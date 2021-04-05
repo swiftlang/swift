@@ -30,7 +30,7 @@ testHasOption(llvm::opt::OptTable &table, options::ID id,
     if (strlen(name) > 0) {
       auto nameStr = std::string(name);
       bool setContainsOption = optionSet.find(nameStr) != optionSet.end();
-      EXPECT_EQ(setContainsOption, true);
+      EXPECT_EQ(setContainsOption, true) << "Missing Option: " << nameStr;
     }
   }
 }
