@@ -504,6 +504,8 @@ extension Task {
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
   /// Explicitly suspend the current task, potentially giving up execution actor

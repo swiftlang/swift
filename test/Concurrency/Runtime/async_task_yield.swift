@@ -3,9 +3,12 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 protocol Go: Actor {
   func go(times: Int) async -> Int
 }
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Go {
   func go(times: Int) async -> Int {
     for i in 0...times {
@@ -16,22 +19,26 @@ extension Go {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor One: Go {}
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Two: Go {}
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func yielding() async {
   let one = One()
   let two = Two()
-  try! await Task.withGroup(resultType: Int.self) { group in
-    await group.add {
+  await withTaskGroup(of: Int.self) { group in
+    await group.spawn {
       await one.go(times: 100)
     }
-    await group.add {
+    await group.spawn {
       await two.go(times: 100)
     }
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await yielding()
