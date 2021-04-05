@@ -117,6 +117,9 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 
+// TODO: "async let wait" and "async let destroy" would be expressed
+//       similar to like TaskFutureWait;
+
 /// This matches the ABI of a closure `<T>(Builtin.NativeObject) async -> T`
 using TaskFutureWaitSignature =
     SWIFT_CC(swiftasync)
@@ -237,11 +240,12 @@ void swift_taskGroup_destroy(TaskGroup *group);
 ///
 /// \code
 /// func swift_taskGroup_addPending(
-///     group: Builtin.RawPointer
+///     group: Builtin.RawPointer,
+///     unconditionally: Bool
 /// ) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_taskGroup_addPending(TaskGroup *group);
+bool swift_taskGroup_addPending(TaskGroup *group, bool unconditionally);
 
 /// Cancel all tasks in the group.
 /// This also prevents new tasks from being added.

@@ -273,9 +273,6 @@ namespace swift {
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
-    /// Enable experimental derivation of `Codable` for enums.
-    bool EnableExperimentalEnumCodableDerivation = false;
-
     /// Enable experimental 'distributed' actors and functions.
     bool EnableExperimentalDistributed = false;
 

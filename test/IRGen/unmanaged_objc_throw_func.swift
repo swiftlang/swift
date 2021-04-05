@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-copy-propagation %s | %FileCheck %s
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
 

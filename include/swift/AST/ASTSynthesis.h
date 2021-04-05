@@ -135,7 +135,7 @@ struct VariadicSynthesizerStorage<> {
   constexpr VariadicSynthesizerStorage() {}
 
   template <class Fn>
-  void visit(const Fn &fn) const {}
+  void visit(Fn &&fn) const {}
 };
 template <class Head, class... Tail>
 struct VariadicSynthesizerStorage<Head, Tail...> {
@@ -145,7 +145,7 @@ struct VariadicSynthesizerStorage<Head, Tail...> {
     : head(head), tail(tail...) {}
 
   template <class Fn>
-  void visit(const Fn &fn) const {
+  void visit(Fn &&fn) const {
     fn(head);
     tail.visit(fn);
   }

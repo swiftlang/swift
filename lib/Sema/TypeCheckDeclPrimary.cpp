@@ -3083,6 +3083,9 @@ void TypeChecker::checkParameterList(ParameterList *params,
       }
     }
 
+    if (param->hasAttachedPropertyWrapper())
+      (void) param->getPropertyWrapperInitializerInfo();
+
     auto *SF = param->getDeclContext()->getParentSourceFile();
     param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
       if (!isa<ParamDecl>(auxiliaryDecl))

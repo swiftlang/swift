@@ -1,50 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureRet | %FileCheck %s -check-prefix=TestSingleExprClosureRet
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureRetVoid | %FileCheck %s -check-prefix=TestSingleExprClosureRetVoid
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureRetUnresolved | %FileCheck %s -check-prefix=TestSingleExprClosureRetUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosure | %FileCheck %s -check-prefix=TestSingleExprClosure
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureVoid | %FileCheck %s -check-prefix=TestSingleExprClosureVoid
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureUnresolved | %FileCheck %s -check-prefix=TestSingleExprClosureUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureCall | %FileCheck %s -check-prefix=TestSingleExprClosure
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprClosureGlobal | %FileCheck %s -check-prefix=TestSingleExprClosureGlobal
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprClosureGlobal | %FileCheck %s -check-prefix=TestNonSingleExprClosureGlobal
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprClosureUnresolved | %FileCheck %s -check-prefix=TestNonSingleExprClosureUnresolved
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprFuncRet | %FileCheck %s -check-prefix=TestSingleExprFuncRet
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprFunc | %FileCheck %s -check-prefix=TestSingleExprFunc
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprFuncUnresolved | %FileCheck %s -check-prefix=TestSingleExprFuncUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprFuncUnresolved | %FileCheck %s -check-prefix=TestNonSingleExprFuncUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprLocalFuncUnresolved | %FileCheck %s -check-prefix=TestSingleExprFuncUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprFuncGlobal | %FileCheck %s -check-prefix=TestSingleExprFuncGlobal
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprFuncGlobal | %FileCheck %s -check-prefix=TestNonSingleExprFuncGlobal
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprAccessorRet | %FileCheck %s -check-prefix=TestSingleExprAccessorRet
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprAccessor | %FileCheck %s -check-prefix=TestSingleExprAccessor
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprAccessorUnresolved | %FileCheck %s -check-prefix=TestSingleExprAccessorUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprAccessorUnresolved | %FileCheck %s -check-prefix=TestNonSingleExprAccessorUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprLocalAccessorUnresolved | %FileCheck %s -check-prefix=TestSingleExprAccessorUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprAccessorGlobal | %FileCheck %s -check-prefix=TestSingleExprAccessorGlobal
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprAccessorGlobal | %FileCheck %s -check-prefix=TestNonSingleExprAccessorGlobal
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprAccessorGetUnresolved | %FileCheck %s -check-prefix=TestSingleExprAccessorUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprAccessorSetUnresolved | %FileCheck %s -check-prefix=TestSingleExprAccessorSetUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprAccessorGetGlobal | %FileCheck %s -check-prefix=TestSingleExprAccessorGlobal
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprSubscriptRet | %FileCheck %s -check-prefix=TestSingleExprSubscriptRet
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprSubscript | %FileCheck %s -check-prefix=TestSingleExprSubscript
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprSubscriptUnresolved | %FileCheck %s -check-prefix=TestSingleExprSubscriptUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingleExprSubscriptUnresolved | %FileCheck %s -check-prefix=TestNonSingleExprSubscriptUnresolved
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingleExprSubscriptGlobal | %FileCheck %s -check-prefix=TestSingleExprSubscriptGlobal
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitInvalid | %FileCheck %s -check-prefix=TestSingeExprInitInvalid
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitNone | %FileCheck %s -check-prefix=TestSingeExprInitNone
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitNilRet | %FileCheck %s -check-prefix=TestSingeExprInitNilRet
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprInitNil | %FileCheck %s -check-prefix=TestSingeExprInitNil
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingeExprInitNil1 | %FileCheck %s -check-prefix=TestNonSingeExprInitNil
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestNonSingeExprInitNil2 | %FileCheck %s -check-prefix=TestNonSingeExprInitNil
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TestSingeExprDeinitInvalid | %FileCheck %s -check-prefix=TestSingeExprDeinitInvalid
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testAccessorUnresolvedTopLevel | %FileCheck %s -check-prefix=TopLevelEnum
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testAccessorUnresolvedTopLevelGet | %FileCheck %s -check-prefix=TopLevelEnum
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testClosureUnresolvedTopLevelInit | %FileCheck %s -check-prefix=TopLevelEnum
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 // MARK: Single-expression closures
 
@@ -166,7 +121,7 @@ struct TestSingleExprClosureCall {
 
   func test() {
     take {
-      self.#^TestSingleExprClosureCall^#
+      self.#^TestSingleExprClosureCall?check=TestSingleExprClosure^#
     }
   }
 }
@@ -296,7 +251,7 @@ struct TestSingleExprLocalFuncUnresolved {
 
   func test() {
     func local() -> MyEnum {
-      .#^TestSingleExprLocalFuncUnresolved^#
+      .#^TestSingleExprLocalFuncUnresolved?check=TestSingleExprFuncUnresolved^#
     }
   }
 }
@@ -406,7 +361,7 @@ struct TestSingleExprLocalAccessorUnresolved {
 
   func test() {
     var test: MyEnum {
-      .#^TestSingleExprLocalAccessorUnresolved^#
+      .#^TestSingleExprLocalAccessorUnresolved?check=TestSingleExprAccessorUnresolved^#
     }
   }
 }
@@ -452,7 +407,7 @@ struct TestSingleExprAccessorGetUnresolved {
 
   var test: MyEnum {
     get {
-      .#^TestSingleExprAccessorGetUnresolved^#
+      .#^TestSingleExprAccessorGetUnresolved?check=TestSingleExprAccessorUnresolved^#
     }
   }
 }
@@ -464,7 +419,7 @@ struct TestSingleExprAccessorGetGlobal {
 
   var test: Int {
     get {
-      #^TestSingleExprAccessorGetGlobal^#
+      #^TestSingleExprAccessorGetGlobal?check=TestSingleExprAccessorGlobal^#
     }
   }
 }
@@ -606,7 +561,7 @@ enum TestSingeExprInitNil {
 enum TestNonSingeExprInitNil1 {
   case foo
   init?() {
-    #^TestNonSingeExprInitNil1^#
+    #^TestNonSingeExprInitNil1?check=TestNonSingeExprInitNil^#
     return nil
   }
 // No type relation.
@@ -616,7 +571,7 @@ enum TestNonSingeExprInitNil1 {
 enum TestNonSingeExprInitNil2 {
   case foo
   init?() {
-    #^TestNonSingeExprInitNil2^#
+    #^TestNonSingeExprInitNil2?check=TestNonSingeExprInitNil^#
     self = .foo
   }
 }
@@ -638,15 +593,15 @@ enum TopLevelEnum {
 // TopLevelEnum: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#TopLevelEnum#];
 
 var testAccessorUnresolvedTopLevel: TopLevelEnum {
-  .#^testAccessorUnresolvedTopLevel^#
+  .#^testAccessorUnresolvedTopLevel?check=TopLevelEnum^#
 }
 
 var testAccessorUnresolvedTopLevelGet: TopLevelEnum {
   get {
-    .#^testAccessorUnresolvedTopLevelGet^#
+    .#^testAccessorUnresolvedTopLevelGet?check=TopLevelEnum^#
   }
 }
 
 var testClosureUnresolvedTopLevelInit: TopLevelEnum = {
-  .#^testClosureUnresolvedTopLevelInit^#
+  .#^testClosureUnresolvedTopLevelInit?check=TopLevelEnum^#
 }()

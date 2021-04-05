@@ -13,6 +13,7 @@ import Darwin
 import Glibc
 #endif
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Counter {
   private var value = 0
   private let scratchBuffer: UnsafeMutableBufferPointer<Int>
@@ -41,6 +42,7 @@ actor Counter {
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   for i in 0..<numIterations {
     let counterIndex = Int.random(in: 0 ..< counters.count)
@@ -50,6 +52,7 @@ func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   // Create counter actors.
   var counters: [Counter] = []
@@ -61,7 +64,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   var workers: [Task.Handle<Void, Error>] = []
   for i in 0..<numWorkers {
     workers.append(
-      Task.runDetached { [counters] in
+      detach { [counters] in
         usleep(UInt32.random(in: 0..<100) * 1000)
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
@@ -76,6 +79,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   print("DONE!")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     // Useful for debugging: specify counter/worker/iteration counts

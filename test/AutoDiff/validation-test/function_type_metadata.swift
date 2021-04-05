@@ -6,33 +6,35 @@ import _Differentiation
 
 var FunctionTypeMetadataTests = TestSuite("FunctionTypeMetadata")
 
-FunctionTypeMetadataTests.test("Reflect differentiable function type") {
-  expectEqual(
-    "@differentiable(reverse) (Swift.Float) -> Swift.Float",
-    String(reflecting: (@differentiable(reverse) (Float) -> Float).self))
-  expectEqual(
-    "@differentiable(reverse) (inout Swift.Float) -> ()",
-    String(reflecting: (@differentiable(reverse) (inout Float) -> Void).self))
-  expectEqual(
-    """
-    @differentiable(reverse) (Swift.Array<Swift.Float>) -> \
-    Swift.Array<Swift.Float>
-    """,
-    String(reflecting: (@differentiable(reverse) ([Float]) -> [Float]).self))
-  expectEqual(
-    """
-    @differentiable(reverse) (Swift.Optional<Swift.Float>) -> \
-    Swift.Optional<Swift.Float>
-    """,
-    String(reflecting: (@differentiable(reverse) (Float?) -> Float?).self))
-  // FIXME(rdar://75916833): Mangle '@noDerivative' in function types.
-  // expectEqual(
-  //   """
-  //   @differentiable(reverse) (Swift.Optional<Swift.Float>, \
-  //   @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
-  //   """,
-  //   String(reflecting: (
-  //       @differentiable(reverse) (Float?, @noDerivative Int) -> Float?).self))
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  FunctionTypeMetadataTests.test("Reflect differentiable function type") {
+    expectEqual(
+      "@differentiable(reverse) (Swift.Float) -> Swift.Float",
+      String(reflecting: (@differentiable(reverse) (Float) -> Float).self))
+    expectEqual(
+      "@differentiable(reverse) (inout Swift.Float) -> ()",
+      String(reflecting: (@differentiable(reverse) (inout Float) -> Void).self))
+    expectEqual(
+      """
+      @differentiable(reverse) (Swift.Array<Swift.Float>) -> \
+      Swift.Array<Swift.Float>
+      """,
+      String(reflecting: (@differentiable(reverse) ([Float]) -> [Float]).self))
+    expectEqual(
+      """
+      @differentiable(reverse) (Swift.Optional<Swift.Float>) -> \
+      Swift.Optional<Swift.Float>
+      """,
+      String(reflecting: (@differentiable(reverse) (Float?) -> Float?).self))
+    // FIXME(rdar://75916833): Mangle '@noDerivative' in function types.
+    // expectEqual(
+    //   """
+    //   @differentiable(reverse) (Swift.Optional<Swift.Float>, \
+    //   @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
+    //   """,
+    //   String(reflecting: (
+    //       @differentiable(reverse) (Float?, @noDerivative Int) -> Float?).self))
+  }
 }
 
 // FIXME(rdar://75916878): Investigate why reflecting differentiable function

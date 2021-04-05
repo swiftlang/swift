@@ -626,6 +626,9 @@ BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 /// InsertElement has type (Vector<N, T>, T, Int32) -> Vector<N, T>.
 BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 
+// Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
+BUILTIN_MISC_OPERATION(ShuffleVector, "shufflevector", "n", Special)
+
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 
@@ -654,8 +657,6 @@ BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
 
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
-
-// FIXME: shufflevector
 
 /// zeroInitializer has type <T> () -> T
 BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
@@ -742,6 +743,10 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 /// Resume a throwing continuation abnormally with the given error.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
+
+/// Build a Builtin.Executor value from the given serial executor reference.
+BUILTIN_MISC_OPERATION(BuildSerialExecutorRef,
+                       "buildSerialExecutorRef", "", Special)
 
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.

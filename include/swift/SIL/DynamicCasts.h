@@ -32,7 +32,7 @@ class SILBuilder;
 class SILLocation;
 class SILModule;
 class SILType;
-enum class CastConsumptionKind : unsigned char;
+enum class CastConsumptionKind : uint8_t;
 struct SILDynamicCastInst;
 
 enum class DynamicCastFeasibility {

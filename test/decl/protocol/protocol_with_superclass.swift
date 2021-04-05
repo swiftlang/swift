@@ -323,7 +323,7 @@ class SecondConformer : SecondClass, SecondProtocol {}
 // Duplicate superclass
 // FIXME: Duplicate diagnostics
 protocol DuplicateSuper : Concrete, Concrete {}
-// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' written here}}
+// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' implied here}}
 // expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
 // expected-error@-3 {{duplicate inheritance from 'Concrete'}}
 

@@ -11,8 +11,9 @@
 //===----------------------------------------------------------------------===//
 #include "InlinableText.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/Parse/Lexer.h"
@@ -43,6 +44,40 @@ getEffectiveEndLoc(SourceManager &sourceMgr, const IfConfigClause *clause,
 }
 
 namespace {
+
+class IsFeatureCheck : public ASTWalker {
+public:
+  bool foundFeature = false;
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+      if (unresolved->getName().getBaseName().userFacingName().startswith("$"))
+        foundFeature = true;
+    }
+
+    return { !foundFeature, expr };
+  }
+};
+
+bool clauseIsFeatureCheck(Expr *cond) {
+  IsFeatureCheck checker;
+  cond->walk(checker);
+  return checker.foundFeature;
+}
+
+/// Whether any of the clauses here involves a feature check
+/// (e.g., $AsyncAwait).
+bool anyClauseIsFeatureCheck(ArrayRef<IfConfigClause> clauses) {
+  for (const auto &clause : clauses) {
+    if (Expr *cond = clause.Cond) {
+      if (clauseIsFeatureCheck(cond))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// A walker that searches through #if declarations, finding all text that does
 /// not contribute to the final evaluated AST.
 ///
@@ -89,6 +124,13 @@ struct ExtractInactiveRanges : public ASTWalker {
 
     // If there's no active clause, add the entire #if...#endif block.
     if (!clause) {
+      addRange(start, end);
+      return false;
+    }
+
+    // If the clause is checking for a particular feature with $, keep
+    // the whole thing.
+    if (anyClauseIsFeatureCheck(icd->getClauses())) {
       addRange(start, end);
       return false;
     }

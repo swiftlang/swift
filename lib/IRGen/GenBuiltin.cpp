@@ -305,7 +305,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     IGF.emitResumeAsyncContinuationThrowing(continuation, error);
     return;
   }
-
+  
+  if (Builtin.ID == BuiltinValueKind::BuildSerialExecutorRef) {
+    auto executor = args.claimNext();
+    executor = IGF.Builder.CreateBitCast(executor,
+                                         IGF.IGM.SwiftExecutorPtrTy);
+    out.add(executor);
+    return;
+  }
+  
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
     auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
     auto actor = args.claimNext();
@@ -850,6 +858,16 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto newValue = args.claimNext();
     auto index = args.claimNext();
     out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::ShuffleVector) {
+    using namespace llvm;
+
+    auto dict0 = args.claimNext();
+    auto dict1 = args.claimNext();
+    auto index = args.claimNext();
+    out.add(IGF.Builder.CreateShuffleVector(dict0, dict1, index));
     return;
   }
 

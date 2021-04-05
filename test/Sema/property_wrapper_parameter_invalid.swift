@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
 @propertyWrapper
 struct NonMutatingWrapper<T> {
@@ -53,8 +53,10 @@ struct Projection<T> {
   var value: T
 }
 
+// expected-note@+2 {{generic struct 'Wrapper' is not '@usableFromInline' or public}}
 @propertyWrapper
-struct Wrapper<T> {
+struct Wrapper<T> { // expected-note 3 {{type declared here}}
+  // expected-note@+1 {{initializer 'init(wrappedValue:)' is not '@usableFromInline' or public}}
   init(wrappedValue: T) {
     self.wrappedValue = wrappedValue
   }
@@ -99,3 +101,66 @@ protocol P {
   // expected-error@+1 {{parameter 'arg' declared inside a protocol cannot have a wrapper}}
   func requirement(@Wrapper arg: Int)
 }
+
+enum E {
+  // expected-error@+1 {{expected parameter name followed by ':'}}
+  case one(@Wrapper value: Int)
+}
+
+// expected-error@+1 {{function cannot be declared public because its parameter uses an internal API wrapper type}}
+public func f1(@Wrapper value: Int) {}
+
+// expected-error@+3 {{generic struct 'Wrapper' is internal and cannot be referenced from an '@inlinable' function}}
+// expected-error@+2 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
+// expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
+@inlinable func f2(@Wrapper value: Int) {}
+
+// expected-error@+1 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
+@usableFromInline func f3(@Wrapper value: Int) {}
+
+@available(*, unavailable)
+@propertyWrapper
+struct UnavailableWrapper<T> { // expected-note {{'UnavailableWrapper' has been explicitly marked unavailable here}}
+  var wrappedValue: T
+}
+
+// expected-error@+1 {{'UnavailableWrapper' is unavailable}}
+func testUnavailableWrapper(@UnavailableWrapper value: Int) {}
+
+@propertyWrapper
+public struct PublicWrapper<T> {
+  public init(wrappedValue: T) { fatalError() }
+  public init(projectedValue: PublicWrapper<T>) { fatalError() }
+  public var wrappedValue: T
+  public var projectedValue: PublicWrapper<T> { self }
+}
+
+// expected-note@+2 2 {{generic struct 'InternalWrapper' is not '@usableFromInline' or public}}
+@propertyWrapper
+struct InternalWrapper<T> { // expected-note 3 {{type declared here}}
+  var wrappedValue: T
+
+  // expected-note@+1 2 {{initializer 'init(wrappedValue:)' is not '@usableFromInline' or public}}
+  init(wrappedValue: T) { self.wrappedValue = wrappedValue }
+}
+
+// expected-error@+1 {{function cannot be declared public because its parameter uses an internal API wrapper type}}
+public func testComposition1(@PublicWrapper @InternalWrapper value: Int) {}
+
+// Okay because `InternalWrapper` is implementation-detail.
+public func testComposition2(@InternalWrapper @PublicWrapper value: Int) {}
+
+// expected-error@+1 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
+@usableFromInline func testComposition3(@PublicWrapper @InternalWrapper value: Int) {}
+
+// Okay because `InternalWrapper` is implementation-detail.
+@usableFromInline func testComposition4(@InternalWrapper @PublicWrapper value: Int) {}
+
+// expected-error@+3 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
+// expected-error@+2 {{the parameter API wrapper of a '@usableFromInline' function must be '@usableFromInline' or public}}
+// expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
+@inlinable func testComposition5(@PublicWrapper @InternalWrapper value: Int) {}
+
+// expected-error@+2 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
+// expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
+@inlinable func testComposition6(@InternalWrapper @PublicWrapper value: Int) {}

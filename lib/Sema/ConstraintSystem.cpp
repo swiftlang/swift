@@ -449,6 +449,16 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     llvm::function_ref<Type(Type)> simplifyType,
     llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
         getOverloadFor) {
+  if (auto conversion =
+          locator->findLast<LocatorPathElt::ImplicitConversion>()) {
+    if (conversion->is(ConversionRestrictionKind::DoubleToCGFloat) ||
+        conversion->is(ConversionRestrictionKind::CGFloatToDouble)) {
+      return getConstraintLocator(
+          ASTNode(), {*conversion, ConstraintLocator::ApplyFunction,
+                      ConstraintLocator::ConstructorMember});
+    }
+  }
+
   auto anchor = locator->getAnchor();
   assert(bool(anchor) && "Expected an anchor!");
 
@@ -692,11 +702,9 @@ Type ConstraintSystem::openUnboundGenericType(
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
-  return TypeChecker::applyUnboundGenericArguments(
-      decl, parentTy, SourceLoc(),
-      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
-                                    /*placeholderHandler*/ nullptr),
-      arguments);
+  return TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
+                                       /*placeholderHandler*/ nullptr)
+      .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
@@ -1281,12 +1289,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TypeChecker::resolveTypeInContext(
-        typeDecl, nullptr,
+    auto type =
         TypeResolution::forContextual(useDC, TypeResolverContext::InExpression,
                                       /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr),
-        /*isSpecialized=*/false);
+                                      /*placeholderHandler*/ nullptr)
+            .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
+                                  /*isSpecialized=*/false);
 
     checkNestedTypeConstraints(*this, type, locator);
 
@@ -1697,6 +1705,7 @@ ConstraintSystem::getTypeOfMemberReference(
         // Concrete type replacing `Self` could be generic, so we need
         // to make sure that it's opened before use.
         baseOpenedTy = openType(concreteSelf, replacements);
+        baseObjTy = baseOpenedTy;
       }
     }
   } else if (baseObjTy->isExistentialType()) {
@@ -2497,10 +2506,14 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
 
     bool walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
-      if (!isa<PatternBindingDecl>(decl))
-        return false;
+      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+        if (patternBinding->isAsyncLet())
+          FoundAsync = true;
 
-      return true;
+        return true;
+      }
+
+      return false;
     }
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override { 
@@ -4304,7 +4317,10 @@ ASTNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
 }
 
 Expr *constraints::getArgumentExpr(ASTNode node, unsigned index) {
-  auto *expr = castToExpr(node);
+  auto *expr = getAsExpr(node);
+  if (!expr)
+    return nullptr;
+
   Expr *argExpr = nullptr;
   if (auto *AE = dyn_cast<ApplyExpr>(expr))
     argExpr = AE->getArg();
@@ -4443,7 +4459,9 @@ void ConstraintSystem::generateConstraints(
 ConstraintLocator *
 ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   auto anchor = locator->getAnchor();
-  if (!anchor)
+
+  // An empty locator which code completion uses for member references.
+  if (anchor.isNull() && locator->getPath().empty())
     return nullptr;
 
   // Applies and unresolved member exprs can have callee locators that are
@@ -4931,6 +4949,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::HashableToAnyHashable:
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+  case ConversionRestrictionKind::CGFloatToDouble:
+  case ConversionRestrictionKind::DoubleToCGFloat:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.

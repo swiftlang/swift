@@ -1164,16 +1164,25 @@ namespace swift {
 /// uninitialized.
 bool memInstMustInitialize(Operand *memOper);
 
-/// Is this an alloc_stack instruction that is:
+/// Is this an alloc_stack instruction that we can prove is:
 ///
 /// 1. Only initialized once in its own def block.
 /// 2. Never written to again except by destroy_addr.
 ///
-/// On return, destroyingUsers contains the list of users that destroy the
-/// alloc_stack. If the alloc_stack is destroyed in pieces, we do not guarantee
-/// that the list of destroying users is a minimal jointly post-dominating set.
-bool isSingleInitAllocStack(AllocStackInst *asi,
-                            SmallVectorImpl<Operand *> &destroyingUses);
+/// Then we return the single initializing use and if \p destroyingUsers was
+/// non-null, On return, if non-null, \p destroyingUsers contains the list of
+/// users that destroy the alloc_stack. If the alloc_stack is destroyed in
+/// pieces, we do not guarantee that the list of destroying users is a minimal
+/// jointly post-dominating set.
+Operand *getSingleInitAllocStackUse(
+    AllocStackInst *asi, SmallVectorImpl<Operand *> *destroyingUses = nullptr);
+
+/// Same as getSingleInitAllocStack except we throw away the single use and just
+/// provide a bool.
+inline bool isSingleInitAllocStack(AllocStackInst *asi,
+                                   SmallVectorImpl<Operand *> &destroyingUses) {
+  return getSingleInitAllocStackUse(asi, &destroyingUses);
+}
 
 /// Return true if the given address value is produced by a special address
 /// producer that is only used for local initialization, not formal access.

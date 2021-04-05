@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-enum-codable-derivation
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 // MARK: - Synthesized CodingKeys Enum
 

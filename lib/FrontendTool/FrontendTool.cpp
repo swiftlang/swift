@@ -1232,6 +1232,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::MergeModules:
   case FrontendOptions::ActionType::Immediate:
   case FrontendOptions::ActionType::EmitAssembly:
+  case FrontendOptions::ActionType::EmitIRGen:
   case FrontendOptions::ActionType::EmitIR:
   case FrontendOptions::ActionType::EmitBC:
   case FrontendOptions::ActionType::EmitObject:

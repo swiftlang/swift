@@ -4803,12 +4803,13 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   auto &nativeSchema =
       IGM.getTypeInfo(funcResultTypeInContext).nativeReturnValueSchema(IGM);
   if (result.empty() && !nativeSchema.empty()) {
-    // When we throw, we set the return values to undef.
-    nativeSchema.enumerateComponents([&](clang::CharUnits begin,
-                                         clang::CharUnits end,
-                                         llvm::Type *componentTy) {
-      nativeResultsStorage.push_back(llvm::UndefValue::get(componentTy));
-    });
+    if (!nativeSchema.requiresIndirect())
+      // When we throw, we set the return values to undef.
+      nativeSchema.enumerateComponents([&](clang::CharUnits begin,
+                                           clang::CharUnits end,
+                                           llvm::Type *componentTy) {
+        nativeResultsStorage.push_back(llvm::UndefValue::get(componentTy));
+      });
     if (!error.empty())
       nativeResultsStorage.push_back(error.claimNext());
     nativeResults = nativeResultsStorage;

@@ -14,6 +14,7 @@
     import Glibc
 #endif
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 class Runner {
     func run() async {
         while !Task.isCancelled {
@@ -22,6 +23,7 @@ class Runner {
     }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Container {
     var generation = 0
     var runners = [Int : Task.Handle<Void, Never>]()
@@ -30,7 +32,7 @@ actor Container {
         for _ in 0..<n {
             let id = generation
             generation += 1
-            let t = Task.runDetached { [weak self] in
+            let t = detach { [weak self] in
                 let r = Runner()
                 await r.run()
                 await self?.remove(id)
@@ -63,6 +65,7 @@ actor Container {
 // FIXME: this doesn't work until we have https://github.com/apple/swift/pull/36298
 // COM: deinit Container with {{[0-9]+}} runners
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct RunIt {
     static func startTest() async {
         let c = Container()
@@ -71,6 +74,7 @@ actor Container {
         await c.cancelAll()
     }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 static func main() async {
         print("starting")
         await RunIt.startTest()

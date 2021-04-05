@@ -329,9 +329,11 @@ protocol P9 {
 struct X7<T: P9> where T.A : C { }
 
 extension X7 where T.A == Int { } // expected-error {{'T.A' requires that 'Int' inherit from 'C'}}
+// expected-note@-1 {{same-type constraint 'T.A' == 'Int' implied here}}
 struct X8<T: C> { }
 
 extension X8 where T == Int { } // expected-error {{'T' requires that 'Int' inherit from 'C'}}
+// expected-note@-1 {{same-type constraint 'T' == 'Int' implied here}}
 
 protocol P10 {
 	associatedtype A

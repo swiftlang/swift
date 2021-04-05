@@ -92,3 +92,5 @@ import _Concurrency
 // CHECK: {{^}}var MAGIC_NUMBER: Int32 { get }
 
 // CHECK: func doSomethingConcurrently(_ block: @Sendable () -> Void)
+
+// CHECK: @MainActor protocol TripleMainActor {

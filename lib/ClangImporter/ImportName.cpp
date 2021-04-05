@@ -1618,8 +1618,12 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       else if (parsedName.IsSetter)
         result.info.accessorKind = ImportedAccessorKind::PropertySetter;
 
-      if (method && parsedName.IsFunctionName &&
-          result.info.accessorKind == ImportedAccessorKind::None) {
+      // only allow effectful property imports if through `swift_async_name`
+      const bool effectfulProperty = parsedName.IsGetter && nameAttr->isAsync
+                      && swiftCtx.LangOpts.EnableExperimentalConcurrency;
+
+      // Consider throws and async imports.
+      if (method && (parsedName.IsFunctionName || effectfulProperty)) {
         // Get the parameters.
         ArrayRef<const clang::ParmVarDecl *> params{method->param_begin(),
                                                     method->param_end()};

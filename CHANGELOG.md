@@ -29,6 +29,54 @@ CHANGELOG
 Swift 5.5
 ---------
 
+* The determination of whether a call to a `rethrows` function can throw now considers default arguments of `Optional` type.
+
+  In Swift 5.4, such default arguments were ignored entirely by `rethrows` checking. This meant that the following example was accepted:
+
+  ```swift
+  func foo(_: (() throws -> ())? = nil) rethrows {}
+  foo()  // no 'try' needed
+  ```
+
+  However, it also meant that the following was accepted, even though the call to `foo()` can throw and the call site is not marked with `try`:
+
+  ```swift
+  func foo(_: (() throws -> ())? = { throw myError }) rethrows {}
+  foo()  // 'try' *should* be required here
+  ```
+
+  The new behavior is that the first example is accepted because the default argument is syntactically written as `nil`, which is known not to throw. The second example is correctly rejected, on account of missing a `try` since the default argument *can* throw.
+
+* [SE-0293][]:
+
+  Property wrappers can now be applied to function and closure parameters:
+
+  ```swift
+  @propertyWrapper
+  struct Wrapper<Value> {
+    var wrappedValue: Value
+
+    var projectedValue: Self { return self }
+
+    init(wrappedValue: Value) { ... }
+
+    init(projectedValue: Self) { ... }
+  }
+
+  func test(@Wrapper value: Int) {
+    print(value)
+    print($value)
+    print(_value)
+  }
+
+  test(value: 10)
+
+  let projection = Wrapper(wrappedValue: 10)
+  test($value: projection)
+  ```
+
+  The call-site can pass a wrapped value or a projected value, and the property wrapper will be initialized using `init(wrappedValue:)` or `init(projectedValue:)`, respectively.
+
 * [SE-0299][]:
 
   It is now possible to use leading-dot syntax in generic contexts to access static members of protocol extensions where `Self` is constrained to a fully concrete type:

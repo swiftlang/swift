@@ -162,6 +162,33 @@ namespace {
 /// for generics.
 enum UnrestrictedGenericParam { _unrestricted };
 
+/// A synthesizer which generates a conformance requirement.
+template <class TypeS, class ProtocolS>
+struct ConformsToSynthesizer {
+  TypeS Type;
+  ProtocolS Protocol;
+};
+template <class TypeS, class ProtocolS>
+constexpr ConformsToSynthesizer<TypeS, ProtocolS>
+_conformsTo(TypeS type, ProtocolS protocol) {
+  return {type, protocol};
+}
+
+/// A synthesizer which generates a layout constraint requirement.
+template <class TypeS>
+struct LayoutConstraintSynthesizer {
+  TypeS Type;
+  LayoutConstraint Constraint;
+};
+template <class TypeS>
+LayoutConstraintSynthesizer<TypeS>
+_layout(TypeS type, LayoutConstraint constraint) {
+  return {type, constraint};
+}
+static LayoutConstraint _classLayout() {
+  return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class);
+}
+
 /// A synthesizer which generates a generic parameter list.
 template <class... ParamS>
 struct GenericParamListSynthesizer {
@@ -178,6 +205,16 @@ struct CountGenericParameters {
 
   void operator()(UnrestrictedGenericParam _) const {
     Count++;
+  }
+
+  template <class TypeS, class ProtoS>
+  void operator()(const ConformsToSynthesizer<TypeS, ProtoS> &_) const {
+    // not a parameter
+  }
+
+  template <class TypeS>
+  void operator()(const LayoutConstraintSynthesizer<TypeS> &_) const {
+    // not a parameter
   }
 };
 
@@ -240,7 +277,22 @@ struct CollectGenericParams {
     }
   }
 
-  void operator()(UnrestrictedGenericParam _) const {}
+  void operator()(UnrestrictedGenericParam _) {}
+
+  template <class TypeS, class ProtoS>
+  void operator()(const ConformsToSynthesizer<TypeS, ProtoS> &conf) {
+    auto type = synthesizeType(SC, conf.Type);
+    auto protocolType = synthesizeType(SC, conf.Protocol);
+    AddedRequirements.push_back({RequirementKind::Conformance,
+                                 type, protocolType});
+  }
+
+  template <class TypeS>
+  void operator()(const LayoutConstraintSynthesizer<TypeS> &req) {
+    auto type = synthesizeType(SC, req.Type);
+    AddedRequirements.push_back({RequirementKind::Layout,
+                                 type, req.Constraint});
+  }
 };
 
 } // end anonymous namespace
@@ -248,7 +300,7 @@ struct CollectGenericParams {
 template <class... ParamsS>
 static GenericSignature
 synthesizeGenericSignature(SynthesisContext &SC,
-                           GenericParamListSynthesizer<ParamsS...> list) {
+                     const GenericParamListSynthesizer<ParamsS...> &list) {
   assert(SC.GenericParams && "synthesizeGenericParamList not called first");
   CollectGenericParams collector(SC);
   list.Params.visit(collector);
@@ -1436,6 +1488,15 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getBuildSerialExecutorRef(ASTContext &ctx, Identifier id) {
+  // TODO: restrict the generic parameter to the SerialExecutor protocol
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _layout(_typeparam(0), _classLayout())),
+                            _parameters(_typeparam(0)),
+                            _executor);
+}
+
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
@@ -1593,6 +1654,27 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
 
   Type ArgElts[] = { VecTy, ElementTy, IndexTy };
   return getBuiltinFunction(Id, ArgElts, VecTy);
+}
+
+static ValueDecl *getShuffleVectorOperation(ASTContext &Context, Identifier Id,
+                                 Type FirstTy, Type SecondTy) {
+  // (Vector<N, T>, Vector<N, T>, Vector<M, Int32) -> Vector<M, T>
+  auto VecTy = FirstTy->getAs<BuiltinVectorType>();
+  if (!VecTy)
+    return nullptr;
+  auto ElementTy = VecTy->getElementType();
+
+  auto IndexTy = SecondTy->getAs<BuiltinVectorType>();
+  if (!IndexTy)
+    return nullptr;
+  auto IdxElTy = IndexTy->getElementType()->getAs<BuiltinIntegerType>();
+  if (!IdxElTy || !IdxElTy->isFixedWidth() || IdxElTy->getFixedWidth() != 32)
+    return nullptr;
+
+  Type ArgElts[] = { VecTy, VecTy, IndexTy };
+  Type ResultTy = BuiltinVectorType::get(Context, ElementTy,
+                                         IndexTy->getNumElements());
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
 static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
@@ -2540,6 +2622,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InsertElement:
     if (Types.size() != 3) return nullptr;
     return getInsertElementOperation(Context, Id, Types[0], Types[1], Types[2]);
+      
+  case BuiltinValueKind::ShuffleVector:
+    if (Types.size() != 2) return nullptr;
+    return getShuffleVectorOperation(Context, Id, Types[0], Types[1]);
 
   case BuiltinValueKind::StaticReport:
     if (!Types.empty()) return nullptr;
@@ -2612,6 +2698,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
+
+  case BuiltinValueKind::BuildSerialExecutorRef:
+    return getBuildSerialExecutorRef(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

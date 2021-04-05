@@ -237,9 +237,6 @@ def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;
 
-def enable_experimental_enum_codable_derivation :
-  Flag<["-"], "enable-experimental-enum-codable-derivation">,
-  HelpText<"Enable experimental derivation of Codable for enums">;
 
 def enable_experimental_distributed :
   Flag<["-"], "enable-experimental-distributed">,

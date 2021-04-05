@@ -17,10 +17,12 @@ enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func formGreeting(name: String) async -> String {
   return "Hello \(name) from async world"
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func testSimple(
   name: String, dogName: String, shouldThrow: Bool, doSuspend: Bool
 ) async {
@@ -28,7 +30,7 @@ func testSimple(
 
   var completed = false
 
-  let taskHandle: Task.Handle<String, Error> = Task.runDetached {
+  let taskHandle: Task.Handle<String, Error> = detach {
     let greeting = await formGreeting(name: name)
 
     // If the intent is to test suspending, wait a bit so the second task
@@ -73,6 +75,7 @@ func testSimple(
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)

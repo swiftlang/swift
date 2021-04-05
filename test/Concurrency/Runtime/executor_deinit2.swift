@@ -10,6 +10,7 @@
 // this needs to match with the check count below.
 let NUM_TASKS : Int = 100
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 final class Capture : Sendable {
     func doSomething() { }
     deinit {
@@ -18,13 +19,14 @@ final class Capture : Sendable {
     }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main
 struct App {
     static func main() async {
         var n = 0
         for _ in 1...NUM_TASKS {
             let c = Capture()
-            let r = Task.runDetached {
+            let r = detach {
                 c.doSomething()
             }
             await r.get()

@@ -1188,7 +1188,9 @@ bool DeclContext::hasValueSemantics() const {
 bool DeclContext::isClassConstrainedProtocolExtension() const {
   if (getExtendedProtocolDecl()) {
     auto ED = cast<ExtensionDecl>(this);
-    return ED->getGenericSignature()->requiresClass(ED->getSelfInterfaceType());
+    if (auto sig = ED->getGenericSignature()) {
+      return sig->requiresClass(ED->getSelfInterfaceType());
+    }
   }
   return false;
 }

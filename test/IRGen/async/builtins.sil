@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native,CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
+// XFAIL: CPU=arm64e
 
 sil_stage canonical
 

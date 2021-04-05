@@ -194,3 +194,7 @@ bool swift_COWChecksEnabled() {
   return runtime::environment::SWIFT_DEBUG_ENABLE_COW_CHECKS();
 }
 
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration() {
+  return runtime::environment::
+      SWIFT_ENABLE_ASYNC_JOB_DISPATCH_INTEGRATION();
+}

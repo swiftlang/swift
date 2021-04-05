@@ -1788,8 +1788,9 @@ ERROR(function_type_access,none,
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{parameter|result}5 uses "
-      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
-      (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3"
+      "%select{| API wrapper}6 type",
+      (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
 ERROR(function_type_spi,none,
       "%select{function|method|initializer}0 "
       "cannot be declared '@_spi' "
@@ -1802,18 +1803,19 @@ WARNING(function_type_access_warn,none,
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its %select{parameter|result}5 uses "
-        "%select{a private|a fileprivate|an internal|%error|%error}3 type",
-        (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+        "%select{a private|a fileprivate|an internal|%error|%error}3 "
+        "%select{|API wrapper}6 type",
+        (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
 ERROR(function_type_usable_from_inline,none,
-      "the %select{parameter|result}1 of a "
+      "the %select{parameter|result}1%select{| API wrapper}2 of a "
       "'@usableFromInline' %select{function|method|initializer}0 "
       "must be '@usableFromInline' or public",
-      (unsigned, bool))
+      (unsigned, bool, bool))
 WARNING(function_type_usable_from_inline_warn,none,
-        "the %select{parameter|result}1 of a "
+        "the %select{parameter|result}1%select{| API wrapper}2 of a "
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
-        (unsigned, bool))
+        (unsigned, bool, bool))
 
 ERROR(spi_attribute_on_non_public,none,
       "%select{private|fileprivate|internal|%error|%error}0 %1 "
@@ -2412,16 +2414,17 @@ NOTE(same_type_redundancy_here,none,
      "same-type constraint %1 == %2 %select{written here|implied here|"
      "inferred from type here}0",
      (unsigned, Type, Type))
-ERROR(requires_superclass_conflict,none,
-      "%select{generic parameter %1 cannot|protocol %1 cannot require 'Self' to|" 
-      "%1 cannot}0 be a subclass of both %2 and %3",
-      (unsigned, Type, Type, Type))
+ERROR(conflicting_superclass_constraints,none,
+      "type %0 cannot be a subclass of both %1 and %2",
+      (Type, Type, Type))
+NOTE(conflicting_superclass_constraint,none,
+     "constraint conflicts with %0 : %1",
+     (Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
 NOTE(superclass_redundancy_here,none,
-     "superclass constraint %1 : %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, Type))
+     "superclass constraint %0 : %1 implied here",
+     (Type, Type))
 
 ERROR(conflicting_layout_constraints,none,
       "type %0 has conflicting constraints %1 and %2",
@@ -4395,9 +4398,6 @@ ERROR(actor_isolated_from_concurrent_function,none,
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_async_let,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
-        (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_escaping_closure,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from an '@escaping' closure",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to %select{|distributed}0 actor-isolated %1 %2",

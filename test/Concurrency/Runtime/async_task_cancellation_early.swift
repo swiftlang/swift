@@ -9,9 +9,10 @@
 
 import Dispatch
 
-func test_runDetached_cancel_child_early() async {
-  print(#function) // CHECK: test_runDetached_cancel_child_early
-  let h: Task.Handle<Bool, Error> = Task.runDetached {
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+func test_detach_cancel_child_early() async {
+  print(#function) // CHECK: test_detach_cancel_child_early
+  let h: Task.Handle<Bool, Error> = detach {
     async let childCancelled: Bool = { () -> Bool in
       await Task.sleep(2_000_000_000)
       return Task.isCancelled
@@ -33,8 +34,9 @@ func test_runDetached_cancel_child_early() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
-    await test_runDetached_cancel_child_early()
+    await test_detach_cancel_child_early()
   }
 }

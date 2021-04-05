@@ -1154,17 +1154,14 @@ private:
       return ShouldNotRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
-      // FIXME
-      llvm_unreachable("Test me");
-      // return ShouldRecurse;
+      AsyncKind = ConditionalEffectKind::Always;
+      return ShouldRecurse;
     }
     ShouldRecurse_t checkThrow(ThrowStmt *E) {
       return ShouldRecurse;
     }
     ShouldRecurse_t checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
-      // FIXME
-      llvm_unreachable("Test me");
-      //return ShouldRecurse;
+      return ShouldRecurse;
     }
 
     ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
@@ -1248,7 +1245,16 @@ private:
   Classification classifyArgument(Expr *arg, Type paramType, EffectKind kind) {
     arg = arg->getValueProvidingExpr();
 
-    if (isa<DefaultArgumentExpr>(arg)) {
+    if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(arg)) {
+      // Special-case a 'nil' default argument, which is known not to throw.
+      if (defaultArg->isCallerSide()) {
+        auto *callerSideArg = defaultArg->getCallerSideDefaultExpr();
+        if (isa<NilLiteralExpr>(callerSideArg)) {
+          if (callerSideArg->getType()->getOptionalObjectType())
+            return Classification();
+        }
+      }
+
       return classifyArgumentByType(arg->getType(),
                                     PotentialEffectReason::forDefaultClosure(),
                                     kind);
