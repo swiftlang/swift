@@ -172,6 +172,17 @@ func vector_bitcast_test_ii(_ src: Builtin.Int16) -> Builtin.Vec16xInt8 {
   return Builtin.sext_Vec16xInt1_Vec16xInt8(v16x1)   // CHECK: sext
 }
 
+func shufflevector_test(_ src: Builtin.FPIEEE32) -> Builtin.Vec4xFPIEEE32 {
+  // CHECK: insertelement <4 x float> zeroinitializer
+  // CHECK: shufflevector <4 x float>
+  let vec = Builtin.insertelement_Vec4xFPIEEE32_FPIEEE32_Int32(
+    Builtin.zeroInitializer(), src, Builtin.zeroInitializer()
+  )
+  return Builtin.shufflevector_Vec4xFPIEEE32_Vec4xInt32(
+    vec, vec, Builtin.zeroInitializer()
+  )
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test
