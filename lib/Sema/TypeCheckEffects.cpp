@@ -1719,6 +1719,10 @@ public:
     if (!suggestTryFixIt)
       return;
 
+    // 'try' should go before 'await'
+    if (awaitLoc.isValid())
+      insertLoc = awaitLoc;
+
     Diags.diagnose(loc, diag::note_forgot_try)
         .fixItInsert(insertLoc, "try ");
     Diags.diagnose(loc, diag::note_error_to_optional)
