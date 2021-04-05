@@ -45,3 +45,6 @@ Struct _GlobalRuntimeFunctionCountersState is a new API without @available attri
 Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
 Struct _RuntimeFunctionCounters is a new API without @available attribute
 Var Collection._hasFastCount has been added as a protocol requirement
+Struct Zip2Sequence has added a conformance to an existing protocol BidirectionalCollection
+Struct Zip2Sequence has added a conformance to an existing protocol Collection
+Struct Zip2Sequence has added a conformance to an existing protocol RandomAccessCollection
