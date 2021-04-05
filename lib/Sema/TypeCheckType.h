@@ -407,6 +407,41 @@ public:
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
   bool areSameType(Type type1, Type type2) const;
+
+  /// Resolve a reference to the given type declaration within a particular
+  /// context.
+  ///
+  /// This routine aids unqualified name lookup for types by performing the
+  /// resolution necessary to rectify the declaration found by name lookup with
+  /// the declaration context from which name lookup started.
+  ///
+  /// \param typeDecl The type declaration found by name lookup.
+  /// \param foundDC The declaration context this type reference was found in.
+  /// \param isSpecialized Whether the type will have generic arguments applied.
+  ///
+  /// \returns the resolved type.
+  Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
+                            bool isSpecialized) const;
+
+  /// Apply generic arguments to the unbound generic type represented by the
+  /// given declaration and parent type.
+  ///
+  /// This function requires the correct number of generic arguments,
+  /// whereas applyGenericArguments emits diagnostics in those cases.
+  ///
+  /// \param decl The declaration that the resulting bound generic type
+  /// shall reference.
+  /// \param parentTy The parent type.
+  /// \param loc The source location for diagnostic reporting.
+  /// \param genericArgs The list of generic arguments to apply.
+  ///
+  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// error.
+  ///
+  /// \see applyGenericArguments
+  Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
+                                    SourceLoc loc,
+                                    ArrayRef<Type> genericArgs) const;
 };
 
 } // end namespace swift
