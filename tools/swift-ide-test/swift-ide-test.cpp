@@ -751,6 +751,11 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                              llvm::cl::desc("Enable experimental distributed actors and functions"),
+                              llvm::cl::init(false));
+
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
@@ -3851,6 +3856,12 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+  }
+  if (options::EnableExperimentalDistributed) {
+    // distributed implies concurrency features:
+    InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+    // enable 'distributed' parsing and features
+    InitInvok.getLangOptions().EnableExperimentalDistributed = true;
   }
 
   // We disable source location resolutions from .swiftsourceinfo files by

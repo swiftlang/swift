@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-distributed
 // REQUIRES: concurrency
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor D {
 
   func hello() {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
@@ -13,6 +14,7 @@ distributed actor D {
   distributed func distHelloAsyncThrows() async throws { } // ok
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension D {
   static func _remote_distHello(actor: D) async throws { }
   static func _remote_distHelloAsync(actor: D) async throws { }
@@ -20,6 +22,7 @@ extension D {
   static func _remote_distHelloAsyncThrows(actor: D) async throws { }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_not_distributed_funcs(distributed: D) async {
   distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
@@ -29,6 +32,7 @@ func test_not_distributed_funcs(distributed: D) async {
   // expected-error@-2{{call can throw, but it is not marked with 'try' and the error is not handled}} // TODO: no need to diagnose this, it is impossible to call anyway
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_outside(distributed: D) async throws {
   distributed.distHello() // expected-error{{call is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}

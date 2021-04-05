@@ -20,6 +20,7 @@ import Swift
 /// which involves enqueuing new partial tasks to be executed at some
 /// point. Actor classes implicitly conform to this protocol as part of their
 /// primary class definition.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol DistributedActor: Actor, Codable {
 
   /// Creates new (local) distributed actor instance, bound to the passed transport.
@@ -27,7 +28,8 @@ public protocol DistributedActor: Actor, Codable {
   /// Upon initialization, the `actorAddress` field is populated by the transport,
   /// with an address assigned to this actor.
   ///
-  /// - Parameter transport:
+  /// - Parameter transport: the transport this distributed actor instance will
+  ///   associated with.
   init(transport: ActorTransport)
 
   /// Resolves the passed in `address` against the `transport`,
@@ -65,9 +67,11 @@ public protocol DistributedActor: Actor, Codable {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_trans")!
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension DistributedActor {
   public init(from decoder: Decoder) throws {
     guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
@@ -91,6 +95,7 @@ extension DistributedActor {
 /***************************** Actor Transport ********************************/
 /******************************************************************************/
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol ActorTransport: Sendable {
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
   /// The returned value is either a local actor or proxy to a remote actor.
@@ -123,6 +128,7 @@ public protocol ActorTransport: Sendable {
 
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public enum ActorResolved<Act: DistributedActor> {
   case resolved(Act)
   case makeProxy
@@ -132,6 +138,7 @@ public enum ActorResolved<Act: DistributedActor> {
 /***************************** Actor Address **********************************/
 /******************************************************************************/
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
   /// Uniquely specifies the actor transport and the protocol used by it.
   ///
@@ -157,6 +164,7 @@ public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
 }
 
 // TODO: naive impl, bring in a real one
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension ActorAddress: CustomStringConvertible {
   public var description: String {
     var result = `protocol`
@@ -185,8 +193,10 @@ extension ActorAddress: CustomStringConvertible {
 /******************************************************************************/
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol ActorTransportError: Error {}
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct DistributedActorCodingError: ActorTransportError {
   public let message: String
 
@@ -207,9 +217,9 @@ public struct DistributedActorCodingError: ActorTransportError {
 // ==== isRemote / isLocal -----------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-public func __isRemoteActor(_ actor: AnyObject) -> Bool
+public func __isRemoteActor(_ actor: AnyObject) -> Bool // TODO: make them not public
 
-public func __isLocalActor(_ actor: AnyObject) -> Bool {
+public func __isLocalActor(_ actor: AnyObject) -> Bool { // TODO: make them not public
   return !__isRemoteActor(actor)
 }
 
@@ -218,11 +228,11 @@ public func __isLocalActor(_ actor: AnyObject) -> Bool {
 /// Called to initialize the distributed-remote actor 'proxy' instance in an actor.
 /// The implementation will call this within the actor's initializer.
 @_silgen_name("swift_distributedActor_remote_initialize")
-public func _distributedActorRemoteInitialize(_ actor: AnyObject)
+func _distributedActorRemoteInitialize(_ actor: AnyObject)
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
 ///
 /// This will call `actorTransport.resignAddress(self.actorAddress)`.
 @_silgen_name("swift_distributedActor_destroy")
-public func _distributedActorDestroy(_ actor: AnyObject)
+func _distributedActorDestroy(_ actor: AnyObject)

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -8,6 +8,7 @@ import _Concurrency
 
 struct Boom: Error {}
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor SomeSpecificDistributedActor {
   let state: String = "hi there"
 
@@ -39,6 +40,7 @@ distributed actor SomeSpecificDistributedActor {
 
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SomeSpecificDistributedActor {
 
   static func _remote_helloAsyncThrows(actor: SomeSpecificDistributedActor) async throws -> String {
@@ -70,6 +72,7 @@ extension SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
@@ -92,10 +95,9 @@ struct FakeTransport: ActorTransport {
 }
 
 // ==== Execute ----------------------------------------------------------------
-let address = ActorAddress(parse: "")
-let transport = FakeTransport()
 
-func test_remote_invoke() async {
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async {
   func check(actor: SomeSpecificDistributedActor) async {
     let personality = __isRemoteActor(actor) ? "remote" : "local"
 
@@ -158,8 +160,12 @@ func test_remote_invoke() async {
   print(remote)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
-    await test_remote_invoke()
+    let address = ActorAddress(parse: "")
+    let transport = FakeTransport()
+
+    await test_remote_invoke(address: address, transport: transport)
   }
 }

@@ -1,15 +1,17 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
 import _Concurrency
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor LocalWorker {
 }
 
 // ==== Fake Transport ---------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
@@ -38,15 +40,17 @@ struct FakeTransport: ActorTransport {
 }
 
 // ==== Execute ----------------------------------------------------------------
-let address = ActorAddress(parse: "")
-let transport = FakeTransport()
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test() {
+  let transport = FakeTransport()
+
   _ = LocalWorker(transport: transport)
   // CHECK: assign type:LocalWorker, address:[[ADDRESS:.*]]
   // CHECK: ready actor:main.LocalWorker, address:[[ADDRESS]]
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     test()

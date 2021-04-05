@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -6,12 +6,14 @@
 import Dispatch
 import _Concurrency
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor SomeSpecificDistributedActor {
   distributed func hello() async throws -> String {
     "local impl"
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SomeSpecificDistributedActor {
   static func _remote_hello(actor: SomeSpecificDistributedActor) async throws -> String {
     return "remote impl (address: \(actor.actorAddress))"
@@ -20,6 +22,7 @@ extension SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
@@ -42,10 +45,12 @@ struct FakeTransport: ActorTransport {
 }
 
 // ==== Execute ----------------------------------------------------------------
-let address = ActorAddress(parse: "")
-let transport = FakeTransport()
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_remote() async {
+  let address = ActorAddress(parse: "")
+  let transport = FakeTransport()
+
   let local = SomeSpecificDistributedActor(transport: transport)
   _ = local.actorAddress
   assert(__isLocalActor(local) == true, "should be local")
@@ -59,6 +64,7 @@ func test_remote() async {
   print("done") // CHECK: done
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_remote()
