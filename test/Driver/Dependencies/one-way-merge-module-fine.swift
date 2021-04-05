@@ -1,5 +1,7 @@
 /// other ==> main
 
+// REQUIRES: rdar76238077
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/one-way-fine/* %t
 // RUN: touch -t 201401240005 %t/*

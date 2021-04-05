@@ -2,6 +2,8 @@
 // Verify that the top-level build record file from the last incremental
 // compilation is preserved with the same name, suffixed by a '~'.
 
+// REQUIRES: rdar76238077
+
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/one-way-fine/* %t
 // RUN: %{python} %S/Inputs/touch.py 443865900 %t/*
