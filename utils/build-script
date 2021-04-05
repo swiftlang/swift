@@ -796,6 +796,11 @@ class BuildScriptInvocation(object):
                 "--llvm-install-components=%s" % args.llvm_install_components
             ]
 
+        if not args.clean_llbuild:
+            impl_args += [
+                "--skip-clean-llbuild"
+            ]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
