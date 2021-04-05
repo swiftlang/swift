@@ -102,7 +102,6 @@ void AsyncTask::completeFuture(AsyncContext *context) {
       reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
   bool hadErrorResult = false;
   auto errorObject = asyncContextPrefix->errorResult;
-//   printf("asyncTask::completeFuture errorObject: %p\n", errorObject);
   fragment->getError() = errorObject;
   if (errorObject) {
     hadErrorResult = true;

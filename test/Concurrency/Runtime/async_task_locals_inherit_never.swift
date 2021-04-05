@@ -68,14 +68,15 @@ func test_async_group() async {
   await Task.withLocal(\.string, boundTo: "top") {
     printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
-    try! await Task.withGroup(resultType: Void.self) { group -> Void? in
+    await withTaskGroup(of: Int.self, returning: Void.self) { group in
       printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
-      await group.add {
+      group.spawn {
         printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
+        return 0
       }
 
-      return try! await group.next()
+      _ = await group.next()
     }
   }
 }

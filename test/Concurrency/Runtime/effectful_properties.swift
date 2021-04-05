@@ -40,7 +40,7 @@ class Specs {
 actor Database {
   var currentData : Specs {
     get async {
-      let handle = Task.runDetached { Specs() }
+      let handle = detach { Specs() }
       print("obtaining specs...")
       return await handle.get()
     }
