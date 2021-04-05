@@ -48,3 +48,8 @@ Var Collection._hasFastCount has been added as a protocol requirement
 Struct Zip2Sequence has added a conformance to an existing protocol BidirectionalCollection
 Struct Zip2Sequence has added a conformance to an existing protocol Collection
 Struct Zip2Sequence has added a conformance to an existing protocol RandomAccessCollection
+Struct EnumeratedSequence has added a conformance to an existing protocol BidirectionalCollection
+Struct EnumeratedSequence has added a conformance to an existing protocol Collection
+Struct EnumeratedSequence has added a conformance to an existing protocol RandomAccessCollection
+Struct EnumeratedSequence has added a conformance to an existing protocol LazySequenceProtocol
+Struct EnumeratedSequence has added a conformance to an existing protocol LazyCollectionProtocol
