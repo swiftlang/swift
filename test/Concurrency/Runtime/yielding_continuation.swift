@@ -52,7 +52,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	tests.test("yield with awaiting next") {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
-	    let t = Task.detach {
+	    let t = detach {
 	      let value = await continuation.next()
 	      expectEqual(value, "hello")
 	    }
@@ -65,7 +65,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	tests.test("yield result with awaiting next") {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
-	    let t = Task.detach {
+	    let t = detach {
 	      let value = await continuation.next()
 	      expectEqual(value, "hello")
 	    }
@@ -79,7 +79,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
 	    let failure = SomeError()
-	    let t = Task.detach {
+	    let t = detach {
 	      do {
 	        let value = try await continuation.next()
 	        expectUnreachable()
@@ -101,7 +101,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
 	    let failure = SomeError()
-	    let t = Task.detach {
+	    let t = detach {
 	      do {
 	        let value = try await continuation.next()
 	        expectUnreachable()
@@ -122,7 +122,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	tests.test("yield multiple times with awaiting next") {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
-	    let t = Task.detach {
+	    let t = detach {
 	      let value1 = await continuation.next()
 	      expectEqual(value1, "hello")
 	      let value2 = await continuation.next()
@@ -139,7 +139,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	tests.test("yield result multiple times with awaiting next") {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
-	    let t = Task.detach {
+	    let t = detach {
 	      let value1 = await continuation.next()
 	      expectEqual(value1, "hello")
 	      let value2 = await continuation.next()
@@ -158,7 +158,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
 	    let failure1 = SomeError()
 	    let failure2 = SomeError()
-	    let t = Task.detach {
+	    let t = detach {
 	      do {
 	        let value1 = try await continuation.next()
 	      } catch {
@@ -191,7 +191,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
 	    let failure1 = SomeError()
 	    let failure2 = SomeError()
-	    let t = Task.detach {
+	    let t = detach {
 	      do {
 	        let value1 = try await continuation.next()
 	      } catch {
@@ -222,14 +222,14 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	tests.test("concurrent value production") {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
-	    let t1 = Task.detach {
+	    let t1 = detach {
 	      var result = await continuation.next()
 	      expectEqual(result, "hello")
 	      result = await continuation.next()
 	      expectEqual(result, "world")
 	    }
 	    
-	    let t2 = Task.detach {
+	    let t2 = detach {
 	      var result = await continuation.next()
 	      expectEqual(result, "hello")
 	      result = await continuation.next()
