@@ -351,6 +351,19 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+const Decl *Decl::getInnermostDeclWithAvailability() const {
+  const Decl *enclosingDecl = this;
+  // Find the innermost enclosing declaration with an @available annotation.
+  while (enclosingDecl != nullptr) {
+    if (enclosingDecl->getAttrs().hasAttribute<AvailableAttr>())
+      return enclosingDecl;
+
+    enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();
+  }
+
+  return nullptr;
+}
+
 Optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   for (auto *attr: getAttrs()) {

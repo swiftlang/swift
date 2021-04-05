@@ -789,6 +789,9 @@ public:
     return Attrs;
   }
 
+  /// Returns the innermost enclosing decl with an availability annotation.
+  const Decl *getInnermostDeclWithAvailability() const;
+
   /// Returns the introduced OS version in the given platform kind specified
   /// by @available attribute.
   /// This function won't consider the parent context to get the information.
