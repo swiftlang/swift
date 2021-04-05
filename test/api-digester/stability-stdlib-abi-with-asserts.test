@@ -44,3 +44,4 @@ Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
 Struct _GlobalRuntimeFunctionCountersState is a new API without @available attribute
 Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
 Struct _RuntimeFunctionCounters is a new API without @available attribute
+Var Collection._hasFastCount has been added as a protocol requirement
