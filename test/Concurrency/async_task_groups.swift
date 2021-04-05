@@ -21,12 +21,12 @@ func asyncThrowsOnCancel() async throws -> Int {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_add() async throws -> Int {
-  try await Task.withGroup(resultType: Int.self) { group in
-    await group.add {
+  try await withThrowingTaskGroup(of: Int.self) { group in
+    group.spawn {
       await asyncFunc()
     }
 
-    await group.add {
+    group.spawn {
       await asyncFunc()
     }
 
@@ -50,10 +50,10 @@ func boom() async throws -> Int { throw Boom() }
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func first_allMustSucceed() async throws {
 
-  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
-    await group.add { await work() }
-    await group.add { await work() }
-    await group.add { try await boom() }
+  let first: Int = try await withThrowingTaskGroup(of: Int.self) { group in
+    group.spawn { await work() }
+    group.spawn { await work() }
+    group.spawn { try await boom() }
 
     if let first = try await group.next() {
       return first
@@ -71,10 +71,10 @@ func first_ignoreFailures() async throws {
   @Sendable func work() async -> Int { 42 }
   @Sendable func boom() async throws -> Int { throw Boom() }
 
-  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
-    await group.add { await work() }
-    await group.add { await work() }
-    await group.add {
+  let first: Int = try await withThrowingTaskGroup(of: Int.self) { group in
+    group.spawn { await work() }
+    group.spawn { await work() }
+    group.spawn {
       do {
         return try await boom()
       } catch {
@@ -119,9 +119,9 @@ func test_taskGroup_quorum_thenCancel() async {
   ///
   /// - Returns: `true` iff `N/2 + 1` followers return `.yay`, `false` otherwise.
   func gatherQuorum(followers: [Follower]) async -> Bool {
-    try! await Task.withGroup(resultType: Vote.self) { group in
+    try! await withThrowingTaskGroup(of: Vote.self) { group in
       for follower in followers {
-        await group.add { try await follower.vote() }
+        group.spawn { try await follower.vote() }
       }
 
       defer {
@@ -154,6 +154,19 @@ func test_taskGroup_quorum_thenCancel() async {
   _ = await gatherQuorum(followers: [Follower("A"), Follower("B"), Follower("C")])
 }
 
+// FIXME: this is a workaround since (A, B) today isn't inferred to be Sendable
+//        and causes an error, but should be a warning (this year at least)
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
+  let first: A
+  let second: B
+
+  init(_ first: A, _ second: B) {
+    self.first = first
+    self.second = second
+  }
+}
+
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendable {
 
@@ -171,7 +184,7 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
       return []
     }
 
-    return try await Task.withGroup(resultType: (Int, T).self) { group in
+    return try await withThrowingTaskGroup(of: SendableTuple2<Int, T>.self) { group in
       var result = ContiguousArray<T>()
       result.reserveCapacity(n)
 
@@ -179,9 +192,9 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
       var submitted = 0
 
       func submitNext() async throws {
-        await group.add { [submitted,i] in
+        group.spawn { [submitted,i] in
           let value = try await transform(self[i])
-          return (submitted, value)
+          return SendableTuple2(submitted, value)
         }
         submitted += 1
         formIndex(after: &i)
@@ -192,7 +205,9 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
         try await submitNext()
       }
 
-      while let (index, taskResult) = try await group.next() {
+      while let tuple = try await group.next() {
+        let index = tuple.first
+        let taskResult = tuple.second
         result[index] = taskResult
 
         try Task.checkCancellation()

@@ -209,7 +209,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_cancelAll) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_addPending) {
-  swift_taskGroup_addPending(nullptr);
+  swift_taskGroup_addPending(nullptr, true);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swifttask_localValuePush) {

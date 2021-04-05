@@ -27,7 +27,7 @@ struct SomeFile: Sendable {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_cancellation_withCancellationHandler(_ anything: Any) async -> PictureData {
-  let handle: Task.Handle<PictureData, Error> = Task.runDetached {
+  let handle: Task.Handle<PictureData, Error> = detach {
     let file = SomeFile()
 
     return await Task.withCancellationHandler(

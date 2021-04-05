@@ -566,7 +566,7 @@ public:
 /// task.
 ///
 /// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
+/// is the type used by `detach` and `Task.group.add` to create
 /// futures.
 class FutureAsyncContext : public AsyncContext {
 public:
