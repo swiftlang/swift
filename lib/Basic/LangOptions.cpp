@@ -58,6 +58,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
 static const SupportedConditionalValue SupportedConditionalCompilationArches[] = {
   "arm",
   "arm64",
+  "arm64_32",
   "i386",
   "x86_64",
   "powerpc64",
@@ -305,6 +306,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::aarch64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "arm64");
     break;
+  case llvm::Triple::ArchType::aarch64_32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "arm64_32");
+    break;
   case llvm::Triple::ArchType::ppc64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "powerpc64");
     break;
@@ -336,6 +340,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
   case llvm::Triple::ArchType::aarch64:
+  case llvm::Triple::ArchType::aarch64_32:
   case llvm::Triple::ArchType::ppc64le:
   case llvm::Triple::ArchType::wasm32:
   case llvm::Triple::ArchType::x86:
