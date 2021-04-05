@@ -730,6 +730,8 @@ struct GenericSignatureBuilder::Implementation {
   std::vector<ConflictingConcreteTypeRequirement>
       ConflictingConcreteTypeRequirements;
 
+  llvm::DenseSet<ExplicitRequirement> ExplicitConformancesImpliedByConcrete;
+
 #ifndef NDEBUG
   /// Whether we've already computed redundant requiremnts.
   bool computedRedundantRequirements = false;
@@ -6256,6 +6258,20 @@ static bool typeConflictsWithLayoutConstraint(Type t, LayoutConstraint layout) {
   return false;
 }
 
+static bool isConcreteConformance(const EquivalenceClass &equivClass,
+                                  ProtocolDecl *proto,
+                                  GenericSignatureBuilder &builder) {
+  if (equivClass.concreteType &&
+      builder.lookupConformance(equivClass.concreteType, proto)) {
+    return true;
+  } else if (equivClass.superclass &&
+           builder.lookupConformance(equivClass.superclass, proto)) {
+    return true;
+  }
+
+  return false;
+}
+
 void GenericSignatureBuilder::computeRedundantRequirements() {
   assert(!Impl->computedRedundantRequirements &&
          "Already computed redundant requirements");
@@ -6289,6 +6305,14 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
 
         // FIXME: Check for a conflict via the concrete type.
         exact.push_back(constraint);
+
+        if (!source->isDerivedRequirement()) {
+          if (isConcreteConformance(equivClass, entry.first, *this)) {
+            Impl->ExplicitConformancesImpliedByConcrete.insert(
+                ExplicitRequirement::fromExplicitConstraint(
+                    RequirementKind::Conformance, constraint));
+          }
+        }
       }
 
       graph.addConstraintsFromEquivClass(RequirementKind::Conformance,
@@ -8159,7 +8183,7 @@ void GenericSignatureBuilder::checkLayoutConstraints(
 }
 
 bool GenericSignatureBuilder::isRedundantExplicitRequirement(
-    ExplicitRequirement req) const {
+    const ExplicitRequirement &req) const {
   assert(Impl->computedRedundantRequirements &&
          "Must ensure computeRedundantRequirements() is called first");
   auto &redundantReqs = Impl->RedundantRequirements;
@@ -8466,23 +8490,6 @@ static void checkGenericSignature(CanGenericSignature canSig,
 }
 #endif
 
-bool GenericSignatureBuilder::hasExplicitConformancesImpliedByConcrete() const {
-  for (auto pair : Impl->RedundantRequirements) {
-    if (pair.first.getKind() != RequirementKind::Conformance)
-      continue;
-
-    for (auto impliedByReq : pair.second) {
-      if (impliedByReq.getKind() == RequirementKind::Superclass)
-        return true;
-
-      if (impliedByReq.getKind() == RequirementKind::SameType)
-        return true;
-    }
-  }
-
-  return false;
-}
-
 static Type stripBoundDependentMemberTypes(Type t) {
   if (auto *depMemTy = t->getAs<DependentMemberType>()) {
     return DependentMemberType::get(
@@ -8532,7 +8539,8 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
     assert(req.getKind() != RequirementKind::SameType &&
            "Should not see same-type requirement here");
 
-    if (isRedundantExplicitRequirement(req))
+    if (isRedundantExplicitRequirement(req) &&
+        Impl->ExplicitConformancesImpliedByConcrete.count(req))
       continue;
 
     auto subjectType = req.getSource()->getStoredType();
@@ -8618,8 +8626,12 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
     assert(!Impl->HadAnyError &&
            "Rebuilt signature had errors");
 
-    assert(!hasExplicitConformancesImpliedByConcrete() &&
-           "Rebuilt signature still had redundant conformance requirements");
+#ifndef NDEBUG
+    for (const auto &req : Impl->ExplicitConformancesImpliedByConcrete) {
+      assert(!isRedundantExplicitRequirement(req) &&
+             "Rebuilt signature still had redundant conformance requirements");
+    }
+#endif
   }
 
   // If any of our explicit conformance requirements were implied by
@@ -8634,7 +8646,7 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   if (!rebuildingWithoutRedundantConformances &&
       !buildingRequirementSignature &&
       !Impl->HadAnyError &&
-      hasExplicitConformancesImpliedByConcrete()) {
+      !Impl->ExplicitConformancesImpliedByConcrete.empty()) {
     return std::move(*this).rebuildSignatureWithoutRedundantRequirements(
         allowConcreteGenericParams,
         buildingRequirementSignature);
