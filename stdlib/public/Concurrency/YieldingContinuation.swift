@@ -12,17 +12,17 @@
 
 import Swift
 
+@_fixed_layout
+@usableFromInline
+internal final class _YieldingContinuationStorage: UnsafeSendable {
+  @usableFromInline
+  var continuation: Builtin.RawUnsafeContinuation?
+}
+
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct YieldingContinuation<Element, Failure: Error>: Sendable {
-  @_fixed_layout
   @usableFromInline
-  internal final class Storage: UnsafeSendable {
-    @usableFromInline
-    var continuation: UnsafeContinuation<Element, Error>?
-  }
-  
-  @usableFromInline
-  let storage = Storage()
+  let storage = _YieldingContinuationStorage()
 
   /// Construct a YieldingContinuation.
   ///
@@ -43,7 +43,7 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   @inlinable
   @inline(__always)
   internal func _extract() -> UnsafeContinuation<Element, Error>? {
-    let raw = Builtin.atomicrmw_xchg_seqcst_Word(
+    let raw = Builtin.atomicrmw_xchg_acqrel_Word(
       Builtin.addressof(&storage.continuation),
       UInt(bitPattern: 0)._builtinWordValue)
     return unsafeBitCast(raw, to: UnsafeContinuation<Element, Error>?.self)
@@ -55,7 +55,7 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
     _ continuation: UnsafeContinuation<Element, Error>
   ) -> UnsafeContinuation<Element, Error>? {
     let rawContinuation = unsafeBitCast(continuation, to: Builtin.Word.self)
-    let raw = Builtin.atomicrmw_xchg_seqcst_Word(
+    let raw = Builtin.atomicrmw_xchg_acqrel_Word(
       Builtin.addressof(&storage.continuation), rawContinuation)
     return unsafeBitCast(raw, to: UnsafeContinuation<Element, Error>?.self)
   }
@@ -89,15 +89,20 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   public func yield(throwing error: __owned Failure) -> Bool {
     if let continuation = _extract() {
       continuation.resume(throwing: error)
-      _fixLifetime(storage)
       return true
     }
     return false
   }
+}
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension YieldingContinuation where Failure == Error {
   /// Await a resume from a call to a yielding function.
   ///
   /// - Return: The element that was yielded or a error that was thrown.
+  ///
+  /// When multiple calls are awaiting a produced value from next any call to
+  /// yield will resume all awaiting calls to next with that value. 
   public func next() async throws -> Element {
     var existing: UnsafeContinuation<Element, Error>?
     do {

@@ -27,7 +27,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
 	tests.test("yield throwing with no awaiting next") {
 	  runAsyncAndBlock {
-	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
+	    let continuation = YieldingContinuation(yielding: String.self, throwing: Error.self)
 	    expectFalse(continuation.yield(throwing: SomeError()))
 	    await forceBeingAsync()
 	  }
@@ -43,7 +43,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
 	tests.test("yield failure result no awaiting next") {
 	  runAsyncAndBlock {
-	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
+	    let continuation = YieldingContinuation(yielding: String.self, throwing: Error.self)
 	    expectFalse(continuation.yield(with: .failure(SomeError())))
 	    await forceBeingAsync()
 	  }
@@ -77,7 +77,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
 	tests.test("yield throwing with awaiting next") {
 	  runAsyncAndBlock {
-	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
+	    let continuation = YieldingContinuation(yielding: String.self, throwing: Error.self)
 	    let failure = SomeError()
 	    let t = detach {
 	      do {
@@ -99,7 +99,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
 	tests.test("yield failure with awaiting next") {
 	  runAsyncAndBlock {
-	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
+	    let continuation = YieldingContinuation(yielding: String.self, throwing: Error.self)
 	    let failure = SomeError()
 	    let t = detach {
 	      do {
@@ -155,7 +155,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
 	tests.test("yield throwing multiple times with awaiting next") {
 	  runAsyncAndBlock {
-	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
+	    let continuation = YieldingContinuation(yielding: String.self, throwing: Error.self)
 	    let failure1 = SomeError()
 	    let failure2 = SomeError()
 	    let t = detach {
@@ -188,7 +188,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
 	tests.test("yield failure multiple times with awaiting next") {
 	  runAsyncAndBlock {
-	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
+	    let continuation = YieldingContinuation(yielding: String.self, throwing: Error.self)
 	    let failure1 = SomeError()
 	    let failure2 = SomeError()
 	    let t = detach {
