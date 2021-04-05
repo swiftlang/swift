@@ -594,9 +594,9 @@ enum class ConditionalEffectKind {
 static void simple_display(llvm::raw_ostream &out, ConditionalEffectKind kind) {
   out << "ConditionalEffectKind::";
   switch(kind) {
-    case ConditionalEffectKind::None:         out << "None"; break;
-    case ConditionalEffectKind::Conditional:  out << "Conditional"; break;
-    case ConditionalEffectKind::Always:       out << "Always"; break;
+    case ConditionalEffectKind::None:         out << "None"; return;
+    case ConditionalEffectKind::Conditional:  out << "Conditional"; return;
+    case ConditionalEffectKind::Always:       out << "Always"; return;
   }
   llvm_unreachable("Bad conditional effect kind");
 }
