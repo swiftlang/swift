@@ -836,6 +836,16 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
     return;
   }
+  
+  if (Builtin.ID == BuiltinValueKind::ShuffleVector) {
+    using namespace llvm;
+
+    auto dict0 = args.claimNext();
+    auto dict1 = args.claimNext();
+    auto index = args.claimNext();
+    out.add(IGF.Builder.CreateShuffleVector(dict0, dict1, index));
+    return;
+  }
 
   if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
