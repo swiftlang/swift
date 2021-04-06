@@ -390,6 +390,24 @@ struct ParentInfo {
       : Title(Title), KindName(KindName), USR(USR) {}
 };
 
+struct ReferencedDeclInfo {
+  StringRef USR;
+  UIdent DeclarationLang;
+  StringRef AccessLevel;
+  StringRef FilePath;
+  StringRef ModuleName;
+  bool IsSystem;
+  bool IsSPI;
+  ArrayRef<ParentInfo> ParentContexts;
+
+  ReferencedDeclInfo(StringRef USR, UIdent DeclLang, StringRef AccessLevel,
+                     StringRef FilePath, StringRef ModuleName, bool System,
+                     bool SPI, ArrayRef<ParentInfo> Parents)
+      : USR(USR), DeclarationLang(DeclLang), AccessLevel(AccessLevel),
+        FilePath(FilePath), ModuleName(ModuleName), IsSystem(System),
+        IsSPI(SPI), ParentContexts(Parents) {}
+};
+
 struct CursorSymbolInfo {
   UIdent Kind;
   UIdent DeclarationLang;
@@ -429,6 +447,8 @@ struct CursorSymbolInfo {
   /// Stores the Symbol Graph title, kind, and USR of the parent contexts of the
   /// symbol under the cursor.
   ArrayRef<ParentInfo> ParentContexts;
+  /// The set of decls referenced in the symbol graph delcaration fragments.
+  ArrayRef<ReferencedDeclInfo> ReferencedSymbols;
   /// For calls this lists the USRs of the receiver types (multiple only in the
   /// case that the base is a protocol composition).
   ArrayRef<StringRef> ReceiverUSRs;

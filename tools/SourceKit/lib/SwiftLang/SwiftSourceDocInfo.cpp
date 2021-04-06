@@ -42,6 +42,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/SourceManager.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 
@@ -714,6 +715,28 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
+static StringRef
+getModuleName(const ValueDecl *VD, llvm::BumpPtrAllocator &Allocator,
+              ModuleDecl *IgnoreModule = nullptr) {
+  ASTContext &Ctx = VD->getASTContext();
+  ClangImporter *Importer =
+      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  auto ClangNode = VD->getClangNode();
+  if (ClangNode) {
+    auto ClangMod = Importer->getClangOwningModule(ClangNode);
+    if (ClangMod)
+      return copyString(Allocator, ClangMod->getFullModuleName());
+  } else if (VD->getModuleContext() != IgnoreModule) {
+    ModuleDecl *MD = VD->getModuleContext();
+    // If the decl is from a cross-import overlay module, report the
+    // overlay's declaring module as the owning module.
+    if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
+      MD = Declaring;
+    return MD->getNameStr();
+  }
+  return "";
+}
+
 struct DeclInfo {
   const ValueDecl *VD;
   Type ContainerType;
@@ -839,6 +862,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
   if (AddSymbolGraph) {
     SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
+    SmallVector<symbolgraphgen::FragmentInfo, 8> FragmentInfos;
     symbolgraphgen::SymbolGraphOptions Options{
         "",
         Invoc.getLangOptions().Target,
@@ -849,7 +873,8 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
                                             DInfo.InSynthesizedExtension,
-                                            Options, OS, PathComponents);
+                                            Options, OS, PathComponents,
+                                            FragmentInfos);
     Symbol.SymbolGraph = copyAndClearString(Allocator, Buffer);
 
     SmallVector<ParentInfo, 4> Parents;
@@ -860,29 +885,47 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                            copyAndClearString(Allocator, Buffer));
     };
     Symbol.ParentContexts = copyArray(Allocator, llvm::makeArrayRef(Parents));
-  }
 
-  {
-    ASTContext &Ctx = DInfo.VD->getASTContext();
-    ClangImporter *Importer =
-        static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-    auto ClangNode = DInfo.VD->getClangNode();
-    if (ClangNode) {
-      auto ClangMod = Importer->getClangOwningModule(ClangNode);
-      if (ClangMod) {
-        Symbol.ModuleName =
-            copyString(Allocator, ClangMod->getFullModuleName());
+    SmallVector<ReferencedDeclInfo, 8> ReferencedDecls;
+    for (auto &FI: FragmentInfos) {
+      SmallVector<ParentInfo, 4> FIParents;
+      for (auto &Component: FI.ParentContexts) {
+        SwiftLangSupport::printUSR(Component.VD, OS);
+        FIParents.emplace_back(copyString(Allocator, Component.Title),
+                               Component.Kind,
+                               copyAndClearString(Allocator, Buffer));
       }
-    } else if (DInfo.VD->getModuleContext() != MainModule) {
-      ModuleDecl *MD = DInfo.VD->getModuleContext();
-      // If the decl is from a cross-import overlay module, report the
-      // overlay's declaring module as the owning module.
-      if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
-        MD = Declaring;
-      Symbol.ModuleName = MD->getNameStr();
+
+      ASTContext &Ctx = FI.VD->getASTContext();
+      StringRef Filename = "";
+      if (auto Loc = FI.VD->getLoc(/*SerializedOK=*/true)) {
+        Filename = Ctx.SourceMgr.getDisplayNameForLoc(Loc);
+      } else if (auto ClangNode = FI.VD->getClangNode()) {
+        auto Loc = ClangNode.getLocation();
+        if (Loc.isValid()) {
+          Filename = Ctx.getClangModuleLoader()->getClangASTContext()
+              .getSourceManager()
+              .getFilename(Loc);
+        }
+      }
+
+      SwiftLangSupport::printUSR(FI.VD, OS);
+      ReferencedDecls.emplace_back(
+          copyAndClearString(Allocator, Buffer),
+          SwiftLangSupport::getUIDForDeclLanguage(FI.VD),
+          swift::getAccessLevelSpelling(FI.VD->getFormalAccess()), Filename,
+          getModuleName(FI.VD, Allocator),
+          FI.VD->getModuleContext()->isSystemModule(),
+          FI.VD->isSPI(),
+          copyArray(Allocator, llvm::makeArrayRef(FIParents)));
     }
+    Symbol.ReferencedSymbols = copyArray(Allocator,
+                                         llvm::makeArrayRef(ReferencedDecls));
   }
 
+  Symbol.ModuleName = copyString(Allocator,
+                                 getModuleName(DInfo.VD, Allocator,
+                                               /*ModuleToIgnore=*/MainModule));
   if (auto IFaceGenRef =
           Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();

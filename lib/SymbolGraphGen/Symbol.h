@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
 #include "swift/SymbolGraphGen/PathComponent.h"
+#include "swift/SymbolGraphGen/FragmentInfo.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -98,7 +99,13 @@ public:
     return SynthesizedBaseTypeDecl;
   }
 
+  /// Reteive the path components associated with this symbol, from outermost
+  /// to innermost (this symbol).
   void getPathComponents(SmallVectorImpl<PathComponent> &Components) const;
+
+  /// Retrieve information about all symbols referenced in the declaration
+  /// fragment printed for this symbol.
+  void getFragmentInfo(SmallVectorImpl<FragmentInfo> &FragmentInfo) const;
 
   /// Print the symbol path to an output stream.
   void printPath(llvm::raw_ostream &OS) const;

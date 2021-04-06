@@ -161,6 +161,8 @@ UID_KEYS = [
     KEY('SymbolGraph', 'key.symbol_graph'),
     KEY('RetrieveSymbolGraph', 'key.retrieve_symbol_graph'),
     KEY('ParentContexts', 'key.parent_contexts'),
+    KEY('ReferencedSymbols', 'key.referenced_symbols'),
+    KEY('IsSPI', 'key.is_spi'),
     KEY('ActionUID', 'key.actionuid'),
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),
