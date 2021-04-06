@@ -503,6 +503,37 @@ extension Task {
   }
 }
 
+// ==== Voluntary Suspension -----------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension Task {
+
+  /// Explicitly suspend the current task, potentially giving up execution actor
+  /// of current actor/task, allowing other tasks to execute.
+  ///
+  /// This is not a perfect cure for starvation;
+  /// if the task is the highest-priority task in the system, it might go
+  /// immediately back to executing.
+  public static func yield() async {
+    // Prepare the job flags
+    var flags = JobFlags()
+    flags.kind = .task
+    flags.priority = .default
+    flags.isFuture = true
+
+    // Create the asynchronous task future, it will do nothing, but simply serves
+    // as a way for us to yield our execution until the executor gets to it and
+    // resumes us.
+    // TODO: consider if it would be useful for this task to be a child task
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, {})
+
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
+    let _ = await Handle<Void, Never>(task).get()
+  }
+}
+
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
 /// Calls the given closure with the with the "current" task in which this
