@@ -2643,7 +2643,9 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                         signature.getType()->getPointerTo(),
                                         IGF.IGM.getPointerAlignment());
     auto fnPtr = IGF.emitInvariantLoad(slot);
-    auto &schema = IGF.getOptions().PointerAuth.SwiftClassMethods;
+    auto &schema = methodType->isAsync()
+                       ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
+                       : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
     return FunctionPointer(methodType, fnPtr, authInfo, signature);

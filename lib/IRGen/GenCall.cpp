@@ -2005,7 +2005,9 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
           /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
     }
     if (auto authInfo = functionPointer.getAuthInfo()) {
-      fn = emitPointerAuthSign(IGF, fn, authInfo);
+      auto newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                         authInfo.getDiscriminator());
+      fn = emitPointerAuthSign(IGF, fn, newAuthInfo);
     }
   }
   llvm::Value *size = nullptr;
@@ -2333,9 +2335,13 @@ public:
   }
 
   FunctionPointer getCalleeFunctionPointer() override {
+    PointerAuthInfo newAuthInfo;
+    if (auto authInfo = CurCallee.getFunctionPointer().getAuthInfo()) {
+      newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                    authInfo.getDiscriminator());
+    }
     return FunctionPointer(
-        FunctionPointer::Kind::Function, calleeFunction,
-        CurCallee.getFunctionPointer().getAuthInfo(),
+        FunctionPointer::Kind::Function, calleeFunction, newAuthInfo,
         Signature::forAsyncAwait(IGF.IGM, getCallee().getOrigFunctionType()));
   }
 
@@ -4698,7 +4704,9 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
         Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
         /*expectedType*/ getFunctionType()->getPointerTo());
     if (auto authInfo = AuthInfo) {
-      result = emitPointerAuthSign(IGF, result, authInfo);
+      auto newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                         authInfo.getDiscriminator());
+      result = emitPointerAuthSign(IGF, result, newAuthInfo);
     }
     return result;
   }
@@ -4735,7 +4743,19 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
 }
 
 FunctionPointer FunctionPointer::getAsFunction(IRGenFunction &IGF) const {
-  return FunctionPointer(Kind::Function, getPointer(IGF), AuthInfo, Sig);
+  switch (getBasicKind()) {
+  case FunctionPointer::BasicKind::Function:
+    return *this;
+  case FunctionPointer::BasicKind::AsyncFunctionPointer: {
+    auto authInfo = AuthInfo;
+    if (authInfo) {
+      authInfo = PointerAuthInfo(AuthInfo.getCorrespondingCodeKey(),
+                                 AuthInfo.getDiscriminator());
+    }
+    return FunctionPointer(Kind::Function, getPointer(IGF), authInfo, Sig);
+  }
+  }
+  llvm_unreachable("unhandled case");
 }
 
 void irgen::emitAsyncReturn(

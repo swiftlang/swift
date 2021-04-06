@@ -697,6 +697,21 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::ResilientClassStubInitCallback);
 
+  opts.AsyncSwiftFunctionPointers =
+      PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Type);
+
+  opts.AsyncSwiftClassMethods =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.AsyncProtocolWitnesses =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.AsyncSwiftClassMethodPointers =
+      PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
+
+  opts.AsyncSwiftDynamicReplacements =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
   opts.AsyncContextParent =
       PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
                         SpecialPointerAuthDiscriminators::AsyncContextParent);
