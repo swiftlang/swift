@@ -399,3 +399,5 @@ $s4diff1hyyS2ijfXEF ---> diff.h(@differentiable(_forward) (Swift.Int) -> Swift.I
 $s4diff1hyyS2ijrXEF ---> diff.h(@differentiable(reverse) (Swift.Int) -> Swift.Int) -> ()
 $s4diff1hyyS2ijdXEF ---> diff.h(@differentiable (Swift.Int) -> Swift.Int) -> ()
 $s4diff1hyyS2ijlXEF ---> diff.h(@differentiable(_linear) (Swift.Int) -> Swift.Int) -> ()
+$s4test3fooyyS2f_SfkztjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, inout @noDerivative Swift.Float) -> Swift.Float) -> ()
+$s4test3fooyyS2f_SfktjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> ()

@@ -569,6 +569,7 @@ private:
     case Node::Kind::AutoDiffSubsetParametersThunk:
     case Node::Kind::AutoDiffFunctionKind:
     case Node::Kind::DifferentiabilityWitness:
+    case Node::Kind::NoDerivative:
     case Node::Kind::IndexSubset:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
@@ -1419,6 +1420,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Owned:
     Printer << "__owned ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::NoDerivative:
+    Printer << "@noDerivative ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NonObjCAttribute:

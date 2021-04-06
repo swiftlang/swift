@@ -72,6 +72,7 @@ public:
   void setValueOwnership(ValueOwnership ownership) {
     Flags = Flags.withValueOwnership(ownership);
   }
+  void setNoDerivative() { Flags = Flags.withNoDerivative(true); }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -1375,28 +1376,39 @@ private:
         node = node->getFirstChild();
         hasParamFlags = true;
       };
-      switch (node->getKind()) {
-      case NodeKind::InOut:
-        setOwnership(ValueOwnership::InOut);
-        break;
 
-      case NodeKind::Shared:
-        setOwnership(ValueOwnership::Shared);
-        break;
+      bool recurse = true;
+      while (recurse) {
+        switch (node->getKind()) {
+        case NodeKind::InOut:
+          setOwnership(ValueOwnership::InOut);
+          break;
 
-      case NodeKind::Owned:
-        setOwnership(ValueOwnership::Owned);
-        break;
+        case NodeKind::Shared:
+          setOwnership(ValueOwnership::Shared);
+          break;
 
-      case NodeKind::AutoClosureType:
-      case NodeKind::EscapingAutoClosureType: {
-        param.setAutoClosure();
-        hasParamFlags = true;
-        break;
-      }
+        case NodeKind::Owned:
+          setOwnership(ValueOwnership::Owned);
+          break;
 
-      default:
-        break;
+        case NodeKind::NoDerivative:
+          param.setNoDerivative();
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
+
+        case NodeKind::AutoClosureType:
+        case NodeKind::EscapingAutoClosureType:
+          param.setAutoClosure();
+          hasParamFlags = true;
+          recurse = false;
+          break;
+
+        default:
+          recurse = false;
+          break;
+        }
       }
 
       auto paramType = decodeMangledType(node);

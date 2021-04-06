@@ -1929,7 +1929,7 @@ class ParameterTypeFlags {
     NonEphemeral = 1 << 2,
     OwnershipShift = 3,
     Ownership    = 7 << OwnershipShift,
-    NoDerivative = 1 << 7,
+    NoDerivative = 1 << 6,
     NumBits = 7
   };
   OptionSet<ParameterFlags> value;

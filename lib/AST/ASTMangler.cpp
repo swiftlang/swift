@@ -2541,6 +2541,9 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
   else
     appendType(elementType, forDecl);
 
+  if (flags.isNoDerivative()) {
+    appendOperator("k");
+  }
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
     /* nothing */

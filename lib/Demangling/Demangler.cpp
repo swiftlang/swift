@@ -793,6 +793,9 @@ recur:
                                                 popTypeAndGetChild()));
     case 'i': return demangleSubscript();
     case 'j': return demangleDifferentiableFunctionType();
+    case 'k':
+      return createType(
+          createWithChild(Node::Kind::NoDerivative, popTypeAndGetChild()));
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));

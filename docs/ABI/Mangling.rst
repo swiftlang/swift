@@ -582,7 +582,7 @@ Types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'z'? 'h'? 'n'? 'd'?   // type with optional label, inout convention, shared convention, owned convention, and variadic specifier
+  list-type ::= type identifier? 'k'? 'z'? 'h'? 'n'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -666,7 +666,7 @@ mangled in to disambiguate.
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
-  SENDABLE ::= 'h'                         // @Sendable
+  SENDABLE ::= 'h'                           // @Sendable
   ASYNC ::= 'H'                              // @async
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
