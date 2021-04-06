@@ -101,6 +101,36 @@ namespace irgen {
       assert(isSigned());
       return Key;
     }
+    bool hasCodeKey() const {
+      assert(isSigned());
+      return (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASIA) ||
+             (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASIB);
+    }
+    bool hasDataKey() const {
+      assert(isSigned());
+      return (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASDA) ||
+             (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASDB);
+    }
+    bool getCorrespondingCodeKey() const {
+      assert(hasDataKey());
+      switch (getKey()) {
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASDA:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASIA;
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASDB:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASIB;
+      }
+      llvm_unreachable("unhandled case");
+    }
+    bool getCorrespondingDataKey() const {
+      assert(hasCodeKey());
+      switch (getKey()) {
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASIA:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASDA;
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASIB:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASDB;
+      }
+      llvm_unreachable("unhandled case");
+    }
     llvm::Value *getDiscriminator() const {
       assert(isSigned());
       return Discriminator;
@@ -219,6 +249,13 @@ namespace irgen {
       // The function pointer should have function type.
       assert(value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
+      if (authInfo) {
+        if (kind == Kind::Function) {
+          assert(authInfo.hasCodeKey());
+        } else {
+          assert(authInfo.hasDataKey());
+        }
+      }
     }
 
     // Temporary only!
@@ -295,7 +332,7 @@ namespace irgen {
     llvm::Value *getExplosionValue(IRGenFunction &IGF,
                                    CanSILFunctionType fnType) const;
 
-    /// Form a FunctionPointer whose KindTy is ::Function.
+    /// Form a FunctionPointer whose Kind is ::Function.
     FunctionPointer getAsFunction(IRGenFunction &IGF) const;
 
     bool useStaticContextSize() const {

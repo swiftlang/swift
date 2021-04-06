@@ -472,7 +472,10 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
                                                    NotForDefinition);
       // Sign using the discriminator we would include in the method
       // descriptor.
-      if (auto &schema = IGM.getOptions().PointerAuth.SwiftClassMethods) {
+      if (auto &schema =
+              entry->getImplementation()->getLoweredFunctionType()->isAsync()
+                  ? IGM.getOptions().PointerAuth.AsyncSwiftClassMethods
+                  : IGM.getOptions().PointerAuth.SwiftClassMethods) {
         auto discriminator =
           PointerAuthInfo::getOtherDiscriminator(IGM, schema, method);
         
