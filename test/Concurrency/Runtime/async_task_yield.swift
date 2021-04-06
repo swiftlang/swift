@@ -3,6 +3,8 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// REQUIRES: rdar76274257
+
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 protocol Go: Actor {
   func go(times: Int) async -> Int
