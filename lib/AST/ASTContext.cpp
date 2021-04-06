@@ -3085,11 +3085,15 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
 }
 
 static bool
-isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
+isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
                         Type result) {
   for (auto param : params) {
     if (!param.getPlainType()->isCanonical())
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return result->isCanonical();
@@ -3128,6 +3132,10 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
   for (auto param : params) {
     if (!sig->isCanonicalTypeInContext(param.getPlainType()))
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return sig->isCanonicalTypeInContext(result);
@@ -3231,17 +3239,21 @@ void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
   assert(params.size() == labels.size());
   for (auto i : indices(params)) {
     auto &param = params[i];
-    param = AnyFunctionType::Param(param.getPlainType(),
-                                   labels[i],
-                                   param.getParameterFlags());
+    param = AnyFunctionType::Param(param.getPlainType(), labels[i],
+                                   param.getParameterFlags(),
+                                   param.getInternalLabel());
   }
 }
 
+/// Profile \p params into \p ID. In contrast to \c == on \c Param, the profile
+/// *does* take the internal label into account and *does not* canonicalize
+/// the param's type.
 static void profileParams(llvm::FoldingSetNodeID &ID,
                           ArrayRef<AnyFunctionType::Param> params) {
   ID.AddInteger(params.size());
   for (auto param : params) {
     ID.AddPointer(param.getLabel().get());
+    ID.AddPointer(param.getInternalLabel().get());
     ID.AddPointer(param.getPlainType().getPointer());
     ID.AddInteger(param.getParameterFlags().toRaw());
   }
@@ -3293,7 +3305,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     >(params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
-  bool isCanonical = isFunctionTypeCanonical(params, result);
+  bool isCanonical = isAnyFunctionTypeCanonical(params, result);
   if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
       isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();

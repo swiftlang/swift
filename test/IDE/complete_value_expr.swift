@@ -680,7 +680,7 @@ func testFuncTypeVars() {
   funcTypeVarsObject.funcVar2#^VF2^#
 // VF2: Begin completions
 // VF2-NEXT: Pattern/CurrModule: ({#Int#})[#Double#]{{; name=.+$}}
-// VF2-NEXT: BuiltinOperator/None:         = {#(Int) -> Double##(Int) -> Double#}[#Void#]
+// VF2-NEXT: BuiltinOperator/None:         = {#(Int) -> Double##(_ a: Int) -> Double#}[#Void#]
 // VF2-NEXT: Keyword[self]/CurrNominal:    .self[#(Int) -> Double#]; name=self
 // VF2-NEXT: End completions
 }

@@ -1001,6 +1001,7 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
     PO.SkipAttributes = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    PO.AlwaysTryPrintParameterLabels = true;
     if (ContextTy)
       PO.setBaseType(ContextTy);
 
@@ -1017,6 +1018,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
 
         if (param.hasLabel()) {
           OS << param.getLabel();
+        } else if (param.hasInternalLabel()) {
+          OS << param.getInternalLabel();
         } else {
           OS << "<#";
           if (param.isInOut())
@@ -2337,8 +2340,7 @@ public:
       SmallVector<AnyFunctionType::Param, 8> erasedParams;
       for (const auto &param : genericFuncType->getParams()) {
         auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
-        erasedParams.emplace_back(erasedTy, param.getLabel(),
-                                  param.getParameterFlags());
+        erasedParams.emplace_back(param.withType(erasedTy));
       }
       return GenericFunctionType::get(genericSig,
           erasedParams,
