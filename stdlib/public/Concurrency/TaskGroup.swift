@@ -708,7 +708,7 @@ extension TaskGroup: AsyncSequence {
     /// - SeeAlso: `TaskGroup.next()` for a detailed discussion its semantics.
     public mutating func next() async -> Element? {
       guard !finished else { return nil }
-      guard let element = try await group.next() else {
+      guard let element = await group.next() else {
         finished = true
         return nil
       }
