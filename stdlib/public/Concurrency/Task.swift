@@ -361,6 +361,20 @@ extension Task {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension Task {
+
+  @discardableResult
+  @available(*, deprecated, message: "`Task.runDetached` was replaced by `detach` and will be removed shortly.")
+  public func runDetached<T>(
+    priority: Task.Priority = .unspecified,
+    operation: __owned @Sendable @escaping () async throws -> T
+  ) -> Task.Handle<T, Error> {
+    detach(priority: priority, operation: operation)
+  }
+
+}
+
 /// Run given throwing `operation` as part of a new top-level task.
 ///
 /// Creating detached tasks should, generally, be avoided in favor of using
@@ -535,6 +549,22 @@ extension Task {
 }
 
 // ==== UnsafeCurrentTask ------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension Task {
+
+  @available(*, deprecated, message: "`Task.unsafeCurrent` was replaced by `withUnsafeCurrentTask { task in ... }`, and will be removed soon.")
+  public static var unsafeCurrent: UnsafeCurrentTask? {
+    guard let _task = _getCurrentAsyncTask() else {
+      return nil
+    }
+    // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+    //        with "destroying a task that never completed" in the task's destroy.
+    //        How do we solve this properly?
+    _swiftRetain(_task)
+    return UnsafeCurrentTask(_task)
+  }
+}
 
 /// Calls the given closure with the with the "current" task in which this
 /// function was invoked.
