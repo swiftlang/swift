@@ -202,7 +202,7 @@ function(swift_create_stdlib_targets name variant define_all_alias)
   # so it can't be added as a target here. build-script will invoke the
   # more-specific target, so just skip creating this target and warn in case
   # someone is using the CMake more directly.
-  if(TARGET ${name}${SWIFT_PRIMARY_VARIANT_SUFFIX}${variant})
+  if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_SDKS)
     add_custom_target(${name}${variant}
       ${ALL_keyword}
       DEPENDS
@@ -211,7 +211,7 @@ function(swift_create_stdlib_targets name variant define_all_alias)
       PROPERTIES
       FOLDER "Swift libraries/Aggregate")
   else()
-    message(WARNING "Primary variant is not being built, target ${name}${SWIFT_PRIMARY_VARIANT_SUFFIX}${variant} does not exist, not creating ${name}${variant} alias target.")
+    message(WARNING "Primary variant ${SWIFT_PRIMARY_VARIANT_SDK} is not being built, not creating ${name}${variant} alias target for it.")
   endif()
 endfunction()
 
