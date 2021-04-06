@@ -1662,7 +1662,7 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() || Triple.isTvOS() ||
+      (Triple.isOSDarwin() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return true;
