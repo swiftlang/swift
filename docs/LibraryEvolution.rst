@@ -145,14 +145,21 @@ The following changes are permitted:
   body, not the labels that are part of the function's full name).
 - Reordering generic requirements (but not the generic parameters themselves).
 - Adding a default argument expression to a parameter.
-- Changing or removing a default argument is a `binary-compatible
-  source-breaking change`.
+- Adding, changing, reordering, or removing property wrappers that either are 
+  implementation-detail or belong in a composition leading with an
+  implementation-detail wrapper.
+- Changing or removing a default argument is a `binary-compatible source-breaking change`.
+- Adding, changing, or removing arguments in the property-wrapper custom attribute
+  of an API-level wrapper or in the custom attributes of API-leading compositions
+  is a `binary-compatible source-breaking change`.
 - Adding or removing the ``@discardableResult`` and ``@warn_unqualified_access``
   attributes.
 
 No other changes are permitted; the following are particularly of note:
 
 - An ABI-public function may not change its parameters or return type.
+- An ABI-public function may not in any way change API-level property 
+  wrappers or compositions leading with such wrappers.
 - An ABI-public function may not change its generic requirements.
 - An ABI-public function may not change its external parameter names (labels).
 - An ABI-public function may not add, remove, or reorder parameters, whether or
@@ -413,8 +420,14 @@ stored subscripts. This means that the following changes are permitted:
   accessor bodies, not the labels that are part of the subscript's full name).
 - Reordering generic requirements (but not the generic parameters themselves).
 - Adding a default argument expression to an index parameter.
+- Adding, changing, reordering, or removing property wrappers that either are 
+  implementation-detail or belong in a composition leading with an
+  implementation-detail wrapper.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
+- Adding, changing, or removing arguments in the property-wrapper custom attribute
+  of an API-level wrapper or in the custom attributes of API-leading compositions
+  is a `binary-compatible source-breaking change`.
 
 Like properties, subscripts can be marked ``@inlinable``, which makes
 changing the body of an accessor a `binary-compatible source-breaking change`.
@@ -778,9 +791,15 @@ counterparts with a few small changes:
 - Changing index parameter internal names is permitted.
 - Reordering generic requirements (but not the generic parameters themselves)
   is permitted.
+- Adding, changing, reordering, or removing property wrappers that either are 
+  implementation-detail or belong in a composition leading with an
+  implementation-detail wrapper are permitted.
 - Adding a default argument expression to an index parameter is permitted.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
+- Adding, changing, or removing arguments in the property-wrapper custom attribute
+  of an API-level wrapper or in the custom attributes of API-leading compositions
+  is a `binary-compatible source-breaking change`.
 
 Adding a public setter to an ``open`` subscript is a
 `binary-compatible source-breaking change`; any existing overrides will not
