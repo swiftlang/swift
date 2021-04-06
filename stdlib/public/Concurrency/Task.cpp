@@ -507,7 +507,7 @@ getAsyncClosureEntryPointAndContextSize(void *function,
       reinterpret_cast<const AsyncFunctionPointer<AsyncSignature> *>(function);
 #if SWIFT_PTRAUTH
   fnPtr = (const AsyncFunctionPointer<AsyncSignature> *)ptrauth_auth_data(
-      (void *)fnPtr, ptrauth_key_process_independent_code, AuthDiscriminator);
+      (void *)fnPtr, ptrauth_key_process_independent_data, AuthDiscriminator);
 #endif
   return {reinterpret_cast<typename AsyncSignature::FunctionType *>(
               fnPtr->Function.get()),

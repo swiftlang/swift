@@ -303,9 +303,39 @@ static inline void swift_ptrauth_copy(T *dest, const T *src, unsigned extra) {
 #endif
 }
 
-/// Initialize the destination with an address-discriminated signed pointer.
-/// This does not authenticate the source value, so be careful about how
-/// you construct it.
+/// Copy an address-discriminated signed data pointer from the source
+/// to the destination.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_copy_data(T *dest, const T *src,
+                                           unsigned extra) {
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_auth_and_resign(*src,
+                                  ptrauth_key_process_independent_data,
+                                  ptrauth_blend_discriminator(src, extra),
+                                  ptrauth_key_process_independent_data,
+                                  ptrauth_blend_discriminator(dest, extra));
+#else
+  *dest = *src;
+#endif
+}
+
+/// Copy an address-discriminated signed pointer from the source
+/// to the destination.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline void
+swift_ptrauth_copy_code_or_data(T *dest, const T *src, unsigned extra,
+                                bool isCode) {
+  if (isCode) {
+    return swift_ptrauth_copy(dest, src, extra);
+  } else {
+    return swift_ptrauth_copy_data(dest, src, extra);
+  }
+}
+
+/// Initialize the destination with an address-discriminated signed
+/// function pointer.  This does not authenticate the source value, so be
+/// careful about how you construct it.
 template <class T>
 SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline void swift_ptrauth_init(T *dest, T value, unsigned extra) {
@@ -317,6 +347,35 @@ static inline void swift_ptrauth_init(T *dest, T value, unsigned extra) {
 #else
   *dest = value;
 #endif
+}
+
+/// Initialize the destination with an address-discriminated signed
+/// data pointer.  This does not authenticate the source value, so be
+/// careful about how you construct it.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+static inline void swift_ptrauth_init_data(T *dest, T value, unsigned extra) {
+  // FIXME: assert that T is not a function-pointer type?
+#if SWIFT_PTRAUTH
+  *dest = ptrauth_sign_unauthenticated(value,
+                                  ptrauth_key_process_independent_data,
+                                  ptrauth_blend_discriminator(dest, extra));
+#else
+  *dest = value;
+#endif
+}
+
+/// Initialize the destination with an address-discriminated signed
+/// pointer.  This does not authenticate the source value, so be
+/// careful about how you construct it.
+template <class T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline void
+swift_ptrauth_init_code_or_data(T *dest, T value, unsigned extra, bool isCode) {
+  if (isCode) {
+    return swift_ptrauth_init(dest, value, extra);
+  } else {
+    return swift_ptrauth_init_data(dest, value, extra);
+  }
 }
 
 template <typename T>
