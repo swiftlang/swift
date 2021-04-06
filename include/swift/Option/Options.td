@@ -184,7 +184,8 @@ def help_hidden : Flag<["-", "--"], "help-hidden">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Display available options, including hidden options">;
 
-def v : Flag<["-"], "v">, Flags<[DoesNotAffectIncrementalBuild]>,
+def v : Flag<["-"], "v">,
+  Flags<[DoesNotAffectIncrementalBuild, SwiftSymbolGraphExtractOption]>,
   HelpText<"Show commands to run and use verbose output">;
 def version : Flag<["-", "--"], "version">, Flags<[FrontendOption]>,
   HelpText<"Print version information and exit">;

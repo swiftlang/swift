@@ -35,6 +35,10 @@ struct SymbolGraphOptions {
   /// Emit members gotten through class inheritance or protocol default
   /// implementations with compound, "SYNTHESIZED" USRs.
   bool EmitSynthesizedMembers;
+  
+  /// Whether to silence the "Found N symbols" messages when rendering
+  /// a symbol graph.
+  bool QuietMessages;
 };
 
 } // end namespace symbolgraphgen
