@@ -361,6 +361,20 @@ extension Task {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension Task {
+
+  @discardableResult
+  @available(*, deprecated, message: "`Task.runDetached` was replaced by `detach` and will be removed shortly.")
+  public func runDetached<T>(
+    priority: Task.Priority = .unspecified,
+    operation: __owned @Sendable @escaping () async -> T
+  ) -> Task.Handle<T, Never> {
+    detach(priority: priority, operation: operation)
+  }
+
+}
+
 /// Run given throwing `operation` as part of a new top-level task.
 ///
 /// Creating detached tasks should, generally, be avoided in favor of using
