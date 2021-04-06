@@ -52,9 +52,3 @@ import main // expected-warning{{'implementation-only-import-suggestion.swift' i
 // RUN: not %target-swift-frontend -typecheck %s -library-level ThatsNotALibraryLevel 2>&1 \
 // RUN:   | %FileCheck %s --check-prefix CHECK-ARG
 // CHECK-ARG: error: unknown library level 'ThatsNotALibraryLevel', expected one of 'api', 'spi' or 'other'
-
-
-// rdar://76004923
-// UNSUPPORTED: OS=ios
-// UNSUPPORTED: OS=watchos
-// UNSUPPORTED: OS=tvos
