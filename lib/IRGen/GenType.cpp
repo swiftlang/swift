@@ -1027,27 +1027,31 @@ namespace {
       return true;
     }
 
+    PointerInfo getPointerInfo() const {
+      return PointerInfo::forAligned(PointeeAlign);
+    }
+
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getAlignedPointerExtraInhabitantCount(IGM, PointeeAlign);
+      return getPointerInfo().getExtraInhabitantCount(IGM);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
                                        unsigned index) const override {
-      return getAlignedPointerExtraInhabitantValue(IGM, PointeeAlign,
-                                                   bits, index, 0);
+      return getPointerInfo()
+               .getFixedExtraInhabitantValue(IGM, bits, index, 0);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
                                          SILType T,
                                          bool isOutlined) const override {
-      return getAlignedPointerExtraInhabitantIndex(IGF, PointeeAlign, src);
+      return getPointerInfo().getExtraInhabitantIndex(IGF, src);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T,
                               bool isOutlined) const override {
-      storeAlignedPointerExtraInhabitant(IGF, PointeeAlign, index, dest);
+      getPointerInfo().storeExtraInhabitant(IGF, index, dest);
     }
   };
 
