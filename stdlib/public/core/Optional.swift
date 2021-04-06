@@ -607,14 +607,13 @@ extension Optional {
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
-@_alwaysEmitIntoClient
-public func ?? <T>(optional: T?, defaultValue: @autoclosure () async throws -> T)
-    reasync rethrows -> T {
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
+    rethrows -> T {
   switch optional {
   case .some(let value):
     return value
   case .none:
-    return try await defaultValue()
+    return try defaultValue()
   }
 }
 
@@ -661,34 +660,7 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () async throws -> T
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
 @_transparent
-@_alwaysEmitIntoClient
-public func ?? <T>(optional: T?, defaultValue: @autoclosure () async throws -> T?)
-    reasync rethrows -> T? {
-  switch optional {
-  case .some(let value):
-    return value
-  case .none:
-    return try await defaultValue()
-  }
-}
-
-// We keep the old entry points around but mark them unavailable for
-// ABI compatibility.
-@usableFromInline
-@available(*, unavailable)
-internal func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
-    rethrows -> T {
-  switch optional {
-  case .some(let value):
-    return value
-  case .none:
-    return try defaultValue()
-  }
-}
-
-@usableFromInline
-@available(*, unavailable)
-internal func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
+public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {
   case .some(let value):
