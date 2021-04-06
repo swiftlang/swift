@@ -43,7 +43,5 @@ func yielding() async {
   static func main() async {
     await yielding()
     // TODO: No idea for a good test for this... Open to ideas?
-    // CHECK:      One
-    // CHECK-NEXT: Two
   }
 }
