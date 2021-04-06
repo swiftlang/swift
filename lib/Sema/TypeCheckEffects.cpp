@@ -1173,12 +1173,7 @@ private:
 
     ShouldRecurse_t checkForEach(ForEachStmt *S) {
       if (S->getAwaitLoc().isValid()) {
-        auto classification = Self.classifyConformance(
-            S->getSequenceConformance(),
-            EffectKind::Async);
-        IsInvalid |= classification.isInvalid();
-        AsyncKind = std::max(AsyncKind,
-                             classification.getConditionalKind(EffectKind::Async));
+        AsyncKind = std::max(AsyncKind, ConditionalEffectKind::Always);
       }
 
       return ShouldRecurse;
@@ -2735,10 +2730,19 @@ private:
     if (!S->getAwaitLoc().isValid())
       return ShouldRecurse;
 
+    // A 'for await' is always async. There's no effect polymorphism
+    // via the conformance in a 'reasync' function body.
+    Flags.set(ContextFlags::HasAnyAsyncSite);
+
+    if (!CurContext.handlesAsync(ConditionalEffectKind::Always))
+      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, None);
+
     ApplyClassifier classifier;
     classifier.RethrowsDC = RethrowsDC;
     classifier.ReasyncDC = ReasyncDC;
 
+    // A 'for try await' might be effect polymorphic via the conformance
+    // in a 'rethrows' function body.
     if (S->getTryLoc().isValid()) {
       auto classification = classifier.classifyConformance(
           S->getSequenceConformance(), EffectKind::Throws);
@@ -2750,16 +2754,6 @@ private:
       if (!CurContext.handlesThrows(throwsKind))
         CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
     }
-
-    auto classification = classifier.classifyConformance(
-        S->getSequenceConformance(), EffectKind::Async);
-    auto asyncKind = classification.getConditionalKind(EffectKind::Async);
-
-    if (asyncKind != ConditionalEffectKind::None)
-      Flags.set(ContextFlags::HasAnyAsyncSite);
-
-    if (!CurContext.handlesAsync(asyncKind))
-      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, None);
 
     return ShouldRecurse;
   }
