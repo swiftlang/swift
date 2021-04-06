@@ -67,3 +67,46 @@ func butt(x: inout Butt) { // expected-note*{{}}
         x.$wrapped_modify_conditionally_available = 0
     }
 }
+
+@available(macOS 11.0, *)
+struct LessAvailable {
+  @SetterConditionallyAvailable
+  var wrapped_setter_more_available: Int
+
+  @ModifyConditionallyAvailable
+  var wrapped_modify_more_available: Int
+
+  var nested: Nested
+
+  struct Nested {
+    @SetterConditionallyAvailable
+    var wrapped_setter_more_available: Int
+
+    @ModifyConditionallyAvailable
+    var wrapped_modify_more_available: Int
+  }
+}
+
+func testInferredAvailability(x: inout LessAvailable) { // expected-error {{'LessAvailable' is only available in macOS 11.0 or newer}} expected-note*{{}}
+  x.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+  x.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+  x.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+  x.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+
+  x.nested.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+  x.nested.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+  x.nested.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+  x.nested.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 11.0 or newer}} expected-note{{}}
+
+  if #available(macOS 11.0, *) {
+    x.wrapped_setter_more_available = 0
+    x.wrapped_modify_more_available = 0
+    x.$wrapped_setter_more_available = 0
+    x.$wrapped_modify_more_available = 0
+
+    x.nested.wrapped_setter_more_available = 0
+    x.nested.wrapped_modify_more_available = 0
+    x.nested.$wrapped_setter_more_available = 0
+    x.nested.$wrapped_modify_more_available = 0
+  }
+}
