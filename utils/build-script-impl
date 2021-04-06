@@ -166,6 +166,7 @@ KNOWN_SETTINGS=(
 
     ## llbuild Options
     llbuild-enable-assertions                     "1"               "enable assertions in llbuild"
+    skip-clean-llbuild                            "0"               "skip cleaning up llbuild"
 
     ## LLDB Options
     lldb-assertions                               "1"               "build lldb with assertions enabled"
@@ -2207,6 +2208,15 @@ for host in "${ALL_HOSTS[@]}"; do
 
                         -DSQLite3_INCLUDE_DIR:PATH="$(xcrun -sdk macosx -show-sdk-path)/usr/include"
                     )
+                fi
+
+                if [[ "${SKIP_CLEAN_LLBUILD}" == "0" ]]
+                then
+                  # Ensure llbuild will rebuild from scratch, since
+                  # arbitrary changes to the compiler can prevent
+                  # a successful incremental build
+                  echo "Cleaning the llbuild build directory"
+                  call rm -rf "$(build_directory ${host} llbuild)"
                 fi
                 ;;
             xctest)
