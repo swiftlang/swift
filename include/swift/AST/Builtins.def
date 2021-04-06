@@ -758,12 +758,15 @@ BUILTIN_MISC_OPERATION(BuildSerialExecutorRef,
 // Retrieve the ExecutorRef on which the current asynchronous
 // function is executing.
 // Does not retain an actor executor.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "n", Special)
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "", Special)
 
 // getCurrentAsyncTask: () -> Builtin.NativeObject
 //
 // Retrieve the pointer to the task in which the current asynchronous
 // function is executing.
+//
+// This is readnone because, within the world modeled by SIL, the
+// current async task of a thread never changes.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "n", Special)
 
 /// cancelAsyncTask(): (Builtin.NativeObject) -> Void
