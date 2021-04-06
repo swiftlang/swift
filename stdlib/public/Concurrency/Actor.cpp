@@ -1538,9 +1538,7 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 
   // Just assume it's actually a default actor that we haven't tagged
   // properly.
-  // FIXME: call the general method.
-  return asImpl(reinterpret_cast<DefaultActor*>(executor.getRawValue()))
-    ->enqueue(job);
+  swift_unreachable("unexpected or corrupt executor reference");
 }
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE

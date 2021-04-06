@@ -2434,9 +2434,9 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   return dispatch;
 }
 
-void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
+void IRGenFunction::emitSuspensionPoint(Explosion &toExecutor,
                                         llvm::Value *asyncResume) {
-                                        
+
   // Setup the suspend point.
   SmallVector<llvm::Value *, 8> arguments;
   unsigned swiftAsyncContextIndex = 0;
@@ -2451,8 +2451,8 @@ void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
 
   // Extra arguments to pass to the suspension function.
   arguments.push_back(asyncResume);
-  arguments.push_back(
-      Builder.CreateBitOrPointerCast(toExecutor, IGM.SwiftExecutorPtrTy));
+  arguments.push_back(toExecutor.claimNext());
+  arguments.push_back(toExecutor.claimNext());
   arguments.push_back(getAsyncContext());
   auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
                                         false /*packed*/);
@@ -2479,7 +2479,8 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   // @llvm.coro.suspend.async by emitSuspensionPoint.
   SmallVector<llvm::Type*, 8> argTys;
   argTys.push_back(IGM.Int8PtrTy); // resume function
-  argTys.push_back(IGM.SwiftExecutorPtrTy); // target executor
+  argTys.push_back(IGM.ExecutorFirstTy); // target executor (first half)
+  argTys.push_back(IGM.ExecutorSecondTy); // target executor (second half)
   argTys.push_back(getAsyncContext()->getType()); // current context
   auto *suspendFnTy =
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
@@ -2495,8 +2496,9 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);
-  llvm::Value *targetExecutor = suspendFn->getArg(1);
-  llvm::Value *context = suspendFn->getArg(2);
+  llvm::Value *targetExecutorFirst = suspendFn->getArg(1);
+  llvm::Value *targetExecutorSecond = suspendFn->getArg(2);
+  llvm::Value *context = suspendFn->getArg(3);
   context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
 
   // Sign the task resume function with the C function pointer schema.
@@ -2510,7 +2512,7 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
 
   auto *suspendCall = Builder.CreateCall(
       IGM.getTaskSwitchFuncFn(),
-      { context, resumeFunction, targetExecutor });
+      { context, resumeFunction, targetExecutorFirst, targetExecutorSecond });
   suspendCall->setDoesNotThrow();
   suspendCall->setCallingConv(IGM.SwiftAsyncCC);
   suspendCall->setTailCallKind(IGM.AsyncTailCallKind);

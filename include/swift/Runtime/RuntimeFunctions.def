@@ -1595,7 +1595,7 @@ FUNCTION(TaskSwitchFunc,
          swift_task_switch, SwiftAsyncCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
-         ARGS(SwiftContextPtrTy, Int8PtrTy, SwiftExecutorPtrTy),
+         ARGS(SwiftContextPtrTy, Int8PtrTy, ExecutorFirstTy, ExecutorSecondTy),
          ATTRS(NoUnwind))
 
 // AsyncTask *swift_continuation_init(AsyncContext *continuationContext,
@@ -1636,7 +1636,7 @@ FUNCTION(ContinuationThrowingResumeWithError,
 FUNCTION(TaskGetCurrentExecutor,
          swift_task_getCurrentExecutor, SwiftCC,
          ConcurrencyAvailability,
-         RETURNS(IntPtrTy),
+         RETURNS(SwiftExecutorTy),
          ARGS(),
          ATTRS(NoUnwind, ArgMemOnly))
 

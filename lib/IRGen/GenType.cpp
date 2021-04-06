@@ -1552,20 +1552,6 @@ const TypeInfo &TypeConverter::getTaskContinuationFunctionPtrTypeInfo() {
   return *TaskContinuationFunctionPtrTI;
 }
 
-const TypeInfo &IRGenModule::getSwiftExecutorPtrTypeInfo() {
-  return Types.getExecutorTypeInfo();
-}
-
-const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
-  if (ExecutorTI) return *ExecutorTI;
-  ExecutorTI = createPrimitive(IGM.SwiftExecutorPtrTy,
-                               IGM.getPointerSize(),
-                               IGM.getPointerAlignment());
-  ExecutorTI->NextConverted = FirstType;
-  FirstType = ExecutorTI;
-  return *ExecutorTI;
-}
-
 const LoadableTypeInfo &
 IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
   switch (refcounting) {
