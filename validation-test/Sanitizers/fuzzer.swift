@@ -3,6 +3,8 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: executable_test
 // REQUIRES: fuzzer_runtime
+// REQUIRES: libdispatch
+
 // XFAIL: OS=ios
 // XFAIL: OS=tvos
 // XFAIL: OS=watchos
