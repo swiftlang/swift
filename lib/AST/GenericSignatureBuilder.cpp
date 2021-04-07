@@ -1096,12 +1096,14 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
                                           ArchetypeResolutionKind::WellFormed);
       assert(parentEquivClass && "Not a well-formed type?");
 
-      if (parentEquivClass->concreteType)
-        derivedViaConcrete = true;
-      else if (parentEquivClass->superclass &&
-               builder.lookupConformance(parentEquivClass->superclass,
-                                         source->getProtocolDecl()))
-        derivedViaConcrete = true;
+      if (requirementSignatureSelfProto) {
+        if (parentEquivClass->concreteType)
+          derivedViaConcrete = true;
+        else if (parentEquivClass->superclass &&
+                 builder.lookupConformance(parentEquivClass->superclass,
+                                           source->getProtocolDecl()))
+          derivedViaConcrete = true;
+      }
 
       // The parent potential archetype must conform to the protocol in which
       // this requirement resides. Add this constraint.
@@ -7200,6 +7202,9 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
 
       for (auto otherReq : found->second) {
         auto *otherSource = otherReq.getSource();
+        if (otherSource->isInferredRequirement())
+          continue;
+
         auto otherLoc = otherSource->getLoc();
         if (otherLoc.isInvalid())
           continue;
@@ -7237,6 +7242,9 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
 
         for (auto otherReq : found->second) {
           auto *otherSource = otherReq.getSource();
+          if (otherSource->isInferredRequirement())
+            continue;
+
           auto otherLoc = otherSource->getLoc();
           if (otherLoc.isInvalid())
             continue;
@@ -7276,6 +7284,9 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
 
         for (auto otherReq : found->second) {
           auto *otherSource = otherReq.getSource();
+          if (otherSource->isInferredRequirement())
+            continue;
+
           auto otherLoc = otherSource->getLoc();
           if (otherLoc.isInvalid())
             continue;
