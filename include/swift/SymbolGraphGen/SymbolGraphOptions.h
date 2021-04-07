@@ -36,9 +36,9 @@ struct SymbolGraphOptions {
   /// implementations with compound, "SYNTHESIZED" USRs.
   bool EmitSynthesizedMembers;
   
-  /// Whether to silence the "Found N symbols" messages when rendering
+  /// Whether to print informational messages when rendering
   /// a symbol graph.
-  bool QuietMessages;
+  bool PrintMessages;
 };
 
 } // end namespace symbolgraphgen

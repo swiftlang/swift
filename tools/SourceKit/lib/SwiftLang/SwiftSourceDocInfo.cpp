@@ -869,7 +869,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         /*PrettyPrint=*/false,
         AccessLevel::Private,
         /*EmitSynthesizedMembers*/ false,
-        /*QuietMessages*/ true,
+        /*PrintMessages*/ false,
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,

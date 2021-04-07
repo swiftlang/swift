@@ -5633,7 +5633,7 @@ void swift::serialize(ModuleOrSourceFile DC,
         /* PrettyPrint */false,
         AccessLevel::Public,
         /*EmitSynthesizedMembers*/true,
-        /*QuietMessages*/true,
+        /*PrintMessages*/false,
       };
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }

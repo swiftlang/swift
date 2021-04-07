@@ -70,7 +70,7 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   SmallVector<Decl *, 64> ModuleDecls;
   M->getDisplayDecls(ModuleDecls);
 
-  if (!Options.QuietMessages)
+  if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()
         << " top-level declarations in this module.\n";
 
@@ -78,7 +78,7 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
     Walker.walk(Decl);
   }
 
-  if (!Options.QuietMessages)
+  if (Options.PrintMessages)
     llvm::errs()
       << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
       << Walker.MainGraph.Edges.size() << " relationships.\n";
