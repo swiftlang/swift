@@ -32,6 +32,12 @@ extension SIMDMask where Storage == ${Vector} {
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Vector}(_builtin)
   }
+    
+  /// A vector with the specified value in all lanes.
+  @_alwaysEmitIntoClient
+  public init(repeating scalar: Bool) {
+    _storage = ${Vector}(repeating: scalar ? -1 : 0)
+  }
   
   @_alwaysEmitIntoClient
   internal static var allTrue: Self {
@@ -276,6 +282,17 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
 #endif
     
+  /// A vector with the specified value in all lanes.
+  @_alwaysEmitIntoClient
+  public init(repeating scalar: ${Scalar}) {
+    let vec = Builtin.insertelement_${Builtin}_Int${int.bits}_Int32(
+      Builtin.zeroInitializer(), scalar._value, Builtin.zeroInitializer()
+    )
+    self.init(Builtin.shufflevector_${Builtin}_Vec${storageN}xInt32(
+      vec, vec, Builtin.zeroInitializer()
+    ))
+  }
+    
   /// A vector mask with the result of a pointwise equality comparison.
   @_alwaysEmitIntoClient
   public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -442,6 +459,17 @@ extension SIMD${n} where Scalar == ${Scalar} {
   @_alwaysEmitIntoClient
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
+  }
+    
+  /// A vector with the specified value in all lanes.
+  @_alwaysEmitIntoClient
+  public init(repeating scalar: ${Scalar}) {
+    let vec = Builtin.insertelement_${Builtin}_FPIEEE${bits}_Int32(
+      Builtin.zeroInitializer(), scalar._value, Builtin.zeroInitializer()
+    )
+    self.init(Builtin.shufflevector_${Builtin}_Vec${storageN}xInt32(
+      vec, vec, Builtin.zeroInitializer()
+    ))
   }
   
   /// A vector mask with the result of a pointwise equality comparison.
