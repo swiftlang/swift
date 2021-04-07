@@ -1253,29 +1253,6 @@ namespace {
             CS.setFavoredType(E, knownType.getPointer());
           }
         }
-
-        // This can only happen when failure diagnostics is trying
-        // to type-check expressions inside of a single-statement
-        // closure which refer to anonymous parameters, in this case
-        // let's either use type as written or allocate a fresh type
-        // variable, just like we do for closure type.
-        // FIXME: We should eliminate this case.
-        if (auto *PD = dyn_cast<ParamDecl>(VD)) {
-          if (!CS.hasType(PD)) {
-            if (knownType &&
-                (knownType->hasUnboundGenericType() ||
-                 knownType->hasPlaceholder())) {
-              knownType = CS.replaceInferableTypesWithTypeVars(knownType,
-                                                               locator);
-            }
-
-            CS.setType(
-                PD, knownType ? knownType
-                         : CS.createTypeVariable(locator,
-                                                 TVO_CanBindToLValue |
-                                                 TVO_CanBindToNoEscape));
-          }
-        }
       }
 
       // If declaration is invalid, let's turn it into a potential hole
