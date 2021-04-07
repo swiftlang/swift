@@ -644,6 +644,11 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   // might end up on a global constant initializer.
   auto nonABICodeKey = PointerAuthSchema::ARM8_3Key::ASIB;
 
+  // A key suitable for data pointers that are only used in private
+  // situations.  Do not use this key for any sort of signature that
+  // might end up on a global constant initializer.
+  auto nonABIDataKey = PointerAuthSchema::ARM8_3Key::ASDB;
+
   // If you change anything here, be sure to update <ptrauth.h>.
   opts.SwiftFunctionPointers =
     PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Type);
@@ -711,6 +716,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
 
   opts.AsyncSwiftDynamicReplacements =
       PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+
+  opts.AsyncPartialApplyCapture =
+      PointerAuthSchema(nonABIDataKey, /*address*/ true, Discrimination::Decl);
 
   opts.AsyncContextParent =
       PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
