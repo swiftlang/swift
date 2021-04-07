@@ -54,7 +54,7 @@ public func testBase(b: Base) -> Int32 {
 
 // Check that vtables and witness tables contain SILDeclRefs with signatures.
 
-// CHECK: sil_vtable [serialized] Base {
+// CHECK: sil_vtable Base {
 // CHECK-NEXT:  #Base.foo: (Base) -> () -> Int32 : @$s10SILDeclRef4BaseC3foos5Int32VyF	// Base.foo()
 // CHECK-NEXT:  #Base.foo: (Base) -> (Int32) -> () : @$s10SILDeclRef4BaseC3foo1nys5Int32V_tF	// Base.foo(n:)
 // CHECK-NEXT:  #Base.foo: (Base) -> (Float) -> Int32 : @$s10SILDeclRef4BaseC3foo1fs5Int32VSf_tF	// Base.foo(f:)
@@ -62,7 +62,7 @@ public func testBase(b: Base) -> Int32 {
 // CHECK-NEXT:  #Base.deinit!deallocator: @$s10SILDeclRef4BaseCfD	// Base.__deallocating_deinit
 // CHECK-NEXT: }
 
-// CHECK:sil_witness_table [serialized] Base: P module SILDeclRef {
+// CHECK:sil_witness_table Base: P module SILDeclRef {
 // CHECK-NEXT: method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : @$s10SILDeclRef4BaseCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo()
 // CHECK-NEXT: method #P.foo: <Self where Self : P> (Self) -> (Int32) -> () : @$s10SILDeclRef4BaseCAA1PA2aDP3foo1nys5Int32V_tFTW	// protocol witness for P.foo(n:) in conformance Base
 // CHECK-NEXT: }
