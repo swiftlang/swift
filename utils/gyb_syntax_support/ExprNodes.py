@@ -104,6 +104,8 @@ EXPR_NODES = [
     # A _ expression.
     Node('DiscardAssignmentExpr', kind='Expr',
          children=[
+             Child('Unknown', kind='Attribute',
+                   is_optional=True),
              Child('Wildcard', kind='WildcardToken'),
          ]),
 

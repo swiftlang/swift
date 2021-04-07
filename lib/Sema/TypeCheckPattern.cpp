@@ -349,7 +349,7 @@ public:
     if (E->isImplicit()) {
       return AnyPattern::createImplicit(Context);
     }
-    return new (Context) AnyPattern(E->getLoc());
+    return new (Context) AnyPattern(E->getUnknownLoc(), E->getLoc());
   }
   
   // Cast expressions 'x as T' get resolved to checked cast patterns.

@@ -191,6 +191,9 @@ public:
 
   bool isNeverDefaultInitializable() const;
 
+  /// Return true if this pattern (or a subpattern) contains @unknown _.
+  bool hasUnknownAnyPattern() const;
+
   /// Mark all vardecls in this pattern as having an owning statement for
   /// the pattern.
   void markOwnedByStatement(Stmt *S) {
@@ -369,22 +372,27 @@ public:
 };
 
 /// A pattern which matches an arbitrary value of a type, but does not
-/// bind a name to it.  This is spelled "_".
+/// bind a name to it.  This is spelled "_" or "@unknown _".
 class AnyPattern : public Pattern {
+  SourceLoc UnknownLoc;
   SourceLoc Loc;
 
 public:
-  explicit AnyPattern(SourceLoc Loc)
-      : Pattern(PatternKind::Any), Loc(Loc) { }
+  explicit AnyPattern(SourceLoc UnknownLoc, SourceLoc Loc)
+      : Pattern(PatternKind::Any), UnknownLoc(UnknownLoc), Loc(Loc) {}
 
   static AnyPattern *createImplicit(ASTContext &Context) {
-    auto *AP = new (Context) AnyPattern(SourceLoc());
+    auto *AP = new (Context) AnyPattern(SourceLoc(), SourceLoc());
     AP->setImplicit();
     return AP;
   }
 
+  SourceLoc getUnknownLoc() const { return UnknownLoc; }
+  bool isUnknown() const { return UnknownLoc.isValid(); }
   SourceLoc getLoc() const { return Loc; }
-  SourceRange getSourceRange() const { return Loc; }
+  SourceRange getSourceRange() const {
+    return isUnknown() ? SourceRange(UnknownLoc, Loc) : SourceRange(Loc);
+  }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Any;

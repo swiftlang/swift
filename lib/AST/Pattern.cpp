@@ -345,6 +345,30 @@ case PatternKind::ID: foundRefutablePattern = true; break;
   return foundRefutablePattern;
 }
 
+bool Pattern::hasUnknownAnyPattern() const {
+  bool foundUnknownAnyPattern = false;
+  const_cast<Pattern *>(this)->forEachNode([&](Pattern *Node) {
+    switch (Node->getKind()) {
+    case PatternKind::Any:
+      foundUnknownAnyPattern |= cast<AnyPattern>(Node)->isUnknown();
+      return;
+    case PatternKind::Named:
+    case PatternKind::Expr:
+    case PatternKind::Bool:
+    case PatternKind::Is:
+    case PatternKind::Paren:
+    case PatternKind::Typed:
+    case PatternKind::Binding:
+    case PatternKind::Tuple:
+    case PatternKind::EnumElement:
+    case PatternKind::OptionalSome:
+      return;
+    }
+    llvm_unreachable("Unhandled PatternKind!");
+  });
+  return foundUnknownAnyPattern;
+}
+
 /// Standard allocator for Patterns.
 void *Pattern::operator new(size_t numBytes, const ASTContext &C) {
   return C.Allocate(numBytes, alignof(Pattern));

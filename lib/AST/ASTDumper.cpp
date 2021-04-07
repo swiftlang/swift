@@ -474,6 +474,8 @@ namespace {
     }
     void visitAnyPattern(AnyPattern *P) {
       printCommon(P, "pattern_any");
+      if (P->getUnknownLoc().isValid())
+        OS << " @unknown";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     void visitTypedPattern(TypedPattern *P) {
@@ -2030,6 +2032,8 @@ public:
 
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
     printCommon(E, "discard_assignment_expr");
+    if (E->getUnknownLoc().isValid())
+      OS << " @unknown";
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

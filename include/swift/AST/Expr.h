@@ -1175,12 +1175,17 @@ public:
 /// DiscardAssignmentExpr - A '_' in the left-hand side of an assignment, which
 /// discards the corresponding tuple element on the right-hand side.
 class DiscardAssignmentExpr : public Expr {
+  /// HACK: Location for @unknown _ in conditional clauses in switch statements.
+  /// @unknown isn't permitted in assignment contexts.
+  SourceLoc UnknownLoc;
   SourceLoc Loc;
 
 public:
-  DiscardAssignmentExpr(SourceLoc Loc, bool Implicit)
-    : Expr(ExprKind::DiscardAssignment, Implicit), Loc(Loc) {}
-  
+  DiscardAssignmentExpr(SourceLoc UnknownLoc, SourceLoc Loc, bool Implicit)
+      : Expr(ExprKind::DiscardAssignment, Implicit), UnknownLoc(UnknownLoc),
+        Loc(Loc) {}
+
+  SourceLoc getUnknownLoc() const { return UnknownLoc; }
   SourceRange getSourceRange() const { return Loc; }
   SourceLoc getLoc() const { return Loc; }
   

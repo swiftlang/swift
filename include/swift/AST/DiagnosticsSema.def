@@ -5667,6 +5667,10 @@ WARNING(non_exhaustive_switch_unknown_only,none,
         "switch covers known cases, but %0 may have additional unknown values"
         "%select{|, possibly added in future versions}1", (Type, bool))
 
+WARNING(unknown_pattern_for_non_enum,none,
+        "unknown pattern is not applicable to non-enum type %0", (Type))
+NOTE(non_enum_drop_unknown,none, "remove '@unknown'", ())
+
 ERROR(override_nsobject_hashvalue_error,none,
       "'NSObject.hashValue' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())
