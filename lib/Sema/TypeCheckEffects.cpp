@@ -1425,6 +1425,9 @@ public:
     DiagnoseErrorOnTry = b;
   }
 
+  /// Stores the location of the innermost await
+  SourceLoc awaitLoc = SourceLoc();
+
   /// Whether this is a function that rethrows.
   bool hasPolymorphicEffect(EffectKind kind) const {
     if (!Function)
@@ -1684,7 +1687,7 @@ public:
     auto loc = E.getStartLoc();
     SourceLoc insertLoc;
     SourceRange highlight;
-    
+
     // Generate more specific messages in some cases.
     if (auto e = dyn_cast_or_null<ApplyExpr>(E.dyn_cast<Expr*>())) {
       if (isa<PrefixUnaryExpr>(e) || isa<PostfixUnaryExpr>(e) ||
@@ -1694,7 +1697,7 @@ public:
       }
       insertLoc = loc;
       highlight = e->getSourceRange();
-      
+
       if (InterpolatedString &&
           e->getCalledValue() &&
           e->getCalledValue()->getBaseName() ==
@@ -1703,7 +1706,7 @@ public:
         insertLoc = InterpolatedString->getLoc();
       }
     }
-    
+
     Diags.diagnose(loc, message).highlight(highlight);
     maybeAddRethrowsNote(Diags, loc, reason);
 
@@ -1716,6 +1719,10 @@ public:
     // because complete context is unavailable.
     if (!suggestTryFixIt)
       return;
+
+    // 'try' should go before 'await'
+    if (awaitLoc.isValid())
+      insertLoc = awaitLoc;
 
     Diags.diagnose(loc, diag::note_forgot_try)
         .fixItInsert(insertLoc, "try ");
@@ -2116,6 +2123,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     DeclContext *OldReasyncDC;
     ContextFlags OldFlags;
     ConditionalEffectKind OldMaxThrowingKind;
+    SourceLoc OldAwaitLoc;
 
   public:
     ContextScope(CheckEffectsCoverage &self, Optional<Context> newContext)
@@ -2123,7 +2131,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
         OldRethrowsDC(self.RethrowsDC),
         OldReasyncDC(self.ReasyncDC),
         OldFlags(self.Flags),
-        OldMaxThrowingKind(self.MaxThrowingKind) {
+        OldMaxThrowingKind(self.MaxThrowingKind),
+        OldAwaitLoc(self.CurContext.awaitLoc) {
       if (newContext) self.CurContext = *newContext;
     }
 
@@ -2141,9 +2150,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.clear(ContextFlags::HasTryThrowSite);
     }
 
-    void enterAwait() {
+    void enterAwait(SourceLoc awaitLoc) {
       Self.Flags.set(ContextFlags::IsAsyncCovered);
       Self.Flags.clear(ContextFlags::HasAnyAsyncSite);
+      Self.CurContext.awaitLoc = awaitLoc;
     }
 
     void enterAsyncLet() {
@@ -2240,6 +2250,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.ReasyncDC = OldReasyncDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;
+      Self.CurContext.awaitLoc = OldAwaitLoc;
     }
   };
 
@@ -2648,12 +2659,13 @@ private:
       break;
     }
   }
+
   ShouldRecurse_t checkAwait(AwaitExpr *E) {
 
     // Walk the operand.
     ContextScope scope(*this, None);
-    scope.enterAwait();
-    
+    scope.enterAwait(E->getAwaitLoc());
+
     E->getSubExpr()->walk(*this);
 
     // Warn about 'await' expressions that weren't actually needed, unless of
@@ -2666,7 +2678,7 @@ private:
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, None,
                                               /*forAwait=*/ true);
     }
-    
+
     // Inform the parent of the walk that an 'await' exists here.
     scope.preserveCoverageFromAwaitOperand();
     return ShouldNotRecurse;
