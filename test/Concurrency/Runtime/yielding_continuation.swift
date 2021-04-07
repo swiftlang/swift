@@ -161,6 +161,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	    let t = detach {
 	      do {
 	        let value1 = try await continuation.next()
+	        expectUnreachable()
 	      } catch {
 	        if let error = error as? SomeError {
 	          expectEqual(error, failure1)
@@ -194,6 +195,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	    let t = detach {
 	      do {
 	        let value1 = try await continuation.next()
+	        expectUnreachable()
 	      } catch {
 	        if let error = error as? SomeError {
 	          expectEqual(error, failure1)
