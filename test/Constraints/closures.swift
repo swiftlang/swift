@@ -1077,3 +1077,10 @@ let _: (@convention(c) () -> Void)? = Bool.random() ? nil : {} // OK on type che
 let _: (@convention(block) () -> Void)? = Bool.random() ? {} : {} // OK
 let _: (@convention(thin) () -> Void)? = Bool.random() ? {} : {} // OK
 let _: (@convention(c) () -> Void)? = Bool.random() ? {} : {} // OK on type checking, diagnostics are deffered to SIL
+
+// Make sure that diagnostic is attached to the closure even when body is empty (implicitly returns `Void`)
+var emptyBodyMismatch: () -> Int {
+  return { // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+    return
+  }
+}
