@@ -11,6 +11,18 @@ func check_state(_ state : MyState) -> Int {
   return state == .opened ? 1 : 0
 }
 
+// generic-enum.swift
+enum GenericMyState<T> : String {
+  case closed
+  case opened
+}
+
+@inline(never)
+func check_generic_state(_ state : GenericMyState<Int>) -> Int {
+  // CHECK: function_ref @$s4main14GenericMyStateO21__derived_enum_equalsySbACyxG_AEtFZ
+  return state == .opened ? 1 : 0
+}
+
 // regular-enum.swift
 enum Regular {
   case closed
