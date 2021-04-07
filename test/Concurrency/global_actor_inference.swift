@@ -282,6 +282,17 @@ struct WrapperOnActor<Wrapped> {
   }
 }
 
+@MainActor
+@propertyWrapper
+public struct WrapperOnMainActor<Wrapped> {
+  // Make sure inference of @MainActor on wrappedValue doesn't crash.
+  public var wrappedValue: Wrapped
+
+  public init(wrappedValue: Wrapped) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
 @propertyWrapper
 actor WrapperActor<Wrapped> {
   @actorIndependent(unsafe) var storage: Wrapped
