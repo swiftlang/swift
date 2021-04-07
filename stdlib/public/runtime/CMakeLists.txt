@@ -79,6 +79,13 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
+# Check that the runtime is using the async calling convention
+# correctly, and that musttail isn't missed by Clang/LLVM.
+if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+  list(APPEND swift_runtime_library_compile_flags
+        "-mllvm" "-enable-swifttailcc-musttail-check")
+endif()
+
 set(sdk "${SWIFT_HOST_VARIANT_SDK}")
 if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   set(static_binary_lnk_file_list)
