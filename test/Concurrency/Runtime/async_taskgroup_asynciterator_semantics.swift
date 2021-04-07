@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: linux
+// UNSUPPORTED: linux
 // XFAIL: windows
 
 struct Boom: Error {}
