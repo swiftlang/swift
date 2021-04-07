@@ -12,16 +12,12 @@
 
 import Swift
 
-@_fixed_layout
-@usableFromInline
 internal final class _YieldingContinuationStorage: UnsafeSendable {
-  @usableFromInline
   var continuation: Builtin.RawUnsafeContinuation?
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct YieldingContinuation<Element, Failure: Error>: Sendable {
-  @usableFromInline
   let storage = _YieldingContinuationStorage()
 
   /// Construct a YieldingContinuation.
@@ -40,17 +36,13 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   /// safely be used and stored in multiple task contexts.
   public init(yielding: Element.Type, throwing: Failure.Type) { }
 
-  @inlinable
-  @inline(__always)
   internal func _extract() -> UnsafeContinuation<Element, Error>? {
     let raw = Builtin.atomicrmw_xchg_acqrel_Word(
       Builtin.addressof(&storage.continuation),
       UInt(bitPattern: 0)._builtinWordValue)
     return unsafeBitCast(raw, to: UnsafeContinuation<Element, Error>?.self)
   }
-  
-  @inlinable
-  @inline(__always)
+
   internal func _inject(
     _ continuation: UnsafeContinuation<Element, Error>
   ) -> UnsafeContinuation<Element, Error>? {
