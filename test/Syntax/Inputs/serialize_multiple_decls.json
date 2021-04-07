@@ -1,23 +1,18 @@
 {
-  "id": 19,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 18,
       "kind": "CodeBlockItemList",
       "layout": [
         {
-          "id": 8,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 7,
               "kind": "StructDecl",
               "layout": [
                 null,
                 null,
                 {
-                  "id": 1,
                   "tokenKind": {
                     "kind": "kw_struct"
                   },
@@ -26,7 +21,6 @@
                   "presence": "Present"
                 },
                 {
-                  "id": 2,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "A"
@@ -39,11 +33,9 @@
                 null,
                 null,
                 {
-                  "id": 6,
                   "kind": "MemberDeclBlock",
                   "layout": [
                     {
-                      "id": 3,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
@@ -52,13 +44,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 4,
                       "kind": "MemberDeclList",
                       "layout": [],
                       "presence": "Present"
                     },
                     {
-                      "id": 5,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -78,17 +68,14 @@
           "presence": "Present"
         },
         {
-          "id": 16,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 15,
               "kind": "StructDecl",
               "layout": [
                 null,
                 null,
                 {
-                  "id": 9,
                   "tokenKind": {
                     "kind": "kw_struct"
                   },
@@ -97,7 +84,6 @@
                   "presence": "Present"
                 },
                 {
-                  "id": 10,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "B"
@@ -110,11 +96,9 @@
                 null,
                 null,
                 {
-                  "id": 14,
                   "kind": "MemberDeclBlock",
                   "layout": [
                     {
-                      "id": 11,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
@@ -123,13 +107,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 12,
                       "kind": "MemberDeclList",
                       "layout": [],
                       "presence": "Present"
                     },
                     {
-                      "id": 13,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -152,7 +134,6 @@
       "presence": "Present"
     },
     {
-      "id": 17,
       "tokenKind": {
         "kind": "eof",
         "text": ""
