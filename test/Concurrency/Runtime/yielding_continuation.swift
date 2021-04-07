@@ -219,7 +219,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	  }
 	}
 
-	tests.test("concurrent value production") {
+	tests.test("concurrent value consumption") {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
 	    let t1 = detach {
