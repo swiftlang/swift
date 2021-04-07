@@ -204,6 +204,12 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// Compute the default prebuilt module cache path for a given resource path
+  /// and SDK version. This function is also used by LLDB.
+  static std::string
+  computePrebuiltCachePath(StringRef RuntimeResourcePath, llvm::Triple target,
+                           Optional<llvm::VersionTuple> sdkVer);
+
   /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
   /// the default value of <resource-dir>/<platform>/prebuilt-modules.
   /// @note This should be called once, after search path options and frontend
