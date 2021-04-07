@@ -62,7 +62,7 @@ DemangleToMetadataTests.test("function types") {
 #endif
 
   // Async functions
-  expectEqual(type(of: f0_async), _typeByName("yyYc")!)
+  expectEqual(type(of: f0_async), _typeByName("yyYac")!)
 
   // Throwing functions
   expectEqual(type(of: f0_throws), _typeByName("yyKc")!)
@@ -82,7 +82,7 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(type(of: f1_owned), _typeByName("yyyXlnc")!)
 
   // Concurrent function types.
-  expectEqual(type(of: f1_takes_concurrent), _typeByName("yyyyJXEc")!)
+  expectEqual(type(of: f1_takes_concurrent), _typeByName("yyyyYbXEc")!)
 
   // Mix-and-match.
   expectEqual(type(of: f2_variadic_inout), _typeByName("yyytd_ytztc")!)

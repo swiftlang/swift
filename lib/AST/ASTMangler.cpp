@@ -2448,25 +2448,25 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
-    appendOperator("Y");
+    appendOperator("Ya");
   if (fn->isSendable())
-    appendOperator("J");
+    appendOperator("Yb");
   if (fn->isThrowing())
     appendOperator("K");
   switch (auto diffKind = fn->getDifferentiabilityKind()) {
   case DifferentiabilityKind::NonDifferentiable:
     break;
   case DifferentiabilityKind::Forward:
-    appendOperator("jf");
+    appendOperator("Yjf");
     break;
   case DifferentiabilityKind::Reverse:
-    appendOperator("jr");
+    appendOperator("Yjr");
     break;
   case DifferentiabilityKind::Normal:
-    appendOperator("jd");
+    appendOperator("Yjd");
     break;
   case DifferentiabilityKind::Linear:
-    appendOperator("jl");
+    appendOperator("Yjl");
     break;
   }
 }
@@ -2542,7 +2542,7 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
     appendType(elementType, forDecl);
 
   if (flags.isNoDerivative()) {
-    appendOperator("k");
+    appendOperator("Yk");
   }
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:

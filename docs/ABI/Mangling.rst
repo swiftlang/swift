@@ -570,19 +570,19 @@ Types
                                              // they are mangled separately as part of the entity.
   params-type ::= empty-list                 // shortcut for no parameters
 
-  sendable ::= 'J'                           // @Sendable on function types
-  async ::= 'Y'                              // 'async' annotation on function types
+  async ::= 'Ya'                             // 'async' annotation on function types
+  sendable ::= 'Yb'                          // @Sendable on function types
   throws ::= 'K'                             // 'throws' annotation on function types
-  differentiable ::= 'jf'                    // @differentiable(_forward) on function type
-  differentiable ::= 'jr'                    // @differentiable(reverse) on function type
-  differentiable ::= 'jd'                    // @differentiable on function type
-  differentiable ::= 'jl'                    // @differentiable(_linear) on function type
+  differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
+  differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
+  differentiable ::= 'Yjd'                   // @differentiable on function type
+  differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
 
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'k'? 'z'? 'h'? 'n'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, and variadic specifier
+  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation

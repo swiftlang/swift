@@ -50,6 +50,14 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       String(reflecting: (
           @differentiable(reverse)
               (Float?, inout @noDerivative Int) -> Float?).self))
+    expectEqual(
+      """
+      @differentiable(reverse) @Sendable (Swift.Optional<Swift.Float>, \
+      inout @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
+      """,
+      String(reflecting: (
+          @differentiable(reverse) @Sendable
+              (Float?, inout @noDerivative Int) -> Float?).self))
   }
 }
 

@@ -20,10 +20,10 @@ func foo() {
   }
 }
 
-// DEMANGLE-TYPE: $sSayySiYcG
+// DEMANGLE-TYPE: $sSayySiYacG
 // CHECK-TYPE: Array<(Int) async -> ()>
 
-// DEMANGLE-TYPE: $sSayySiYKcG
+// DEMANGLE-TYPE: $sSayySiYaKcG
 // CHECK-TYPE: Array<(Int) async throws -> ()>
 
 // DEMANGLE-TYPE: $sIegH_D

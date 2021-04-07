@@ -1484,7 +1484,7 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   assert(thunkSuffix[1] == 'T'
          && thunkSuffix[0] == 'o'
          && "not an objc thunk?");
-  closureName += "yyYcfU_"; // closure with type () async -> ()
+  closureName += "yyYacfU_"; // closure with type () async -> ()
   closureName.push_back(thunkSuffix[1]);
   closureName.push_back(thunkSuffix[0]);
 

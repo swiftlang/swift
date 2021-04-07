@@ -809,6 +809,12 @@ private:
     unsigned startIndex = 0;
     bool isSendable = false, isAsync = false, isThrows = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::DifferentiableFunctionType) {
+      diffKind =
+          (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
       ++startIndex;
@@ -825,12 +831,6 @@ private:
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
-    }
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::DifferentiableFunctionType) {
-      diffKind =
-          (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
-      ++startIndex;
     }
 
     switch (diffKind) {

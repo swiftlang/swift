@@ -738,27 +738,6 @@ public:
         ++firstChildIdx;
       }
 
-      bool isThrow = false;
-      if (Node->getChild(firstChildIdx)->getKind()
-            == NodeKind::ThrowsAnnotation) {
-        isThrow = true;
-        ++firstChildIdx;
-      }
-
-      bool isSendable = false;
-      if (Node->getChild(firstChildIdx)->getKind()
-            == NodeKind::ConcurrentFunctionType) {
-        isSendable = true;
-        ++firstChildIdx;
-      }
-
-      bool isAsync = false;
-      if (Node->getChild(firstChildIdx)->getKind()
-            == NodeKind::AsyncAnnotation) {
-        isAsync = true;
-        ++firstChildIdx;
-      }
-
       FunctionMetadataDifferentiabilityKind diffKind;
       if (Node->getChild(firstChildIdx)->getKind() ==
             NodeKind::DifferentiableFunctionType) {
@@ -781,6 +760,27 @@ public:
           diffKind = FunctionMetadataDifferentiabilityKind::Linear;
           break;
         }
+        ++firstChildIdx;
+      }
+
+      bool isThrow = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::ThrowsAnnotation) {
+        isThrow = true;
+        ++firstChildIdx;
+      }
+
+      bool isSendable = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::ConcurrentFunctionType) {
+        isSendable = true;
+        ++firstChildIdx;
+      }
+
+      bool isAsync = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::AsyncAnnotation) {
+        isAsync = true;
         ++firstChildIdx;
       }
 
@@ -1371,25 +1371,25 @@ private:
             FunctionParam<BuiltType> &param) -> bool {
       Demangle::NodePointer node = typeNode;
 
-      auto setOwnership = [&](ValueOwnership ownership) {
-        param.setValueOwnership(ownership);
-        node = node->getFirstChild();
-        hasParamFlags = true;
-      };
-
       bool recurse = true;
       while (recurse) {
         switch (node->getKind()) {
         case NodeKind::InOut:
-          setOwnership(ValueOwnership::InOut);
+          param.setValueOwnership(ValueOwnership::InOut);
+          node = node->getFirstChild();
+          hasParamFlags = true;
           break;
 
         case NodeKind::Shared:
-          setOwnership(ValueOwnership::Shared);
+          param.setValueOwnership(ValueOwnership::Shared);
+          node = node->getFirstChild();
+          hasParamFlags = true;
           break;
 
         case NodeKind::Owned:
-          setOwnership(ValueOwnership::Owned);
+          param.setValueOwnership(ValueOwnership::Owned);
+          node = node->getFirstChild();
+          hasParamFlags = true;
           break;
 
         case NodeKind::NoDerivative:
