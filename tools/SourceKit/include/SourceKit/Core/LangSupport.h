@@ -225,9 +225,7 @@ struct SourceFileRange {
 enum class SyntaxTreeTransferMode {
   /// Don't transfer the syntax tree
   Off,
-  /// Transfer the syntax tree incrementally
-  Incremental,
-  /// Always transfer the entire syntax tree
+  /// Transfer the entire syntax tree
   Full
 };
 
@@ -285,8 +283,7 @@ public:
   virtual void handleSourceText(StringRef Text) = 0;
 
   virtual void
-  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                   std::unordered_set<unsigned> &ReusedNodeIds) = 0;
+  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) = 0;
   virtual bool syntaxTreeEnabled() {
     return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
   }

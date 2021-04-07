@@ -201,9 +201,6 @@ public:
   /// Get the shared raw syntax.
   const RawSyntax *getRaw() const;
 
-  /// Get an ID for this node that is stable across incremental parses
-  SyntaxNodeId getId() const { return getRaw()->getId(); }
-
   /// Get the number of child nodes in this piece of syntax, not including
   /// tokens.
   size_t getNumChildren() const;
@@ -369,13 +366,6 @@ public:
 
   /// Get the kind of syntax.
   SyntaxKind getKind() const { return getRaw()->getKind(); }
-
-  /// Get an ID for the \c RawSyntax node backing this \c Syntax which is
-  /// stable across incremental parses.
-  /// Note that this is different from the \c AbsoluteRawSyntax's \c NodeId,
-  /// which uniquely identifies this node in the tree, but is not stable across
-  /// incremental parses.
-  SyntaxNodeId getId() const { return getRaw()->getId(); }
 
   /// Return the number of bytes this node takes when spelled out in the source,
   /// including trivia.
