@@ -1312,7 +1312,7 @@ static void resolveCursor(
         SmallVector<RefactoringKind, 8> Kinds;
         RangeConfig Range;
         Range.BufferId = BufferID;
-        auto Pair = SM.getPresumedLineAndColumnForLoc(Loc);
+        auto Pair = SM.getLineAndColumnInBuffer(Loc);
         Range.Line = Pair.first;
         Range.Column = Pair.second;
         Range.Length = Length;
