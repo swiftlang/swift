@@ -6268,9 +6268,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
 
   SmallVector<Type, 4> typesToCheck;
 
-  // Optional<T>
-  typesToCheck.push_back(
-      OptionalType::get(resolvedTy->getWithoutSpecifierType()));
+  // T -> Optional<T>
+  if (!resolvedTy->getOptionalObjectType())
+    typesToCheck.push_back(OptionalType::get(resolvedTy));
 
   // AnyHashable
   if (auto *anyHashable = ctx.getAnyHashableDecl())
