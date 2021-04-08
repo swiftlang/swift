@@ -1416,7 +1416,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                           call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}"
+                           call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}" || call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                         else
                            call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                         fi
@@ -1432,7 +1432,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                           call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}"
+                           call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}" || call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                         else
                            call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                         fi
