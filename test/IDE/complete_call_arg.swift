@@ -1,12 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_WITH_INTERNAL_NAME | %FileCheck %s -check-prefix=CLOSURE_PARAM_WITH_INTERNAL_NAME
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_WITH_PARENS | %FileCheck %s -check-prefix=CLOSURE_PARAM_WITH_PARENS
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONAL_CLOSURE_PARAM | %FileCheck %s -check-prefix=OPTIONAL_CLOSURE_PARAM
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ESCAPING_OPTIONAL_CLOSURE_PARAM | %FileCheck %s -check-prefix=ESCAPING_OPTIONAL_CLOSURE_PARAM
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES | %FileCheck %s -check-prefix=COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES
-
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
