@@ -257,8 +257,9 @@ getAccessorForComputedComponent(IRGenModule &IGM,
                                &ignoreWitnessMetadata,
                                forwardedArgs);
     }
-    auto fnPtr = FunctionPointer::forDirect(IGM, accessorFn,
-                                            accessor->getLoweredFunctionType());
+    auto fnPtr =
+        FunctionPointer::forDirect(IGM, accessorFn, /*secondaryValue*/ nullptr,
+                                   accessor->getLoweredFunctionType());
     auto call = IGF.Builder.CreateCall(fnPtr, forwardedArgs.claimAll());
     
     if (call->getType()->isVoidTy())

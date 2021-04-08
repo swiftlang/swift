@@ -658,8 +658,9 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   Selector selector(method);
   llvm::Value *selectorValue = IGF.emitObjCSelectorRefLoad(selector.str());
 
-  auto fn = FunctionPointer::forDirect(FunctionPointer::Kind::Function,
-                                       messenger, sig);
+  auto fn =
+      FunctionPointer::forDirect(FunctionPointer::Kind::Function, messenger,
+                                 /*secondaryValue*/ nullptr, sig);
   return Callee(std::move(info), fn, receiverValue, selectorValue);
 }
 

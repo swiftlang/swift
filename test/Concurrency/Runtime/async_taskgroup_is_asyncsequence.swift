@@ -6,7 +6,7 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 
-// XFAIL: linux
+// UNSUPPORTED: linux
 // XFAIL: windows
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

@@ -12,8 +12,8 @@
 import _Concurrency
 
 struct G<T> {
-  // CHECK-LL: @"$s4main1GV19theMutatingFunctionyqd__qd__YlFTu" = hidden global %swift.async_func_pointer
-  // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main1GV19theMutatingFunctionyqd__qd__YlF"(
+  // CHECK-LL: @"$s4main1GV19theMutatingFunctionyqd__qd__YalFTu" = hidden global %swift.async_func_pointer
+  // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main1GV19theMutatingFunctionyqd__qd__YalF"(
   mutating func theMutatingFunction<U>(_ u: U) async -> U {
     return u
   }

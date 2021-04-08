@@ -994,3 +994,22 @@ bb0(%1 : $@thick X.Type):
   return %30 : $X
 }
 
+sil @hop_to_executor : $@convention(thin) @async (@guaranteed Builtin.Executor) -> () {
+entry(%executor: $Builtin.Executor):
+  hop_to_executor %executor : $Builtin.Executor
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_inline_nonasync
+// CHECK-NOT: hop_to_executor
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test_inline_nonasync'
+
+sil @test_inline_nonasync : $@convention(thin) (@guaranteed Builtin.Executor) -> () {
+entry(%executor: $Builtin.Executor):
+  %f = function_ref @hop_to_executor : $@convention(thin) @async (@guaranteed Builtin.Executor) -> ()
+  %c = apply [noasync] %f(%executor) : $@convention(thin) @async (@guaranteed Builtin.Executor) -> ()
+  %r = tuple ()
+  return %r : $()
+}

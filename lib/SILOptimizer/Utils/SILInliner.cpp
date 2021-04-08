@@ -288,6 +288,7 @@ protected:
 
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
+  void visitHopToExecutorInst(HopToExecutorInst *Inst);
 
   void visitTerminator(SILBasicBlock *BB);
 
@@ -620,7 +621,15 @@ void SILInlineCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 
   return SILCloner<SILInlineCloner>::visitDebugValueAddrInst(Inst);
 }
+void SILInlineCloner::visitHopToExecutorInst(HopToExecutorInst *Inst) {
+  // Drop hop_to_executor in non async functions.
+  if (!Apply.getFunction()->isAsync()) {
+    assert(Apply.isNonAsync());
+    return;
+  }
 
+  return SILCloner<SILInlineCloner>::visitHopToExecutorInst(Inst);
+}
 const SILDebugScope *
 SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (!CalleeScope)
