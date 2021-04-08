@@ -9,6 +9,9 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
+// Windows does not do swiftailcc
+// XFAIL: OS=windows-msvc
+
 import _Concurrency
 
 
