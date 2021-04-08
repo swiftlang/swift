@@ -1676,6 +1676,11 @@ void Remangler::mangleOwned(Node *node) {
   Buffer << 'n';
 }
 
+void Remangler::mangleNoDerivative(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Yk";
+}
+
 void Remangler::mangleInfixOperator(Node *node) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";
@@ -2460,15 +2465,15 @@ void Remangler::mangleFullObjCResilientClassStub(Node *node) {
 }
 
 void Remangler::mangleConcurrentFunctionType(Node *node) {
-  Buffer << 'J';
+  Buffer << "Yb";
 }
 
 void Remangler::mangleAsyncAnnotation(Node *node) {
-  Buffer << 'Y';
+  Buffer << "Ya";
 }
 
 void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  Buffer << 'j' << (char)node->getIndex(); // differentiability kind
+  Buffer << "Yj" << (char)node->getIndex(); // differentiability kind
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {

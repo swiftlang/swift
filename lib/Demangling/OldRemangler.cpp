@@ -1485,6 +1485,11 @@ void Remangler::mangleInOut(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleNoDerivative(Node *node) {
+  Buffer << 'k';
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleTuple(Node *node) {
   size_t NumElems = node->getNumChildren();
   if (NumElems > 0 &&
