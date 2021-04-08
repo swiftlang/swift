@@ -192,13 +192,17 @@ class TestSwiftVersionType(unittest.TestCase):
         self.assertIsInstance(version, Version)
         self.assertEqual(version.components, (100, 0, 999, 1))
 
+        version = swift_version_type('5.4.0.300.205')
+        self.assertIsInstance(version, Version)
+        self.assertEqual(version.components, (5, 4, 0, 300, 205))
+
     def test_invalid_swift_version(self):
         swift_version_type = types.SwiftVersionType()
 
         with self.assertRaises(ArgumentTypeError):
             swift_version_type('2')
-            swift_version_type('1.8.0.2.3')
-            swift_version_type('100.0.56.1.85')
+            swift_version_type('1.8.0.2.3.1')
+            swift_version_type('100.0.56.1.85.1')
 
 
 class TestShellSplitType(unittest.TestCase):
