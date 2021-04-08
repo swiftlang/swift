@@ -43,7 +43,7 @@ public func index(_ arr: inout ReadOnlyIntArray, _ arg: Int32) -> Int32 { arr[ar
 // CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS2]], [[INDEX]]) : $@convention(c) (@inout ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
 // CHECK: } // end sil function '$s4main5indexys5Int32VSo16ReadOnlyIntArrayVz_ADtF'
 
-// CHECK: sil shared [transparent] [serializable] @$sSo16ReadOnlyIntArrayVys5Int32VADcig : $@convention(method) (Int32, @inout ReadOnlyIntArray) -> Int32 {
+// CHECK: sil shared [transparent] @$sSo16ReadOnlyIntArrayVys5Int32VADcig : $@convention(method) (Int32, @inout ReadOnlyIntArray) -> Int32 {
 // CHECK: bb0([[INDEX:%.*]] : $Int32, [[SELF:%.*]] : $*ReadOnlyIntArray):
 // CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*ReadOnlyIntArray
 // CHECK:   [[OP:%.*]] = function_ref [[READCLASSNAME]] : $@convention(c) (@inout ReadOnlyIntArray, Int32) -> UnsafePointer<Int32>
@@ -63,7 +63,7 @@ public func index(_ arr: inout ReadWriteIntArray, _ arg: Int32, _ val: Int32) { 
 // CHECK:   [[PTR:%.*]] = apply [[OP]]([[ARRACCESS2]], [[INDEX]]) : $@convention(c) (@inout ReadWriteIntArray, Int32) -> UnsafeMutablePointer<Int32>
 // CHECK: } // end sil function '$s4main5indexyySo17ReadWriteIntArrayVz_s5Int32VAFtF'
 
-// CHECK: sil shared [transparent] [serializable] @$sSo17ReadWriteIntArrayVys5Int32VADcis : $@convention(method) (Int32, Int32, @inout ReadWriteIntArray) -> () {
+// CHECK: sil shared [transparent] @$sSo17ReadWriteIntArrayVys5Int32VADcis : $@convention(method) (Int32, Int32, @inout ReadWriteIntArray) -> () {
 // CHECK: bb0([[NEWVALUE:%.*]] : $Int32, [[INDEX:%.*]] : $Int32, [[SELF:%.*]] : $*ReadWriteIntArray):
 // CHECK:   [[SELFACCESS:%.*]] = begin_access [modify] [static] [[SELF]] : $*ReadWriteIntArray
 // CHECK:   [[OP:%.*]] = function_ref [[READWRITECLASSNAME]] : $@convention(c) (@inout ReadWriteIntArray, Int32) -> UnsafeMutablePointer<Int32>
