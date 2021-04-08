@@ -6222,6 +6222,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     Type type, Type protocolTy, ConstraintLocatorBuilder locator,
     TypeMatchOptions flags) {
+  auto &ctx = getASTContext();
+
   // Since this is a performance optimization, let's ignore it
   // in diagnostic mode.
   if (shouldAttemptFixes())
@@ -6270,10 +6272,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   typesToCheck.push_back(
       OptionalType::get(resolvedTy->getWithoutSpecifierType()));
 
-  // Unsafe{Mutable}Pointer<T>
-  {
-    auto &ctx = getASTContext();
+  // AnyHashable
+  typesToCheck.push_back(ctx.getAnyHashableDecl()->getDeclaredInterfaceType());
 
+  // Rest of the implicit conversions depend on the resolved type.
+  {
     auto *ptrDecl = ctx.getUnsafePointerDecl();
 
     // String -> UnsafePointer<Void>

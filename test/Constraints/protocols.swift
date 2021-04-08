@@ -441,11 +441,16 @@ extension UnsafePointer : Trivial {
   typealias T = Int
 }
 
+extension AnyHashable : Trivial {
+  typealias T = Int
+}
+
 func test_inference_through_implicit_conversion() {
-  class C {}
+  struct C : Hashable {}
 
   func test<T: Trivial>(_: T) -> T {}
 
   let _: C? = test(C()) // Ok -> argument is implicitly promoted into an optional
   let _: UnsafePointer<C> = test([C()]) // Ok - argument is implicitly converted to a pointer
+  let _: AnyHashable = test(C()) // Ok - argument is implicitly converted to `AnyHashable` because it's Hashable
 }
