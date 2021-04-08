@@ -399,15 +399,28 @@ class DefaultActorImpl : public HeapObject {
 
     /// There is currently a thread processing the actor at the stored
     /// max priority.
-    Running
+    Running,
+
+    /// The actor is a zombie that's been fully released but is still
+    /// running.  We delay deallocation until its running thread gives
+    /// it up, which fortunately doesn't touch anything in the
+    /// actor except for the DefaultActorImpl.
+    ///
+    /// To coordinate between the releasing thread and the running
+    /// thread, we have a two-stage "latch".  This is because the
+    /// releasing thread does not atomically decide to not deallocate.
+    /// Fortunately almost all of the overhead here is only incurred
+    /// when we actually do end up in the zombie state.
+    Zombie_Latching,
+    Zombie_ReadyForDeallocation
   };
 
   struct Flags : public FlagSet<size_t> {
     enum : size_t {
       Status_offset = 0,
-      Status_width = 2,
+      Status_width = 3,
 
-      HasActiveInlineJob = 2,
+      HasActiveInlineJob = 3,
 
       MaxPriority = 8,
       MaxPriority_width = JobFlags::Priority_width,
@@ -419,6 +432,19 @@ class DefaultActorImpl : public HeapObject {
     /// What is the current high-level status of this actor?
     FLAGSET_DEFINE_FIELD_ACCESSORS(Status_offset, Status_width, Status,
                                    getStatus, setStatus)
+
+    bool isAnyRunningStatus() const {
+      auto status = getStatus();
+      return status == Status::Running ||
+             status == Status::Zombie_Latching ||
+             status == Status::Zombie_ReadyForDeallocation;
+    }
+
+    bool isAnyZombieStatus() const {
+      auto status = getStatus();
+      return status == Status::Zombie_Latching ||
+             status == Status::Zombie_ReadyForDeallocation;
+    }
 
     /// Is there currently an active processing job allocated inline
     /// in the actor?
@@ -459,10 +485,12 @@ public:
   }
 
   /// Properly destruct an actor, except for the heap header.
-  void destroy() {
-    assert(CurrentState.load(std::memory_order_relaxed).Flags.getStatus()
-             == Status::Idle && "actor not idle during destruction?");
-  }
+  void destroy();
+
+  /// Properly respond to the last release of a default actor.  Note
+  /// that the actor will have been completely torn down by the time
+  /// we reach this point.
+  void deallocate();
 
   /// Add a job to this actor.
   void enqueue(Job *job);
@@ -477,6 +505,8 @@ public:
   Job *claimNextJobOrGiveUp(bool actorIsOwned, RunningJobInfo runner);
 
 private:
+  void deallocateUnconditional();
+
   /// Schedule an inline processing job.  This can generally only be
   /// done if we know nobody else is trying to do it at the same time,
   /// e.g. if this thread just sucessfully transitioned the actor from
@@ -530,6 +560,53 @@ static DefaultActor *asAbstract(DefaultActorImpl *actor) {
 /*****************************************************************************/
 /*********************** DEFAULT ACTOR IMPLEMENTATION ************************/
 /*****************************************************************************/
+
+void DefaultActorImpl::destroy() {
+  auto oldState = CurrentState.load(std::memory_order_relaxed);
+  while (true) {
+    assert(!oldState.FirstJob && "actor has queued jobs at destruction");
+    if (oldState.Flags.getStatus() == Status::Idle) return;
+
+    assert(oldState.Flags.getStatus() == Status::Running &&
+           "actor scheduled but not running at destruction");
+
+    // If the actor is currently running, set it to zombie status
+    // so that we know to deallocate it when it's given up.
+    auto newState = oldState;
+    newState.Flags.setStatus(Status::Zombie_Latching);
+    if (CurrentState.compare_exchange_weak(oldState, newState,
+                                           std::memory_order_relaxed,
+                                           std::memory_order_relaxed))
+      return;
+  }
+}
+
+void DefaultActorImpl::deallocate() {
+  // If we're in a zombie state waiting to latch, put the actor in the
+  // ready-for-deallocation state, but don't actually deallocate yet.
+  // Note that we should never see the actor already in the
+  // ready-for-deallocation state; giving up the actor while in the
+  // latching state will always put it in Idle state.
+  auto oldState = CurrentState.load(std::memory_order_relaxed);
+  while (oldState.Flags.getStatus() == Status::Zombie_Latching) {
+    auto newState = oldState;
+    newState.Flags.setStatus(Status::Zombie_ReadyForDeallocation);
+    if (CurrentState.compare_exchange_weak(oldState, newState,
+                                           std::memory_order_relaxed,
+                                           std::memory_order_relaxed))
+      return;
+  }
+
+  assert(oldState.Flags.getStatus() == Status::Idle);
+
+  deallocateUnconditional();
+}
+
+void DefaultActorImpl::deallocateUnconditional() {
+  auto metadata = cast<ClassMetadata>(this->metadata);
+  swift_deallocObject(this, metadata->getInstanceSize(),
+                      metadata->getInstanceAlignMask());
+}
 
 /// Given that a job is enqueued normally on a default actor, get/set
 /// the next job in the actor's queue.
@@ -888,7 +965,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
   fprintf(stderr, "[%p] giving up thread for actor %p\n", pthread_self(), this);
 #endif
   auto oldState = CurrentState.load(std::memory_order_acquire);
-  assert(oldState.Flags.getStatus() == Status::Running);
+  assert(oldState.Flags.isAnyRunningStatus());
 
   ProcessOverrideJob *overridesToWake = nullptr;
   auto firstNewJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr,
@@ -896,9 +973,22 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
 
   _swift_tsan_release(this);
   while (true) {
+    // In Zombie_ReadyForDeallocation state, nothing else should
+    // be touching the atomic, and there's no point updating it.
+    if (oldState.Flags.getStatus() == Status::Zombie_ReadyForDeallocation) {
+      wakeOverrides(overridesToWake, oldState.Flags.getMaxPriority());
+      deallocateUnconditional();
+      return;
+    }
+
+    // In Zombie_Latching state, we should try to update to Idle;
+    // if we beat the releasing thread, it'll deallocate.
+    // In Running state, we may need to schedule a processing job.
+
     State newState = oldState;
     newState.FirstJob = JobRef::getPreprocessed(firstNewJob);
     if (firstNewJob) {
+      assert(oldState.Flags.getStatus() == Status::Running);
       newState.Flags.setStatus(Status::Scheduled);
     } else {
       newState.Flags.setStatus(Status::Idle);
@@ -946,7 +1036,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
     // The priority of the remaining work.
     auto newPriority = newState.Flags.getMaxPriority();
 
-    // Wake any overrides.
+    // Process the override commands we found.
     wakeOverrides(overridesToWake, newPriority);
 
     // This is the actor's owning job; per the ownership rules (see
@@ -983,13 +1073,16 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
 
   // The status had better be Running unless we're trying to acquire
   // our first job.
-  assert(oldState.Flags.getStatus() == Status::Running ||
-         !actorIsOwned);
+  assert(oldState.Flags.isAnyRunningStatus() || !actorIsOwned);
 
   // If we don't yet own the actor, we need to try to claim the actor
   // first; we cannot safely access the queue memory yet because other
   // threads may concurrently be trying to do this.
   if (!actorIsOwned) {
+    // We really shouldn't ever be in a state where we're trying to take
+    // over a non-running actor if the actor is in a zombie state.
+    assert(!oldState.Flags.isAnyZombieStatus());
+
     while (true) {
       // A helper function when the only change we need to try is to
       // update for an inline runner.
@@ -1061,7 +1154,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
     }
   }
 
-  assert(oldState.Flags.getStatus() == Status::Running);
+  assert(oldState.Flags.isAnyRunningStatus());
 
   // We should have taken care of the inline-job bookkeeping now.
   assert(!oldState.Flags.hasActiveInlineJob() || !runner.wasInlineJob());
@@ -1075,6 +1168,14 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
   Optional<JobPriority> remainingJobPriority;
   _swift_tsan_release(this);
   while (true) {
+    // In Zombie_ReadyForDeallocation state, nothing else should
+    // be touching the atomic, and there's no point updating it.
+    if (oldState.Flags.getStatus() == Status::Zombie_ReadyForDeallocation) {
+      wakeOverrides(overridesToWake, oldState.Flags.getMaxPriority());
+      deallocateUnconditional();
+      return nullptr;
+    }
+
     State newState = oldState;
 
     // If the priority we're currently running with is adqeuate for
@@ -1300,6 +1401,8 @@ void DefaultActorImpl::enqueue(Job *job) {
   OverrideJobCache overrideJob;
 
   while (true) {
+    assert(!oldState.Flags.isAnyZombieStatus() &&
+           "enqueuing work on a zombie actor");
     auto newState = oldState;
 
     // Put the job at the front of the job list (which will get
@@ -1387,6 +1490,9 @@ bool DefaultActorImpl::tryAssumeThread(RunningJobInfo runner) {
     }
   }
 
+  assert(!oldState.Flags.isAnyZombieStatus() &&
+         "trying to assume a zombie actor");
+
   return false;
 }
 
@@ -1400,6 +1506,34 @@ void swift::swift_defaultActor_destroy(DefaultActor *_actor) {
 
 void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
   asImpl(_actor)->enqueue(job);
+}
+
+void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
+  asImpl(_actor)->deallocate();
+}
+
+static bool isDefaultActorClass(const ClassMetadata *metadata) {
+  assert(metadata->isTypeMetadata());
+  while (true) {
+    // Trust the class descriptor if it says it's a default actor.
+    if (metadata->getDescription()->isDefaultActor())
+      return true;
+
+    // Go to the superclass.
+    metadata = metadata->Superclass;
+
+    // If we run out of Swift classes, it's not a default actor.
+    if (!metadata || !metadata->isTypeMetadata()) return false;
+  }
+}
+
+void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
+  auto metadata = cast<ClassMetadata>(actor->metadata);
+  if (isDefaultActorClass(metadata))
+    return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
+
+  swift_deallocObject(actor, metadata->getInstanceSize(),
+                      metadata->getInstanceAlignMask());
 }
 
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.

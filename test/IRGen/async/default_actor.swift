@@ -23,24 +23,24 @@ import resilient_actor
 
 // CHECK-LABEL: define hidden swiftcc void @"$s13default_actor1ACfD"(%T13default_actor1AC* swiftself %0)
 // CHECK-NOT: ret void
-// CHECK:     call swiftcc void @swift_deallocObject(
+// CHECK:     call swiftcc void @swift_defaultActor_deallocate(
 // CHECK:     ret void
 actor A {}
 
 // CHECK-LABEL: define hidden swiftcc void @"$s13default_actor1BCfD"(%T13default_actor1BC* swiftself %0)
 // CHECK-NOT: ret void
-// CHECK:     call swiftcc void @swift_deallocObject(
+// CHECK:     call swiftcc void @swift_defaultActor_deallocateResilient(
 // CHECK:     ret void
 actor B : ResilientBaseActor {}
 
 // CHECK-LABEL: define hidden swiftcc void @"$s13default_actor1CCfD"(%T13default_actor1CC* swiftself %0)
 // CHECK-NOT: ret void
-// CHECK:     call swiftcc void @swift_deallocObject(
+// CHECK:     call swiftcc void @swift_defaultActor_deallocateResilient(
 // CHECK:     ret void
 actor C : FixedSubclassOfResilientBaseActor {}
 
 // CHECK-LABEL: define hidden swiftcc void @"$s13default_actor1DCfD"(%T13default_actor1DC* swiftself %0)
 // CHECK-NOT: ret void
-// CHECK:     call swiftcc void @swift_deallocObject(
+// CHECK:     call swiftcc void @swift_defaultActor_deallocate(
 // CHECK:     ret void
 actor D : FixedBaseActor {}

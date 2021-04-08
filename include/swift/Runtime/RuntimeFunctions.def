@@ -1656,6 +1656,22 @@ FUNCTION(DefaultActorDestroy,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_defaultActor_deallocate(DefaultActor *actor);
+FUNCTION(DefaultActorDeallocate,
+         swift_defaultActor_deallocate, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_defaultActor_deallocateResilient(HeapObject *actor);
+FUNCTION(DefaultActorDeallocateResilient,
+         swift_defaultActor_deallocateResilient, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 //// void swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group);
 //FUNCTION(TaskGroupInitialize,
 //         swift_taskGroup_initialize, SwiftCC,
