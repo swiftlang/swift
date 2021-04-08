@@ -4251,10 +4251,27 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
 }
 
 bool ClassDecl::isDefaultActor() const {
+  return isDefaultActor(getModuleContext(), ResilienceExpansion::Minimal);
+}
+
+bool ClassDecl::isDefaultActor(ModuleDecl *M,
+                               ResilienceExpansion expansion) const {
   auto mutableThis = const_cast<ClassDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
-                           IsDefaultActorRequest{mutableThis},
+                           IsDefaultActorRequest{mutableThis, M,
+                                                 expansion},
                            false);
+}
+
+const ClassDecl *ClassDecl::getRootActorClass() const {
+  if (!isActor()) return nullptr;
+  auto cur = this;
+  while (true) {
+    auto super = cur->getSuperclassDecl();
+    if (!super || !super->isActor())
+      return cur;
+    cur = super;
+  }
 }
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
@@ -8056,7 +8073,12 @@ bool ClassDecl::hasExplicitCustomActorMethods() const {
 }
 
 bool ClassDecl::isRootDefaultActor() const {
-  if (!isDefaultActor()) return false;
+  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Minimal);
+}
+
+bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
+                                   ResilienceExpansion expansion) const {
+  if (!isDefaultActor(M, expansion)) return false;
   auto superclass = getSuperclassDecl();
   return (!superclass || superclass->isNSObject());
 }
