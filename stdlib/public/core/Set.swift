@@ -1223,12 +1223,10 @@ extension Set {
   @inlinable
   public __consuming func intersection(_ other: Set<Element>) -> Set<Element> {
     var newSet = Set<Element>()
-    var (iter, other) = (self, other)
-    if iter.count > other.count {
-      swap(&iter, &other)
-    }
-    for member in iter {
-      if other.contains(member) {
+    let (smaller, larger) =
+      count < other.count ? (self, other) : (other, self)
+    for member in smaller {
+      if larger.contains(member) {
         newSet.insert(member)
       }
     }
