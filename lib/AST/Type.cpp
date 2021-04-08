@@ -3150,7 +3150,7 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
   case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
     if (dc->getParentModule() == typeDecl->getDeclContext()->getParentModule())
-      return true;
+      return typeDecl->getEffectiveAccess() > AccessLevel::FilePrivate;
 
     return typeDecl->getEffectiveAccess() > AccessLevel::Internal;
   }
