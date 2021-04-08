@@ -1,9 +1,8 @@
-// RUN: %target-build-swift %import-libdispatch -parse-as-library -sanitize=fuzzer %s -o %t
+// RUN: %target-build-swift -Xfrontend -disable-implicit-concurrency-module-import -parse-as-library -sanitize=fuzzer %s -o %t
 // RUN: not %t -only_ascii=1 -max_len=3 | %FileCheck %s
 // REQUIRES: CPU=x86_64
 // REQUIRES: executable_test
 // REQUIRES: fuzzer_runtime
-// REQUIRES: libdispatch
 
 // XFAIL: OS=ios
 // XFAIL: OS=tvos

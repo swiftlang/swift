@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %import-libdispatch -emit-library -o %t/%target-library-name(complex) -emit-module %S/complex.swift -module-link-name complex
+// RUN: %target-build-swift -Xfrontend -disable-implicit-concurrency-module-import -emit-library -o %t/%target-library-name(complex) -emit-module %S/complex.swift -module-link-name complex
 // RUN: %target-jit-run %s -I %t -L %t | %FileCheck %s
 
 // RUN: grep -v import %s > %t/main.swift
@@ -7,7 +7,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_interpreter
-// REQUIRES: libdispatch
 
 import complex
 
