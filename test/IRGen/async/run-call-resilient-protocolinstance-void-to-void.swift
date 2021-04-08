@@ -20,7 +20,7 @@ func call<T : Protokol>(_ t: T) async {
   await t.protocolinstanceVoidToVoid()
 }
 
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main4callyyxY17ResilientProtocol8ProtokolRzlF"(
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main4callyyxYa17ResilientProtocol8ProtokolRzlF"(
 func test_case() async {
   let impl = Impl()
   await call(impl) // CHECK: Impl()

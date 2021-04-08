@@ -2524,10 +2524,12 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   }
 
   if (attrs.has(TAK_noDerivative)) {
-    // @noDerivative is only valid on function parameters, or on function
-    // results in SIL.
+    // @noDerivative is valid on function parameters (AST and SIL) or on
+    // function results (SIL-only).
     bool isNoDerivativeAllowed =
-        isParam || (isResult && (options & TypeResolutionFlags::SILType));
+        isParam ||
+        options.is(TypeResolverContext::InoutFunctionInput) ||
+        (isResult && (options & TypeResolutionFlags::SILType));
     auto *SF = getDeclContext()->getParentSourceFile();
     if (SF && !isDifferentiableProgrammingEnabled(*SF)) {
       diagnose(
@@ -2645,7 +2647,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
       autoclosure = ATR->getAttrs().has(TAK_autoclosure);
 
-    ValueOwnership ownership;
+    ValueOwnership ownership = ValueOwnership::Default;
 
     auto *nestedRepr = eltTypeRepr;
 
@@ -2657,31 +2659,35 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       nestedRepr = tupleRepr->getElementType(0);
     }
 
-    switch (nestedRepr->getKind()) {
-    case TypeReprKind::Shared:
-      ownership = ValueOwnership::Shared;
-      break;
-    case TypeReprKind::InOut:
-      ownership = ValueOwnership::InOut;
-      break;
-    case TypeReprKind::Owned:
-      ownership = ValueOwnership::Owned;
-      break;
-    default:
-      ownership = ValueOwnership::Default;
-      break;
+    if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+      switch (specifierRepr->getKind()) {
+      case TypeReprKind::Shared:
+        ownership = ValueOwnership::Shared;
+        nestedRepr = specifierRepr->getBase();
+        break;
+      case TypeReprKind::InOut:
+        ownership = ValueOwnership::InOut;
+        nestedRepr = specifierRepr->getBase();
+        break;
+      case TypeReprKind::Owned:
+        ownership = ValueOwnership::Owned;
+        nestedRepr = specifierRepr->getBase();
+        break;
+      default:
+        break;
+      }
     }
 
     bool noDerivative = false;
-    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
       if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
             isDifferentiableProgrammingEnabled(
                 *getDeclContext()->getParentSourceFile()))
-          diagnose(eltTypeRepr->getLoc(),
+          diagnose(nestedRepr->getLoc(),
                    diag::attr_only_on_parameters_of_differentiable,
                    "@noDerivative")
-              .highlight(eltTypeRepr->getSourceRange());
+              .highlight(nestedRepr->getSourceRange());
         else
           noDerivative = true;
       }
@@ -3476,7 +3482,7 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
   if (isa<InOutTypeRepr>(repr)
       && !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
     // Anything within an inout isn't a parameter anymore.
-    options.setContext(None);
+    options.setContext(TypeResolverContext::InoutFunctionInput);
   }
 
   return resolveType(repr->getBase(), options);
@@ -3554,6 +3560,7 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   bool doDiag = false;
   switch (options.getContext()) {
   case TypeResolverContext::None:
+  case TypeResolverContext::InoutFunctionInput:
     if (!isDirect || !(options & allowIUO))
       doDiag = true;
     break;
