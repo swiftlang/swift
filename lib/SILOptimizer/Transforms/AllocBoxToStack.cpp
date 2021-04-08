@@ -18,7 +18,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -87,7 +87,7 @@ static bool useCaptured(Operand *UI) {
 
 // Is any successor of BB in the LiveIn set?
 static bool successorHasLiveIn(SILBasicBlock *BB,
-                               BasicBlockSetVector<16> &LiveIn) {
+                               BasicBlockSetVector &LiveIn) {
   for (auto &Succ : BB->getSuccessors())
     if (LiveIn.contains(Succ))
       return true;
@@ -97,7 +97,7 @@ static bool successorHasLiveIn(SILBasicBlock *BB,
 
 // Propagate liveness backwards from an initial set of blocks in our
 // LiveIn set.
-static void propagateLiveness(BasicBlockSetVector<16> &LiveIn,
+static void propagateLiveness(BasicBlockSetVector &LiveIn,
                               SILBasicBlock *DefBB) {
 
   // First populate a worklist of predecessors.
@@ -144,8 +144,8 @@ static bool addLastRelease(SILValue V, SILBasicBlock *BB,
 static bool getFinalReleases(SILValue Box,
                              SmallVectorImpl<SILInstruction *> &Releases) {
   SILFunction *function = Box->getFunction();
-  BasicBlockSetVector<16> LiveIn(function);
-  BasicBlockSetVector<16> UseBlocks(function);
+  BasicBlockSetVector LiveIn(function);
+  BasicBlockSetVector UseBlocks(function);
 
   auto *DefBB = Box->getParentBlock();
 

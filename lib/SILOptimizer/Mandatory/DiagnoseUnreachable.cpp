@@ -23,7 +23,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -84,7 +84,7 @@ public:
   ///
   /// This is a SetVector since several blocks may lead to the same error
   /// report and we iterate through these when producing the diagnostic.
-  BasicBlockSetVector<16> PossiblyUnreachableBlocks;
+  BasicBlockSetVector PossiblyUnreachableBlocks;
 
   /// The set of blocks in which we reported unreachable code errors.
   /// These are used to ensure that we don't issue duplicate reports.
