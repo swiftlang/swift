@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -6253,9 +6254,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
 
   auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
 
+  auto *M = DC->getParentModule();
+
   // First, let's check whether the type itself conforms,
   // if it does - we are done.
-  if (TypeChecker::conformsToProtocol(resolvedTy, protocol, DC))
+  if (M->lookupConformance(resolvedTy, protocol))
     return SolutionKind::Solved;
 
   // If the type doesn't conform, let's check whether
@@ -6294,11 +6297,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     }
   }
 
-  return llvm::any_of(
-             typesToCheck,
-             [&](Type type) {
-               return bool(TypeChecker::conformsToProtocol(type, protocol, DC));
-             })
+  return llvm::any_of(typesToCheck,
+                      [&](Type type) {
+                        return bool(M->lookupConformance(type, protocol));
+                      })
              ? SolutionKind::Solved
              : SolutionKind::Error;
 }
