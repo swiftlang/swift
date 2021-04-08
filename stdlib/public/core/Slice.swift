@@ -223,7 +223,11 @@ extension Slice: Collection {
     try _base.withContiguousStorageIfAvailable { buffer in
       let start = _base.distance(from: _base.startIndex, to: _startIndex)
       let count = _base.distance(from: _startIndex, to: _endIndex)
-      let slice = UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
+      let endAndOF = start.addingReportingOverflow(count)
+      _debugPrecondition(!endAndOF.overflow)
+      let slice = UnsafeBufferPointer(
+        rebasing: buffer[Range(uncheckedBounds: (start, endAndOF.partialValue))]
+      )
       return try body(slice)
     }
   }
