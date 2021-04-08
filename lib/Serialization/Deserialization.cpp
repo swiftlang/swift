@@ -1528,11 +1528,9 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           // Found a full match in a different module. It should be a different
           // one because otherwise it would have succeeded on the first search.
           // This is usually caused by the use of poorly modularized headers.
-          auto line = "'" +
+          auto line = "There is a matching '" +
                       declName.getString(strScratch).str() +
-                      "' was not found in module '" +
-                      std::string(baseModule->getName().str()) +
-                      "', but there is one in module '" +
+                      "' in module '" +
                       std::string(nameAndModule.first.str()) +
                       "'. If this is imported from clang, please make sure " +
                       "the header is part of a single clang module.";
@@ -1545,7 +1543,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           auto line = "'" +
                       declName.getString(strScratch).str() +
                       "' in module '" +
-                      std::string(baseModule->getName().str()) +
+                      std::string(nameAndModule.first.str()) +
                       "' was filtered out.";
           notes.emplace_back(line);
         }
