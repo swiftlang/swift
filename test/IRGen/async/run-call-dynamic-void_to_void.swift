@@ -16,10 +16,9 @@ import _Concurrency
 
 
 // CHECK: running
+// CHECK-LL: @"$s4main3runyyY{.*}FTu" = hidden global %swift.async_func_pointer
 
-// CHECK-LL: @"$s4main3runyyYFTu" = hidden global %swift.async_func_pointer
-
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main3runyyYF"(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define {{.*}}hidden swift{{(tail)?}}cc void @"$s4main3runyyY{{.*}}F"(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 // CHECK-LL: musttail call swifttailcc void
 dynamic func run() async {
   print("running")
