@@ -616,11 +616,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     IntPtrTy              // Task.Status
   });
 
-  SwiftExecutorTy = createStructType(*this, "swift.executor", {});
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
   SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
+  ExecutorFirstTy = RefCountedPtrTy;
+  ExecutorSecondTy = SizeTy;
+  SwiftExecutorTy = createStructType(*this, "swift.executor", {
+    ExecutorFirstTy,      // identity
+    ExecutorSecondTy,     // implementation
+  });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
     Int8PtrTy, Int8PtrTy, // SchedulerPrivate
@@ -651,7 +655,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
        SizeTy,               // await synchronization
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
-       SwiftExecutorPtrTy}); // resume to executor
+       SwiftExecutorTy});    // resume to executor
   ContinuationAsyncContextPtrTy =
     ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 

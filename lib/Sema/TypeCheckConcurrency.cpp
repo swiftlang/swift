@@ -299,7 +299,8 @@ bool IsActorRequest::evaluate(
 }
 
 bool IsDefaultActorRequest::evaluate(
-    Evaluator &evaluator, ClassDecl *classDecl) const {
+    Evaluator &evaluator, ClassDecl *classDecl, ModuleDecl *M,
+    ResilienceExpansion expansion) const {
   // If the class isn't an actor, it's not a default actor.
   if (!classDecl->isActor())
     return false;
@@ -318,6 +319,11 @@ bool IsDefaultActorRequest::evaluate(
     if (!superclassDecl->isNSObject())
       return false;
   }
+
+  // If the class is resilient from the perspective of the module
+  // module, it's not a default actor.
+  if (classDecl->isForeign() || classDecl->isResilient(M, expansion))
+    return false;
 
   // If the class has explicit custom-actor methods, it's not
   // a default actor.
