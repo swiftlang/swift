@@ -1440,29 +1440,23 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         auto *locator = typeVar->getImpl().getLocator();
         if (locator->isForGenericParameter()) {
           auto &CG = cs.getConstraintGraph();
-          auto *repr = cs.getRepresentative(typeVar);
-          for (auto *constraint : CG[repr].getConstraints()) {
+
+          auto isTransferableConformance = [&typeVar](Constraint *constraint) {
             if (constraint->getKind() != ConstraintKind::ConformsTo)
-              continue;
+              return false;
 
-            // This is not a direct requirement.
-            if (!constraint->getFirstType()->isEqual(typeVar))
-              continue;
+            auto requirementTy = constraint->getFirstType();
+            if (!requirementTy->isEqual(typeVar))
+              return false;
 
-            // If the composition consists of a class + protocol,
-            // we can't attach conformance to the argument because
-            // parameter would have to pick one of the components.
-            if (argTy.findIf([](Type type) {
-                  return type->is<ProtocolCompositionType>();
-                }))
-              continue;
+            return constraint->getSecondType()->is<ProtocolType>();
+          };
 
-            auto protocolTy = constraint->getSecondType();
-            if (!protocolTy->is<ProtocolType>())
-              continue;
-
-            cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
-                             protocolTy, constraint->getLocator());
+          for (auto *constraint : CG[typeVar].getConstraints()) {
+            if (isTransferableConformance(constraint))
+              cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
+                               constraint->getSecondType(),
+                               constraint->getLocator());
           }
         }
       }
@@ -6249,6 +6243,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   auto resolvedTy = getFixedTypeRecursive(type, /*wantRValue=*/true);
   if (resolvedTy->isTypeVariableOrMember())
     return formUnsolved();
+
+  // If the composition consists of a class + protocol,
+  // we can't check conformance of the argument because
+  // parameter could pick one of the components.
+  if (resolvedTy.findIf(
+          [](Type type) { return type->is<ProtocolCompositionType>(); }))
+    return SolutionKind::Solved;
 
   auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
 
