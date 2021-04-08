@@ -2539,6 +2539,56 @@ static Optional<ActorIsolation> getIsolationFromConformances(
   return foundIsolation;
 }
 
+/// Compute the isolation of a nominal type from the property wrappers on
+/// any stored properties.
+static Optional<ActorIsolation> getIsolationFromWrappers(
+    NominalTypeDecl *nominal) {
+  if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
+    return None;
+
+  if (!nominal->getParentSourceFile())
+    return None;
+  
+  Optional<ActorIsolation> foundIsolation;
+  for (auto member : nominal->getMembers()) {
+    auto var = dyn_cast<VarDecl>(member);
+    if (!var || !var->isInstanceMember())
+      continue;
+
+    auto info = var->getAttachedPropertyWrapperTypeInfo(0);
+    if (!info)
+      continue;
+
+    auto isolation = getActorIsolation(info.valueVar);
+
+    // Inconsistent wrappedValue/projectedValue isolation disables inference.
+    if (info.projectedValueVar &&
+        getActorIsolation(info.projectedValueVar) != isolation)
+      continue;
+
+    switch (isolation) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+      break;
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      if (!foundIsolation) {
+        foundIsolation = isolation;
+        continue;
+      }
+
+      if (*foundIsolation != isolation)
+        return None;
+
+      break;
+    }
+  }
+
+  return foundIsolation;
+}
+
 // Check whether a declaration is an asynchronous handler.
 static bool isAsyncHandler(ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -2763,12 +2813,19 @@ ActorIsolation ActorIsolationRequest::evaluate(
       }
     }
 
-    // If the declaration is a nominal type and any of the protocols to which
-    // it directly conforms is isolated to a global actor, use that.
     if (auto nominal = dyn_cast<NominalTypeDecl>(value)) {
+      // If the declaration is a nominal type and any of the protocols to which
+      // it directly conforms is isolated to a global actor, use that.
       if (auto conformanceIsolation = getIsolationFromConformances(nominal))
         if (auto inferred = inferredIsolation(*conformanceIsolation))
           return inferred;
+
+      // If the declaration is a nominal type and any property wrappers on
+      // its stored properties require isolation, use that.
+      if (auto wrapperIsolation = getIsolationFromWrappers(nominal)) {
+        if (auto inferred = inferredIsolation(*wrapperIsolation))
+          return inferred;
+      }
     }
   }
 

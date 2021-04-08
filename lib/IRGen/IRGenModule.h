@@ -1296,7 +1296,7 @@ public:
   ClassDecl *getSwiftNativeNSObjectDecl();
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
-
+  llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   bool isStandardLibrary() const;
 
 private:

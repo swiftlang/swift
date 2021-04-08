@@ -55,6 +55,15 @@ public:
         foundFeature = true;
     }
 
+    if (auto call = dyn_cast<CallExpr>(expr)) {
+      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(call->getFn())) {
+        StringRef userFacing = unresolved->getName().getBaseName()
+            .userFacingName();
+        if (userFacing == "compiler" || userFacing == "_compiler_version")
+          foundFeature = true;
+      }
+    }
+
     return { !foundFeature, expr };
   }
 };
@@ -128,10 +137,9 @@ struct ExtractInactiveRanges : public ASTWalker {
       return false;
     }
 
-    // If the clause is checking for a particular feature with $, keep
-    // the whole thing.
+    // If the clause is checking for a particular feature with $ or a compiler
+    // version, keep the whole thing.
     if (anyClauseIsFeatureCheck(icd->getClauses())) {
-      addRange(start, end);
       return false;
     }
 

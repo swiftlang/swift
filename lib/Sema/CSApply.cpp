@@ -1040,8 +1040,9 @@ namespace {
 
           // SILGen knows how to emit property-wrapped parameters, but the
           // function type needs the backing wrapper type in its param list.
-          innerParamTypes.push_back(AnyFunctionType::Param(paramRef->getType(),
-                                                           innerParam->getArgumentName()));
+          innerParamTypes.push_back(AnyFunctionType::Param(
+              paramRef->getType(), innerParam->getArgumentName(),
+              ParameterTypeFlags(), innerParam->getParameterName()));
         } else {
           // Rewrite the parameter ref if necessary.
           if (outerParam->isInOut()) {

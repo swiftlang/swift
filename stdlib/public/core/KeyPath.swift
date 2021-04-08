@@ -30,10 +30,10 @@ internal func _abstract(
 // The two must coexist, so it was renamed. The old name must not be
 // used in the new runtime. _TtCs11_AnyKeyPath is the mangled name for
 // Swift._AnyKeyPath.
-@_objcRuntimeName(_TtCs11_AnyKeyPath)
 
 /// A type-erased key path, from any root type to any resulting value
 /// type.
+@_objcRuntimeName(_TtCs11_AnyKeyPath)
 public class AnyKeyPath: Hashable, _AppendKeyPath {
   /// The root type for this key path.
   @inlinable

@@ -1222,7 +1222,9 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
     auto *wrappedType = cs.createTypeVariable(cs.getConstraintLocator(locator), 0);
     auto paramType = paramTypes[i].getParameterType();
     auto paramLabel = paramTypes[i].getLabel();
-    adjustedParamTypes.push_back(AnyFunctionType::Param(wrappedType, paramLabel));
+    auto paramInternalLabel = paramTypes[i].getInternalLabel();
+    adjustedParamTypes.push_back(AnyFunctionType::Param(
+        wrappedType, paramLabel, ParameterTypeFlags(), paramInternalLabel));
     cs.applyPropertyWrapperToParameter(paramType, wrappedType, paramDecl, argLabel,
                                        ConstraintKind::Equal, locator);
   }
@@ -3704,7 +3706,11 @@ static bool diagnoseAmbiguity(
                  })) {
         // All fixes have to do with arguments, so let's show the parameter
         // lists.
-        auto *fn = type->getAs<AnyFunctionType>();
+        //
+        // It's possible that function type is wrapped in an optional
+        // if it's from `@objc optional` method, so we need to ignore that.
+        auto *fn =
+            type->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
         assert(fn);
 
         if (fn->getNumParams() == 1) {

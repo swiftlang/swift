@@ -123,7 +123,6 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
     case Node::Kind::AsyncFunctionPointer:
-    case Node::Kind::AsyncNonconstantPartialApplyThunk:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
       return true;
@@ -2536,11 +2535,6 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
         return demangleAutoDiffFunctionOrSimpleThunk(
             Node::Kind::AutoDiffFunction);
       }
-    case 'w': {
-      NodePointer discriminator = demangleIndexAsNode();
-      return createWithChild(Node::Kind::AsyncNonconstantPartialApplyThunk,
-                             discriminator);
-    }
     default:
       return nullptr;
   }

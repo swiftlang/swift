@@ -351,6 +351,19 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+const Decl *Decl::getInnermostDeclWithAvailability() const {
+  const Decl *enclosingDecl = this;
+  // Find the innermost enclosing declaration with an @available annotation.
+  while (enclosingDecl != nullptr) {
+    if (enclosingDecl->getAttrs().hasAttribute<AvailableAttr>())
+      return enclosingDecl;
+
+    enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();
+  }
+
+  return nullptr;
+}
+
 Optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   for (auto *attr: getAttrs()) {
@@ -2622,7 +2635,8 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       newFlags = newFlags.withInOut(false);
     }
 
-    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags);
+    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags,
+                                    param.getInternalLabel());
     newParams.push_back(newParam);
   }
 
@@ -6335,11 +6349,12 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
     type = ParamDecl::getVarargBaseTy(type);
 
   auto label = getArgumentName();
+  auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
       getValueOwnership(),
       /*isNoDerivative*/ false);
-  return AnyFunctionType::Param(type, label, flags);
+  return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
 Optional<Initializer *> ParamDecl::getCachedDefaultArgumentInitContext() const {

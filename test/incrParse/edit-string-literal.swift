@@ -1,4 +1,4 @@
-// RUN: %incr-transfer-tree %s --expected-incremental-syntax-tree %S/Outputs/incrementalTransfer.json
+// RUN: %validate-incrparse %s
 
 func foo() {
 }

@@ -2690,7 +2690,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
         noDerivative);
-    elements.emplace_back(ty, Identifier(), paramFlags);
+    elements.emplace_back(ty, Identifier(), paramFlags,
+                          inputRepr->getElementName(i));
   }
 
   // All non-`@noDerivative` parameters of `@differentiable` function types must

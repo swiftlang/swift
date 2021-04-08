@@ -6695,7 +6695,9 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     auto sig = IGM.getSignature(methodType);
     fnPtr = Builder.CreateBitCast(fnPtr, sig.getType()->getPointerTo());
 
-    auto &schema = getOptions().PointerAuth.SwiftClassMethodPointers;
+    auto &schema = methodType->isAsync()
+                       ? getOptions().PointerAuth.AsyncSwiftClassMethodPointers
+                       : getOptions().PointerAuth.SwiftClassMethodPointers;
     auto authInfo =
       PointerAuthInfo::emit(*this, schema, /*storageAddress=*/nullptr, method);
 

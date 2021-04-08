@@ -313,7 +313,6 @@ NODE(AutoDiffSubsetParametersThunk)
 NODE(AutoDiffDerivativeVTableThunk)
 NODE(DifferentiabilityWitness)
 NODE(IndexSubset)
-NODE(AsyncNonconstantPartialApplyThunk)
 NODE(AsyncAwaitResumePartialFunction)
 NODE(AsyncSuspendResumePartialFunction)
 

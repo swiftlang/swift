@@ -831,9 +831,8 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
 }
 
 extension Dictionary {
-  /// Accesses the value with the given key. If the dictionary doesn't contain
-  /// the given key, accesses the provided default value as if the key and
-  /// default value existed in the dictionary.
+  /// Accesses the value with the given key, falling back to the given default
+  /// value if the key isn't found.
   ///
   /// Use this subscript when you want either the value for a particular key
   /// or, when that key is not present in the dictionary, a default value. This
@@ -866,7 +865,7 @@ extension Dictionary {
   ///     }
   ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
   ///
-  /// When `letterCounts[letter, defaultValue: 0] += 1` is executed with a
+  /// When `letterCounts[letter, default: 0] += 1` is executed with a
   /// value of `letter` that isn't already a key in `letterCounts`, the
   /// specified default value (`0`) is returned from the subscript,
   /// incremented, and then added to the dictionary under that key.

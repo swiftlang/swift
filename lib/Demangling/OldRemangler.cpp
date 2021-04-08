@@ -606,10 +606,6 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
 }
 
-void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
-  unreachable("unsupported");
-}
-
 void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
   unreachable("unsupported");
 }

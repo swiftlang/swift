@@ -1333,6 +1333,8 @@ public:
 #endif
 
       SILFunction *Func = entry.getMethodWitness().Witness;
+      auto *afd = cast<AbstractFunctionDecl>(
+          entry.getMethodWitness().Requirement.getDecl());
       llvm::Constant *witness = nullptr;
       if (Func) {
         if (Func->isAsync()) {
@@ -1343,11 +1345,20 @@ public:
       } else {
         // The method is removed by dead method elimination.
         // It should be never called. We add a pointer to an error function.
-        witness = IGM.getDeletedMethodErrorFn();
+        if (afd->hasAsync()) {
+          witness = llvm::ConstantExpr::getBitCast(
+              IGM.getDeletedAsyncMethodErrorAsyncFunctionPointer(),
+              IGM.FunctionPtrTy);
+        } else {
+          witness = llvm::ConstantExpr::getBitCast(
+              IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
+        }
       }
       witness = llvm::ConstantExpr::getBitCast(witness, IGM.Int8PtrTy);
 
-      auto &schema = IGM.getOptions().PointerAuth.ProtocolWitnesses;
+      PointerAuthSchema schema =
+          afd->hasAsync() ? IGM.getOptions().PointerAuth.AsyncProtocolWitnesses
+                          : IGM.getOptions().PointerAuth.ProtocolWitnesses;
       Table.addSignedPointer(witness, schema, requirement);
       return;
     }
@@ -3353,7 +3364,9 @@ FunctionPointer irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   witnessFnPtr = IGF.Builder.CreateBitCast(witnessFnPtr,
                                            signature.getType()->getPointerTo());
 
-  auto &schema = IGF.getOptions().PointerAuth.ProtocolWitnesses;
+  auto &schema = fnType->isAsync()
+                     ? IGF.getOptions().PointerAuth.AsyncProtocolWitnesses
+                     : IGF.getOptions().PointerAuth.ProtocolWitnesses;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, slot, member);
 
   return FunctionPointer(fnType, witnessFnPtr, authInfo, signature);
