@@ -734,7 +734,8 @@ public:
   llvm::PointerType *SwiftTaskPtrTy;
   llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::PointerType *SwiftJobPtrTy;
-  llvm::PointerType *SwiftExecutorPtrTy;
+  llvm::PointerType *ExecutorFirstTy;
+  llvm::IntegerType *ExecutorSecondTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
   llvm::StructType *AsyncTaskAndContextTy;
@@ -908,7 +909,7 @@ public:
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();
-  const TypeInfo &getSwiftExecutorPtrTypeInfo();
+  const LoadableTypeInfo &getExecutorTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size, Alignment align);
   const LoadableTypeInfo &

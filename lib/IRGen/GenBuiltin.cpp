@@ -28,6 +28,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenConcurrency.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -221,11 +222,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // getCurrentActor has no arguments.
   if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
-    auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetCurrentExecutorFn(),
-                                        {});
-    call->setDoesNotThrow();
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    out.add(call);
+    emitGetCurrentExecutor(IGF, out);
     return;
   }
 
@@ -307,10 +304,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::BuildSerialExecutorRef) {
-    auto executor = args.claimNext();
-    executor = IGF.Builder.CreateBitCast(executor,
-                                         IGF.IGM.SwiftExecutorPtrTy);
-    out.add(executor);
+    auto actor = args.claimNext();
+    emitBuildSerialExecutorRef(IGF, actor, argTypes[0], out);
     return;
   }
 

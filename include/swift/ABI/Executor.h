@@ -18,6 +18,7 @@
 #define SWIFT_ABI_EXECUTOR_H
 
 #include <inttypes.h>
+#include "swift/ABI/Actor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Casting.h"
 
@@ -31,15 +32,22 @@ class Job;
 SWIFT_EXPORT_FROM(swift_Concurrency)
 Metadata* MainActorMetadata;
 
-/// An ExecutorRef isn't necessarily just a pointer to an executor
-/// object; it may have other bits set.
+/// An unmanaged reference to an executor.
+///
+/// The representation is two words: identity and implementation.
+/// The identity word is a reference to the executor object; for
+/// default actors, this is the actor object.  The implementation
+/// word describes how the executor works; it carries a witness table
+/// as well as a small number of bits indicating various special
+/// implementation properties.  As an exception to both of these
+/// rules, a null identity represents a generic executor and
+/// implies a null implementation word.
 class ExecutorRef {
-  static constexpr uintptr_t IsDefaultActor = 1;
-  static constexpr uintptr_t PointerMask = 7;
+  HeapObject *Identity; // Not necessarily Swift reference-countable
+  uintptr_t Implementation;
 
-  uintptr_t Value;
-
-  constexpr ExecutorRef(uintptr_t value) : Value(value) {}
+  constexpr ExecutorRef(HeapObject *identity, uintptr_t implementation)
+    : Identity(identity), Implementation(implementation) {}
 
 public:
   /// A generic execution environment.  When running in a generic
@@ -47,63 +55,66 @@ public:
   /// to an actor.  As an executor request, this represents a request
   /// to drop whatever the current actor is.
   constexpr static ExecutorRef generic() {
-    return ExecutorRef(0);
+    return ExecutorRef(nullptr, 0);
   }
 
   /// FIXME: only exists for the quick-and-dirty MainActor implementation.
   /// NOTE: I didn't go with Executor::forMainActor(DefaultActor*) because
   /// __swift_run_job_main_executor can't take more than one argument.
-  constexpr static ExecutorRef mainExecutor() {
-    return ExecutorRef(2);
+  static ExecutorRef mainExecutor() {
+    auto identity = getMainActorIdentity();
+    return ExecutorRef(identity, 0);
+  }
+  static HeapObject *getMainActorIdentity() {
+    return reinterpret_cast<HeapObject*>(
+                                   ExecutorRefFlags::MainActorIdentity);
   }
 
   /// Given a pointer to a default actor, return an executor reference
   /// for it.
   static ExecutorRef forDefaultActor(DefaultActor *actor) {
     assert(actor);
-    return ExecutorRef(reinterpret_cast<uintptr_t>(actor) | IsDefaultActor);
+    return ExecutorRef(actor, unsigned(ExecutorRefFlags::DefaultActor));
+  }
+
+  HeapObject *getIdentity() const {
+    return Identity;
   }
 
   /// Is this the generic executor reference?
   bool isGeneric() const {
-    return Value == 0;
+    return Identity == 0;
   }
 
   /// FIXME: only exists for the quick-and-dirty MainActor implementation.
   bool isMainExecutor() const {
-    if (Value == ExecutorRef::mainExecutor().Value)
+    if (Identity == getMainActorIdentity())
       return true;
 
-    HeapObject *heapObj = reinterpret_cast<HeapObject*>(Value & ~PointerMask);
-
-    if (heapObj == nullptr || MainActorMetadata == nullptr)
+    if (Identity == nullptr || MainActorMetadata == nullptr)
       return false;
 
-    Metadata const* metadata = swift_getObjectType(heapObj);
+    Metadata const* metadata = swift_getObjectType(Identity);
     return metadata == MainActorMetadata;
   }
 
   /// Is this a default-actor executor reference?
   bool isDefaultActor() const {
-    return Value & IsDefaultActor;
+    return Implementation & unsigned(ExecutorRefFlags::DefaultActor);
   }
   DefaultActor *getDefaultActor() const {
     assert(isDefaultActor());
-    return reinterpret_cast<DefaultActor*>(Value & ~PointerMask);
-  }
-
-  uintptr_t getRawValue() const {
-    return Value;
+    return reinterpret_cast<DefaultActor*>(Identity);
   }
 
   /// Do we have to do any work to start running as the requested
   /// executor?
   bool mustSwitchToRun(ExecutorRef newExecutor) const {
-    return *this != newExecutor;
+    return Identity != newExecutor.Identity;
   }
 
   bool operator==(ExecutorRef other) const {
-    return Value == other.Value
+    return Identity == other.Identity
     /// FIXME: only exists for the quick-and-dirty MainActor implementation.
           || (isMainExecutor() && other.isMainExecutor());
   }
