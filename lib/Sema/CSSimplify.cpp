@@ -6273,16 +6273,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
       OptionalType::get(resolvedTy->getWithoutSpecifierType()));
 
   // AnyHashable
-  typesToCheck.push_back(ctx.getAnyHashableDecl()->getDeclaredInterfaceType());
+  if (auto *anyHashable = ctx.getAnyHashableDecl())
+    typesToCheck.push_back(anyHashable->getDeclaredInterfaceType());
 
   // Rest of the implicit conversions depend on the resolved type.
-  {
-    auto *ptrDecl = ctx.getUnsafePointerDecl();
-
+  if (auto *ptrDecl = ctx.getUnsafePointerDecl()) {
     // String -> UnsafePointer<Void>
-    if (resolvedTy->isEqual(ctx.getStringDecl()->getDeclaredInterfaceType())) {
-      typesToCheck.push_back(BoundGenericType::get(ptrDecl, /*parent=*/Type(),
-                                                   {ctx.TheEmptyTupleType}));
+    if (auto *string = ctx.getStringDecl()) {
+      if (resolvedTy->isEqual(string->getDeclaredInterfaceType())) {
+        typesToCheck.push_back(BoundGenericType::get(ptrDecl, /*parent=*/Type(),
+                                                     {ctx.TheEmptyTupleType}));
+      }
     }
 
     // Array<T> -> UnsafePointer<T>
@@ -6295,8 +6296,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     if (type->is<InOutType>()) {
       typesToCheck.push_back(
           BoundGenericType::get(ptrDecl, /*parent=*/Type(), {resolvedTy}));
-      typesToCheck.push_back(BoundGenericType::get(
-          ctx.getUnsafeMutablePointerDecl(), /*parent=*/Type(), {resolvedTy}));
+
+      if (auto *mutablePtr = ctx.getUnsafeMutablePointerDecl())
+        typesToCheck.push_back(
+            BoundGenericType::get(mutablePtr, /*parent=*/Type(), {resolvedTy}));
     }
   }
 
