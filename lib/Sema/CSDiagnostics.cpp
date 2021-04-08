@@ -2121,6 +2121,24 @@ Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
   return diag::assignment_lhs_is_immutable_variable;
 }
 
+SourceLoc ContextualFailure::getLoc() const {
+  auto *locator = getLocator();
+
+  // `getSingleExpressionBody` can point to an implicit expression
+  // without source information in cases like `{ return }`.
+  if (locator->isLastElement<LocatorPathElt::ClosureBody>()) {
+    auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+    if (closure->hasSingleExpressionBody()) {
+      auto *body = closure->getSingleExpressionBody();
+      if (auto loc = body->getLoc())
+        return loc;
+    }
+    return closure->getLoc();
+  }
+
+  return FailureDiagnostic::getLoc();
+}
+
 bool ContextualFailure::diagnoseAsError() {
   auto anchor = getAnchor();
   auto path = getLocator()->getPath();
@@ -4471,7 +4489,15 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
       fixText += " ";
       interleave(
           funcType->getParams(),
-          [&fixText](const AnyFunctionType::Param &param) { fixText += '_'; },
+          [&fixText](const AnyFunctionType::Param &param) {
+            if (param.hasLabel()) {
+              fixText += param.getLabel().str();
+            } else if (param.hasInternalLabel()) {
+              fixText += param.getInternalLabel().str();
+            } else {
+              fixText += '_';
+            }
+          },
           [&fixText] { fixText += ','; });
       fixText += " in ";
     }

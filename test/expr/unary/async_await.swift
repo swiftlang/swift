@@ -99,9 +99,9 @@ func testThrowingAndAsync() async throws {
 
   // Errors
   _ = await throwingAndAsync() // expected-error{{call can throw but is not marked with 'try'}}
-  // expected-note@-1{{did you mean to use 'try'?}}
-  // expected-note@-2{{did you mean to handle error as optional value?}}
-  // expected-note@-3{{did you mean to disable error propagation?}}
+  // expected-note@-1{{did you mean to use 'try'?}}{{7-7=try }}
+  // expected-note@-2{{did you mean to handle error as optional value?}}{{7-7=try? }}
+  // expected-note@-3{{did you mean to disable error propagation?}}{{7-7=try! }}
   _ = try throwingAndAsync() // expected-error{{call is 'async' but is not marked with 'await'}}{{11-11=await }}
 }
 

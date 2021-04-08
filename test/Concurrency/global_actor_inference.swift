@@ -282,6 +282,17 @@ struct WrapperOnActor<Wrapped> {
   }
 }
 
+@MainActor
+@propertyWrapper
+public struct WrapperOnMainActor<Wrapped> {
+  // Make sure inference of @MainActor on wrappedValue doesn't crash.
+  public var wrappedValue: Wrapped
+
+  public init(wrappedValue: Wrapped) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
 @propertyWrapper
 actor WrapperActor<Wrapped> {
   @actorIndependent(unsafe) var storage: Wrapped
@@ -369,6 +380,34 @@ actor ActorWithWrapper {
     _ = _synced // expected-error{{'_synced' isolated to global actor}}
   }
 }
+
+@propertyWrapper
+struct WrapperOnSomeGlobalActor<Wrapped> {
+  @actorIndependent(unsafe) private var stored: Wrapped
+
+  nonisolated init(wrappedValue: Wrapped) {
+    stored = wrappedValue
+  }
+
+  @SomeGlobalActor var wrappedValue: Wrapped {
+    get { stored }
+    set { stored = newValue }
+  }
+}
+
+struct InferredFromPropertyWrapper {
+  @WrapperOnSomeGlobalActor var value = 17
+
+  func test() -> Int { // expected-note{{calls to instance method 'test()' from outside of its actor context are implicitly asynchronous}}
+    value
+  }
+}
+
+func testInferredFromWrapper(x: InferredFromPropertyWrapper) { // expected-note{{add '@SomeGlobalActor' to make global function 'testInferredFromWrapper(x:)' part of global actor 'SomeGlobalActor'}}
+  _ = x.test() // expected-error{{instance method 'test()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+}
+
+
 
 // ----------------------------------------------------------------------
 // Unsafe global actors

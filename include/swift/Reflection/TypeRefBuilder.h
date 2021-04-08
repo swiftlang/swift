@@ -418,14 +418,9 @@ public:
       FunctionMetadataDifferentiabilityKind diffKind) {
     return FunctionTypeRef::create(*this, params, result, flags, diffKind);
   }
-  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
-  using BuiltRequirement = TypeRefRequirement;
 
   const FunctionTypeRef *createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
-      BuiltRequirement *witnessMethodConformanceRequirement,
-      const llvm::SmallVectorImpl<BuiltType> &genericParameters,
-      const llvm::SmallVectorImpl<BuiltRequirement> &requirements,
       llvm::ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
       llvm::ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
       llvm::Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
@@ -545,6 +540,8 @@ public:
   }
 
   using BuiltSILBoxField = typename SILBoxTypeWithLayoutTypeRef::Field;
+  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
+  using BuiltRequirement = TypeRefRequirement;
   using BuiltLayoutConstraint = TypeRefLayoutConstraint;
   BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
     // FIXME: Implement this.

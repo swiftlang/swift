@@ -2,7 +2,6 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -partial-apply-lowering %s | %FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
@@ -18,7 +17,6 @@ import _Concurrency
 
 // CHECK-LL: @Super_runTu =
 // CHECK-LL: @Sub_runTu =
-// CHECK-LL: @"$s20partial_apply_methodTw_Tu" =
 
 protocol Q {
   func testU() -> String
@@ -164,42 +162,6 @@ bb0(%initialized : $Sub):
   return %out : $()
 }
 
-// CHECK-SIL-LABEL: sil hidden @partial_apply_method
-//  CHECK-SIL-SAME: : $@convention(thin) <U where U : Q> (
-//  CHECK-SIL-SAME:     @guaranteed Super,
-//  CHECK-SIL-SAME:     @convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String
-//  CHECK-SIL-SAME: ) ->
-//  CHECK-SIL-SAME:     @async @callee_guaranteed (@in_guaranteed U, Int64) -> @owned String {
-//       CHECK-SIL: bb0(
-//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : $Super,
-//  CHECK-SIL-SAME:     [[DYNAMIC_METHOD:%[^,]+]] : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
-//  CHECK-SIL-SAME: ):
-//       CHECK-SIL:   [[THUNK:%[^,]+]] = function_ref @$s20partial_apply_methodTw_ : $@convention(thin) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @owned String
-//       CHECK-SIL:   [[RESULT:%[^,]+]] = partial_apply [callee_guaranteed] [[THUNK]]<U>([[INSTANCE]], [[DYNAMIC_METHOD]]) : $@convention(thin) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @owned String
-//       CHECK-SIL:   return [[RESULT]] : $@async @callee_guaranteed (@in_guaranteed U, Int64) -> @owned String
-// CHECK-SIL-LABEL: } // end sil function 'partial_apply_method'
-
-// CHECK-SIL-LABEL: sil private [thunk] [ossa] @$s20partial_apply_methodTw_ : $@convention(thin) @async <U where U : Q> (
-//  CHECK-SIL-SAME:     @in_guaranteed U,
-//  CHECK-SIL-SAME:     Int64,
-//  CHECK-SIL-SAME:     @guaranteed Super,
-//  CHECK-SIL-SAME:     @convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String) -> @owned String
-//  CHECK-SIL-SAME: {
-//       CHECK-SIL: bb0(
-//  CHECK-SIL-SAME:     [[GENERIC_ADDR:%[^,]+]] : $*U,
-//  CHECK-SIL-SAME:     [[INT:%[^,]+]] : $Int64,
-//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : @guaranteed $Super,
-//  CHECK-SIL-SAME:     [[METHOD:%[^,]+]] : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
-//  CHECK-SIL-SAME: ):
-//       CHECK-SIL:   [[RESULT:%[^,]+]] = apply [[METHOD]]<U>(
-//  CHECK-SIL-SAME:       [[GENERIC_ADDR]],
-//  CHECK-SIL-SAME:       [[INT]],
-//  CHECK-SIL-SAME:       [[INSTANCE]]
-//  CHECK-SIL-SAME:   ) : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
-//       CHECK-SIL:   return [[RESULT]] : $String
-// CHECK-SIL-LABEL: } // end sil function '$s20partial_apply_methodTw_'
-
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s20partial_apply_methodTw_TA"(
 sil hidden @partial_apply_method : $@convention(thin) <U where U : Q> (@guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @callee_guaranteed @async (@in_guaranteed U, Int64) -> @owned String {
 entry(%int : $Super, %fn : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String):
     %pa = partial_apply [callee_guaranteed] %fn<U>(%int) : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String

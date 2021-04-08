@@ -848,6 +848,11 @@ ASTUnitRef ASTProducer::createASTUnit(
     Error = "compilation setup failed";
     return nullptr;
   }
+  if (CompIns.loadStdlibIfNeeded()) {
+    LOG_WARN_FUNC("Loading the stdlib failed");
+    Error = "Loading the stdlib failed";
+    return nullptr;
+  }
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);

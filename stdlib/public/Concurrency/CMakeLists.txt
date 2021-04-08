@@ -39,6 +39,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   Actor.swift
   CheckedContinuation.swift
   GlobalExecutor.cpp
+  Errors.swift
   Executor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift

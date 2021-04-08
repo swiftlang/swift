@@ -30,6 +30,7 @@ public func foo() -> A.SomeType { fatalError() }
 // CHECK: *** DESERIALIZATION FAILURE (please include this section in any bug report) ***
 // CHECK-NEXT: Could not deserialize type for 'foo()'
 // CHECK-NEXT: Caused by: top-level value not found
-// CHECK-NEXT: Cross-reference to 'SomeType' in module 'A'
+// CHECK-NEXT: Cross-reference to module 'A'
+// CHECK-NEXT: ... SomeType
 // CHECK-NEXT: Notes:
 // CHECK-NEXT: * 'SomeType' was not found in module 'B', but there is one in module 'B'. If this is imported from clang, please make sure the header is part of a single clang module.

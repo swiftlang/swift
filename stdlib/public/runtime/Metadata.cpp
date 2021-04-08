@@ -412,9 +412,11 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
       auto src = srcWords + vtable->getVTableOffset(description);
       auto dest = dstWords + vtable->getVTableOffset(description);
       for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
-        swift_ptrauth_copy(reinterpret_cast<void **>(&dest[i]),
-                           reinterpret_cast<void *const *>(&src[i]),
-                           descriptors[i].Flags.getExtraDiscriminator());
+        swift_ptrauth_copy_code_or_data(
+            reinterpret_cast<void **>(&dest[i]),
+            reinterpret_cast<void *const *>(&src[i]),
+            descriptors[i].Flags.getExtraDiscriminator(),
+            !descriptors[i].Flags.isAsync());
       }
     }
 
@@ -2631,9 +2633,11 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
 #if SWIFT_PTRAUTH
       auto descriptors = description->getMethodDescriptors();
       for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
-        swift_ptrauth_copy(reinterpret_cast<void**>(&dest[i]),
-                           reinterpret_cast<void*const*>(&src[i]),
-                           descriptors[i].Flags.getExtraDiscriminator());
+        swift_ptrauth_copy_code_or_data(
+            reinterpret_cast<void **>(&dest[i]),
+            reinterpret_cast<void *const *>(&src[i]),
+            descriptors[i].Flags.getExtraDiscriminator(),
+            !descriptors[i].Flags.isAsync());
       }
 #else
       memcpy(dest, src, vtable->VTableSize * sizeof(uintptr_t));
@@ -2678,9 +2682,10 @@ static void initClassVTable(ClassMetadata *self) {
     auto descriptors = description->getMethodDescriptors();
     for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
       auto &methodDescription = descriptors[i];
-      swift_ptrauth_init(&classWords[vtableOffset + i],
-                         methodDescription.Impl.get(),
-                         methodDescription.Flags.getExtraDiscriminator());
+      swift_ptrauth_init_code_or_data(
+          &classWords[vtableOffset + i], methodDescription.Impl.get(),
+          methodDescription.Flags.getExtraDiscriminator(),
+          !methodDescription.Flags.isAsync());
     }
   }
 
@@ -2719,9 +2724,10 @@ static void initClassVTable(ClassMetadata *self) {
       auto offset = (baseVTable->getVTableOffset(baseClass) +
                      (baseMethod - baseClassMethods.data()));
 
-      swift_ptrauth_init(&classWords[offset],
-                         descriptor.Impl.get(),
-                         baseMethod->Flags.getExtraDiscriminator());
+      swift_ptrauth_init_code_or_data(&classWords[offset],
+                                      descriptor.Impl.get(),
+                                      baseMethod->Flags.getExtraDiscriminator(),
+                                      !baseMethod->Flags.isAsync());
     }
   }
 }
@@ -3282,11 +3288,17 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
 #if SWIFT_PTRAUTH
   // Re-sign the return value without the address.
   unsigned extra = method->Flags.getExtraDiscriminator();
-  return ptrauth_auth_and_resign(*methodPtr,
-                                 ptrauth_key_function_pointer,
-                                 ptrauth_blend_discriminator(methodPtr, extra),
-                                 ptrauth_key_function_pointer,
-                                 extra);
+  if (method->Flags.isAsync()) {
+    return ptrauth_auth_and_resign(
+        *methodPtr, ptrauth_key_process_independent_data,
+        ptrauth_blend_discriminator(methodPtr, extra),
+        ptrauth_key_process_independent_data, extra);
+  } else {
+    return ptrauth_auth_and_resign(
+        *methodPtr, ptrauth_key_function_pointer,
+        ptrauth_blend_discriminator(methodPtr, extra),
+        ptrauth_key_function_pointer, extra);
+  }
 #else
   return *methodPtr;
 #endif
@@ -4654,7 +4666,9 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+    swift_ptrauth_init_code_or_data(slot, witness,
+                                    reqt.Flags.getExtraDiscriminator(),
+                                    !reqt.Flags.isAsync());
     return;
 
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
@@ -4693,7 +4707,9 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    swift_ptrauth_copy(dest, src, reqt.Flags.getExtraDiscriminator());
+    swift_ptrauth_copy_code_or_data(dest, src,
+                                    reqt.Flags.getExtraDiscriminator(),
+                                    !reqt.Flags.isAsync());
     return;
 
   // FIXME: these should both use ptrauth_key_process_independent_data now.

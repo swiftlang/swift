@@ -1508,58 +1508,8 @@ public:
               result);
   }
 
-  struct BuiltLayoutConstraint {
-    bool operator==(BuiltLayoutConstraint rhs) const { return true; }
-    operator bool() const { return true; }
-  };
-  using BuiltLayoutConstraint = BuiltLayoutConstraint;
-  BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
-    return {};
-  }
-  BuiltLayoutConstraint
-  getLayoutConstraintWithSizeAlign(LayoutConstraintKind kind, unsigned size,
-                                   unsigned alignment) {
-    return {};
-  }
-
-#if LLVM_PTR_SIZE == 4
-  /// Unfortunately the alignment of TypeRef is too large to squeeze in 3 extra
-  /// bits on (some?) 32-bit systems.
-  class BigBuiltTypeIntPair {
-    BuiltType Ptr;
-    RequirementKind Int;
-
-  public:
-    BigBuiltTypeIntPair(BuiltType ptr, RequirementKind i) : Ptr(ptr), Int(i) {}
-    RequirementKind getInt() const { return Int; }
-    BuiltType getPointer() const { return Ptr; }
-    uint64_t getOpaqueValue() const {
-      return (uint64_t)Ptr | ((uint64_t)Int << 32);
-    }
-  };
-#endif
-
-  struct Requirement : public RequirementBase<BuiltType,
-#if LLVM_PTR_SIZE == 4
-         BigBuiltTypeIntPair,
-#else
-         llvm::PointerIntPair<BuiltType, 3, RequirementKind>,
-
-#endif
-         BuiltLayoutConstraint> {
-    Requirement(RequirementKind kind, BuiltType first, BuiltType second)
-        : RequirementBase(kind, first, second) {}
-    Requirement(RequirementKind kind, BuiltType first,
-                BuiltLayoutConstraint second)
-        : RequirementBase(kind, first, second) {}
-  };
-  using BuiltRequirement = Requirement;
-
   TypeLookupErrorOr<BuiltType> createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
-      BuiltRequirement *witnessMethodConformanceRequirement,
-      llvm::ArrayRef<BuiltType> genericParameters,
-      llvm::ArrayRef<BuiltRequirement> requirements,
       llvm::ArrayRef<Demangle::ImplFunctionParam<BuiltType>> params,
       llvm::ArrayRef<Demangle::ImplFunctionResult<BuiltType>> results,
       llvm::Optional<Demangle::ImplFunctionResult<BuiltType>> errorResult,
@@ -1627,6 +1577,51 @@ public:
 
   using BuiltSILBoxField = llvm::PointerIntPair<BuiltType, 1>;
   using BuiltSubstitution = std::pair<BuiltType, BuiltType>;
+  struct BuiltLayoutConstraint {
+    bool operator==(BuiltLayoutConstraint rhs) const { return true; }
+    operator bool() const { return true; }
+  };
+  using BuiltLayoutConstraint = BuiltLayoutConstraint;
+  BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
+    return {};
+  }
+  BuiltLayoutConstraint
+  getLayoutConstraintWithSizeAlign(LayoutConstraintKind kind, unsigned size,
+                                   unsigned alignment) {
+    return {};
+  }
+
+#if LLVM_PTR_SIZE == 4
+  /// Unfortunately the alignment of TypeRef is too large to squeeze in 3 extra
+  /// bits on (some?) 32-bit systems.
+  class BigBuiltTypeIntPair {
+    BuiltType Ptr;
+    RequirementKind Int;
+  public:
+    BigBuiltTypeIntPair(BuiltType ptr, RequirementKind i) : Ptr(ptr), Int(i) {}
+    RequirementKind getInt() const { return Int; }
+    BuiltType getPointer() const { return Ptr; }
+    uint64_t getOpaqueValue() const {
+      return (uint64_t)Ptr | ((uint64_t)Int << 32);
+    }
+  };
+#endif
+
+  struct Requirement : public RequirementBase<BuiltType,
+#if LLVM_PTR_SIZE == 4
+         BigBuiltTypeIntPair,
+#else
+         llvm::PointerIntPair<BuiltType, 3, RequirementKind>,
+
+#endif
+         BuiltLayoutConstraint> {
+    Requirement(RequirementKind kind, BuiltType first, BuiltType second)
+        : RequirementBase(kind, first, second) {}
+    Requirement(RequirementKind kind, BuiltType first,
+                BuiltLayoutConstraint second)
+        : RequirementBase(kind, first, second) {}
+  };
+  using BuiltRequirement = Requirement;
 
   TypeLookupErrorOr<BuiltType> createSILBoxTypeWithLayout(
       llvm::ArrayRef<BuiltSILBoxField> Fields,

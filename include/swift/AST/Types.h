@@ -2785,8 +2785,9 @@ public:
   public:
     explicit Param(Type t,
                    Identifier l = Identifier(),
-                   ParameterTypeFlags f = ParameterTypeFlags())
-        : Ty(t), Label(l), Flags(f) {
+                   ParameterTypeFlags f = ParameterTypeFlags(),
+                   Identifier internalLabel = Identifier())
+        : Ty(t), Label(l), InternalLabel(internalLabel), Flags(f) {
       assert(t && "param type must be non-null");
       assert(!t->is<InOutType>() && "set flags instead");
     }
@@ -2796,8 +2797,18 @@ public:
     /// element type.
     Type Ty;
     
-    // The label associated with the parameter, if any.
+    /// The label associated with the parameter, if any.
     Identifier Label;
+
+    /// The internal label of the parameter, if explicitly specified, otherwise
+    /// empty. The internal label is considered syntactic sugar. It is not
+    /// considered part of the canonical type and is thus also ignored in \c
+    /// operator==.
+    /// E.g.
+    ///  - `name name2: Int` has internal label `name2`
+    ///  - `_ name2: Int` has internal label `name2`
+    ///  - `name: Int` has no internal label
+    Identifier InternalLabel;
     
     /// Parameter specific flags.
     ParameterTypeFlags Flags = {};
@@ -2823,6 +2834,9 @@ public:
 
     bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
+
+    bool hasInternalLabel() const { return !InternalLabel.empty(); }
+    Identifier getInternalLabel() const { return InternalLabel; }
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
 
@@ -2851,6 +2865,11 @@ public:
       return Flags.getValueOwnership();
     }
 
+    /// Returns \c true if the two \c Params are equal in their canonicalized
+    /// form.
+    /// Two \c Params are equal if their external label, flags and
+    /// *canonicalized* types match. The internal label and sugar types are
+    /// *not* considered for type equality.
     bool operator==(Param const &b) const {
       return (Label == b.Label &&
               getPlainType()->isEqual(b.getPlainType()) &&
@@ -2858,16 +2877,22 @@ public:
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
-    Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
-
-    Param withLabel(Identifier newLabel) const {
-      return Param(Ty, newLabel, Flags);
+    /// Return the parameter without external and internal labels.
+    Param getWithoutLabels() const {
+      return Param(Ty, /*Label=*/Identifier(), Flags,
+                   /*InternalLabel=*/Identifier());
     }
 
-    Param withType(Type newType) const { return Param(newType, Label, Flags); }
+    Param withLabel(Identifier newLabel) const {
+      return Param(Ty, newLabel, Flags, InternalLabel);
+    }
+
+    Param withType(Type newType) const {
+      return Param(newType, Label, Flags, InternalLabel);
+    }
 
     Param withFlags(ParameterTypeFlags flags) const {
-      return Param(Ty, Label, flags);
+      return Param(Ty, Label, flags, InternalLabel);
     }
   };
 
@@ -2988,14 +3013,19 @@ public:
     return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
   }
 
-  /// Given two arrays of parameters determine if they are equal.
+  /// Given two arrays of parameters determine if they are equal in their
+  /// canonicalized form. Internal labels and type sugar is *not* taken into
+  /// account.
   static bool equalParams(ArrayRef<Param> a, ArrayRef<Param> b);
 
-  /// Given two arrays of parameters determine if they are equal.
+  /// Given two arrays of parameters determine if they are equal in their
+  /// canonicalized form. Internal labels and type sugar is *not* taken into
+  /// account.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
   /// Given an array of parameters and an array of labels of the
   /// same length, update each parameter to have the corresponding label.
+  /// The internal parameter labels remain the same.
   static void relabelParams(MutableArrayRef<Param> params,
                             ArrayRef<Identifier> labels);
 

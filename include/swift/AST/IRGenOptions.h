@@ -142,6 +142,26 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Resilient class stub initializer callbacks.
   PointerAuthSchema ResilientClassStubInitCallbacks;
 
+  /// Like SwiftFunctionPointers but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncSwiftFunctionPointers;
+
+  /// Like SwiftClassMethods but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncSwiftClassMethods;
+
+  /// Like ProtocolWitnesses but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncProtocolWitnesses;
+
+  /// Like SwiftClassMethodPointers but for use with AsyncFunctionPointer
+  /// values.
+  PointerAuthSchema AsyncSwiftClassMethodPointers;
+
+  /// Like SwiftDynamicReplacements but for use with AsyncFunctionPointer
+  /// values.
+  PointerAuthSchema AsyncSwiftDynamicReplacements;
+
+  /// Like PartialApplyCapture but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncPartialApplyCapture;
+
   /// The parent async context stored within a child async context.
   PointerAuthSchema AsyncContextParent;
 

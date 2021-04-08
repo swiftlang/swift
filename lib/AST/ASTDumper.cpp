@@ -3808,6 +3808,8 @@ namespace {
         PrintWithColorRAII(OS, TypeFieldColor) << "param";
         if (param.hasLabel())
           printField("name", param.getLabel().str());
+        if (param.hasInternalLabel())
+          printField("internal_name", param.getInternalLabel().str());
         dumpParameterFlags(param.getParameterFlags());
         printRec(param.getPlainType());
         OS << ")";

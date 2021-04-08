@@ -703,7 +703,7 @@ public:
   Decl *getDecl() const override { return decl; }
 };
 
-/// Since each generic parameter can "see" the preceeding ones,
+/// Since each generic parameter can "see" the preceding ones,
 /// (e.g. <A, B: A>) -- it's not legal but that's how lookup behaves --
 /// Each GenericParamScope scopes just ONE parameter, and we next
 /// each one within the previous one.

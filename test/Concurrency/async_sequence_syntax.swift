@@ -75,3 +75,10 @@ func forAwaitInsideDoCatch<Source: AsyncSequence>(_ source: Source) async {
     }
   } catch {} // no-warning
 }
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+func forAwaitWithConcreteType(_ seq: ThrowingAsyncSequence) throws { // expected-note {{add 'async' to function 'forAwaitWithConcreteType' to make it asynchronous}}
+  for try await elt in seq { // expected-error {{'async' in a function that does not support concurrency}}
+    _ = elt
+  }
+}

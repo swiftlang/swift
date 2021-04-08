@@ -2644,7 +2644,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       IGF.CurFn, FunctionPtrTy);
 
-  auto &schema = getOptions().PointerAuth.SwiftDynamicReplacements;
+  auto &schema = f->isAsync()
+                     ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                     : getOptions().PointerAuth.SwiftDynamicReplacements;
   llvm::Value *ReplFn = nullptr, *hasReplFn = nullptr;
 
   if (UseBasicDynamicReplacement) {
