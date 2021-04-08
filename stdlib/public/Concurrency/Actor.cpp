@@ -27,6 +27,11 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 
+#if SWIFT_OBJC_INTEROP
+extern void *objc_autoreleasePoolPush();
+extern void objc_autoreleasePoolPop(void *);
+#endif
+
 // Uncomment to enable helpful debug spew to stderr
 //#define SWIFT_TASK_PRINTF_DEBUG 1
 
@@ -156,8 +161,16 @@ SWIFT_CC(swift)
 static void swift_job_runImpl(Job *job, ExecutorRef executor) {
   ExecutorTrackingInfo trackingInfo;
   trackingInfo.enterAndShadow(executor);
-
+    
+#if SWIFT_OBJC_INTEROP
+  auto pool = objc_autoreleasePoolPush();
+#endif
+    
   runJobInEstablishedExecutorContext(job);
+    
+#if SWIFT_OBJC_INTEROP
+  objc_autoreleasePoolPop(pool);
+#endif
 
   trackingInfo.leave();
 }
