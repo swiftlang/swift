@@ -11,9 +11,6 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
-// This test is failing on Windows.
-// UNSUPPORTED: OS=windows-msvc
-
 import Builtin
 import Swift
 import _Concurrency
