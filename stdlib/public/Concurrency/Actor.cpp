@@ -32,9 +32,6 @@ extern void *objc_autoreleasePoolPush();
 extern void objc_autoreleasePoolPop(void *);
 #endif
 
-// Uncomment to enable helpful debug spew to stderr
-//#define SWIFT_TASK_PRINTF_DEBUG 1
-
 using namespace swift;
 
 /// Should we yield the thread?
