@@ -328,7 +328,9 @@ struct X24<T: P20> : P24 {
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X24<τ_0_0.B>, τ_0_0.B : P20>
 protocol P25a {
   associatedtype A: P24 // expected-warning{{redundant conformance constraint 'Self.A' : 'P24'}}
+  // expected-note@-1 {{conformance constraint 'Self.B' : 'P20' implied here}}
   associatedtype B: P20 where A == X24<B> // expected-note{{conformance constraint 'Self.A' : 'P24' implied here}}
+  // expected-warning@-1 {{redundant conformance constraint 'Self.B' : 'P20'}}
 }
 
 // CHECK-LABEL: .P25b@
