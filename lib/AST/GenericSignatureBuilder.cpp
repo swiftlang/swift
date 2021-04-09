@@ -2828,6 +2828,7 @@ static void concretizeNestedTypeFromConcreteParent(
   assert(parentEquiv->conformsTo.count(proto) > 0 &&
          "No conformance requirement");
   const RequirementSource *parentConcreteSource = nullptr;
+
   for (const auto &constraint : parentEquiv->conformsTo.find(proto)->second) {
     if (!isSuperclassConstrained) {
       if (constraint.source->kind == RequirementSource::Concrete) {
@@ -5796,16 +5797,24 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
       bool alreadyFound = false;
       const RequirementSource *conformsSource = nullptr;
       for (const auto &constraint : conforms.second) {
-        if (constraint.source->getAffectedType()->isEqual(dependentType)) {
+        bool derivedViaConcrete = false;
+
+        auto *minimal = constraint.source->getMinimalConformanceSource(
+            builder, constraint.getSubjectDependentType({ }), proto,
+            derivedViaConcrete);
+
+        if (minimal == nullptr || derivedViaConcrete)
+          continue;
+
+        if (minimal->getAffectedType()->isEqual(dependentType)) {
           alreadyFound = true;
           break;
         }
 
         // Capture the source for later use, skipping
         if (!conformsSource &&
-            constraint.source->kind
-              != RequirementSource::RequirementSignatureSelf)
-          conformsSource = constraint.source;
+            minimal->kind != RequirementSource::RequirementSignatureSelf)
+          conformsSource = minimal;
       }
 
       if (alreadyFound) continue;
@@ -6382,9 +6391,7 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
         equivClass.recursiveSuperclassType = true;
       }
     }
-
-    checkConformanceConstraints(genericParams, &equivClass);
-  };
+  }
 
   if (!Impl->ExplicitSameTypeRequirements.empty()) {
     // FIXME: Expand all conformance requirements. This is expensive :(
@@ -6853,18 +6860,6 @@ static bool isRedundantlyInheritableObjCProtocol(
   auto &ctx = proto->getASTContext();
   inheritingProto->getAttrs().add(new (ctx) RestatedObjCConformanceAttr(proto));
   return true;
-}
-
-void GenericSignatureBuilder::checkConformanceConstraints(
-                          TypeArrayView<GenericTypeParamType> genericParams,
-                          EquivalenceClass *equivClass) {
-  for (auto &entry : equivClass->conformsTo) {
-    // Remove self-derived constraints.
-    assert(!entry.second.empty() && "No constraints to work with?");
-
-    // Remove any self-derived constraints.
-    removeSelfDerived(*this, entry.second, entry.first);
-  }
 }
 
 void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
