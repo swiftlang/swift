@@ -7579,25 +7579,35 @@ synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
                                                         inoutSelfExpr,
                                                         keyRefExpr);
 
-  // `getterImpl` can return either UnsafePointer or UnsafeMutablePointer.
-  // Retrieve the corresponding `.pointee` declaration.
+  // This default handles C++'s operator[] that returns a value type.
+  Expr *propertyExpr = getterImplCallExpr;
   PointerTypeKind ptrKind;
-  getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind);
-  VarDecl *pointeePropertyDecl = ctx.getPointerPointeePropertyDecl(ptrKind);
 
-  SubstitutionMap subMap =
-      SubstitutionMap::get(ctx.getUnsafePointerDecl()->getGenericSignature(),
-                           { elementTy }, { });
-  auto pointeePropertyRefExpr =
-      new (ctx) MemberRefExpr(getterImplCallExpr,
-                              SourceLoc(),
-                              ConcreteDeclRef(pointeePropertyDecl, subMap),
-                              DeclNameLoc(),
-                              /*implicit=*/ true);
-  pointeePropertyRefExpr->setType(elementTy);
+  // The following check returns true if the subscript operator returns a C++
+  // reference type. This check actually checks to see if the type is a pointer
+  // type, but this does not apply to C pointers because they are Optional types
+  // when imported. TODO: Use a more obvious check here.
+  if (getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind)) {
+    // `getterImpl` can return either UnsafePointer or UnsafeMutablePointer.
+    // Retrieve the corresponding `.pointee` declaration.
+    VarDecl *pointeePropertyDecl = ctx.getPointerPointeePropertyDecl(ptrKind);
+
+    // Handle operator[] that returns a reference type.
+    SubstitutionMap subMap =
+        SubstitutionMap::get(ctx.getUnsafePointerDecl()->getGenericSignature(),
+                             { elementTy }, { });
+    auto pointeePropertyRefExpr =
+        new (ctx) MemberRefExpr(getterImplCallExpr,
+                                SourceLoc(),
+                                ConcreteDeclRef(pointeePropertyDecl, subMap),
+                                DeclNameLoc(),
+                                /*implicit=*/ true);
+    pointeePropertyRefExpr->setType(elementTy);
+    propertyExpr = pointeePropertyRefExpr;
+  }
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(),
-                                         pointeePropertyRefExpr,
+                                         propertyExpr,
                                          /*implicit=*/ true);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), { returnStmt }, SourceLoc(),
@@ -7657,8 +7667,10 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
-  // Unwrap `T`.
-  const auto elementTy = rawElementTy->getAnyPointerElementType();
+  // Unwrap `T`. Use rawElementTy for return by value.
+  const auto elementTy = rawElementTy->getAnyPointerElementType() ?
+                         rawElementTy->getAnyPointerElementType() :
+                         rawElementTy;
 
   auto &ctx = Impl.SwiftContext;
   auto bodyParams = getterImpl->getParameters();
@@ -7737,6 +7749,10 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
   }
 
   makeComputed(subscript, getterDecl, setterDecl);
+
+  // Implicitly unwrap Optional types for T *operator[].
+  Impl.recordImplicitUnwrapForDecl(subscript,
+                                   getterImpl->isImplicitlyUnwrappedOptional());
 
   return subscript;
 }
