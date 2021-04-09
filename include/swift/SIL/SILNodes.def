@@ -415,6 +415,10 @@ VALUE(MultipleValueInstructionResult, ValueBase)
 
 VALUE(SILUndef, ValueBase)
 
+/// Used internally in e.g. the SIL parser and deserializer.
+/// A PlaceholderValue must not appear in valid SIL.
+VALUE(PlaceholderValue, ValueBase)
+
 ABSTRACT_NODE(SILInstruction, SILNode)
 
 ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)

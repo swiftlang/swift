@@ -1111,6 +1111,8 @@ public:
     // Verify some basis structural stuff about an instruction's operands.
     for (auto &operand : I->getAllOperands()) {
       require(operand.get(), "instruction has null operand");
+      require(!isa<PlaceholderValue>(operand.get()),
+              "instruction has placeholder operand");
 
       if (auto *valueI = operand.get()->getDefiningInstruction()) {
         require(valueI->getParent(),

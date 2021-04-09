@@ -500,8 +500,7 @@ SILParser::~SILParser() {
   for (auto &Entry : ForwardRefLocalValues) {
     if (ValueBase *dummyVal = LocalValues[Entry.first()]) {
       dummyVal->replaceAllUsesWith(SILUndef::get(dummyVal->getType(), SILMod));
-      SILInstruction::destroy(cast<GlobalAddrInst>(dummyVal));
-      SILMod.deallocateInst(cast<GlobalAddrInst>(dummyVal));
+      ::delete cast<PlaceholderValue>(dummyVal);
     }
   }
 }
@@ -687,7 +686,7 @@ SILValue SILParser::getLocalValue(UnresolvedValueName Name, SILType Type,
   // it until we see a real definition.
   ForwardRefLocalValues[Name.Name] = Name.NameLoc;
 
-  Entry = new (SILMod) GlobalAddrInst(getDebugLoc(B, Loc), Type);
+  Entry = ::new PlaceholderValue(Type);
   return Entry;
 }
 
@@ -715,8 +714,7 @@ void SILParser::setLocalValue(ValueBase *Value, StringRef Name,
     } else {
       // Forward references only live here if they have a single result.
       Entry->replaceAllUsesWith(Value);
-      SILInstruction::destroy(cast<GlobalAddrInst>(Entry));
-      SILMod.deallocateInst(cast<GlobalAddrInst>(Entry));
+      ::delete cast<PlaceholderValue>(Entry);
     }
     Entry = Value;
     return;

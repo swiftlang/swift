@@ -169,6 +169,9 @@ void SILModule::checkForLeaks() const {
     llvm::errs() << "Instructions in module: " << instsInModule << '\n';
     llvm_unreachable("leaking instructions");
   }
+  
+  assert(PlaceholderValue::getNumPlaceholderValuesAlive() == 0 &&
+         "leaking placeholders");
 }
 
 void SILModule::checkForLeaksAfterDestruction() {
