@@ -89,7 +89,7 @@ namespace ctypes {
     // Types that are defined in the _Concurrency library
 
     // Default actor storage type.
-    struct BD {
+    struct alignas(2 * alignof(void*)) BD {
       void *storage[NumWords_DefaultActor];
     };
 
