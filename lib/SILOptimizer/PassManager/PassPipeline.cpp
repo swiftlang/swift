@@ -477,7 +477,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
-  if (!P.getOptions().DisableCopyPropagation) {
+  if (P.getOptions().EnableCopyPropagation) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
