@@ -6147,8 +6147,11 @@ void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
   assert(i->getTargetExecutor()->getType().is<BuiltinExecutorType>());
   llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
           llvm::Intrinsic::coro_async_resume, {});
-          
-  emitSuspensionPoint(getLoweredSingletonExplosion(i->getOperand()), resumeFn);
+
+  Explosion executor;
+  getLoweredExplosion(i->getOperand(), executor);
+
+  emitSuspensionPoint(executor, resumeFn);
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {

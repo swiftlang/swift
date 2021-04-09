@@ -16,6 +16,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenConstant.cpp
   GenControl.cpp
   GenCoverage.cpp
+  GenConcurrency.cpp
   GenDecl.cpp
   GenDiffFunc.cpp
   GenDiffWitness.cpp

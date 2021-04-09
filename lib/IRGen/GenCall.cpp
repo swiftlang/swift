@@ -1971,10 +1971,17 @@ void irgen::extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
     returned = IGF.coerceValue(returned, bodyType, IGF.IGM.DataLayout);
 
   if (auto *structType = dyn_cast<llvm::StructType>(bodyType))
-    for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
-      out.add(IGF.Builder.CreateExtractValue(returned, i));
+    IGF.emitAllExtractValues(returned, structType, out);
   else
     out.add(returned);
+}
+
+void IRGenFunction::emitAllExtractValues(llvm::Value *value,
+                                         llvm::StructType *structType,
+                                         Explosion &out) {
+  assert(value->getType() == structType);
+  for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
+    out.add(Builder.CreateExtractValue(value, i));
 }
 
 std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(

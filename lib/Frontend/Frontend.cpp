@@ -754,8 +754,7 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
 }
 
 bool CompilerInvocation::shouldImportSwiftConcurrency() const {
-  return getLangOptions().EnableExperimentalConcurrency
-      && !getLangOptions().DisableImplicitConcurrencyModuleImport &&
+  return !getLangOptions().DisableImplicitConcurrencyModuleImport &&
       getFrontendOptions().InputMode !=
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }

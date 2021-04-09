@@ -25,6 +25,9 @@
 
 namespace swift {
 
+// Uncomment to enable helpful debug spew to stderr
+//#define SWIFT_TASK_PRINTF_DEBUG 1
+
 class AsyncTask;
 class TaskGroup;
 

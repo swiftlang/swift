@@ -1595,7 +1595,7 @@ FUNCTION(TaskSwitchFunc,
          swift_task_switch, SwiftAsyncCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
-         ARGS(SwiftContextPtrTy, Int8PtrTy, SwiftExecutorPtrTy),
+         ARGS(SwiftContextPtrTy, Int8PtrTy, ExecutorFirstTy, ExecutorSecondTy),
          ATTRS(NoUnwind))
 
 // AsyncTask *swift_continuation_init(AsyncContext *continuationContext,
@@ -1636,7 +1636,7 @@ FUNCTION(ContinuationThrowingResumeWithError,
 FUNCTION(TaskGetCurrentExecutor,
          swift_task_getCurrentExecutor, SwiftCC,
          ConcurrencyAvailability,
-         RETURNS(IntPtrTy),
+         RETURNS(SwiftExecutorTy),
          ARGS(),
          ATTRS(NoUnwind, ArgMemOnly))
 
@@ -1651,6 +1651,22 @@ FUNCTION(DefaultActorInitialize,
 // void swift_defaultActor_destroy(DefaultActor *actor);
 FUNCTION(DefaultActorDestroy,
          swift_defaultActor_destroy, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_defaultActor_deallocate(DefaultActor *actor);
+FUNCTION(DefaultActorDeallocate,
+         swift_defaultActor_deallocate, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_defaultActor_deallocateResilient(HeapObject *actor);
+FUNCTION(DefaultActorDeallocateResilient,
+         swift_defaultActor_deallocateResilient, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
