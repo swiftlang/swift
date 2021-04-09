@@ -1170,8 +1170,8 @@ public:
 
 private:
   friend Decl;
-  Optional<RawComment> getRawComment(const Decl *D);
-  void setRawComment(const Decl *D, RawComment RC);
+  Optional<std::pair<RawComment, bool>> getRawComment(const Decl *D);
+  void setRawComment(const Decl *D, RawComment RC, bool FromSerialized);
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
