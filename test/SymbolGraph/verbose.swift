@@ -6,6 +6,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name verbose -emit-module -emit-module-path %t/verbose.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t | %FileCheck %s -check-prefix=DRIVER --allow-empty
 
+// rdar://76461340
+// REQUIRES: rdar76461340
+
 // QUIET-NOT: Emitting symbol graph for module file
 // QUIET-NOT: 2 top-level declarations in this module.
 // QUIET-NOT: Found 1 symbols and 0 relationships.
