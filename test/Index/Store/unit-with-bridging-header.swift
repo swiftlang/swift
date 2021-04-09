@@ -32,8 +32,9 @@
 // PCH-UNIT: DEPEND START
 // PCH-UNIT: Unit | system | {{.*}}Swift.swiftmodule
 // PCH-UNIT: Unit | user | {{.*}}bridge-head.pch | bridge-head.pch-
+// PCH-UNIT: Unit | system | _Concurrency |
 // PCH-UNIT: Record | user | {{.*}}unit-with-bridging-header.swift | unit-with-bridging-header.swift-
-// PCH-UNIT: DEPEND END (3)
+// PCH-UNIT: DEPEND END (4)
 
 // TEXTUAL-UNIT: s1.o-
 // TEXTUAL-UNIT: --------
@@ -41,6 +42,6 @@
 // TEXTUAL-UNIT: DEPEND START
 // TEXTUAL-UNIT: Unit | system | {{.*}}Swift.swiftmodule
 // TEXTUAL-UNIT: Record | user | {{.*}}unit-with-bridging-header.swift | unit-with-bridging-header.swift-
-// TEXTUAL-UNIT: DEPEND END (2)
+// TEXTUAL-UNIT: DEPEND END (3)
 
 func test() {}
