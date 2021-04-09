@@ -514,13 +514,17 @@ Types
 
   type ::= 'Bb'                              // Builtin.BridgeObject
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
-  type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
-  type ::= 'BD'                              // Builtin.DefaultActorStorage
-  type ::= 'Be'                              // Builtin.Executor
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
+    type ::= 'BD'                              // Builtin.DefaultActorStorage
+    type ::= 'Be'                              // Builtin.Executor
+  #endif
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral
-  type ::= 'Bj'                              // Builtin.Job
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    type ::= 'Bj'                              // Builtin.Job
+  #endif
   type ::= 'BO'                              // Builtin.UnknownObject (no longer a distinct type, but still used for AnyObject)
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
@@ -570,8 +574,10 @@ Types
                                              // they are mangled separately as part of the entity.
   params-type ::= empty-list                 // shortcut for no parameters
 
-  async ::= 'Ya'                             // 'async' annotation on function types
-  sendable ::= 'Yb'                          // @Sendable on function types
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    async ::= 'Ya'                             // 'async' annotation on function types
+    sendable ::= 'Yb'                          // @Sendable on function types
+  #endif
   throws ::= 'K'                             // 'throws' annotation on function types
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
@@ -666,8 +672,10 @@ mangled in to disambiguate.
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
-  SENDABLE ::= 'h'                           // @Sendable
-  ASYNC ::= 'H'                              // @async
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    SENDABLE ::= 'h'                           // @Sendable
+    ASYNC ::= 'H'                              // @async
+  #endif
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
   PARAM-CONVENTION ::= 'c'                   // indirect in constant
