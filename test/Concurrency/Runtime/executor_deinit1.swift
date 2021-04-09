@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// UNSUPPORTED: linux
+
 
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }

@@ -1153,8 +1153,19 @@ namespace {
         Protocols.push_back(proto);
       }
 
-      for (Decl *member : theProtocol->getMembers())
+      for (Decl *member : theProtocol->getMembers()) {
+        // Async methods coming from ObjC protocols shouldn't be recorded twice.
+        // At the moment, the language doesn't allow suppressing the
+        // completionHandler-based variant, so this is sufficient.
+        if (theProtocol->hasClangNode() && theProtocol->isObjC()) {
+          if (auto funcOrAccessor = dyn_cast<AbstractFunctionDecl>(member)) {
+            if (funcOrAccessor->isAsyncContext()) {
+              continue;
+            }
+          }
+        }
         visit(member);
+      }
     }
 
     /// Gather protocol records for all of the explicitly-specified Objective-C
