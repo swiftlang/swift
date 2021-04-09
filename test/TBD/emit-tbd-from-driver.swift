@@ -1,4 +1,6 @@
 // REQUIRES: VENDOR=apple
+// UNSUPPORTED: CPU=i386
+
 // RUN: %empty-directory(%t)
 
 // RUN: echo "public func foo() -> some CustomStringConvertible { 32 }" > %t/source1.swift
