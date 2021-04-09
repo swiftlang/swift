@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// See https://bugs.swift.org/browse/SR-14333
+// UNSUPPORTED: OS=windows-msvc
+
 import _Concurrency
 import StdlibUnittest
 
