@@ -244,6 +244,11 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectEqual(Builtin.FPIEEE64.self, _typeByName("Bf64_")!)
 
   expectEqual(Builtin.Vec4xFPIEEE32.self, _typeByName("Bf32_Bv4_")!)
+
+  expectEqual(Builtin.RawUnsafeContinuation.self, _typeByName("Bc")!)
+  expectEqual(Builtin.Executor.self, _typeByName("Be")!)
+  expectNotNil(_typeByName("BD"))
+  expectEqual(Builtin.Job.self, _typeByName("Bj")!)
 }
 
 class CG4<T: P1, U: P2> {

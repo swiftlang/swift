@@ -1146,6 +1146,10 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName,
                               BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
       break;
+    case 'e':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                              BUILTIN_TYPE_NAME_EXECUTOR);
+      break;
     case 'f': {
       int size = demangleIndex() - 1;
       if (size <= 0 || size > maxTypeSize)
