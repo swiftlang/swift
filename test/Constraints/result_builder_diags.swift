@@ -712,4 +712,13 @@ struct TuplifiedStructWithInvalidClosure {
       0
     }
   }
+
+  @TupleBuilder var errorsDiagnosedByParser: some Any {
+    if let cond = condition {
+      tuplify { _ in
+        self. // expected-error {{expected member name following '.'}}
+      }
+      42
+    }
+  }
 }
