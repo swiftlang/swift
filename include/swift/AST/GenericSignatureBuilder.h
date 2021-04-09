@@ -712,22 +712,11 @@ private:
                             TypeArrayView<GenericTypeParamType> genericParams,
                             EquivalenceClass *equivClass);
 
-  /// Check the superclass constraints within the equivalence
-  /// class of the given potential archetype.
-  void checkSuperclassConstraints(
-                            TypeArrayView<GenericTypeParamType> genericParams,
-                            EquivalenceClass *equivClass);
-
   /// Check conformance constraints within the equivalence class of the
   /// given potential archetype.
   void checkConformanceConstraints(
                             TypeArrayView<GenericTypeParamType> genericParams,
                             EquivalenceClass *equivClass);
-
-  /// Check layout constraints within the equivalence class of the given
-  /// potential archetype.
-  void checkLayoutConstraints(TypeArrayView<GenericTypeParamType> genericParams,
-                              EquivalenceClass *equivClass);
 
   /// Check same-type constraints within the equivalence class of the
   /// given potential archetype.
