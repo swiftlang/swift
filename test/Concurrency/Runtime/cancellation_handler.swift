@@ -4,6 +4,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: OS=windows-msvc
 
 // for sleep
 #if canImport(Darwin)
