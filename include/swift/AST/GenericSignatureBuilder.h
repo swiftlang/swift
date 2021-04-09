@@ -1241,8 +1241,7 @@ public:
   /// requirement redundant, because without said original requirement, the
   /// derived requirement ceases to hold.
   bool isSelfDerivedSource(GenericSignatureBuilder &builder,
-                           Type type,
-                           bool &derivedViaConcrete) const;
+                           Type type) const;
 
   /// For a requirement source that describes the requirement \c type:proto,
   /// retrieve the minimal subpath of this requirement source that will
@@ -1254,8 +1253,7 @@ public:
   const RequirementSource *getMinimalConformanceSource(
                                             GenericSignatureBuilder &builder,
                                             Type type,
-                                            ProtocolDecl *proto,
-                                            bool &derivedViaConcrete) const;
+                                            ProtocolDecl *proto) const;
 
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;

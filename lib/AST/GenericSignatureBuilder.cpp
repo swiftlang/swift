@@ -936,10 +936,8 @@ bool RequirementSource::shouldDiagnoseRedundancy(bool primary) const {
 }
 
 bool RequirementSource::isSelfDerivedSource(GenericSignatureBuilder &builder,
-                                            Type type,
-                                            bool &derivedViaConcrete) const {
-  return getMinimalConformanceSource(builder, type, /*proto=*/nullptr,
-                                     derivedViaConcrete)
+                                            Type type) const {
+  return getMinimalConformanceSource(builder, type, /*proto=*/nullptr)
     != this;
 }
 
@@ -989,10 +987,7 @@ static bool isSelfDerivedProtocolRequirementInProtocol(
 const RequirementSource *RequirementSource::getMinimalConformanceSource(
                                              GenericSignatureBuilder &builder,
                                              Type currentType,
-                                             ProtocolDecl *proto,
-                                             bool &derivedViaConcrete) const {
-  derivedViaConcrete = false;
-
+                                             ProtocolDecl *proto) const {
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return this;
 
@@ -1058,15 +1053,6 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
           builder.resolveEquivalenceClass(parentType,
                                           ArchetypeResolutionKind::WellFormed);
       assert(parentEquivClass && "Not a well-formed type?");
-
-      if (requirementSignatureSelfProto) {
-        if (parentEquivClass->concreteType)
-          derivedViaConcrete = true;
-        else if (parentEquivClass->superclass &&
-                 builder.lookupConformance(parentEquivClass->superclass,
-                                           source->getProtocolDecl()))
-          derivedViaConcrete = true;
-      }
 
       // The parent potential archetype must conform to the protocol in which
       // this requirement resides. Add this constraint.
@@ -1136,7 +1122,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
                               redundantSubpath->first,
                               redundantSubpath->second);
     return shorterSource
-      ->getMinimalConformanceSource(builder, currentType, proto, derivedViaConcrete);
+      ->getMinimalConformanceSource(builder, currentType, proto);
   }
 
   // It's self-derived but we don't have a redundant subpath to eliminate.
@@ -5797,13 +5783,10 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
       bool alreadyFound = false;
       const RequirementSource *conformsSource = nullptr;
       for (const auto &constraint : conforms.second) {
-        bool derivedViaConcrete = false;
-
         auto *minimal = constraint.source->getMinimalConformanceSource(
-            builder, constraint.getSubjectDependentType({ }), proto,
-            derivedViaConcrete);
+            builder, constraint.getSubjectDependentType({ }), proto);
 
-        if (minimal == nullptr || derivedViaConcrete)
+        if (minimal == nullptr)
           continue;
 
         if (minimal->getAffectedType()->isEqual(dependentType)) {
@@ -6028,16 +6011,12 @@ void GenericSignatureBuilder::computeRedundantRequirements(
           requirementSignatureSelfProto,
           [&](const Constraint<ProtocolDecl *> &constraint) {
             // FIXME: Remove this.
-            bool derivedViaConcrete;
             auto minimalSource =
               constraint.source->getMinimalConformanceSource(
                   *this,
                   constraint.getSubjectDependentType({ }),
-                  proto, derivedViaConcrete);
+                  proto);
             if (minimalSource != constraint.source)
-              return true;
-
-            if (derivedViaConcrete)
               return true;
 
             return false;
@@ -6613,27 +6592,21 @@ void GenericSignatureBuilder::processDelayedRequirements() {
 
 namespace {
   /// Remove self-derived sources from the given vector of constraints.
-  ///
-  /// \returns true if any derived-via-concrete constraints were found.
   template<typename T>
-  bool removeSelfDerived(GenericSignatureBuilder &builder,
+  void removeSelfDerived(GenericSignatureBuilder &builder,
                          std::vector<Constraint<T>> &constraints,
                          ProtocolDecl *proto,
-                         bool dropDerivedViaConcrete = true,
                          bool allCanBeSelfDerived = false) {
     auto genericParams = builder.getGenericParams();
-    bool anyDerivedViaConcrete = false;
-    Optional<Constraint<T>> remainingConcrete;
     SmallVector<Constraint<T>, 4> minimalSources;
     constraints.erase(
       std::remove_if(constraints.begin(), constraints.end(),
         [&](const Constraint<T> &constraint) {
-          bool derivedViaConcrete;
           auto minimalSource =
             constraint.source->getMinimalConformanceSource(
                          builder,
                          constraint.getSubjectDependentType(genericParams),
-                         proto, derivedViaConcrete);
+                         proto);
           if (minimalSource != constraint.source) {
             // The minimal source is smaller than the original source, so the
             // original source is self-derived.
@@ -6650,21 +6623,8 @@ namespace {
             return true;
           }
 
-           if (!derivedViaConcrete)
-             return false;
-
-           anyDerivedViaConcrete = true;
-
-           if (!dropDerivedViaConcrete)
-             return false;
-
-           // Drop derived-via-concrete requirements.
-           if (!remainingConcrete)
-             remainingConcrete = constraint;
-
-           ++NumSelfDerived;
-           return true;
-         }),
+          return false;
+        }),
       constraints.end());
 
     // If we found any minimal sources, add them now, avoiding introducing any
@@ -6684,13 +6644,8 @@ namespace {
       }
     }
 
-    // If we only had concrete conformances, put one back.
-    if (constraints.empty() && remainingConcrete)
-      constraints.push_back(*remainingConcrete);
-
     assert((!constraints.empty() || allCanBeSelfDerived) &&
            "All constraints were self-derived!");
-    return anyDerivedViaConcrete;
   }
 } // end anonymous namespace
 
@@ -7253,9 +7208,7 @@ static void computeDerivedSameTypeComponents(
     // construction of self-derived sources really don't work, because we
     // discover more information later, so we need a more on-line or
     // iterative approach.
-    bool derivedViaConcrete;
-    if (concrete.source->isSelfDerivedSource(builder, subjectType,
-                                             derivedViaConcrete))
+    if (concrete.source->isSelfDerivedSource(builder, subjectType))
       continue;
 
     // If it has a better source than we'd seen before for this component,
@@ -7589,13 +7542,10 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   if (!equivClass->derivedSameTypeComponents.empty())
     return;
 
-  bool anyDerivedViaConcrete = false;
   // Remove self-derived constraints.
-  if (removeSelfDerived(*this, equivClass->sameTypeConstraints,
-                        /*proto=*/nullptr,
-                        /*dropDerivedViaConcrete=*/false,
-                        /*allCanBeSelfDerived=*/true))
-    anyDerivedViaConcrete = true;
+  removeSelfDerived(*this, equivClass->sameTypeConstraints,
+                    /*proto=*/nullptr,
+                    /*allCanBeSelfDerived=*/true);
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
   llvm::array_pod_sort(equivClass->sameTypeConstraints.begin(),
@@ -7671,16 +7621,6 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     // Ignore inferred requirements; we don't want to diagnose them.
     intercomponentEdges.push_back(
       IntercomponentEdge(firstComponentIdx, secondComponentIdx, constraint));
-  }
-
-  // If there were any derived-via-concrete constraints, drop them now before
-  // we emit other diagnostics.
-  if (anyDerivedViaConcrete) {
-    // Remove derived-via-concrete constraints.
-    (void)removeSelfDerived(*this, equivClass->sameTypeConstraints,
-                            /*proto=*/nullptr,
-                            /*dropDerivedViaConcrete=*/true,
-                            /*allCanBeSelfDerived=*/true);
   }
 
   // Walk through each of the components, checking the intracomponent edges.
@@ -7880,7 +7820,6 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
 
   removeSelfDerived(*this, equivClass->concreteTypeConstraints,
                     /*proto=*/nullptr,
-                    /*dropDerivedViaConcrete=*/true,
                     /*allCanBeSelfDerived=*/true);
 
   // This can occur if the combination of a superclass requirement and
