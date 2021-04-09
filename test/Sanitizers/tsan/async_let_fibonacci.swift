@@ -5,6 +5,8 @@
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 
+// REQUIRES: radar76446550
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
