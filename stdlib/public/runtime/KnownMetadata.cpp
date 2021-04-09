@@ -22,6 +22,11 @@
 #include <cstring>
 #include <climits>
 
+namespace swift {
+class AsyncTask;
+class Job;
+}
+
 using namespace swift;
 using namespace metadataimpl;
 
@@ -80,6 +85,19 @@ namespace ctypes {
     /// with this, but the type isn't copyable, so most of the value
     /// operations are meaningless.
     using BB = ValueBuffer;
+
+    // Types that are defined in the _Concurrency library
+
+    // Default actor storage type.
+    struct alignas(2 * alignof(void*)) BD {
+      void *storage[NumWords_DefaultActor];
+    };
+
+    // ExecutorRef type.
+    struct Be {
+      HeapObject *Identity;
+      uintptr_t Implementation;
+    };
   }
 }
 
@@ -93,6 +111,12 @@ namespace pointer_types {
 
     /// The value-witness table for BridgeObject.
     using Bb = BridgeObjectBox;
+
+    // RawUnsafeContinuation type.
+    using Bc = RawPointerBox;
+
+    // Job type.
+    using Bj = RawPointerBox;
 
 #if SWIFT_OBJC_INTEROP
     /*** Objective-C pointers *************************************************/
