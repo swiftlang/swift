@@ -470,18 +470,11 @@ static void swift_taskGroup_initializeImpl(TaskGroup *group) {
   assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
-  swift_task_addStatusRecord(record);
-}
+  bool notCancelled = swift_task_addStatusRecord(record);
 
-// =============================================================================
-// ==== create -----------------------------------------------------------------
-SWIFT_CC(swift)
-static TaskGroup *swift_taskGroup_createImpl() {
-  // TODO: John suggested we should rather create from a builtin, which would allow us to optimize allocations even more?
-  void *allocation = swift_task_alloc(sizeof(TaskGroup));
-  auto group = reinterpret_cast<TaskGroup *>(allocation);
-  swift_taskGroup_initialize(group);
-  return group;
+  // If the task has already been cancelled, reflect that immediately in
+  // the group status.
+  if (!notCancelled) impl->statusCancel();
 }
 
 // =============================================================================
@@ -514,9 +507,6 @@ void TaskGroupImpl::destroy() {
     taskDequeued = readyQueue.dequeue(item);
   }
   mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-
-  // TODO: get the parent task, do we need to store it?
-  swift_task_dealloc(this);
 }
 
 // =============================================================================
