@@ -624,7 +624,7 @@ public:
 
   GenericSignature rebuildSignatureWithoutRedundantRequirements(
                       bool allowConcreteGenericParams,
-                      bool buildingRequirementSignature) &&;
+                      ProtocolDecl *requirementSignatureSelfProto) &&;
 
   /// Finalize the set of requirements and compute the generic
   /// signature.
@@ -633,7 +633,7 @@ public:
   /// generic signature builder no longer has valid state.
   GenericSignature computeGenericSignature(
                       bool allowConcreteGenericParams = false,
-                      bool buildingRequirementSignature = false,
+                      ProtocolDecl *requirementSignatureSelfProto = nullptr,
                       bool rebuildingWithoutRedundantConformances = false) &&;
 
   /// Compute the requirement signature for the given protocol.

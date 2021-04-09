@@ -8536,7 +8536,7 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
 
 GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequirements(
                                           bool allowConcreteGenericParams,
-                                          bool buildingRequirementSignature) && {
+                                          ProtocolDecl *requirementSignatureSelfProto) && {
   NumSignaturesRebuiltWithoutRedundantRequirements++;
 
   GenericSignatureBuilder newBuilder(Context);
@@ -8544,7 +8544,34 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   for (auto param : getGenericParams())
     newBuilder.addGenericParameter(param);
 
-  auto newSource = FloatingRequirementSource::forAbstract();
+  const RequirementSource *requirementSignatureSource = nullptr;
+  if (requirementSignatureSelfProto != nullptr) {
+    auto selfType = requirementSignatureSelfProto->getSelfInterfaceType();
+    requirementSignatureSource =
+        RequirementSource::forRequirementSignature(*this, selfType,
+                                                   requirementSignatureSelfProto);
+
+    // Add the conformance requirement 'Self : Proto' directly without going
+    // through addConformanceRequirement(), since the latter calls
+    // expandConformanceRequirement(), which we want to skip since we're
+    // re-adding the requirements directly below.
+    auto resolvedType = ResolvedType(newBuilder.Impl->PotentialArchetypes[0]);
+    auto equivClass = resolvedType.getEquivalenceClass(newBuilder);
+
+    (void) equivClass->recordConformanceConstraint(newBuilder, resolvedType,
+                                                   requirementSignatureSelfProto,
+                                                   requirementSignatureSource);
+  }
+
+  auto newSource = [&]() {
+    if (requirementSignatureSelfProto != nullptr) {
+      return FloatingRequirementSource::viaProtocolRequirement(
+          requirementSignatureSource, requirementSignatureSelfProto,
+          /*inferred=*/false);
+    }
+
+    return FloatingRequirementSource::forAbstract();
+  }();
 
   for (const auto &req : Impl->ExplicitRequirements) {
     assert(req.getKind() != RequirementKind::SameType &&
@@ -8619,21 +8646,18 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   // Build a new signature using the new builder.
   return std::move(newBuilder).computeGenericSignature(
       allowConcreteGenericParams,
-      buildingRequirementSignature,
+      requirementSignatureSelfProto,
       /*rebuildingWithoutRedundantConformances=*/true);
 }
 
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
-                                          bool buildingRequirementSignature,
+                                          ProtocolDecl *requirementSignatureSelfProto,
                                           bool rebuildingWithoutRedundantConformances) && {
   // Finalize the builder, producing any necessary diagnostics.
   finalize(getGenericParams(), allowConcreteGenericParams);
 
   if (rebuildingWithoutRedundantConformances) {
-    assert(!buildingRequirementSignature &&
-           "Rebuilding a requirement signature?");
-
     assert(!Impl->HadAnyError &&
            "Rebuilt signature had errors");
 
@@ -8655,12 +8679,11 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   //
   // Also, don't do this when building a requirement signature.
   if (!rebuildingWithoutRedundantConformances &&
-      !buildingRequirementSignature &&
       !Impl->HadAnyError &&
       !Impl->ExplicitConformancesImpliedByConcrete.empty()) {
     return std::move(*this).rebuildSignatureWithoutRedundantRequirements(
         allowConcreteGenericParams,
-        buildingRequirementSignature);
+        requirementSignatureSelfProto);
   }
 
   // Collect the requirements placed on the generic parameter types.
@@ -8683,7 +8706,8 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // We cannot do this when there were errors.
   //
   // Also, we cannot do this when building a requirement signature.
-  if (!buildingRequirementSignature && !Impl->HadAnyError) {
+  if (requirementSignatureSelfProto == nullptr &&
+      !Impl->HadAnyError) {
     // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));
