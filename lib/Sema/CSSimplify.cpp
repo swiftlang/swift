@@ -6254,6 +6254,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
           [](Type type) { return type->is<ProtocolCompositionType>(); }))
     return SolutionKind::Solved;
 
+  // All bets are off for pointers, there are multiple combinations
+  // to check and it doesn't see worth to do that upfront.
+  {
+    PointerTypeKind pointerKind;
+    if (resolvedTy->getAnyPointerElementType(pointerKind))
+      return SolutionKind::Solved;
+  }
+
   auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
 
   auto *M = DC->getParentModule();
@@ -6277,29 +6285,51 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     typesToCheck.push_back(anyHashable->getDeclaredInterfaceType());
 
   // Rest of the implicit conversions depend on the resolved type.
-  if (auto *ptrDecl = ctx.getUnsafePointerDecl()) {
+  {
+    auto getPointerFor = [&ctx](PointerTypeKind ptrKind,
+                                Optional<Type> elementTy = None) -> Type {
+      switch (ptrKind) {
+      case PTK_UnsafePointer:
+        assert(elementTy);
+        return BoundGenericType::get(ctx.getUnsafePointerDecl(),
+                                     /*parent=*/Type(), {*elementTy});
+      case PTK_UnsafeMutablePointer:
+        assert(elementTy);
+        return BoundGenericType::get(ctx.getUnsafeMutablePointerDecl(),
+                                     /*parent=*/Type(), {*elementTy});
+
+      case PTK_UnsafeRawPointer:
+        return ctx.getUnsafeRawPointerDecl()->getDeclaredInterfaceType();
+
+      case PTK_UnsafeMutableRawPointer:
+        return ctx.getUnsafeMutableRawPointerDecl()->getDeclaredInterfaceType();
+
+      case PTK_AutoreleasingUnsafeMutablePointer:
+        llvm_unreachable("no implicit conversion");
+      }
+    };
+
     // String -> UnsafePointer<Void>
     if (auto *string = ctx.getStringDecl()) {
       if (resolvedTy->isEqual(string->getDeclaredInterfaceType())) {
-        typesToCheck.push_back(BoundGenericType::get(ptrDecl, /*parent=*/Type(),
-                                                     {ctx.TheEmptyTupleType}));
+        typesToCheck.push_back(
+            getPointerFor(PTK_UnsafePointer, ctx.TheEmptyTupleType));
       }
     }
 
-    // Array<T> -> UnsafePointer<T>
+    // Array<T> -> Unsafe{Raw}Pointer<T>
     if (auto elt = isArrayType(resolvedTy)) {
-      typesToCheck.push_back(
-          BoundGenericType::get(ptrDecl, /*parent=*/Type(), {*elt}));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafePointer, *elt));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeRawPointer, *elt));
     }
 
-    // inout argument -> UnsafePointer<T>, UnsafeMutablePointer<T>
+    // inout argument -> UnsafePointer<T>, UnsafeMutablePointer<T>,
+    //                   UnsafeRawPointer, UnsafeMutableRawPointer.
     if (type->is<InOutType>()) {
-      typesToCheck.push_back(
-          BoundGenericType::get(ptrDecl, /*parent=*/Type(), {resolvedTy}));
-
-      if (auto *mutablePtr = ctx.getUnsafeMutablePointerDecl())
-        typesToCheck.push_back(
-            BoundGenericType::get(mutablePtr, /*parent=*/Type(), {resolvedTy}));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafePointer, resolvedTy));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeMutablePointer, resolvedTy));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeRawPointer));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeMutableRawPointer));
     }
   }
 

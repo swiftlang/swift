@@ -445,13 +445,31 @@ extension AnyHashable : Trivial {
   typealias T = Int
 }
 
+extension UnsafeRawPointer : Trivial {
+  typealias T = Int
+}
+
+extension UnsafeMutableRawPointer : Trivial {
+  typealias T = Int
+}
+
 func test_inference_through_implicit_conversion() {
   struct C : Hashable {}
 
   func test<T: Trivial>(_: T) -> T {}
 
+  var arr: [C] = []
+  let ptr: UnsafeMutablePointer<C> = UnsafeMutablePointer(bitPattern: 0)!
+  let rawPtr: UnsafeMutableRawPointer = UnsafeMutableRawPointer(bitPattern: 0)!
+
   let _: C? = test(C()) // Ok -> argument is implicitly promoted into an optional
   let _: UnsafePointer<C> = test([C()]) // Ok - argument is implicitly converted to a pointer
+  let _: UnsafeRawPointer = test([C()]) // Ok - argument is implicitly converted to a raw pointer
+  let _: UnsafeMutableRawPointer = test(&arr) // Ok - inout Array<T> -> UnsafeMutableRawPointer
+  let _: UnsafePointer<C> = test(ptr) // Ok - UnsafeMutablePointer<T> -> UnsafePointer<T>
+  let _: UnsafeRawPointer = test(ptr) // Ok - UnsafeMutablePointer<T> -> UnsafeRawPointer
+  let _: UnsafeRawPointer = test(rawPtr) // Ok - UnsafeMutableRawPointer -> UnsafeRawPointer
+  let _: UnsafeMutableRawPointer = test(ptr) // Ok - UnsafeMutablePointer<T> -> UnsafeMutableRawPointer
   let _: AnyHashable = test(C()) // Ok - argument is implicitly converted to `AnyHashable` because it's Hashable
 }
 
