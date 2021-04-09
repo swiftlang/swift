@@ -535,6 +535,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
   Decl *Current = nullptr;
   Type CurrentType;
 
+  void setCurrentType(Type NewCurrentType) {
+    CurrentType = NewCurrentType;
+    assert(CurrentType.isNull() ||
+           !CurrentType->hasArchetype() &&
+               "CurrentType should be an interface type");
+  }
+
   friend DeclVisitor<PrintAST>;
 
   /// RAII object that increases the indentation level.
@@ -913,8 +920,13 @@ private:
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
       : Printer(Printer), Options(Options) {
-    if (Options.TransformContext)
-      CurrentType = Options.TransformContext->getBaseType();
+    if (Options.TransformContext) {
+      Type CurrentType = Options.TransformContext->getBaseType();
+      if (CurrentType && CurrentType->hasArchetype()) {
+        CurrentType = CurrentType->mapTypeOutOfContext();
+      }
+      setCurrentType(CurrentType);
+    }
   }
 
   using ASTVisitor::visit;
@@ -941,11 +953,11 @@ public:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         auto Subs = CurrentType->getContextSubstitutionMap(
           Options.CurrentModule, NTD->getDeclContext());
-        CurrentType = NTD->getDeclaredInterfaceType().subst(Subs);
+        setCurrentType(NTD->getDeclaredInterfaceType().subst(Subs));
       }
     }
 
-    SWIFT_DEFER { CurrentType = OldType; };
+    SWIFT_DEFER { setCurrentType(OldType); };
 
     if (Synthesize) {
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
