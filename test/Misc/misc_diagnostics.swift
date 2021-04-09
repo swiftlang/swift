@@ -228,4 +228,10 @@ func test_implicit_cgfloat_conversion() {
     }
     _ = S(x: 0.0, y: values.0) // Ok
   }
+
+  func allow_optional_promotion_double(_: Double??) {}
+  func allow_optional_promotion_cgfloat(_: CGFloat??) {}
+
+  allow_optional_promotion_double(cgf) // Ok -> CGFloat -> Double -> Double??
+  allow_optional_promotion_cgfloat(d) // Ok -> Double -> CGFloat -> CFloat??
 }
