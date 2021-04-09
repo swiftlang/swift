@@ -15,8 +15,8 @@ protocol Fooable {}
 extension String: Fooable {}
 
 extension Optional where Wrapped: Fooable {
-  // CHECK-LL: @"$sSq4mainAA7FooableRzlE22theConstrainedFunctionyyYFTu" = hidden global %swift.async_func_pointer
-  // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$sSq4mainAA7FooableRzlE22theConstrainedFunctionyyYF"(
+  // CHECK-LL: @"$sSq4mainAA7FooableRzlE22theConstrainedFunctionyyYaFTu" = hidden global %swift.async_func_pointer
+  // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$sSq4mainAA7FooableRzlE22theConstrainedFunctionyyYaF"(
   func theConstrainedFunction() async {
     // CHECK: running Optional<String>.theConstrainedFunction
     print("running \(Self.self).theConstrainedFunction")

@@ -234,6 +234,12 @@ namespace irgen {
     /// The actual pointer, either to the function or to its descriptor.
     llvm::Value *Value;
 
+    /// An additional value whose meaning varies by the FunctionPointer's Kind:
+    /// - Kind::AsyncFunctionPointer -> pointer to the corresponding function
+    ///                                 if the FunctionPointer was created via
+    ///                                 forDirect; nullptr otherwise. 
+    llvm::Value *SecondaryValue;
+
     PointerAuthInfo AuthInfo;
 
     Signature Sig;
@@ -243,9 +249,11 @@ namespace irgen {
     /// We may add more arguments to this; try to use the other
     /// constructors/factories if possible.
     explicit FunctionPointer(Kind kind, llvm::Value *value,
+                             llvm::Value *secondaryValue,
                              PointerAuthInfo authInfo,
                              const Signature &signature)
-        : kind(kind), Value(value), AuthInfo(authInfo), Sig(signature) {
+        : kind(kind), Value(value), SecondaryValue(secondaryValue),
+          AuthInfo(authInfo), Sig(signature) {
       // The function pointer should have function type.
       assert(value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
@@ -258,18 +266,25 @@ namespace irgen {
       }
     }
 
+    explicit FunctionPointer(Kind kind, llvm::Value *value,
+                             PointerAuthInfo authInfo,
+                             const Signature &signature)
+        : FunctionPointer(kind, value, nullptr, authInfo, signature){};
+
     // Temporary only!
     explicit FunctionPointer(Kind kind, llvm::Value *value,
                              const Signature &signature)
       : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
 
-    static FunctionPointer forDirect(IRGenModule &IGM,
-                                     llvm::Constant *value,
+    static FunctionPointer forDirect(IRGenModule &IGM, llvm::Constant *value,
+                                     llvm::Constant *secondaryValue,
                                      CanSILFunctionType fnType);
 
     static FunctionPointer forDirect(Kind kind, llvm::Constant *value,
+                                     llvm::Constant *secondaryValue,
                                      const Signature &signature) {
-      return FunctionPointer(kind, value, PointerAuthInfo(), signature);
+      return FunctionPointer(kind, value, secondaryValue, PointerAuthInfo(),
+                             signature);
     }
 
     static FunctionPointer forExplosionValue(IRGenFunction &IGF,
@@ -294,6 +309,13 @@ namespace irgen {
 
     /// Return the actual function pointer.
     llvm::Value *getRawPointer() const { return Value; }
+
+    /// Assuming that the receiver is of kind AsyncFunctionPointer, returns the
+    /// pointer to the corresponding function if available.
+    llvm::Value *getRawAsyncFunction() const {
+      assert(kind.isAsyncFunctionPointer());
+      return SecondaryValue;
+    }
 
     /// Given that this value is known to have been constructed from
     /// a direct function, return the function pointer.

@@ -5291,6 +5291,10 @@ ERROR(availabilty_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly "
       "construct a String from subscripted result", ())
 
+NOTE(availability_unavailable_implicit_init, none,
+     "call to unavailable %0 %1 from superclass %2 occurs implicitly at the "
+     "end of this initializer", (DescriptiveDeclKind, DeclName, DeclName))
+
 // Conformance availability checking diagnostics
 
 ERROR(conformance_availability_unavailable, none,

@@ -29,4 +29,16 @@ public:
   int &operator[](int x);
 };
 
+struct NonTrivialIntArrayByVal {
+  NonTrivialIntArrayByVal(int first) { values[0] = first; }
+  NonTrivialIntArrayByVal(const NonTrivialIntArrayByVal &other) {}
+  int operator[](int x);
+
+  // For testing purposes.
+  void setValueAtIndex(int value, unsigned i) { values[i] = value; }
+
+private:
+  int values[5] = { 1, 2, 3, 4, 5 };
+};
+
 #endif

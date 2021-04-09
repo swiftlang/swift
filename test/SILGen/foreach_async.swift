@@ -71,7 +71,7 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 // Trivial Struct
 //===----------------------------------------------------------------------===//
 
-// CHECK-LABEL: sil hidden [ossa] @$s13foreach_async13trivialStructyyAA17AsyncLazySequenceVySaySiGGYF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s13foreach_async13trivialStructyyAA17AsyncLazySequenceVySaySiGGYaF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> () {
 // CHECK: bb0([[SOURCE:%.*]] : @guaranteed $AsyncLazySequence<Array<Int>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var AsyncLazySequence<Array<Int>>.Iterator }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
@@ -97,7 +97,7 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 
 // CHECK: [[ERROR_BB]]([[VAR:%.*]] : @owned $Error):
 // CHECK:    unreachable
-// CHECK: } // end sil function '$s13foreach_async13trivialStructyyAA17AsyncLazySequenceVySaySiGGYF'
+// CHECK: } // end sil function '$s13foreach_async13trivialStructyyAA17AsyncLazySequenceVySaySiGGYaF'
 func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
   for await x in xx {
     loopBodyEnd()
@@ -105,7 +105,7 @@ func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
   funcEnd()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s13foreach_async21trivialStructContinueyyAA17AsyncLazySequenceVySaySiGGYF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s13foreach_async21trivialStructContinueyyAA17AsyncLazySequenceVySaySiGGYaF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> () {
 // CHECK: bb0([[SOURCE:%.*]] : @guaranteed $AsyncLazySequence<Array<Int>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var AsyncLazySequence<Array<Int>>.Iterator }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
@@ -139,7 +139,7 @@ func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
 
 // CHECK: [[ERROR_BB]]([[VAR:%.*]] : @owned $Error):
 // CHECK:    unreachable
-// CHECK: } // end sil function '$s13foreach_async21trivialStructContinueyyAA17AsyncLazySequenceVySaySiGGYF'
+// CHECK: } // end sil function '$s13foreach_async21trivialStructContinueyyAA17AsyncLazySequenceVySaySiGGYaF'
 
 func trivialStructContinue(_ xx: AsyncLazySequence<[Int]>) async {
   for await x in xx {
@@ -166,7 +166,7 @@ func trivialStructBreak(_ xx: AsyncLazySequence<[Int]>) async {
   funcEnd()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s13foreach_async26trivialStructContinueBreakyyAA17AsyncLazySequenceVySaySiGGYF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s13foreach_async26trivialStructContinueBreakyyAA17AsyncLazySequenceVySaySiGGYaF : $@convention(thin) @async (@guaranteed AsyncLazySequence<Array<Int>>) -> ()
 // CHECK: bb0([[SOURCE:%.*]] : @guaranteed $AsyncLazySequence<Array<Int>>):
 // CHECK:   [[ITERATOR_BOX:%.*]] = alloc_box ${ var AsyncLazySequence<Array<Int>>.Iterator }, var, name "$x$generator"
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
@@ -204,7 +204,7 @@ func trivialStructBreak(_ xx: AsyncLazySequence<[Int]>) async {
 // CHECK: [[LOOP_EXIT]]:
 // CHECK:   return
 
-// CHECK: } // end sil function '$s13foreach_async26trivialStructContinueBreakyyAA17AsyncLazySequenceVySaySiGGYF'
+// CHECK: } // end sil function '$s13foreach_async26trivialStructContinueBreakyyAA17AsyncLazySequenceVySaySiGGYaF'
 func trivialStructContinueBreak(_ xx: AsyncLazySequence<[Int]>) async {
   for await x in xx {
     if (condition()) {

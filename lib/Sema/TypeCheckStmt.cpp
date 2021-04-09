@@ -1662,7 +1662,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
 
     for (auto decl : lookupResults) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(decl);
-    if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
+      if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;
 
@@ -1673,9 +1673,14 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
 
     // Make sure we can reference the designated initializer correctly.
     auto loc = fromCtor->getLoc();
-    diagnoseDeclAvailability(
+    const bool didDiagnose = diagnoseDeclAvailability(
         ctor, loc, nullptr,
         ExportContext::forFunctionBody(fromCtor, loc));
+    if (didDiagnose) {
+      fromCtor->diagnose(diag::availability_unavailable_implicit_init,
+                         ctor->getDescriptiveKind(), ctor->getName(),
+                         superclassDecl->getName());
+    }
   }
 
 

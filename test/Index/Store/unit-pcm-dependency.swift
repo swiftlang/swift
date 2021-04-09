@@ -50,13 +50,14 @@ func test() {
 // FILE1-NOT: ClangModuleA.h
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
 // FILE1: Unit | system | Swift | {{.*}}Swift.swiftmodule
+// FILE1: Unit | system | _Concurrency
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
 // FILE1: Unit | user | ClangModuleB | {{.*}}ClangModuleB-{{[A-Z0-9]*}}.pcm | ClangModuleB-{{[A-Z0-9]*}}.pcm-
 // FILE1: Unit | user | ClangModuleC | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm | ClangModuleC-{{[A-Z0-9]*}}.pcm-
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
 // FILE1: Record | user | {{.*}}unit-pcm-dependency.swift | unit-pcm-dependency.swift-
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
-// FILE1: DEPEND END (4)
+// FILE1: DEPEND END (5)
 
 // FILE2-NOT: main.swiftmodule-
 

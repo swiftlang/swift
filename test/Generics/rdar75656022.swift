@@ -49,7 +49,8 @@ struct OriginalExampleWithWarning<A, B> where A : P2, B : P2, A.T == B.T {
     where C : P1,
           D : P1, // expected-warning {{redundant conformance constraint 'D' : 'P1'}}
           C.T : P1, // expected-warning {{redundant conformance constraint 'C.T' : 'P1'}}
-          A == S1<C, C.T.T, S2<C.T>>,
+          A == S1<C, C.T.T, S2<C.T>>, // expected-note {{conformance constraint 'D' : 'P1' implied here}}
+          // expected-note@-1 {{conformance constraint 'C.T' : 'P1' implied here}}
           C.T == D,
           E == D.T { }
 }
@@ -71,6 +72,7 @@ struct WithoutBogusGenericParametersWithWarning<A, B> where A : P2, B : P2, A.T 
     where C : P1,
           C.T : P1, // expected-warning {{redundant conformance constraint 'C.T' : 'P1'}}
           A == S1<C, C.T.T, S2<C.T>> {}
+          // expected-note@-1 {{conformance constraint 'C.T' : 'P1' implied here}}
 }
 
 // Same as above but without unnecessary generic parameters

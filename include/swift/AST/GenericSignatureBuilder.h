@@ -654,7 +654,7 @@ public:
 
   class ExplicitRequirement;
 
-  bool isRedundantExplicitRequirement(ExplicitRequirement req) const;
+  bool isRedundantExplicitRequirement(const ExplicitRequirement &req) const;
 
 private:
   void computeRedundantRequirements();

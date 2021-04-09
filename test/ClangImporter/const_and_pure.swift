@@ -8,8 +8,8 @@ func testit() {
 	normal_function()
 }
 
-// CHECK: sil [serializable] [readnone] [clang const_function] @const_function : $@convention(c) () -> ()
-// CHECK: sil [serializable] [readonly] [clang pure_function] @pure_function : $@convention(c) () -> ()
-// CHECK: sil [serializable] [clang normal_function] @normal_function : $@convention(c) () -> ()
+// CHECK: sil [readnone] [clang const_function] @const_function : $@convention(c) () -> ()
+// CHECK: sil [readonly] [clang pure_function] @pure_function : $@convention(c) () -> ()
+// CHECK: sil [clang normal_function] @normal_function : $@convention(c) () -> ()
 
 

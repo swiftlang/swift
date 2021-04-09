@@ -2063,6 +2063,14 @@ private:
       inout->addChild(type, Factory);
       return inout;
     }
+    if (c == 'k') {
+      auto noDerivative = Factory.createNode(Node::Kind::NoDerivative);
+      auto type = demangleTypeImpl();
+      if (!type)
+        return nullptr;
+      noDerivative->addChild(type, Factory);
+      return noDerivative;
+    }
     if (c == 'S') {
       return demangleSubstitutionIndex();
     }

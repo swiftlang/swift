@@ -81,7 +81,7 @@ func genericInoutIndirectCaller<T: Differentiable, U: Differentiable>(
   return inoutIndirectCaller(x, y, z)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$sSdSfSdSfIegnrrr_TJSpSSSpSrSUSP : $@convention(thin) (@in_guaranteed Double, @guaranteed @callee_guaranteed (@in_guaranteed Double) -> (@out Float, @out Double, @out Float)) -> (@out Float, @out Float) {
+// CHECK-LABEL: sil shared [transparent] [thunk] @$sSdSfSdSfIegnrrr_TJSpSSSpSrSUSP : $@convention(thin) (@in_guaranteed Double, @guaranteed @callee_guaranteed (@in_guaranteed Double) -> (@out Float, @out Double, @out Float)) -> (@out Float, @out Float) {
 // CHECK: bb0(%0 : $*Float, %1 : $*Float, %2 : $*Double, %3 : $@callee_guaranteed (@in_guaranteed Double) -> (@out Float, @out Double, @out Float)):
 // CHECK:   %4 = alloc_stack $Double
 // CHECK:   %5 = apply %3(%0, %4, %1, %2) : $@callee_guaranteed (@in_guaranteed Double) -> (@out Float, @out Double, @out Float)
@@ -91,7 +91,7 @@ func genericInoutIndirectCaller<T: Differentiable, U: Differentiable>(
 // CHECK:   return %8 : $()
 // CHECK: }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$s13TangentVector16_Differentiation14DifferentiablePQy_AaDQzAaDQy0_Ieglrr_TJSpSSSpSrSSUP : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> @out τ_0_0.TangentVector {
+// CHECK-LABEL: sil shared [transparent] [thunk] @$s13TangentVector16_Differentiation14DifferentiablePQy_AaDQzAaDQy0_Ieglrr_TJSpSSSpSrSSUP : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> @out τ_0_0.TangentVector {
 // CHECK: bb0(%0 : $*τ_0_0.TangentVector, %1 : $*τ_0_1.TangentVector, %2 : $@callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)):
 // CHECK:   %3 = alloc_stack $τ_0_2.TangentVector
 // CHECK:   %4 = apply %2(%0, %3, %1) : $@callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)
@@ -101,7 +101,7 @@ func genericInoutIndirectCaller<T: Differentiable, U: Differentiable>(
 // CHECK:   return %7 : $()
 // CHECK: }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$s13TangentVector16_Differentiation14DifferentiablePQy_AaDQzAaDQy0_Ieglrr_TJSpSSSpSrUSUP : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> () {
+// CHECK-LABEL: sil shared [transparent] [thunk] @$s13TangentVector16_Differentiation14DifferentiablePQy_AaDQzAaDQy0_Ieglrr_TJSpSSSpSrUSUP : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Differentiable, τ_0_1 : Differentiable, τ_0_2 : Differentiable> (@inout τ_0_1.TangentVector, @guaranteed @callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)) -> () {
 // CHECK: bb0(%0 : $*τ_0_1.TangentVector, %1 : $@callee_guaranteed (@inout τ_0_1.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_2.TangentVector)):
 // CHECK:   %2 = alloc_stack $τ_0_0.TangentVector
 // CHECK:   %3 = alloc_stack $τ_0_2.TangentVector

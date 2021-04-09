@@ -103,6 +103,9 @@ public:
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
+  void emitAllExtractValues(llvm::Value *aggValue, llvm::StructType *type,
+                            Explosion &out);
+
   /// Return the error result slot to be passed to the callee, given an error
   /// type.  There's always only one error type.
   ///
@@ -168,7 +171,7 @@ public:
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
 
-  void emitSuspensionPoint(llvm::Value *toExecutor, llvm::Value *asyncResume);
+  void emitSuspensionPoint(Explosion &executor, llvm::Value *asyncResume);
   llvm::Function *getOrCreateResumeFromSuspensionFn();
   llvm::Function *createAsyncSuspendFn();
 

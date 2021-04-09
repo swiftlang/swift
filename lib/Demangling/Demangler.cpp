@@ -730,6 +730,22 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   return resolved;
 }
 
+NodePointer Demangler::demangleTypeAnnotation() {
+  switch (char c2 = nextChar()) {
+  case 'a':
+    return createNode(Node::Kind::AsyncAnnotation);
+  case 'b':
+    return createNode(Node::Kind::ConcurrentFunctionType);
+  case 'j':
+    return demangleDifferentiableFunctionType();
+  case 'k':
+    return createType(
+        createWithChild(Node::Kind::NoDerivative, popTypeAndGetChild()));
+  default:
+    return nullptr;
+  }
+}
+
 NodePointer Demangler::demangleOperator() {
 recur:
   switch (unsigned char c = nextChar()) {
@@ -767,7 +783,6 @@ recur:
       }
 
     case 'I': return demangleImplFunctionType();
-    case 'J': return createNode(Node::Kind::ConcurrentFunctionType);
     case 'K': return createNode(Node::Kind::ThrowsAnnotation);
     case 'L': return demangleLocalIdentifier();
     case 'M': return demangleMetatype();
@@ -782,7 +797,7 @@ recur:
     case 'V': return demangleAnyGenericType(Node::Kind::Structure);
     case 'W': return demangleWitness();
     case 'X': return demangleSpecialType();
-    case 'Y': return createNode(Node::Kind::AsyncAnnotation);
+    case 'Y': return demangleTypeAnnotation();
     case 'Z': return createWithChild(Node::Kind::Static, popNode(isEntity));
     case 'a': return demangleAnyGenericType(Node::Kind::TypeAlias);
     case 'c': return popFunctionType(Node::Kind::FunctionType);
@@ -792,7 +807,6 @@ recur:
     case 'h': return createType(createWithChild(Node::Kind::Shared,
                                                 popTypeAndGetChild()));
     case 'i': return demangleSubscript();
-    case 'j': return demangleDifferentiableFunctionType();
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
@@ -1132,6 +1146,10 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName,
                               BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
       break;
+    case 'e':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                              BUILTIN_TYPE_NAME_EXECUTOR);
+      break;
     case 'f': {
       int size = demangleIndex() - 1;
       if (size <= 0 || size > maxTypeSize)
@@ -1254,10 +1272,10 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
+  addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
-  addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
@@ -1291,6 +1309,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
 
   unsigned FirstChildIdx = 0;
   if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::DifferentiableFunctionType)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::ThrowsAnnotation)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
@@ -1298,9 +1319,6 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::AsyncAnnotation)
-    ++FirstChildIdx;
-  if (FuncType->getChild(FirstChildIdx)->getKind()
-        == Node::Kind::DifferentiableFunctionType)
     ++FirstChildIdx;
   auto ParameterType = FuncType->getChild(FirstChildIdx);
 

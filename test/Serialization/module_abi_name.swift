@@ -9,4 +9,4 @@ func callFunction() {
   def_module_abi_name.function()
 }
 
-// CHECK: sil [serialized] @$s7Goodbye8functionyyF : $@convention(thin) () -> ()
+// CHECK: sil @$s7Goodbye8functionyyF : $@convention(thin) () -> ()

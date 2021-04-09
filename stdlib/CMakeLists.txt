@@ -196,13 +196,23 @@ function(swift_create_stdlib_targets name variant define_all_alias)
   if(NOT define_all_alias)
     set(ALL_keyword ALL)
   endif()
-  add_custom_target(${name}${variant}
-    ${ALL_keyword}
-    DEPENDS
-    ${name}${SWIFT_PRIMARY_VARIANT_SUFFIX}${variant})
-  set_target_properties(${name}${variant}
-    PROPERTIES
-    FOLDER "Swift libraries/Aggregate")
+
+  # When cross-compiling host tools for multiple architectures, targeting a
+  # different SDK, the primary variant is not one of the variants being built,
+  # so it can't be added as a target here. build-script will invoke the
+  # more-specific target, so just skip creating this target and warn in case
+  # someone is using the CMake more directly.
+  if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_SDKS)
+    add_custom_target(${name}${variant}
+      ${ALL_keyword}
+      DEPENDS
+      ${name}${SWIFT_PRIMARY_VARIANT_SUFFIX}${variant})
+    set_target_properties(${name}${variant}
+      PROPERTIES
+      FOLDER "Swift libraries/Aggregate")
+  else()
+    message(WARNING "Primary variant ${SWIFT_PRIMARY_VARIANT_SDK} is not being built, not creating ${name}${variant} alias target for it.")
+  endif()
 endfunction()
 
 swift_create_stdlib_targets("swift-stdlib" "" TRUE)

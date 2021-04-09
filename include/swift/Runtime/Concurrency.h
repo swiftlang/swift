@@ -512,6 +512,14 @@ void swift_defaultActor_initialize(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_destroy(DefaultActor *actor);
 
+/// Deallocate an instance of a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_deallocate(DefaultActor *actor);
+
+/// Deallocate an instance of what might be a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_deallocateResilient(HeapObject *actor);
+
 /// Enqueue a job on the default actor implementation.
 ///
 /// The job must be ready to run.  Notably, if it's a task, that

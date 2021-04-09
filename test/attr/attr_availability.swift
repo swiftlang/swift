@@ -1117,3 +1117,14 @@ func testBadRename() {
 
 struct AvailableGenericParam<@available(*, deprecated) T> {}
 // expected-error@-1 {{'@available' attribute cannot be applied to this declaration}}
+
+class UnavailableNoArgsSuperclassInit {
+  @available(*, unavailable)
+  init() {} // expected-note {{'init()' has been explicitly marked unavailable here}}
+}
+
+class UnavailableNoArgsSubclassInit: UnavailableNoArgsSuperclassInit {
+  init(marker: ()) {}
+  // expected-error@-1 {{'init()' is unavailable}}
+  // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'UnavailableNoArgsSuperclassInit' occurs implicitly at the end of this initializer}}
+}

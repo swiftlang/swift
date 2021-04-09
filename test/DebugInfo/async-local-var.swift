@@ -15,7 +15,7 @@ public func makeDinner() async throws -> String {
   let local_constant = 5
   let local = await getString()
   try await wait()
-// CHECK-LABEL: define {{.*}} void @"$s1a10makeDinnerSSyYKFTQ0_"
+// CHECK-LABEL: define {{.*}} void @"$s1a10makeDinnerSSyYaKFTQ0_"
 // CHECK-NEXT: entryresume.0:
 // CHECK-NOT: {{ ret }}
 // CHECK: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[LOCAL:[0-9]+]], {{.*}}!DIExpression(DW_OP_deref

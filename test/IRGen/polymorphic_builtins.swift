@@ -11,7 +11,7 @@
 
 import Swift
 
-// SIL-LABEL: sil [transparent] [serialized] @$s20polymorphic_builtins11_isConcrete4typeSbxm_tlF : $@convention(thin) <T> (@thick T.Type) -> Bool {
+// SIL-LABEL: sil [transparent] @$s20polymorphic_builtins11_isConcrete4typeSbxm_tlF : $@convention(thin) <T> (@thick T.Type) -> Bool {
 // SIL: builtin "isConcrete"<T>({{%[0-9]*}} : $@thick T.Type) : $Builtin.Int1
 // SIL: // end sil function '$s20polymorphic_builtins11_isConcrete4typeSbxm_tlF'
 @_transparent
@@ -19,7 +19,7 @@ public func _isConcrete<T>(type: T.Type) -> Bool {
   return Bool(_builtinBooleanLiteral: Builtin.isConcrete(type))
 }
 
-// SIL-LABEL: sil [transparent] [serialized] @$s20polymorphic_builtins41calleeAddVectorsGenericTransparentGuardedyxx_xtlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+// SIL-LABEL: sil [transparent] @$s20polymorphic_builtins41calleeAddVectorsGenericTransparentGuardedyxx_xtlF : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T) -> @out T {
 // SIL: builtin "isConcrete"<T>({{%[0-9]*}} : $@thick T.Type) : $Builtin.Int1
 // SIL: builtin "generic_add"<T>(
 // SIL: } // end sil function '$s20polymorphic_builtins41calleeAddVectorsGenericTransparentGuardedyxx_xtlF'

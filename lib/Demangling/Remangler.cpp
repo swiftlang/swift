@@ -753,6 +753,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'j';
   } else if (text == BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE) {
     Buffer << 'D';
+  } else if (text == BUILTIN_TYPE_NAME_EXECUTOR) {
+    Buffer << 'e';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
@@ -1676,6 +1678,11 @@ void Remangler::mangleOwned(Node *node) {
   Buffer << 'n';
 }
 
+void Remangler::mangleNoDerivative(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Yk";
+}
+
 void Remangler::mangleInfixOperator(Node *node) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";
@@ -2460,15 +2467,15 @@ void Remangler::mangleFullObjCResilientClassStub(Node *node) {
 }
 
 void Remangler::mangleConcurrentFunctionType(Node *node) {
-  Buffer << 'J';
+  Buffer << "Yb";
 }
 
 void Remangler::mangleAsyncAnnotation(Node *node) {
-  Buffer << 'Y';
+  Buffer << "Ya";
 }
 
 void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  Buffer << 'j' << (char)node->getIndex(); // differentiability kind
+  Buffer << "Yj" << (char)node->getIndex(); // differentiability kind
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {

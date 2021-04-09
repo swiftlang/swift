@@ -1385,6 +1385,14 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
 
     // Type-specific flags:
 
+    /// Set if the class is a default actor class.  Note that this is
+    /// based on the best knowledge available to the class; actor
+    /// classes with resilient superclassess might be default actors
+    /// without knowing it.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_IsDefaultActor = 8,
+
     /// The kind of reference that this class makes to its resilient superclass
     /// descriptor.  A TypeReferenceKind.
     ///
@@ -1464,6 +1472,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_AreImmediateMembersNegative,
                                 class_areImmediateMembersNegative,
                                 class_setAreImmediateMembersNegative)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsDefaultActor,
+                                class_isDefaultActor,
+                                class_setIsDefaultActor)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -2164,6 +2175,20 @@ enum class ContinuationStatus : size_t {
 
   /// The continuation has already been resumed, but not yet awaited.
   Resumed = 2
+};
+
+/// Flags describing the executor implementation that are stored
+/// in the ExecutorRef.
+enum class ExecutorRefFlags : size_t {
+  // The number of bits available here is very limited because it's
+  // potentially just the alignment bits of a protocol witness table
+  // pointer
+
+  /// The executor is a default actor.
+  DefaultActor = 0x1,
+
+  /// TODO: remove this
+  MainActorIdentity = 0x2,
 };
 
 } // end namespace swift
