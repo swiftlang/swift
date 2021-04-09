@@ -6380,13 +6380,10 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
         }
 
         equivClass.recursiveSuperclassType = true;
-      } else {
-        checkSuperclassConstraints(genericParams, &equivClass);
       }
     }
 
     checkConformanceConstraints(genericParams, &equivClass);
-    checkLayoutConstraints(genericParams, &equivClass);
   };
 
   if (!Impl->ExplicitSameTypeRequirements.empty()) {
@@ -7924,22 +7921,6 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     diag::same_type_conflict,
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
-}
-
-void GenericSignatureBuilder::checkSuperclassConstraints(
-                              TypeArrayView<GenericTypeParamType> genericParams,
-                              EquivalenceClass *equivClass) {
-  assert(equivClass->superclass && "No superclass constraint?");
-
-  removeSelfDerived(*this, equivClass->superclassConstraints, /*proto=*/nullptr);
-}
-
-void GenericSignatureBuilder::checkLayoutConstraints(
-                              TypeArrayView<GenericTypeParamType> genericParams,
-                              EquivalenceClass *equivClass) {
-  if (!equivClass->layout) return;
-
-  removeSelfDerived(*this, equivClass->layoutConstraints, /*proto=*/nullptr);
 }
 
 bool GenericSignatureBuilder::isRedundantExplicitRequirement(
