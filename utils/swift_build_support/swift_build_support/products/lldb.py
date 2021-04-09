@@ -33,4 +33,5 @@ class LLDB(product.Product):
                 llvm.LLVM,
                 libcxx.LibCXX,
                 libicu.LibICU,
-                swift.Swift]
+                swift.Swift,
+                libdispatch.LibDispatch]

@@ -873,10 +873,10 @@ class BuildScriptInvocation(object):
             impl_product_classes.append(products.LibICU)
         if self.args.build_swift:
             impl_product_classes.append(products.Swift)
-        if self.args.build_lldb:
-            impl_product_classes.append(products.LLDB)
         if self.args.build_libdispatch:
             impl_product_classes.append(products.LibDispatch)
+        if self.args.build_lldb:
+            impl_product_classes.append(products.LLDB)
         if self.args.build_foundation:
             impl_product_classes.append(products.Foundation)
         if self.args.build_xctest:
