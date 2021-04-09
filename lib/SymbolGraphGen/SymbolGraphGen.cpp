@@ -70,16 +70,18 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   SmallVector<Decl *, 64> ModuleDecls;
   M->getDisplayDecls(ModuleDecls);
 
-  llvm::errs() << ModuleDecls.size()
-      << " top-level declarations in this module.\n";
+  if (Options.PrintMessages)
+    llvm::errs() << ModuleDecls.size()
+        << " top-level declarations in this module.\n";
 
   for (auto *Decl : ModuleDecls) {
     Walker.walk(Decl);
   }
 
-  llvm::errs()
-    << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
-    << Walker.MainGraph.Edges.size() << " relationships.\n";
+  if (Options.PrintMessages)
+    llvm::errs()
+      << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
+      << Walker.MainGraph.Edges.size() << " relationships.\n";
 
   int Success = EXIT_SUCCESS;
 

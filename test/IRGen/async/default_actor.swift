@@ -5,7 +5,8 @@
 
 // CHECK: @"$s13default_actor1ACMn" = hidden constant
 //   0x81000050: 0x01000000 IsDefaultActor
-// CHECK-SAME: i32 -2130706352,
+//   0x81010050: the same, but using a singleton metadata initialization
+// CHECK-SAME: i32 {{-2130706352|-2130640816}},
 
 // CHECK: @"$s13default_actor1BCMn" = hidden constant
 //   0x62010050: 0x02000000 IndirectTypeDescriptor + 0x01000000 IsDefaultActor

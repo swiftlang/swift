@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-concurrency -import-objc-header %S/Inputs/Delegate.h %s -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-concurrency -import-objc-header %S/Inputs/Delegate.h %s -emit-ir -o - | %FileCheck %s -DALIGNMENT=%target-alignment
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -12,4 +12,4 @@ let anyObject: AnyObject = (MyAsyncProtocol.self as AnyObject) // or something l
 // CHECK-LABEL: @_PROTOCOL_INSTANCE_METHODS_MyAsyncProtocol = internal constant
 // CHECK-SAME: selector_data(myAsyncMethod:)
 // CHECK-NOT: selector_data(myAsyncMethod:)
-// CHECK-SAME: align 8
+// CHECK-SAME: align [[ALIGNMENT]]

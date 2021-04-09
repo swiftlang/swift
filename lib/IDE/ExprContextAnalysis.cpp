@@ -745,6 +745,22 @@ static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
   return false;
 }
 
+/// For function call arguments \p Args, return the argument at \p Position
+/// computed by \c getPositionInArgs
+static Expr *getArgAtPosition(Expr *Args, unsigned Position) {
+  if (isa<ParenExpr>(Args)) {
+    assert(Position == 0);
+    return Args;
+  }
+
+  if (auto *tuple = dyn_cast<TupleExpr>(Args)) {
+    return tuple->getElement(Position);
+  } else {
+    llvm_unreachable("Unable to retrieve arg at position returned by "
+                     "getPositionInArgs?");
+  }
+}
+
 /// Get index of \p CCExpr in \p Params. Note that the position in \p Params may
 /// be different than the position in \p Args if there are defaulted arguments
 /// in \p Params which don't occur in \p Args.
@@ -848,15 +864,15 @@ class ExprContextAnalyzer {
   bool analyzeApplyExpr(Expr *E) {
     // Collect parameter lists for possible func decls.
     SmallVector<FunctionTypeAndDecl, 2> Candidates;
-    Expr *Arg = nullptr;
+    Expr *Args = nullptr;
     if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
       if (!collectPossibleCalleesForApply(*DC, applyExpr, Candidates))
         return false;
-      Arg = applyExpr->getArg();
+      Args = applyExpr->getArg();
     } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
       if (!collectPossibleCalleesForSubscript(*DC, subscriptExpr, Candidates))
         return false;
-      Arg = subscriptExpr->getIndex();
+      Args = subscriptExpr->getIndex();
     } else {
       llvm_unreachable("unexpected expression kind");
     }
@@ -866,14 +882,43 @@ class ExprContextAnalyzer {
     // Determine the position of code completion token in call argument.
     unsigned PositionInArgs;
     bool HasName;
-    if (!getPositionInArgs(*DC, Arg, ParsedExpr, PositionInArgs, HasName))
+    if (!getPositionInArgs(*DC, Args, ParsedExpr, PositionInArgs, HasName))
       return false;
 
     // Collect possible types (or labels) at the position.
     {
-      bool MayNeedName = !HasName && !E->isImplicit() &&
-                         (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
-                          isa<UnresolvedMemberExpr>(E));
+      bool MayBeArgForLabeledParam =
+          HasName || E->isImplicit() ||
+          (!isa<CallExpr>(E) && !isa<SubscriptExpr>(E) &&
+           !isa<UnresolvedMemberExpr>(E));
+
+      // If the completion position cannot be the actual argument, it must be
+      // able to be an argument label.
+      bool MayBeLabel = !MayBeArgForLabeledParam;
+
+      // Alternatively, the code completion position may complete to an argument
+      // label if we are currently completing variadic args.
+      // E.g.
+      // func foo(x: Int..., y: Int...) {}
+      // foo(x: 1, #^COMPLETE^#)
+      // #^COMPLETE^# may complete to either an additional variadic arg or to
+      // the argument label `y`.
+      //
+      // Varargs are represented by a VarargExpansionExpr that contains an
+      // ArrayExpr on the call side.
+      if (auto Vararg = dyn_cast<VarargExpansionExpr>(
+              getArgAtPosition(Args, PositionInArgs))) {
+        if (auto Array = dyn_cast_or_null<ArrayExpr>(Vararg->getSubExpr())) {
+          if (Array->getNumElements() > 0 &&
+              !isa<CodeCompletionExpr>(Array->getElement(0))) {
+            // We can only complete as argument label if we have at least one
+            // proper vararg before the code completion token. We shouldn't be
+            // suggesting labels for:
+            // foo(x: #^COMPLETE^#)
+            MayBeLabel = true;
+          }
+        }
+      }
       SmallPtrSet<CanType, 4> seenTypes;
       llvm::SmallSet<std::pair<Identifier, CanType>, 4> seenArgs;
       for (auto &typeAndDecl : Candidates) {
@@ -883,7 +928,7 @@ class ExprContextAnalyzer {
 
         auto Params = typeAndDecl.Type->getParams();
         unsigned PositionInParams;
-        if (!getPositionInParams(*DC, Arg, ParsedExpr, Params,
+        if (!getPositionInParams(*DC, Args, ParsedExpr, Params,
                                  PositionInParams)) {
           // If the argument doesn't have a matching position in the parameters,
           // indicate that with optional nullptr param.
@@ -907,11 +952,13 @@ class ExprContextAnalyzer {
               paramList && (paramList->get(Pos)->isDefaultArgument() ||
                             paramList->get(Pos)->isVariadic());
 
-          if (paramType.hasLabel() && MayNeedName) {
+          if (MayBeLabel && paramType.hasLabel()) {
             if (seenArgs.insert({paramType.getLabel(), ty->getCanonicalType()})
                     .second)
               recordPossibleParam(&paramType, !canSkip);
-          } else {
+          }
+
+          if (MayBeArgForLabeledParam || !paramType.hasLabel()) {
             auto argTy = ty;
             if (paramType.isInOut())
               argTy = InOutType::get(argTy);
