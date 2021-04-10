@@ -346,6 +346,10 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   if (flags.task_isChildTask()) {
     parent = swift_task_getCurrent();
     assert(parent != nullptr && "creating a child task with no active task");
+
+    // Inherit the priority of the parent task if unspecified.
+    if (flags.getPriority() == JobPriority::Unspecified)
+      flags.setPriority(parent->getPriority());
   }
 
   // Figure out the size of the header.

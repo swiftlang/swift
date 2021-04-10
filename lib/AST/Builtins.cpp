@@ -1481,6 +1481,18 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(),
+                            _rawPointer);
+}
+
+static ValueDecl *getDestroyTaskGroup(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
 static ValueDecl *getBuildSerialExecutorRef(ASTContext &ctx, Identifier id) {
   // TODO: restrict the generic parameter to the SerialExecutor protocol
   return getBuiltinFunction(ctx, id, _thin,
@@ -2727,6 +2739,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDefaultActor:
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
+
+  case BuiltinValueKind::CreateTaskGroup:
+    return getCreateTaskGroup(Context, Id);
+
+  case BuiltinValueKind::DestroyTaskGroup:
+    return getDestroyTaskGroup(Context, Id);
 
   case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
   case BuiltinValueKind::ResumeThrowingContinuationReturning:

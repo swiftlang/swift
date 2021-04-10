@@ -1858,6 +1858,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::GetCurrentExecutor:
+    case BuiltinValueKind::CreateTaskGroup:
+    case BuiltinValueKind::DestroyTaskGroup:
       return;
 
     // General memory access to a pointer in first operand position.

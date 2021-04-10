@@ -58,7 +58,7 @@ extension Task {
     // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
     //        with "destroying a task that never completed" in the task's destroy.
     //        How do we solve this properly?
-    _swiftRetain(_task)
+    Builtin.retain(_task)
 
     return Task(_task)
   }
@@ -561,7 +561,7 @@ extension Task {
     // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
     //        with "destroying a task that never completed" in the task's destroy.
     //        How do we solve this properly?
-    _swiftRetain(_task)
+    Builtin.retain(_task)
     return UnsafeCurrentTask(_task)
   }
 }
@@ -591,7 +591,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
   //        with "destroying a task that never completed" in the task's destroy.
   //        How do we solve this properly?
-  _swiftRetain(_task)
+  Builtin.retain(_task)
 
   return try body(UnsafeCurrentTask(_task))
 }
