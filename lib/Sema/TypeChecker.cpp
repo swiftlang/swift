@@ -378,7 +378,9 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
       },
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      PlaceholderType::get);
+      [](auto &ctx, auto *originator) {
+        return Type();
+      });
 
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
