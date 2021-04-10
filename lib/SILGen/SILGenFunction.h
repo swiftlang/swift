@@ -295,8 +295,6 @@ public:
   /// the notion of the current block being emitted into.
   SILGenBuilder B;
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
-
   struct BreakContinueDest {
     LabeledStmt *Target;
     JumpDest BreakDest;

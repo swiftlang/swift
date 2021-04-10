@@ -1257,15 +1257,15 @@ bb3:
 // CHECK-LABEL: } // end sil function 'cse_open_existential_ref_local_cloner'
 sil @cse_open_existential_ref_local_cloner : $@convention(thin) (@guaranteed Proto, Bool) -> () {
 bb0(%0 : $Proto, %1 : $Bool):
-  %4 = open_existential_ref %0 : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto
-  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %9 = open_existential_ref %0 : $Proto to $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto
-  %10 = witness_method $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThat, %9 : $@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %11 = apply %10<@opened("1B685052-4796-11E6-B7DF-B8E856428C60") Proto>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %13 = open_existential_ref %0 : $Proto to $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto
-  %14 = witness_method $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %13 : $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60") Proto>(%13) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = open_existential_ref %0 : $Proto to $@opened("2B68354A-4796-11E6-B7DF-B8E856428C60") Proto
+  %5 = witness_method $@opened("2B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %4 : $@opened("2B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("2B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %9 = open_existential_ref %0 : $Proto to $@opened("2B685052-4796-11E6-B7DF-B8E856428C60") Proto
+  %10 = witness_method $@opened("2B685052-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThat, %9 : $@opened("2B685052-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<@opened("2B685052-4796-11E6-B7DF-B8E856428C60") Proto>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %13 = open_existential_ref %0 : $Proto to $@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60") Proto
+  %14 = witness_method $@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %13 : $@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60") Proto>(%13) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   %res = tuple ()
   return %res : $()
 }
@@ -1277,9 +1277,9 @@ bb0(%0 : $Proto, %1 : $Bool):
 // CHECK: return
 sil @dont_cse_open_existential_ref : $@convention(thin) (@guaranteed Proto & Ping) -> @owned Ping {
 bb0(%0 : $Proto & Ping):
-  %4 = open_existential_ref %0 : $Proto & Ping to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto
-  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = open_existential_ref %0 : $Proto & Ping to $@opened("3B68354A-4796-11E6-B7DF-B8E856428C60") Proto
+  %5 = witness_method $@opened("3B68354A-4796-11E6-B7DF-B8E856428C60") Proto, #Proto.doThis, %4 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C60") Proto : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened("3B68354A-4796-11E6-B7DF-B8E856428C60") Proto>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   %9 = open_existential_ref %0 : $Proto & Ping to $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83") Proto & Ping
   %10 = upcast %9 : $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83") Proto & Ping to $Ping
   %11 = class_method %10 : $Ping, #Ping.ping : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping

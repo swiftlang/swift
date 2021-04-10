@@ -798,25 +798,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   LastValueID = 1;
   LocalValues.clear();
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(fn);
   SILBuilder Builder(*fn);
-  // Track the archetypes just like SILGen. This
-  // is required for adding typedef operands to instructions.
-  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-
-  // Define a callback to be invoked on the deserialized types.
-  auto OldDeserializedTypeCallback = MF->DeserializedTypeCallback;
-  SWIFT_DEFER {
-    MF->DeserializedTypeCallback = OldDeserializedTypeCallback;
-  };
-
-  MF->DeserializedTypeCallback = [&OpenedArchetypesTracker] (Type ty) {
-    // We can't call getCanonicalType() immediately on everything we
-    // deserialize, but fortunately we only need to register opened
-    // existentials.
-    if (ty->isOpenedExistential())
-      OpenedArchetypesTracker.registerUsedOpenedArchetypes(CanType(ty));
-  };
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
@@ -866,7 +848,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // Check that there are no unresolved forward definitions of opened
   // archetypes.
-  if (OpenedArchetypesTracker.hasUnresolvedOpenedArchetypeDefinitions())
+  if (SILMod.hasUnresolvedOpenedArchetypeDefinitions())
     llvm_unreachable(
         "All forward definitions of opened archetypes should be resolved");
 

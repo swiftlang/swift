@@ -139,9 +139,6 @@ namespace {
     llvm::StringMap<ValueBase*> LocalValues;
     llvm::StringMap<SourceLoc> ForwardRefLocalValues;
 
-    /// A callback to be invoked every time a type was deserialized.
-    std::function<void(Type)> ParsedTypeCallback;
-
     Type performTypeResolution(TypeRepr *TyR, bool IsSILType,
                                GenericEnvironment *GenericEnv,
                                GenericParamList *GenericParams);
@@ -157,8 +154,7 @@ namespace {
   public:
     SILParser(Parser &P)
         : P(P), SILMod(static_cast<SILParserState *>(P.SIL)->M),
-          TUState(*static_cast<SILParserState *>(P.SIL)),
-          ParsedTypeCallback([](Type ty) {}) {}
+          TUState(*static_cast<SILParserState *>(P.SIL)) {}
 
     ~SILParser();
 
@@ -1183,8 +1179,6 @@ bool SILParser::parseASTType(CanType &result,
   else
     result = resolvedType->getCanonicalType();
 
-  // Invoke the callback on the parsed type.
-  ParsedTypeCallback(resolvedType);
   return false;
 }
 
@@ -1291,9 +1285,6 @@ bool SILParser::parseSILType(SILType &Result,
 
   Result = SILType::getPrimitiveType(Ty->getCanonicalType(),
                                      category);
-
-  // Invoke the callback on the parsed type.
-  ParsedTypeCallback(Ty);
 
   return false;
 }
@@ -6086,22 +6077,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
       }
 
       // Parse the basic block list.
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(FunctionState.F);
       SILBuilder B(*FunctionState.F);
-      // Track the archetypes just like SILGen. This
-      // is required for adding typedef operands to instructions.
-      B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-
-      // Define a callback to be invoked on the deserialized types.
-      auto OldParsedTypeCallback = FunctionState.ParsedTypeCallback;
-      SWIFT_DEFER {
-        FunctionState.ParsedTypeCallback = OldParsedTypeCallback;
-      };
-
-      FunctionState.ParsedTypeCallback = [&OpenedArchetypesTracker](Type ty) {
-        OpenedArchetypesTracker.registerUsedOpenedArchetypes(
-          ty->getCanonicalType());
-      };
 
       do {
         if (FunctionState.parseSILBasicBlock(B))
@@ -6114,7 +6090,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
 
       // Check that there are no unresolved forward definitions of opened
       // archetypes.
-      if (OpenedArchetypesTracker.hasUnresolvedOpenedArchetypeDefinitions())
+      if (M.hasUnresolvedOpenedArchetypeDefinitions())
         llvm_unreachable(
             "All forward definitions of opened archetypes should be resolved");
     }
