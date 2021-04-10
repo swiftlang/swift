@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -target x86_64-apple-macosx10.15 -emit-sil -verify
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -emit-sil -verify
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
