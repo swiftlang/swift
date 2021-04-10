@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 // Code should type check with a new enough deployment target:
-// RUN: %target-swift-frontend -typecheck %s -target x86_64-apple-macos50
+// RUN: %target-swift-frontend -typecheck %s -target %target-cpu-apple-macos50
 
 // REQUIRES: OS=macosx
 
