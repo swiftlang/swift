@@ -865,9 +865,9 @@ swift_task_addCancellationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
-  auto *record =
-      new (allocation) CancellationNotificationStatusRecord(
-          handler, context);
+  auto unsigned_handler = swift_auth_code(handler, 3848);
+  auto *record = new (allocation)
+      CancellationNotificationStatusRecord(unsigned_handler, context);
 
   swift_task_addStatusRecord(record);
   return record;
