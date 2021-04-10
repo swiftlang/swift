@@ -740,6 +740,14 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
 BUILTIN_MISC_OPERATION(BuildSerialExecutorRef,
                        "buildSerialExecutorRef", "", Special)
 
+/// Create a task group.
+BUILTIN_MISC_OPERATION(CreateTaskGroup,
+                       "createTaskGroup", "", Special)
+
+/// Destroy a task group.
+BUILTIN_MISC_OPERATION(DestroyTaskGroup,
+                       "destroyTaskGroup", "", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
