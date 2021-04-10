@@ -366,7 +366,7 @@ extension Task {
 
   @discardableResult
   @available(*, deprecated, message: "`Task.runDetached` was replaced by `detach` and will be removed shortly.")
-  public func runDetached<T>(
+  public static func runDetached<T>(
     priority: Task.Priority = .unspecified,
     operation: __owned @Sendable @escaping () async throws -> T
   ) -> Task.Handle<T, Error> {
