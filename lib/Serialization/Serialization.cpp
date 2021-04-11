@@ -5640,6 +5640,7 @@ void swift::serialize(ModuleOrSourceFile DC,
         AccessLevel::Public,
         /*EmitSynthesizedMembers*/true,
         /*PrintMessages*/false,
+        /*EmitInheritedDocs*/options.SkipSymbolGraphInheritedDocs,
       };
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }
