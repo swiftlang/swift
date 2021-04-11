@@ -223,6 +223,17 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   // getCurrentActor has no arguments.
   if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
     emitGetCurrentExecutor(IGF, out);
+
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
+    out.add(emitCreateTaskGroup(IGF));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::DestroyTaskGroup) {
+    emitDestroyTaskGroup(IGF, args.claimNext());
     return;
   }
 

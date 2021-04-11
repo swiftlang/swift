@@ -40,9 +40,6 @@ import SomeExternalModule
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "SwiftOnoneSupport"
-// CHECK-NEXT: },
-// CHECK-NEXT: {
-// CHECK-NEXT: "swift": "_Concurrency"
 // CHECK-NEXT: }
 // CHECK-NEXT: ],
 

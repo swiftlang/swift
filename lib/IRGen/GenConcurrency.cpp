@@ -170,3 +170,27 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
 
   IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
 }
+
+llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF) {
+  auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
+  auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));
+  auto group = IGF.Builder.CreateBitCast(address.getAddress(),
+                                         IGF.IGM.Int8PtrTy);
+  IGF.Builder.CreateLifetimeStart(group);
+
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFn(),
+                                      {group});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  return group;
+}
+
+void irgen::emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group) {
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupDestroyFn(),
+                                      {group});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.Builder.CreateLifetimeEnd(group);
+}

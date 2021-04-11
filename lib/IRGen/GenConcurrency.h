@@ -36,6 +36,12 @@ void emitBuildSerialExecutorRef(IRGenFunction &IGF, llvm::Value *actor,
 /// Emit the getCurrentExecutor builtin.
 void emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out);
 
+/// Emit the createTaskGroup builtin.
+llvm::Value *emitCreateTaskGroup(IRGenFunction &IGF);
+
+/// Emit the destroyTaskGroup builtin.
+void emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group);
+
 } // end namespace irgen
 } // end namespace swift
 

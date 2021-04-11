@@ -137,13 +137,16 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
 
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
-  if (Optional<RawComment> RC = Context.getRawComment(this))
-    return RC.getValue();
+  if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
+    auto P = RC.getValue();
+    if (!SerializedOK || P.second)
+      return P.first;
+  }
 
   // Check the declaration itself.
   if (auto *Attr = getAttrs().getAttribute<RawDocCommentAttr>()) {
     RawComment Result = toRawComment(Context, Attr->getCommentRange());
-    Context.setRawComment(this, Result);
+    Context.setRawComment(this, Result, true);
     return Result;
   }
 
@@ -172,7 +175,7 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
           auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
 
           if (!RC.isEmpty()) {
-            Context.setRawComment(this, RC);
+            Context.setRawComment(this, RC, true);
             return RC;
           }
         }
@@ -180,7 +183,7 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
     }
 
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      Context.setRawComment(this, C->Raw);
+      Context.setRawComment(this, C->Raw, false);
       return C->Raw;
     }
 
