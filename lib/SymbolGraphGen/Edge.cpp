@@ -57,5 +57,21 @@ void Edge::serialize(llvm::json::OStream &OS) const {
         });
       }
     }
+    
+    // If our source symbol is a synthesized decl, write in information about
+    // where it's inheriting docs from.
+    if (Source.getSynthesizedBaseTypeDecl()) {
+      Symbol inheritedSym(Graph, Source.getSymbolDecl(), nullptr);
+      SmallString<256> USR, Display;
+      llvm::raw_svector_ostream DisplayOS(Display);
+      
+      inheritedSym.getUSR(USR);
+      inheritedSym.printPath(DisplayOS);
+      
+      OS.attributeObject("sourceOrigin", [&](){
+        OS.attribute("identifier", USR.str());
+        OS.attribute("displayName", Display.str());
+      });
+    }
   });
 }
