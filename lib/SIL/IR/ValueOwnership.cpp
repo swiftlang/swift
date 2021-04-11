@@ -285,29 +285,14 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *arg) {
   return arg->getOwnershipKind();
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::
+visitMultipleValueInstructionResult(MultipleValueInstructionResult *Result) {
+  return Result->getOwnershipKind();
+}
+
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitSILPhiArgument(SILPhiArgument *Arg) {
   return Arg->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
-    DestructureStructResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
-    DestructureTupleResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginApplyResult(
-    BeginApplyResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginCOWMutationResult(
-    BeginCOWMutationResult *Result) {
-  return Result->getOwnershipKind();
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(

@@ -411,9 +411,11 @@ template <typename LTy> struct tupleextractoperation_ty {
              L.match((ValueBase *)TEI->getOperand());
     }
 
-    if (auto *DTR = dyn_cast<DestructureTupleResult>(V)) {
-      return DTR->getIndex() == index &&
-             L.match((ValueBase *)DTR->getParent()->getOperand());
+    if (auto *DTR = dyn_cast<MultipleValueInstructionResult>(V)) {
+      if (auto *DT = dyn_cast<DestructureTupleInst>(DTR->getParent())) {
+        return DTR->getIndex() == index &&
+          L.match((ValueBase *)DT->getOperand());
+      }
     }
 
     return false;
