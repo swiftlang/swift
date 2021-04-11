@@ -24,7 +24,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -67,7 +67,7 @@ static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
 /// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
-  BasicBlockWorklist<256> Worklist(BB);
+  BasicBlockWorklist Worklist(BB);
   llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
 
   while (SILBasicBlock *BB = Worklist.pop()) {

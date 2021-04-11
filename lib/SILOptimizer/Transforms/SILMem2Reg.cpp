@@ -28,7 +28,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -46,7 +46,6 @@ using namespace swift;
 STATISTIC(NumAllocStackFound,    "Number of AllocStack found");
 STATISTIC(NumAllocStackCaptured, "Number of AllocStack captured");
 STATISTIC(NumInstRemoved,        "Number of Instructions removed");
-STATISTIC(NumPhiPlaced,          "Number of Phi blocks placed");
 
 namespace {
 
@@ -219,7 +218,7 @@ namespace {
 
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
-  using BlockSet = BasicBlockSetVector<16>;
+  using BlockSet = BasicBlockSetVector;
   using BlockToInstMap = llvm::DenseMap<SILBasicBlock *, SILInstruction *>;
 
   // Use a priority queue keyed on dominator tree level so that inserted nodes
@@ -700,10 +699,6 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
           worklist.push_back(child);
     }
   }
-
-  LLVM_DEBUG(llvm::dbgs() << "*** Found: " << phiBlocks.size()
-                          << " new PHIs\n");
-  NumPhiPlaced += phiBlocks.size();
 
   // At this point we calculated the locations of all of the new Phi values.
   // Next, add the Phi values and promote all of the loads and stores into the
