@@ -2303,9 +2303,9 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
                isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else if (isa<clang::NamespaceDecl>(namedDecl)) {
-      // Note: Namespaces are not really structs, but since namespaces are
+      // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
-      appendOperator("V");
+      appendOperator("O");
     } else {
       llvm_unreachable("unknown imported Clang type");
     }
