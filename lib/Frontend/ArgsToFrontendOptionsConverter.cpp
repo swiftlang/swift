@@ -248,6 +248,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
     Opts.SymbolGraphOutputDir = A->getValue();
   }
+  
+  Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
 
   return false;
 }

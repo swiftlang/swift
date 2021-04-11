@@ -173,6 +173,9 @@ void Symbol::serializeRange(size_t InitialIndentation,
 }
 
 void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+  if (Graph->Walker.Options.SkipInheritedDocs && SynthesizedBaseTypeDecl) {
+    return;
+  }
   const auto *DocCommentProvidingDecl =
       dyn_cast_or_null<ValueDecl>(
           getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
