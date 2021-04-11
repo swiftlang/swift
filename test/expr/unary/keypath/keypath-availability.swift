@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -typecheck -verify %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.9 -typecheck -verify %s
 // REQUIRES: OS=macosx
 
 struct Butt {

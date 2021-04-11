@@ -8,9 +8,8 @@
 // CHECK: 00-output_for_index
 // CHECK: DEPEND START
 // CHECK: Unit | system | Swift | [[MODULE:.*[/\\]Swift[.]swiftmodule([/\\].+[.]swiftmodule)?]] | [[SWIFT:.+[.]swiftmodule-[A-Z0-9]*]]
-// CHECK: Unit | system | _Concurrency | {{.*}}
 // CHECK: Record | user | {{.*}}{{/|\\}}unit-one-file-multi-file-invocation.swift |
-// CHECK: DEPEND END (3)
+// CHECK: DEPEND END (2)
 
 // CHECK: [[SWIFT]]
 // CHECK: DEPEND START

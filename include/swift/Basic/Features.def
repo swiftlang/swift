@@ -44,5 +44,6 @@ LANGUAGE_FEATURE(GlobalActors, 0, "Global actors", langOpts.EnableExperimentalCo
 LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
 LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
 LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins", true)
+LANGUAGE_FEATURE(BuiltinTaskGroup, 0, "TaskGroup builtins", true)
 
 #undef LANGUAGE_FEATURE

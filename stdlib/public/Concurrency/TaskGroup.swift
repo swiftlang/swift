@@ -80,30 +80,28 @@ extension Task {
 ///   - the group will await any not yet complete tasks,
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@inlinable
 public func withTaskGroup<ChildTaskResult: Sendable, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
 ) async -> GroupResult {
-  let task = Builtin.getCurrentAsyncTask()
-  let _group = _taskGroupCreate()
-  var group: TaskGroup<ChildTaskResult>! = TaskGroup(task: task, group: _group)
+  #if compiler(>=5.5) && $BuiltinTaskGroup
+
+  let _group = Builtin.createTaskGroup()
+  var group = TaskGroup<ChildTaskResult>(group: _group)
 
   // Run the withTaskGroup body.
   let result = await body(&group)
 
-  // Drain any not next() awaited tasks if the group wasn't cancelled
-  // If any of these tasks were to throw
-  //
-  // Failures of tasks are ignored.
-  while !group.isEmpty {
-    _ = await group.next()
-    continue // keep awaiting on all pending tasks
-  }
+  await group.awaitAllRemainingTasks()
 
-  group = nil
-  _taskGroupDestroy(group: _group)
+  Builtin.destroyTaskGroup(_group)
   return result
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
 }
 
 /// Starts a new throwing task group which provides a scope in which a dynamic 
@@ -161,67 +159,54 @@ public func withTaskGroup<ChildTaskResult: Sendable, GroupResult>(
 /// - if the body throws:
 ///   - all tasks remaining in the group will be automatically cancelled.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@inlinable
 public func withThrowingTaskGroup<ChildTaskResult: Sendable, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
 ) async rethrows -> GroupResult {
-  let task = Builtin.getCurrentAsyncTask()
-  let _group = _taskGroupCreate()
-  var group: ThrowingTaskGroup<ChildTaskResult, Error>! =
-    ThrowingTaskGroup(task: task, group: _group)
+  #if compiler(>=5.5) && $BuiltinTaskGroup
+
+  let _group = Builtin.createTaskGroup()
+  var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
 
   do {
     // Run the withTaskGroup body.
     let result = try await body(&group)
 
-    // TODO: For whatever reason extracting the common teardown code into a local async function here causes it to hang forever?!
-    // Drain any not next() awaited tasks if the group wasn't cancelled
-    // If any of these tasks were to throw
-    //
-    // Failures of tasks are ignored.
-    while !group.isEmpty {
-      _ = try? await group.next()
-      continue // keep awaiting on all pending tasks
-    }
-    group = nil
-    _taskGroupDestroy(group: _group)
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
 
     return result
   } catch {
     group.cancelAll()
-    // Drain any not next() awaited tasks if the group wasn't cancelled
-    // If any of these tasks were to throw
-    //
-    // Failures of tasks are ignored.
-    while !group.isEmpty {
-      _ = try? await group.next()
-      continue // keep awaiting on all pending tasks
-    }
-    group = nil
-    _taskGroupDestroy(group: _group)
+
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
 
     throw error
   }
+
+  #else
+  fatalError("Swift compiler is incompatible with this SDK version")
+  #endif
 }
 
 /// A task group serves as storage for dynamically spawned tasks.
 ///
 /// It is created by the `withTaskGroup` function.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
 public struct TaskGroup<ChildTaskResult: Sendable> {
 
-  private let _task: Builtin.NativeObject
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
-  private let _group: Builtin.RawPointer
+  @usableFromInline
+  internal let _group: Builtin.RawPointer
 
   /// No public initializers
-  init(task: Builtin.NativeObject, group: Builtin.RawPointer) {
-    // TODO: this feels slightly off, any other way to avoid the task being too eagerly released?
-    _swiftRetain(task) // to avoid the task being destroyed when the group is destroyed
-
-    self._task = task
+  @inlinable
+  init(group: Builtin.RawPointer) {
     self._group = group
   }
 
@@ -231,12 +216,11 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) async -> Bool {
     return try await self.spawnUnlessCancelled(priority: priority) {
-      try! await operation()
+      await operation()
     }
   }
 
-
-/// Add a child task to the group.
+  /// Add a child task to the group.
   ///
   /// ### Error handling
   /// Operations are allowed to `throw`, in which case the `try await next()`
@@ -256,12 +240,11 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
     _ = _taskGroupAddPendingTask(group: _group, unconditionally: true)
-    
+
     // Set up the job flags for a new task.
     var flags = Task.JobFlags()
     flags.kind = .task
-    flags.priority = priority != Task.Priority.unspecified ?
-        priority : getJobFlags(_task).priority
+    flags.priority = priority
     flags.isFuture = true
     flags.isChildTask = true
     flags.isGroupChildTask = true
@@ -306,8 +289,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     // Set up the job flags for a new task.
     var flags = Task.JobFlags()
     flags.kind = .task
-    flags.priority = priority != Task.Priority.unspecified ?
-        priority : getJobFlags(_task).priority
+    flags.priority = priority
     flags.isFuture = true
     flags.isChildTask = true
     flags.isGroupChildTask = true
@@ -379,19 +361,15 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// It is possible to directly rethrow such error out of a `withTaskGroup` body
   /// function's body, causing all remaining tasks to be implicitly cancelled.
   public mutating func next() async -> ChildTaskResult? {
-    #if NDEBUG
-    let callingTask = Builtin.getCurrentAsyncTask() // can't inline into the assert sadly
-    assert(unsafeBitCast(callingTask, to: size_t.self) ==
-      unsafeBitCast(_task, to: size_t.self),
-      """
-      group.next() invoked from task other than the task which created the group! \
-      This means the group must have illegally escaped the withTaskGroup{} scope.
-      """)
-    #endif
-  
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
     return try! await _taskGroupWaitNext(group: _group)
+  }
+
+  /// Await all the remaining tasks on this group.
+  @usableFromInline
+  internal mutating func awaitAllRemainingTasks() async {
+    while let _ = await next() {}
   }
   
   /// Query whether the group has any remaining tasks.
@@ -430,8 +408,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns: `true` if the group (or its parent task) was cancelled,
   ///            `false` otherwise.
   public var isCancelled: Bool {
-    return _taskIsCancelled(_task) ||
-      _taskGroupIsCancelled(group: _group)
+    return _taskGroupIsCancelled(group: _group)
   }
 }
 
@@ -459,20 +436,30 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 ///
 /// It is created by the `withTaskGroup` function.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
 public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
-  private let _task: Builtin.NativeObject
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
-  private let _group: Builtin.RawPointer
+  @usableFromInline
+  internal let _group: Builtin.RawPointer
 
   /// No public initializers
-  init(task: Builtin.NativeObject, group: Builtin.RawPointer) {
-    // FIXME: this feels slightly off, any other way to avoid the task being too eagerly released?
-    _swiftRetain(task) // to avoid the task being destroyed when the group is destroyed
-
-    self._task = task
+  @inlinable
+  init(group: Builtin.RawPointer) {
     self._group = group
+  }
+
+  /// Await all the remaining tasks on this group.
+  @usableFromInline
+  internal mutating func awaitAllRemainingTasks() async {
+    while true {
+      do {
+        guard let _ = try await next() else {
+          return
+        }
+      } catch {}
+    }
   }
 
   @available(*, deprecated, message: "`Task.Group.add` has been replaced by `(Throwing)TaskGroup.spawn` or `(Throwing)TaskGroup.spawnUnlessCancelled` and will be removed shortly.")
@@ -510,8 +497,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     // Set up the job flags for a new task.
     var flags = Task.JobFlags()
     flags.kind = .task
-    flags.priority = priority != Task.Priority.unspecified ?
-        priority : getJobFlags(_task).priority
+    flags.priority = priority
     flags.isFuture = true
     flags.isChildTask = true
     flags.isGroupChildTask = true
@@ -556,8 +542,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     // Set up the job flags for a new task.
     var flags = Task.JobFlags()
     flags.kind = .task
-    flags.priority = priority != Task.Priority.unspecified ?
-        priority : getJobFlags(_task).priority
+    flags.priority = priority
     flags.isFuture = true
     flags.isChildTask = true
     flags.isGroupChildTask = true
@@ -629,31 +614,11 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// It is possible to directly rethrow such error out of a `withTaskGroup` body
   /// function's body, causing all remaining tasks to be implicitly cancelled.
   public mutating func next() async throws -> ChildTaskResult? {
-    #if NDEBUG
-    let callingTask = Builtin.getCurrentAsyncTask() // can't inline into the assert sadly
-    assert(unsafeBitCast(callingTask, to: size_t.self) ==
-      unsafeBitCast(_task, to: size_t.self),
-      """
-      group.next() invoked from task other than the task which created the group! \
-      This means the group must have illegally escaped the withTaskGroup{} scope.
-      """)
-    #endif
-
     return try await _taskGroupWaitNext(group: _group)
   }
 
   /// - SeeAlso: `next()`
   public mutating func nextResult() async throws -> Result<ChildTaskResult, Failure>? {
-    #if NDEBUG
-    let callingTask = Builtin.getCurrentAsyncTask() // can't inline into the assert sadly
-    assert(unsafeBitCast(callingTask, to: size_t.self) ==
-      unsafeBitCast(_task, to: size_t.self),
-      """
-      group.next() invoked from task other than the task which created the group! \
-      This means the group must have illegally escaped the withTaskGroup{} scope.
-      """)
-    #endif
-
     do {
       guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
         return nil
@@ -701,8 +666,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Returns: `true` if the group (or its parent task) was cancelled,
   ///            `false` otherwise.
   public var isCancelled: Bool {
-    return _taskIsCancelled(_task) ||
-      _taskGroupIsCancelled(group: _group)
+    return _taskGroupIsCancelled(group: _group)
   }
 }
 
@@ -819,22 +783,6 @@ extension ThrowingTaskGroup: AsyncSequence {
 }
 
 /// ==== -----------------------------------------------------------------------
-
-// FIXME: remove this
-@_silgen_name("swift_retain")
-func _swiftRetain(
-  _ task: Builtin.NativeObject
-) -> UInt
-
-// FIXME: remove this
-@_silgen_name("swift_release")
-func _swiftRelease(
-  _ object: Builtin.NativeObject
-)
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@_silgen_name("swift_taskGroup_create")
-func _taskGroupCreate() -> Builtin.RawPointer
 
 /// Attach task group child to the group group to the task.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

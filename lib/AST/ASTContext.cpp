@@ -285,7 +285,7 @@ struct ASTContext::Implementation {
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
-  llvm::DenseMap<const Decl *, RawComment> RawComments;
+  llvm::DenseMap<const Decl *, std::pair<RawComment, bool>> RawComments;
 
   /// Map from Swift declarations to brief comments.
   llvm::DenseMap<const Decl *, StringRef> BriefComments;
@@ -2020,7 +2020,7 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   return TheStdlibModule;
 }
 
-Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
+Optional<std::pair<RawComment, bool>> ASTContext::getRawComment(const Decl *D) {
   auto Known = getImpl().RawComments.find(D);
   if (Known == getImpl().RawComments.end())
     return None;
@@ -2028,8 +2028,8 @@ Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
   return Known->second;
 }
 
-void ASTContext::setRawComment(const Decl *D, RawComment RC) {
-  getImpl().RawComments[D] = RC;
+void ASTContext::setRawComment(const Decl *D, RawComment RC, bool FromSerialized) {
+  getImpl().RawComments[D] = std::make_pair(RC, FromSerialized);
 }
 
 Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {

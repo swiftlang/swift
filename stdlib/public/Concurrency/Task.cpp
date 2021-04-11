@@ -348,6 +348,10 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   if (flags.task_isChildTask()) {
     parent = swift_task_getCurrent();
     assert(parent != nullptr && "creating a child task with no active task");
+
+    // Inherit the priority of the parent task if unspecified.
+    if (flags.getPriority() == JobPriority::Unspecified)
+      flags.setPriority(parent->getPriority());
   }
 
   // Figure out the size of the header.
@@ -863,9 +867,9 @@ swift_task_addCancellationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
-  auto *record =
-      new (allocation) CancellationNotificationStatusRecord(
-          handler, context);
+  auto unsigned_handler = swift_auth_code(handler, 3848);
+  auto *record = new (allocation)
+      CancellationNotificationStatusRecord(unsigned_handler, context);
 
   swift_task_addStatusRecord(record);
   return record;

@@ -145,10 +145,6 @@ OVERRIDE_TASK_GROUP(taskGroup_initialize, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group), (group))
 
-OVERRIDE_TASK_GROUP(taskGroup_create, TaskGroup *,
-                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                    swift::, , )
-
 OVERRIDE_TASK_GROUP(taskGroup_attachChild, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, AsyncTask *child),
