@@ -49,10 +49,52 @@
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
 
+namespace swift {
+
+/// A fixed size slab of memory, which can be allocated and freed by the
+/// SILModule at (basically) zero cost.
+class FixedSizeSlab : public llvm::ilist_node<FixedSizeSlab>,
+                       public SILAllocated<FixedSizeSlab> {
+public:
+  /// The capacity of the payload.
+  static constexpr size_t capacity = 64 * sizeof(uintptr_t);
+
+private:
+  friend class SILModule;
+
+  /// The magic number which is stored in overflowGuard.
+  static constexpr uintptr_t magicNumber = (uintptr_t)0xdeadbeafdeadbeafull;
+
+  /// The payload.
+  char data[capacity];
+  
+  /// Used for a cheap buffer overflow check - in the spirit of libgmalloc.
+  uintptr_t overflowGuard = magicNumber;
+
+public:
+  /// Returns the payload pointing to \p T.
+  template<typename T> T *dataFor() { return (T *)(&data[0]); }
+
+  /// Returns the payload pointing to const \p T
+  template<typename T> const T *dataFor() const { return (const T *)(&data[0]); }
+};
+
+} // end swift namespace
+
 namespace llvm {
 namespace yaml {
 class Output;
 } // end namespace yaml
+
+template <>
+struct ilist_traits<::swift::FixedSizeSlab> :
+public ilist_node_traits<::swift::FixedSizeSlab> {
+public:
+  static void deleteNode(::swift::FixedSizeSlab *V) {
+    llvm_unreachable("cannot delete a slab");
+  }
+};
+
 } // end namespace llvm
 
 namespace swift {
@@ -129,6 +171,7 @@ public:
   };
 
   using ActionCallback = std::function<void()>;
+  using SlabList = llvm::ilist<FixedSizeSlab>;
 
 private:
   friend KeyPathPattern;
@@ -150,6 +193,12 @@ private:
 
   /// Allocator that manages the memory of all the pieces of the SILModule.
   mutable llvm::BumpPtrAllocator BPA;
+
+  /// The list of freed slabs, which can be reused.
+  SlabList freeSlabs;
+  
+  /// For consistency checking.
+  size_t numAllocatedSlabs = 0;
 
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
@@ -732,6 +781,22 @@ public:
   template <typename T> T *allocate(unsigned Count) const {
     return static_cast<T *>(allocate(sizeof(T) * Count, alignof(T)));
   }
+
+  /// Allocates a slab of memory.
+  ///
+  /// This has (almost) zero cost, because for the first time, the allocation is
+  /// done with the BPA.
+  /// Subsequent allocations are reusing the already freed slabs.
+  FixedSizeSlab *allocSlab();
+  
+  /// Frees a slab.
+  ///
+  /// This has (almost) zero cost, because the slab is just put into the
+  /// freeSlabs list.
+  void freeSlab(FixedSizeSlab *slab);
+  
+  /// Frees all slabs of a list.
+  void freeAllSlabs(SlabList &slabs);
 
   template <typename T>
   MutableArrayRef<T> allocateCopy(ArrayRef<T> Array) const {

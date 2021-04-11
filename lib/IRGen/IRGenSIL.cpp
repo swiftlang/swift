@@ -32,7 +32,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
@@ -2242,7 +2242,7 @@ void IRGenSILFunction::emitSILFunction() {
   // Invariant: for every block in the work queue, we have visited all
   // of its dominators.
   // Start with the entry block, for which the invariant trivially holds.
-  BasicBlockWorklist<32> workQueue(&*CurSILFn->getEntryBlock());
+  BasicBlockWorklist workQueue(&*CurSILFn->getEntryBlock());
 
   while (SILBasicBlock *bb = workQueue.pop()) {
     // Emit the block.
