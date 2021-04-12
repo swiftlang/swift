@@ -1169,9 +1169,14 @@ public:
     return fnPtr;
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
+    PointerAuthInfo newAuthInfo;
+    if (auto authInfo = fnPtr.getAuthInfo()) {
+      newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                    authInfo.getDiscriminator());
+    }
     auto newFnPtr = FunctionPointer(
-        FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF),
-        fnPtr.getAuthInfo(), Signature::forAsyncAwait(subIGF.IGM, origType));
+        FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF), newAuthInfo,
+        Signature::forAsyncAwait(subIGF.IGM, origType));
     auto &Builder = subIGF.Builder;
 
     auto argValues = args.claimAll();
