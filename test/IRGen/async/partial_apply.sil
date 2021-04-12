@@ -617,3 +617,13 @@ bb0(%0 : $Int):
   %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) @async (Int, Int) -> (Int, @error Error)
   return %3 : $@async @callee_guaranteed (Int) -> (Int, @error Error)
 }
+
+sil @method_with_out_return : $@convention(method) @async (SwiftClass) -> @out Int
+
+sil @partially_apply_method_with_out_return : $@convention(thin) (SwiftClass) -> @async @callee_guaranteed () -> @out Int {
+bb(%class : $SwiftClass):
+  %method_with_out_param = function_ref @method_with_out_return : $@convention(method) @async (SwiftClass) -> @out Int
+  %result = partial_apply [callee_guaranteed] %method_with_out_param(%class) : $@convention(method) @async (SwiftClass) -> @out Int
+  return %result : $@callee_guaranteed @async () -> @out Int
+}
+
