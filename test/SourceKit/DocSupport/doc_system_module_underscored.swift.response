@@ -897,7 +897,7 @@ protocol Other1 {
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "T",
-    key.usr: "s:16UnderscoredProto1DVAASQRzrlE1Txmfp",
+    key.usr: "s:16UnderscoredProto1DV1Txmfp",
     key.offset: 1472,
     key.length: 1
   },
@@ -945,7 +945,7 @@ protocol Other1 {
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "T",
-    key.usr: "s:16UnderscoredProto1DVAASQRzrlE1Txmfp",
+    key.usr: "s:16UnderscoredProto1DV1Txmfp",
     key.offset: 1585,
     key.length: 1
   },
@@ -1570,7 +1570,7 @@ protocol Other1 {
     ],
     key.offset: 1454,
     key.length: 135,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:16UnderscoredProto6Other1P\">Other1</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement>",
+    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:16UnderscoredProto1DV\">D</ref.struct> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DV1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:16UnderscoredProto6Other1P\">Other1</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol></decl.generic_type_requirement>",
     key.extends: {
       key.kind: source.lang.swift.ref.struct,
       key.name: "D",
@@ -1584,7 +1584,7 @@ protocol Other1 {
         key.original_usr: "s:16UnderscoredProto05_SomeB0PA2A6Other14ItemRpzrlE04fromcB24ExtensionSplitConditions05takese2IfD0yAF_tF",
         key.offset: 1505,
         key.length: 82,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fromSomeProtoExtensionSplitConditions</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>takesItemIfOther1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:16UnderscoredProto1DVAASQRzrlE1Txmfp\">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fromSomeProtoExtensionSplitConditions</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>takesItemIfOther1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr=\"s:16UnderscoredProto1DV1Txmfp\">T</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
