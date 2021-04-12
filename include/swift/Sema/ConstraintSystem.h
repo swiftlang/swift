@@ -4513,6 +4513,12 @@ private:
                                             ConstraintLocatorBuilder locator,
                                             TypeMatchOptions flags);
 
+  /// Similar to \c simplifyConformsToConstraint but also checks for
+  /// optional and pointer derived a given type.
+  SolutionKind simplifyTransitivelyConformsTo(Type type, Type protocol,
+                                              ConstraintLocatorBuilder locator,
+                                              TypeMatchOptions flags);
+
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
                                              TypeMatchOptions flags,

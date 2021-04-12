@@ -7,6 +7,6 @@ struct Value {
 
 func test(values: [[Value]]) -> String {
   // expected-error@+1 {{the compiler is unable to type-check this expression in reasonable time}}
-  "[" + "" + values.map({ "[" + $0.map({ $0.debugDescription }).joined(separator: ", ") + "]" }).joined(separator: ", ") + "]"
+  "[" + "" + "" + values.map({ "[" + $0.map({ $0.debugDescription }).joined(separator: ", ") + "" + "]" }).joined(separator: ", ") + "" + "]"
 }
 

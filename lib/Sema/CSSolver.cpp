@@ -2232,6 +2232,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
         case ConstraintKind::Defaultable:
         case ConstraintKind::ConformsTo:
         case ConstraintKind::LiteralConformsTo:
+        case ConstraintKind::TransitivelyConformsTo:
           return false;
 
         default:

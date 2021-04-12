@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CSDiagnostics.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -1433,6 +1434,34 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       assert(!argsWithLabels[argIdx].isAutoClosure() ||
              isSynthesizedArgument(argument));
 
+      // If parameter is a generic parameter, let's copy its
+      // conformance requirements (if any), to the argument
+      // be able to filter mismatching choices earlier.
+      if (auto *typeVar = paramTy->getAs<TypeVariableType>()) {
+        auto *locator = typeVar->getImpl().getLocator();
+        if (locator->isForGenericParameter()) {
+          auto &CG = cs.getConstraintGraph();
+
+          auto isTransferableConformance = [&typeVar](Constraint *constraint) {
+            if (constraint->getKind() != ConstraintKind::ConformsTo)
+              return false;
+
+            auto requirementTy = constraint->getFirstType();
+            if (!requirementTy->isEqual(typeVar))
+              return false;
+
+            return constraint->getSecondType()->is<ProtocolType>();
+          };
+
+          for (auto *constraint : CG[typeVar].getConstraints()) {
+            if (isTransferableConformance(constraint))
+              cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
+                               constraint->getSecondType(),
+                               constraint->getLocator());
+          }
+        }
+      }
+
       cs.addConstraint(
           subKind, argTy, paramTy,
           matchingAutoClosureResult
@@ -1542,6 +1571,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -1682,6 +1712,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -2072,6 +2103,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -4983,6 +5015,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::Defaultable:
     case ConstraintKind::Disjunction:
     case ConstraintKind::DynamicTypeOf:
@@ -5131,14 +5164,36 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
            (nominal1->isDoubleType() || nominal2->isDoubleType()))) {
+        ConstraintLocatorBuilder location{locator};
+        // Look through all value-to-optional promotions to allow
+        // conversions like Double -> CGFloat?? and vice versa.
+        if (auto last = location.last()) {
+          // T -> Optional<T>
+          if (last->is<LocatorPathElt::OptionalPayload>()) {
+            SmallVector<LocatorPathElt, 4> path;
+            auto anchor = location.getLocatorParts(path);
+
+            // Drop all of the applied `value-to-optional` promotions.
+            path.erase(llvm::remove_if(
+                           path,
+                           [](const LocatorPathElt &elt) {
+                             return elt.is<LocatorPathElt::OptionalPayload>();
+                           }),
+                       path.end());
+
+            location = getConstraintLocator(anchor, path);
+          }
+        }
+
         // Support implicit Double<->CGFloat conversions only for
         // something which could be directly represented in the AST
         // e.g. argument-to-parameter, contextual conversions etc.
-        if (!locator.trySimplifyToExpr())
+        if (!location.trySimplifyToExpr()) {
           return getTypeMatchFailure(locator);
+        }
 
         SmallVector<LocatorPathElt, 4> path;
-        auto anchor = locator.getLocatorParts(path);
+        auto anchor = location.getLocatorParts(path);
 
         // Try implicit CGFloat conversion only if:
         // - This is not:
@@ -6184,6 +6239,128 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // There's nothing more we can do; fail.
   return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
+    Type type, Type protocolTy, ConstraintLocatorBuilder locator,
+    TypeMatchOptions flags) {
+  auto &ctx = getASTContext();
+
+  // Since this is a performance optimization, let's ignore it
+  // in diagnostic mode.
+  if (shouldAttemptFixes())
+    return SolutionKind::Solved;
+
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *conformance =
+          Constraint::create(*this, ConstraintKind::TransitivelyConformsTo,
+                             type, protocolTy, getConstraintLocator(locator));
+
+      addUnsolvedConstraint(conformance);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  auto resolvedTy = getFixedTypeRecursive(type, /*wantRValue=*/true);
+  if (resolvedTy->isTypeVariableOrMember())
+    return formUnsolved();
+
+  // If the composition consists of a class + protocol,
+  // we can't check conformance of the argument because
+  // parameter could pick one of the components.
+  if (resolvedTy.findIf(
+          [](Type type) { return type->is<ProtocolCompositionType>(); }))
+    return SolutionKind::Solved;
+
+  // All bets are off for pointers, there are multiple combinations
+  // to check and it doesn't see worth to do that upfront.
+  {
+    PointerTypeKind pointerKind;
+    if (resolvedTy->getAnyPointerElementType(pointerKind))
+      return SolutionKind::Solved;
+  }
+
+  auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
+
+  auto *M = DC->getParentModule();
+
+  // First, let's check whether the type itself conforms,
+  // if it does - we are done.
+  if (M->lookupConformance(resolvedTy, protocol))
+    return SolutionKind::Solved;
+
+  // If the type doesn't conform, let's check whether
+  // an Optional or Unsafe{Mutable}Pointer from it would.
+
+  SmallVector<Type, 4> typesToCheck;
+
+  // T -> Optional<T>
+  if (!resolvedTy->getOptionalObjectType())
+    typesToCheck.push_back(OptionalType::get(resolvedTy));
+
+  // AnyHashable
+  if (auto *anyHashable = ctx.getAnyHashableDecl())
+    typesToCheck.push_back(anyHashable->getDeclaredInterfaceType());
+
+  // Rest of the implicit conversions depend on the resolved type.
+  {
+    auto getPointerFor = [&ctx](PointerTypeKind ptrKind,
+                                Optional<Type> elementTy = None) -> Type {
+      switch (ptrKind) {
+      case PTK_UnsafePointer:
+        assert(elementTy);
+        return BoundGenericType::get(ctx.getUnsafePointerDecl(),
+                                     /*parent=*/Type(), {*elementTy});
+      case PTK_UnsafeMutablePointer:
+        assert(elementTy);
+        return BoundGenericType::get(ctx.getUnsafeMutablePointerDecl(),
+                                     /*parent=*/Type(), {*elementTy});
+
+      case PTK_UnsafeRawPointer:
+        return ctx.getUnsafeRawPointerDecl()->getDeclaredInterfaceType();
+
+      case PTK_UnsafeMutableRawPointer:
+        return ctx.getUnsafeMutableRawPointerDecl()->getDeclaredInterfaceType();
+
+      case PTK_AutoreleasingUnsafeMutablePointer:
+        llvm_unreachable("no implicit conversion");
+      }
+    };
+
+    // String -> UnsafePointer<Void>
+    if (auto *string = ctx.getStringDecl()) {
+      if (resolvedTy->isEqual(string->getDeclaredInterfaceType())) {
+        typesToCheck.push_back(
+            getPointerFor(PTK_UnsafePointer, ctx.TheEmptyTupleType));
+      }
+    }
+
+    // Array<T> -> Unsafe{Raw}Pointer<T>
+    if (auto elt = isArrayType(resolvedTy)) {
+      typesToCheck.push_back(getPointerFor(PTK_UnsafePointer, *elt));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeRawPointer, *elt));
+    }
+
+    // inout argument -> UnsafePointer<T>, UnsafeMutablePointer<T>,
+    //                   UnsafeRawPointer, UnsafeMutableRawPointer.
+    if (type->is<InOutType>()) {
+      typesToCheck.push_back(getPointerFor(PTK_UnsafePointer, resolvedTy));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeMutablePointer, resolvedTy));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeRawPointer));
+      typesToCheck.push_back(getPointerFor(PTK_UnsafeMutableRawPointer));
+    }
+  }
+
+  return llvm::any_of(typesToCheck,
+                      [&](Type type) {
+                        return bool(M->lookupConformance(type, protocol));
+                      })
+             ? SolutionKind::Solved
+             : SolutionKind::Error;
 }
 
 /// Determine the kind of checked cast to perform from the given type to
@@ -11262,6 +11439,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyConformsToConstraint(first, second, kind, locator,
                                         subflags);
 
+  case ConstraintKind::TransitivelyConformsTo:
+    return simplifyTransitivelyConformsTo(first, second, locator,
+                                          subflags);
+
   case ConstraintKind::CheckedCast:
     return simplifyCheckedCastConstraint(first, second, subflags, locator);
 
@@ -11727,6 +11908,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
              constraint.getFirstType(),
              constraint.getSecondType(),
              constraint.getKind(),
+             constraint.getLocator(),
+             None);
+
+  case ConstraintKind::TransitivelyConformsTo:
+    return simplifyTransitivelyConformsTo(
+             constraint.getFirstType(),
+             constraint.getSecondType(),
              constraint.getLocator(),
              None);
 
