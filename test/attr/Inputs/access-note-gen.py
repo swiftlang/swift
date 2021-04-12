@@ -107,9 +107,11 @@ def adjust_comments(offset, comment_str):
 # Writing attrs to access notes
 #
 
-def move_at_objc_to_access_note(access_notes_file, arg, offset, access_note_name):
+def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset, access_note_name):
     """Write an @objc attribute into an access notes file, then return the
        string that will replace the attribute and trailing comment."""
+
+    is_bad = (maybe_bad == "bad-")
 
     access_notes_file.write(u"""
 - Name: '{}'
@@ -122,19 +124,23 @@ def move_at_objc_to_access_note(access_notes_file, arg, offset, access_note_name
     if offset is None:
         offset = 1
 
-    return u"// access-note-adjust" + offsetify(offset) + u" [attr moved] " + \
-           u"expected-remark{{access note for fancy tests adds attribute 'objc' to " + \
-           u"this }} expected-note{{add attribute explicitly to silence this warning}}"
+    replacement = u"// access-note-adjust" + offsetify(offset) + u" [attr moved] "
 
+    if not is_bad:
+        replacement += u"expected-remark{{access note for fancy tests adds attribute " + \
+                       u"'objc' to this }} expected-note{{add attribute explicitly to " + \
+                       u"silence this warning}}"
+
+    return replacement
 
 #
 # Matching lines
 #
 
 """Matches '@objc(foo) // access-note-move{{access-note-name}}'
-   or '@objc // access-note-move{{access-note-name}}'"""
+   or '@objc // bad-access-note-move{{access-note-name}}'"""
 access_note_move_re = re.compile(r'@objc(?:\(([\w:]+)\))?[ \t]*' +
-                                 r'//[ \t]*access-note-move' +
+                                 r'//[ \t]*(bad-)?access-note-move' +
                                  offset_re_fragment +
                                  r'\{\{([^}]*)\}\}')
 
