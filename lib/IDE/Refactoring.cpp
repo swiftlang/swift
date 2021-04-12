@@ -1189,7 +1189,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
-  auto LineAndCol = SM.getPresumedLineAndColumnForLoc(NameLoc);
+  auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
   UnresolvedLoc UnresoledName{NameLoc, true};
 
@@ -1210,8 +1210,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   llvm::transform(
       Ranges, NoteRegions.begin(),
       [&SM](RenameRangeDetail &Detail) -> NoteRegion {
-        auto Start = SM.getPresumedLineAndColumnForLoc(Detail.Range.getStart());
-        auto End = SM.getPresumedLineAndColumnForLoc(Detail.Range.getEnd());
+        auto Start = SM.getLineAndColumnInBuffer(Detail.Range.getStart());
+        auto End = SM.getLineAndColumnInBuffer(Detail.Range.getEnd());
         return {Detail.RangeKind, Start.first, Start.second,
                 End.first,        End.second,  Detail.Index};
       });

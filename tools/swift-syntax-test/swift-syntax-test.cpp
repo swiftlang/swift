@@ -696,7 +696,7 @@ int doDumpRawTokenSyntax(const StringRef InputFile) {
     SourceLoc Loc =
         SourceMgr.getLocForOffset(BufferID, TokAndPos.second.getOffset());
     unsigned Line, Column;
-    std::tie(Line, Column) = SourceMgr.getPresumedLineAndColumnForLoc(Loc);
+    std::tie(Line, Column) = SourceMgr.getLineAndColumnInBuffer(Loc);
     llvm::outs() << Line << ":" << Column << "\n";
     TokAndPos.first->dump(llvm::outs());
     llvm::outs() << "\n";
