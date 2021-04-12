@@ -427,6 +427,7 @@ public:
   }
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    visitExprPre(E);
     ShouldRecurse_t recurse = ShouldRecurse;
     if (isa<ErrorExpr>(E)) {
       asImpl().flagInvalidCode();
@@ -486,6 +487,8 @@ public:
   ShouldRecurse_t checkForEach(ForEachStmt *S) {
     return ShouldRecurse;
   }
+
+  void visitExprPre(Expr *expr) { asImpl().visitExprPre(expr); }
 };
 
 /// A potential reason why something might have an effect.
@@ -1098,6 +1101,8 @@ private:
         // guaranteed to give back None, which leaves our ThrowKind unchanged.
       }
     }
+
+    void visitExprPre(Expr *expr) { return; }
   };
 
   class FunctionAsyncClassifier
@@ -1182,6 +1187,8 @@ private:
 
       return ShouldRecurse;
     }
+
+    void visitExprPre(Expr *expr) { return; }
   };
 
   Optional<ConditionalEffectKind>
@@ -2290,6 +2297,8 @@ public:
   }
 
 private:
+  void visitExprPre(Expr *expr) { return; }
+
   ShouldRecurse_t checkClosure(ClosureExpr *E) {
     ContextScope scope(*this, Context::forClosure(E));
     scope.enterSubFunction();
