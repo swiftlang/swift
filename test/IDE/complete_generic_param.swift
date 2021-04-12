@@ -4,6 +4,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT4 | %FileCheck %s -check-prefix=INHERIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT5 | %FileCheck %s -check-prefix=INHERIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INHERIT6 | %FileCheck %s -check-prefix=INHERIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TYPE_PARAM
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SECOND_GENERIC_TYPE_PARAM | %FileCheck %s -check-prefix=GENERIC_TYPE_PARAM
 
 class C1{}
 protocol P1{}
@@ -34,3 +36,12 @@ class C3 {
 // INHERIT-NOT: ValueInt1
 // INHERIT-NOT: ValueString2
 // INHERIT-NOT: TopLevelFunc
+
+
+class Sr14432<T, U> {}
+
+_ = Sr14432<#^GENERIC_TYPE_PARAM^# >()
+_ = Sr14432<SomeType, #^SECOND_GENERIC_TYPE_PARAM^# >()
+// GENERIC_TYPE_PARAM: Begin completions
+// GENERIC_TYPE_PARAM-DAG: Decl[Class]/CurrModule:             C1[#C1#];
+// GENERIC_TYPE_PARAM: End completions
