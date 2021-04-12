@@ -1049,7 +1049,9 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // to mark them as @objc
   if (VD->getEffectfulGetAccessor()) {
     VD->diagnose(diag::effectful_not_representable_objc,
-                 VD->getDescriptiveKind());
+                 VD->getDescriptiveKind())
+        .limitBehavior(behavior);
+    Reason.describe(VD);
     return false;
   }
 
@@ -1088,7 +1090,9 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // to mark them as @objc
   if (SD->getEffectfulGetAccessor()) {
     SD->diagnose(diag::effectful_not_representable_objc,
-                 SD->getDescriptiveKind());
+                 SD->getDescriptiveKind())
+        .limitBehavior(behavior);
+    Reason.describe(SD);
     return false;
   }
 
