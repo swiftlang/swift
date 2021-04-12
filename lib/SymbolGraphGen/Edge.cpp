@@ -58,10 +58,16 @@ void Edge::serialize(llvm::json::OStream &OS) const {
       }
     }
     
+    const ValueDecl *InheritingDecl = nullptr;
+    if (const auto *ID = Source.getDeclInheritingDocs()) {
+      if (Target.getSymbolDecl() == ID || Source.getSynthesizedBaseTypeDecl())
+        InheritingDecl = ID;
+    }
+    
     // If our source symbol is a synthesized decl, write in information about
     // where it's inheriting docs from.
-    if (Source.getSynthesizedBaseTypeDecl()) {
-      Symbol inheritedSym(Graph, Source.getSymbolDecl(), nullptr);
+    if (InheritingDecl) {
+      Symbol inheritedSym(Graph, InheritingDecl, nullptr);
       SmallString<256> USR, Display;
       llvm::raw_svector_ostream DisplayOS(Display);
       
