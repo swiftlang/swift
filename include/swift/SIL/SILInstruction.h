@@ -3468,6 +3468,21 @@ public:
   SILValue getTargetExecutor() const { return getOperand(); }
 };
 
+/// Extract the ex that the code is executing on the operand executor already.
+class ExtractExecutorInst
+    : public UnaryInstructionBase<SILInstructionKind::ExtractExecutorInst,
+                                  SingleValueInstruction>
+{
+  friend SILBuilder;
+
+  ExtractExecutorInst(SILDebugLocation debugLoc, SILValue executor,
+                      bool hasOwnership, SILType Ty)
+      : UnaryInstructionBase(debugLoc, executor, Ty) { }
+
+public:
+  SILValue getExpectedExecutor() const { return getOperand(); }
+};
+
 /// Instantiates a key path object.
 class KeyPathInst final
     : public InstructionBase<SILInstructionKind::KeyPathInst,

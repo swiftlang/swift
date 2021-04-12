@@ -3056,6 +3056,15 @@ void SILCloner<ImplClass>
                             getOpValue(Inst->getTargetExecutor())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitExtractExecutorInst(ExtractExecutorInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createExtractExecutor(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getExpectedExecutor())));
+}
 
 } // end namespace swift
 

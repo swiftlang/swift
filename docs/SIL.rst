@@ -3319,6 +3319,24 @@ lowered by the SIL pipeline, so that IR generation only operands of type
 
 The operand is a guaranteed operand, i.e. not consumed.
 
+extract_executor
+```````````````
+
+::
+
+  sil-instruction ::= 'extract_executor' sil-operand
+
+  %1 = extract_executor %0 : $T
+  // $T must be Builtin.Executor or conform to the Actor protocol
+  // %1 will be of type Builtin.Executor
+
+Extracts the executor from the executor or actor operand. SIL generation
+emits this instruction to produce executor values when needed (e.g.,
+to provide to a runtime function). It will be lowered away by the SIL
+pipeline.
+
+The operand is a guaranteed operand, i.e. not consumed.
+
 dealloc_stack
 `````````````
 ::

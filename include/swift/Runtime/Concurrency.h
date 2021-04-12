@@ -577,6 +577,13 @@ AsyncTask *swift_task_getCurrent(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 ExecutorRef swift_task_getCurrentExecutor(void);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCurrentExecutor(ExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_reportUnexpectedExecutor(
+    const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
+    uintptr_t line, ExecutorRef executor);
 }
 
 #pragma clang diagnostic pop

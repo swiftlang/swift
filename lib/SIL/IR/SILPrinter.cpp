@@ -2145,6 +2145,10 @@ public:
     *this << getIDAndType(HTEI->getTargetExecutor());
   }
 
+  void visitExtractExecutorInst(ExtractExecutorInst *AEI) {
+    *this << getIDAndType(AEI->getExpectedExecutor());
+  }
+
   void visitSwitchValueInst(SwitchValueInst *SII) {
     *this << getIDAndType(SII->getOperand());
     for (unsigned i = 0, e = SII->getNumCases(); i < e; ++i) {

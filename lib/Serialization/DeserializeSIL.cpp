@@ -1878,6 +1878,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(EndApply)
   UNARY_INSTRUCTION(HopToExecutor)
+  UNARY_INSTRUCTION(ExtractExecutor)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 

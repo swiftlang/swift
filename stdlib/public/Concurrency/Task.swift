@@ -759,6 +759,20 @@ func _taskCancel(_ task: Builtin.NativeObject)
 @_silgen_name("swift_task_isCancelled")
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@usableFromInline
+@_silgen_name("swift_task_isCurrentExecutor")
+func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@usableFromInline
+@_silgen_name("swift_task_reportUnexpectedExecutor")
+func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
+                               _ _filenameLength: Builtin.Word,
+                               _ _filenameIsASCII: Builtin.Int1,
+                               _ _line: Builtin.Word,
+                               _ _executor: Builtin.Executor)
+
 #if _runtime(_ObjC)
 
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
