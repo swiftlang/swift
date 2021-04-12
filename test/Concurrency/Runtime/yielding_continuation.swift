@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
 
 // https://bugs.swift.org/browse/SR-14466
 // UNSUPPORTED: OS=windows-msvc

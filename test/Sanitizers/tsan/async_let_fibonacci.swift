@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
+// UNSUPPORTED: use_os_stdlib
 
 #if canImport(Darwin)
 import Darwin

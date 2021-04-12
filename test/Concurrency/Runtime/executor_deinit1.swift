@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// UNSUPPORTED: use_os_stdlib
 
 // https://bugs.swift.org/browse/SR-14461
 // UNSUPPORTED: linux
