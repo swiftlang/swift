@@ -1247,6 +1247,12 @@ public:
 /// *NOTE* We want this to be a pure abstract class that does not add /any/ size
 /// to subclasses.
 class MultipleValueInstructionResult : public ValueBase {
+  /// Return the parent instruction of this result.
+  MultipleValueInstruction *getParentImpl() const;
+
+  /// Set the index of this result.
+  void setIndex(unsigned NewIndex);
+
 public:
   /// Create a new multiple value instruction result.
   ///
@@ -1257,16 +1263,11 @@ public:
   /// *NOTE* subclassDeltaOffset must be use only 5 bits. This gives us to
   /// support subclasses up to 32 bytes in size. We can scavange up to 6 more
   /// bits from ValueBase if this is not large enough.
-  MultipleValueInstructionResult(ValueKind valueKind, unsigned index,
-                                 SILType type,
+  MultipleValueInstructionResult(unsigned index, SILType type,
                                  ValueOwnershipKind ownershipKind);
 
-  /// Return the parent instruction of this result.
-  MultipleValueInstruction *getParent();
-
-  const MultipleValueInstruction *getParent() const {
-    return const_cast<MultipleValueInstructionResult *>(this)->getParent();
-  }
+  template <class Inst = MultipleValueInstruction>
+  Inst *getParent() const { return cast<Inst>(getParentImpl()); }
 
   unsigned getIndex() const {
     return Bits.MultipleValueInstructionResult.Index;
@@ -1282,22 +1283,37 @@ public:
   /// This is stored in SILNode in the subclass data.
   void setOwnershipKind(ValueOwnershipKind Kind);
 
-  static bool classof(const SILInstruction *) = delete;
+  /// Returns true if this is the token result of a begin_apply.
+  bool isBeginApplyToken() const;
+
+  static bool classof(const SILInstruction *) { return false; }
   static bool classof(const SILUndef *) = delete;
   static bool classof(const SILArgument *) = delete;
   static bool classof(const MultipleValueInstructionResult *) { return true; }
   static bool classof(SILNodePointer node) {
-    // This is an abstract class without anything implementing it right now, so
-    // just return false. This will be fixed in a subsequent commit.
-    SILNodeKind kind = node->getKind();
-    return kind >= SILNodeKind::First_MultipleValueInstructionResult &&
-           kind <= SILNodeKind::Last_MultipleValueInstructionResult;
+    return node->getKind() == SILNodeKind::MultipleValueInstructionResult;
   }
-
-protected:
-  /// Set the index of this result.
-  void setIndex(unsigned NewIndex);
 };
+
+/// Returns \p val as MultipleValueInstructionResult if \p val is a result of
+/// a MultipleValueInstruction \p Inst, or null if this is not the case.
+template <class Inst>
+MultipleValueInstructionResult *isaResultOf(SILValue val) {
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(val)) {
+    if (isa<Inst>(result->getParent()))
+      return result;
+  }
+  return nullptr;
+}
+
+/// Returns \p val as MultipleValueInstructionResult if \p val is a result of
+/// a MultipleValueInstruction \p Inst.
+template <class Inst>
+MultipleValueInstructionResult *getAsResultOf(SILValue val) {
+  auto *result = cast<MultipleValueInstructionResult>(val);
+  assert(result->getParent<Inst>());
+  return result;
+}
 
 template <class Result>
 SILInstructionResultArray::SILInstructionResultArray(ArrayRef<Result> results)
@@ -1350,37 +1366,28 @@ template <typename...> class FinalTrailingObjects;
 /// implementations be initialized before this base class is (and
 /// conversely that this base class be initialized before any of the
 /// succeeding numTrailingObjects implementations are called).
-template <typename Derived, typename DerivedResult,
+template <typename Derived,
           typename Init = InitialTrailingObjects<>,
           typename Final = FinalTrailingObjects<>>
 class MultipleValueInstructionTrailingObjects;
 
-template <typename Derived, typename DerivedResult,
+template <typename Derived,
           typename... InitialOtherTrailingTypes,
           typename... FinalOtherTrailingTypes>
-class MultipleValueInstructionTrailingObjects<Derived, DerivedResult,
+class MultipleValueInstructionTrailingObjects<Derived,
                       InitialTrailingObjects<InitialOtherTrailingTypes...>,
                       FinalTrailingObjects<FinalOtherTrailingTypes...>>
     : protected llvm::TrailingObjects<Derived,
                                       InitialOtherTrailingTypes...,
                                       MultipleValueInstruction *,
-                                      DerivedResult,
+                                      MultipleValueInstructionResult,
                                       FinalOtherTrailingTypes...> {
-  static_assert(std::is_final<DerivedResult>(),
-                "Expected DerivedResult to be final");
-  static_assert(
-      std::is_base_of<MultipleValueInstructionResult, DerivedResult>::value,
-      "Expected DerivedResult to be a subclass of "
-      "MultipleValueInstructionResult");
-  static_assert(sizeof(MultipleValueInstructionResult) == sizeof(DerivedResult),
-                "Expected DerivedResult to be the same size as a "
-                "MultipleValueInstructionResult");
-
 protected:
   using TrailingObjects =
       llvm::TrailingObjects<Derived,
                             InitialOtherTrailingTypes...,
-                            MultipleValueInstruction *, DerivedResult,
+                            MultipleValueInstruction *,
+                            MultipleValueInstructionResult,
                             FinalOtherTrailingTypes...>;
   friend TrailingObjects;
 
@@ -1394,8 +1401,8 @@ protected:
     return 1;
   }
 
-  size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<DerivedResult>) const {
+  size_t numTrailingObjects(typename TrailingObjects::template
+                          OverloadToken<MultipleValueInstructionResult>) const {
     return NumResults;
   }
 
@@ -1416,10 +1423,10 @@ protected:
     *ParentPtr = static_cast<MultipleValueInstruction *>(Parent);
 
     auto *DataPtr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
+        getTrailingObjects<MultipleValueInstructionResult>();
     for (unsigned i : range(NumResults)) {
-      ::new (&DataPtr[i]) DerivedResult(i, Types[i], OwnershipKinds[i],
-                                        std::forward<Args>(OtherArgs)...);
+      ::new (&DataPtr[i]) MultipleValueInstructionResult(i, Types[i],
+                          OwnershipKinds[i], std::forward<Args>(OtherArgs)...);
       assert(DataPtr[i].getParent() == Parent &&
              "Failed to setup parent reference correctly?!");
     }
@@ -1430,8 +1437,8 @@ protected:
     if (!NumResults)
       return;
     auto *DataPtr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
-    // We call the DerivedResult destructors to ensure that:
+        getTrailingObjects<MultipleValueInstructionResult>();
+    // We call the MultipleValueInstructionResult destructors to ensure that:
     //
     // 1. If our derived results have any stored data that need to be cleaned
     // up, we clean them up. *NOTE* Today, no results have this property.
@@ -1439,19 +1446,19 @@ protected:
     // has any uses when it is being destroyed. Rather than re-implement that in
     // result, we get that for free.
     for (unsigned i : range(NumResults))
-      DataPtr[i].~DerivedResult();
+      DataPtr[i].~MultipleValueInstructionResult();
   }
 
 public:
-  ArrayRef<DerivedResult> getAllResultsBuffer() const {
+  ArrayRef<MultipleValueInstructionResult> getAllResultsBuffer() const {
     auto *ptr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
+        getTrailingObjects<MultipleValueInstructionResult>();
     return { ptr, NumResults };
   }
 
-  MutableArrayRef<DerivedResult> getAllResultsBuffer() {
+  MutableArrayRef<MultipleValueInstructionResult> getAllResultsBuffer() {
     auto *ptr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
+        getTrailingObjects<MultipleValueInstructionResult>();
     return { ptr, NumResults };
   }
 
@@ -2646,28 +2653,6 @@ public:
   }
 };
 
-class BeginApplyInst;
-class BeginApplyResult final : public MultipleValueInstructionResult {
-public:
-  BeginApplyResult(unsigned index, SILType type,
-                   ValueOwnershipKind ownershipKind)
-      : MultipleValueInstructionResult(ValueKind::BeginApplyResult,
-                                       index, type, ownershipKind) {}
-
-  BeginApplyInst *getParent(); // inline below
-  const BeginApplyInst *getParent() const {
-    return const_cast<BeginApplyResult *>(this)->getParent();
-  }
-
-  /// Is this result the token result of the begin_apply, which abstracts
-  /// over the implicit coroutine state?
-  bool isTokenResult() const; // inline below
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::BeginApplyResult;
-  }
-};
-
 class EndApplyInst;
 class AbortApplyInst;
 
@@ -2678,7 +2663,7 @@ class BeginApplyInst final
                              ApplyInstBase<BeginApplyInst,
                                            MultipleValueInstruction>>,
       public MultipleValueInstructionTrailingObjects<
-          BeginApplyInst, BeginApplyResult,
+          BeginApplyInst,
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
           InitialTrailingObjects<Operand>> {
@@ -2712,8 +2697,9 @@ class BeginApplyInst final
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
-  SILValue getTokenResult() const {
-    return &getAllResultsBuffer().back();
+  MultipleValueInstructionResult *getTokenResult() const {
+    return const_cast<MultipleValueInstructionResult *>(
+             &getAllResultsBuffer().back());
   }
 
   SILInstructionResultArray getYieldedValues() const {
@@ -2728,14 +2714,6 @@ public:
                              SmallVectorImpl<Operand *> &abortApplyInsts) const;
 };
 
-inline BeginApplyInst *BeginApplyResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<BeginApplyInst>(Parent);
-}
-inline bool BeginApplyResult::isTokenResult() const {
-  return getIndex() == getParent()->getNumResults() - 1;
-}
-
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
 class AbortApplyInst
     : public UnaryInstructionBase<SILInstructionKind::AbortApplyInst,
@@ -2744,13 +2722,17 @@ class AbortApplyInst
 
   AbortApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
       : UnaryInstructionBase(debugLoc, beginApplyToken) {
-    assert(isa<BeginApplyResult>(beginApplyToken) &&
-           cast<BeginApplyResult>(beginApplyToken)->isTokenResult());
+    assert(isaResultOf<BeginApplyInst>(beginApplyToken) &&
+           isaResultOf<BeginApplyInst>(beginApplyToken)->isBeginApplyToken());
   }
 
 public:
+  MultipleValueInstructionResult *getToken() const {
+    return getAsResultOf<BeginApplyInst>(getOperand());
+  }
+
   BeginApplyInst *getBeginApply() const {
-    return cast<BeginApplyResult>(getOperand())->getParent();
+    return getToken()->getParent<BeginApplyInst>();
   }
 };
 
@@ -2763,13 +2745,17 @@ class EndApplyInst
 
   EndApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
       : UnaryInstructionBase(debugLoc, beginApplyToken) {
-    assert(isa<BeginApplyResult>(beginApplyToken) &&
-           cast<BeginApplyResult>(beginApplyToken)->isTokenResult());
+    assert(isaResultOf<BeginApplyInst>(beginApplyToken) &&
+           isaResultOf<BeginApplyInst>(beginApplyToken)->isBeginApplyToken());
   }
 
 public:
+  MultipleValueInstructionResult *getToken() const {
+    return getAsResultOf<BeginApplyInst>(getOperand());
+  }
+
   BeginApplyInst *getBeginApply() const {
-    return cast<BeginApplyResult>(getOperand())->getParent();
+    return getToken()->getParent<BeginApplyInst>();
   }
 };
 
@@ -7186,27 +7172,6 @@ class IsUniqueInst
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
 
-class BeginCOWMutationInst;
-
-/// A result for the begin_cow_mutation instruction. See documentation for
-/// begin_cow_mutation for more information.
-class BeginCOWMutationResult final : public MultipleValueInstructionResult {
-public:
-  BeginCOWMutationResult(unsigned index, SILType type,
-                         ValueOwnershipKind ownershipKind)
-      : MultipleValueInstructionResult(ValueKind::BeginCOWMutationResult,
-                                       index, type, ownershipKind) {}
-
-  BeginCOWMutationInst *getParent(); // inline below
-  const BeginCOWMutationInst *getParent() const {
-    return const_cast<BeginCOWMutationResult *>(this)->getParent();
-  }
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::BeginCOWMutationResult;
-  }
-};
-
 /// Performs a uniqueness check of the operand for the purpose of modifying
 /// a copy-on-write object.
 ///
@@ -7216,8 +7181,7 @@ public:
 class BeginCOWMutationInst final
     : public UnaryInstructionBase<SILInstructionKind::BeginCOWMutationInst,
                                   MultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<
-          BeginCOWMutationInst, BeginCOWMutationResult>
+      public MultipleValueInstructionTrailingObjects<BeginCOWMutationInst>
 {
   friend SILBuilder;
   friend TrailingObjects;
@@ -7252,12 +7216,6 @@ public:
     SILNode::Bits.BeginCOWMutationInst.Native = native;
   }
 };
-
-// Out of line to work around forward declaration issues.
-inline BeginCOWMutationInst *BeginCOWMutationResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<BeginCOWMutationInst>(Parent);
-}
 
 /// Marks the end of the mutation of a reference counted object.
 class EndCOWMutationInst
@@ -9270,32 +9228,12 @@ public:
   }
 };
 
-/// A result for the destructure_struct instruction. See documentation for
-/// destructure_struct for more information.
-class DestructureStructResult final : public MultipleValueInstructionResult {
-public:
-  DestructureStructResult(unsigned Index, SILType Type,
-                          ValueOwnershipKind OwnershipKind)
-      : MultipleValueInstructionResult(ValueKind::DestructureStructResult,
-                                       Index, Type, OwnershipKind) {}
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::DestructureStructResult;
-  }
-
-  DestructureStructInst *getParent();
-  const DestructureStructInst *getParent() const {
-    return const_cast<DestructureStructResult *>(this)->getParent();
-  }
-};
-
 /// Instruction that takes in a struct value and splits the struct into the
 /// struct's fields.
 class DestructureStructInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureStructInst,
                                   OwnershipForwardingMultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<DestructureStructInst,
-                                                     DestructureStructResult> {
+      public MultipleValueInstructionTrailingObjects<DestructureStructInst> {
   friend TrailingObjects;
 
   DestructureStructInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
@@ -9314,38 +9252,12 @@ public:
   }
 };
 
-// Out of line to work around forward declaration issues.
-inline DestructureStructInst *DestructureStructResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<DestructureStructInst>(Parent);
-}
-
-/// A result for the destructure_tuple instruction. See documentation for
-/// destructure_tuple for more information.
-class DestructureTupleResult final : public MultipleValueInstructionResult {
-public:
-  DestructureTupleResult(unsigned Index, SILType Type,
-                         ValueOwnershipKind OwnershipKind)
-      : MultipleValueInstructionResult(ValueKind::DestructureTupleResult, Index,
-                                       Type, OwnershipKind) {}
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::DestructureTupleResult;
-  }
-
-  DestructureTupleInst *getParent();
-  const DestructureTupleInst *getParent() const {
-    return const_cast<DestructureTupleResult *>(this)->getParent();
-  }
-};
-
 /// Instruction that takes in a tuple value and splits the tuple into the
 /// tuples's elements.
 class DestructureTupleInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureTupleInst,
                                   OwnershipForwardingMultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<DestructureTupleInst,
-                                                     DestructureTupleResult> {
+      public MultipleValueInstructionTrailingObjects<DestructureTupleInst> {
   friend TrailingObjects;
 
   DestructureTupleInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
@@ -9363,12 +9275,6 @@ public:
     return node->getKind() == SILNodeKind::DestructureTupleInst;
   }
 };
-
-// Out of line to work around forward declaration issues.
-inline DestructureTupleInst *DestructureTupleResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<DestructureTupleInst>(Parent);
-}
 
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.
@@ -9468,6 +9374,11 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
     return result;
   return nullptr;
 }
+
+inline bool MultipleValueInstructionResult::isBeginApplyToken() const {
+  return getParent<BeginApplyInst>()->getTokenResult() == this;
+}
+
 
 } // end swift namespace
 

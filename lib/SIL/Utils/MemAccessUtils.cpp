@@ -486,7 +486,8 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     value = base;
     break;
   case Yield:
-    assert(isa<BeginApplyResult>(base));
+    assert(isa<BeginApplyInst>(
+             cast<MultipleValueInstructionResult>(base)->getParent()));
     value = base;
     break;
   case Unidentified:

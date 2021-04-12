@@ -1042,9 +1042,7 @@ public:
       printSILUndef(cast<SILUndef>(node));
       return;
 
-#define MULTIPLE_VALUE_INST_RESULT(ID, PARENT) \
-    case SILNodeKind::ID:
-#include "swift/SIL/SILNodes.def"
+    case SILNodeKind::MultipleValueInstructionResult:
       printSILMultipleValueInstructionResult(
           cast<MultipleValueInstructionResult>(node));
       return;
