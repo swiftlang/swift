@@ -172,15 +172,32 @@ void Symbol::serializeRange(size_t InitialIndentation,
   });
 }
 
-void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
-  if (Graph->Walker.Options.SkipInheritedDocs && SynthesizedBaseTypeDecl) {
-    return;
-  }
+const ValueDecl *Symbol::getDeclInheritingDocs() const {
+  // get the decl that would provide docs for this symbol
   const auto *DocCommentProvidingDecl =
-      dyn_cast_or_null<ValueDecl>(
-          getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
-  if (!DocCommentProvidingDecl) {
-    DocCommentProvidingDecl = VD;
+    dyn_cast_or_null<ValueDecl>(
+      getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
+  
+  // if the decl is the same as the one for this symbol, we're not
+  // inheriting docs, so return null.
+  if (DocCommentProvidingDecl == VD) {
+    return nullptr;
+  } else {
+    // otherwise, return whatever `getDocCommentProvidingDecl` returned.
+    // it will be null if there are no decls that provide docs for this
+    // symbol.
+    return DocCommentProvidingDecl;
+  }
+}
+
+void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+  const auto *DocCommentProvidingDecl = VD;
+  if (!Graph->Walker.Options.SkipInheritedDocs) {
+    DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
+      getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
+    if (!DocCommentProvidingDecl) {
+      DocCommentProvidingDecl = VD;
+    }
   }
   auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
   if (RC.isEmpty()) {
