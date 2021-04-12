@@ -246,6 +246,12 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
+  using DeclAndAttr = std::tuple<ValueDecl *, DeclAttribute *>;
+
+  /// List of attributes added by access notes, used to emit remarks for valid
+  /// ones.
+  std::vector<DeclAndAttr> AttrsAddedByAccessNotes;
+
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.
   const SourceFileKind Kind;

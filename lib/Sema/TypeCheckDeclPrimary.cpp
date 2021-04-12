@@ -1450,14 +1450,10 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
     attr->setAddedByAccessNote();
     VD->getAttrs().add(attr);
 
-    SmallString<64> attrString;
-    llvm::raw_svector_ostream os(attrString);
-    attr->print(os, VD);
-
-    diagnoseChangeByAccessNote(diag::attr_added_by_access_note,
-                               diag::fixit_attr_added_by_access_note)
-      .fixItInsert(VD->getAttributeInsertionLoc(attr->isDeclModifier()),
-                   attrString);
+    // Arrange for us to emit a remark about this attribute after type checking
+    // has ensured it's valid.
+    if (auto SF = VD->getDeclContext()->getParentSourceFile())
+      SF->AttrsAddedByAccessNotes.emplace_back(VD, attr);
   } else {
     VD->getAttrs().removeAttribute(attr);
     diagnoseChangeByAccessNote(diag::attr_removed_by_access_note,
@@ -1516,6 +1512,29 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
 void TypeChecker::applyAccessNote(ValueDecl *VD) {
   (void)evaluateOrDefault(VD->getASTContext().evaluator,
                           ApplyAccessNoteRequest{VD}, {});
+}
+
+void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
+  for (auto declAndAttr : SF.AttrsAddedByAccessNotes) {
+    auto VD = std::get<0>(declAndAttr);
+    auto attr = std::get<1>(declAndAttr);
+
+    if (attr->isInvalid()) continue;
+    assert(attr->getAddedByAccessNote());
+
+    bool isModifier = attr->isDeclModifier();
+
+    auto reason = VD->getModuleContext()->getAccessNotes().Reason;
+    VD->diagnose(diag::attr_added_by_access_note, reason, isModifier,
+                 attr->getAttrName(), VD->getDescriptiveKind());
+//    VD->getModuleContext()->getAccessNotes().noteReason(VD);
+
+    SmallString<64> attrString;
+    llvm::raw_svector_ostream os(attrString);
+    attr->print(os, VD);
+    VD->diagnose(diag::fixit_attr_added_by_access_note, isModifier)
+        .fixItInsert(VD->getAttributeInsertionLoc(isModifier), attrString);
+  }
 }
 
 evaluator::SideEffect
@@ -2680,8 +2699,8 @@ public:
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
       Optional<ForeignAsyncConvention> asyncConvention;
       Optional<ForeignErrorConvention> errorConvention;
-      if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                asyncConvention, errorConvention)) {
+      ObjCReason reason(ObjCReason::ExplicitlyCDecl, CDeclAttr);
+      if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
@@ -2691,6 +2710,8 @@ public:
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
                                          diag::cdecl_throws);
         }
+      } else {
+        reason.setAttrInvalid();
       }
     }
   }

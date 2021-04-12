@@ -124,6 +124,11 @@ static void describeObjCReason(const ValueDecl *VD, ObjCReason Reason) {
   }
 }
 
+void ObjCReason::setAttrInvalid() const {
+  if (requiresAttr(kind))
+    getAttr()->setInvalid();
+}
+
 static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                                Type T,
                                                SourceRange TypeRange,
@@ -588,49 +593,61 @@ bool swift::isRepresentableInObjC(
     // Accessors can only be @objc if the storage declaration is.
     // Global computed properties may however @_cdecl their accessors.
     auto storage = accessor->getStorage();
-    if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
-        Reason != ObjCReason::WitnessToObjC &&
-        Reason != ObjCReason::MemberOfObjCProtocol) {
-      if (accessor->isGetter()) {
+    bool storageIsObjC = storage->isObjC()
+        || Reason == ObjCReason::ExplicitlyCDecl
+        || Reason == ObjCReason::WitnessToObjC
+        || Reason == ObjCReason::MemberOfObjCProtocol;
+
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet: {
+      // willSet/didSet implementations are never exposed to objc, they are
+      // always directly dispatched from the synthesized setter.
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_observing_accessor)
+          .limitBehavior(behavior);
+      describeObjCReason(accessor, Reason);
+      return false;
+    }
+
+    case AccessorKind::Get:
+      if (!storageIsObjC) {
         auto error = isa<VarDecl>(storage)
                        ? diag::objc_getter_for_nonobjc_property
                        : diag::objc_getter_for_nonobjc_subscript;
 
-        accessor->diagnose(error).limitBehavior(behavior);
+        diagnoseAndRemoveAttr(accessor, Reason.getAttr(), error)
+            .limitBehavior(behavior);
         describeObjCReason(accessor, Reason);
-      } else if (accessor->isSetter()) {
+        return false;
+      }
+      return true;
+
+    case AccessorKind::Set:
+      if (!storageIsObjC) {
         auto error = isa<VarDecl>(storage)
                        ? diag::objc_setter_for_nonobjc_property
                        : diag::objc_setter_for_nonobjc_subscript;
 
-        accessor->diagnose(error).limitBehavior(behavior);
+        diagnoseAndRemoveAttr(accessor, Reason.getAttr(), error)
+            .limitBehavior(behavior);
         describeObjCReason(accessor, Reason);
+        return false;
       }
-      return false;
-    }
-
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::DidSet:
-    case AccessorKind::WillSet:
-      // willSet/didSet implementations are never exposed to objc, they are
-      // always directly dispatched from the synthesized setter.
-      accessor->diagnose(diag::objc_observing_accessor).limitBehavior(behavior);
-      describeObjCReason(accessor, Reason);
-      return false;
-
-    case AccessorKind::Get:
-    case AccessorKind::Set:
       return true;
 
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
-      accessor->diagnose(diag::objc_addressor).limitBehavior(behavior);
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(), diag::objc_addressor)
+          .limitBehavior(behavior);
       describeObjCReason(accessor, Reason);
       return false;
 
     case AccessorKind::Read:
     case AccessorKind::Modify:
-      accessor->diagnose(diag::objc_coroutine_accessor).limitBehavior(behavior);
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_coroutine_accessor)
+          .limitBehavior(behavior);
       describeObjCReason(accessor, Reason);
       return false;
     }
@@ -1145,9 +1162,9 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
 
 ObjCReason swift::objCReasonForObjCAttr(const ObjCAttr *attr) {
   if (attr->getAddedByAccessNote())
-    return ObjCReason::ExplicitlyObjCByAccessNote;
+    return ObjCReason(ObjCReason::ExplicitlyObjCByAccessNote, attr);
 
-  return ObjCReason::ExplicitlyObjC;
+  return ObjCReason(ObjCReason::ExplicitlyObjC, attr);
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has
@@ -1325,18 +1342,22 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   //
   // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
   // (where they warn on failure) and loudly in Swift 4 (error on failure).
-  if (VD->getAttrs().hasAttribute<IBOutletAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBOutlet);
-  if (VD->getAttrs().hasAttribute<IBActionAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBAction);
-  if (VD->getAttrs().hasAttribute<IBSegueActionAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBSegueAction);
-  if (VD->getAttrs().hasAttribute<IBInspectableAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBInspectable);
-  if (VD->getAttrs().hasAttribute<GKInspectableAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyGKInspectable);
-  if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyNSManaged);
+  if (auto attr = VD->getAttrs().getAttribute<IBOutletAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBOutlet, attr);
+  if (auto attr = VD->getAttrs().getAttribute<IBActionAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBAction, attr);
+  if (auto attr = VD->getAttrs().getAttribute<IBSegueActionAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBSegueAction, attr);
+  if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBInspectable, attr);
+  if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyGKInspectable, attr);
+  if (auto attr = VD->getAttrs().getAttribute<NSManagedAttr>()) {
+    // Make sure the implicit DynamicAttr gets added before we potentially
+    // disable this attribute.
+    (void) VD->isDynamic();
+    return ObjCReason(ObjCReason::ExplicitlyNSManaged, attr);
+  }
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol) {
     if (!VD->isProtocolRequirement())
@@ -1389,7 +1410,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
                       "@objc ");
       }
 
-      return ObjCReason(ObjCReason::ExplicitlyDynamic);
+      return ObjCReason(ObjCReason::ExplicitlyDynamic, attr);
     }
   }
 
@@ -1584,17 +1605,23 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   Optional<ForeignAsyncConvention> asyncConvention;
   Optional<ForeignErrorConvention> errorConvention;
   if (auto var = dyn_cast<VarDecl>(VD)) {
-    if (!isRepresentableInObjC(var, *isObjC))
+    if (!isRepresentableInObjC(var, *isObjC)) {
+      isObjC->setAttrInvalid();
       return false;
+    }
   } else if (auto subscript = dyn_cast<SubscriptDecl>(VD)) {
-    if (!isRepresentableInObjC(subscript, *isObjC))
+    if (!isRepresentableInObjC(subscript, *isObjC)) {
+      isObjC->setAttrInvalid();
       return false;
+    }
   } else if (isa<DestructorDecl>(VD)) {
     // Destructors need no additional checking.
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (!isRepresentableInObjC(
-            func, *isObjC, asyncConvention, errorConvention))
+            func, *isObjC, asyncConvention, errorConvention)) {
+      isObjC->setAttrInvalid();
       return false;
+    }
   }
 
   // Note that this declaration is exposed to Objective-C.

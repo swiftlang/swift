@@ -17,6 +17,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "CodeSynthesis.h"
@@ -335,6 +336,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
+    diagnoseAttrsAddedByAccessNote(SF);
     return;
   case SourceFileKind::SIL:
   case SourceFileKind::Interface:
