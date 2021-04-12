@@ -5131,14 +5131,36 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
            (nominal1->isDoubleType() || nominal2->isDoubleType()))) {
+        ConstraintLocatorBuilder location{locator};
+        // Look through all value-to-optional promotions to allow
+        // conversions like Double -> CGFloat?? and vice versa.
+        if (auto last = location.last()) {
+          // T -> Optional<T>
+          if (last->is<LocatorPathElt::OptionalPayload>()) {
+            SmallVector<LocatorPathElt, 4> path;
+            auto anchor = location.getLocatorParts(path);
+
+            // Drop all of the applied `value-to-optional` promotions.
+            path.erase(llvm::remove_if(
+                           path,
+                           [](const LocatorPathElt &elt) {
+                             return elt.is<LocatorPathElt::OptionalPayload>();
+                           }),
+                       path.end());
+
+            location = getConstraintLocator(anchor, path);
+          }
+        }
+
         // Support implicit Double<->CGFloat conversions only for
         // something which could be directly represented in the AST
         // e.g. argument-to-parameter, contextual conversions etc.
-        if (!locator.trySimplifyToExpr())
+        if (!location.trySimplifyToExpr()) {
           return getTypeMatchFailure(locator);
+        }
 
         SmallVector<LocatorPathElt, 4> path;
-        auto anchor = locator.getLocatorParts(path);
+        auto anchor = location.getLocatorParts(path);
 
         // Try implicit CGFloat conversion only if:
         // - This is not:
