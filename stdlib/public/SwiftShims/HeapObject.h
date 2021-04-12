@@ -35,6 +35,13 @@ typedef struct HeapMetadata HeapMetadata;
 typedef struct HeapObject HeapObject;
 #endif
 
+#if !defined(__swift__) && __has_feature(ptrauth_calls)
+#include <ptrauth.h>
+#endif
+#ifndef __ptrauth_objc_isa_pointer
+#define __ptrauth_objc_isa_pointer
+#endif
+
 // The members of the HeapObject header that are not shared by a
 // standard Objective-C instance
 #define SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS       \
@@ -44,7 +51,7 @@ typedef struct HeapObject HeapObject;
 /// This must match RefCountedStructTy in IRGen.
 struct HeapObject {
   /// This is always a valid pointer to a metadata object.
-  HeapMetadata const *metadata;
+  HeapMetadata const *__ptrauth_objc_isa_pointer metadata;
 
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 
