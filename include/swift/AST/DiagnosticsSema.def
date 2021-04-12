@@ -5878,5 +5878,10 @@ REMARK(attr_objc_name_conflicts_with_access_note, none,
        "source code specifies %3; the access note will be ignored",
        (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
 
+// Used on invalid @objc diagnostics
+NOTE(note_invalid_attr_added_by_access_note, none,
+     "%select{attribute|modifier}0 '%1' was added by access note for %2",
+     (bool, StringRef, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

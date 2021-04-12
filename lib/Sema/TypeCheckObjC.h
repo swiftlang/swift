@@ -159,6 +159,10 @@ public:
   }
 
   void setAttrInvalid() const;
+
+  /// Emit an additional diagnostic describing why we are applying @objc to the
+  /// decl, if this is not obvious from the decl itself.
+  void describe(const Decl *VD) const;
 };
 
 /// Determine how to diagnose conflicts due to inferring @objc with this

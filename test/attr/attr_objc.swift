@@ -274,13 +274,13 @@ enum subject_enum: Int {
   @objc(subject_enumElement3) // bad-access-note-move{{subject_enum.subject_enumElement3}} expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-31=}}
   case subject_enumElement3, subject_enumElement4
   // Becuase of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
-  // expected-remark@-2 * {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}
+  // expected-remark@-2 * {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}} expected-note@-2 *{{attribute 'objc' was added by access note for fancy tests}}
 
   // Fake for access notes: @objc // bad-access-note-move@+2{{subject_enum.subject_enumElement6}}
   @objc // bad-access-note-move{{subject_enum.subject_enumElement5}} expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
   // Becuase of the fake access-note-move above, we expect to see extra diagnostics when we run this test with both explicit @objc attributes *and* access notes:
-  // expected-remark@-2 * {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}}
+  // expected-remark@-2 * {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} expected-note@-2 *{{attribute 'objc' was added by access note for fancy tests}}
 
   @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
   case subject_enumElement7
@@ -596,7 +596,7 @@ class subject_subscriptGeneric<T> {
 }
 
 class subject_subscriptInvalid1 {
-  @objc // access-note-move{{subject_subscriptInvalid1.subscript(_:)}}
+  @objc // bad-access-note-move{{subject_subscriptInvalid1.subscript(_:)}}
   class subscript(_ i: Int) -> AnyObject? { // access-note-adjust expected-error {{class subscript cannot be marked @objc}}
     return nil
   }
@@ -869,6 +869,7 @@ class infer_instanceFunc1 {
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // access-note-adjust expected-error@-3 {{method cannot be marked @objc because the type of the parameter 2 cannot be represented in Objective-C}}
   // expected-note@-4 {{non-'@objc' enums cannot be represented in Objective-C}}
+  // Produces an extra: expected-note@-5 * {{attribute 'objc' was added by access note for fancy tests}}
 
   @objc // access-note-move{{infer_instanceFunc1.func_UnnamedParam1(_:)}}
   func func_UnnamedParam1(_: Int) {} // no-error
@@ -1835,8 +1836,7 @@ protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
 
 class C {
   // Don't crash.
-  @objc // bad-access-note-move{{C.foo(x:)}}
-  func foo(x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
+  @objc func foo(x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
   @IBAction func myAction(sender: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
   @IBSegueAction func myAction(coder: Undeclared, sender: Undeclared) -> Undeclared {fatalError()} // expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}}
 }
