@@ -35,8 +35,6 @@
 using namespace swift;
 using namespace Lowering;
 
-STATISTIC(NumSlabsAllocated, "number of slabs allocated in SILModule");
-
 class SILModule::SerializationCallback final
     : public DeserializationNotificationHandler {
   void didDeserialize(ModuleDecl *M, SILFunction *fn) override {
@@ -118,10 +116,6 @@ SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
 SILModule::~SILModule() {
 #ifndef NDEBUG
   checkForLeaks();
-
-  NumSlabsAllocated += numAllocatedSlabs;
-  assert(numAllocatedSlabs == freeSlabs.size() && "leaking slabs in SILModule");
-  freeSlabs.clearAndLeakNodesUnsafely();
 #endif
 
   // Decrement ref count for each SILGlobalVariable with static initializers.
@@ -201,26 +195,6 @@ void *SILModule::allocate(unsigned Size, unsigned Align) const {
     return AlignedAlloc(Size, Align);
 
   return BPA.Allocate(Size, Align);
-}
-
-FixedSizeSlab *SILModule::allocSlab() {
-  if (freeSlabs.empty()) {
-    numAllocatedSlabs++;
-    return new (*this) FixedSizeSlab();
-  }
-
-  FixedSizeSlab *slab = &*freeSlabs.rbegin();
-  freeSlabs.remove(slab);
-  return slab;
-}
-
-void SILModule::freeSlab(FixedSizeSlab *slab) {
-  freeSlabs.push_back(slab);
-  assert(slab->overflowGuard == FixedSizeSlab::magicNumber);
-}
-
-void SILModule::freeAllSlabs(SlabList &slabs) {
-  freeSlabs.splice(freeSlabs.end(), slabs);
 }
 
 void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
