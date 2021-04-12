@@ -135,6 +135,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
+  result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
 
   // We should print __consuming, __owned, etc for the module interface file.
