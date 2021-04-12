@@ -915,6 +915,7 @@ static bool checkObjCDeclContext(Decl *D) {
 }
 
 static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
+                                              ObjCReason reason,
                                               DiagnosticBehavior behavior) {
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
@@ -949,6 +950,7 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
                      ctx.Id_Foundation)
     .highlight(attr->getRangeWithAt())
     .limitBehavior(behavior);
+  reason.describe(decl);
 }
 
 void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
@@ -991,6 +993,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
 
   if (error) {
     diagnoseAndRemoveAttr(attr, *error).limitBehavior(behavior);
+    reason.describe(D);
     return;
   }
 
@@ -1078,10 +1081,11 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     // Enum elements require names.
     diagnoseAndRemoveAttr(attr, diag::objc_enum_case_req_name)
         .limitBehavior(behavior);
+    reason.describe(D);
   }
 
   // Diagnose an @objc attribute used without importing Foundation.
-  diagnoseObjCAttrWithoutFoundation(attr, D, behavior);
+  diagnoseObjCAttrWithoutFoundation(attr, D, reason, behavior);
 }
 
 void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
@@ -1190,6 +1194,12 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr)
           .limitBehavior(behavior);
+
+    if (attr->getAddedByAccessNote()) {
+      auto notesFileReason = D->getModuleContext()->getAccessNotes().Reason;
+      D->diagnose(diag::note_invalid_attr_added_by_access_note,
+                  attr->isDeclModifier(), attr->getAttrName(), notesFileReason);
+    }
   }
   Checker.checkOriginalDefinedInAttrs(D, ODIAttrs);
 }

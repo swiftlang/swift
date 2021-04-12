@@ -126,7 +126,10 @@ def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset, acces
 
     replacement = u"// access-note-adjust" + offsetify(offset) + u" [attr moved] "
 
-    if not is_bad:
+    if is_bad:
+        replacement += u"expected-note{{attribute 'objc' was added by access note " + \
+                       u"for fancy tests}}"
+    else:
         replacement += u"expected-remark{{access note for fancy tests adds attribute " + \
                        u"'objc' to this }} expected-note{{add attribute explicitly to " + \
                        u"silence this warning}}"
