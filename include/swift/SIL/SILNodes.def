@@ -411,12 +411,7 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
   ARGUMENT(SILFunctionArgument, SILArgument)
   ARGUMENT_RANGE(SILArgument, SILPhiArgument, SILFunctionArgument)
 
-ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
-  MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
-  MULTIPLE_VALUE_INST_RESULT(BeginCOWMutationResult, MultipleValueInstructionResult)
-  MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
-  MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
-  VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, DestructureTupleResult)
+VALUE(MultipleValueInstructionResult, ValueBase)
 
 VALUE(SILUndef, ValueBase)
 

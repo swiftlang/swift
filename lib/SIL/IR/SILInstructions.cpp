@@ -495,8 +495,8 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
                                substCalleeType, subs);
   void *buffer =
-    allocateTrailingInst<BeginApplyInst, Operand,
-                         MultipleValueInstruction*, BeginApplyResult>(
+    allocateTrailingInst<BeginApplyInst, Operand, MultipleValueInstruction*,
+                         MultipleValueInstructionResult>(
       F, getNumAllOperands(args, typeDependentOperands),
       1, resultTypes.size());
   return ::new(buffer) BeginApplyInst(loc, callee, substCalleeSILType,
@@ -2125,8 +2125,8 @@ BeginCOWMutationInst::create(SILDebugLocation loc, SILValue operand,
                                       OwnershipKind::Owned};
 
   void *buffer =
-    allocateTrailingInst<BeginCOWMutationInst,
-                         MultipleValueInstruction*, BeginCOWMutationResult>(
+    allocateTrailingInst<BeginCOWMutationInst, MultipleValueInstruction*,
+                         MultipleValueInstructionResult>(
       F, 1, 2);
   return ::new(buffer) BeginCOWMutationInst(loc, operand,
                                   ArrayRef<SILType>(resultTypes, 2),
@@ -2807,7 +2807,7 @@ DestructureStructInst::create(const SILFunction &F, SILDebugLocation Loc,
 
   unsigned NumElts = Types.size();
   unsigned Size =
-      totalSizeToAlloc<MultipleValueInstruction *, DestructureStructResult>(
+    totalSizeToAlloc<MultipleValueInstruction *, MultipleValueInstructionResult>(
           1, NumElts);
 
   void *Buffer = M.allocateInst(Size, alignof(DestructureStructInst));
@@ -2834,7 +2834,7 @@ DestructureTupleInst::create(const SILFunction &F, SILDebugLocation Loc,
   // We add 1 since we store an offset to our
   unsigned NumElts = Types.size();
   unsigned Size =
-      totalSizeToAlloc<MultipleValueInstruction *, DestructureTupleResult>(
+    totalSizeToAlloc<MultipleValueInstruction *, MultipleValueInstructionResult>(
           1, NumElts);
 
   void *Buffer = M.allocateInst(Size, alignof(DestructureTupleInst));

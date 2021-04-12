@@ -138,7 +138,7 @@ private:
   bool checkValueWithoutLifetimeEndingUses(ArrayRef<Operand *> regularUsers);
 
   bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *arg);
-  bool checkYieldWithoutLifetimeEndingUses(BeginApplyResult *yield,
+  bool checkYieldWithoutLifetimeEndingUses(MultipleValueInstructionResult *yield,
                                            ArrayRef<Operand *> regularUsers);
 
   bool isGuaranteedFunctionArgWithLifetimeEndingUses(
@@ -487,7 +487,7 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
 }
 
 bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
-    BeginApplyResult *yield, ArrayRef<Operand *> regularUses) {
+    MultipleValueInstructionResult *yield, ArrayRef<Operand *> regularUses) {
   switch (yield->getOwnershipKind()) {
   case OwnershipKind::Any:
     llvm_unreachable("value with any ownership kind?!");
@@ -515,7 +515,8 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
   // If we have a guaranteed value, make sure that all uses are before our
   // end_yield.
   SmallVector<Operand *, 4> coroutineEndUses;
-  for (auto *use : yield->getParent()->getTokenResult()->getUses()) {
+  for (auto *use : yield->getParent<BeginApplyInst>()->
+                     getTokenResult()->getUses()) {
     coroutineEndUses.push_back(use);
   }
 
@@ -545,7 +546,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses(
     }
   }
 
-  if (auto *yield = dyn_cast<BeginApplyResult>(value)) {
+  if (auto *yield = isaResultOf<BeginApplyInst>(value)) {
     return checkYieldWithoutLifetimeEndingUses(yield, regularUses);
   }
 
