@@ -13,7 +13,6 @@
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 
 using namespace swift;
@@ -177,11 +176,11 @@ bool ValueLifetimeAnalysis::computeFrontier(FrontierImpl &frontier, Mode mode,
 
   // Exit-blocks from the lifetime region. The value is live at the end of
   // a predecessor block but not in the frontier block itself.
-  BasicBlockSetVector frontierBlocks(getFunction());
+  BasicBlockSetVector<16> frontierBlocks(getFunction());
 
   // Blocks where the value is live at the end of the block and which have
   // a frontier block as successor.
-  BasicBlockSetVector liveOutBlocks(getFunction());
+  BasicBlockSetVector<16> liveOutBlocks(getFunction());
 
   auto visitBlock = [&](SILBasicBlock *bb) {
     return !deBlocks || !deBlocks->isDeadEnd(bb);
