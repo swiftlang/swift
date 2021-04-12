@@ -13,6 +13,8 @@
 // rdar://75365575 (Failing to start atos external symbolizer)
 // UNSUPPORTED: OS=watchos
 
+// REQUIRES: rdar76542113
+
 var globalCounterValue = 0
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
