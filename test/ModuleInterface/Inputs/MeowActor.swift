@@ -4,7 +4,7 @@
   
   public actor _Impl {
     @actorIndependent
-    public func enqueue(partialTask: PartialAsyncTask) {
+    public func enqueue(_ job: UnownedJob) {
       // DOES NOTHING! :)
     }
   }

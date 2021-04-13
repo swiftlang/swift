@@ -120,6 +120,24 @@ bool LowerHopToActor::processExtract(ExtractExecutorInst *extract) {
   return true;
 }
 
+static bool isDefaultActorType(CanType actorType, ModuleDecl *M,
+                               ResilienceExpansion expansion) {
+  if (auto cls = actorType.getClassOrBoundGenericClass())
+    return cls->isDefaultActor(M, expansion);
+  return false;
+}
+
+static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
+                                              ProtocolDecl *actorProtocol) {
+  for (auto member: actorProtocol->getAllMembers()) {
+    if (auto var = dyn_cast<VarDecl>(member)) {
+      if (var->getName() == ctx.Id_unownedExecutor)
+        return var->getAccessor(AccessorKind::Get);
+    }
+  }
+  return nullptr;
+}
+
 SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor) {
   // Get the dominating executor value for this actor, if available,
   // or else emit code to derive it.
@@ -132,17 +150,48 @@ SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor) {
   CanType actorType = actor->getType().getASTType();
 
   auto &ctx = F->getASTContext();
-  auto builtinName = ctx.getIdentifier(
-    getBuiltinName(BuiltinValueKind::BuildSerialExecutorRef));
-  auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
   auto resultType = SILType::getPrimitiveObjectType(ctx.TheExecutorType);
-  auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
-                                   {actorType}, {});
 
-  // Use builSerialExecutorRef to cast the actor to Builtin.Executor.
-  // TODO: use the Executor protocol
-  auto unmarkedExecutor =
-    B.createBuiltin(loc, builtinName, resultType, subs, {actor});
+  // If the actor type is a default actor, go ahead and devirtualize here.
+  auto module = F->getModule().getSwiftModule();
+  SILValue unmarkedExecutor;
+  if (isDefaultActorType(actorType, module, F->getResilienceExpansion())) {
+    auto builtinName = ctx.getIdentifier(
+      getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
+    auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
+    auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                                     {actorType}, {});
+    unmarkedExecutor =
+      B.createBuiltin(loc, builtinName, resultType, subs, {actor});
+
+  // Otherwise, go through Actor.unownedExecutor.
+  } else {
+    auto actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+    auto req = getUnownedExecutorGetter(ctx, actorProtocol);
+    assert(req && "Concurrency library broken");
+    SILDeclRef fn(req, SILDeclRef::Kind::Func);
+
+    auto actorConf = module->lookupConformance(actorType, actorProtocol);
+    assert(actorConf &&
+           "hop_to_executor with actor that doesn't conform to Actor");
+
+    auto subs = SubstitutionMap::get(req->getGenericSignature(),
+                                     {actorType}, {actorConf});
+    auto fnType = F->getModule().Types.getConstantFunctionType(*F, fn);
+
+    auto witness =
+      B.createWitnessMethod(loc, actorType, actorConf, fn,
+                            SILType::getPrimitiveObjectType(fnType));
+    auto witnessCall = B.createApply(loc, witness, subs, {actor});
+
+    // The protocol requirement returns an UnownedSerialExecutor; extract
+    // the Builtin.Executor from it.
+    auto executorDecl = ctx.getUnownedSerialExecutorDecl();
+    auto executorProps = executorDecl->getStoredProperties();
+    assert(executorProps.size() == 1);
+    unmarkedExecutor =
+      B.createStructExtract(loc, witnessCall, executorProps[0]);
+  }
 
   // Mark the dependence of the resulting value on the actor value to
   // force the actor to stay alive.

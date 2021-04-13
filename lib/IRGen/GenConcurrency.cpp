@@ -19,11 +19,13 @@
 
 #include "BitPatternBuilder.h"
 #include "ExtraInhabitants.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 
 using namespace swift;
@@ -126,38 +128,36 @@ const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
   return *ExecutorTI;
 }
 
-void irgen::emitBuildSerialExecutorRef(IRGenFunction &IGF,
-                                       llvm::Value *actor,
-                                       SILType actorType,
-                                       Explosion &out) {
-  auto cls = actorType.getClassOrBoundGenericClass();
+void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
+                                          Explosion &out) {
+  // FIXME
+}
 
-  // HACK: if the actor type is Swift.MainActor, treat it specially.
-  if (cls && cls->getNameStr() == "MainActor" &&
-      cls->getDeclContext()->isModuleScopeContext() &&
-      cls->getModuleContext()->getName().str() == SWIFT_CONCURRENCY_NAME) {
-    llvm::Value *identity = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                              unsigned(ExecutorRefFlags::MainActorIdentity));
-    identity = IGF.Builder.CreateIntToPtr(identity, IGF.IGM.ExecutorFirstTy);
-    out.add(identity);
-
-    llvm::Value *impl = IGF.IGM.getSize(Size(0));
-    out.add(impl);
-    return;
-  }
+void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
+                                             llvm::Value *actor,
+                                             Explosion &out) {
+  unsigned flags = unsigned(ExecutorRefFlags::DefaultActor);
 
   llvm::Value *identity =
     IGF.Builder.CreateBitCast(actor, IGF.IGM.ExecutorFirstTy);
-  llvm::Value *impl = IGF.IGM.getSize(Size(0));
+  llvm::Value *impl =
+    IGF.IGM.getSize(Size(flags));
 
-  unsigned flags = 0;
+  out.add(identity);
+  out.add(impl);
+}
 
-  // FIXME: this isn't how we should be doing any of this
-  flags |= unsigned(ExecutorRefFlags::DefaultActor);
+void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
+                                               llvm::Value *executor,
+                                               CanType executorType,
+                                       ProtocolConformanceRef executorConf,
+                                               Explosion &out) {
+  llvm::Value *identity =
+    IGF.Builder.CreateBitCast(executor, IGF.IGM.ExecutorFirstTy);
+  llvm::Value *impl =
+    emitWitnessTableRef(IGF, executorType, executorConf);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.SizeTy);
 
-  if (flags) {
-    impl = IGF.Builder.CreateOr(impl, IGF.IGM.getSize(Size(flags)));
-  }
   out.add(identity);
   out.add(impl);
 }

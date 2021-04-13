@@ -27,6 +27,7 @@ class AsyncContext;
 class AsyncTask;
 class DefaultActor;
 class Job;
+class SerialExecutorWitnessTable;
 
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -46,6 +47,10 @@ class ExecutorRef {
   HeapObject *Identity; // Not necessarily Swift reference-countable
   uintptr_t Implementation;
 
+  enum: uintptr_t {
+    WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
+  };
+
   constexpr ExecutorRef(HeapObject *identity, uintptr_t implementation)
     : Identity(identity), Implementation(implementation) {}
 
@@ -56,18 +61,6 @@ public:
   /// to drop whatever the current actor is.
   constexpr static ExecutorRef generic() {
     return ExecutorRef(nullptr, 0);
-  }
-
-  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-  /// NOTE: I didn't go with Executor::forMainActor(DefaultActor*) because
-  /// __swift_run_job_main_executor can't take more than one argument.
-  static ExecutorRef mainExecutor() {
-    auto identity = getMainActorIdentity();
-    return ExecutorRef(identity, 0);
-  }
-  static HeapObject *getMainActorIdentity() {
-    return reinterpret_cast<HeapObject*>(
-                                   ExecutorRefFlags::MainActorIdentity);
   }
 
   /// Given a pointer to a default actor, return an executor reference
@@ -86,18 +79,6 @@ public:
     return Identity == 0;
   }
 
-  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-  bool isMainExecutor() const {
-    if (Identity == getMainActorIdentity())
-      return true;
-
-    if (Identity == nullptr || MainActorMetadata == nullptr)
-      return false;
-
-    Metadata const* metadata = swift_getObjectType(Identity);
-    return metadata == MainActorMetadata;
-  }
-
   /// Is this a default-actor executor reference?
   bool isDefaultActor() const {
     return Implementation & unsigned(ExecutorRefFlags::DefaultActor);
@@ -107,6 +88,12 @@ public:
     return reinterpret_cast<DefaultActor*>(Identity);
   }
 
+  const SerialExecutorWitnessTable *getSerialExecutorWitnessTable() const {
+    assert(!isGeneric() && !isDefaultActor());
+    auto table = Implementation & WitnessTableMask;
+    return reinterpret_cast<const SerialExecutorWitnessTable*>(table);
+  }
+
   /// Do we have to do any work to start running as the requested
   /// executor?
   bool mustSwitchToRun(ExecutorRef newExecutor) const {
@@ -114,9 +101,7 @@ public:
   }
 
   bool operator==(ExecutorRef other) const {
-    return Identity == other.Identity
-    /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-          || (isMainExecutor() && other.isMainExecutor());
+    return Identity == other.Identity;
   }
   bool operator!=(ExecutorRef other) const {
     return !(*this == other);
