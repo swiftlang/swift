@@ -1494,7 +1494,12 @@ namespace {
       emitRODataFields(fields, forMeta, hasUpdater);
       
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
-      return buildGlobalVariable(fields, dataSuffix, /*const*/ true);
+      
+      // The rodata is constant if the object layout is known entirely
+      // statically. Otherwise, the ObjC runtime may slide the InstanceSize
+      // based on changing base class layout.
+      return buildGlobalVariable(fields, dataSuffix,
+                               /*const*/ forMeta || FieldLayout->isFixedSize());
     }
 
   private:
