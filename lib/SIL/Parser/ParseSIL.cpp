@@ -3034,6 +3034,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
     UNARY_INSTRUCTION(HopToExecutor)
+    UNARY_INSTRUCTION(ExtractExecutor)
     REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
     REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
     REFCOUNTING_INSTRUCTION(UnmanagedAutoreleaseValue)

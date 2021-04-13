@@ -254,6 +254,7 @@ OPERAND_OWNERSHIP(InteriorPointer, RefTailAddr)
 OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
 // FIXME: HopToExecutorInst should be an instantaneous use.
 OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
+OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
 // Instructions that propagate a value value within a borrow scope.
 OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)

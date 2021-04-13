@@ -831,6 +831,8 @@ NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
 
 NON_VALUE_INST(HopToExecutorInst, hop_to_executor,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+SINGLE_VALUE_INST(ExtractExecutorInst, extract_executor,
+                  SILInstruction, MayRead, DoesNotRelease)
 
 NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)
