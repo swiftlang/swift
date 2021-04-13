@@ -1169,9 +1169,14 @@ public:
     return fnPtr;
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
+    PointerAuthInfo newAuthInfo;
+    if (auto authInfo = fnPtr.getAuthInfo()) {
+      newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                    authInfo.getDiscriminator());
+    }
     auto newFnPtr = FunctionPointer(
-        FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF),
-        fnPtr.getAuthInfo(), Signature::forAsyncAwait(subIGF.IGM, origType));
+        FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF), newAuthInfo,
+        Signature::forAsyncAwait(subIGF.IGM, origType));
     auto &Builder = subIGF.Builder;
 
     auto argValues = args.claimAll();
@@ -1506,6 +1511,8 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
     auto argIndex = emission->getCurrentArgumentIndex();
     if (haveContextArgument)
       argIndex += polyArgs.size();
+    if (origType->isAsync())
+      argIndex += 1;
 
     llvm::Type *expectedArgTy = origSig.getType()->getParamType(argIndex);
 
@@ -1853,13 +1860,6 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   auto bindings = NecessaryBindings::forPartialApplyForwarder(
       IGF.IGM, origType, subs, considerParameterSources);
 
-  // TODO: Revisit.  Now that async thick functions are always represented with
-  //       an async function pointer, it should again be possible to allow
-  //       contexts that consist of only a single swift refcounted value.
-  if (origType->isAsync()) {
-    hasSingleSwiftRefcountedContext = No;
-  }
-
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
@@ -2020,13 +2020,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
                                       origSig, origType, substType,
                                       outType, subs, nullptr, argConventions);
-    if (origType->isAsync()) {
-      llvm_unreachable(
-          "async functions never have a single refcounted context");
-    } else {
-      forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
-      forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
-    }
+    forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
+    forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
     out.add(forwarder);
 
     llvm::Value *ctx = args.claimNext();

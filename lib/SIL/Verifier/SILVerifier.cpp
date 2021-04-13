@@ -1279,8 +1279,8 @@ public:
   }
 
   static bool isLegalSILTokenProducer(SILValue value) {
-    if (auto beginApply = dyn_cast<BeginApplyResult>(value))
-      return beginApply->isTokenResult();
+    if (auto *baResult = isaResultOf<BeginApplyInst>(value))
+      return baResult->isBeginApplyToken();
 
     // Add more token cases here as they arise.
 
@@ -1631,14 +1631,12 @@ public:
   }
 
   void checkAbortApplyInst(AbortApplyInst *AI) {
-    require(isa<BeginApplyResult>(AI->getOperand()) &&
-            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+    require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of abort_apply must be a begin_apply");
   }
 
   void checkEndApplyInst(EndApplyInst *AI) {
-    require(isa<BeginApplyResult>(AI->getOperand()) &&
-            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+    require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of end_apply must be a begin_apply");
   }
 
@@ -3082,7 +3080,7 @@ public:
       // our destructure ownership kind is non-trivial then all non-trivial
       // results must have the same ownership kind as our operand.
       auto parentKind = DSI->getForwardingOwnershipKind();
-      for (const DestructureStructResult &result : DSI->getAllResultsBuffer()) {
+      for (const auto &result : DSI->getAllResultsBuffer()) {
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
                 "parent forwarding ownership kind");

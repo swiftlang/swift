@@ -1,4 +1,5 @@
 // REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
 // UNSUPPORTED: CPU=i386
 
 // RUN: %empty-directory(%t)

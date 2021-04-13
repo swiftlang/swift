@@ -33,4 +33,4 @@ public func foo() -> A.SomeType { fatalError() }
 // CHECK-NEXT: Cross-reference to module 'A'
 // CHECK-NEXT: ... SomeType
 // CHECK-NEXT: Notes:
-// CHECK-NEXT: * 'SomeType' was not found in module 'B', but there is one in module 'B'. If this is imported from clang, please make sure the header is part of a single clang module.
+// CHECK-NEXT: * There is a matching 'SomeType' in module 'B'. If this is imported from clang, please make sure the header is part of a single clang module.

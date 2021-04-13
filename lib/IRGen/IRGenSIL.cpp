@@ -3215,11 +3215,15 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   // The callee type must use the `method` convention.
   auto calleeTy = i->getCallee()->getType().castTo<SILFunctionType>();
   auto resultTy = i->getFunctionType();
-
-  if (calleeTy->isAsync())
-    return false;
   
   if (calleeTy->getRepresentation() != SILFunctionTypeRepresentation::Method)
+    return false;
+
+  // Partially applying a polymorphic function entails capturing its generic 
+  // arguments (it is not legal to leave any polymorphic arguments unbound)
+  // which means that both self and those generic arguments would need to be
+  // captured.
+  if (calleeTy->isPolymorphic())
     return false;
   
   // There should be one applied argument.

@@ -1209,6 +1209,10 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t OpaqueReadResumeFunction = 56769;
   const uint16_t OpaqueModifyResumeFunction = 3909;
 
+  /// ObjC class pointers.
+  const uint16_t ObjCISA = 0x6AE1;
+  const uint16_t ObjCSuperclass = 0xB5AB;
+
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
 

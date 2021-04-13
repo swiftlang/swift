@@ -1539,9 +1539,8 @@ MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
 }
 
 MultipleValueInstructionResult::MultipleValueInstructionResult(
-    ValueKind valueKind, unsigned index, SILType type,
-    ValueOwnershipKind ownershipKind)
-    : ValueBase(valueKind, type) {
+    unsigned index, SILType type, ValueOwnershipKind ownershipKind)
+    : ValueBase(ValueKind::MultipleValueInstructionResult, type) {
   setOwnershipKind(ownershipKind);
   setIndex(index);
 }
@@ -1561,7 +1560,7 @@ ValueOwnershipKind MultipleValueInstructionResult::getOwnershipKind() const {
   return ValueOwnershipKind(Bits.MultipleValueInstructionResult.VOKind);
 }
 
-MultipleValueInstruction *MultipleValueInstructionResult::getParent() {
+MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const {
   char *Ptr = reinterpret_cast<char *>(
       const_cast<MultipleValueInstructionResult *>(this));
 

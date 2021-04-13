@@ -333,7 +333,7 @@ public:
 
   std::pair<unsigned, unsigned> indentLineAndColumn() {
     if (InnermostCtx)
-      return SM.getPresumedLineAndColumnForLoc(InnermostCtx->ContextLoc);
+      return SM.getLineAndColumnInBuffer(InnermostCtx->ContextLoc);
     return std::make_pair(0, 0);
   }
 

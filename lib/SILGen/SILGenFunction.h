@@ -1626,11 +1626,12 @@ public:
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  std::pair<SILValue, CleanupHandle>
+  std::pair<MultipleValueInstructionResult *, CleanupHandle>
   emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
                             SubstitutionMap subs, ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
-  void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
+  void emitEndApplyWithRethrow(SILLocation loc,
+                               MultipleValueInstructionResult *token);
 
   /// Emit a literal that applies the various initializers.
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);

@@ -1372,7 +1372,7 @@ public:
   Result visitGlobalAccess(SILValue global) {
     return asImpl().visitBase(global, AccessedStorage::Global);
   }
-  Result visitYieldAccess(BeginApplyResult *yield) {
+  Result visitYieldAccess(MultipleValueInstructionResult *yield) {
     return asImpl().visitBase(yield, AccessedStorage::Yield);
   }
   Result visitStackAccess(AllocStackInst *stack) {
@@ -1448,8 +1448,10 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
 
   // A yield is effectively a nested access, enforced independently in
   // the caller and callee.
-  case ValueKind::BeginApplyResult:
-    return asImpl().visitYieldAccess(cast<BeginApplyResult>(sourceAddr));
+  case ValueKind::MultipleValueInstructionResult:
+    if (auto *baResult = isaResultOf<BeginApplyInst>(sourceAddr))
+      return asImpl().visitYieldAccess(baResult);
+    break;
 
   // A function argument is effectively a nested access, enforced
   // independently in the caller and callee.

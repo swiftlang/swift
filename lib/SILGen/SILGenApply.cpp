@@ -4569,7 +4569,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
 }
 
-std::pair<SILValue, CleanupHandle>
+std::pair<MultipleValueInstructionResult *, CleanupHandle>
 SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SILType substFnType,
                                           SubstitutionMap subs,
@@ -4583,7 +4583,7 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   auto yieldResults = beginApply->getYieldedValues();
   yields.append(yieldResults.begin(), yieldResults.end());
 
-  auto token = beginApply->getTokenResult();
+  auto *token = beginApply->getTokenResult();
 
   Cleanups.pushCleanup<EndCoroutineApply>(token);
   auto abortCleanup = Cleanups.getTopCleanup();
@@ -4591,10 +4591,10 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   return { token, abortCleanup };
 }
 
-void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc, SILValue token) {
-  // TODO: adjust this to handle TryBeginApplyResult.
-  assert(isa<BeginApplyResult>(token));
-  assert(cast<BeginApplyResult>(token)->isTokenResult());
+void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc,
+                                        MultipleValueInstructionResult *token) {
+  // TODO: adjust this to handle results of TryBeginApplyInst.
+  assert(token->isBeginApplyToken());
 
   B.createEndApply(loc, token);
 }

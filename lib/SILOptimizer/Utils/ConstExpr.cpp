@@ -332,8 +332,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   // If this is a destructure_result, then we can return the element being
   // extracted.
-  if (isa<DestructureStructResult>(value) ||
-      isa<DestructureTupleResult>(value)) {
+  if (isaResultOf<DestructureStructInst>(value) ||
+      isaResultOf<DestructureTupleInst>(value)) {
     auto *result = cast<MultipleValueInstructionResult>(value);
     SILValue aggValue = result->getParent()->getOperand(0);
     auto val = getConstantValue(aggValue);
