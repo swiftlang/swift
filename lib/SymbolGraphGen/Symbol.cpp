@@ -179,8 +179,10 @@ const ValueDecl *Symbol::getDeclInheritingDocs() const {
       getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
   
   // if the decl is the same as the one for this symbol, we're not
-  // inheriting docs, so return null.
-  if (DocCommentProvidingDecl == VD) {
+  // inheriting docs, so return null. however, if this symbol is
+  // a synthesized symbol, `VD` is actually the source symbol, and
+  // we should point to that one regardless.
+  if (DocCommentProvidingDecl == VD && !SynthesizedBaseTypeDecl) {
     return nullptr;
   } else {
     // otherwise, return whatever `getDocCommentProvidingDecl` returned.
