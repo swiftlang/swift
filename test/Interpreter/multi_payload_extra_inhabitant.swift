@@ -9,6 +9,7 @@
 
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // CHECK-NOT: Type verification
 
