@@ -292,6 +292,7 @@ func blender(_ peeler : () -> Void) {
   // expected-warning@-1 3{{cannot pass argument of non-sendable type 'Any' across actors}}
 
   blender((peelBanana)) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  // expected-error@-1{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
   await wisk(peelBanana) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
   // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
 

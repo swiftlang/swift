@@ -3237,3 +3237,55 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
   return conformance;
 }
+
+AnyFunctionType *swift::applyGlobalActorType(
+    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc) {
+  Type globalActorType;
+  switch (auto isolation = getActorIsolation(funcOrEnum)) {
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::Independent:
+  case ActorIsolation::Unspecified:
+    return fnType;
+
+  case ActorIsolation::GlobalActorUnsafe:
+    // Only treat as global-actor-qualified within code that has adopted
+    // Swift Concurrency features.
+    if (!contextUsesConcurrencyFeatures(dc))
+      return fnType;
+
+    LLVM_FALLTHROUGH;
+
+  case ActorIsolation::GlobalActor:
+    globalActorType = isolation.getGlobalActor();
+    break;
+  }
+
+  // If there's no implicit "self" declaration, apply the global actor to
+  // the outermost function type.
+  bool hasImplicitSelfDecl = isa<EnumElementDecl>(funcOrEnum) ||
+      (isa<AbstractFunctionDecl>(funcOrEnum) &&
+       cast<AbstractFunctionDecl>(funcOrEnum)->hasImplicitSelfDecl());
+  if (!hasImplicitSelfDecl) {
+    return fnType->withExtInfo(
+        fnType->getExtInfo().withGlobalActor(globalActorType));
+  }
+
+  // Dig out the inner function type.
+  auto innerFnType = fnType->getResult()->getAs<AnyFunctionType>();
+  if (!innerFnType)
+    return fnType;
+
+  // Update the inner function type with the global actor.
+  innerFnType = innerFnType->withExtInfo(
+      innerFnType->getExtInfo().withGlobalActor(globalActorType));
+
+  // Rebuild the outer function type around it.
+  if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
+    return GenericFunctionType::get(
+        genericFnType->getGenericSignature(), fnType->getParams(),
+        Type(innerFnType), fnType->getExtInfo());
+  }
+
+  return FunctionType::get(
+      fnType->getParams(), Type(innerFnType), fnType->getExtInfo());
+}

@@ -23,8 +23,8 @@ func testConversions(f: @escaping @SomeGlobalActor (Int) -> Void, g: @escaping (
   let _: @OtherGlobalActor (Int) -> Void = f // expected-error{{cannot convert value of type 'SomeGlobalActor' to specified type 'OtherGlobalActor'}}
 }
 
-@SomeGlobalActor func onSomeGlobalActor() -> Int { 5 }
-@SomeGlobalActor(unsafe) func onSomeGlobalActorUnsafe() -> Int { 5 }
+@SomeGlobalActor func onSomeGlobalActor() -> Int { 5 } // expected-note 2{{calls to global function 'onSomeGlobalActor()' from outside of its actor context are implicitly asynchronous}}
+@SomeGlobalActor(unsafe) func onSomeGlobalActorUnsafe() -> Int { 5 } // expected-note{{calls to global function 'onSomeGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
 
 @OtherGlobalActor func onOtherGlobalActor() -> Int { 5 } // expected-note{{calls to global function 'onOtherGlobalActor()' from outside of its actor context are implicitly asynchronous}}
 @OtherGlobalActor(unsafe) func onOtherGlobalActorUnsafe() -> Int { 5 }  // expected-note 2{{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
@@ -108,4 +108,21 @@ func f2(_ x: X<@SomeGlobalActor () -> Void>) {
 }
 func g2(_ x: X<() -> Void>) {
   f2(x) // expected-error{{cannot convert value of type 'X<() -> Void>' to expected argument type 'X<@SomeGlobalActor () -> Void>'}}
+}
+
+
+func testTypesNonConcurrencyContext() { // expected-note{{add '@SomeGlobalActor' to make global function 'testTypesNonConcurrencyContext()' part of global actor 'SomeGlobalActor'}}
+  let f1 = onSomeGlobalActor // expected-error{{isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  let f2 = onSomeGlobalActorUnsafe
+
+  let _: () -> Int = f1 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f2
+}
+
+func testTypesConcurrencyContext() async {
+  let f1 = onSomeGlobalActor // expected-error{{isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  let f2 = onSomeGlobalActorUnsafe // expected-error{{isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+
+  let _: () -> Int = f1 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f2 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
 }

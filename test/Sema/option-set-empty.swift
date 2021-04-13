@@ -1,6 +1,8 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 struct SomeOptions: OptionSet {
+  // expected-error@-1{{circular reference}}
+  // expected-note@-2 2{{through reference here}}
     var rawValue: Int
     
     static let some = MyOptions(rawValue: 4)
@@ -10,6 +12,7 @@ struct SomeOptions: OptionSet {
     let someVal = MyOptions(rawValue: 6)
     let option = MyOptions(float: Float.infinity)
     let none = SomeOptions(rawValue: 0) // expected-error {{value type 'SomeOptions' cannot have a stored property that recursively contains it}}
+  // expected-note@-1 3{{through reference here}}
 }
 
 struct MyOptions: OptionSet {
