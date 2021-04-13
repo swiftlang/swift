@@ -238,7 +238,7 @@ static ExecutorRef swift_task_getCurrentExecutorImpl() {
 }
 
 #if defined(_WIN32)
-static _CFThreadRef __initialPthread = INVALID_HANDLE_VALUE;
+static HANDLE __initialPthread = INVALID_HANDLE_VALUE;
 #endif
 
 /// Determine whether we are currently executing on the main thread
