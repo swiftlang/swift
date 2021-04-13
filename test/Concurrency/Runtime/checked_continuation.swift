@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
 
 import _Concurrency
 import StdlibUnittest
