@@ -2,9 +2,9 @@
 
 // REQUIRES: concurrency
 
-func f(_: @escaping @concurrent () -> Void) { }
+func f(_: @escaping @Sendable () -> Void) { }
 open class F {
-  func useConcurrent(_: @escaping @concurrent () -> Void) { }
+  func useConcurrent(_: @escaping @Sendable () -> Void) { }
 }
 
 extension Int {
@@ -86,7 +86,7 @@ func testCaseTrivialValue4() {
                     // expected-note @-8 {{capturing use}}
 }
 
-class Klass: UnsafeConcurrentValue {
+class Klass: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   var next: Klass? = nil
 }
 func inoutUserKlass(_ k: inout Klass) {}
@@ -130,7 +130,7 @@ func testCaseClassInoutField() {
 // Non Trivial Value Type //
 ////////////////////////////
 
-struct NonTrivialValueType: ConcurrentValue {
+struct NonTrivialValueType: Sendable {
   var i: Int
   var k: Klass? = nil
 
@@ -182,7 +182,7 @@ protocol MyProt {
   var k: Klass? { get set }
 }
 
-func testCaseAddressOnlyAllocBoxToStackable<T : MyProt & ConcurrentValue>(i : T) {
+func testCaseAddressOnlyAllocBoxToStackable<T : MyProt & Sendable>(i : T) {
   var i2 = i
   f {
     print(i2.i + 17)
@@ -199,7 +199,7 @@ func testCaseAddressOnlyAllocBoxToStackable<T : MyProt & ConcurrentValue>(i : T)
 
 // Alloc box to stack can't handle this test case, so show off a bit and make
 // sure we can emit a great diagnostic here!
-func testCaseAddressOnlyNoAllocBoxToStackable<T : MyProt & ConcurrentValue>(i : T) {
+func testCaseAddressOnlyNoAllocBoxToStackable<T : MyProt & Sendable>(i : T) {
   let f2 = F()
   var i2 = i
   f2.useConcurrent {

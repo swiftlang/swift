@@ -498,8 +498,7 @@ public:
     if (!Conformance)
       return nullptr;
 
-    PrettyStackTraceConformance trace(SGM.getASTContext(),
-                                      "generating SIL witness table",
+    PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
 
     auto *proto = Conformance->getProtocol();
@@ -886,8 +885,7 @@ public:
   }
 
   void emit() {
-    PrettyStackTraceConformance trace(SGM.getASTContext(),
-                                      "generating SIL witness table",
+    PrettyStackTraceConformance trace("generating SIL witness table",
                                       conformance);
 
     // Add entries for all the requirements.
@@ -1134,10 +1132,9 @@ public:
 
     // If this variable has an attached property wrapper with an initialization
     // function, emit the backing initializer function.
-    if (auto wrapperInfo = vd->getPropertyWrapperBackingPropertyInfo()) {
-      if (wrapperInfo.initializeFromOriginal && !vd->isStatic()) {
-        SGM.emitPropertyWrapperBackingInitializer(vd);
-      }
+    auto initInfo = vd->getPropertyWrapperInitializerInfo();
+    if (initInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
+      SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
     visitAbstractStorageDecl(vd);

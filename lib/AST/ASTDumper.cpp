@@ -1385,6 +1385,9 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     case InitializerKind::DefaultArgument:
       os << "default argument initializer";
       break;
+    case InitializerKind::PropertyWrapper:
+      os << "property wrapper initializer";
+      break;
     }
     break;
 
@@ -2267,6 +2270,11 @@ public:
     printRec(E->getResultExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E) {
+    printCommon(E, "unresolvedtype_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitFunctionConversionExpr(FunctionConversionExpr *E) {
     printCommon(E, "function_conversion_expr") << '\n';
     printRec(E->getSubExpr());
@@ -2526,7 +2534,7 @@ public:
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
         if (!fType->getExtInfo().isNoEscape())
           PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
-        if (fType->getExtInfo().isConcurrent())
+        if (fType->getExtInfo().isSendable())
           PrintWithColorRAII(OS, ClosureModifierColor) << " concurrent";
       }
     }
@@ -2582,6 +2590,12 @@ public:
       OS << '\n';
       printRec(value);
     }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E) {
+    printCommon(E, "applied_property_wrapper_expr");
+    printRec(E->getValue());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3270,8 +3284,7 @@ static void dumpProtocolConformanceRec(
       }
     }
 
-    if (auto condReqs = normal->getConditionalRequirementsIfAvailableOrCached(
-            /*computeIfPossible=*/false)) {
+    if (auto condReqs = normal->getConditionalRequirementsIfAvailable()) {
       for (auto requirement : *condReqs) {
         out << '\n';
         out.indent(indent + 2);
@@ -3564,6 +3577,7 @@ namespace {
 
     TRIVIAL_TYPE_PRINTER(BuiltinIntegerLiteral, builtin_integer_literal)
     TRIVIAL_TYPE_PRINTER(BuiltinJob, builtin_job)
+    TRIVIAL_TYPE_PRINTER(BuiltinExecutor, builtin_executor_ref)
     TRIVIAL_TYPE_PRINTER(BuiltinDefaultActorStorage, builtin_default_actor_storage)
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)
@@ -3794,6 +3808,8 @@ namespace {
         PrintWithColorRAII(OS, TypeFieldColor) << "param";
         if (param.hasLabel())
           printField("name", param.getLabel().str());
+        if (param.hasInternalLabel())
+          printField("internal_name", param.getInternalLabel().str());
         dumpParameterFlags(param.getParameterFlags());
         printRec(param.getPlainType());
         OS << ")";
@@ -3813,7 +3829,7 @@ namespace {
                    getSILFunctionTypeRepresentationString(representation));
 
       printFlag(!T->isNoEscape(), "escaping");
-      printFlag(T->isConcurrent(), "concurrent");
+      printFlag(T->isSendable(), "Sendable");
       printFlag(T->isAsync(), "async");
       printFlag(T->isThrowing(), "throws");
 
@@ -3828,6 +3844,11 @@ namespace {
         T->getClangTypeInfo().dump(os, ctx);
         printField("clang_type", os.str());
       }
+
+      if (Type globalActor = T->getGlobalActor()) {
+        printField("global_actor", globalActor.getString());
+      }
+
       printAnyFunctionParams(T->getParams(), "input");
       Indent -=2;
       printRec("output", T->getResult());

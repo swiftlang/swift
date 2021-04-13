@@ -205,7 +205,7 @@ private:
       return storage.extendedASTNodeLoc->primary;
     case SourceLocKind:
     case FilenameAndLocationKind:
-      assert(false);
+      llvm_unreachable("location type has no AST node");
     }
   }
 

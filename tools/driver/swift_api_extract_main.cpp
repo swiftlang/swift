@@ -103,6 +103,8 @@ public:
       }
     }
 
+    Invocation.getLangOptions().EnableModuleLoadingRemarks = true;
+
     if (auto *A = ParsedArgs.getLastArg(OPT_sdk))
       Invocation.setSDKPath(A->getValue());
 
@@ -206,6 +208,10 @@ public:
                                    InputModuleName);
       return 1;
     }
+
+    // If there are errors emitted when loading module, exit with error.
+    if (Instance.getASTContext().hadError())
+      return 1;
 
     if (OutputFilename == "-") {
       writeAPIJSONFile(M, llvm::outs(), PrettyPrint);

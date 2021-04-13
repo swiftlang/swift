@@ -3,34 +3,35 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
 
+// UNSUPPORTED: OS=windows-msvc
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple() async {
   print("\(#function) -----------------------")
-  let one = await Task.current()
-  let two = await Task.current()
+  let one = Task.current!
+  let two = Task.current!
   print("same equal: \(one == two)") // CHECK: same equal: true
   print("hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 
-  async let x = Task.current()
+  async let x = Task.current
   let three = await x
 
   print("parent/child equal: \(three == two)") // CHECK: parent/child equal: false
   print("parent/child hashes equal: \(three.hashValue == two.hashValue)") // CHECK: parent/child hashes equal: false
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func unsafe() async {
   print("\(#function) -----------------------")
-  let one = Task.unsafeCurrent!
-  let two = Task.unsafeCurrent!
+  let one = withUnsafeCurrentTask { $0! }
+  let two = withUnsafeCurrentTask { $0! }
   print("unsafe same equal: \(one == two)") // CHECK: same equal: true
   print("unsafe hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 
-  async let x = Task.unsafeCurrent!
+  async let x = withUnsafeCurrentTask { $0! }
   let three = await x
 
   print("unsafe parent/child equal: \(three == two)") // CHECK: parent/child equal: false
@@ -40,14 +41,16 @@ func unsafe() async {
   print("unsafe.task parent/child hashes equal: \(three.task.hashValue == two.task.hashValue)") // CHECK: parent/child hashes equal: false
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func unsafeSync() {
   print("\(#function) -----------------------")
-  let one = Task.unsafeCurrent!
-  let two = Task.unsafeCurrent!
+  let one = withUnsafeCurrentTask { $0! }
+  let two = withUnsafeCurrentTask { $0! }
   print("unsafe same equal: \(one == two)") // CHECK: same equal: true
   print("unsafe hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await simple()

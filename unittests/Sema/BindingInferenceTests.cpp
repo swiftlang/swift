@@ -41,7 +41,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
   auto intTy = getStdlibType("Int");
 
   {
-    auto bindings = cs.inferBindingsFor(literalTy);
+    auto bindings = cs.getBindingsFor(literalTy);
 
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
@@ -61,7 +61,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
                    cs.getConstraintLocator(intLiteral));
 
   {
-    auto bindings = cs.inferBindingsFor(literalTy);
+    auto bindings = cs.getBindingsFor(literalTy);
 
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
@@ -95,7 +95,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
                    cs.getConstraintLocator(intLiteral));
 
   {
-    auto bindings = cs.inferBindingsFor(floatLiteralTy);
+    auto bindings = cs.getBindingsFor(floatLiteralTy);
 
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
@@ -118,15 +118,15 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
                    cs.getConstraintLocator({}));
 
   {
-    auto bindings = cs.inferBindingsFor(otherTy, /*finalize=*/false);
+    auto bindings = cs.getBindingsFor(otherTy);
 
     // Make sure that there are no direct bindings or protocol requirements.
 
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)0);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)0);
 
-    llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> env;
-    env.insert({floatLiteralTy, cs.inferBindingsFor(floatLiteralTy)});
+    llvm::SmallDenseMap<TypeVariableType *, BindingSet> env;
+    env.insert({floatLiteralTy, cs.getBindingsFor(floatLiteralTy)});
 
     bindings.finalize(env);
 
@@ -192,7 +192,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
         cs.getConstraintLocator({}, LocatorPathElt::ContextualType()));
 
     auto bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.Protocols.empty());
+    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1});
@@ -214,7 +214,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
                      cs.getConstraintLocator({}));
 
     auto bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.Protocols.empty());
+    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1, protocolTy2});
@@ -299,4 +299,40 @@ TEST_F(SemaTest, TestComplexTransitiveProtocolInference) {
   verifyProtocolInferenceResults(
       *bindingsForT5.TransitiveProtocols,
       {protocolTy1, protocolTy2, protocolTy3, protocolTy4});
+}
+
+/// Let's try a situation where there protocols are inferred from
+/// multiple sources on different levels of equivalence chain.
+///
+/// T0 = T1
+///         = T2 (P0)
+///              = T3 (P1)
+TEST_F(SemaTest, TestTransitiveProtocolInferenceThroughEquivalenceChains) {
+  ConstraintSystemOptions options;
+  ConstraintSystem cs(DC, options);
+
+  auto *protocolTy0 = createProtocol("P0");
+  auto *protocolTy1 = createProtocol("P1");
+
+  auto *nilLocator = cs.getConstraintLocator({});
+
+  auto typeVar0 = cs.createTypeVariable(nilLocator, /*options=*/0);
+  // Allow this type variable to be bound to l-value type to prevent
+  // it from being merged with the rest of the type variables.
+  auto typeVar1 =
+    cs.createTypeVariable(nilLocator, /*options=*/TVO_CanBindToLValue);
+  auto typeVar2 = cs.createTypeVariable(nilLocator, /*options=*/0);
+  auto typeVar3 = cs.createTypeVariable(nilLocator, TVO_CanBindToLValue);
+
+  cs.addConstraint(ConstraintKind::Conversion, typeVar0, typeVar1, nilLocator);
+  cs.addConstraint(ConstraintKind::Equal, typeVar1, typeVar2, nilLocator);
+  cs.addConstraint(ConstraintKind::Equal, typeVar2, typeVar3, nilLocator);
+  cs.addConstraint(ConstraintKind::ConformsTo, typeVar2, protocolTy0, nilLocator);
+  cs.addConstraint(ConstraintKind::ConformsTo, typeVar3, protocolTy1, nilLocator);
+
+  auto bindings = inferBindings(cs, typeVar0);
+
+  ASSERT_TRUE(bool(bindings.TransitiveProtocols));
+  verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
+                                 {protocolTy0, protocolTy1});
 }

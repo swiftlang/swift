@@ -65,7 +65,7 @@ struct OtherGlobalActor {
 }
 
 @GA1 struct X {
-  @GA1 var member: Int // expected-error{{stored property 'member' of a struct cannot have a global actor}}
+  @GA1 var member: Int
 }
 
 struct Y {
@@ -83,7 +83,7 @@ class SomeClass {
 
 @GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
 
-@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
+@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
 
@@ -96,5 +96,5 @@ struct Container {
 // Redundant attributes
 // -----------------------------------------------------------------------
 extension SomeActor {
-  @GA1 @actorIndependent func conflict1() { } // expected-error{{instance method 'conflict1()' has multiple actor-isolation attributes ('actorIndependent' and 'GA1')}}
+  @GA1 nonisolated func conflict1() { } // expected-error{{instance method 'conflict1()' has multiple actor-isolation attributes ('nonisolated' and 'GA1')}}
 }

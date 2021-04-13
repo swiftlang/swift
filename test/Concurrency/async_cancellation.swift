@@ -6,10 +6,12 @@ enum PictureData {
   case failedToLoadImagePlaceholder
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_cancellation_checkCancellation() async throws {
   try Task.checkCancellation()
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_cancellation_guard_isCancelled(_ any: Any) async -> PictureData {
   guard !Task.isCancelled else {
     return PictureData.failedToLoadImagePlaceholder
@@ -18,24 +20,26 @@ func test_cancellation_guard_isCancelled(_ any: Any) async -> PictureData {
   return PictureData.value("...")
 }
 
-struct SomeFile: ConcurrentValue {
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+struct SomeFile: Sendable {
   func close() {}
 }
 
-func test_cancellation_withCancellationHandler(_ anything: Any) async -> PictureData {
-  let handle: Task.Handle<PictureData, Error> = Task.runDetached {
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> PictureData {
+  let handle: Task.Handle<PictureData, Error> = detach {
     let file = SomeFile()
 
-    return await Task.withCancellationHandler(
-      handler: { file.close() },
-      operation: {
+    return await withTaskCancellationHandler(
+      handler: { file.close() }) {
       await test_cancellation_guard_isCancelled(file)
-    })
+    }
   }
 
   handle.cancel()
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_cancellation_loop() async -> Int {
   struct SampleTask { func process() async {} }
 

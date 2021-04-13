@@ -26,6 +26,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
@@ -42,7 +43,6 @@ class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
 class RootProtocolConformance;
-class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
@@ -263,42 +263,6 @@ void checkUnsupportedProtocolType(ASTContext &ctx,
 void checkUnsupportedProtocolType(ASTContext &ctx,
                                   GenericParamList *genericParams);
 
-/// Resolve a reference to the given type declaration within a particular
-/// context.
-///
-/// This routine aids unqualified name lookup for types by performing the
-/// resolution necessary to rectify the declaration found by name lookup with
-/// the declaration context from which name lookup started.
-///
-/// \param typeDecl The type declaration found by name lookup.
-/// \param isSpecialized Whether the type will have generic arguments applied.
-/// \param resolution The resolution to perform.
-///
-/// \returns the resolved type.
-Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
-                          TypeResolution resolution, bool isSpecialized);
-
-/// Apply generic arguments to the unbound generic type represented by the
-/// given declaration and parent type.
-///
-/// This function requires the correct number of generic arguments,
-/// whereas applyGenericArguments emits diagnostics in those cases.
-///
-/// \param decl The declaration that the resulting bound generic type
-/// shall reference.
-/// \param parentTy The parent type.
-/// \param loc The source location for diagnostic reporting.
-/// \param resolution The type resolution.
-/// \param genericArgs The list of generic arguments to apply.
-///
-/// \returns A BoundGenericType bound to the given arguments, or null on
-/// error.
-///
-/// \see applyGenericArguments
-Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
-                                  SourceLoc loc, TypeResolution resolution,
-                                  ArrayRef<Type> genericArgs);
-
 /// Substitute the given base type into the type of the given nested type,
 /// producing the effective type that the nested type will have.
 ///
@@ -421,6 +385,13 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 /// (that is, a typealias or shorthand syntax) equivalent to the result type
 /// of the function, set the result type of the expression to that sugar type.
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
+
+/// Type check a \c StmtConditionElement.
+/// Sets \p isFalsable to \c true if the condition might evaluate to \c false,
+/// otherwise leaves \p isFalsable untouched.
+/// \returns \c true if there was an error type checking, \c false otherwise.
+bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
+                                   DeclContext *dc);
 
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
@@ -689,8 +660,7 @@ bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
-void coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
-                               AnyFunctionType *FN);
+void coerceParameterListToType(ParameterList *P, AnyFunctionType *FN);
 
 /// Type-check an initialized variable pattern declaration.
 bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
@@ -1184,6 +1154,12 @@ UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
                            SmallVectorImpl<ValueDecl *> *allResults = nullptr);
+
+/// Forces all changes specified by the module's access notes file to be
+/// applied to this declaration. It is safe to call this function more than
+/// once.
+void applyAccessNote(ValueDecl *VD);
+
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
@@ -1245,15 +1221,22 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 /// \param limit How many levels of unwrapping to perform, where 0 means to return the
 /// \c backingStorageType directly and the maximum is the number of attached property wrappers
 /// (which will produce the original property type). If not specified, defaults to the maximum.
-Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
+Type computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
 
-/// Build a call to the init(wrappedValue:) initializers of the property
-/// wrappers, filling in the given \c value as the original value. Optionally
-/// pass a callback that will get invoked with the innermost init(wrappedValue:)
-/// call.
-Expr *buildPropertyWrapperWrappedValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+/// Compute the projected value type for the given property that has attached
+/// property wrappers when the backing storage is known to have the given type.
+Type computeProjectedValueType(const VarDecl *var, Type backingStorageType);
+
+/// Build a call to the init(wrappedValue:) or init(projectedValue:)
+/// initializer of the property wrapper, filling in the given \c value
+/// as the wrapped or projected value argument.
+///
+/// Optionally pass a callback that will get invoked with the innermost init
+/// apply expression.
+Expr *buildPropertyWrapperInitCall(
+    const VarDecl *var, Type backingStorageType, Expr *value,
+    PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
 
 /// Whether an overriding declaration requires the 'override' keyword.

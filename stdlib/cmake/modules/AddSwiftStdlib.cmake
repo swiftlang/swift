@@ -358,6 +358,9 @@ function(_add_target_variant_link_flags)
     MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "dl")
+    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686")
+      list(APPEND link_libraries PRIVATE "atomic")
+    endif()
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
@@ -623,7 +626,8 @@ function(_add_swift_target_library_single target name)
         DARWIN_INSTALL_NAME_DIR
         SDK
         DEPLOYMENT_VERSION_MACCATALYST
-        MACCATALYST_BUILD_FLAVOR)
+        MACCATALYST_BUILD_FLAVOR
+        ENABLE_LTO)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -778,6 +782,7 @@ function(_add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
+      ENABLE_LTO "${SWIFTLIB_SINGLE_ENABLE_LTO}"
       INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
       MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
@@ -1139,7 +1144,7 @@ function(_add_swift_target_library_single target name)
   endif()
 
   if (NOT SWIFTLIB_SINGLE_TARGET_LIBRARY)
-    set(lto_type "${SWIFT_TOOLS_ENABLE_LTO}")
+    set(lto_type "${SWIFT_STDLIB_ENABLE_LTO}")
   endif()
 
   _add_target_variant_c_compile_flags(
@@ -1988,7 +1993,7 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
         MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
-
+        ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
     if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
@@ -2322,7 +2327,7 @@ function(_add_swift_target_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME c_compile_flags)
   _add_target_variant_link_flags(
@@ -2330,7 +2335,7 @@ function(_add_swift_target_executable_single name)
     ARCH "${SWIFTEXE_SINGLE_ARCHITECTURE}"
     BUILD_TYPE "${CMAKE_BUILD_TYPE}"
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
-    ENABLE_LTO "${SWIFT_TOOLS_ENABLE_LTO}"
+    ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
     LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
     RESULT_VAR_NAME link_flags
@@ -2350,6 +2355,7 @@ function(_add_swift_target_executable_single name)
       SDK ${SWIFTEXE_SINGLE_SDK}
       ARCHITECTURE ${SWIFTEXE_SINGLE_ARCHITECTURE}
       COMPILE_FLAGS ${SWIFTEXE_SINGLE_COMPILE_FLAGS}
+      ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
       IS_MAIN)
   add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
 

@@ -9,9 +9,9 @@
 // Then, blit some invalid opaque result types into the interface
 //
 // Test that we reject broken type parameters
-// RUN: echo "public typealias SomeGenericBalderdash = @_opaqueReturnTypeOf(\"$somesuchnonsense\", 0) 🦸<InvalidParameter>" >> %t/InvalidOpaqueResultType.swiftinterface
+// RUN: echo "public typealias SomeGenericBalderdash = @_opaqueReturnTypeOf(\"$somesuchnonsense\", 0) __<InvalidParameter>" >> %t/InvalidOpaqueResultType.swiftinterface
 // Test that we reject types we cannot demangle
-// RUN: echo "public typealias SomesuchNonsense = @_opaqueReturnTypeOf(\"$somesuchnonsense\", 0) 🦸" >> %t/InvalidOpaqueResultType.swiftinterface
+// RUN: echo "public typealias SomesuchNonsense = @_opaqueReturnTypeOf(\"$somesuchnonsense\", 0) __" >> %t/InvalidOpaqueResultType.swiftinterface
 //
 // The stage is set:
 //

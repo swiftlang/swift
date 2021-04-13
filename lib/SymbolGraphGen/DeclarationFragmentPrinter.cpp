@@ -155,6 +155,8 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
   if (ShouldLink) {
     llvm::raw_svector_ostream OS(USR);
     ide::printDeclUSR(RefTo, OS);
+    if (ReferencedDecls)
+      ReferencedDecls->insert(RefTo);
   }
   closeFragment();
 }

@@ -76,7 +76,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -1280,7 +1280,7 @@ BlockState::ValueState BlockState::getValueStateAtEndOfBlock(RLEContext &Ctx,
 SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
                                                      LSLocation &L) {
   llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> Values;
-  BasicBlockWorklist<16> WorkList(Fn);
+  BasicBlockWorklist WorkList(Fn);
 
   // Push in all the predecessors to get started.
   for (auto Pred : BB->getPredecessorBlocks()) {
@@ -1328,12 +1328,20 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     Values.push_back({CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt)});
   }
 
+  auto ownershipRange =
+      makeTransformRange(llvm::make_range(Values.begin(), Values.end()),
+                         [](std::pair<SILBasicBlock *, SILValue> v) {
+                           return v.second.getOwnershipKind();
+                         });
+
+  auto mergedOwnershipKind = ValueOwnershipKind::merge(ownershipRange);
+
   // Finally, collect all the values for the SILArgument, materialize it using
   // the SSAUpdater.
   Updater.initialize(
       L.getType(&BB->getModule(), TypeExpansionContext(*BB->getParent()))
           .getObjectType(),
-      Values[0].second.getOwnershipKind());
+      mergedOwnershipKind);
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   Updater.setInsertedPhis(&insertedPhis);
@@ -1443,7 +1451,7 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
   // Process each basic block with the gen and kill set. Every time the
   // ForwardSetOut of a basic block changes, the optimization is rerun on its
   // successors.
-  BasicBlockWorklist<16> WorkList(Fn);
+  BasicBlockWorklist WorkList(Fn);
 
   // Push into the worklist in post order so that we can pop from the back and
   // get reverse post order.

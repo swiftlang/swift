@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/PrettyStackTrace.h"
@@ -145,7 +146,8 @@ file_types::ID CommandOutput::getPrimaryOutputType() const {
 }
 
 void CommandOutput::addPrimaryOutput(CommandInputPair Input,
-                                     StringRef PrimaryOutputFile) {
+                                     StringRef PrimaryOutputFile,
+                                     StringRef IndexUnitOutputPath) {
   PrettyStackTraceDriverCommandOutputAddition CrashInfo(
     "primary", this, Input.Primary, PrimaryOutputType, PrimaryOutputFile);
   if (PrimaryOutputType == file_types::TY_Nothing) {
@@ -165,6 +167,13 @@ void CommandOutput::addPrimaryOutput(CommandInputPair Input,
   assert(!PrimaryOutputFile.empty());
   assert(AdditionalOutputTypes.count(PrimaryOutputType) == 0);
   ensureEntry(Input.Primary, PrimaryOutputType, PrimaryOutputFile, false);
+
+  // If there is an overriding output path to record in the index store instead
+  // of the primary output path, add it.
+  if (!IndexUnitOutputPath.empty()) {
+    ensureEntry(Input.Primary, file_types::TY_IndexUnitOutputPath,
+                IndexUnitOutputPath, false);
+  }
 }
 
 StringRef CommandOutput::getPrimaryOutputFilename() const {
@@ -185,6 +194,34 @@ SmallVector<StringRef, 16> CommandOutput::getPrimaryOutputFilenames() const {
     assert(!Out.empty() || PrimaryOutputType == file_types::TY_Nothing);
   }
   assert(NonEmpty == 0 || NonEmpty == Inputs.size());
+  return V;
+}
+
+SmallVector<StringRef, 16>
+CommandOutput::getIndexUnitOutputFilenames() const {
+  SmallVector<StringRef, 16> V;
+  size_t NonEmpty = 0;
+  for (auto const &I: Inputs) {
+    auto Out = getOutputForInputAndType(I.Primary,
+                                        file_types::TY_IndexUnitOutputPath);
+    V.push_back(Out);
+    if (!Out.empty())
+      ++NonEmpty;
+  }
+
+  if (!NonEmpty || NonEmpty == V.size()) {
+    if (!NonEmpty)
+      V.clear();
+    return V;
+  }
+
+  auto PrimaryOutputs = getPrimaryOutputFilenames();
+  assert(PrimaryOutputs.size() == V.size());
+
+  for (auto I: indices(V)) {
+    if (V[I].empty())
+      V[I] = PrimaryOutputs[I];
+  }
   return V;
 }
 

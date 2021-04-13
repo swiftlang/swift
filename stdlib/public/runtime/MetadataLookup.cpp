@@ -33,7 +33,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
 #include "Private.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include <functional>
 #include <vector>
@@ -1477,8 +1477,13 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType>
-  createFunctionType(llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
-                     BuiltType result, FunctionTypeFlags flags) const {
+  createFunctionType(
+      llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
+      BuiltType result, FunctionTypeFlags flags,
+      FunctionMetadataDifferentiabilityKind diffKind) const {
+    assert(
+        (flags.isDifferentiable() && diffKind.isDifferentiable()) ||
+        (!flags.isDifferentiable() && !diffKind.isDifferentiable()));
     llvm::SmallVector<BuiltType, 8> paramTypes;
     llvm::SmallVector<uint32_t, 8> paramFlags;
 
@@ -1492,11 +1497,15 @@ public:
         paramFlags.push_back(param.getFlags().getIntValue());
     }
 
-    return swift_getFunctionTypeMetadata(flags, paramTypes.data(),
-                                         flags.hasParameterFlags()
-                                           ? paramFlags.data()
-                                           : nullptr,
-                                         result);
+    return flags.isDifferentiable()
+        ? swift_getFunctionTypeMetadataDifferentiable(
+              flags, diffKind, paramTypes.data(),
+              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+              result)
+        : swift_getFunctionTypeMetadata(
+              flags, paramTypes.data(),
+              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+              result);
   }
 
   TypeLookupErrorOr<BuiltType> createImplFunctionType(
@@ -1948,7 +1957,7 @@ static void installGetClassHook() {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability"
-  if (objc_setHook_getClass) {
+  if (&objc_setHook_getClass) {
     objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook);
   }
 #pragma clang diagnostic pop
@@ -2504,4 +2513,4 @@ void swift::swift_disableDynamicReplacementScope(
   DynamicReplacementLock.get().withLock([=] { scope->disable(); });
 }
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

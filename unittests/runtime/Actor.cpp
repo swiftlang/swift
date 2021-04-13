@@ -35,7 +35,8 @@ static void finishTest() {
 
 static std::vector<Job*> globalQueue;
 SWIFT_CC(swift)
-static void enqueueGlobal(Job *job) {
+static void enqueueGlobal(Job *job,
+                          swift_task_enqueueGlobal_original original) {
   assert(job);
 
   // Check that the job isn't already on the queue.
@@ -85,7 +86,7 @@ static void run(llvm::function_ref<void()> fn) {
 
 namespace {
 
-/// A simple actor class.
+/// A simple actor.
 class TestActor : public DefaultActor {
 public:
   TestActor();
@@ -118,15 +119,14 @@ class TaskContinuationFromLambda {
   static llvm::Optional<Fn> lambdaStorage;
 
   SWIFT_CC(swiftasync)
-  static void invoke(AsyncTask *task, ExecutorRef executor,
-                     SWIFT_ASYNC_CONTEXT AsyncContext *context) {
-    (*lambdaStorage)(task, executor, static_cast<Context*>(context));
+  static void invoke(SWIFT_ASYNC_CONTEXT AsyncContext *context, SWIFT_CONTEXT HeapObject *) {
+    return (*lambdaStorage)(static_cast<Context*>(context));
   }
 
 public:
   static TaskContinuationFunction *get(Fn &&fn) {
     lambdaStorage.emplace(std::move(fn));
-    return &invoke;
+    return (TaskContinuationFunction*) &invoke;
   }
 };
 
@@ -142,7 +142,6 @@ createTaskWithContext(JobPriority priority, Fn &&fn) {
     TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
 
   auto pair = swift_task_create_f(JobFlags(JobKind::Task, priority),
-                                  /*parent*/ nullptr,
                                   invoke,
                                   sizeof(Context));
   return std::make_pair(pair.Task,
@@ -161,6 +160,11 @@ static void parkTask(AsyncTask *task, Context *context, Fn &&fn) {
     TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
   task->ResumeTask = invoke;
   task->ResumeContext = context;
+}
+
+template <class Context, class Fn>
+static TaskContinuationFunction *prepareContinuation(Fn &&fn) {
+  return TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
 }
 
 namespace {
@@ -216,23 +220,23 @@ static AsyncTask *createTaskStoring(JobPriority priority,
 TEST(ActorTest, validateTestHarness) {
   run([] {
     auto task0 = createTask(JobPriority::Background,
-      [](AsyncTask *task, ExecutorRef executor, AsyncContext *context) {
+      [](AsyncContext *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(5);
         EXPECT_PROGRESS(6);
         finishTest();
-        return context->resumeParent(task, executor);
+        return context->ResumeParent(context);
       });
     auto task1 = createTask(JobPriority::Default,
-      [](AsyncTask *task, ExecutorRef executor, AsyncContext *context) {
+      [](AsyncContext *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(1);
         EXPECT_PROGRESS(2);
-        return context->resumeParent(task, executor);
+        return context->ResumeParent(context);
       });
     auto task2 = createTask(JobPriority::Default,
-      [](AsyncTask *task, ExecutorRef executor, AsyncContext *context) {
+      [](AsyncContext *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(3);
         EXPECT_PROGRESS(4);
-        return context->resumeParent(task, executor);
+        return context->ResumeParent(context);
       });
 
     swift_task_enqueueGlobal(task0);
@@ -250,30 +254,32 @@ TEST(ActorTest, actorSwitch) {
     auto actor = createActor();
     auto task0 = createTaskStoring(JobPriority::Default,
                                    (AsyncTask*) nullptr, actor,
-      [](AsyncTask *task, ExecutorRef executor, Context *context) {
+      [](Context *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(1);
-        EXPECT_TRUE(executor.isGeneric());
+        EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
         EXPECT_EQ(nullptr, context->get<0>());
-        std::get<0>(context->values) = task;
+        std::get<0>(context->values) = swift_task_getCurrent();
 
-        parkTask(task, context,
-          [](AsyncTask *task, ExecutorRef executor, Context *context) {
+        auto continuation = prepareContinuation<Context>(
+          [](Context *context) SWIFT_CC(swiftasync) {
             EXPECT_PROGRESS(2);
+            auto executor = swift_task_getCurrentExecutor();
             EXPECT_FALSE(executor.isGeneric());
             EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
                       executor);
-            EXPECT_EQ(task, context->get<0>());
-            parkTask(task, context,
-              [](AsyncTask *task, ExecutorRef executor, Context *context) {
+            EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
+            auto continuation = prepareContinuation<Context>(
+              [](Context *context) SWIFT_CC(swiftasync) {
                 EXPECT_PROGRESS(3);
-                EXPECT_TRUE(executor.isGeneric());
-                EXPECT_EQ(task, context->get<0>());
+                EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
+                EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
                 finishTest();
-                return context->resumeParent(task, executor);
+                return context->ResumeParent(context);
               });
-            return swift_task_switch(task, executor, ExecutorRef::generic());
+            return swift_task_switch(context, continuation,
+                                     ExecutorRef::generic());
           });
-        return swift_task_switch(task, executor,
+        return swift_task_switch(context, continuation,
                  ExecutorRef::forDefaultActor(context->get<1>()));
       });
     swift_task_enqueueGlobal(task0);
@@ -290,25 +296,29 @@ TEST(ActorTest, actorContention) {
 
     auto task0 = createTaskStoring(JobPriority::Default,
                                    (AsyncTask*) nullptr, actor,
-      [](AsyncTask *task, ExecutorRef executor, Context *context) {
+      [](Context *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(1);
-        EXPECT_TRUE(executor.isGeneric());
+        EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
         EXPECT_EQ(nullptr, context->get<0>());
+        auto task = swift_task_getCurrent();
+        EXPECT_FALSE(task == nullptr);
         std::get<0>(context->values) = task;
 
         parkTask(task, context,
-          [](AsyncTask *task, ExecutorRef executor, Context *context) {
+          [](Context *context) SWIFT_CC(swiftasync) {
             EXPECT_PROGRESS(3);
+            auto executor = swift_task_getCurrentExecutor();
             EXPECT_FALSE(executor.isGeneric());
             EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
                       executor);
+            auto task = swift_task_getCurrent();
             EXPECT_EQ(task, context->get<0>());
             parkTask(task, context,
-              [](AsyncTask *task, ExecutorRef executor, Context *context) {
+              [](Context *context) SWIFT_CC(swiftasync) {
                 EXPECT_PROGRESS(4);
-                EXPECT_TRUE(executor.isGeneric());
-                EXPECT_EQ(task, context->get<0>());
-                return context->resumeParent(task, executor);
+                EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
+                EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
+                return context->ResumeParent(context);
               });
             swift_task_enqueue(task, ExecutorRef::generic());
           });
@@ -319,21 +329,23 @@ TEST(ActorTest, actorContention) {
 
     auto task1 = createTaskStoring(JobPriority::Background,
                                    (AsyncTask*) nullptr, actor,
-      [](AsyncTask *task, ExecutorRef executor, Context *context) {
+      [](Context *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(2);
+        auto executor = swift_task_getCurrentExecutor();
         EXPECT_FALSE(executor.isGeneric());
         EXPECT_EQ(ExecutorRef::forDefaultActor(context->get<1>()),
                   executor);
         EXPECT_EQ(nullptr, context->get<0>());
+        auto task = swift_task_getCurrent();
         std::get<0>(context->values) = task;
 
         parkTask(task, context,
-          [](AsyncTask *task, ExecutorRef executor, Context *context) {
+          [](Context *context) SWIFT_CC(swiftasync) {
             EXPECT_PROGRESS(5);
-            EXPECT_TRUE(executor.isGeneric());
-            EXPECT_EQ(task, context->get<0>());
+            EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
+            EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
             finishTest();
-            return context->resumeParent(task, executor);
+            return context->ResumeParent(context);
           });
 
         swift_task_enqueue(task, ExecutorRef::generic());

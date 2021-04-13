@@ -173,11 +173,12 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
 
   if (auto *tai = dyn_cast<TryApplyInst>(paiAI)) {
     builder.createTryApply(paiAI.getLoc(), callee, subs, argList,
-                           tai->getNormalBB(), tai->getErrorBB());
+                           tai->getNormalBB(), tai->getErrorBB(),
+                           tai->getApplyOptions());
   } else {
     auto *apply = cast<ApplyInst>(paiAI);
     auto *newAI = builder.createApply(paiAI.getLoc(), callee, subs, argList,
-                                      apply->isNonThrowing());
+                                      apply->getApplyOptions());
     callbacks.replaceValueUsesWith(apply, newAI);
   }
   // We also need to destroy the partial_apply instruction itself because it is

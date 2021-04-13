@@ -71,7 +71,7 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
-// KEYWORD2-NEXT:             Keyword/None:          concurrent[#Func Attribute#]; name=concurrent
+// KEYWORD2-NEXT:             Keyword/None:          Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2:                  End completions
@@ -191,7 +191,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // ON_METHOD-DAG: Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // ON_METHOD-DAG: Keyword/None:                       transpose[#Func Attribute#]; name=transpose
-// ON_METHOD-DAG: Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// ON_METHOD-DAG: Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // ON_METHOD-NOT: Keyword
 // ON_METHOD: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -242,7 +242,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers
 // ON_MEMBER_LAST-DAG: Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain
 // ON_MEMBER_LAST-DAG: Keyword/None:                       rethrows[#Declaration Attribute#]; name=rethrows
-// ON_MEMBER_LAST-DAG: Keyword/None:                       reasync[#Declaration Attribute#]; name=reasync
 // ON_MEMBER_LAST-DAG: Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // ON_MEMBER_LAST-DAG: Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline
 // ON_MEMBER_LAST-DAG: Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
@@ -254,7 +253,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
-// ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
+// ON_MEMBER_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
@@ -291,7 +290,6 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       inlinable[#Declaration Attribute#]; name=inlinable{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       objcMembers[#Declaration Attribute#]; name=objcMembers{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       NSApplicationMain[#Declaration Attribute#]; name=NSApplicationMain{{$}}
-// KEYWORD_LAST-DAG: Keyword/None:                       reasync[#Declaration Attribute#]; name=reasync{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       rethrows[#Declaration Attribute#]; name=rethrows{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       warn_unqualified_access[#Declaration Attribute#]; name=warn_unqualified_access
 // KEYWORD_LAST-DAG: Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline{{$}}
@@ -305,7 +303,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // KEYWORD_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // KEYWORD_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
-// KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
+// KEYWORD_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST:                  End completions

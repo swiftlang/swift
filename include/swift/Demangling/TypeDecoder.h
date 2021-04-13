@@ -72,6 +72,7 @@ public:
   void setValueOwnership(ValueOwnership ownership) {
     Flags = Flags.withValueOwnership(ownership);
   }
+  void setNoDerivative() { Flags = Flags.withNoDerivative(true); }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -312,9 +313,14 @@ public:
 
   bool isEscaping() const { return Escaping; }
 
-  bool isConcurrent() const { return Concurrent; }
+  bool isSendable() const { return Concurrent; }
 
   bool isPseudogeneric() const { return Pseudogeneric; }
+
+  bool isDifferentiable() const {
+    return getDifferentiabilityKind() !=
+        ImplFunctionDifferentiabilityKind::NonDifferentiable;
+  }
 
   ImplFunctionDifferentiabilityKind getDifferentiabilityKind() const {
     return ImplFunctionDifferentiabilityKind(DifferentiabilityKind);
@@ -708,10 +714,6 @@ public:
     case NodeKind::NoEscapeFunctionType:
     case NodeKind::AutoClosureType:
     case NodeKind::EscapingAutoClosureType:
-    case NodeKind::DifferentiableFunctionType:
-    case NodeKind::EscapingDifferentiableFunctionType:
-    case NodeKind::LinearFunctionType:
-    case NodeKind::EscapingLinearFunctionType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -727,21 +729,37 @@ public:
           flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
       } else if (Node->getKind() == NodeKind::ThinFunctionType) {
         flags = flags.withConvention(FunctionMetadataConvention::Thin);
-      } else if (Node->getKind() == NodeKind::DifferentiableFunctionType ||
-               Node->getKind() ==
-                   NodeKind::EscapingDifferentiableFunctionType) {
-        flags = flags.withDifferentiabilityKind(
-            FunctionMetadataDifferentiabilityKind::Reverse);
-      } else if (Node->getKind() == NodeKind::LinearFunctionType ||
-                 Node->getKind() == NodeKind::EscapingLinearFunctionType) {
-        flags = flags.withDifferentiabilityKind(
-            FunctionMetadataDifferentiabilityKind::Linear);
       }
 
       unsigned firstChildIdx = 0;
       if (Node->getChild(firstChildIdx)->getKind() == NodeKind::ClangType) {
         // [TODO: synthesize-Clang-type-from-mangled-name] Use the first child
         // to create a ClangTypeInfo.
+        ++firstChildIdx;
+      }
+
+      FunctionMetadataDifferentiabilityKind diffKind;
+      if (Node->getChild(firstChildIdx)->getKind() ==
+            NodeKind::DifferentiableFunctionType) {
+        auto mangledDiffKind = (MangledDifferentiabilityKind)
+            Node->getChild(firstChildIdx)->getIndex();
+        switch (mangledDiffKind) {
+        case MangledDifferentiabilityKind::NonDifferentiable:
+          assert(false && "Unexpected case NonDifferentiable");
+          break;
+        case MangledDifferentiabilityKind::Forward:
+          diffKind = FunctionMetadataDifferentiabilityKind::Forward;
+          break;
+        case MangledDifferentiabilityKind::Reverse:
+          diffKind = FunctionMetadataDifferentiabilityKind::Reverse;
+          break;
+        case MangledDifferentiabilityKind::Normal:
+          diffKind = FunctionMetadataDifferentiabilityKind::Normal;
+          break;
+        case MangledDifferentiabilityKind::Linear:
+          diffKind = FunctionMetadataDifferentiabilityKind::Linear;
+          break;
+        }
         ++firstChildIdx;
       }
 
@@ -752,10 +770,10 @@ public:
         ++firstChildIdx;
       }
 
-      bool isConcurrent = false;
+      bool isSendable = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::ConcurrentFunctionType) {
-        isConcurrent = true;
+        isSendable = true;
         ++firstChildIdx;
       }
 
@@ -766,8 +784,9 @@ public:
         ++firstChildIdx;
       }
 
-      flags = flags.withConcurrent(isConcurrent)
-          .withAsync(isAsync).withThrows(isThrow);
+      flags = flags.withConcurrent(isSendable)
+          .withAsync(isAsync).withThrows(isThrow)
+          .withDifferentiable(diffKind.isDifferentiable());
 
       if (Node->getNumChildren() < firstChildIdx + 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -786,16 +805,13 @@ public:
               .withEscaping(
                           Node->getKind() == NodeKind::FunctionType ||
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock ||
-                          Node->getKind() ==
-                              NodeKind::EscapingDifferentiableFunctionType ||
-                          Node->getKind() ==
-                              NodeKind::EscapingLinearFunctionType);
+                          Node->getKind() == NodeKind::EscapingObjCBlock);
 
       auto result = decodeMangledType(Node->getChild(firstChildIdx+1));
       if (result.isError())
         return result;
-      return Builder.createFunctionType(parameters, result.getType(), flags);
+      return Builder.createFunctionType(
+          parameters, result.getType(), flags, diffKind);
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;
@@ -838,7 +854,7 @@ public:
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
-          if (child->getText() == "@concurrent") {
+          if (child->getText() == "@Sendable") {
             flags = flags.withConcurrent();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
@@ -1355,33 +1371,44 @@ private:
             FunctionParam<BuiltType> &param) -> bool {
       Demangle::NodePointer node = typeNode;
 
-      auto setOwnership = [&](ValueOwnership ownership) {
-        param.setValueOwnership(ownership);
-        node = node->getFirstChild();
-        hasParamFlags = true;
-      };
-      switch (node->getKind()) {
-      case NodeKind::InOut:
-        setOwnership(ValueOwnership::InOut);
-        break;
+      bool recurse = true;
+      while (recurse) {
+        switch (node->getKind()) {
+        case NodeKind::InOut:
+          param.setValueOwnership(ValueOwnership::InOut);
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      case NodeKind::Shared:
-        setOwnership(ValueOwnership::Shared);
-        break;
+        case NodeKind::Shared:
+          param.setValueOwnership(ValueOwnership::Shared);
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      case NodeKind::Owned:
-        setOwnership(ValueOwnership::Owned);
-        break;
+        case NodeKind::Owned:
+          param.setValueOwnership(ValueOwnership::Owned);
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      case NodeKind::AutoClosureType:
-      case NodeKind::EscapingAutoClosureType: {
-        param.setAutoClosure();
-        hasParamFlags = true;
-        break;
-      }
+        case NodeKind::NoDerivative:
+          param.setNoDerivative();
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      default:
-        break;
+        case NodeKind::AutoClosureType:
+        case NodeKind::EscapingAutoClosureType:
+          param.setAutoClosure();
+          hasParamFlags = true;
+          recurse = false;
+          break;
+
+        default:
+          recurse = false;
+          break;
+        }
       }
 
       auto paramType = decodeMangledType(node);

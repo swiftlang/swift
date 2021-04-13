@@ -23,11 +23,13 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -342,7 +344,19 @@ namespace swift {
       return ActorIsolationVal;
     }
   };
-  
+
+  /// Describes the current behavior to take with a diagnostic.
+  /// Ordered from most severe to least.
+  enum class DiagnosticBehavior : uint8_t {
+    Unspecified = 0,
+    Fatal,
+    Error,
+    Warning,
+    Remark,
+    Note,
+    Ignore,
+  };
+
   struct DiagnosticFormatOptions {
     const std::string OpeningQuotationMark;
     const std::string ClosingQuotationMark;
@@ -393,6 +407,7 @@ namespace swift {
     SourceLoc Loc;
     bool IsChildNote = false;
     const swift::Decl *Decl = nullptr;
+    DiagnosticBehavior BehaviorLimit = DiagnosticBehavior::Unspecified;
 
     friend DiagnosticEngine;
 
@@ -420,10 +435,12 @@ namespace swift {
     bool isChildNote() const { return IsChildNote; }
     SourceLoc getLoc() const { return Loc; }
     const class Decl *getDecl() const { return Decl; }
+    DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
 
     void setLoc(SourceLoc loc) { Loc = loc; }
     void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
     void setDecl(const class Decl *decl) { Decl = decl; }
+    void setBehaviorLimit(DiagnosticBehavior limit){ BehaviorLimit = limit; }
 
     /// Returns true if this object represents a particular diagnostic.
     ///
@@ -492,6 +509,11 @@ namespace swift {
     
     /// Flush the active diagnostic to the diagnostic output engine.
     void flush();
+
+    /// Prevent the diagnostic from behaving more severely than \p limit. For
+    /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
+    /// emitted as a warning, but a note will still be emitted as a note.
+    InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
 
     /// Add a token-based range to the currently-active diagnostic.
     InFlightDiagnostic &highlight(SourceRange R);
@@ -597,19 +619,6 @@ namespace swift {
   /// Class to track, map, and remap diagnostic severity and fatality
   ///
   class DiagnosticState {
-  public:
-    /// Describes the current behavior to take with a diagnostic
-    enum class Behavior : uint8_t {
-      Unspecified,
-      Ignore,
-      Note,
-      Remark,
-      Warning,
-      Error,
-      Fatal,
-    };
-
-  private:
     /// Whether we should continue to emit diagnostics, even after a
     /// fatal error
     bool showDiagnosticsAfterFatalError = false;
@@ -627,17 +636,19 @@ namespace swift {
     bool anyErrorOccurred = false;
 
     /// Track the previous emitted Behavior, useful for notes
-    Behavior previousBehavior = Behavior::Unspecified;
+    DiagnosticBehavior previousBehavior = DiagnosticBehavior::Unspecified;
 
-    /// Track settable, per-diagnostic state that we store
-    std::vector<Behavior> perDiagnosticBehavior;
+    /// Track which diagnostics should be ignored.
+    llvm::BitVector ignoredDiagnostics;
+
+    friend class DiagnosticStateRAII;
 
   public:
     DiagnosticState();
 
     /// Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    Behavior determineBehavior(DiagID id);
+    DiagnosticBehavior determineBehavior(const Diagnostic &diag);
 
     bool hadAnyError() const { return anyErrorOccurred; }
     bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
@@ -662,9 +673,9 @@ namespace swift {
       fatalErrorOccurred = false;
     }
 
-    /// Set per-diagnostic behavior
-    void setDiagnosticBehavior(DiagID id, Behavior behavior) {
-      perDiagnosticBehavior[(unsigned)id] = behavior;
+    /// Set whether a diagnostic should be ignored.
+    void setIgnoredDiagnostic(DiagID id, bool ignored) {
+      ignoredDiagnostics[(unsigned)id] = ignored;
     }
 
   private:
@@ -729,9 +740,14 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// Whether we are actively pretty-printing a declaration as part of
+    /// diagnostics.
+    bool IsPrettyPrintingDecl = false;
+
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
+    friend class DiagnosticStateRAII;
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
@@ -784,6 +800,8 @@ namespace swift {
       return diagnosticDocumentationPath;
     }
 
+    bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
+
     void setLocalization(std::string locale, std::string path) {
       assert(!locale.empty());
       assert(!path.empty());
@@ -796,21 +814,21 @@ namespace swift {
       if (llvm::sys::fs::exists(filePath)) {
         if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
           localization = std::make_unique<diag::SerializedLocalizationProducer>(
-              std::move(file.get()));
+              std::move(file.get()), getPrintDiagnosticNames());
         }
       } else {
         llvm::sys::path::replace_extension(filePath, ".yaml");
         // In case of missing localization files, we should fallback to messages
         // from `.def` files.
         if (llvm::sys::fs::exists(filePath)) {
-          localization =
-              std::make_unique<diag::YAMLLocalizationProducer>(filePath.str());
+          localization = std::make_unique<diag::YAMLLocalizationProducer>(
+              filePath.str(), getPrintDiagnosticNames());
         }
       }
     }
 
     void ignoreDiagnostic(DiagID id) {
-      state.setDiagnosticBehavior(id, DiagnosticState::Behavior::Ignore);
+      state.setIgnoredDiagnostic(id, true);
     }
 
     void resetHadAnyError() {
@@ -1031,7 +1049,7 @@ namespace swift {
 
   public:
     llvm::StringRef diagnosticStringFor(const DiagID id,
-                                        bool printDiagnosticName);
+                                        bool printDiagnosticNames);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
@@ -1043,6 +1061,33 @@ namespace swift {
     SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
     }
+  };
+
+  /// Remember details about the state of a diagnostic engine and restore them
+  /// when the object is destroyed.
+  ///
+  /// Diagnostic engines contain state about the most recent diagnostic emitted
+  /// which influences subsequent emissions; in particular, if you try to emit
+  /// a note and the previous diagnostic was ignored, the note will be ignored
+  /// too. This can be a problem in code structured like:
+  ///
+  ///     D->diagnose(diag::an_error);
+  ///     if (conditionWhichMightEmitDiagnostics())
+  ///        D->diagnose(diag::a_note); // might be affected by diagnostics from
+  ///                                   // conditionWhichMightEmitDiagnostics()!
+  ///
+  /// To prevent this, functions which are called for their return values but
+  /// may emit diagnostics as a side effect can use \c DiagnosticStateRAII to
+  /// ensure that their changes to diagnostic engine state don't leak out and
+  /// affect the caller's diagnostics.
+  class DiagnosticStateRAII {
+    llvm::SaveAndRestore<DiagnosticBehavior> previousBehavior;
+
+  public:
+    DiagnosticStateRAII(DiagnosticEngine &diags)
+      : previousBehavior(diags.state.previousBehavior) {}
+
+    ~DiagnosticStateRAII() {}
   };
 
   class BufferIndirectlyCausingDiagnosticRAII {
@@ -1106,9 +1151,9 @@ namespace swift {
                                        Engine.TentativeDiagnostics.end());
 
       for (auto &diagnostic : diagnostics) {
-        auto behavior = Engine.state.determineBehavior(diagnostic.getID());
-        if (behavior == DiagnosticState::Behavior::Fatal ||
-            behavior == DiagnosticState::Behavior::Error)
+        auto behavior = Engine.state.determineBehavior(diagnostic);
+        if (behavior == DiagnosticBehavior::Fatal ||
+            behavior == DiagnosticBehavior::Error)
           return true;
       }
 

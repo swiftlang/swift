@@ -394,7 +394,7 @@ public:
 
   Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
 
-  void collectAllGroups(std::vector<StringRef> &Names) const override;
+  void collectAllGroups(SmallVectorImpl<StringRef> &Names) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 

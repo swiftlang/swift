@@ -1084,11 +1084,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, NumSubs = 0,
-           NumConformances = 0, IsNonThrowingApply = 0;
+           NumConformances = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
   SourceLoc SLoc;
+  ApplyOptions ApplyOpts;
   ArrayRef<uint64_t> ListOfValues;
   SILLocation Loc = RegularLocation(SLoc);
 
@@ -1146,10 +1147,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                   TyID3);
     break;
   case SIL_INST_APPLY: {
-    unsigned IsPartial;
-    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs, TyID, TyID2,
+    unsigned Kind, RawApplyOpts;
+    SILInstApplyLayout::readRecord(scratch, Kind, RawApplyOpts, NumSubs, TyID, TyID2,
                                    ValID, ListOfValues);
-    switch (IsPartial) {
+    switch (Kind) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
       break;
@@ -1162,21 +1163,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     case SIL_TRY_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::TryApplyInst;
       break;
-    case SIL_NON_THROWING_APPLY:
-      RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
-      IsNonThrowingApply = true;
-      break;
     case SIL_BEGIN_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::BeginApplyInst;
-      break;
-    case SIL_NON_THROWING_BEGIN_APPLY:
-      RawOpCode = (unsigned)SILInstructionKind::BeginApplyInst;
-      IsNonThrowingApply = true;
       break;
         
     default:
       llvm_unreachable("unexpected apply inst kind");
     }
+
+    ApplyOpts = ApplyOptions(ApplyFlags(RawApplyOpts));
     break;
   }
   case SIL_INST_NO_OPERAND:
@@ -1522,11 +1517,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     if (OpCode == SILInstructionKind::ApplyInst) {
       ResultInst =
           Builder.createApply(Loc, getLocalValue(ValID, FnTy), Substitutions,
-                              Args, IsNonThrowingApply != 0);
+                              Args, ApplyOpts);
     } else {
       ResultInst = Builder.createBeginApply(Loc, getLocalValue(ValID, FnTy),
-                                            Substitutions, Args,
-                                            IsNonThrowingApply != 0);
+                                            Substitutions, Args, ApplyOpts);
     }
     break;
   }
@@ -1557,7 +1551,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
     ResultInst = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
-                                        Substitutions, Args, normalBB, errorBB);
+                                        Substitutions, Args, normalBB, errorBB,
+                                        ApplyOpts);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1858,7 +1853,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
-  UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
@@ -1895,6 +1889,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
         verificationType);
+    break;
+  }
+
+  case SILInstructionKind::DestroyValueInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned poisonRefs = Attr;
+    ResultInst = Builder.createDestroyValue(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID),
+                                        (SILValueCategory)TyCategory, Fn)),
+        poisonRefs != 0);
     break;
   }
 
@@ -3433,8 +3438,7 @@ llvm::Expected<SILWitnessTable *>
   auto theConformance = cast<RootProtocolConformance>(
                           maybeConformance.get().getConcrete());
 
-  PrettyStackTraceConformance trace(SILMod.getASTContext(),
-                                    "deserializing SIL witness table for",
+  PrettyStackTraceConformance trace("deserializing SIL witness table for",
                                     theConformance);
 
   if (!existingWt)

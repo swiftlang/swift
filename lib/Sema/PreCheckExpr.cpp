@@ -238,6 +238,30 @@ static bool diagnoseRangeOperatorMisspell(DiagnosticEngine &Diags,
   return false;
 }
 
+static bool diagnoseNonexistentPowerOperator(DiagnosticEngine &Diags,
+                                             UnresolvedDeclRefExpr *UDRE,
+                                             DeclContext *DC) {
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!(name.isOperator() && name.is("**")))
+    return false;
+
+  DC = DC->getModuleScopeContext();
+
+  auto &ctx = DC->getASTContext();
+  DeclNameRef powerName(ctx.getIdentifier("pow"));
+
+  // Look if 'pow(_:_:)' exists within current context.
+  auto lookUp = TypeChecker::lookupUnqualified(
+      DC, powerName, UDRE->getLoc(), defaultUnqualifiedLookupOptions);
+  if (lookUp) {
+    Diags.diagnose(UDRE->getLoc(), diag::nonexistent_power_operator)
+        .highlight(UDRE->getSourceRange());
+    return true;
+  }
+
+  return false;
+}
+
 static bool diagnoseIncDecOperator(DiagnosticEngine &Diags,
                                    UnresolvedDeclRefExpr *UDRE) {
   auto name = UDRE->getName().getBaseIdentifier();
@@ -328,6 +352,34 @@ static bool isMemberChainTail(Expr *expr, Expr *parent) {
   return parent == nullptr || !isMemberChainMember(parent);
 }
 
+static bool isValidForwardReference(ValueDecl *D, DeclContext *DC,
+                                    ValueDecl **localDeclAfterUse) {
+  *localDeclAfterUse = nullptr;
+
+  // References to variables injected by lldb are always valid.
+  if (isa<VarDecl>(D) && cast<VarDecl>(D)->isDebuggerVar())
+    return true;
+
+  // If we find something in the current context, it must be a forward
+  // reference, because otherwise if it was in scope, it would have
+  // been returned by the call to ASTScope::lookupLocalDecls() above.
+  if (D->getDeclContext()->isLocalContext()) {
+    do {
+      if (D->getDeclContext() == DC) {
+        *localDeclAfterUse = D;
+        return false;
+      }
+
+      // If we're inside of a 'defer' context, walk up to the parent
+      // and check again. We don't want 'defer' bodies to forward
+      // reference bindings in the immediate outer scope.
+    } while (isa<FuncDecl>(DC) &&
+             cast<FuncDecl>(DC)->isDeferBody() &&
+             (DC = DC->getParent()));
+  }
+  return true;
+}
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -337,6 +389,25 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclNameRef Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
+
+  DeclNameRef LookupName = Name;
+  if (Name.isCompoundName()) {
+    auto &context = DC->getASTContext();
+
+    // Remove any $ prefixes for lookup
+    SmallVector<Identifier, 4> lookupLabels;
+    for (auto label : Name.getArgumentNames()) {
+      if (label.hasDollarPrefix()) {
+        auto unprefixed = label.str().drop_front();
+        lookupLabels.push_back(context.getIdentifier(unprefixed));
+      } else {
+        lookupLabels.push_back(label);
+      }
+    }
+
+    DeclName lookupName(context, Name.getBaseName(), lookupLabels);
+    LookupName = DeclNameRef(lookupName);
+  }
 
   auto errorResult = [&]() -> Expr * {
     if (replaceInvalidRefsWithErrors)
@@ -362,7 +433,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   if (Loc.isValid() && !Name.isOperator()) {
     SmallVector<ValueDecl *, 2> localDecls;
     ASTScope::lookupLocalDecls(DC->getParentSourceFile(),
-                               Name.getFullName(), Loc,
+                               LookupName.getFullName(), Loc,
                                /*stopAfterInnermostBraceStmt=*/false,
                                ResultValues);
     for (auto *localDecl : ResultValues) {
@@ -376,27 +447,15 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (Loc.isInvalid())
       DC = DC->getModuleScopeContext();
 
-    Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
+    Lookup = TypeChecker::lookupUnqualified(DC, LookupName, Loc, lookupOptions);
 
     ValueDecl *localDeclAfterUse = nullptr;
-    auto isValid = [&](ValueDecl *D) {
-      // References to variables injected by lldb are always valid.
-      if (isa<VarDecl>(D) && cast<VarDecl>(D)->isDebuggerVar())
-        return true;
-
-      // If we find something in the current context, it must be a forward
-      // reference, because otherwise if it was in scope, it would have
-      // been returned by the call to ASTScope::lookupLocalDecls() above.
-      if (D->getDeclContext()->isLocalContext() &&
-          D->getDeclContext() == DC) {
-        localDeclAfterUse = D;
-        return false;
-      }
-      return true;
-    };
     AllDeclRefs =
         findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
-                       /*breakOnMember=*/true, ResultValues, isValid);
+                       /*breakOnMember=*/true, ResultValues,
+                       [&](ValueDecl *D) {
+                         return isValidForwardReference(D, DC, &localDeclAfterUse);
+                       });
 
     // If local declaration after use is found, check outer results for
     // better matching candidates.
@@ -416,7 +475,10 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
         localDeclAfterUse = nullptr;
         AllDeclRefs =
             findNonMembers(Lookup.innerResults(), UDRE->getRefKind(),
-                           /*breakOnMember=*/true, ResultValues, isValid);
+                           /*breakOnMember=*/true, ResultValues,
+                           [&](ValueDecl *D) {
+                             return isValidForwardReference(D, DC, &localDeclAfterUse);
+                           });
       }
     }
   }
@@ -427,7 +489,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     // e.g. (x*-4) that needs whitespace.
     if (diagnoseRangeOperatorMisspell(Context.Diags, UDRE) ||
         diagnoseIncDecOperator(Context.Diags, UDRE) ||
-        diagnoseOperatorJuxtaposition(UDRE, DC)) {
+        diagnoseOperatorJuxtaposition(UDRE, DC) ||
+        diagnoseNonexistentPowerOperator(Context.Diags, UDRE, DC)) {
       return errorResult();
     }
 
@@ -435,7 +498,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
-        TypeChecker::lookupUnqualified(DC, Name, Loc, relookupOptions);
+        TypeChecker::lookupUnqualified(DC, LookupName, Loc, relookupOptions);
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
@@ -1328,22 +1391,6 @@ namespace {
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
-  auto *PL = closure->getParameters();
-
-  // Validate the parameters.
-  bool hadParameterError = false;
-
-  // If we encounter an error validating the parameter list, don't bail.
-  // Instead, go on to validate any potential result type, and bail
-  // afterwards.  This allows for better diagnostics, and keeps the
-  // closure expression type well-formed.
-  for (auto param : *PL) {
-    hadParameterError |= param->isInvalid();
-  }
-
-  if (hadParameterError)
-    return false;
-
   // If we won't be checking the body of the closure, don't walk into it here.
   if (!shouldTypeCheckInEnclosingExpression(closure))
     return false;

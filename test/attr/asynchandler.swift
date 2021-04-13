@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
+// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -enable-experimental-async-handler
 
 // REQUIRES: concurrency
 
@@ -64,7 +64,7 @@ class Y: P {
     // expected-note@-2{{add '@asyncHandler' to function 'callback()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
 
     // okay, it's an async context
-    let _ = await globalAsyncFunction() // expected-error{{'async' in a function that does not support concurrency}}
+    let _ = await globalAsyncFunction() // expected-error{{'async' call in a function that does not support concurrency}}
  }
 }
 

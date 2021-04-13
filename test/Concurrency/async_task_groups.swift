@@ -4,31 +4,29 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncFunc() async -> Int { 42 }
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncThrowsFunc() async throws -> Int { 42 }
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncThrowsOnCancel() async throws -> Int {
   // terrible suspend-spin-loop -- do not do this
   // only for purposes of demonstration
   while Task.isCancelled {
-    sleep(1)
+    await Task.sleep(1_000_000_000)
   }
 
   throw Task.CancellationError()
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_add() async throws -> Int {
-  try await Task.withGroup(resultType: Int.self) { group in
-    await group.add {
+  try await withThrowingTaskGroup(of: Int.self) { group in
+    group.spawn {
       await asyncFunc()
     }
 
-    await group.add {
+    group.spawn {
       await asyncFunc()
     }
 
@@ -40,49 +38,22 @@ func test_taskGroup_add() async throws -> Int {
   } // implicitly awaits
 }
 
-func test_taskGroup_addHandles() async throws -> Int {
-  try await Task.withGroup(resultType: Int.self) { group in
-    let one = await group.add {
-      await asyncFunc()
-    }
-
-    let two = await group.add {
-      await asyncFunc()
-    }
-
-    _ = try await one.get()
-    _ = try await two.get()
-  } // implicitly awaits
-}
-
-func test_taskGroup_cancel_handles() async throws {
-  try await Task.withGroup(resultType: Int.self) { group in
-    let one = await group.add {
-      try await asyncThrowsOnCancel()
-    }
-
-    let two = await group.add {
-      await asyncFunc()
-    }
-
-    _ = try await one.get()
-    _ = try await two.get()
-  } // implicitly awaits
-}
-
 // ==== ------------------------------------------------------------------------
 // MARK: Example group Usages
 
 struct Boom: Error {}
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func work() async -> Int { 42 }
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func boom() async throws -> Int { throw Boom() }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func first_allMustSucceed() async throws {
 
-  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
-    await group.add { await work() }
-    await group.add { await work() }
-    await group.add { try await boom() }
+  let first: Int = try await withThrowingTaskGroup(of: Int.self) { group in
+    group.spawn { await work() }
+    group.spawn { await work() }
+    group.spawn { try await boom() }
 
     if let first = try await group.next() {
       return first
@@ -95,14 +66,15 @@ func first_allMustSucceed() async throws {
   // Expected: re-thrown Boom
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func first_ignoreFailures() async throws {
-  @concurrent func work() async -> Int { 42 }
-  @concurrent func boom() async throws -> Int { throw Boom() }
+  @Sendable func work() async -> Int { 42 }
+  @Sendable func boom() async throws -> Int { throw Boom() }
 
-  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
-    await group.add { await work() }
-    await group.add { await work() }
-    await group.add {
+  let first: Int = try await withThrowingTaskGroup(of: Int.self) { group in
+    group.spawn { await work() }
+    group.spawn { await work() }
+    group.spawn {
       do {
         return try await boom()
       } catch {
@@ -128,13 +100,14 @@ func first_ignoreFailures() async throws {
 // ==== ------------------------------------------------------------------------
 // MARK: Advanced Custom Task Group Usage
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_quorum_thenCancel() async {
   // imitates a typical "gather quorum" routine that is typical in distributed systems programming
   enum Vote {
     case yay
     case nay
   }
-  struct Follower: ConcurrentValue {
+  struct Follower: Sendable {
     init(_ name: String) {}
     func vote() async throws -> Vote {
       // "randomly" vote yes or no
@@ -146,9 +119,9 @@ func test_taskGroup_quorum_thenCancel() async {
   ///
   /// - Returns: `true` iff `N/2 + 1` followers return `.yay`, `false` otherwise.
   func gatherQuorum(followers: [Follower]) async -> Bool {
-    try! await Task.withGroup(resultType: Vote.self) { group in
+    try! await withThrowingTaskGroup(of: Vote.self) { group in
       for follower in followers {
-        await group.add { try await follower.vote() }
+        group.spawn { try await follower.vote() }
       }
 
       defer {
@@ -181,13 +154,27 @@ func test_taskGroup_quorum_thenCancel() async {
   _ = await gatherQuorum(followers: [Follower("A"), Follower("B"), Follower("C")])
 }
 
-extension Collection where Self: ConcurrentValue, Element: ConcurrentValue, Self.Index: ConcurrentValue {
+// FIXME: this is a workaround since (A, B) today isn't inferred to be Sendable
+//        and causes an error, but should be a warning (this year at least)
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
+  let first: A
+  let second: B
+
+  init(_ first: A, _ second: B) {
+    self.first = first
+    self.second = second
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendable {
 
   /// Just another example of how one might use task groups.
-  func map<T: ConcurrentValue>(
+  func map<T: Sendable>(
     parallelism requestedParallelism: Int? = nil/*system default*/,
     // ordered: Bool = true, /
-    _ transform: @concurrent (Element) async throws -> T
+    _ transform: @Sendable (Element) async throws -> T
   ) async throws -> [T] { // TODO: can't use rethrows here, maybe that's just life though; rdar://71479187 (rethrows is a bit limiting with async functions that use task groups)
     let defaultParallelism = 2
     let parallelism = requestedParallelism ?? defaultParallelism
@@ -197,7 +184,7 @@ extension Collection where Self: ConcurrentValue, Element: ConcurrentValue, Self
       return []
     }
 
-    return try await Task.withGroup(resultType: (Int, T).self) { group in
+    return try await withThrowingTaskGroup(of: SendableTuple2<Int, T>.self) { group in
       var result = ContiguousArray<T>()
       result.reserveCapacity(n)
 
@@ -205,9 +192,9 @@ extension Collection where Self: ConcurrentValue, Element: ConcurrentValue, Self
       var submitted = 0
 
       func submitNext() async throws {
-        await group.add { [submitted,i] in
+        group.spawn { [submitted,i] in
           let value = try await transform(self[i])
-          return (submitted, value)
+          return SendableTuple2(submitted, value)
         }
         submitted += 1
         formIndex(after: &i)
@@ -218,7 +205,9 @@ extension Collection where Self: ConcurrentValue, Element: ConcurrentValue, Self
         try await submitNext()
       }
 
-      while let (index, taskResult) = try await group.next() {
+      while let tuple = try await group.next() {
+        let index = tuple.first
+        let taskResult = tuple.second
         result[index] = taskResult
 
         try Task.checkCancellation()

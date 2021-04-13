@@ -554,6 +554,23 @@ bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
+class Derived : C {}
+
+// CHECK-LABEL: sil @dead_unconditional_checked_cast :
+// CHECK-NOT:   unconditional_checked_cast
+// CHECK:     bb1:
+// CHECK:       strong_release %0
+// CHECK:     } // end sil function 'dead_unconditional_checked_cast'
+sil @dead_unconditional_checked_cast : $@convention(thin) (@owned C) -> () {
+bb0(%0 : $C):
+  %1 = unconditional_checked_cast %0 : $C to Derived
+  br bb1
+bb1:
+  strong_release %1 : $Derived
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @cond_fail_applied_to_zero_removal
 // CHECK: bb0
 // CHECK-NEXT: cond_fail
@@ -4187,3 +4204,25 @@ bb1(%result : $Builtin.NativeObject):
 bb2(%error : $Error):
   unreachable
 }
+
+sil_global private @outlined_global : $_ContiguousArrayStorage<Int>
+
+// CHECK-LABEL: sil @test_global_value
+// CHECK-NOT:   retain
+// CHECK-NOT:   release
+// CHECK-NOT:   debug_value
+// CHECK:     } // end sil function 'test_global_value'
+sil @test_global_value : $@convention(thin) () -> Int {
+bb0:
+  %0 = global_value @outlined_global : $_ContiguousArrayStorage<Int>
+  strong_retain %0 : $_ContiguousArrayStorage<Int>
+  debug_value %0 : $_ContiguousArrayStorage<Int>, let, name "x"
+  %2 = upcast %0 : $_ContiguousArrayStorage<Int> to $__ContiguousArrayStorageBase
+  strong_retain %2 : $__ContiguousArrayStorageBase
+  %13 = ref_tail_addr [immutable] %2 : $__ContiguousArrayStorageBase, $Int
+  %16 = load %13 : $*Int
+  strong_release %2 : $__ContiguousArrayStorageBase
+  strong_release %0 : $_ContiguousArrayStorage<Int>
+  return %16 : $Int
+} // end sil function 'test_global_value'
+

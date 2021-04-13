@@ -189,6 +189,15 @@ Solution ConstraintSystem::finalize() {
     solution.resultBuilderTransformed.insert(transformed);
   }
 
+  for (const auto &appliedWrapper : appliedPropertyWrappers) {
+    solution.appliedPropertyWrappers.insert(appliedWrapper);
+  }
+
+  // Remember implicit value conversions.
+  for (const auto &valueConversion : ImplicitValueConversions) {
+    solution.ImplicitValueConversions.push_back(valueConversion);
+  }
+
   return solution;
 }
 
@@ -273,7 +282,15 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (const auto &transformed : solution.resultBuilderTransformed) {
     resultBuilderTransformed.push_back(transformed);
   }
-    
+
+  for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
+    appliedPropertyWrappers.insert(appliedWrapper);
+  }
+
+  for (auto &valueConversion : solution.ImplicitValueConversions) {
+    ImplicitValueConversions.push_back(valueConversion);
+  }
+
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
 }
@@ -290,7 +307,7 @@ void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
                       savedBindings.end());
 }
 
-bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
+bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
   while (!ActiveConstraints.empty()) {
     // Grab the next constraint from the worklist.
@@ -316,7 +333,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
     }
 
     // Check whether a constraint failed. If so, we're done.
-    if (failedConstraint && !ContinueAfterFailures) {
+    if (failedConstraint) {
       return true;
     }
 
@@ -474,11 +491,13 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numResultBuilderTransformed = cs.resultBuilderTransformed.size();
+  numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
   numInferredClosureTypes = cs.ClosureTypes.size();
   numContextualTypes = cs.contextualTypes.size();
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
+  numImplicitValueConversions = cs.ImplicitValueConversions.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -554,6 +573,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
   /// Remove any builder transformed closures.
   truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
 
+  // Remove any applied property wrappers.
+  truncate(cs.appliedPropertyWrappers, numAppliedPropertyWrappers);
+
   // Remove any inferred closure types (e.g. used in result builder body).
   truncate(cs.ClosureTypes, numInferredClosureTypes);
 
@@ -565,6 +587,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);
+
+  // Remove any implicit value conversions.
+  truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -598,7 +623,7 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
 }
 
 bool ConstraintSystem::Candidate::solve(
-    llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) {
+    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
   // Don't attempt to solve candidate if there is closure
   // expression involved, because it's handled specially
   // by parent constraint system (e.g. parameter lists).
@@ -710,13 +735,21 @@ bool ConstraintSystem::Candidate::solve(
 
 void ConstraintSystem::Candidate::applySolutions(
     llvm::SmallVectorImpl<Solution> &solutions,
-    llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) const {
+    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const {
   // A collection of OSRs with their newly reduced domains,
   // it's domains are sets because multiple solutions can have the same
   // choice for one of the type variables, and we want no duplication.
-  llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSet<ValueDecl *, 2>>
+  llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSetVector<ValueDecl *, 2>>
     domains;
   for (auto &solution : solutions) {
+    auto &score = solution.getFixedScore();
+
+    // Avoid any solutions with implicit value conversions
+    // because they might get reverted later when more context
+    // becomes available.
+    if (score.Data[SK_ImplicitValueConversion] > 0)
+      continue;
+
     for (auto choice : solution.overloadChoices) {
       // Some of the choices might not have locators.
       if (!choice.getFirst())
@@ -731,7 +764,7 @@ void ConstraintSystem::Candidate::applySolutions(
       auto overload = choice.getSecond().choice;
       auto type = overload.getDecl()->getInterfaceType();
 
-      // One of the solutions has polymorphic type assigned with one of it's
+      // One of the solutions has polymorphic type associated with one of its
       // type variables. Such functions can only be properly resolved
       // via complete expression, so we'll have to forget solutions
       // we have already recorded. They might not include all viable overload
@@ -1082,7 +1115,7 @@ void ConstraintSystem::shrink(Expr *expr) {
   // so we can start solving them separately.
   expr->walk(collector);
 
-  llvm::SmallDenseSet<OverloadSetRefExpr *> shrunkExprs;
+  llvm::SmallSetVector<OverloadSetRefExpr *, 4> shrunkExprs;
   for (auto &candidate : collector.Candidates) {
     // If there are no results, let's forget everything we know about the
     // system so far. This actually is ok, because some of the expressions
@@ -1098,7 +1131,7 @@ void ConstraintSystem::shrink(Expr *expr) {
             return childExpr;
 
           OSR->setDecls(domain->getSecond());
-          shrunkExprs.erase(OSR);
+          shrunkExprs.remove(OSR);
         }
 
         return childExpr;
@@ -2142,6 +2175,15 @@ bool DisjunctionChoice::isSymmetricOperator() const {
   return firstType->isEqual(secondType);
 }
 
+bool DisjunctionChoice::isUnaryOperator() const {
+  auto *decl = getOperatorDecl(Choice);
+  if (!decl)
+    return false;
+
+  auto func = cast<FuncDecl>(decl);
+  return func->getParameters()->size() == 1;
+}
+
 void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   assert(ExplicitConversion);
 
@@ -2159,7 +2201,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   if (typeVar->getImpl().getFixedType(nullptr))
     return;
 
-  auto bindings = cs.inferBindingsFor(typeVar);
+  auto bindings = cs.getBindingsFor(typeVar);
 
   auto numBindings =
       bindings.Bindings.size() + bindings.getNumViableLiteralBindings();
@@ -2190,6 +2232,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
         case ConstraintKind::Defaultable:
         case ConstraintKind::ConformsTo:
         case ConstraintKind::LiteralConformsTo:
+        case ConstraintKind::TransitivelyConformsTo:
           return false;
 
         default:

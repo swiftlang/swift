@@ -198,7 +198,24 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
-bool AddConcurrentAttribute::diagnose(const Solution &solution,
+bool MarkGlobalActorFunction::diagnose(const Solution &solution,
+                                      bool asNote) const {
+  DroppedGlobalActorFunctionAttr failure(
+      solution, getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+MarkGlobalActorFunction *
+MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                               ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+    locator = cs.getConstraintLocator(
+        locator, LocatorPathElt::ArgumentAttribute::forGlobalActor());
+
+  return new (cs.getAllocator()) MarkGlobalActorFunction(cs, lhs, rhs, locator);
+}
+
+bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
       solution, getFromType(), getToType(), getLocator(),
@@ -206,8 +223,8 @@ bool AddConcurrentAttribute::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
-AddConcurrentAttribute *
-AddConcurrentAttribute::create(ConstraintSystem &cs,
+AddSendableAttribute *
+AddSendableAttribute::create(ConstraintSystem &cs,
                                FunctionType *fromType,
                                FunctionType *toType,
                                ConstraintLocator *locator) {
@@ -215,7 +232,7 @@ AddConcurrentAttribute::create(ConstraintSystem &cs,
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forConcurrent());
 
-  return new (cs.getAllocator()) AddConcurrentAttribute(
+  return new (cs.getAllocator()) AddSendableAttribute(
       cs, fromType, toType, locator);
 }
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {
@@ -627,6 +644,28 @@ UseWrappedValue *UseWrappedValue::create(ConstraintSystem &cs,
                                          ConstraintLocator *locator) {
   return new (cs.getAllocator())
       UseWrappedValue(cs, propertyWrapper, base, wrapper, locator);
+}
+
+bool AllowInvalidPropertyWrapperType::diagnose(const Solution &solution, bool asNote) const {
+  InvalidPropertyWrapperType failure(solution, wrapperType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPropertyWrapperType *
+AllowInvalidPropertyWrapperType::create(ConstraintSystem &cs, Type wrapperType,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowInvalidPropertyWrapperType(cs, wrapperType, locator);
+}
+
+bool RemoveProjectedValueArgument::diagnose(const Solution &solution, bool asNote) const {
+  InvalidProjectedValueArgument failure(solution, wrapperType, param, getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveProjectedValueArgument *
+RemoveProjectedValueArgument::create(ConstraintSystem &cs, Type wrapperType,
+                                      ParamDecl *param, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveProjectedValueArgument(cs, wrapperType, param, locator);
 }
 
 bool UseSubscriptOperator::diagnose(const Solution &solution,
@@ -1695,14 +1734,26 @@ bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
   class PreCheckWalker : public ASTWalker {
     DeclContext *DC;
     DiagnosticTransaction Transaction;
+    // Check whether expression(s) in the body of the
+    // result builder had any `ErrorExpr`s before pre-check.
+    bool FoundErrorExpr = false;
 
   public:
     PreCheckWalker(DeclContext *dc)
         : DC(dc), Transaction(dc->getASTContext().Diags) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // This has to be checked before `preCheckExpression`
+      // because pre-check would convert invalid references
+      // into `ErrorExpr`s.
+      E->forEachChildExpr([&](Expr *expr) {
+        FoundErrorExpr |= isa<ErrorExpr>(expr);
+        return FoundErrorExpr ? nullptr : expr;
+      });
+
       auto hasError = ConstraintSystem::preCheckExpression(
           E, DC, /*replaceInvalidRefsWithErrors=*/true);
+
       return std::make_pair(false, hasError ? nullptr : E);
     }
 
@@ -1716,7 +1767,18 @@ bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
     }
 
     bool diagnosed() const {
-      return Transaction.hasErrors();
+      // pre-check produced an error.
+      if (Transaction.hasErrors())
+        return true;
+
+      // If there were `ErrorExpr`s before pre-check
+      // they should have been diagnosed already by parser.
+      if (FoundErrorExpr) {
+        auto &DE = DC->getASTContext().Diags;
+        return DE.hadAnyError();
+      }
+
+      return false;
     }
   };
 

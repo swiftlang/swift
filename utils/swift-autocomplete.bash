@@ -48,7 +48,6 @@ _swift_complete()
       -enable-expand-all \
       -enable-experimental-linear-map-transposition \
       -enable-loop-arc \
-      -enable-mem-behavior-dump-all \
       -enable-rc-identity-arg-strip \
       -enable-sil-passmanager-verifier-analysis \
       -enable-trap-debug-info \
@@ -102,6 +101,7 @@ _swift_complete()
       -sil-partial-specialization-with-generic-substitutions \
       -sil-print-all \
       -sil-print-debuginfo \
+      -sil-print-function \
       -sil-print-functions \
       -sil-print-generic-specialization-info \
       -sil-print-generic-specialization-loops \
@@ -160,8 +160,8 @@ _swift_complete()
     if [[ ${prevWord} == "-Xfrontend" ]] || echo ${COMP_WORDS[@]} | grep --quiet -e '-frontend' ; then
       frontendOption="-frontend"
     fi
-    options=`${tool} ${frontendOption} -help-hidden 2>/dev/null | grep '^  *-[a-zA-Z-]' | sed -E 's/^  *(-[a-zA-Z=-]+).*/\1/'`
-    COMPREPLY=( $(compgen -W "${options}" -- ${currentWord}) )
+    toolOptions=`${tool} ${frontendOption} -help-hidden 2>/dev/null | grep '^  *-[a-zA-Z-]' | sed -E 's/^  *(-[a-zA-Z=-]+).*/\1/'`
+    COMPREPLY=( $(compgen -W "${toolOptions}" -- ${currentWord}) )
   fi
   return 0
 }
@@ -186,6 +186,7 @@ _ninja_complete()
 
 complete -o default -F _swift_complete swiftc
 complete -o default -F _swift_complete swift
+complete -o default -F _swift_complete swift-frontend
 complete -o default -F _swift_complete sil-opt
 complete -o default -F _swift_complete sil-func-extractor
 complete -o default -F _swift_complete swift-demangle

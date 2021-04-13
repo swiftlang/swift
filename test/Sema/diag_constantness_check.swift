@@ -328,3 +328,36 @@ func testAtomicOrderingConstantness(
   _ = atomicInt.load(ordering: myOrder)
     // expected-error@-1 {{ordering argument must be a static method or property of 'AtomicLoadOrdering'}}
 }
+
+// Test that the check can handle ranges
+@_semantics("oslog.requires_constant_arguments")
+func constantRange(x: Range<Int>) {}
+
+@_semantics("oslog.requires_constant_arguments")
+func constantClosedRange(x: ClosedRange<Int>) {}
+
+func testConstantRange(x: Int) {
+  constantRange(x: 0..<5)
+  constantRange(x: 0..<x)
+    // expected-error@-1 {{argument must be an integer literal}}
+  constantClosedRange(x: 0...10)
+  constantClosedRange(x: x...10)
+    // expected-error@-1 {{argument must be an integer literal}}
+}
+
+struct ConstructorTest {
+  @_semantics("oslog.requires_constant_arguments")
+  init(x: Int) { }
+
+  @_semantics("oslog.requires_constant_arguments")
+  init(_ x: Int) { }
+}
+
+func testConstructorAnnotation(x: Int) {
+  let _ = ConstructorTest(x: 10)
+  let _ = ConstructorTest(x: x)
+    // expected-error@-1 {{argument must be an integer literal}}
+  let _ = ConstructorTest(10)
+  let _ = ConstructorTest(x)
+    // expected-error@-1 {{argument must be an integer literal}}
+}

@@ -1160,11 +1160,19 @@ public struct ${Self}
   public init(_ source: ${FloatType}) {
     _precondition(source.isFinite,
       "${FloatType} value cannot be converted to ${Self} because it is either infinite or NaN")
-%     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
+%     if FloatBits == 16 and signed and bits >= 32:
+    // A Float16 value, if finite, is always in-range for 32- and 64-bit signed
+    // integer types.
+%     else:
     _precondition(source > ${str(lower)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+%       if FloatBits == 16 and not signed and bits >= 16:
+    // A Float16 value, if greater than -1 and finite, is always in-range for
+    // 16-, 32-, and 64-bit unsigned integer types.
+%       else:
     _precondition(source < ${str(upper)}.0,
       "${FloatType} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+%       end
 %     end
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
   }
@@ -1191,10 +1199,16 @@ public struct ${Self}
     // The value passed as `source` must not be infinite, NaN, or exceed the
     // bounds of the integer type; the result of `fptosi` or `fptoui` is
     // undefined if it overflows.
-%     if not (FloatBits == 16 and bits >= 32): # Float16 is always in-range for 32- and 64-bit ints.
-    guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
-%     else:
+%     if FloatBits == 16 and signed and bits >= 32:
+    // A Float16 value, if finite, is always in-range for 32- and 64-bit signed
+    // integer types.
     guard source.isFinite else {
+%     elif FloatBits == 16 and not signed and bits >= 16:
+    // A Float16 value, if greater than -1 and finite, is always in-range for
+    // 16-, 32-, and 64-bit unsigned integer types.
+    guard source > ${str(lower)}.0 && source.isFinite else {
+%     else:
+    guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
 %     end
       return nil
     }
@@ -1399,7 +1413,7 @@ ${assignmentOperatorComment(x.operator, True)}
 
   /// A type that represents the words of this integer.
   @frozen
-  public struct Words: RandomAccessCollection, ConcurrentValue {
+  public struct Words: RandomAccessCollection, Sendable {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
@@ -1709,7 +1723,7 @@ ${operatorComment(x.operator, True)}
 }
 
 
-extension ${Self}: ConcurrentValue { }
+extension ${Self}: Sendable { }
 
 % if signed:
 // TODO: Consider removing the underscore.

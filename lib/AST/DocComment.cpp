@@ -440,7 +440,7 @@ const ValueDecl *findRequirementDeclWithDocComment(const ValueDecl *VD,
   std::queue<const ValueDecl *> requirements;
   while (true) {
     for (auto *req : VD->getSatisfiedProtocolRequirements()) {
-      if (!req->getRawComment().isEmpty())
+      if (!req->getRawComment(AllowSerialized).isEmpty())
         return req;
       else
         requirements.push(req);

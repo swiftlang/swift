@@ -1,18 +1,16 @@
 // RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -enable-experimental-concurrency | %IRGenFileCheck %s
 // REQUIRES: concurrency
 
-// rdar_72047158
-// XFAIL: CPU=arm64e
 
 // CHECK: %T11actor_class7MyClassC = type <{ %swift.refcounted, %swift.defaultactor, %TSi }>
 // CHECK: %swift.defaultactor = type { [10 x i8*] }
 
 // CHECK-objc-LABEL: @"$s11actor_class7MyClassCMm" = global
-// CHECK-objc-SAME: %objc_class* @"OBJC_METACLASS_$__TtCs12_SwiftObject"
+// CHECK-objc-SAME: @"OBJC_METACLASS_$__TtCs12_SwiftObject{{(.ptrauth)?}}"
 
 // CHECK: @"$s11actor_class7MyClassCMf" = internal global
-// CHECK-SAME: @"$s11actor_class7MyClassCfD"
-// CHECK-objc-SAME: %objc_class* @"OBJC_CLASS_$__TtCs12_SwiftObject"
+// CHECK-SAME: @"$s11actor_class7MyClassCfD{{(.ptrauth)?}}"
+// CHECK-objc-SAME: @"OBJC_CLASS_$__TtCs12_SwiftObject{{(.ptrauth)?}}"
 // CHECK-nonobjc-SAME: %swift.type* null,
 //   Flags: uses Swift refcounting
 // CHECK-SAME: i32 2,
@@ -28,7 +26,7 @@
 // Type descriptor.
 // CHECK-LABEL: @"$s11actor_class9ExchangerCMn" = {{.*}}constant
 //   superclass ref, negative bounds, positive bounds, num immediate members, num fields, field offset vector offset
-// CHECK-SAME: i32 0, i32 2, i32 [[#CLASS_METADATA_HEADER+9]], i32 9, i32 2, i32 [[#CLASS_METADATA_HEADER+1]],
+// CHECK-SAME: i32 0, i32 2, i32 [[#CLASS_METADATA_HEADER+8]], i32 8, i32 2, i32 [[#CLASS_METADATA_HEADER+1]],
 
 // Reflection field records.
 // CHECK-LABEL: @"$s11actor_class9ExchangerCMF" = internal constant
@@ -41,11 +39,6 @@ public actor MyClass {
   public var x: Int
   public init() { self.x = 0 }
 }
-
-// CHECK-LABEL: define {{.*}}void @"$s11actor_class7MyClassC7enqueue11partialTasky12_Concurrency012PartialAsyncG0V_tF"
-// CHECK:      swift_retain
-// CHECK:      [[T0:%.*]] = bitcast %T11actor_class7MyClassC* %1 to {{.*}}*
-// CHECK-NEXT: call swiftcc void @swift_defaultActor_enqueue(%swift.job* %0, {{.*}}* [[T0]])
 
 // CHECK-LABEL: define {{.*}}@"$s11actor_class7MyClassC1xSivg"
 // CHECK: [[T0:%.*]] = getelementptr inbounds %T11actor_class7MyClassC, %T11actor_class7MyClassC* %0, i32 0, i32 2

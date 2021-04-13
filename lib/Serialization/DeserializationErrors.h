@@ -276,16 +276,25 @@ class XRefError : public llvm::ErrorInfo<XRefError, DeclDeserializationError> {
 
   XRefTracePath path;
   const char *message;
+  SmallVector<std::string, 2> notes;
 public:
   template <size_t N>
-  XRefError(const char (&message)[N], XRefTracePath path, DeclName name)
-      : path(path), message(message) {
+  XRefError(const char (&message)[N], XRefTracePath path, DeclName name,
+            SmallVector<std::string, 2> notes = {})
+      : path(path), message(message), notes(notes) {
     this->name = name;
   }
 
   void log(raw_ostream &OS) const override {
     OS << message << "\n";
     path.print(OS);
+
+    if (!notes.empty()) {
+      OS << "Notes:\n";
+      for (auto &line : notes) {
+        OS << "* " << line << "\n";
+      }
+    }
   }
 
   std::error_code convertToErrorCode() const override {
@@ -360,9 +369,9 @@ public:
   }
 
   void log(raw_ostream &OS) const override {
-    OS << "could not deserialize type for '" << name << "'";
+    OS << "Could not deserialize type for '" << name << "'";
     if (underlyingReason) {
-      OS << ": ";
+      OS << "\nCaused by: ";
       underlyingReason->log(OS);
     }
   }

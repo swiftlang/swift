@@ -4,22 +4,21 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-import Dispatch
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
+import Dispatch
 
 enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func formGreeting(name: String) async -> String {
   return "Hello \(name) from async world"
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func testSimple(
   name: String, dogName: String, shouldThrow: Bool, doSuspend: Bool
 ) async {
@@ -27,14 +26,14 @@ func testSimple(
 
   var completed = false
 
-  let taskHandle: Task.Handle<String, Error> = Task.runDetached {
+  let taskHandle: Task.Handle<String, Error> = detach {
     let greeting = await formGreeting(name: name)
 
     // If the intent is to test suspending, wait a bit so the second task
     // can complete.
     if doSuspend {
       print("- Future sleeping")
-      sleep(1)
+      await Task.sleep(1_000_000_000)
     }
 
     if (shouldThrow) {
@@ -50,7 +49,7 @@ func testSimple(
   // can complete.
   if !doSuspend {
     print("+ Reader sleeping")
-    sleep(1)
+    await Task.sleep(1_000_000_000)
   }
 
   do {
@@ -72,6 +71,7 @@ func testSimple(
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)

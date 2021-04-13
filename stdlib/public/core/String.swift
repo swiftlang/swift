@@ -383,7 +383,7 @@ public struct String {
   public init() { self.init(_StringGuts()) }
 }
 
-extension String: ConcurrentValue { }
+extension String: Sendable { }
 
 extension String {
   #if !INTERNAL_CHECKS_ENABLED

@@ -892,6 +892,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
       AccessorKind::Get, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
       intType, parentDC);
@@ -942,7 +943,8 @@ getHashableConformance(const Decl *parentDecl) {
   ASTContext &C = parentDecl->getASTContext();
   const auto IDC = cast<IterableDeclContext>(parentDecl);
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: IDC->getLocalConformances()) {
+  for (auto conformance: IDC->getLocalConformances(
+           ConformanceLookupKind::NonStructural)) {
     if (conformance->getProtocol() == hashableProto) {
       return conformance;
     }

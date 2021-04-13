@@ -26,6 +26,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
@@ -1008,6 +1009,19 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
            node->getKind() <= SILNodeKind::Last_##ID;                          \
   }
 
+/// Abstract base class which defines the source and destination operand numbers
+/// for copy-like instructions, like store, assign, copy_addr and cast
+/// instructions.
+class CopyLikeInstruction {
+public:
+  enum {
+    /// The source operand index.
+    Src,
+    /// The destination operand index.
+    Dest
+  };
+};
+
 /// Abstract base class used for isa checks on instructions to determine if they
 /// forward ownership and to verify that the set of ownership instructions and
 /// the ownership utilities stay in sync via assertions.
@@ -1025,6 +1039,16 @@ protected:
   }
 
 public:
+  /// Forwarding ownership is determined by the forwarding instruction's
+  /// constant ownership attribute. If forwarding ownership is owned, then the
+  /// instruction moves an owned operand to its result, ending its lifetime. If
+  /// forwarding ownership is guaranteed, then the instruction propagates the
+  /// lifetime of its borrows operand through its result.
+  ///
+  /// The resulting forwarded value's ownership, returned by getOwnershipKind(),
+  /// is not identical to the forwarding ownership. It differs when the result
+  /// is trivial type. e.g. an owned or guaranteed value can be cast to a
+  /// trivial type using owned or guaranteed forwarding.
   ValueOwnershipKind getForwardingOwnershipKind() const {
     return ownershipKind;
   }
@@ -1223,6 +1247,12 @@ public:
 /// *NOTE* We want this to be a pure abstract class that does not add /any/ size
 /// to subclasses.
 class MultipleValueInstructionResult : public ValueBase {
+  /// Return the parent instruction of this result.
+  MultipleValueInstruction *getParentImpl() const;
+
+  /// Set the index of this result.
+  void setIndex(unsigned NewIndex);
+
 public:
   /// Create a new multiple value instruction result.
   ///
@@ -1233,16 +1263,11 @@ public:
   /// *NOTE* subclassDeltaOffset must be use only 5 bits. This gives us to
   /// support subclasses up to 32 bytes in size. We can scavange up to 6 more
   /// bits from ValueBase if this is not large enough.
-  MultipleValueInstructionResult(ValueKind valueKind, unsigned index,
-                                 SILType type,
+  MultipleValueInstructionResult(unsigned index, SILType type,
                                  ValueOwnershipKind ownershipKind);
 
-  /// Return the parent instruction of this result.
-  MultipleValueInstruction *getParent();
-
-  const MultipleValueInstruction *getParent() const {
-    return const_cast<MultipleValueInstructionResult *>(this)->getParent();
-  }
+  template <class Inst = MultipleValueInstruction>
+  Inst *getParent() const { return cast<Inst>(getParentImpl()); }
 
   unsigned getIndex() const {
     return Bits.MultipleValueInstructionResult.Index;
@@ -1258,22 +1283,37 @@ public:
   /// This is stored in SILNode in the subclass data.
   void setOwnershipKind(ValueOwnershipKind Kind);
 
-  static bool classof(const SILInstruction *) = delete;
+  /// Returns true if this is the token result of a begin_apply.
+  bool isBeginApplyToken() const;
+
+  static bool classof(const SILInstruction *) { return false; }
   static bool classof(const SILUndef *) = delete;
   static bool classof(const SILArgument *) = delete;
   static bool classof(const MultipleValueInstructionResult *) { return true; }
   static bool classof(SILNodePointer node) {
-    // This is an abstract class without anything implementing it right now, so
-    // just return false. This will be fixed in a subsequent commit.
-    SILNodeKind kind = node->getKind();
-    return kind >= SILNodeKind::First_MultipleValueInstructionResult &&
-           kind <= SILNodeKind::Last_MultipleValueInstructionResult;
+    return node->getKind() == SILNodeKind::MultipleValueInstructionResult;
   }
-
-protected:
-  /// Set the index of this result.
-  void setIndex(unsigned NewIndex);
 };
+
+/// Returns \p val as MultipleValueInstructionResult if \p val is a result of
+/// a MultipleValueInstruction \p Inst, or null if this is not the case.
+template <class Inst>
+MultipleValueInstructionResult *isaResultOf(SILValue val) {
+  if (auto *result = dyn_cast<MultipleValueInstructionResult>(val)) {
+    if (isa<Inst>(result->getParent()))
+      return result;
+  }
+  return nullptr;
+}
+
+/// Returns \p val as MultipleValueInstructionResult if \p val is a result of
+/// a MultipleValueInstruction \p Inst.
+template <class Inst>
+MultipleValueInstructionResult *getAsResultOf(SILValue val) {
+  auto *result = cast<MultipleValueInstructionResult>(val);
+  assert(result->getParent<Inst>());
+  return result;
+}
 
 template <class Result>
 SILInstructionResultArray::SILInstructionResultArray(ArrayRef<Result> results)
@@ -1326,37 +1366,28 @@ template <typename...> class FinalTrailingObjects;
 /// implementations be initialized before this base class is (and
 /// conversely that this base class be initialized before any of the
 /// succeeding numTrailingObjects implementations are called).
-template <typename Derived, typename DerivedResult,
+template <typename Derived,
           typename Init = InitialTrailingObjects<>,
           typename Final = FinalTrailingObjects<>>
 class MultipleValueInstructionTrailingObjects;
 
-template <typename Derived, typename DerivedResult,
+template <typename Derived,
           typename... InitialOtherTrailingTypes,
           typename... FinalOtherTrailingTypes>
-class MultipleValueInstructionTrailingObjects<Derived, DerivedResult,
+class MultipleValueInstructionTrailingObjects<Derived,
                       InitialTrailingObjects<InitialOtherTrailingTypes...>,
                       FinalTrailingObjects<FinalOtherTrailingTypes...>>
     : protected llvm::TrailingObjects<Derived,
                                       InitialOtherTrailingTypes...,
                                       MultipleValueInstruction *,
-                                      DerivedResult,
+                                      MultipleValueInstructionResult,
                                       FinalOtherTrailingTypes...> {
-  static_assert(std::is_final<DerivedResult>(),
-                "Expected DerivedResult to be final");
-  static_assert(
-      std::is_base_of<MultipleValueInstructionResult, DerivedResult>::value,
-      "Expected DerivedResult to be a subclass of "
-      "MultipleValueInstructionResult");
-  static_assert(sizeof(MultipleValueInstructionResult) == sizeof(DerivedResult),
-                "Expected DerivedResult to be the same size as a "
-                "MultipleValueInstructionResult");
-
 protected:
   using TrailingObjects =
       llvm::TrailingObjects<Derived,
                             InitialOtherTrailingTypes...,
-                            MultipleValueInstruction *, DerivedResult,
+                            MultipleValueInstruction *,
+                            MultipleValueInstructionResult,
                             FinalOtherTrailingTypes...>;
   friend TrailingObjects;
 
@@ -1370,8 +1401,8 @@ protected:
     return 1;
   }
 
-  size_t numTrailingObjects(
-      typename TrailingObjects::template OverloadToken<DerivedResult>) const {
+  size_t numTrailingObjects(typename TrailingObjects::template
+                          OverloadToken<MultipleValueInstructionResult>) const {
     return NumResults;
   }
 
@@ -1392,10 +1423,10 @@ protected:
     *ParentPtr = static_cast<MultipleValueInstruction *>(Parent);
 
     auto *DataPtr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
+        getTrailingObjects<MultipleValueInstructionResult>();
     for (unsigned i : range(NumResults)) {
-      ::new (&DataPtr[i]) DerivedResult(i, Types[i], OwnershipKinds[i],
-                                        std::forward<Args>(OtherArgs)...);
+      ::new (&DataPtr[i]) MultipleValueInstructionResult(i, Types[i],
+                          OwnershipKinds[i], std::forward<Args>(OtherArgs)...);
       assert(DataPtr[i].getParent() == Parent &&
              "Failed to setup parent reference correctly?!");
     }
@@ -1406,8 +1437,8 @@ protected:
     if (!NumResults)
       return;
     auto *DataPtr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
-    // We call the DerivedResult destructors to ensure that:
+        getTrailingObjects<MultipleValueInstructionResult>();
+    // We call the MultipleValueInstructionResult destructors to ensure that:
     //
     // 1. If our derived results have any stored data that need to be cleaned
     // up, we clean them up. *NOTE* Today, no results have this property.
@@ -1415,19 +1446,19 @@ protected:
     // has any uses when it is being destroyed. Rather than re-implement that in
     // result, we get that for free.
     for (unsigned i : range(NumResults))
-      DataPtr[i].~DerivedResult();
+      DataPtr[i].~MultipleValueInstructionResult();
   }
 
 public:
-  ArrayRef<DerivedResult> getAllResultsBuffer() const {
+  ArrayRef<MultipleValueInstructionResult> getAllResultsBuffer() const {
     auto *ptr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
+        getTrailingObjects<MultipleValueInstructionResult>();
     return { ptr, NumResults };
   }
 
-  MutableArrayRef<DerivedResult> getAllResultsBuffer() {
+  MutableArrayRef<MultipleValueInstructionResult> getAllResultsBuffer() {
     auto *ptr = this->TrailingObjects::template
-        getTrailingObjects<DerivedResult>();
+        getTrailingObjects<MultipleValueInstructionResult>();
     return { ptr, NumResults };
   }
 
@@ -2142,6 +2173,16 @@ struct TerribleOverloadTokenHack :
 template <class T>
 using OverloadToken = TerribleOverloadTokenHack::Hack<T>;
 
+enum class ApplyFlags : uint8_t {
+  /// This is a call to a 'rethrows' function that is known not to throw.
+  DoesNotThrow = 0x1,
+
+  /// This is a call to a 'reasync' function that is known not to 'await'.
+  DoesNotAwait = 0x2
+};
+
+using ApplyOptions = OptionSet<ApplyFlags>;
+
 /// ApplyInstBase - An abstract class for different kinds of function
 /// application.
 template <class Impl, class Base,
@@ -2162,12 +2203,11 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   /// points to the specialization info of the inlined function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// Used for apply_inst instructions: true if the called function has an
-  /// error result but is not actually throwing.
-  unsigned NonThrowing: 1;
+  /// Stores an ApplyOptions.
+  unsigned Options: 2;
 
   /// The number of call arguments as required by the callee.
-  unsigned NumCallArguments : 31;
+  unsigned NumCallArguments : 30;
 
   /// The total number of type-dependent operands.
   unsigned NumTypeDependentOperands;
@@ -2188,7 +2228,7 @@ protected:
                 As... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo),
-        NonThrowing(false), NumCallArguments(args.size()),
+        NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs) {
 
@@ -2220,12 +2260,24 @@ protected:
                                   ArrayRef<SILValue> typeDependentOperands) {
     return NumStaticOperands + args.size() + typeDependentOperands.size();
   }
-
-  void setNonThrowing(bool isNonThrowing) { NonThrowing = isNonThrowing; }
-  
-  bool isNonThrowingApply() const { return NonThrowing; }
   
 public:
+  void setApplyOptions(ApplyOptions options) {
+    Options = unsigned(options.toRaw());
+  }
+  
+  ApplyOptions getApplyOptions() const {
+    return ApplyOptions(ApplyFlags(Options));
+  }
+
+  bool isNonThrowing() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotThrow);
+  }
+  
+  bool isNonAsync() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
+  }
+
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
@@ -2545,22 +2597,16 @@ class ApplyInst final
             SubstitutionMap Substitutions,
             ArrayRef<SILValue> Args,
             ArrayRef<SILValue> TypeDependentOperands,
-            bool isNonThrowing,
+            ApplyOptions options,
             const GenericSpecializationInformation *SpecializationInfo);
 
   static ApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee,
          SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
-         bool isNonThrowing, Optional<SILModuleConventions> ModuleConventions,
+         ApplyOptions options,
+         Optional<SILModuleConventions> ModuleConventions,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
-
-public:
-  /// Returns true if the called function has an error result but is not actually
-  /// throwing an error.
-  bool isNonThrowing() const {
-    return isNonThrowingApply();
-  }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -2607,28 +2653,6 @@ public:
   }
 };
 
-class BeginApplyInst;
-class BeginApplyResult final : public MultipleValueInstructionResult {
-public:
-  BeginApplyResult(unsigned index, SILType type,
-                   ValueOwnershipKind ownershipKind)
-      : MultipleValueInstructionResult(ValueKind::BeginApplyResult,
-                                       index, type, ownershipKind) {}
-
-  BeginApplyInst *getParent(); // inline below
-  const BeginApplyInst *getParent() const {
-    return const_cast<BeginApplyResult *>(this)->getParent();
-  }
-
-  /// Is this result the token result of the begin_apply, which abstracts
-  /// over the implicit coroutine state?
-  bool isTokenResult() const; // inline below
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::BeginApplyResult;
-  }
-};
-
 class EndApplyInst;
 class AbortApplyInst;
 
@@ -2639,7 +2663,7 @@ class BeginApplyInst final
                              ApplyInstBase<BeginApplyInst,
                                            MultipleValueInstruction>>,
       public MultipleValueInstructionTrailingObjects<
-          BeginApplyInst, BeginApplyResult,
+          BeginApplyInst,
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
           InitialTrailingObjects<Operand>> {
@@ -2660,31 +2684,26 @@ class BeginApplyInst final
                  SubstitutionMap substitutions,
                  ArrayRef<SILValue> args,
                  ArrayRef<SILValue> typeDependentOperands,
-                 bool isNonThrowing,
+                 ApplyOptions options,
                  const GenericSpecializationInformation *specializationInfo);
 
   static BeginApplyInst *
   create(SILDebugLocation debugLoc, SILValue Callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
-         bool isNonThrowing, Optional<SILModuleConventions> moduleConventions,
+         ApplyOptions options, Optional<SILModuleConventions> moduleConventions,
          SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
          const GenericSpecializationInformation *specializationInfo);
 
 public:
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
-  SILValue getTokenResult() const {
-    return &getAllResultsBuffer().back();
+  MultipleValueInstructionResult *getTokenResult() const {
+    return const_cast<MultipleValueInstructionResult *>(
+             &getAllResultsBuffer().back());
   }
 
   SILInstructionResultArray getYieldedValues() const {
     return getAllResultsBuffer().drop_back();
-  }
-
-  /// Returns true if the called coroutine has an error result but is not
-  /// actually throwing an error.
-  bool isNonThrowing() const {
-    return isNonThrowingApply();
   }
 
   void getCoroutineEndPoints(
@@ -2695,14 +2714,6 @@ public:
                              SmallVectorImpl<Operand *> &abortApplyInsts) const;
 };
 
-inline BeginApplyInst *BeginApplyResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<BeginApplyInst>(Parent);
-}
-inline bool BeginApplyResult::isTokenResult() const {
-  return getIndex() == getParent()->getNumResults() - 1;
-}
-
 /// AbortApplyInst - Unwind the full application of a yield_once coroutine.
 class AbortApplyInst
     : public UnaryInstructionBase<SILInstructionKind::AbortApplyInst,
@@ -2711,13 +2722,17 @@ class AbortApplyInst
 
   AbortApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
       : UnaryInstructionBase(debugLoc, beginApplyToken) {
-    assert(isa<BeginApplyResult>(beginApplyToken) &&
-           cast<BeginApplyResult>(beginApplyToken)->isTokenResult());
+    assert(isaResultOf<BeginApplyInst>(beginApplyToken) &&
+           isaResultOf<BeginApplyInst>(beginApplyToken)->isBeginApplyToken());
   }
 
 public:
+  MultipleValueInstructionResult *getToken() const {
+    return getAsResultOf<BeginApplyInst>(getOperand());
+  }
+
   BeginApplyInst *getBeginApply() const {
-    return cast<BeginApplyResult>(getOperand())->getParent();
+    return getToken()->getParent<BeginApplyInst>();
   }
 };
 
@@ -2730,13 +2745,17 @@ class EndApplyInst
 
   EndApplyInst(SILDebugLocation debugLoc, SILValue beginApplyToken)
       : UnaryInstructionBase(debugLoc, beginApplyToken) {
-    assert(isa<BeginApplyResult>(beginApplyToken) &&
-           cast<BeginApplyResult>(beginApplyToken)->isTokenResult());
+    assert(isaResultOf<BeginApplyInst>(beginApplyToken) &&
+           isaResultOf<BeginApplyInst>(beginApplyToken)->isBeginApplyToken());
   }
 
 public:
+  MultipleValueInstructionResult *getToken() const {
+    return getAsResultOf<BeginApplyInst>(getOperand());
+  }
+
   BeginApplyInst *getBeginApply() const {
-    return cast<BeginApplyResult>(getOperand())->getParent();
+    return getToken()->getParent<BeginApplyInst>();
   }
 };
 
@@ -3441,11 +3460,12 @@ class HopToExecutorInst
 {
   friend SILBuilder;
 
-  HopToExecutorInst(SILDebugLocation DebugLoc, SILValue Actor, bool HasOwnership)
-      : UnaryInstructionBase(DebugLoc, Actor) { }
+  HopToExecutorInst(SILDebugLocation debugLoc, SILValue executor,
+                    bool hasOwnership)
+      : UnaryInstructionBase(debugLoc, executor) { }
 
 public:
-  SILValue getActor() const { return getOperand(); }
+  SILValue getTargetExecutor() const { return getOperand(); }
 };
 
 /// Instantiates a key path object.
@@ -3803,7 +3823,8 @@ static_assert(2 == SILNode::NumStoreOwnershipQualifierBits, "Size mismatch");
 /// StoreInst - Represents a store from a memory location.
 class StoreInst
     : public InstructionBase<SILInstructionKind::StoreInst,
-                             NonValueInstruction> {
+                             NonValueInstruction>,
+      public CopyLikeInstruction {
   friend SILBuilder;
 
 private:
@@ -3813,13 +3834,6 @@ private:
             StoreOwnershipQualifier Qualifier);
 
 public:
-  enum {
-    /// the value being stored
-    Src,
-    /// the lvalue being stored to
-    Dest
-  };
-
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
@@ -3895,16 +3909,9 @@ inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
 /// address. Must be paired with an end_borrow in its use-def list.
 class StoreBorrowInst
     : public InstructionBase<SILInstructionKind::StoreBorrowInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      public CopyLikeInstruction {
   friend class SILBuilder;
-
-public:
-  enum {
-    /// The source of the value being borrowed.
-    Src,
-    /// The destination of the borrowed value.
-    Dest
-  };
 
 private:
   FixedOperandList<2> Operands;
@@ -4306,7 +4313,8 @@ static_assert(2 == SILNode::NumAssignOwnershipQualifierBits, "Size mismatch");
 
 template <SILInstructionKind Kind, int NumOps>
 class AssignInstBase
-    : public InstructionBase<Kind, NonValueInstruction> {
+    : public InstructionBase<Kind, NonValueInstruction>,
+      public CopyLikeInstruction {
 
 protected:
   FixedOperandList<NumOps> Operands;
@@ -4317,13 +4325,6 @@ protected:
       Operands(this, std::forward<T>(args)...) { }
 
 public:
-  enum {
-    /// the value being stored
-    Src,
-    /// the lvalue being stored to
-    Dest
-  };
-
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
@@ -4360,39 +4361,38 @@ class AssignByWrapperInst
   friend SILBuilder;
 
 public:
-  /// The assignment destination for the property wrapper
-  enum class Destination {
-    BackingWrapper,
-    WrappedValue,
+  enum Mode {
+    /// The mode is not decided yet (by DefiniteInitialization).
+    Unknown,
+    
+    /// The initializer is called with Src as argument. The result is stored to
+    /// Dest.
+    Initialization,
+    
+    // Like ``Initialization``, except that the destination is "assigned" rather
+    // than "initialized". This means that the existing value in the destination
+    // is destroyed before the new value is stored.
+    Assign,
+    
+    /// The setter is called with Src as argument. The Dest is not used in this
+    /// case.
+    AssignWrappedValue
   };
 
 private:
-  Destination AssignDest = Destination::WrappedValue;
-
   AssignByWrapperInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
-                       SILValue Initializer, SILValue Setter,
-                       AssignOwnershipQualifier Qualifier =
-                         AssignOwnershipQualifier::Unknown);
+                       SILValue Initializer, SILValue Setter, Mode mode);
 
 public:
-
   SILValue getInitializer() { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
 
-  AssignOwnershipQualifier getOwnershipQualifier() const {
-    return AssignOwnershipQualifier(
-      SILNode::Bits.AssignByWrapperInst.OwnershipQualifier);
+  Mode getMode() const {
+    return Mode(SILNode::Bits.AssignByWrapperInst.Mode);
   }
 
-  Destination getAssignDestination() const { return AssignDest; }
-
-  void setAssignInfo(AssignOwnershipQualifier qualifier, Destination dest) {
-    assert(qualifier == AssignOwnershipQualifier::Init && dest == Destination::BackingWrapper ||
-           qualifier == AssignOwnershipQualifier::Reassign && dest == Destination::BackingWrapper ||
-           qualifier == AssignOwnershipQualifier::Reassign && dest == Destination::WrappedValue);
-
-    SILNode::Bits.AssignByWrapperInst.OwnershipQualifier = unsigned(qualifier);
-    AssignDest = dest;
+  void setMode(Mode mode) {
+    SILNode::Bits.AssignByWrapperInst.Mode = unsigned(mode);
   }
 };
 
@@ -4439,9 +4439,10 @@ public:
 private:
   Kind ThisKind;
 
-  MarkUninitializedInst(SILDebugLocation DebugLoc, SILValue Value, Kind K)
+  MarkUninitializedInst(SILDebugLocation DebugLoc, SILValue Value, Kind K,
+                        ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(DebugLoc, Value, Value->getType(),
-                             Value.getOwnershipKind()),
+                             forwardingOwnershipKind),
         ThisKind(K) {}
 
 public:
@@ -4510,9 +4511,10 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var);
+                 SILDebugVariable Var, bool poisonRefs);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
-                                SILModule &M, SILDebugVariable Var);
+                                SILModule &M, SILDebugVariable Var,
+                                bool poisonRefs);
 
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
@@ -4523,6 +4525,21 @@ public:
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
+  }
+
+  /// True if all references within this debug value will be overwritten with a
+  /// poison sentinel at this point in the program. This is used in debug builds
+  /// when shortening non-trivial value lifetimes to ensure the debugger cannot
+  /// inspect invalid memory. These are not generated until OSSA is
+  /// lowered. They are not expected to be serialized within the module, and the
+  /// debug pipeline is not expected to do any significant code motion after
+  /// OSSA lowering. It should not be necessary to model the poison operation as
+  /// a side effect, which would violate the rule that debug_values cannot
+  /// affect optimization.
+  bool poisonRefs() const { return SILNode::Bits.DebugValueInst.PoisonRefs; }
+
+  void setPoisonRefs(bool poisonRefs = true) {
+    SILNode::Bits.DebugValueInst.PoisonRefs = poisonRefs;
   }
 };
 
@@ -4643,17 +4660,9 @@ class Store##Name##Inst \
 /// but a copy instruction must be used for address-only types.
 class CopyAddrInst
     : public InstructionBase<SILInstructionKind::CopyAddrInst,
-                             NonValueInstruction> {
+                             NonValueInstruction>,
+      public CopyLikeInstruction {
   friend SILBuilder;
-
-public:
-  enum {
-    /// The lvalue being loaded from.
-    Src,
-
-    /// The lvalue being stored to.
-    Dest
-  };
 
 private:
   FixedOperandList<2> Operands;
@@ -5336,12 +5345,12 @@ class StructInst final : public InstructionBaseWithTrailingOperands<
   /// Because of the storage requirements of StructInst, object
   /// creation goes through 'create()'.
   StructInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
-             bool HasOwnership);
+             ValueOwnershipKind forwardingOwnershipKind);
 
   /// Construct a StructInst.
   static StructInst *create(SILDebugLocation DebugLoc, SILType Ty,
                             ArrayRef<SILValue> Elements, SILModule &M,
-                            bool HasOwnership);
+                            ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   /// The elements referenced by this StructInst.
@@ -5589,11 +5598,10 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
   /// Because of the storage requirements of ObjectInst, object
   /// creation goes through 'create()'.
   ObjectInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elements,
-             unsigned NumBaseElements, bool HasOwnership)
-      : InstructionBaseWithTrailingOperands(
-            Elements, DebugLoc, Ty,
-            HasOwnership ? mergeSILValueOwnership(Elements)
-                         : ValueOwnershipKind(OwnershipKind::None)) {
+             unsigned NumBaseElements,
+             ValueOwnershipKind forwardingOwnershipKind)
+      : InstructionBaseWithTrailingOperands(Elements, DebugLoc, Ty,
+                                            forwardingOwnershipKind) {
     SILNode::Bits.ObjectInst.NumBaseElements = NumBaseElements;
   }
 
@@ -5601,7 +5609,7 @@ class ObjectInst final : public InstructionBaseWithTrailingOperands<
   static ObjectInst *create(SILDebugLocation DebugLoc, SILType Ty,
                             ArrayRef<SILValue> Elements,
                             unsigned NumBaseElements, SILModule &M,
-                            bool HasOwnership);
+                            ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   /// All elements referenced by this ObjectInst.
@@ -5636,16 +5644,14 @@ class TupleInst final : public InstructionBaseWithTrailingOperands<
   /// Because of the storage requirements of TupleInst, object
   /// creation goes through 'create()'.
   TupleInst(SILDebugLocation DebugLoc, SILType Ty, ArrayRef<SILValue> Elems,
-            bool HasOwnership)
-      : InstructionBaseWithTrailingOperands(
-            Elems, DebugLoc, Ty,
-            HasOwnership ? mergeSILValueOwnership(Elems)
-                         : ValueOwnershipKind(OwnershipKind::None)) {}
+            ValueOwnershipKind forwardingOwnershipKind)
+      : InstructionBaseWithTrailingOperands(Elems, DebugLoc, Ty,
+                                            forwardingOwnershipKind) {}
 
   /// Construct a TupleInst.
   static TupleInst *create(SILDebugLocation DebugLoc, SILType Ty,
                            ArrayRef<SILValue> Elements, SILModule &M,
-                           bool HasOwnership);
+                           ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   /// The elements referenced by this TupleInst.
@@ -5714,10 +5720,9 @@ class EnumInst
   EnumElementDecl *Element;
 
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
-           EnumElementDecl *Element, SILType ResultTy)
-      : InstructionBase(DebugLoc, ResultTy,
-                        Operand ? Operand.getOwnershipKind()
-                                : ValueOwnershipKind(OwnershipKind::None)),
+           EnumElementDecl *Element, SILType ResultTy,
+           ValueOwnershipKind forwardingOwnershipKind)
+      : InstructionBase(DebugLoc, ResultTy, forwardingOwnershipKind),
         Element(Element) {
     if (Operand) {
       OptionalOperand.emplace(this, Operand);
@@ -5752,9 +5757,10 @@ class UncheckedEnumDataInst
   EnumElementDecl *Element;
 
   UncheckedEnumDataInst(SILDebugLocation DebugLoc, SILValue Operand,
-                        EnumElementDecl *Element, SILType ResultTy)
+                        EnumElementDecl *Element, SILType ResultTy,
+                        ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
-                             Operand.getOwnershipKind()),
+                             forwardingOwnershipKind),
         Element(Element) {}
 
 public:
@@ -5919,7 +5925,8 @@ protected:
                    SILValue DefaultValue,
                    ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
                    SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                   ProfileCounter DefaultCount, bool HasOwnership);
+                   ProfileCounter DefaultCount,
+                   ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   ArrayRef<Operand> getAllOperands() const;
@@ -6018,12 +6025,11 @@ private:
                  bool DefaultValue, ArrayRef<SILValue> CaseValues,
                  ArrayRef<EnumElementDecl *> CaseDecls,
                  Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                 ProfileCounter DefaultCount, bool HasOwnership)
+                 ProfileCounter DefaultCount,
+                 ValueOwnershipKind forwardingOwnershipKind)
       : InstructionBaseWithTrailingOperands(
             Operand, CaseValues, DebugLoc, Type, bool(DefaultValue), CaseCounts,
-            DefaultCount,
-            HasOwnership ? mergeSILValueOwnership(CaseValues)
-                         : ValueOwnershipKind(OwnershipKind::None)) {
+            DefaultCount, forwardingOwnershipKind) {
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -6033,15 +6039,15 @@ private:
          SILValue DefaultValue,
          ArrayRef<std::pair<EnumElementDecl *, SILValue>> CaseValues,
          SILModule &M, Optional<ArrayRef<ProfileCounter>> CaseCounts,
-         ProfileCounter DefaultCount, bool HasOwnership);
+         ProfileCounter DefaultCount,
+         ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Select one of a set of values based on the case of an enum.
 class SelectEnumAddrInst final
     : public InstructionBaseWithTrailingOperands<
-                                        SILInstructionKind::SelectEnumAddrInst,
-                                        SelectEnumAddrInst,
-                                        SelectEnumInstBase, EnumElementDecl *> {
+          SILInstructionKind::SelectEnumAddrInst, SelectEnumAddrInst,
+          SelectEnumInstBase, EnumElementDecl *> {
   friend SILBuilder;
   friend SelectEnumInstBase;
 
@@ -6049,11 +6055,12 @@ class SelectEnumAddrInst final
                      bool DefaultValue, ArrayRef<SILValue> CaseValues,
                      ArrayRef<EnumElementDecl *> CaseDecls,
                      Optional<ArrayRef<ProfileCounter>> CaseCounts,
-                     ProfileCounter DefaultCount, bool HasOwnership)
+                     ProfileCounter DefaultCount,
+                     ValueOwnershipKind forwardingOwnershipKind)
       : InstructionBaseWithTrailingOperands(Operand, CaseValues, DebugLoc, Type,
                                             bool(DefaultValue), CaseCounts,
                                             DefaultCount) {
-    (void)HasOwnership;
+    (void)forwardingOwnershipKind;
     assert(CaseValues.size() - DefaultValue == CaseDecls.size());
     std::uninitialized_copy(CaseDecls.begin(), CaseDecls.end(),
                             getTrailingObjects<EnumElementDecl *>());
@@ -6079,13 +6086,14 @@ class SelectValueInst final
 
   SelectValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
                   SILValue DefaultResult,
-                  ArrayRef<SILValue> CaseValuesAndResults, bool HasOwnership);
+                  ArrayRef<SILValue> CaseValuesAndResults,
+                  ValueOwnershipKind forwardingOwnershipKind);
 
   static SelectValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Type,
          SILValue DefaultValue,
          ArrayRef<std::pair<SILValue, SILValue>> CaseValues, SILModule &M,
-         bool HasOwnership);
+         ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   std::pair<SILValue, SILValue>
@@ -6171,9 +6179,10 @@ class TupleExtractInst
   friend SILBuilder;
 
   TupleExtractInst(SILDebugLocation DebugLoc, SILValue Operand,
-                   unsigned FieldNo, SILType ResultTy)
+                   unsigned FieldNo, SILType ResultTy,
+                   ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy,
-                             Operand.getOwnershipKind()) {
+                             forwardingOwnershipKind) {
     SILNode::Bits.TupleExtractInst.FieldNo = FieldNo;
   }
 
@@ -6313,9 +6322,10 @@ class StructExtractInst
   friend SILBuilder;
 
   StructExtractInst(SILDebugLocation DebugLoc, SILValue Operand, VarDecl *Field,
-                    SILType ResultTy)
+                    SILType ResultTy,
+                    ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy, Field,
-                             Operand.getOwnershipKind()) {}
+                             forwardingOwnershipKind) {}
 
 public:
   StructDecl *getStructDecl() const {
@@ -6575,7 +6585,8 @@ class OpenExistentialValueInst
   friend SILBuilder;
 
   OpenExistentialValueInst(SILDebugLocation debugLoc, SILValue operand,
-                           SILType selfTy);
+                           SILType selfTy,
+                           ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Given a class existential, "opens" the
@@ -6587,7 +6598,8 @@ class OpenExistentialRefInst
   friend SILBuilder;
 
   OpenExistentialRefInst(SILDebugLocation DebugLoc, SILValue Operand,
-                         SILType Ty, bool HasOwnership);
+                         SILType Ty,
+                         ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Given an existential metatype,
@@ -6626,7 +6638,8 @@ class OpenExistentialBoxValueInst
   friend SILBuilder;
 
   OpenExistentialBoxValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                              SILType ty);
+                              SILType ty,
+                              ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Given an address to an uninitialized buffer of
@@ -6723,17 +6736,19 @@ class InitExistentialRefInst final
   InitExistentialRefInst(SILDebugLocation DebugLoc, SILType ExistentialType,
                          CanType FormalConcreteType, SILValue Instance,
                          ArrayRef<SILValue> TypeDependentOperands,
-                         ArrayRef<ProtocolConformanceRef> Conformances)
+                         ArrayRef<ProtocolConformanceRef> Conformances,
+                         ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(
-          DebugLoc, Instance, TypeDependentOperands, ExistentialType,
-          Instance.getOwnershipKind()),
+            DebugLoc, Instance, TypeDependentOperands, ExistentialType,
+            forwardingOwnershipKind),
         ConcreteType(FormalConcreteType), Conformances(Conformances) {}
 
   static InitExistentialRefInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
          CanType ConcreteType, SILValue Instance,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent,
-         SILOpenedArchetypesState &OpenedArchetypes);
+         SILOpenedArchetypesState &OpenedArchetypes,
+         ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   CanType getFormalConcreteType() const {
@@ -7023,8 +7038,9 @@ class MarkDependenceInst
 
   FixedOperandList<2> Operands;
 
-  MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base)
-      : InstructionBase(DebugLoc, value->getType(), value.getOwnershipKind()),
+  MarkDependenceInst(SILDebugLocation DebugLoc, SILValue value, SILValue base,
+                     ValueOwnershipKind forwardingOwnershipKind)
+      : InstructionBase(DebugLoc, value->getType(), forwardingOwnershipKind),
         Operands{this, value, base} {}
 
 public:
@@ -7123,8 +7139,25 @@ class DestroyValueInst
                                   NonValueInstruction> {
   friend class SILBuilder;
 
-  DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand, bool poisonRefs)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setPoisonRefs(poisonRefs);
+  }
+
+public:
+  /// If true, then all references within the destroyed value will be
+  /// overwritten with a sentinel. This is used in debug builds when shortening
+  /// non-trivial value lifetimes to ensure the debugger cannot inspect invalid
+  /// memory. These semantics are part of the destroy_value instruction to
+  /// avoid representing use-after-destroy in OSSA form and so that OSSA
+  /// transformations keep the poison operation associated with the destroy
+  /// point. After OSSA, these are lowered to 'debug_values [poison]'
+  /// instructions, after which the Onone pipeline should avoid code motion.
+  bool poisonRefs() const { return SILNode::Bits.DestroyValueInst.PoisonRefs; }
+
+  void setPoisonRefs(bool poisonRefs = true) {
+    SILNode::Bits.DestroyValueInst.PoisonRefs = poisonRefs;
+  }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
@@ -7139,27 +7172,6 @@ class IsUniqueInst
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy) {}
 };
 
-class BeginCOWMutationInst;
-
-/// A result for the begin_cow_mutation instruction. See documentation for
-/// begin_cow_mutation for more information.
-class BeginCOWMutationResult final : public MultipleValueInstructionResult {
-public:
-  BeginCOWMutationResult(unsigned index, SILType type,
-                         ValueOwnershipKind ownershipKind)
-      : MultipleValueInstructionResult(ValueKind::BeginCOWMutationResult,
-                                       index, type, ownershipKind) {}
-
-  BeginCOWMutationInst *getParent(); // inline below
-  const BeginCOWMutationInst *getParent() const {
-    return const_cast<BeginCOWMutationResult *>(this)->getParent();
-  }
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::BeginCOWMutationResult;
-  }
-};
-
 /// Performs a uniqueness check of the operand for the purpose of modifying
 /// a copy-on-write object.
 ///
@@ -7169,8 +7181,7 @@ public:
 class BeginCOWMutationInst final
     : public UnaryInstructionBase<SILInstructionKind::BeginCOWMutationInst,
                                   MultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<
-          BeginCOWMutationInst, BeginCOWMutationResult>
+      public MultipleValueInstructionTrailingObjects<BeginCOWMutationInst>
 {
   friend SILBuilder;
   friend TrailingObjects;
@@ -7205,12 +7216,6 @@ public:
     SILNode::Bits.BeginCOWMutationInst.Native = native;
   }
 };
-
-// Out of line to work around forward declaration issues.
-inline BeginCOWMutationInst *BeginCOWMutationResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<BeginCOWMutationInst>(Parent);
-}
 
 /// Marks the end of the mutation of a reference counted object.
 class EndCOWMutationInst
@@ -8468,16 +8473,16 @@ private:
       SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
       ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
       Optional<ArrayRef<ProfileCounter>> CaseCounts,
-      ProfileCounter DefaultCount)
+      ProfileCounter DefaultCount, ValueOwnershipKind forwardingOwnershipKind)
       : InstructionBase(DebugLoc, Operand, DefaultBB, CaseBBs, CaseCounts,
-                        DefaultCount, Operand.getOwnershipKind()) {}
+                        DefaultCount, forwardingOwnershipKind) {}
   static SwitchEnumInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILBasicBlock *DefaultBB,
          ArrayRef<std::pair<EnumElementDecl *, SILBasicBlock *>> CaseBBs,
          SILFunction &F, Optional<ArrayRef<ProfileCounter>> CaseCounts,
-         ProfileCounter DefaultCount);
+         ProfileCounter DefaultCount,
+         ValueOwnershipKind forwardingOwnershipKind);
 };
-
 /// A switch on an enum's discriminator in memory.
 class SwitchEnumAddrInst
     : public InstructionBase<SILInstructionKind::SwitchEnumAddrInst,
@@ -8621,7 +8626,8 @@ template<SILInstructionKind Kind,
          typename Base>
 class AddrCastInstBase
     : public InstructionBaseWithTrailingOperands<Kind, Derived,
-                                                 TypesForAddrCasts<Base>> {
+                                                 TypesForAddrCasts<Base>>,
+      public CopyLikeInstruction {
 protected:
   friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand>;
 
@@ -8652,13 +8658,6 @@ public:
     return this->getAllOperands().slice(2);
   }
 
-  enum {
-    /// the value being stored
-    Src,
-    /// the lvalue being stored to
-    Dest
-  };
-
   SILValue getSrc() const { return this->getAllOperands()[Src].get(); }
   SILValue getDest() const { return this->getAllOperands()[Dest].get(); }
 
@@ -8685,19 +8684,21 @@ class CheckedCastBranchInst final
                         SILType DestLoweredTy, CanType DestFormalTy,
                         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
                         ProfileCounter Target1Count,
-                        ProfileCounter Target2Count)
+                        ProfileCounter Target2Count,
+                        ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, SuccessBB, FailureBB,
-            Target1Count, Target2Count, Operand.getOwnershipKind()),
+            Target1Count, Target2Count, forwardingOwnershipKind),
         DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
         IsExact(IsExact) {}
 
   static CheckedCastBranchInst *
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
-         SILType DestLoweredTy, CanType DestFormalTy,
-         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         ProfileCounter Target1Count, ProfileCounter Target2Count);
+         SILType DestLoweredTy, CanType DestFormalTy, SILBasicBlock *SuccessBB,
+         SILBasicBlock *FailureBB, SILFunction &F,
+         SILOpenedArchetypesState &OpenedArchetypes,
+         ProfileCounter Target1Count, ProfileCounter Target2Count,
+         ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   bool isExact() const { return IsExact; }
@@ -8875,14 +8876,18 @@ class TryApplyInst final
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> TypeDependentOperands,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+               ApplyOptions options,
                const GenericSpecializationInformation *SpecializationInfo);
 
   static TryApplyInst *
   create(SILDebugLocation DebugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
-         SILBasicBlock *normalBB, SILBasicBlock *errorBB, SILFunction &F,
+         SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+         ApplyOptions options, SILFunction &F,
          SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
+
+
 };
 
 /// DifferentiableFunctionInst - creates a `@differentiable` function-typed
@@ -8909,7 +8914,7 @@ private:
                              IndexSubset *ResultIndices,
                              SILValue OriginalFunction,
                              ArrayRef<SILValue> DerivativeFunctions,
-                             bool HasOwnership);
+                             ValueOwnershipKind forwardingOwnershipKind);
 
   static SILType getDifferentiableFunctionType(SILValue OriginalFunction,
                                                IndexSubset *ParameterIndices,
@@ -8924,7 +8929,7 @@ public:
   create(SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
          IndexSubset *ResultIndices, SILValue OriginalFunction,
          Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
-         bool HasOwnership);
+         ValueOwnershipKind forwardingOwnershipKind);
 
   /// Returns the original function operand.
   SILValue getOriginalFunction() const { return getOperand(0); }
@@ -8994,13 +8999,14 @@ private:
 public:
   LinearFunctionInst(SILDebugLocation Loc, IndexSubset *ParameterIndices,
                      SILValue OriginalFunction,
-                     Optional<SILValue> TransposeFunction, bool HasOwnership);
+                     Optional<SILValue> TransposeFunction,
+                     ValueOwnershipKind forwardingOwnershipKind);
 
   static LinearFunctionInst *create(SILModule &Module, SILDebugLocation Loc,
                                     IndexSubset *ParameterIndices,
                                     SILValue OriginalFunction,
                                     Optional<SILValue> TransposeFunction,
-                                    bool HasOwnership);
+                                    ValueOwnershipKind forwardingOwnershipKind);
 
   IndexSubset *getParameterIndices() const { return ParameterIndices; }
   bool hasTransposeFunction() const { return HasTransposeFunction; }
@@ -9041,6 +9047,7 @@ public:
   explicit DifferentiableFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc,
       NormalDifferentiableFunctionTypeComponent extractee, SILValue function,
+      ValueOwnershipKind forwardingOwnershipKind,
       Optional<SILType> extracteeType = None);
 
   NormalDifferentiableFunctionTypeComponent getExtractee() const {
@@ -9074,8 +9081,8 @@ private:
 public:
   explicit LinearFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc,
-      LinearDifferentiableFunctionTypeComponent extractee,
-      SILValue theFunction);
+      LinearDifferentiableFunctionTypeComponent extractee, SILValue theFunction,
+      ValueOwnershipKind forwardingOwnershipKind);
 
   LinearDifferentiableFunctionTypeComponent getExtractee() const {
     return extractee;
@@ -9221,71 +9228,27 @@ public:
   }
 };
 
-/// A result for the destructure_struct instruction. See documentation for
-/// destructure_struct for more information.
-class DestructureStructResult final : public MultipleValueInstructionResult {
-public:
-  DestructureStructResult(unsigned Index, SILType Type,
-                          ValueOwnershipKind OwnershipKind)
-      : MultipleValueInstructionResult(ValueKind::DestructureStructResult,
-                                       Index, Type, OwnershipKind) {}
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::DestructureStructResult;
-  }
-
-  DestructureStructInst *getParent();
-  const DestructureStructInst *getParent() const {
-    return const_cast<DestructureStructResult *>(this)->getParent();
-  }
-};
-
 /// Instruction that takes in a struct value and splits the struct into the
 /// struct's fields.
 class DestructureStructInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureStructInst,
                                   OwnershipForwardingMultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<DestructureStructInst,
-                                                     DestructureStructResult> {
+      public MultipleValueInstructionTrailingObjects<DestructureStructInst> {
   friend TrailingObjects;
 
   DestructureStructInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
                         ArrayRef<SILType> Types,
-                        ArrayRef<ValueOwnershipKind> OwnershipKinds)
-      : UnaryInstructionBase(Loc, Operand, Operand.getOwnershipKind()),
+                        ArrayRef<ValueOwnershipKind> OwnershipKinds,
+                        ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(Loc, Operand, forwardingOwnershipKind),
         MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
 
 public:
-  static DestructureStructInst *create(const SILFunction &F,
-                                       SILDebugLocation Loc,
-                                       SILValue Operand);
+  static DestructureStructInst *
+  create(const SILFunction &F, SILDebugLocation Loc, SILValue Operand,
+         ValueOwnershipKind forwardingOwnershipKind);
   static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::DestructureStructInst;
-  }
-};
-
-// Out of line to work around forward declaration issues.
-inline DestructureStructInst *DestructureStructResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<DestructureStructInst>(Parent);
-}
-
-/// A result for the destructure_tuple instruction. See documentation for
-/// destructure_tuple for more information.
-class DestructureTupleResult final : public MultipleValueInstructionResult {
-public:
-  DestructureTupleResult(unsigned Index, SILType Type,
-                         ValueOwnershipKind OwnershipKind)
-      : MultipleValueInstructionResult(ValueKind::DestructureTupleResult, Index,
-                                       Type, OwnershipKind) {}
-
-  static bool classof(SILNodePointer node) {
-    return node->getKind() == SILNodeKind::DestructureTupleResult;
-  }
-
-  DestructureTupleInst *getParent();
-  const DestructureTupleInst *getParent() const {
-    return const_cast<DestructureTupleResult *>(this)->getParent();
   }
 };
 
@@ -9294,30 +9257,24 @@ public:
 class DestructureTupleInst final
     : public UnaryInstructionBase<SILInstructionKind::DestructureTupleInst,
                                   OwnershipForwardingMultipleValueInstruction>,
-      public MultipleValueInstructionTrailingObjects<DestructureTupleInst,
-                                                     DestructureTupleResult> {
+      public MultipleValueInstructionTrailingObjects<DestructureTupleInst> {
   friend TrailingObjects;
 
   DestructureTupleInst(SILModule &M, SILDebugLocation Loc, SILValue Operand,
                        ArrayRef<SILType> Types,
-                       ArrayRef<ValueOwnershipKind> OwnershipKinds)
-      : UnaryInstructionBase(Loc, Operand, Operand.getOwnershipKind()),
+                       ArrayRef<ValueOwnershipKind> OwnershipKinds,
+                       ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(Loc, Operand, forwardingOwnershipKind),
         MultipleValueInstructionTrailingObjects(this, Types, OwnershipKinds) {}
 
 public:
-  static DestructureTupleInst *create(const SILFunction &F,
-                                      SILDebugLocation Loc,
-                                      SILValue Operand);
+  static DestructureTupleInst *
+  create(const SILFunction &F, SILDebugLocation Loc, SILValue Operand,
+         ValueOwnershipKind forwardingOwnershipKind);
   static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::DestructureTupleInst;
   }
 };
-
-// Out of line to work around forward declaration issues.
-inline DestructureTupleInst *DestructureTupleResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<DestructureTupleInst>(Parent);
-}
 
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.
@@ -9417,6 +9374,11 @@ OwnershipForwardingMixin::get(SILInstruction *inst) {
     return result;
   return nullptr;
 }
+
+inline bool MultipleValueInstructionResult::isBeginApplyToken() const {
+  return getParent<BeginApplyInst>()->getTokenResult() == this;
+}
+
 
 } // end swift namespace
 

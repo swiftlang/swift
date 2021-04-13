@@ -103,10 +103,8 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 //OVERLOADED_PAREN: End completions
 
   fn(h: .left, #^OVERLOADED_ARG2_LABEL^#)
-// FIXME: Should only suggest 'v:' (rdar://problem/60346573).
-//OVERLOADED_ARG2_LABEL: Begin completions, 2 items
+//OVERLOADED_ARG2_LABEL: Begin completions, 1 item
 //OVERLOADED_ARG2_LABEL-DAG: Pattern/ExprSpecific:               {#v: Functor.Vertical#}[#Functor.Vertical#];
-//OVERLOADED_ARG2_LABEL-DAG: Pattern/ExprSpecific:               {#h: Functor.Horizontal#}[#Functor.Horizontal#];
 //OVERLOADED_ARG2_LABEL: End completions
 
   fn(h: .left, v: .#^OVERLOADED_ARG2_VALUE^#)

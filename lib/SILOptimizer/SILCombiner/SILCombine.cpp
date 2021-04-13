@@ -24,7 +24,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -49,6 +49,12 @@ static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
     llvm::cl::desc("Enable sinking of owened forwarding insts"),
     llvm::cl::init(true), llvm::cl::Hidden);
 
+// Allow disabling general optimization for targetted unit tests.
+static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
+    "sil-combine-canonicalize",
+    llvm::cl::desc("Canonicalization during sil-combine"), llvm::cl::init(true),
+    llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
@@ -61,7 +67,7 @@ static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
 /// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
-  BasicBlockWorklist<256> Worklist(BB);
+  BasicBlockWorklist Worklist(BB);
   llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
 
   while (SILBasicBlock *BB = Worklist.pop()) {
@@ -141,6 +147,9 @@ public:
   }
 
   bool tryCanonicalize(SILInstruction *inst) {
+    if (!EnableSILCombineCanonicalize)
+      return false;
+
     changed = false;
     canonicalize(inst);
     return changed;

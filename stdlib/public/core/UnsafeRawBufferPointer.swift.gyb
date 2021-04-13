@@ -820,9 +820,9 @@ public func withUnsafeBytes<T, Result>(
   return try body(buffer)
 }
 
-extension UnsafeRawBufferPointer: ConcurrentValue { }
-extension UnsafeRawBufferPointer.Iterator: ConcurrentValue { }
-extension UnsafeMutableRawBufferPointer: ConcurrentValue { }
+extension UnsafeRawBufferPointer: Sendable { }
+extension UnsafeRawBufferPointer.Iterator: Sendable { }
+extension UnsafeMutableRawBufferPointer: Sendable { }
 
 
 // ${'Local Variables'}:

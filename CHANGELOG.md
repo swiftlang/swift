@@ -6,6 +6,7 @@ CHANGELOG
 
 | Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
+| [Swift 5.5](#swift-55) |            |             |
 | [Swift 5.4](#swift-54) |            |             |
 | [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
 | [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
@@ -25,8 +26,76 @@ CHANGELOG
 
 </details>
 
-Swift Next
-----------
+Swift 5.5
+---------
+
+* The determination of whether a call to a `rethrows` function can throw now considers default arguments of `Optional` type.
+
+  In Swift 5.4, such default arguments were ignored entirely by `rethrows` checking. This meant that the following example was accepted:
+
+  ```swift
+  func foo(_: (() throws -> ())? = nil) rethrows {}
+  foo()  // no 'try' needed
+  ```
+
+  However, it also meant that the following was accepted, even though the call to `foo()` can throw and the call site is not marked with `try`:
+
+  ```swift
+  func foo(_: (() throws -> ())? = { throw myError }) rethrows {}
+  foo()  // 'try' *should* be required here
+  ```
+
+  The new behavior is that the first example is accepted because the default argument is syntactically written as `nil`, which is known not to throw. The second example is correctly rejected, on account of missing a `try` since the default argument *can* throw.
+
+* [SE-0293][]:
+
+  Property wrappers can now be applied to function and closure parameters:
+
+  ```swift
+  @propertyWrapper
+  struct Wrapper<Value> {
+    var wrappedValue: Value
+
+    var projectedValue: Self { return self }
+
+    init(wrappedValue: Value) { ... }
+
+    init(projectedValue: Self) { ... }
+  }
+
+  func test(@Wrapper value: Int) {
+    print(value)
+    print($value)
+    print(_value)
+  }
+
+  test(value: 10)
+
+  let projection = Wrapper(wrappedValue: 10)
+  test($value: projection)
+  ```
+
+  The call-site can pass a wrapped value or a projected value, and the property wrapper will be initialized using `init(wrappedValue:)` or `init(projectedValue:)`, respectively.
+
+* [SE-0299][]:
+
+  It is now possible to use leading-dot syntax in generic contexts to access static members of protocol extensions where `Self` is constrained to a fully concrete type:
+
+  ```swift
+  public protocol ToggleStyle { ... }
+
+  public struct DefaultToggleStyle: ToggleStyle { ... }
+
+  extension ToggleStyle where Self == DefaultToggleStyle {
+    public static var `default`: Self { .init() }
+  }
+
+  struct Toggle {
+    func applyToggle<T: ToggleStyle>(_ style: T) { ... }
+  }
+
+  Toggle(...).applyToggle(.default)
+  ```
 
 * Whenever a reference to `Self` does not impede the usage of a protocol as a value type, or a protocol member on a value of protocol type, the same is now true for references to `[Self]` and `[Key : Self]`:
 
@@ -72,6 +141,31 @@ Swift Next
     if useIt {
       doIt(result)
     }
+  }
+  ```
+
+* [SE-0297][]:
+
+  An Objective-C method that delivers its results asynchronously via a completion handler block will be translated into an `async` method that directly returns the result (or throws). For example, the following Objective-C method from [CloudKit](https://developer.apple.com/documentation/cloudkit/ckcontainer/1640387-fetchshareparticipantwithuserrec):
+
+  ```objc
+  - (void)fetchShareParticipantWithUserRecordID:(CKRecordID *)userRecordID
+      completionHandler:(void (^)(CKShareParticipant * _Nullable, NSError * _Nullable))completionHandler;
+  ```
+
+  will be translated into an `async throws` method that returns the participant instance:
+
+  ```swift
+  func fetchShareParticipant(
+      withUserRecordID userRecordID: CKRecord.ID
+  ) async throws -> CKShare.Participant
+  ```
+
+  Swift callers can invoke this `async` method within an `await` expression:
+
+  ```swift
+  guard let participant = try? await container.fetchShareParticipant(withUserRecordID: user) else {
+      return nil
   }
   ```
 
@@ -8335,8 +8429,11 @@ Swift 1.0
 [SE-0284]: <https://github.com/apple/swift-evolution/blob/main/proposals/0284-multiple-variadic-parameters.md>
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
+[SE-0293]: <https://github.com/apple/swift-evolution/blob/main/proposals/0293-extend-property-wrappers-to-function-and-closure-parameters.md>
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
+[SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
+[SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

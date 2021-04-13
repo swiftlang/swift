@@ -547,9 +547,17 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
-  // TODO: Once clang support is merged this should also use
-  //  clangASTContext.getTargetInfo().isSwiftAsyncCCSupported()
-  SwiftAsyncCC = opts.UseAsyncLowering ? llvm::CallingConv::SwiftTail : SwiftCC;
+
+  bool isAsyncCCSupported =
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
+    == clang::TargetInfo::CCCR_OK;
+  if (isAsyncCCSupported) {
+    SwiftAsyncCC = llvm::CallingConv::SwiftTail;
+    AsyncTailCallKind = llvm::CallInst::TCK_MustTail;
+  } else {
+    SwiftAsyncCC = SwiftCC;
+    AsyncTailCallKind = llvm::CallInst::TCK_Tail;
+  }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
@@ -595,8 +603,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   AsyncFunctionPointerTy = createStructType(*this, "swift.async_func_pointer",
                                             {RelativeAddressTy, Int32Ty}, true);
-  SwiftContextTy = createStructType(*this, "swift.context", {});
-  auto *ContextPtrTy = llvm::PointerType::getUnqual(SwiftContextTy);
+  SwiftContextTy = llvm::StructType::create(getLLVMContext(), "swift.context");
+  SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
 
   // This must match the definition of class AsyncTask in swift/ABI/Task.h.
   SwiftTaskTy = createStructType(*this, "swift.task", {
@@ -604,37 +612,52 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
     SizeTy,               // Job.Flags
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
-    ContextPtrTy,         // Task.ResumeContext
+    SwiftContextPtrTy,    // Task.ResumeContext
     IntPtrTy              // Task.Status
   });
 
-  SwiftExecutorTy = createStructType(*this, "swift.executor", {});
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
-  SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
-  SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
-  SwiftJobTy = createStructType(*this, "swift.job", {
-    SizeTy,               // flags
-    Int8PtrTy             // execution function pointer
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
+  ExecutorFirstTy = RefCountedPtrTy;
+  ExecutorSecondTy = SizeTy;
+  SwiftExecutorTy = createStructType(*this, "swift.executor", {
+    ExecutorFirstTy,      // identity
+    ExecutorSecondTy,     // implementation
   });
-  SwiftJobPtrTy = SwiftJobTy->getPointerTo();
+  SwiftJobTy = createStructType(*this, "swift.job", {
+    RefCountedStructTy,   // object header
+    Int8PtrTy, Int8PtrTy, // SchedulerPrivate
+    SizeTy,               // flags
+    FunctionPtrTy,        // RunJob/ResumeTask
+  });
+  SwiftJobPtrTy = SwiftJobTy->getPointerTo(DefaultAS);
 
   // using TaskContinuationFunction =
-  //   SWIFT_CC(swift)
-  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
+  //   SWIFT_CC(swift) void (SWIFT_ASYNC_CONTEXT AsyncContext *);
   TaskContinuationFunctionTy = llvm::FunctionType::get(
-      VoidTy, {SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftContextPtrTy},
-      /*isVarArg*/ false);
+      VoidTy, {SwiftContextPtrTy}, /*isVarArg*/ false);
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
+
+  SwiftContextTy->setBody({
+    SwiftContextPtrTy,    // Parent
+    TaskContinuationFunctionPtrTy, // ResumeParent,
+    SizeTy,               // Flags
+  });
 
   AsyncTaskAndContextTy = createStructType(
       *this, "swift.async_task_and_context",
       { SwiftTaskPtrTy, SwiftContextPtrTy });
 
-  AsyncContinuationContextTy = createStructType(
-      *this, "swift.async_continuation_context",
-      {SwiftContextPtrTy, SizeTy, ErrorPtrTy, OpaquePtrTy, SwiftExecutorPtrTy});
-  AsyncContinuationContextPtrTy = AsyncContinuationContextTy->getPointerTo();
+  ContinuationAsyncContextTy = createStructType(
+      *this, "swift.continuation_context",
+      {SwiftContextTy,       // AsyncContext header
+       SizeTy,               // await synchronization
+       ErrorPtrTy,           // error result pointer
+       OpaquePtrTy,          // normal result address
+       SwiftExecutorTy});    // resume to executor
+  ContinuationAsyncContextPtrTy =
+    ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
@@ -877,6 +900,11 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   }
 
   return cache;
+}
+
+llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+      LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
 #define QUOTE(...) __VA_ARGS__
@@ -1622,7 +1650,8 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() || Triple.isTvOS() || Triple.isOSLinux());
+      (Triple.isOSDarwin() || Triple.isTvOS() ||
+       (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return true;
   }

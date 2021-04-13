@@ -500,7 +500,7 @@ public:
       return StoredPointer();
 
     auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
-    return classMeta->Superclass;
+    return stripSignedPointer(classMeta->Superclass);
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
@@ -534,9 +534,9 @@ public:
     size_t start = isaAndRetainCountSize;
 
     auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
-    while (classMeta->Superclass) {
+    while (stripSignedPointer(classMeta->Superclass)) {
       classMeta = cast<TargetClassMetadata<Runtime>>(
-          readMetadata(classMeta->Superclass));
+          readMetadata(stripSignedPointer(classMeta->Superclass)));
 
       // Subtract the size contribution of the isa and retain counts from 
       // the super class.
@@ -808,9 +808,26 @@ public:
                        .withAsync(Function->isAsync())
                        .withThrows(Function->isThrowing())
                        .withParameterFlags(Function->hasParameterFlags())
-                       .withEscaping(Function->isEscaping());
-      auto BuiltFunction =
-          Builder.createFunctionType(Parameters, Result, flags);
+                       .withEscaping(Function->isEscaping())
+                       .withDifferentiable(Function->isDifferentiable());
+
+      FunctionMetadataDifferentiabilityKind diffKind;
+      switch (Function->getDifferentiabilityKind().Value) {
+      #define CASE(X) \
+        case TargetFunctionMetadataDifferentiabilityKind< \
+            typename Runtime::StoredSize>::X: \
+          diffKind = FunctionMetadataDifferentiabilityKind::X; \
+          break;
+      CASE(NonDifferentiable)
+      CASE(Forward)
+      CASE(Reverse)
+      CASE(Normal)
+      CASE(Linear)
+      #undef CASE
+      }
+
+      auto BuiltFunction = Builder.createFunctionType(
+          Parameters, Result, flags, diffKind);
       TypeCache[MetadataAddress] = BuiltFunction;
       return BuiltFunction;
     }
@@ -1670,6 +1687,11 @@ protected:
         if (flags.hasParameterFlags())
           totalSize += flags.getNumParameters() * sizeof(uint32_t);
 
+        if (flags.isDifferentiable())
+          totalSize = roundUpToAlignment(totalSize, sizeof(void *)) +
+              sizeof(TargetFunctionMetadataDifferentiabilityKind<
+                  typename Runtime::StoredSize>);
+
         return _readMetadata(address,
                              roundUpToAlignment(totalSize, sizeof(void *)));
       }
@@ -1729,7 +1751,8 @@ protected:
         if (descriptorAddress || !skipArtificialSubclasses)
           return static_cast<StoredPointer>(descriptorAddress);
 
-        auto superclassMetadataAddress = classMeta->Superclass;
+        auto superclassMetadataAddress =
+            stripSignedPointer(classMeta->Superclass);
         if (!superclassMetadataAddress)
           return 0;
 
@@ -2639,11 +2662,11 @@ private:
     BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
     if (!BuiltObjCClass) {
       // Try the superclass.
-      if (!classMeta->Superclass)
+      if (!stripSignedPointer(classMeta->Superclass))
         return BuiltType();
 
-      BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
-                                            skipArtificialSubclasses);
+      BuiltObjCClass = readTypeFromMetadata(
+          stripSignedPointer(classMeta->Superclass), skipArtificialSubclasses);
     }
 
     TypeCache[origMetadataPtr] = BuiltObjCClass;

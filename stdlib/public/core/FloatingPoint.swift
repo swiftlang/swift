@@ -416,7 +416,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///     let x = -33.375
   ///     // x.sign == .minus
   ///
-  /// Do not use this property to check whether a floating point value is
+  /// Don't use this property to check whether a floating point value is
   /// negative. For a value `x`, the comparison `x.sign == .minus` is not
   /// necessarily the same as `x < 0`. In particular, `x.sign == .minus` if
   /// `x` is -0, and while `x < 0` is always `false` if `x` is NaN, `x.sign`
@@ -1130,7 +1130,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// A Boolean value indicating whether this instance is finite.
   ///
   /// All values other than NaN and infinity are considered finite, whether
-  /// normal or subnormal.
+  /// normal or subnormal.  For NaN, both `isFinite` and `isInfinite` are false.
   var isFinite: Bool { get }
 
   /// A Boolean value indicating whether the instance is equal to zero.
@@ -1147,7 +1147,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// A Boolean value indicating whether the instance is subnormal.
   ///
   /// A *subnormal* value is a nonzero number that has a lesser magnitude than
-  /// the smallest normal number. Subnormal values do not use the full
+  /// the smallest normal number. Subnormal values don't use the full
   /// precision available to values of a type.
   ///
   /// Zero is neither a normal nor a subnormal number. Subnormal numbers are
@@ -1157,8 +1157,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
 
   /// A Boolean value indicating whether the instance is infinite.
   ///
-  /// Note that `isFinite` and `isInfinite` do not form a dichotomy, because
-  /// they are not total: If `x` is `NaN`, then both properties are `false`.
+  /// For NaN, both `isFinite` and `isInfinite` are false.
   var isInfinite: Bool { get }
 
   /// A Boolean value indicating whether the instance is NaN ("not a number").
@@ -1229,7 +1228,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
 
 /// The sign of a floating-point value.
 @frozen
-public enum FloatingPointSign: Int, ConcurrentValue {
+public enum FloatingPointSign: Int, Sendable {
   /// The sign for a positive value.
   case plus
 
@@ -1278,7 +1277,7 @@ public enum FloatingPointSign: Int, ConcurrentValue {
 
 /// The IEEE 754 floating-point classes.
 @frozen
-public enum FloatingPointClassification: ConcurrentValue {
+public enum FloatingPointClassification: Sendable {
   /// A signaling NaN ("not a number").
   ///
   /// A signaling NaN sets the floating-point exception status when used in
@@ -1316,7 +1315,7 @@ public enum FloatingPointClassification: ConcurrentValue {
 }
 
 /// A rule for rounding a floating-point number.
-public enum FloatingPointRoundingRule: ConcurrentValue {
+public enum FloatingPointRoundingRule: Sendable {
   /// Round to the closest allowed value; if two values are equally close, the
   /// one with greater magnitude is chosen.
   ///

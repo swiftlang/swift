@@ -1,7 +1,6 @@
 add_swift_unittest(SwiftSyntaxTests
   DeclSyntaxTests.cpp
   ExprSyntaxTests.cpp
-  GenericSyntaxTests.cpp
   StmtSyntaxTests.cpp
   SyntaxCollectionTests.cpp
   TriviaTests.cpp

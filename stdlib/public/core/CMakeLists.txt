@@ -45,7 +45,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
-  ConcurrentValue.swift
+  Sendable.swift
   ContiguousArray.swift
   ContiguouslyStored.swift
   ClosedRange.swift
@@ -61,7 +61,6 @@ set(SWIFTLIB_ESSENTIAL
   DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
-  EitherSequence.swift
   EmptyCollection.swift
   Equatable.swift
   ErrorType.swift
@@ -225,6 +224,7 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  SIMDConcreteOperations.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )

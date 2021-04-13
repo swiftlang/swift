@@ -87,122 +87,6 @@ Trivia lexTrivia(StringRef TriviaStr) {
   return SyntaxTrivia;
 }
 
-/// If the \p Str is not allocated in \p Arena, copy it to \p Arena and adjust
-/// \p Str to point to the string's copy in \p Arena.
-void copyToArenaIfNecessary(StringRef &Str, const RC<SyntaxArena> Arena) {
-  if (Str.empty()) {
-    // Empty strings can live wherever they want. Nothing to do.
-    return;
-  }
-  if (Arena->containsPointer(Str.data())) {
-    // String already in arena. Nothing to do.
-    return;
-  }
-  // Copy string to arena
-  char *Data = (char *)Arena->Allocate(Str.size(), alignof(char *));
-  std::uninitialized_copy(Str.begin(), Str.end(), Data);
-  Str = StringRef(Data, Str.size());
-}
-
-// FIXME: If we want thread-safety for tree creation, this needs to be atomic.
-unsigned RawSyntax::NextFreeNodeId = 1;
-
-RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                     size_t TextLength, SourcePresence Presence,
-                     const RC<SyntaxArena> &Arena,
-                     llvm::Optional<unsigned> NodeId)
-    : RefCount(0), Arena(Arena),
-      Bits({{unsigned(TextLength), unsigned(Presence), false}}) {
-  assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-  assert(Kind != SyntaxKind::Token &&
-         "'token' syntax node must be constructed with dedicated constructor");
-
-  size_t TotalSubNodeCount = 0;
-  for (auto Child : Layout) {
-    if (Child) {
-      TotalSubNodeCount += Child->getTotalSubNodeCount() + 1;
-    }
-  }
-
-  if (NodeId.hasValue()) {
-    this->NodeId = NodeId.getValue();
-    NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
-  } else {
-    this->NodeId = NextFreeNodeId++;
-  }
-  Bits.Layout.NumChildren = Layout.size();
-  Bits.Layout.TotalSubNodeCount = TotalSubNodeCount;
-  Bits.Layout.Kind = unsigned(Kind);
-
-  // Initialize layout data.
-  std::uninitialized_copy(Layout.begin(), Layout.end(),
-                          getTrailingObjects<RC<RawSyntax>>());
-}
-
-RawSyntax::RawSyntax(tok TokKind, StringRef Text, size_t TextLength,
-                     StringRef LeadingTrivia, StringRef TrailingTrivia,
-                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
-                     llvm::Optional<unsigned> NodeId)
-    : RefCount(0), Arena(Arena),
-      Bits({{unsigned(TextLength), unsigned(Presence), true}}) {
-  assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-  copyToArenaIfNecessary(LeadingTrivia, Arena);
-  copyToArenaIfNecessary(Text, Arena);
-  copyToArenaIfNecessary(TrailingTrivia, Arena);
-
-  if (Presence == SourcePresence::Missing) {
-    assert(TextLength == 0);
-  } else {
-    assert(TextLength ==
-           LeadingTrivia.size() + Text.size() + TrailingTrivia.size());
-  }
-
-  if (NodeId.hasValue()) {
-    this->NodeId = NodeId.getValue();
-    NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
-  } else {
-    this->NodeId = NextFreeNodeId++;
-  }
-  Bits.Token.LeadingTrivia = LeadingTrivia.data();
-  Bits.Token.TokenText = Text.data();
-  Bits.Token.TrailingTrivia = TrailingTrivia.data();
-  Bits.Token.LeadingTriviaLength = LeadingTrivia.size();
-  Bits.Token.TokenLength = Text.size();
-  Bits.Token.TrailingTriviaLength = TrailingTrivia.size();
-  Bits.Token.TokenKind = unsigned(TokKind);
-}
-
-RawSyntax::~RawSyntax() {
-  if (!isToken()) {
-    for (auto &child : getLayout())
-      child.~RC<RawSyntax>();
-  }
-}
-
-RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                              size_t TextLength, SourcePresence Presence,
-                              const RC<SyntaxArena> &Arena,
-                              llvm::Optional<unsigned> NodeId) {
-  assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-  auto size = totalSizeToAlloc<RC<RawSyntax>>(Layout.size());
-  void *data = Arena->Allocate(size, alignof(RawSyntax));
-  return RC<RawSyntax>(
-      new (data) RawSyntax(Kind, Layout, TextLength, Presence, Arena, NodeId));
-}
-
-RC<RawSyntax> RawSyntax::make(tok TokKind, StringRef Text, size_t TextLength,
-                              StringRef LeadingTrivia, StringRef TrailingTrivia,
-                              SourcePresence Presence,
-                              const RC<SyntaxArena> &Arena,
-                              llvm::Optional<unsigned> NodeId) {
-  assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-  auto size = totalSizeToAlloc<RC<RawSyntax>>(0);
-  void *data = Arena->Allocate(size, alignof(RawSyntax));
-  return RC<RawSyntax>(new (data)
-                           RawSyntax(TokKind, Text, TextLength, LeadingTrivia,
-                                     TrailingTrivia, Presence, Arena, NodeId));
-}
-
 Trivia RawSyntax::getLeadingTriviaPieces() const {
   return lexTrivia(getLeadingTrivia());
 }
@@ -211,20 +95,20 @@ Trivia RawSyntax::getTrailingTriviaPieces() const {
   return lexTrivia(getTrailingTrivia());
 }
 
-RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
+const RawSyntax *RawSyntax::append(const RawSyntax *NewLayoutElement) const {
   auto Layout = getLayout();
-  std::vector<RC<RawSyntax>> NewLayout;
+  std::vector<const RawSyntax *> NewLayout;
   NewLayout.reserve(Layout.size() + 1);
   std::copy(Layout.begin(), Layout.end(), std::back_inserter(NewLayout));
   NewLayout.push_back(NewLayoutElement);
-  return RawSyntax::makeAndCalcLength(getKind(), NewLayout,
-                                      SourcePresence::Present);
+  return RawSyntax::make(getKind(), NewLayout, SourcePresence::Present, Arena);
 }
 
-RC<RawSyntax> RawSyntax::replacingChild(CursorIndex Index,
-                                        RC<RawSyntax> NewLayoutElement) const {
+const RawSyntax *
+RawSyntax::replacingChild(CursorIndex Index,
+                          const RawSyntax *NewLayoutElement) const {
   auto Layout = getLayout();
-  std::vector<RC<RawSyntax>> NewLayout;
+  std::vector<const RawSyntax *> NewLayout;
   NewLayout.reserve(Layout.size());
 
   std::copy(Layout.begin(), Layout.begin() + Index,
@@ -235,7 +119,7 @@ RC<RawSyntax> RawSyntax::replacingChild(CursorIndex Index,
   std::copy(Layout.begin() + Index + 1, Layout.end(),
             std::back_inserter(NewLayout));
 
-  return RawSyntax::makeAndCalcLength(getKind(), NewLayout, getPresence());
+  return RawSyntax::make(getKind(), NewLayout, getPresence(), Arena);
 }
 
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {

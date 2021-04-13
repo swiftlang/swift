@@ -64,12 +64,14 @@ namespace {
 bool isUnavailableOrObsoleted(const Decl *D) {
   if (const auto *Avail =
         D->getAttrs().getUnavailable(D->getASTContext())) {
-    switch (Avail->getVersionAvailability(D->getASTContext())) {
-      case AvailableVersionComparison::Unavailable:
-      case AvailableVersionComparison::Obsoleted:
-        return true;
-      default:
-        break;
+    if (Avail->Platform != PlatformKind::none) {
+      switch (Avail->getVersionAvailability(D->getASTContext())) {
+        case AvailableVersionComparison::Unavailable:
+        case AvailableVersionComparison::Obsoleted:
+          return true;
+        default:
+          break;
+      }
     }
   }
   return false;

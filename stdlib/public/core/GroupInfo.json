@@ -64,7 +64,6 @@
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
     "CollectionAlgorithms.swift",
-    "EitherSequence.swift",
     "EmptyCollection.swift",
     "Stride.swift",
     "Repeat.swift",
@@ -169,6 +168,7 @@
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
+      "SIMDConcreteOperations.swift",
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}
   ],
@@ -199,7 +199,7 @@
   ],
   "Misc": [
     "AtomicInt.swift",
-    "ConcurrentValue.swift",
+    "Sendable.swift",
     "ErrorType.swift",
     "Identifiable.swift",
     "InputStream.swift",

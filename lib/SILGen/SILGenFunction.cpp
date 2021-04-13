@@ -132,6 +132,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
     return getMagicFunctionName(cast<ClassDecl>(ref.getDecl()));
   case SILDeclRef::Kind::IVarDestroyer:
@@ -243,22 +245,16 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       auto &Diags = getASTContext().Diags;
 
       SourceLoc loc;
-      bool isDeferBody;
       if (closure.kind == SILDeclRef::Kind::DefaultArgGenerator) {
         auto *param = getParameterAt(closure.getDecl(),
                                      closure.defaultArgIndex);
         loc = param->getLoc();
-        isDeferBody = false;
       } else {
         auto f = *closure.getAnyFunctionRef();
         loc = f.getLoc();
-        isDeferBody = f.isDeferBody();
       }
 
-      Diags.diagnose(loc,
-                     isDeferBody
-                     ? diag::capture_before_declaration_defer
-                     : diag::capture_before_declaration,
+      Diags.diagnose(loc, diag::capture_before_declaration,
                      vd->getBaseIdentifier());
       Diags.diagnose(vd->getLoc(), diag::captured_value_declared_here);
       Diags.diagnose(capture.getLoc(), diag::value_captured_here);
@@ -522,6 +518,23 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
       // original asyncHandler.
       !F.isAsync()) {
     emitAsyncHandler(fd);
+  } else if (llvm::any_of(*fd->getParameters(),
+                          [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
+    // If any parameters have property wrappers, emit the local auxiliary
+    // variables before emitting the function body.
+    LexicalScope BraceScope(*this, CleanupLocation(fd));
+    for (auto *param : *fd->getParameters()) {
+      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+        SILLocation WrapperLoc(auxiliaryVar);
+        WrapperLoc.markAsPrologue();
+        if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
+          visitPatternBindingDecl(patternBinding);
+
+        visit(auxiliaryVar);
+      });
+    }
+
+    emitStmt(fd->getTypecheckedBody());
   } else {
     emitStmt(fd->getTypecheckedBody());
   }
@@ -594,6 +607,12 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
   prepareEpilog(true, ace->isBodyThrowing(), CleanupLocation(ace));
+  for (auto *param : *ace->getParameters()) {
+    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+      visit(auxiliaryVar);
+    });
+  }
+
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
   } else {
@@ -885,9 +904,10 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   }
 
   // For a property wrapper backing initializer, form a parameter list
-  // containing the wrapped value.
+  // containing the wrapped or projected value.
   ParameterList *params = nullptr;
-  if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+  if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer ||
+      function.kind == SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue) {
     auto &ctx = getASTContext();
     auto param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                      ctx.getIdentifier("$input_value"),
@@ -895,8 +915,19 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                      ctx.getIdentifier("$input_value"),
                                      dc);
     param->setSpecifier(ParamSpecifier::Owned);
+    param->setImplicit();
     auto vd = cast<VarDecl>(function.getDecl());
-    param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
+    if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+      param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
+    } else {
+      auto *placeholder =
+          vd->getPropertyWrapperInitializerInfo().getProjectedValuePlaceholder();
+      auto interfaceType = placeholder->getType();
+      if (interfaceType->hasArchetype())
+        interfaceType = interfaceType->mapTypeOutOfContext();
+
+      param->setInterfaceType(interfaceType);
+    }
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
   }
@@ -916,14 +947,24 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     // in the initializer expression to the given parameter.
     if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
       auto var = cast<VarDecl>(function.getDecl());
-      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
       auto param = params->get(0);
-      auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+      auto *placeholder = initInfo.getWrappedValuePlaceholder();
       opaqueValue.emplace(
           *this, placeholder->getOpaqueValuePlaceholder(),
           maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
 
-      assert(value == wrappedInfo.initializeFromOriginal);
+      assert(value == initInfo.getInitFromWrappedValue());
+    } else if (function.kind == SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue) {
+      auto var = cast<VarDecl>(function.getDecl());
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
+      auto param = params->get(0);
+      auto *placeholder = initInfo.getProjectedValuePlaceholder();
+      opaqueValue.emplace(
+          *this, placeholder->getOpaqueValuePlaceholder(),
+          maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
+
+      assert(value == initInfo.getInitFromProjectedValue());
     }
 
     emitReturnExpr(Loc, value);

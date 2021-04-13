@@ -922,7 +922,7 @@ public:
 
     // Call the callee pullback.
     auto *pullbackCall = builder.createApply(loc, pullback, SubstitutionMap(),
-                                             args, /*isNonThrowing*/ false);
+                                             args);
     builder.emitDestroyValueOperation(loc, pullback);
 
     // Extract all results from `pullbackCall`.

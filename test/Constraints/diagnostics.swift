@@ -100,11 +100,11 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
-// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
+// expected-note@-1 {{required by global function 'f8' where 'T' = '(Int, Double)'}}
 f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+f8((1,2.0), f9) // expected-error {{type '(Int, Double)' cannot conform to 'P2'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -1103,10 +1103,17 @@ func rdar17170728() {
   }
 
   let _ = [i, j, k].reduce(0 as Int?) {
-    // expected-error@-1{{missing argument label 'into:' in call}}
-    // expected-error@-2{{cannot convert value of type 'Int?' to expected argument type}}
+    // expected-error@-1 3 {{cannot convert value of type 'Int?' to expected element type 'Bool'}}
+    // expected-error@-2 {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-3 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-4 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
+    // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-2 {{cannot convert value of type 'Bool?' to closure result type 'Int'}}
+    // expected-error@-3 {{result values in '? :' expression have mismatching types 'Int' and 'Bool?'}}
+    // expected-error@-4 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
+    // expected-error@-5 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+    // expected-error@-6 {{result values in '? :' expression have mismatching types 'Int' and 'Bool?'}}
   }
 }
 
@@ -1353,3 +1360,17 @@ SR5688_1!.count // expected-error {{function 'SR5688_1' was used as a property; 
 
 func SR5688_2() -> Int? { 0 }
 let _: Int = SR5688_2! // expected-error {{function 'SR5688_2' was used as a property; add () to call it}} {{22-22=()}}
+
+
+// rdar://74696023 - Fallback error when passing incorrect optional type to `==` operator
+func rdar74696023() {
+  struct MyError {
+    var code: Int = 0
+  }
+
+  func test(error: MyError?, code: Int32) {
+    guard error?.code == code else { fatalError() } // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+}

@@ -508,5 +508,5 @@ extension Slice
   }
 }
 
-extension Slice: ConcurrentValue
-where Base: ConcurrentValue, Base.Index: ConcurrentValue { }
+extension Slice: Sendable
+where Base: Sendable, Base.Index: Sendable { }

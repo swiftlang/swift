@@ -1223,8 +1223,10 @@ extension Set {
   @inlinable
   public __consuming func intersection(_ other: Set<Element>) -> Set<Element> {
     var newSet = Set<Element>()
-    for member in self {
-      if other.contains(member) {
+    let (smaller, larger) =
+      count < other.count ? (self, other) : (other, self)
+    for member in smaller {
+      if larger.contains(member) {
         newSet.insert(member)
       }
     }
@@ -1630,9 +1632,9 @@ extension Set {
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 
-extension Set: ConcurrentValue, UnsafeConcurrentValue
-  where Element: ConcurrentValue { }
-extension Set.Index: ConcurrentValue, UnsafeConcurrentValue
-  where Element: ConcurrentValue { }
-extension Set.Iterator: ConcurrentValue, UnsafeConcurrentValue
-  where Element: ConcurrentValue { }
+extension Set: Sendable, UnsafeSendable
+  where Element: Sendable { }
+extension Set.Index: Sendable, UnsafeSendable
+  where Element: Sendable { }
+extension Set.Iterator: Sendable, UnsafeSendable
+  where Element: Sendable { }

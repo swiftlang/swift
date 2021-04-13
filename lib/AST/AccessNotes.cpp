@@ -46,14 +46,7 @@ AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
   else
     accessorKind = None;
 
-  name = parsedName.formDeclName(ctx);
-
-  // FIXME: parseDeclName() doesn't handle the special `subscript` name.
-  // Fixing this without affecting existing uses in import-as-member will need
-  // a bit of work. Hack around the problem for this specific caller instead.
-  if (name.getBaseName() == ctx.getIdentifier("subscript"))
-    name = DeclName(ctx, DeclBaseName::createSubscript(),
-                    name.getArgumentNames());
+  name = parsedName.formDeclName(ctx, /*isSubscript=*/true);
 }
 
 bool AccessNoteDeclName::matches(ValueDecl *VD) const {

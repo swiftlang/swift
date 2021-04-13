@@ -40,7 +40,7 @@ using namespace swift;
 /// If the given property is a `var`, return true because `move(by:)` can be
 /// invoked regardless.  Otherwise, return true if and only if the property's
 /// type's 'Differentiable.move(by:)' witness is non-mutating.
-static bool canInvokeMoveAlongOnProperty(
+static bool canInvokeMoveByOnProperty(
     VarDecl *vd, ProtocolConformanceRef diffableConformance) {
   assert(diffableConformance && "Property must conform to 'Differentiable'");
   // `var` always supports `move(by:)` since it is mutable.
@@ -64,7 +64,7 @@ static void
 getStoredPropertiesForDifferentiation(
     NominalTypeDecl *nominal, DeclContext *DC,
     SmallVectorImpl<VarDecl *> &result,
-    bool includeLetPropertiesWithNonmutatingMoveAlong = false) {
+    bool includeLetPropertiesWithNonmutatingMoveBy = false) {
   auto &C = nominal->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   for (auto *vd : nominal->getStoredProperties()) {
@@ -90,8 +90,8 @@ getStoredPropertiesForDifferentiation(
     // Skip `let` stored properties with a mutating `move(by:)` if requested.
     // `mutating func move(by:)` cannot be synthesized to update `let`
     // properties.
-    if (!includeLetPropertiesWithNonmutatingMoveAlong && 
-        !canInvokeMoveAlongOnProperty(vd, conformance))
+    if (!includeLetPropertiesWithNonmutatingMoveBy && 
+        !canInvokeMoveByOnProperty(vd, conformance))
       continue;
     result.push_back(vd);
   }
@@ -409,7 +409,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // Note that, for example, this will always find `AdditiveArithmetic` and `Differentiable` because
   // the `Differentiable` protocol itself requires that its `TangentVector` conforms to
   // `AdditiveArithmetic` and `Differentiable`.
-  llvm::SmallPtrSet<ProtocolType *, 4> tvDesiredProtos;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> tvDesiredProtos;
   llvm::SmallPtrSet<ProtocolDecl *, 4> conformanceInheritedProtos;
   getInheritedProtocols(derived.ConformanceDecl, conformanceInheritedProtos);
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
@@ -421,15 +421,13 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       auto *firstType = req.getFirstType()->getAs<DependentMemberType>();
       if (!firstType || firstType->getAssocType() != tvAssocType)
         continue;
-      auto tvRequiredProto = req.getSecondType()->getAs<ProtocolType>();
-      if (!tvRequiredProto)
-        continue;
-      tvDesiredProtos.insert(tvRequiredProto);
+      tvDesiredProtos.insert(req.getProtocolDecl());
     }
   }
   SmallVector<TypeLoc, 4> tvDesiredProtoTypeLocs;
   for (auto *p : tvDesiredProtos)
-    tvDesiredProtoTypeLocs.push_back(TypeLoc::withoutLoc(p));
+    tvDesiredProtoTypeLocs.push_back(
+      TypeLoc::withoutLoc(p->getDeclaredInterfaceType()));
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
@@ -452,9 +450,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto *tangentProperty = new (C) VarDecl(
         member->isStatic(), member->getIntroducer(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
-    tangentProperty->setSynthesized();
-    // Note: `tangentProperty` is not marked as implicit here, because that
-    // incorrectly affects memberwise initializer synthesis.
+    // Note: `tangentProperty` is not marked as implicit or synthesized here,
+    // because that incorrectly affects memberwise initializer synthesis and
+    // causes the type checker to not guarantee the order of these members.
     auto memberContextualType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
     auto memberTanType =
@@ -509,20 +507,27 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     }
   }
 
-  // If nominal type is `@_fixed_layout`, also mark `TangentVector` struct as
-  // `@_fixed_layout`.
-  if (nominal->getAttrs().hasAttribute<FixedLayoutAttr>())
-    addFixedLayoutAttr(structDecl);
-
-  // If nominal type is `@frozen`, also mark `TangentVector` struct as
-  // `@frozen`.
+  // If nominal type is `@frozen`, also mark `TangentVector` struct.
   if (nominal->getAttrs().hasAttribute<FrozenAttr>())
     structDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/ true));
+  
+  // Add `typealias TangentVector = Self` so that the `TangentVector` itself
+  // won't need its own conformance derivation.
+  auto *tangentEqualsSelfAlias = new (C) TypeAliasDecl(
+      SourceLoc(), SourceLoc(), C.Id_TangentVector, SourceLoc(),
+      /*GenericParams*/ nullptr, structDecl);
+  tangentEqualsSelfAlias->setUnderlyingType(structDecl->getSelfTypeInContext());
+  tangentEqualsSelfAlias->setAccess(structDecl->getFormalAccess());
+  tangentEqualsSelfAlias->setImplicit();
+  tangentEqualsSelfAlias->setSynthesized();
+  structDecl->addMember(tangentEqualsSelfAlias);
 
-  // If nominal type is `@usableFromInline`, also mark `TangentVector` struct as
-  // `@usableFromInline`.
-  if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>())
+  // If nominal type is `@usableFromInline`, also mark `TangentVector` struct.
+  if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     structDecl->getAttrs().add(new (C) UsableFromInlineAttr(/*implicit*/ true));
+    tangentEqualsSelfAlias->getAttrs().add(
+        new (C) UsableFromInlineAttr(/*implicit*/ true));
+  }
 
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
@@ -595,7 +600,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
         TypeChecker::conformsToProtocol(varType, diffableProto, nominal);
     // If stored property should not be diagnosed, continue.
     if (diffableConformance && 
-        canInvokeMoveAlongOnProperty(vd, diffableConformance))
+        canInvokeMoveByOnProperty(vd, diffableConformance))
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.
     vd->getAttrs().add(new (Context) NoDerivativeAttr(/*Implicit*/ true));

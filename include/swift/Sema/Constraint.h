@@ -187,6 +187,14 @@ enum class ConstraintKind : char {
   /// - If base is a protocol metatype, this constraint becomes a conformance
   ///   check instead of an equality.
   UnresolvedMemberChainBase,
+  /// The first type is a property wrapper with a wrapped-value type
+  /// equal to the second type.
+  PropertyWrapper,
+  /// The first type (or its optional or pointer version) must conform to a
+  /// second type (protocol type). This is not a direct requirement but one
+  /// inferred from a conversion, so the check is more relax comparing to
+  /// `ConformsTo`.
+  TransitivelyConformsTo,
 };
 
 /// Classification of the different kinds of constraints.
@@ -258,6 +266,12 @@ enum class ConversionRestrictionKind {
   /// Implicit conversion from an Objective-C class type to its
   /// toll-free-bridged CF type.
   ObjCTollFreeBridgeToCF,
+  /// Implicit conversion from a value of Double to a value of CGFloat type via
+  /// an implicit CGFloat initializer call.
+  DoubleToCGFloat,
+  /// Implicit conversion from a value of CGFloat type to a value of Double type
+  /// via an implicit Double initializer call passing a CGFloat value.
+  CGFloatToDouble,
 };
 
 /// Specifies whether a given conversion requires the creation of a temporary
@@ -570,6 +584,7 @@ public:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::LiteralConformsTo:
+    case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:
     case ConstraintKind::ApplicableFunction:
@@ -586,6 +601,7 @@ public:
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
+    case ConstraintKind::PropertyWrapper:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:

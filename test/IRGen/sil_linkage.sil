@@ -1,11 +1,13 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=WMO --check-prefix=CHECK
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s --check-prefix=PRIMARY --check-prefix=CHECK
 
 sil_stage canonical
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_fragile_function_test() {{.*}} {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_transparent_fragile_function_test() {{.*}} {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @public_transparent_function_test() {{.*}} {
-// CHECK: define weak_odr hidden swiftcc void @public_non_abi_function_test() {{.*}} {
+// PRIMARY: define weak_odr hidden swiftcc void @public_non_abi_function_test() {{.*}} {
+// WMO: define linkonce_odr hidden swiftcc void @public_non_abi_function_test() {{.*}} {
 // CHECK: define hidden swiftcc void @hidden_fragile_function_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_fragile_function_test() {{.*}} {
 // CHECK: define{{( internal)?}} swiftcc void @private_fragile_function_test() {{.*}} {

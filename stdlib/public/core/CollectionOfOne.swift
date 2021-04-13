@@ -171,5 +171,5 @@ extension CollectionOfOne: CustomReflectable {
   }
 }
 
-extension CollectionOfOne: ConcurrentValue where Element: ConcurrentValue { }
-extension CollectionOfOne.Iterator: ConcurrentValue where Element: ConcurrentValue { }
+extension CollectionOfOne: Sendable where Element: Sendable { }
+extension CollectionOfOne.Iterator: Sendable where Element: Sendable { }

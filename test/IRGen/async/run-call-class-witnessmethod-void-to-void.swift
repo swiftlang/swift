@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -emit-ir -module-name main | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -parse-as-library -emit-ir -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -26,12 +26,12 @@ protocol P {
 // CHECK: exiting f
 // CHECK: exiting call_f
 
-// CHECK-LL: @"$s4main1PPAAE1fyyYFTu" = hidden global %swift.async_func_pointer
-// CHECK-LL: @"$s4main6call_fyyxYAA1PRzlFTu" = hidden global %swift.async_func_pointer
-// CHECK-LL: @"$s4main1XCAA1PA2aDP1fyyYFTWTu" = internal global %swift.async_func_pointer
+// CHECK-LL: @"$s4main1PPAAE1fyyYaFTu" = hidden global %swift.async_func_pointer
+// CHECK-LL: @"$s4main6call_fyyxYaAA1PRzlFTu" = hidden global %swift.async_func_pointer
+// CHECK-LL: @"$s4main1XCAA1PA2aDP1fyyYaFTWTu" = internal global %swift.async_func_pointer
 
 extension P {
-  // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main1PPAAE1fyyYF"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+  // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main1PPAAE1fyyYaF"(
   func f() async {
     print("entering f")
     printGeneric(Self.self)
@@ -40,10 +40,10 @@ extension P {
   }
 }
 
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s4main1XCAA1PA2aDP1fyyYFTW"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s4main1XCAA1PA2aDP1fyyYaFTW"(
 extension X : P {}
 
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main6call_fyyxYAA1PRzlF"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main6call_fyyxYaAA1PRzlF"(
 func call_f<T : P>(_ t: T) async {
   print("entering call_f")
   await t.f()

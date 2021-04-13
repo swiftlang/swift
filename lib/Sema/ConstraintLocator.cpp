@@ -15,10 +15,12 @@
 // a particular constraint was derived.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Sema/Constraint.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/StringExtras.h"
@@ -85,6 +87,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ArgumentAttribute:
   case ConstraintLocator::UnresolvedMemberChainResult:
   case ConstraintLocator::PlaceholderType:
+  case ConstraintLocator::ImplicitConversion:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -171,10 +174,14 @@ bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
   return !path.empty() && path.back().isKeyPathDynamicMember();
 }
 
-bool ConstraintLocator::isForKeyPathComponent() const {
+bool ConstraintLocator::isInKeyPathComponent() const {
   return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
     return elt.isKeyPathComponent();
   });
+}
+
+bool ConstraintLocator::isForKeyPathComponentResult() const {
+  return isLastElement<LocatorPathElt::KeyPathComponentResult>();
 }
 
 bool ConstraintLocator::isForGenericParameter() const {
@@ -485,7 +492,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
         break;
 
       case AttrLoc::Attribute::Concurrent:
-        out << "@concurrent";
+        out << "@Sendable";
+        break;
+
+      case AttrLoc::Attribute::GlobalActor:
+        out << "@<global actor>";
         break;
       }
 
@@ -498,6 +509,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case PlaceholderType:
       out << "placeholder type";
+      break;
+
+    case ConstraintLocator::ImplicitConversion:
+      auto convElt = elt.castTo<LocatorPathElt::ImplicitConversion>();
+      out << "implicit conversion " << getName(convElt.getConversionKind());
       break;
     }
   }

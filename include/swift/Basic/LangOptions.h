@@ -55,6 +55,20 @@ namespace swift {
     Complete,
   };
 
+  /// Access or distribution level of a library.
+  enum class LibraryLevel : uint8_t {
+    /// Application Programming Interface that is publicly distributed so
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
+
+    /// System Programming Interface that has restricted distribution
+    /// all decls in the module are considered to be SPI including public ones.
+    SPI,
+
+    /// The library has some other undefined distribution.
+    Other
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -238,14 +252,26 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
+    /// Provide additional warnings about code that is unsafe in the
+    /// eventual Swift concurrency model, and will eventually become errors
+    /// in a future Swift language version, but are too noisy for existing
+    /// language modes.
+    bool WarnConcurrency = false;
+
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
+    /// Enable experimental asyncHandler support.
+    bool EnableExperimentalAsyncHandler = false;
+
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
+
+    /// Enable inference of Sendable conformances for public types.
+    bool EnableInferPublicSendable = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
@@ -278,13 +304,6 @@ namespace swift {
     /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
 
-    /// Whether to use the import as member inference system
-    ///
-    /// When importing a global, try to infer whether we can import it as a
-    /// member of some type instead. This includes inits, computed properties,
-    /// and methods.
-    bool InferImportAsMember = false;
-
     /// If set to true, compile with the SIL Opaque Values enabled.
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
@@ -297,6 +316,9 @@ namespace swift {
     /// Whether to enable Swift 3 @objc inference, e.g., for members of
     /// Objective-C-derived classes and 'dynamic' members.
     bool EnableSwift3ObjCInference = false;
+
+    /// Access or distribution level of the whole module being parsed.
+    LibraryLevel LibraryLevel = LibraryLevel::Other;
 
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.
@@ -383,9 +405,6 @@ namespace swift {
     };
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
-
-    /// Allow @hasAsyncAlternative attribute
-    bool EnableExperimentalHasAsyncAlternative = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -635,13 +654,6 @@ namespace swift {
     /// instead of dropped altogether when possible.
     bool ImportForwardDeclarations = false;
 
-    /// Whether to use the import as member inference system
-    ///
-    /// When importing a global, try to infer whether we can import it as a
-    /// member of some type instead. This includes inits, computed properties,
-    /// and methods.
-    bool InferImportAsMember = false;
-
     /// If true ignore the swift bridged attribute.
     bool DisableSwiftBridgeAttr = false;
 
@@ -674,7 +686,6 @@ namespace swift {
                           static_cast<uint8_t>(Mode),
                           DetailedPreprocessingRecord,
                           ImportForwardDeclarations,
-                          InferImportAsMember,
                           DisableSwiftBridgeAttr,
                           DisableOverlayModules);
     }

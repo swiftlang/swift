@@ -1,0 +1,1810 @@
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+
+// Declare this SIL to be canonical because some tests break raw SIL
+// conventions. e.g. address-type block args. -enforce-exclusivity=none is also
+// required to allow address-type block args in canonical SIL.
+sil_stage canonical
+
+import Builtin
+import Swift
+
+///////////////////////
+// Type Declarations //
+///////////////////////
+
+class Klass {
+  var a: Int
+   deinit
+  init()
+}
+
+class B {}
+class E : B {}
+
+sil [ossa] @consume_klass : $@convention(thin) (@owned Klass) -> ()
+sil [ossa] @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+sil [ossa] @get_klass : $@convention(thin) () -> @owned Klass
+
+struct KlassWrapper {
+  var k: Klass
+}
+
+internal enum CompareResult {
+  case equal
+  case less
+}
+
+struct FakeBool {
+  @_hasStorage var value: Builtin.Int1 { get set }
+  init(value: Builtin.Int1)
+}
+
+sil [ossa] @dummy : $@convention(thin) () -> FakeBool
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @test_dead_block :
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   unreachable
+// CHECK-NEXT: }
+sil [ossa] @test_dead_block : $() -> () {
+bb0:
+  unreachable
+
+bb1:
+  %4 = integer_literal $Builtin.Int64, 1
+  br bb2
+
+bb2:
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  unreachable
+}
+
+// CHECK-LABEL: @release_in_arcinert_termination_block
+// CHECK: bb0
+// CHECK:   unreachable
+// CHECK: }
+sil [ossa] @release_in_arcinert_termination_block : $(@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  br bb1
+
+bb1:
+  destroy_value %0 : $Klass
+  unreachable
+}
+
+// CHECK-LABEL: @release_in_nonarcinert_termination_block :
+// CHECK: bb0
+// CHECK: destroy_value
+// CHECK: apply
+// CHECK: unreachable
+// CHECK: } // end sil function 'release_in_nonarcinert_termination_block'
+sil [ossa] @release_in_nonarcinert_termination_block : $(@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0 : $Klass
+  br bb1
+
+bb1:
+  destroy_value %0 : $Klass
+  %2 = function_ref @consume_klass : $@convention(thin) (@owned Klass) -> ()
+  apply %2(%1) : $@convention(thin) (@owned Klass) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: @test_single_pred_block :
+// CHECK: bb3([[ARG:%[0-9]+]] : $Builtin.Int64):
+// CHECK: struct $Int64
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_single_pred_block'
+sil [ossa] @test_single_pred_block : $@convention(thin) (Builtin.Int1) -> Int64 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb3
+
+bb1:
+  %4 = integer_literal $Builtin.Int64, 1
+  br bb2(%4 : $Builtin.Int64)
+
+bb3:
+  %9 = integer_literal $Builtin.Int64, 2
+  br bb2(%9 : $Builtin.Int64)
+
+bb2(%6 : $Builtin.Int64):
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  br bb4(%7 : $Int64)
+
+bb4(%8 : $Int64):
+  return %8 : $Int64
+}
+
+// CHECK-LABEL: @test_single_pred_block_nontrivial :
+// CHECK: bb3([[ARG:%[0-9]+]] : @owned $Klass):
+// CHECK:   [[WRAPPED:%.*]] = struct $KlassWrapper ([[ARG]] :
+// CHECK-NEXT: return [[WRAPPED]]
+// CHECK: } // end sil function 'test_single_pred_block_nontrivial'
+sil [ossa] @test_single_pred_block_nontrivial : $@convention(thin) (Builtin.Int1) -> @owned KlassWrapper {
+bb0(%0 : $Builtin.Int1):
+  %f = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  cond_br %0, bb1, bb3
+
+bb1:
+  %4a = apply %f() : $@convention(thin) () -> @owned Klass
+  br bb2(%4a : $Klass)
+
+bb3:
+  %4b = apply %f() : $@convention(thin) () -> @owned Klass
+  br bb2(%4b : $Klass)
+
+bb2(%5 : @owned $Klass):
+  %6 = struct $KlassWrapper (%5 : $Klass)
+  br bb4(%6 : $KlassWrapper)
+
+bb4(%9 : @owned $KlassWrapper):
+  return %9 : $KlassWrapper
+}
+
+// CHECK-LABEL: sil [ossa] @canonicalize_not_branch :
+// CHECK: bb0([[ARG:%.*]] : $Builtin.Int1):
+// CHECK:   cond_br [[ARG]], bb2, bb1
+// CHECK: bb1:
+// CHECK:   integer_literal {{.*}} 2
+// CHECK:   br
+// CHECK: bb2:
+// CHECK:   integer_literal {{.*}} 3
+// CHECK:   br
+// CHECK: } // end sil function 'canonicalize_not_branch'
+sil [ossa] @canonicalize_not_branch : $@convention(thin) (Builtin.Int1) -> (Builtin.Int32) {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = builtin "xor_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %2, bb1, bb2
+
+bb1:
+  %4 = integer_literal $Builtin.Int32, 2
+  br bb3(%4 : $Builtin.Int32)
+
+bb2:
+  %5 = integer_literal $Builtin.Int32, 3
+  br bb3(%5 : $Builtin.Int32)
+
+bb3(%6 : $Builtin.Int32):
+  return %6 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @canonicalize_not_branch_expect :
+// CHECK: bb0([[ARG:%.*]] : $Builtin.Int1):
+// CHECK:   [[ZERO:%.*]] =  integer_literal $Builtin.Int1, 0
+// CHECK:   [[EXPECT:%.*]] = builtin "int_expect_Int1"([[ARG]] : $Builtin.Int1, [[ZERO]]
+// CHECK:    cond_br [[EXPECT]], bb2, bb1
+// CHECK: bb1:
+// CHECK:   integer_literal {{.*}} 2
+// CHECK:   br
+// CHECK: bb2:
+// CHECK:   integer_literal {{.*}} 3
+// CHECK:   br
+// CHECK: } // end sil function 'canonicalize_not_branch_expect'
+sil [ossa] @canonicalize_not_branch_expect : $@convention(thin) (Builtin.Int1) -> (Builtin.Int32) {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = builtin "xor_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  %3 = builtin "int_expect_Int1"(%2 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %3, bb1, bb2
+
+bb1:
+  %4 = integer_literal $Builtin.Int32, 2
+  br bb3(%4 : $Builtin.Int32)
+
+bb2:
+  %5 = integer_literal $Builtin.Int32, 3
+  br bb3(%5 : $Builtin.Int32)
+
+bb3(%6 : $Builtin.Int32):
+  return %6 : $Builtin.Int32
+}
+
+enum BoolLike { case true_, false_ }
+// BoolLike with a payload of state on the true_ side.
+
+// func testThread(a : BoolLike) -> Int32 {
+//   if a { return 42 } else { return 17 } }
+//
+// CHECK-LABEL: sil [ossa] @testThread :
+// CHECK: switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
+// CHECK: } // end sil function 'testThread'
+sil [ossa] @testThread : $@convention(thin) (@in BoolLike) -> Int64 {
+bb0(%0 : $*BoolLike):
+  switch_enum_addr %0 : $*BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb3 // id: %3
+
+bb1:                                              // Preds: bb0
+  %4 = integer_literal $Builtin.Int1, -1          // user: %5
+  br bb2(%4 : $Builtin.Int1)                      // id: %5
+
+bb2(%6 : $Builtin.Int1):                          // Preds: bb3 bb1
+  br bb4                                          // id: %7
+
+bb3:                                              // Preds: bb0
+  %8 = integer_literal $Builtin.Int1, 0           // user: %9
+  br bb2(%8 : $Builtin.Int1)                      // id: %9
+
+bb4:                                              // Preds: bb2
+  cond_br %6, bb5, bb6                            // id: %10
+
+bb5:                                              // Preds: bb4
+  %11 = metatype $@thin Int64.Type
+  %12 = integer_literal $Builtin.Int64, 42        // user: %13
+  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
+  br bb7(%13 : $Int64)                            // id: %14
+
+bb6:                                              // Preds: bb4
+  %15 = metatype $@thin Int64.Type
+  %16 = integer_literal $Builtin.Int64, 17        // user: %17
+  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %18
+  br bb7(%17 : $Int64)                            // id: %18
+
+bb7(%19 : $Int64):                                // Preds: bb6 bb5
+  return %19 : $Int64                             // id: %21
+}
+
+/// CHECK-LABEL: sil [ossa] @testCondBrFold
+/// CHECK: bb0(
+/// CHECK-NEXT: return %1 : $Int64
+sil [ossa] @testCondBrFold : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %8 = integer_literal $Builtin.Int1, 0
+  cond_br %8, bb1, bb2
+bb1:
+  unreachable
+bb2:
+  return %1 : $Int64
+}
+
+/// CHECK-LABEL: sil [ossa] @testSwitchEnumFold
+/// CHECK: bb0(
+/// CHECK-NEXT: return %0 : $Int64
+sil [ossa] @testSwitchEnumFold : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = enum $BoolLike, #BoolLike.true_!enumelt
+  switch_enum %1 : $BoolLike, case #BoolLike.true_!enumelt: bb2, case #BoolLike.false_!enumelt: bb1
+bb1:
+  unreachable
+bb2:
+  return %0 : $Int64
+}
+
+// CHECK-LABEL: @elim_trampoline
+// CHECK: bb0
+// CHECK:  cond_br {{.*}}, bb1, bb2
+// CHECK:bb1:
+// CHECK:  br bb3(%1
+// CHECK:bb2:
+// CHECK:  br bb3(%2
+// CHECK:bb3({{.*}}):
+// CHECK:  return
+sil [ossa] @elim_trampoline : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb3(%2 : $Int64)
+
+bb3(%5 : $Int64):
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: @elim_trampoline2
+// CHECK-NOT: cond_br
+// CHECK: return
+sil [ossa] @elim_trampoline2 : $@convention(thin) (Builtin.Int1, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb3(%1 : $Int64)
+
+bb3(%4 : $Int64):
+  return %4 : $Int64
+}
+
+// CHECK-LABEL: @elim_trampoline_debug
+// CHECK-NOT: cond_br %0, bb1(%1 : $Int64), bb1(%1 : $Int64)
+// CHECK: return
+sil [ossa] @elim_trampoline_debug : $@convention(thin) (Builtin.Int1, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  debug_value %0 : $Builtin.Int1
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb3(%1 : $Int64)
+
+bb3(%4 : $Int64):
+  return %4 : $Int64
+}
+
+// CHECK-LABEL: @elim_trampoline3
+// CHECK:  cond_br %0, bb1, bb2
+// CHECK:bb1:
+// CHECK:  br bb3(%1
+// CHECK:bb2:
+// CHECK:  br bb3(%2
+// CHECK:bb3({{.*}}):
+// CHECK:  return
+sil [ossa] @elim_trampoline3 : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb3(%2 : $Int64)
+
+bb3(%5 : $Int64):
+  br bb4(%5 : $Int64)
+
+bb4(%6 : $Int64):
+  return %6 : $Int64
+}
+
+// Make sure the cond_br is not simplified as it would create
+// a critical edge.
+// CHECK-LABEL: @elim_trampoline4
+// CHECK: cond_br %0, bb2, bb1
+// CHECK: bb1:
+// CHECK: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: bb3
+// CHECK: return
+// CHECK: }
+
+sil [ossa] @external_f : $@convention(thin) () -> ()
+
+sil [ossa] @elim_trampoline4 : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb4(%2 : $Int64)
+
+bb4(%4 : $Int64):
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
+  br bb5(%4: $Int64)
+
+bb3(%5 : $Int64):
+  br bb5(%5 : $Int64)
+
+bb5(%6 : $Int64):
+  return %6 : $Int64
+}
+
+// Make sure that a conditional branch to a trampoline without parameters
+// gets eliminated by branching to a target of this trampoline.
+// CHECK-LABEL: @elim_trampoline5
+// CHECK: cond_br %{{.*}}, bb1, bb3
+// CHECK: bb3:
+// CHECK-NEXT: br bb4
+// CHECK: bb4:
+// CHECK: br bb8({{.*}})
+// CHECK: bb5:
+// CHECK-NEXT: builtin
+// CHECK-NEXT: cond_br
+// CHECK: bb8{{.*}}:
+// Last cond_br should branch directly to the target of a trampoline
+// instead of the original bb3
+// CHECK: cond_br {{.*}}, bb5, bb9
+// CHECK: }
+sil [ossa] @elim_trampoline5 : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = integer_literal $Builtin.Int32, 0
+  %2 = struct_extract %0 : $Int32, #Int32._value
+  %3 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %3, bb1, bb2a
+
+bb1:
+  br bbReturn
+
+bbReturn:
+  %5 = tuple ()
+  return %5 : $()
+
+bb2a:
+  br bb2(%1 : $Builtin.Int32)
+
+bb2(%7 : $Builtin.Int32):
+  %8 = integer_literal $Builtin.Int32, 1
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = integer_literal $Builtin.Int32, 2
+  br bb5(%1 : $Builtin.Int32)
+
+bb3:
+  br bb4(%8 : $Builtin.Int32)
+
+bb4(%13 : $Builtin.Int32):
+  %14 = builtin "cmp_eq_Int32"(%13 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %14, bb4a, bb2b
+
+bb2b:
+  br bb2(%13 : $Builtin.Int32)
+
+bb4a:
+  br bbReturn
+
+bb5(%16 : $Builtin.Int32):
+  %17 = builtin "sadd_with_overflow_Int32"(%16 : $Builtin.Int32, %8 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 0
+  %19 = builtin "cmp_eq_Int32"(%18 : $Builtin.Int32, %10 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %19, bb3, bb6
+
+bb6:
+  br bb5(%18 : $Builtin.Int32)
+}
+
+// CHECK-LABEL: @elim_trampoline_loop
+// Make sure we are not crashing on this one.
+// CHECK: return
+sil [ossa] @elim_trampoline_loop : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb2a(%2 : $Int64)
+
+bb2a(%4a : $Int64):
+  br bb2a(%4a : $Int64)
+
+bb3(%5 : $Int64):
+  br bb4(%5 : $Int64)
+
+bb4(%6 : $Int64):
+  return %6 : $Int64
+}
+
+// CHECK-LABEL: @elim_common_arg
+// CHECK: bb3:
+// CHECK-NEXT: return %1
+sil [ossa] @elim_common_arg : $@convention(thin) (Builtin.Int1, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64):
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  apply %f1() : $@convention(thin) () -> ()
+  br bb3(%1 : $Int64)
+
+bb2:
+  apply %f1() : $@convention(thin) () -> ()
+  br bb3(%1 : $Int64)
+
+bb3(%a1 : $Int64):
+  return %a1 : $Int64
+}
+
+// CHECK-LABEL: @elim_diamonds
+// CHECK: bb0
+// CHECK-NEXT: return %1
+sil [ossa] @elim_diamonds : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3(%1 : $Int64)
+
+bb2:
+  br bb3(%1 : $Int64)
+
+bb3(%5 : $Int64):
+  cond_br %0, bb4, bb5
+
+bb4:
+  br bb6(%5 : $Int64)
+
+bb5:
+  br bb6(%5 : $Int64)
+
+bb6(%8 : $Int64):
+  return %8 : $Int64
+}
+
+// CHECK-LABEL: @infinite_loop
+// CHECK: bb0
+// CHECK-NEXT: br bb1
+// CHECK: bb1
+// CHECK-NEXT: br bb1
+sil [ossa] @infinite_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+bb1:
+  br bb1
+}
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: @dead_loop
+// CHECK-NOT: br bb
+sil [ossa] @dead_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0           // users: %1, %4
+  %2 = integer_literal $Builtin.Int1, -1          // user: %11
+  cond_br %0, bb1, bb3                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int32, 0           // users: %6, %7
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  br bb2(%5 : $Builtin.Int32)                      // id: %7
+
+bb2(%8 : $Builtin.Int32):                          // Preds: bb1 bb2
+  %9 = integer_literal $Builtin.Int32, 1           // user: %11
+  %11 = builtin "sadd_with_overflow_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32, %2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %12, %13
+  %12 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 0 // users: %15, %16
+  %13 = tuple_extract %11 : $(Builtin.Int32, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = struct $Int32 (%12 : $Builtin.Int32)
+  br bb2(%12 : $Builtin.Int32)                     // id: %16
+
+bb3:                                              // Preds: bb0
+  %17 = tuple ()                                  // user: %18
+  return %17 : $()                                // id: %18
+}
+
+class C {
+  final var value: Int32
+  init(v: Int32)
+}
+
+
+enum A {
+  case B, C, D
+}
+
+// CHECK-LABEL: cannot_optimize_switch_enum
+sil [ossa] @cannot_optimize_switch_enum : $@convention(thin) (A) -> () {
+// CHECK: bb0
+bb0(%0 : $A):
+// CHECK: %1 = function_ref
+// CHECK-NEXT: switch_enum %0 : $A, case #A.B!enumelt: bb1, default [[BB:bb[0-9a-zA-Z]+]]
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  switch_enum %0 : $A, case #A.B!enumelt: bb1, default bb2
+
+bb1:
+  apply %f1() : $@convention(thin) () -> ()
+  br bb5
+
+// CHECK: [[BB]]
+bb2(%defaultArg : $A):
+// CHECK-NEXT: switch_enum %0
+  switch_enum %0 : $A, case #A.C!enumelt: bb3, default bb4
+
+bb3:
+  apply %f1() : $@convention(thin) () -> ()
+  br bb5
+
+bb4(%defaultArg2 : $A):
+  apply %f1() : $@convention(thin) () -> ()
+  br bb5
+
+bb5:
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simplify_switch_enum1
+// CHECK: bb0:
+// CHECK-NOT: bb[0-9]
+// CHECK: apply
+// CHECK-NEXT: return
+sil [ossa] @simplify_switch_enum1 : $@convention(thin) () -> Int32 {
+bb0:
+  %10 = integer_literal $Builtin.Int32, 2
+  %11 = struct $Int32 (%10 : $Builtin.Int32)
+  %20 = integer_literal $Builtin.Int32, 3
+  %21 = struct $Int32 (%20 : $Builtin.Int32)
+  cond_br undef, bb1, bb2
+
+bb1:
+  %12 = enum $Optional<Int32>, #Optional.some!enumelt, %11 : $Int32
+  br bb3(%12 : $Optional<Int32>)
+
+bb2:
+  %22 = enum $Optional<Int32>, #Optional.some!enumelt, %21 : $Int32
+  br bb3(%22 : $Optional<Int32>)
+
+bb3(%30 : $Optional<Int32>):
+  %u = function_ref @unknown : $@convention(thin) () -> ()
+  apply %u() : $@convention(thin) () -> ()
+  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5
+
+bb4:
+  br bb6(%11 : $Int32)
+
+bb5(%payload : $Int32):
+  br bb6(%21 : $Int32)
+
+bb6(%r : $Int32):
+  return %r : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @simplify_switch_enum2
+// CHECK: bb3([[A:%[0-9]+]] : $Optional<Int32>):
+// CHECK: apply
+// CHECK: [[R:%[0-9]+]] = unchecked_enum_data [[A]] : $Optional<Int32>, #Optional.some!enumelt
+// CHECK: return [[R]]
+sil [ossa] @simplify_switch_enum2 : $@convention(thin) (Optional<Int32>) -> Int32 {
+bb0(%0 : $Optional<Int32>):
+  %10 = integer_literal $Builtin.Int32, 2
+  %11 = struct $Int32 (%10 : $Builtin.Int32)
+  %20 = integer_literal $Builtin.Int32, 3
+  %21 = struct $Int32 (%20 : $Builtin.Int32)
+  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+
+bb1:
+  %12 = enum $Optional<Int32>, #Optional.some!enumelt, %11 : $Int32
+  br bb3(%12 : $Optional<Int32>)
+
+bb2(%0payload : $Int32):
+  br bb3(%0 : $Optional<Int32>)
+
+bb3(%30 : $Optional<Int32>):
+  %u = function_ref @unknown : $@convention(thin) () -> ()
+  apply %u() : $@convention(thin) () -> ()
+  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5
+
+bb4:
+  br bb6(%21 : $Int32)
+
+bb5(%p : $Int32):
+  br bb6(%p : $Int32)
+
+bb6(%r : $Int32):
+  return %r : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @identical_switch_enum_addr_dests : $@convention(thin) (@in Optional<Int32>) -> () {
+// CHECK: bb0(%0 : $*Optional<Int32>):
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @identical_switch_enum_addr_dests : $@convention(thin) (@in Optional<Int32>) -> () {
+bb0(%0 : $*Optional<Int32>):
+  switch_enum_addr %0 : $*Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @identical_switch_value_dests : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil [ossa] @identical_switch_value_dests : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = integer_literal $Builtin.Int32, 24
+  %2 = integer_literal $Builtin.Int32, 25
+  switch_value %0 : $Builtin.Int32, case %1: bb1, case %2: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @fold_switch_value : $@convention(thin) () -> Int32 {
+// CHECK: bb0:
+// CHECK-NOT: bb1
+// CHECK: integer_literal $Builtin.Int32, 100
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+sil [ossa] @fold_switch_value : $@convention(thin) () -> Int32 {
+bb0:
+  %1 = integer_literal $Builtin.Int32, 24
+  %2 = integer_literal $Builtin.Int32, 25
+  switch_value %1 : $Builtin.Int32, case %1: bb1, case %2: bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int32, 100
+  br bb3(%3 : $Builtin.Int32)
+
+bb2:
+  %4 = integer_literal $Builtin.Int32, 200
+  br bb3(%4 : $Builtin.Int32)
+
+bb3(%5 : $Builtin.Int32):
+  %r = struct $Int32 (%5 : $Builtin.Int32)
+  return %r : $Int32
+}
+
+enum OneCase {
+  case First
+}
+
+enum TwoCase {
+  case First
+  case Second
+}
+
+enum ThreeCase {
+  case First
+  case Second
+  case Third
+}
+
+sil [ossa] @unknown : $@convention(thin) () -> ()
+sil [ossa] @int1_user : $@convention(thin) (Builtin.Int1) -> ()
+
+// CHECK-LABEL: sil [ossa] @select_enum_case_canonicalization : $@convention(thin) (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
+// CHECK: bb0([[ONE_1:%.*]] : $OneCase, [[TWO_1:%.*]] : $TwoCase, [[TWO_2:%.*]] : $TwoCase, [[THREE_1:%.*]] : $ThreeCase, [[THREE_2:%.*]] : $ThreeCase, [[THREE_3:%.*]] : $ThreeCase):
+// CHECK: [[TAG1:%.*]] = select_enum [[ONE_1]] : $OneCase, case #OneCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG2:%.*]] = select_enum [[TWO_1]] : $TwoCase, case #TwoCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG3:%.*]] = select_enum [[TWO_2]] : $TwoCase, case #TwoCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG3_OLD:%.*]] = select_enum [[TWO_2]] : $TwoCase, case #TwoCase.Second!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG4:%.*]] = select_enum [[THREE_1]] : $ThreeCase, case #ThreeCase.First!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG5:%.*]] = select_enum [[THREE_2]] : $ThreeCase, case #ThreeCase.Second!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: [[TAG6:%.*]] = select_enum [[THREE_3]] : $ThreeCase, case #ThreeCase.Third!enumelt: [[TRUE:%[0-9]+]]
+// CHECK: cond_br [[TAG1]], bb1, bb6
+// CHECK: cond_br [[TAG2]], bb2, bb3
+// CHECK: [[INT1_USER_FUN:%.*]] = function_ref @int1_user : $@convention(thin) (Builtin.Int1) -> ()
+// CHECK: apply [[INT1_USER_FUN]]([[TAG3_OLD]])
+// CHECK: cond_br [[TAG3]], bb5, bb4
+// CHECK: cond_br [[TAG4]], bb7, bb8
+// CHECK: cond_br [[TAG5]], bb9, bb10
+// CHECK: cond_br [[TAG6]], bb11, bb12
+sil [ossa] @select_enum_case_canonicalization : $@convention(thin) (OneCase, TwoCase, TwoCase, ThreeCase, ThreeCase, ThreeCase) -> () {
+bb0(%0 : $OneCase, %1 : $TwoCase, %2 : $TwoCase, %3 : $ThreeCase, %4 : $ThreeCase, %5 : $ThreeCase):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %6 = select_enum %0 : $OneCase, case #OneCase.First!enumelt: %t, default %f : $Builtin.Int1
+  %7 = select_enum %1 : $TwoCase, case #TwoCase.First!enumelt: %t, default %f : $Builtin.Int1
+  %8 = select_enum %2 : $TwoCase, case #TwoCase.Second!enumelt: %t, default %f : $Builtin.Int1
+  %9 = select_enum %3 : $ThreeCase, case #ThreeCase.First!enumelt: %t, default %f : $Builtin.Int1
+  %10 = select_enum %4 : $ThreeCase, case #ThreeCase.Second!enumelt: %t, default %f : $Builtin.Int1
+  %11 = select_enum %5 : $ThreeCase, case #ThreeCase.Third!enumelt: %t, default %f : $Builtin.Int1
+  %12 = function_ref @unknown : $@convention(thin) () -> ()
+  cond_br %6, bb1a, bb1b
+
+bb1a:
+  apply %12() : $@convention(thin) () -> ()
+  cond_br %7, bb2a, bb3a
+
+bb2a:
+  apply %12() : $@convention(thin) () -> ()
+  %13 = function_ref @int1_user : $@convention(thin) (Builtin.Int1) -> ()
+  apply %13(%8) : $@convention(thin) (Builtin.Int1) -> ()
+  cond_br %8, bb4a, bb5a
+
+bb3a:
+  apply %12() : $@convention(thin) () -> ()
+  br exit
+
+bb4a:
+  apply %12() : $@convention(thin) () -> ()
+  br exit
+
+bb5a:
+  apply %12() : $@convention(thin) () -> ()
+  br exit
+
+bb1b:
+  apply %12() : $@convention(thin) () -> ()
+  cond_br %9, bb2b, bb3b
+
+bb2b:
+  apply %12() : $@convention(thin) () -> ()
+  cond_br %10, bb4b, bb5b
+
+bb3b:
+  apply %12() : $@convention(thin) () -> ()
+  cond_br %11, bb6b, bb7b
+
+bb4b:
+  apply %12() : $@convention(thin) () -> ()
+  br exit
+
+bb5b:
+  apply %12() : $@convention(thin) () -> ()
+  br exit
+
+bb6b:
+  apply %12() : $@convention(thin) () -> ()
+  br exit
+
+bb7b:
+  apply %12() : $@convention(thin) () -> ()
+  br exit
+
+exit:
+  apply %12() : $@convention(thin) () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+enum IntEnum : Int32 {
+  case E0
+  case E1
+  case E2
+}
+
+// CHECK-LABEL: sil [ossa] @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
+// CHECK-DAG: [[X2:%[0-9]+]] = integer_literal $Builtin.Int32, 0
+// CHECK-DAG: [[X5:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.none!enumelt
+// CHECK-DAG: [[X6:%[0-9]+]] = integer_literal $Builtin.Int32, 2
+// CHECK-DAG: [[X7:%[0-9]+]] = enum $IntEnum, #IntEnum.E2!enumelt
+// CHECK-DAG: [[X8:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X7]] : $IntEnum
+// CHECK-DAG: [[X9:%[0-9]+]] = integer_literal $Builtin.Int32, 1
+// CHECK-DAG: [[X10:%[0-9]+]] = enum $IntEnum, #IntEnum.E1!enumelt
+// CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X10]] : $IntEnum
+// CHECK-DAG: [[X12:%[0-9]+]] = enum $IntEnum, #IntEnum.E0!enumelt
+// CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X12]] : $IntEnum
+// CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum>
+// CHECK-DAG: return [[X14]] : $Optional<IntEnum>
+sil [ossa] @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
+bb0(%0 : $Builtin.Int32):
+  %2 = integer_literal $Builtin.Int32, 0
+  %4 = builtin "cmp_eq_Int32"(%2 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %4, bb1, bb2
+
+bb1:
+  %6 = enum $IntEnum, #IntEnum.E0!enumelt
+  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt, %6 : $IntEnum
+  br bb7(%7 : $Optional<IntEnum>)
+
+bb2:
+  %9 = integer_literal $Builtin.Int32, 1
+  %10 = builtin "cmp_eq_Int32"(%9 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %10, bb3, bb4
+
+bb3:
+  %12 = enum $IntEnum, #IntEnum.E1!enumelt
+  %13 = enum $Optional<IntEnum>, #Optional.some!enumelt, %12 : $IntEnum
+  br bb7(%13 : $Optional<IntEnum>)
+
+bb4:
+  %15 = integer_literal $Builtin.Int32, 2
+  %16 = builtin "cmp_eq_Int32"(%15 : $Builtin.Int32, %0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %16, bb5, bb6
+
+bb5:
+  %18 = enum $IntEnum, #IntEnum.E2!enumelt
+  %19 = enum $Optional<IntEnum>, #Optional.some!enumelt, %18 : $IntEnum
+  br bb7(%19 : $Optional<IntEnum>)
+
+bb6:
+  %21 = enum $Optional<IntEnum>, #Optional.none!enumelt
+  br bb7(%21 : $Optional<IntEnum>)
+
+bb7(%23 : $Optional<IntEnum>):
+  return %23 : $Optional<IntEnum>
+}
+
+// CHECK-LABEL: sil [ossa] @checked_cast_anyobject_metatypeinst_to_class
+// CHECK: bb0
+// CHECK-NOT: checked_cast
+// CHECK-NOT: bb1
+// CHECK: [[RET:%.*]] = tuple ()
+// CHECK: return [[RET]] : $()
+
+sil [ossa] @checked_cast_anyobject_metatypeinst_to_class : $@convention(thin)() -> () {
+bb0:
+  %0 = metatype $@thick AnyObject.Protocol
+  checked_cast_br %0 : $@thick AnyObject.Protocol to B.Type, bb1, bb2
+
+bb1(%3 : $@thick B.Type):
+  br bb3
+
+bb2(%default : $@thick AnyObject.Protocol):
+  br bb3
+
+bb3:
+ %2 = tuple()
+ return %2 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @remove_cond_fail_trueblock
+// CHECK: bb0([[COND:%.*]] :
+// CHECK-NOT: bb
+// CHECK: cond_fail [[COND]]
+// CHECK-NOT: bb
+// CHECK: return
+sil [ossa] @remove_cond_fail_trueblock : $@convention(thin)(Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+bb1:
+  %1 = integer_literal $Builtin.Int1, -1
+  cond_fail %1 : $Builtin.Int1
+  unreachable
+bb2:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_cond_fail_falseblock
+// CHECK: bb0([[COND:%.*]] :
+// CHECK-NOT: bb
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NOT: bb
+// CHECK: [[NOTCOND:%.*]] = builtin "xor_Int1"([[COND]]{{.*}}, [[TRUE]]
+// CHECK: cond_fail [[NOTCOND]]
+// CHECK-NOT: bb
+// CHECK: return
+sil [ossa] @remove_cond_fail_falseblock : $@convention(thin)(Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb2, bb1
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, -1
+  cond_fail %1 : $Builtin.Int1
+  unreachable
+
+bb2:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_cond_fail_wrong_const
+// CHECK:      bb0(%0 : $Builtin.Int1):
+// CHECK-NEXT:   cond_br %0, bb1, bb2
+sil [ossa] @dont_remove_cond_fail_wrong_const : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb1a
+
+bb1:
+  %i1 = integer_literal $Builtin.Int1, 0
+  cond_fail %i1 : $Builtin.Int1
+  br bb2
+
+bb1a:
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_cond_fail_same_cond_in_true
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NOT: bb
+// CHECK: cond_fail [[COND]]
+// CHECK: bb1:
+// CHECK: return
+sil [ossa] @remove_cond_fail_same_cond_in_true : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  cond_br %0, bb1b, bb2
+
+bb1b:
+  br bb1
+
+bb1:
+  cond_fail %0 : $Builtin.Int1
+  unreachable
+
+bb2:
+  // Make bb1 not dominated from bb0 to prevent that dominator based
+  // simplification does the same thing.
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
+  cond_br %1, bb1a, bb3
+
+bb1a:
+  br bb1
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_cond_fail_same_cond_in_false
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NOT: bb
+// CHECK: [[INV:%[0-9]*]] = builtin "xor_Int1"([[COND]]
+// CHECK-NOT: bb
+// CHECK: cond_fail [[INV]]
+// CHECK: bb1:
+// CHECK: return
+sil [ossa] @remove_cond_fail_same_cond_in_false : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  cond_br %0, bb2, bb1b
+
+bb1b:
+  br bb1
+
+bb1:
+  %i1 = integer_literal $Builtin.Int1, -1
+  %i2 = builtin "xor_Int1"(%0 : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %i2 : $Builtin.Int1
+  unreachable
+
+bb2:
+  // Make bb1 not dominated from bb0 to prevent that dominator based
+  // simplification does the same thing.
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
+  cond_br %1, bb1a, bb3
+
+bb1a:
+  br bb1
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @remove_cond_fail_same_cond_in_false2
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NOT: bb
+// CHECK: cond_fail [[COND]]
+// CHECK: bb1:
+// CHECK: return
+sil [ossa] @remove_cond_fail_same_cond_in_false2 : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %i1 = integer_literal $Builtin.Int1, -1
+  %i2 = builtin "xor_Int1"(%0 : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %i2, bb2, bb1a
+
+bb1a:
+  br bb1
+
+bb1:
+  cond_fail %0 : $Builtin.Int1
+  unreachable
+
+bb2:
+  // Make bb1 not dominated from bb0 to prevent that dominator based
+  // simplification does the same thing.
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
+  cond_br %1, bb1b, bb3
+
+bb1b:
+  br bb1
+
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_cond_fail_same_cond_in_false
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK-NEXT: cond_fail [[COND]]
+// CHECK: return
+sil [ossa] @dont_remove_cond_fail_same_cond_in_false : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  cond_br %0, bb3, bb1
+
+bb1:
+  br bb2
+
+bb2:
+  cond_fail %0 : $Builtin.Int1
+  unreachable
+
+bb3:
+  // Make bb1 not dominated from bb0.
+  %55 = function_ref @external_f : $@convention(thin) () -> ()
+  apply %55() : $@convention(thin) () -> ()
+  cond_br %1, bb4, bb5
+
+bb4:
+  br bb2
+
+bb5:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @move_cond_fail
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   [[X:%[0-9]*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   cond_fail [[X]]
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   cond_fail %1
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NOT:    cond_fail
+// CHECK:        return
+sil [ossa] @move_cond_fail : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  %i1 = integer_literal $Builtin.Int1, -1
+  br bb3(%i1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  cond_fail %a3 : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @move_cond_fail_inverted
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   [[X:%[0-9]*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   [[Y:%[0-9]*]] = builtin "xor_Int1"(%2 : $Builtin.Int1, [[X]] : $Builtin.Int1)
+// CHECK-NEXT:   cond_fail [[Y]]
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   [[R:%[0-9]*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   [[S:%[0-9]*]] = builtin "xor_Int1"(%1 : $Builtin.Int1, [[R]] : $Builtin.Int1)
+// CHECK-NEXT:   cond_fail [[S]]
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NOT:    cond_fail
+// CHECK:        return
+sil [ossa] @move_cond_fail_inverted : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int1, -1
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%2 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  %v1 = builtin "xor_Int1"(%a3 : $Builtin.Int1, %2 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %v1 : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_cond_fail_no_const
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   cond_fail
+sil [ossa] @dont_move_cond_fail_no_const : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%2 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  cond_fail %a3 : $Builtin.Int1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_cond_fail_no_postdom
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   integer_literal
+// CHECK-NEXT:   br bb4
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   cond_br
+// CHECK:      bb3:
+// CHECK:        br bb4
+// CHECK:      bb4({{.*}}):
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   cond_fail
+sil [ossa] @dont_move_cond_fail_no_postdom : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1, %2 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  %i1 = integer_literal $Builtin.Int1, -1
+  br bb3b(%i1 : $Builtin.Int1)
+
+bb3b(%1b : $Builtin.Int1):
+  br bb3(%1b : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  cond_br %2, bb3a, bb4a
+
+bb3a:
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  cond_fail %a3 : $Builtin.Int1
+  br bb4
+
+bb4a:
+  br bb4
+
+bb4:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_cond_fail_multiple_uses
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   integer_literal
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   cond_fail
+sil [ossa] @dont_move_cond_fail_multiple_uses : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  %i1 = integer_literal $Builtin.Int1, -1
+  br bb3(%i1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  cond_fail %a3 : $Builtin.Int1
+  return %a3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_cond_fail_multiple_uses2
+// CHECK:      bb1:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3({{.*}}):
+// CHECK-NEXT:   builtin "xor_Int1"
+// CHECK-NEXT:   cond_fail
+// CHECK-NEXT:   return
+sil [ossa] @dont_move_cond_fail_multiple_uses2 : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %f1 = function_ref @external_f : $@convention(thin) () -> ()
+  %i1 = integer_literal $Builtin.Int1, -1
+  cond_br %0, bb2, bb1
+
+bb1:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%i1 : $Builtin.Int1)
+
+bb2:
+  apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
+  br bb3(%1 : $Builtin.Int1)
+
+bb3(%a3 : $Builtin.Int1):
+  %v1 = builtin "xor_Int1"(%a3 : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %v1 : $Builtin.Int1
+  return %v1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [ossa] @successful_checked_cast_br_on_alloc_ref
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NOT: checked_cast_br
+// CHECK-NOT: bb1
+// CHECK: destroy_value
+// CHECK: integer_literal $Builtin.Int32, 1
+// CHECK: return
+sil [ossa] @successful_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
+bb0:
+  %1 = alloc_ref $B
+  checked_cast_br [exact] %1 : $B to B, bb1, bb2
+
+bb1(%2 : @owned $B):
+  destroy_value %2 : $B
+  %3 = integer_literal $Builtin.Int32, 1
+  br bb3 (%3 : $Builtin.Int32)
+
+bb2(%2a : @owned $B):
+  destroy_value %2a : $B
+  %5 = integer_literal $Builtin.Int32, 2
+  br bb3 (%5 : $Builtin.Int32)
+
+bb3(%10 : $Builtin.Int32):
+  return %10 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @failing_checked_cast_br_on_alloc_ref
+// CHECK: bb0
+// CHECK-NEXT: alloc_ref
+// CHECK-NOT: checked_cast_br
+// CHECK-NOT: bb1
+// CHECK: destroy_value
+// CHECK: integer_literal $Builtin.Int32, 2
+// CHECK: return
+sil [ossa] @failing_checked_cast_br_on_alloc_ref : $() -> Builtin.Int32 {
+bb0:
+  %1 = alloc_ref $E
+  %2 = upcast %1 : $E to $B
+  checked_cast_br [exact] %2 : $B to B, bb1, bb2
+
+bb1(%3 : @owned $B):
+  destroy_value %3 : $B
+  %4 = integer_literal $Builtin.Int32, 1
+  br bb3 (%4 : $Builtin.Int32)
+
+bb2(%3a : @owned $B):
+  destroy_value %3a : $B
+  %5 = integer_literal $Builtin.Int32, 2
+  br bb3 (%5 : $Builtin.Int32)
+
+bb3(%10 : $Builtin.Int32):
+  return %10 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @unpack_enum_arg
+// CHECK: bb1:
+// CHECK:   br bb3(%0 : $Int)
+// CHECK: bb2:
+// CHECK:   br bb3(%1 : $Int)
+// CHECK: bb3([[A:%[0-9]+]] : $Int):
+// CHECK:   return [[A]]
+sil [ossa] @unpack_enum_arg : $@convention(thin) (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = enum $Optional<Int>, #Optional.some!enumelt, %0 : $Int
+  br bb3(%2 : $Optional<Int>)
+
+bb2:
+  %3 = enum $Optional<Int>, #Optional.some!enumelt, %1 : $Int
+  br bb3(%3 : $Optional<Int>)
+
+bb3(%4 : $Optional<Int>):
+  %5 = unchecked_enum_data %4 : $Optional<Int>, #Optional.some!enumelt
+  return %5 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @dont_crash_on_enum_payload_is_enum
+// CHECK: bb0(%0 : $TwoCase):
+// CHECK:   switch_enum %0
+// CHECK: bb1:
+// CHECK:   return
+sil [ossa] @dont_crash_on_enum_payload_is_enum : $@convention(thin) (TwoCase) -> () {
+bb0(%0 : $TwoCase):
+  %x = enum $Optional<TwoCase>, #Optional.some!enumelt, %0 : $TwoCase
+  br bb1(%x : $Optional<TwoCase>)
+
+bb1(%10 : $Optional<TwoCase>):
+  switch_enum %10 : $Optional<TwoCase>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%1 : $TwoCase):
+  // Simplification of that switch_enum crashed the compiler because
+  // SILArgument::getIncomingValues returns %10 ($Optional<TwoCase>) as the
+  // incoming value for %1 ($TwoCase).
+  // rdar://problem/26251856
+  switch_enum %1 : $TwoCase, case #TwoCase.First!enumelt: bb3, case #TwoCase.Second!enumelt: bb4
+
+bb3:
+  %f1 = function_ref @unknown : $@convention(thin) () -> ()
+  %n1 = apply %f1() : $@convention(thin) () -> ()
+  br bb6
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %6 = tuple ()
+  return %6 : $()
+}
+
+class Base {
+  @inline(never) func inner()
+  func middle()
+  func outer()
+}
+
+class Derived : Base {
+  override func inner()
+  @inline(never) final override func middle()
+}
+
+class Final : Derived {
+}
+
+enum TestEnum {
+  case int64(Builtin.Int64)
+  case string (Base)
+  case none
+}
+
+enum MyError : Error {
+ case a
+ case b
+ case c(TestEnum)
+}
+
+enum MyError2 : Error {
+ case o(Optional<MyError>)
+}
+
+sil [ossa] @foo : $@convention(thin) (Builtin.Int64) -> Builtin.Int8
+sil [ossa] @foo2 : $@convention(thin) (Builtin.Int32) -> Builtin.Int8
+
+sil [ossa] @dont_thread_throw_block : $@convention(thin) (@guaranteed TestEnum) -> (Builtin.Int8, @error Error) {
+bb0(%0 : @guaranteed $TestEnum):
+  switch_enum %0 : $TestEnum, case #TestEnum.int64!enumelt: bb1,  default bb4
+
+bb1(%5 : $Builtin.Int64):
+  %7 = function_ref @foo : $@convention(thin) (Builtin.Int64) -> Builtin.Int8
+  %9 = apply %7(%5) : $@convention(thin) (Builtin.Int64) -> Builtin.Int8
+  br bb6(%9 : $Builtin.Int8)
+
+bb2(%11 : $Builtin.Int32):
+  %13 = function_ref @foo2 : $@convention(thin) (Builtin.Int32) -> Builtin.Int8
+  %15 = apply %13(%11) : $@convention(thin) (Builtin.Int32) -> Builtin.Int8
+  br bb6(%15 : $Builtin.Int8)
+
+bb4(%default : @guaranteed $TestEnum):
+  %22 = alloc_existential_box $Error, $MyError2
+  %22a = begin_borrow %22 : $Error
+  %23 = project_existential_box $MyError2 in %22a : $Error
+  switch_enum %0 : $TestEnum, case #TestEnum.none!enumelt: bbnone, case #TestEnum.int64!enumelt: bb7, case #TestEnum.string!enumelt: bb10
+
+bbnone:
+  %tn = enum $TestEnum, #TestEnum.none!enumelt
+  %en = enum $MyError, #MyError.c!enumelt, %tn : $TestEnum
+  br bb5(%en : $MyError)
+
+bb7(%50 : $Builtin.Int64):
+  %t = enum $TestEnum, #TestEnum.int64!enumelt, %50 : $Builtin.Int64
+  %e1 = enum $MyError, #MyError.c!enumelt, %t : $TestEnum
+  br bb5(%e1 : $MyError)
+
+bb10(%53 : @guaranteed $Base):
+  %t4 = enum $TestEnum, #TestEnum.string!enumelt, %53 : $Base
+  %e4 = enum $MyError, #MyError.c!enumelt, %t4 : $TestEnum
+  %e4a = copy_value %e4 : $MyError
+  br bb5(%e4a : $MyError)
+
+bb5(%e : @owned $MyError):
+  %89 = enum $Optional<MyError>, #Optional.some!enumelt, %e : $MyError
+  %e5 = enum $MyError2, #MyError2.o!enumelt, %89 : $Optional<MyError>
+  store %e5 to [init] %23 : $*MyError2
+  end_borrow %22a : $Error
+  throw %22 : $Error
+
+bb6(%44 : $Builtin.Int8):
+  return %44 : $Builtin.Int8
+}
+
+protocol Q {}
+
+class IsQ : Q {}
+
+// checked_cast_br take_* should be replaced by a destroy in case it ever
+// converts a managed object to an unmanaged value. Currently this doesn't
+// happen at the language level because bridge (NSNumber->Int) casts aren't
+// represented with checked_cast_br.
+// ---
+// CHECK-LABEL: sil [ossa] @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
+// CHECK: bb0(%0 : $*IsQ):
+// CHECK:   [[Q:%.*]] = alloc_stack $Q
+// CHECK:   [[LD:%.*]] = load [take] %0 : $*IsQ
+// CHECK:   destroy_value [[LD]] : $IsQ
+// CHECK:   dealloc_stack [[Q]] : $*Q
+// CHECK:   [[R:%.*]] = tuple ()
+// CHECK:   return [[R]] : $()
+// CHECK-LABEL: } // end sil function 'test_dead_checked_cast_br'
+sil [ossa] @test_dead_checked_cast_br : $@convention(thin) (@in IsQ) -> () {
+bb0(%0 : $*IsQ):
+  %p = alloc_stack $Q
+  checked_cast_addr_br take_always IsQ in %0 : $*IsQ to Q in %p : $*Q, bb1, bb3
+
+bb1:
+  %m1 = integer_literal $Builtin.Int1, -1
+  destroy_addr %p : $*Q
+  br bb2(%m1 : $Builtin.Int1)
+
+bb2(%5 : $Builtin.Int1):
+  // To avoid violating ownership, Q needs to be destroyed here. However, that
+  // would create a use of the checked_cast, defeating the test. In theory, Q
+  // could be some unmananged type with no destroy, but we don't have a way to
+  // express that in the type system, and bridged casts don't yet go through
+  // this optimization path.
+  dealloc_stack %p : $*Q
+  %r = tuple ()
+  return %r : $()
+
+bb3:
+  %z = integer_literal $Builtin.Int1, 0
+  br bb2(%z : $Builtin.Int1)
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hang
+// CHECK:      bb6:
+// CHECK:        integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:   br bb6
+// CHECK-NEXT: }
+sil [ossa] @dont_hang : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb4
+
+bb1:
+  %0 = integer_literal $Builtin.Int64, 1
+  cond_br undef, bb2a, bb6a
+
+bb2a:
+  br bb2
+
+bb2:
+  br bb3
+
+bb3:
+  br bb5
+
+bb4:
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb3
+
+bb5:
+  br bb2
+
+bb6a:
+  br bb6
+
+bb6:
+  %2 = integer_literal $Builtin.Int64, 1
+  br bb7
+
+bb7:
+  br bb5
+}
+
+// CHECK-LABEL: sil [ossa] @test_constant_folding
+// CHECK:  [[R:%[0-9]+]] = integer_literal $Builtin.Int32, 30
+// CHECK:  return [[R]] : $Builtin.Int32
+// CHECK-NEXT: }
+sil [ossa] @test_constant_folding : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %20 = integer_literal $Builtin.Int32, 20
+  %30 = integer_literal $Builtin.Int32, 30
+  cond_br %0, bb1, bb2
+bb1:
+  br bb3(%20 : $Builtin.Int32)
+bb2:
+  br bb3(%30 : $Builtin.Int32)
+
+bb3(%2 : $Builtin.Int32):
+  %3 = builtin "cmp_slt_Int32"(%2 : $Builtin.Int32, %30 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %3, bb4, bb5
+bb4:
+  br bb6(%20 : $Builtin.Int32)
+bb5:
+  br bb6(%30 : $Builtin.Int32)
+
+bb6(%4 : $Builtin.Int32):
+  %5 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %30 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %5, bb7, bb8
+bb7:
+  br bb9(%20 : $Builtin.Int32)
+bb8:
+  br bb9(%30 : $Builtin.Int32)
+
+bb9(%6 : $Builtin.Int32):
+  return %6 : $Builtin.Int32
+}
+
+struct TestStr {
+  let a: Int32
+  let c: Int32
+}
+
+enum TestEnm {
+  case X
+  case Y(TestStr)
+}
+
+// CHECK-LABEL: sil [ossa] @dont_crash
+// CHECK:      bb0(%0 : $TestEnm, %1 : $Int32):
+// CHECK-NEXT:   %2 = tuple ()
+// CHECK-NEXT:   return %2 : $()
+sil [ossa] @dont_crash : $@convention(method) (TestEnm, Int32) -> () {
+bb0(%2 : $TestEnm, %3 : $Int32):
+  %98 = integer_literal $Builtin.Int1, -1
+  cond_br %98, bb2a, bb3
+
+bb2a:
+  br bb2
+
+bb2:
+  %18 = tuple()
+  return %18 : $()
+
+bb3:
+  br bb8(%2 : $TestEnm)
+
+bb8(%47 : $TestEnm):
+  %49 = unchecked_enum_data %47 : $TestEnm, #TestEnm.Y!enumelt
+  %57 = struct_extract %49 : $TestStr, #TestStr.c
+  cond_br undef, bb9, bb11
+
+bb9:
+  br bb10
+
+bb10:
+  %64 = struct $TestStr (%3 : $Int32, %57 : $Int32)
+  %65 = enum $TestEnm, #TestEnm.Y!enumelt, %64 : $TestStr
+  cond_br undef, bb2b, bb16
+
+bb2b:
+  br bb2
+
+bb11:
+  br bb10
+
+
+bb16:
+  br bb8(%65 : $TestEnm)
+}
+
+sil [ossa] @print : $@convention(thin) (@guaranteed String) -> ()
+sil [ossa] @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+
+sil [ossa] @dont_clone_begin_apply : $(Builtin.Int1, @guaranteed String) -> () {
+bb0(%condition : $Builtin.Int1, %arg : @guaranteed $String):
+  %print = function_ref @print : $@convention(thin) (@guaranteed String) -> ()
+  cond_br %condition, bb1, bb2
+bb1:
+  apply %print(%arg) : $@convention(thin) (@guaranteed String) -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %yield_string = function_ref @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  (%yield, %token) = begin_apply %yield_string() : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  cond_br %condition, bb4, bb5
+bb4:
+  apply %print(%yield) : $@convention(thin) (@guaranteed String) -> ()
+  br bb6
+bb5:
+  br bb6
+bb6:
+  end_apply %token
+  %rv = tuple ()
+  return %rv : $()
+}
+
+class X {
+  @objc func f() { }
+}
+
+sil [ossa] @external_g : $@convention(thin) () -> ()
+
+// Don't tail duplicate dynamic_method_br. IRGen cannot handle phi nodes of
+// objc_methods.
+// CHECK-LABEL: sil [ossa] @dont_tail_duplicate_dynamic_method_br
+// CHECK: dynamic_method_br
+// CHECK-NOT: dynamic_method_br
+// CHECK: return
+sil [ossa] @dont_tail_duplicate_dynamic_method_br : $@convention(thin) (@owned Builtin.AnyObject, Builtin.Int1) -> () {
+bb0(%x : @owned $Builtin.AnyObject, %b : $Builtin.Int1):
+  cond_br %b, bb1, bb2
+
+bb1:
+  %f = function_ref @external_f : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  %x2 = copy_value %x : $Builtin.AnyObject
+  br bb3(%x2 : $Builtin.AnyObject)
+
+bb2:
+  %g = function_ref @external_g : $@convention(thin) () -> ()
+  apply %g() : $@convention(thin) () -> ()
+  %x3 = copy_value %x : $Builtin.AnyObject
+  br bb3(%x3 : $Builtin.AnyObject)
+
+bb3(%y : @owned $Builtin.AnyObject):
+  destroy_value %x : $Builtin.AnyObject
+  dynamic_method_br %y : $Builtin.AnyObject, #X.f!foreign, bb4, bb5
+
+bb4(%m : $@convention(objc_method) (Builtin.AnyObject) -> ()):
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  destroy_value %y : $Builtin.AnyObject
+  %r = tuple()
+  return %r : $()
+}
+
+// OSSA-only test.
+//
+// Test that simplifySwitchEnumBlock does not assert on a default
+// switch case with an argument.
+//
+// CHECK-LABEL: sil [ossa] @testSwitchEnumDefaultArg : $@convention(thin) (CompareResult) -> FakeBool {
+// CHECK: bb0(%0 : $CompareResult):
+// CHECK-NOT: switch
+// CHECK-NOT: br
+// CHECK: [[CALL:%.*]] = apply
+// CHECK: return [[CALL]] : $FakeBool
+// CHECK-LABEL: } // end sil function 'testSwitchEnumDefaultArg'
+sil [ossa] @testSwitchEnumDefaultArg : $@convention(thin) (CompareResult) -> FakeBool {
+bb0(%0 : $CompareResult):
+  %1 = enum $CompareResult, #CompareResult.equal!enumelt
+  switch_enum %1 : $CompareResult, case #CompareResult.less!enumelt: bb1, default bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct $FakeBool(%3 : $Builtin.Int1)
+  br bb3(%3 : $Builtin.Int1)
+
+bb2(%6 : $CompareResult):
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = struct $FakeBool(%7 : $Builtin.Int1)
+  br bb3(%7 : $Builtin.Int1)
+
+bb3(%10 : $Builtin.Int1):
+  cond_br %10, bb4, bb5
+
+bb4:
+  %11 = struct $FakeBool(%10 : $Builtin.Int1)
+  br bb6(%11 : $FakeBool)
+
+bb5:
+  %f = function_ref @dummy : $@convention(thin) () -> FakeBool
+  %call = apply %f()  : $@convention(thin) () -> FakeBool
+  br bb6(%call : $FakeBool)
+
+bb6(%14 : $FakeBool):
+  return %14 : $FakeBool
+}

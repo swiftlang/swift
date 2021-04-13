@@ -48,8 +48,12 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// The name of the module which the frontend is building.
+  /// The name of the module that the frontend is building.
   std::string ModuleName;
+
+  /// The ABI name of the module that the frontend is building, to be used in
+  /// mangling and metadata.
+  std::string ModuleABIName;
 
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
@@ -130,7 +134,8 @@ public:
     REPL,      ///< REPL mode
 
     EmitAssembly, ///< Emit assembly
-    EmitIR,       ///< Emit LLVM IR
+    EmitIRGen,    ///< Emit LLVM IR before LLVM optimizations
+    EmitIR,       ///< Emit LLVM IR after LLVM optimizations
     EmitBC,       ///< Emit LLVM BC
     EmitObject,   ///< Emit object file
 
@@ -298,7 +303,7 @@ public:
   ///
   /// This flag is currently only propagated from the driver to
   /// any merge-modules jobs.
-  bool EnableExperimentalCrossModuleIncrementalBuild = false;
+  bool DisableCrossModuleIncrementalBuild = false;
 
   /// Best effort to output a .swiftmodule regardless of any compilation
   /// errors. SIL generation and serialization is skipped entirely when there

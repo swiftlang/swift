@@ -1401,36 +1401,6 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
-void TypeChecker::checkParameterList(ParameterList *params,
-                                     DeclContext *owner) {
-  for (auto param: *params) {
-    checkDeclAttributes(param);
-
-    // async autoclosures can only occur as parameters to async functions.
-    if (param->isAutoClosure()) {
-      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
-        if (fnType->isAsync() &&
-            !(isa<AbstractFunctionDecl>(owner) &&
-              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
-          param->diagnose(diag::async_autoclosure_nonasync_function);
-          if (auto func = dyn_cast<FuncDecl>(owner))
-            addAsyncNotes(func);
-        }
-      }
-    }
-  }
-
-  // For source compatibilty, allow duplicate internal parameter names
-  // on protocol requirements.
-  //
-  // FIXME: Consider turning this into a warning or error if we do
-  // another -swift-version.
-  if (!isa<ProtocolDecl>(owner->getParent())) {
-    // Check for duplicate parameter names.
-    diagnoseDuplicateDecls(*params);
-  }
-}
-
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   SmallVector<VarDecl *, 2> boundVars;
   pattern->collectVariables(boundVars);
@@ -1477,6 +1447,7 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
 
   if (*expected) {
     attr = willCreate();
+    attr->setAddedByAccessNote();
     VD->getAttrs().add(attr);
 
     SmallString<64> attrString;
@@ -1542,6 +1513,11 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   }
 }
 
+void TypeChecker::applyAccessNote(ValueDecl *VD) {
+  (void)evaluateOrDefault(VD->getASTContext().evaluator,
+                          ApplyAccessNoteRequest{VD}, {});
+}
+
 evaluator::SideEffect
 ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
@@ -1573,8 +1549,7 @@ public:
     PrettyStackTraceDecl StackTrace("type-checking", decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl))
-      (void)evaluateOrDefault(VD->getASTContext().evaluator,
-                              ApplyAccessNoteRequest{VD}, {});
+      TypeChecker::applyAccessNote(VD);
 
     DeclVisitor<DeclChecker>::visit(decl);
 
@@ -1635,6 +1610,25 @@ public:
     // Force the lookup of decls referenced by a scoped import in case it emits
     // diagnostics.
     (void)ID->getDecls();
+
+    // Report the public import of a private module.
+    if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
+      auto target = ID->getModule();
+      auto importer = ID->getModuleContext();
+      if (target &&
+          !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+          target->getLibraryLevel() == LibraryLevel::SPI) {
+
+        auto &diags = ID->getASTContext().Diags;
+        InFlightDiagnostic inFlight =
+            diags.diagnose(ID, diag::warn_public_import_of_private_module,
+                           target->getName(), importer->getName());
+        if (ID->getAttrs().isEmpty()) {
+           inFlight.fixItInsert(ID->getStartLoc(),
+                              "@_implementationOnly ");
+        }
+      }
+    }
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -1674,10 +1668,12 @@ public:
     // when the VarDecl is merely used from another file.
 
     // Compute these requests in case they emit diagnostics.
+    TypeChecker::applyAccessNote(VD);
     (void) VD->getInterfaceType();
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();
-    (void) VD->getPropertyWrapperBackingProperty();
+    (void) VD->getPropertyWrapperAuxiliaryVariables();
+    (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
 
     // Visit auxiliary decls first
@@ -1796,6 +1792,30 @@ public:
     });
   }
 
+  /// If the given pattern binding has a property wrapper, check the
+  /// isolation and effects of the backing storage initializer.
+  void checkPropertyWrapperBackingInitializer(PatternBindingDecl *PBD) {
+    auto singleVar = PBD->getSingleVar();
+    if (!singleVar)
+      return;
+
+    if (!singleVar->hasAttachedPropertyWrapper())
+      return;
+
+    auto *backingVar = singleVar->getPropertyWrapperBackingProperty();
+    if (!backingVar)
+      return;
+
+    auto backingPBD = backingVar->getParentPatternBinding();
+    if (!backingPBD)
+      return;
+
+    auto initInfo = singleVar->getPropertyWrapperInitializerInfo();
+    if (auto initializer = initInfo.getInitFromWrappedValue()) {
+      checkPropertyWrapperActorIsolation(backingPBD, initializer);
+      TypeChecker::checkPropertyWrapperEffects(backingPBD, initializer);
+    }
+  }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     DeclContext *DC = PBD->getDeclContext();
@@ -1943,6 +1963,8 @@ public:
         }
       }
     }
+
+    checkPropertyWrapperBackingInitializer(PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -2457,13 +2479,10 @@ public:
       requirementsSig->print(llvm::errs());
       llvm::errs() << "\n";
 
-      // Note: One cannot canonicalize a requirement signature, because
-      // requirement signatures are necessarily missing requirements.
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
         CanGenericSignature::getCanonical(requirementsSig->getGenericParams(),
-                                          requirementsSig->getRequirements(),
-                                          /*skipValidation=*/true);
+                                          requirementsSig->getRequirements());
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
@@ -2983,4 +3002,43 @@ public:
 void TypeChecker::typeCheckDecl(Decl *D) {
   auto *SF = D->getDeclContext()->getParentSourceFile();
   DeclChecker(D->getASTContext(), SF).visit(D);
+}
+
+void TypeChecker::checkParameterList(ParameterList *params,
+                                     DeclContext *owner) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+
+    // async autoclosures can only occur as parameters to async functions.
+    if (param->isAutoClosure()) {
+      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+        if (fnType->isAsync() &&
+            !(isa<AbstractFunctionDecl>(owner) &&
+              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
+          param->diagnose(diag::async_autoclosure_nonasync_function);
+          if (auto func = dyn_cast<FuncDecl>(owner))
+            addAsyncNotes(func);
+        }
+      }
+    }
+
+    if (param->hasAttachedPropertyWrapper())
+      (void) param->getPropertyWrapperInitializerInfo();
+
+    auto *SF = param->getDeclContext()->getParentSourceFile();
+    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
+      if (!isa<ParamDecl>(auxiliaryDecl))
+        DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+    });
+  }
+
+  // For source compatibilty, allow duplicate internal parameter names
+  // on protocol requirements.
+  //
+  // FIXME: Consider turning this into a warning or error if we do
+  // another -swift-version.
+  if (!isa<ProtocolDecl>(owner->getParent())) {
+    // Check for duplicate parameter names.
+    diagnoseDuplicateDecls(*params);
+  }
 }

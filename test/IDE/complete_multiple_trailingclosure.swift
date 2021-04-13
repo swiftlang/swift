@@ -13,8 +13,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_2 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_SAMELINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_SAMELINE_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_REQUIRED_NEWLINE_3 | %FileCheck %s -check-prefix=INIT_REQUIRED_NEWLINE_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_1 | %FileCheck %s -check-prefix=INIT_FALLBACK
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_2 | %FileCheck %s -check-prefix=INIT_FALLBACK
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_1 | %FileCheck %s -check-prefix=INIT_FALLBACK_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FALLBACK_2 | %FileCheck %s -check-prefix=INIT_FALLBACK_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBERDECL_SAMELINE | %FileCheck %s -check-prefix=MEMBERDECL_SAMELINE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBERDECL_NEWLINE | %FileCheck %s -check-prefix=MEMBERDECL_NEWLINE
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INITIALIZED_VARDECL_SAMELINE | %FileCheck %s -check-prefix=INITIALIZED_VARDECL_SAMELINE
@@ -201,15 +201,25 @@ func testFallbackPostfix() {
   let _ = MyStruct4 {
     1
   } #^INIT_FALLBACK_1^#
-// INIT_FALLBACK: Begin completions, 2 items
-// INIT_FALLBACK-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
-// INIT_FALLBACK-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
-// INIT_FALLBACK: End completions
+// FIXME: We shouldn't be suggesting arg3 here because the second initializer
+// doesn't match the already-provided parameters (missing `name` label argument
+// and closure does not return `String`). However, we are not type-checking at
+// the stage at which we complete argument labels, so we can't rule it out for
+// now (SR-14450).
+// INIT_FALLBACK_1: Begin completions, 3 items
+// INIT_FALLBACK_1-DAG: Pattern/ExprSpecific:               {#arg3: () -> _ {|}#}[#() -> _#]
+// INIT_FALLBACK_1-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_FALLBACK_1-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
+// INIT_FALLBACK_1: End completions
   let _ = MyStruct4(name: "test") {
     ""
   } arg3: {
     1
   } #^INIT_FALLBACK_2^#
+// INIT_FALLBACK_2: Begin completions, 2 items
+// INIT_FALLBACK_2-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
+// INIT_FALLBACK_2-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
+// INIT_FALLBACK_2: End completions
 }
 
 protocol P {

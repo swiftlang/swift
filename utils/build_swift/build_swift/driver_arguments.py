@@ -1037,6 +1037,8 @@ def create_argument_parser():
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
 
+    option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
+           help='skip cleaning up llbuild')
     option('--skip-clean-swiftpm', toggle_false('clean_swiftpm'),
            help='skip cleaning up swiftpm')
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),

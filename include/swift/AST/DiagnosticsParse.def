@@ -249,7 +249,8 @@ ERROR(computed_property_no_accessors, none,
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,
-      "protocol property %0 cannot have a default implementation specified here; use extension instead", (StringRef))
+      "protocol property %0 cannot have a default implementation specified "
+      "here; use extension instead", (StringRef))
 ERROR(computed_property_missing_type,none,
       "computed property must have an explicit type", ())
 ERROR(getset_nontrivial_pattern,none,
@@ -277,6 +278,12 @@ ERROR(expected_lbrace_accessor,PointsToFirstBadToken,
 ERROR(expected_accessor_kw,none,
       "expected 'get', 'set', 'willSet', or 'didSet' keyword to "
       "start an accessor definition",())
+ERROR(invalid_accessor_specifier,none,
+      "'%0' accessor cannot have specifier '%1'",
+      (StringRef, StringRef))
+ERROR(invalid_accessor_with_effectful_get,none,
+      "'%0' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'",
+      (StringRef))
 ERROR(missing_getter,none,
       "%select{variable|subscript}0 with %1 must also have a getter",
       (unsigned, StringRef))
@@ -1375,6 +1382,9 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_expected_integer_literal,none,
+"expected integer literal in '%0' attribute", (StringRef))
+
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
 
@@ -1674,12 +1684,8 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
 
-// hasAsyncAlternative
-ERROR(requires_has_async_alternative, none,
-      "'%0' support is required to be explicitly enabled using "
-      "-experimental-has-async-alternative-attribute", (StringRef))
-
-ERROR(has_async_alternative_invalid_name, none,
+// completionHandlerAsync
+ERROR(attr_completion_handler_async_invalid_name, none,
       "argument of '%0' attribute must be an identifier or full function name",
       (StringRef))
 

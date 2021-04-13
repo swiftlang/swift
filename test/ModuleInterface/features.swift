@@ -10,10 +10,10 @@
 // compilers to skip over the uses of newer features.
 
 // CHECK: #if compiler(>=5.3) && $Actors
-// CHECK-NEXT: actor {{.*}} MyActor
+// CHECK-NEXT: public actor MyActor
 // CHECK: }
 // CHECK-NEXT: #endif
-public actor class MyActor {
+public actor MyActor {
 }
 
 // CHECK: #if compiler(>=5.3) && $Actors
@@ -47,10 +47,10 @@ public func globalAsync() async { }
 // CHECK-NEXT: #endif
 @_marker public protocol MP2: MP { }
 
-// CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK: public protocol MP3 : FeatureTest.MP {
+// CHECK: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK-NEXT: public protocol MP3 : AnyObject, FeatureTest.MP {
 // CHECK-NEXT: }
-public protocol MP3: MP { }
+public protocol MP3: AnyObject, MP { }
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
 // CHECK-NEXT: extension MP2 {
@@ -67,24 +67,57 @@ public class OldSchool: MP {
   public func takeClass() async { }
 }
 
+// CHECK: class OldSchool2 {
+public class OldSchool2: MP {
+  // CHECK: #if compiler(>=5.3) && $AsyncAwait
+  // CHECK-NEXT: takeClass()
+  // CHECK-NEXT: #endif
+  public func takeClass() async { }
+}
+
 // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
 // CHECK-NEXT: @rethrows public protocol RP
 @rethrows public protocol RP {
-  func f() throws
+  func f() throws -> Bool
+}
+
+// CHECK: public struct UsesRP {
+public struct UsesRP {
+  // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+  // CHECK-NEXT:  public var value: FeatureTest.RP? {
+  // CHECK-NOT: #if compiler(>=5.3) && $RethrowsProtocol
+  // CHECK: get
+  public var value: RP? {
+    nil
+  }
+}
+
+// CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+// CHECK-NEXT: public struct IsRP
+public struct IsRP: RP {
+  // CHECK-NEXT: public func f()
+  public func f() -> Bool { }
+
+  // CHECK-NOT: $RethrowsProtocol
+  // CHECK-NEXT: public var isF: 
+  // CHECK-NEXT: get
+  public var isF: Bool {
+    f()
+  }
 }
 
 // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
 // CHECK-NEXT: public func acceptsRP
 public func acceptsRP<T: RP>(_: T) { }
 
-// CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK: extension Array : FeatureTest.MP where Element : FeatureTest.MP {
+// CHECK: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK-NEXT: extension Array : FeatureTest.MP where Element : FeatureTest.MP {
 extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
-// CHECK-NEXT: }
+// CHECK: }
 
-// CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK: extension OldSchool : Swift.UnsafeConcurrentValue {
-extension OldSchool: UnsafeConcurrentValue { }
+// CHECK: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK-NEXT: extension OldSchool : Swift.UnsafeSendable {
+extension OldSchool: UnsafeSendable { }
 // CHECK-NEXT: }
 
 // CHECK: #if compiler(>=5.3) && $GlobalActors
@@ -100,19 +133,19 @@ public struct SomeGlobalActor {
 // CHECK-NEXT: #endif
 public func runSomethingSomewhere(body: () async -> Void) { }
 
-// CHECK: #if compiler(>=5.3) && $ConcurrentFunctions
-// CHECK-NEXT: func runSomethingConcurrently(body: @concurrent () -> 
+// CHECK: #if compiler(>=5.3) && $Sendable
+// CHECK-NEXT: func runSomethingConcurrently(body: @Sendable () -> 
 // CHECK-NEXT: #endif
-public func runSomethingConcurrently(body: @concurrent () -> Void) { }
+public func runSomethingConcurrently(body: @Sendable () -> Void) { }
 
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: func stage
 // CHECK-NEXT: #endif
 public func stage(with actor: MyActor) { }
 
-// CHECK-NOT: extension FeatureTest.MyActor : Swift.ConcurrentValue
+// CHECK-NOT: extension MyActor : Swift.Sendable
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension FeatureTest.OldSchool : FeatureTest.MP {
+// CHECK-NEXT: extension OldSchool : FeatureTest.MP {
 // CHECK-NEXT: #endif
 

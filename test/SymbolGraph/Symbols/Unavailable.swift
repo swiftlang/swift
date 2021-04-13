@@ -25,13 +25,4 @@ extension ShouldAppear {
   public func shouldntAppear2() {}
 }
 
-// CHECK-NOT: SwiftObsoleted
-@available(swift, obsoleted: 1.0)
-public struct SwiftObsoleted {}
-
-@available(swift, obsoleted: 1.0)
-extension ShouldAppear {
-  public func shouldntAppear3() {}
-}
-
 // CHECK-NOT: shouldntAppear

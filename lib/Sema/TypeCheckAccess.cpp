@@ -920,7 +920,29 @@ public:
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
 
+    bool hasInaccessibleParameterWrapper = false;
     for (auto *P : *fn->getParameters()) {
+      // Check for inaccessible API property wrappers attached to the parameter.
+      if (P->hasExternalPropertyWrapper()) {
+        auto wrapperAttrs = P->getAttachedPropertyWrappers();
+        for (auto index : indices(wrapperAttrs)) {
+          auto wrapperType = P->getAttachedPropertyWrapperType(index);
+          auto wrapperTypeRepr = wrapperAttrs[index]->getTypeRepr();
+          checkTypeAccess(wrapperType, wrapperTypeRepr, fn, /*mayBeInferred*/ false,
+              [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+                  DowngradeToWarning downgradeDiag) {
+                if (typeAccessScope.isChildOf(minAccessScope) ||
+                    (!complainRepr &&
+                     typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+                  minAccessScope = typeAccessScope;
+                  complainRepr = thisComplainRepr;
+                  downgradeToWarning = downgradeDiag;
+                  hasInaccessibleParameterWrapper = true;
+                }
+              });
+        }
+      }
+
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
@@ -970,7 +992,8 @@ public:
         diagID = diag::function_type_access_warn;
       auto diag = fn->diagnose(diagID, isExplicit, fnAccess,
                                isa<FileUnit>(fn->getDeclContext()), minAccess,
-                               functionKind, problemIsResult);
+                               functionKind, problemIsResult,
+                               hasInaccessibleParameterWrapper);
       highlightOffendingType(diag, complainRepr);
     }
   }
@@ -1394,6 +1417,26 @@ public:
       : isTypeContext ? FK_Method : FK_Function;
 
     for (auto *P : *fn->getParameters()) {
+      // Check for inaccessible API property wrappers attached to the parameter.
+      if (P->hasExternalPropertyWrapper()) {
+        auto wrapperAttrs = P->getAttachedPropertyWrappers();
+        for (auto index : indices(wrapperAttrs)) {
+          auto wrapperType = P->getAttachedPropertyWrapperType(index);
+          auto wrapperTypeRepr = wrapperAttrs[index]->getTypeRepr();
+          checkTypeAccess(wrapperType, wrapperTypeRepr, fn, /*mayBeInferred*/ false,
+              [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
+                  DowngradeToWarning downgradeDiag) {
+                auto diagID = diag::function_type_usable_from_inline;
+                if (!fn->getASTContext().isSwiftVersionAtLeast(5))
+                  diagID = diag::function_type_usable_from_inline_warn;
+                auto diag = fn->diagnose(diagID, functionKind,
+                                         /*problemIsResult=*/false,
+                                         /*inaccessibleWrapper=*/true);
+                highlightOffendingType(diag, complainRepr);
+              });
+        }
+      }
+
       checkTypeAccess(
           P->getInterfaceType(), P->getTypeRepr(), fn, /*mayBeInferred*/ false,
           [&](AccessScope typeAccessScope, const TypeRepr *complainRepr,
@@ -1402,7 +1445,8 @@ public:
             if (!fn->getASTContext().isSwiftVersionAtLeast(5))
               diagID = diag::function_type_usable_from_inline_warn;
             auto diag = fn->diagnose(diagID, functionKind,
-                                     /*problemIsResult=*/false);
+                                     /*problemIsResult=*/false,
+                                     /*inaccessibleWrapper=*/false);
             highlightOffendingType(diag, complainRepr);
           });
     }
@@ -1417,7 +1461,8 @@ public:
         if (!fn->getASTContext().isSwiftVersionAtLeast(5))
           diagID = diag::function_type_usable_from_inline_warn;
         auto diag = fn->diagnose(diagID, functionKind,
-                                 /*problemIsResult=*/true);
+                                 /*problemIsResult=*/true,
+                                 /*inaccessibleWrapper=*/false);
         highlightOffendingType(diag, complainRepr);
       });
     }
@@ -1718,8 +1763,15 @@ public:
   void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
     checkGenericParams(fn, fn);
 
-    for (auto *P : *fn->getParameters())
+    for (auto *P : *fn->getParameters()) {
+      auto wrapperAttrs = P->getAttachedPropertyWrappers();
+      for (auto index : indices(wrapperAttrs)) {
+        auto wrapperType = P->getAttachedPropertyWrapperType(index);
+        checkType(wrapperType, wrapperAttrs[index]->getTypeRepr(), fn);
+      }
+
       checkType(P->getInterfaceType(), P->getTypeRepr(), fn);
+    }
   }
 
   void visitFuncDecl(FuncDecl *FD) {
@@ -1797,6 +1849,12 @@ public:
   void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
                             const Decl *refDecl, SourceLoc diagLoc,
                             SourceRange refRange) {
+    // Bail on invalid predence groups. This can happen when the user spells a
+    // relation element that doesn't actually exist.
+    if (!PGD) {
+      return;
+    }
+
     const SourceFile *SF = refDecl->getDeclContext()->getParentSourceFile();
     ModuleDecl *M = PGD->getModuleContext();
     if (!SF->isImportedImplementationOnly(M))

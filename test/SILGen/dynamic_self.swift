@@ -354,59 +354,66 @@ class FactoryFactory {
   }
 }
 
-// Super call to a method returning Self
+// Test that we downcast to the correct type when invoking 'Self'-returning class members on 'super'.
 class Base {
   required init() {}
 
-  func returnsSelf() -> Self {
-    return self
-  }
+  func method() -> Self { self }
+  var property: Self { self }
+  subscript() -> Self { self }
 
-  static func returnsSelfStatic() -> Self {
-    return self.init()
-  }
+  static func staticMethod() -> Self { self.init() }
+  static var staticProperty: Self { self.init() }
+  static subscript() -> Self { self.init() }
 }
 
 class Derived : Base {
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC9superCallyyF : $@convention(method) (@guaranteed Derived) -> ()
-  // CHECK: [[SELF:%.*]] = copy_value %0
-  // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
-  // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC11returnsSelfACXDyF
-  // CHECK: apply [[METHOD]]([[SUPER]])
-  // CHECK: return
+  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK-NOT: unchecked_ref_cast
+  // CHECK: end sil function '$s12dynamic_self7DerivedC9superCallyyF'
   func superCall() {
-    _ = super.returnsSelf()
+    _ = super.method
+    _ = super.method()
+    _ = super.property
+    _ = super[]
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC15superCallStaticyyFZ : $@convention(method) (@thick Derived.Type) -> ()
-  // CHECK: [[SUPER:%.*]] = upcast %0 : $@thick Derived.Type to $@thick Base.Type
-  // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC17returnsSelfStaticACXDyFZ
-  // CHECK: apply [[METHOD]]([[SUPER]])
-  // CHECK: return
+  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK-NOT: unchecked_ref_cast
+  // CHECK: end sil function '$s12dynamic_self7DerivedC15superCallStaticyyFZ'
   static func superCallStatic() {
-    _ = super.returnsSelfStatic()
+    _ = super.staticMethod
+    _ = super.staticMethod()
+    _ = super.staticProperty
+    _ = super[]
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyF : $@convention(method) (@guaranteed Derived) -> @owned Derived
-  // CHECK: [[SELF:%.*]] = copy_value %0
-  // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
-  // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC11returnsSelfACXDyF
-  // CHECK: apply [[METHOD]]([[SUPER]])
-  // CHECK: return
+  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK-NOT: unchecked_ref_cast
+  // CHECK: end sil function '$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyF'
   func superCallFromMethodReturningSelf() -> Self {
-    _ = super.returnsSelf()
-    return self
+    _ = super.method
+    _ = super.method()
+    _ = super[]
+    return super.property
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ : $@convention(method) (@thick Derived.Type) -> @owned Derived
-  // CHECK: [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @dynamic_self Derived.Type
-  // CHECK: [[SUPER:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Derived.Type to $@thick Base.Type
-  // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC17returnsSelfStaticACXDyFZ
-  // CHECK: apply [[METHOD]]([[SUPER]])
-  // CHECK: return
+  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK-NOT: unchecked_ref_cast
+  // CHECK: end sil function '$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ'
   static func superCallFromMethodReturningSelfStatic() -> Self {
-    _ = super.returnsSelfStatic()
-    return self.init()
+    _ = super.staticMethod
+    _ = super.staticMethod()
+    _ = super[]
+    return super.staticProperty
   }
 }
 

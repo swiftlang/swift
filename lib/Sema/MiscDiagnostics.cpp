@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -67,6 +68,7 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Error about collection literals that default to Any collections in
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
+///   - KeyPath expressions cannot refer to effectful properties / subscripts
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -149,6 +151,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         CallArgs.insert(DSE->getIndex());
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        // raise an error if this KeyPath contains an effectful member.
+        checkForEffectfulKeyPath(KPE);
+
         for (auto Comp : KPE->getComponents()) {
           if (auto *Arg = Comp.getIndexExpr())
             CallArgs.insert(Arg);
@@ -319,6 +324,25 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
       
       return { true, E };
+    }
+
+    /// Visit each component of the keypath and emit a diganostic if they
+    /// refer to a member that has effects.
+    void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
+      for (const auto &component : keyPath->getComponents()) {
+        if (component.hasDeclRef()) {
+          auto decl = component.getDeclRef().getDecl();
+          if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
+            if (auto getter = asd->getEffectfulGetAccessor()) {
+              Ctx.Diags.diagnose(component.getLoc(),
+                                 diag::effectful_keypath_component,
+                                 asd->getDescriptiveKind());
+              Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
+                                 asd->getDescriptiveKind());
+            }
+          }
+        }
+      }
     }
 
     void checkCheckedCastExpr(CheckedCastExpr *cast) {
@@ -1847,28 +1871,45 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   llvm::SmallString<16> missingBuffer;
   llvm::SmallString<16> extraBuffer;
   for (unsigned i = 0; i != n; ++i) {
-    Identifier oldName;
+    // oldName and newName are
+    //  - None if i is out of bounds for the argument list
+    //  - nullptr for an argument without a label
+    //  - have a value if the argument has a label
+    Optional<Identifier> oldName;
     if (i < argList.args.size())
       oldName = argList.labels[i];
-    Identifier newName;
+    Optional<Identifier> newName;
     if (i < newNames.size())
       newName = newNames[i];
 
+    assert(oldName || newName && "We can't have oldName and newName out of "
+                                 "bounds, otherwise n would be smaller");
+
     if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size()-1 &&
+        (argList.hasTrailingClosure && i == argList.args.size() - 1 &&
          (numMissing > 0 || numExtra > 0 || numWrong > 0)))
       continue;
 
-    if (oldName.empty()) {
+    if (!oldName.hasValue() && newName.hasValue()) {
       ++numMissing;
-      missingBuffer += newName.str();
-      missingBuffer += ":";
-    } else if (newName.empty()) {
+      missingBuffer += newName->str();
+      missingBuffer += ':';
+    } else if (oldName.hasValue() && !newName.hasValue()) {
       ++numExtra;
-      extraBuffer += oldName.str();
+      extraBuffer += oldName->str();
       extraBuffer += ':';
-    } else
+    } else if (oldName->empty()) {
+      // In the cases from here onwards oldValue and newValue are not null
+      ++numMissing;
+      missingBuffer += newName->str();
+      missingBuffer += ":";
+    } else if (newName->empty()) {
+      ++numExtra;
+      extraBuffer += oldName->str();
+      extraBuffer += ':';
+    } else {
       ++numWrong;
+    }
   }
 
   // Emit the diagnostic.
@@ -4598,6 +4639,58 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
   ComparisonWithNaNFinder Walker(DC);
   const_cast<Expr *>(E)->walk(Walker);
+}
+
+namespace {
+
+class CompletionHandlerUsageChecker final : public ASTWalker {
+  ASTContext &ctx;
+
+public:
+  CompletionHandlerUsageChecker(ASTContext &ctx) : ctx(ctx) {}
+
+  bool walkToDeclPre(Decl *D) override { return !isa<PatternBindingDecl>(D); }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (expr->getType().isNull())
+      return {false, expr}; // Something failed to typecheck, bail out
+
+    if (auto *closure = dyn_cast<ClosureExpr>(expr))
+      return {closure->isBodyAsync(), closure};
+
+    if (auto *call = dyn_cast<ApplyExpr>(expr)) {
+      if (auto *fn = dyn_cast<DeclRefExpr>(call->getFn())) {
+        if (auto *afd = dyn_cast<AbstractFunctionDecl>(fn->getDecl())) {
+          auto *asyncFunc = afd->getAsyncAlternative();
+          if (!asyncFunc)
+            return {false, call};
+          ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+          ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
+                             asyncFunc->getName());
+        }
+      }
+    }
+    return {true, expr};
+  }
+};
+
+} // namespace
+
+void swift::checkFunctionAsyncUsage(AbstractFunctionDecl *decl) {
+  if (!decl->isAsyncContext())
+    return;
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  BraceStmt *body = decl->getBody();
+  if (body)
+    body->walk(checker);
+}
+
+void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  for (Expr *init : decl->initializers()) {
+    if (auto closure = dyn_cast_or_null<ClosureExpr>(init))
+      closure->walk(checker);
+  }
 }
 
 //===----------------------------------------------------------------------===//

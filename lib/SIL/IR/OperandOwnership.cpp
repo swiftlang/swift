@@ -443,9 +443,24 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
     : apply.getArgumentConvention(op);
 
-  return getFunctionArgOwnership(
-      argConv,
-      /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+  auto argOwnership = getFunctionArgOwnership(
+    argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+
+  // OSSA cleanup needs to handle each of these callee ownership cases.
+  //
+  // OperandOwnership::ForwardingConsume is only for thick @callee_owned.
+  //
+  // OperandOwnership::Borrow would only happen for a coroutine closure, which
+  // isn't yet possible.
+  if (apply.isCalleeOperand(op)) {
+    assert((argOwnership == OperandOwnership::TrivialUse
+            || argOwnership == OperandOwnership::UnownedInstantaneousUse
+            || argOwnership == OperandOwnership::InstantaneousUse
+            || argOwnership == OperandOwnership::ForwardingConsume
+            || argOwnership == OperandOwnership::Borrow) &&
+           "unsupported callee ownership");
+  }
+  return argOwnership;
 }
 
 OperandOwnership
@@ -559,6 +574,9 @@ namespace {
 struct OperandOwnershipBuiltinClassifier
     : SILBuiltinVisitor<OperandOwnershipBuiltinClassifier, OperandOwnership> {
   using Map = OperandOwnership;
+      
+  const Operand &op;
+  OperandOwnershipBuiltinClassifier(const Operand &op) : op(op) {}
 
   OperandOwnership visitLLVMIntrinsic(BuiltinInst *bi, llvm::Intrinsic::ID id) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
@@ -691,6 +709,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, SToUCheckedTrunc)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Expect)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Shl)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericShl)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ShuffleVector)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Sizeof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, StaticReport)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Strideof)
@@ -725,17 +744,68 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 
-// FIXME: These are considered InteriorPointer because they may propagate a
-// pointer into a borrowed values. If they do not propagate an interior pointer,
-// then they should be InstantaneousUse instead and should not require a
-// guaranteed value.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
+                                                              StringRef attr) {
+  // The function operand is consumed by the new task.
+  if (&op == &bi->getOperandRef(2))
+    return OperandOwnership::DestroyingConsume;
+  
+  // FIXME: These are considered InteriorPointer because they may propagate a
+  // pointer into a borrowed values. If they do not propagate an interior pointer,
+  // then they should be InstantaneousUse instead and should not require a
+  // guaranteed value.
+  return OperandOwnership::InteriorPointer;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskGroupFuture(BuiltinInst *bi,
+                                                                   StringRef attr) {
+  // The function operand is consumed by the new task.
+  if (&op == &bi->getOperandRef(3))
+    return OperandOwnership::DestroyingConsume;
+  
+  // FIXME: These are considered InteriorPointer because they may propagate a
+  // pointer into a borrowed values. If they do not propagate an interior pointer,
+  // then they should be InstantaneousUse instead and should not require a
+  // guaranteed value.
+  return OperandOwnership::InteriorPointer;
+}
+
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeNonThrowingContinuationReturning(BuiltinInst *bi, StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeThrowingContinuationReturning(BuiltinInst *bi, StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTask)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTaskFuture)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
@@ -746,6 +816,8 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffProjectTopLevelSubcontext)
 // FIXME: ConvertTaskToJob is documented as taking NativePointer. It's operand's
 // ownership should be 'TrivialUse'.
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, ConvertTaskToJob)
+
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildSerialExecutorRef)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
 
@@ -758,6 +830,7 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
         "Builtin should never be visited! E.x.: It may not have arguments");   \
   }
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
+SHOULD_NEVER_VISIT_BUILTIN(GetCurrentExecutor)
 #undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see
@@ -771,7 +844,7 @@ SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
 #include "swift/AST/Builtins.def"
 
 OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
-  return OperandOwnershipBuiltinClassifier().check(bi);
+  return OperandOwnershipBuiltinClassifier(op).check(bi);
 }
 
 //===----------------------------------------------------------------------===//

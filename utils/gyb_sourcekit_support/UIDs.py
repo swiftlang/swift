@@ -38,6 +38,7 @@ UID_KEYS = [
     KEY('Line', 'key.line'),
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
+    KEY('Receivers', 'key.receivers'),
     KEY('IsDynamic', 'key.is_dynamic'),
     KEY('IsImplicit', 'key.is_implicit'),
     KEY('FilePath', 'key.filepath'),
@@ -112,7 +113,6 @@ UID_KEYS = [
     KEY('Deprecated', 'key.deprecated'),
     KEY('Obsoleted', 'key.obsoleted'),
     KEY('RemoveCache', 'key.removecache'),
-    KEY('TypeInterface', 'key.typeinterface'),
     KEY('TypeUsr', 'key.typeusr'),
     KEY('ContainerTypeUsr', 'key.containertypeusr'),
     KEY('ModuleGroups', 'key.modulegroups'),
@@ -161,6 +161,8 @@ UID_KEYS = [
     KEY('SymbolGraph', 'key.symbol_graph'),
     KEY('RetrieveSymbolGraph', 'key.retrieve_symbol_graph'),
     KEY('ParentContexts', 'key.parent_contexts'),
+    KEY('ReferencedSymbols', 'key.referenced_symbols'),
+    KEY('IsSPI', 'key.is_spi'),
     KEY('ActionUID', 'key.actionuid'),
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),
@@ -188,6 +190,8 @@ UID_KEYS = [
     KEY('AnnotatedTypename', 'key.annotated.typename'),
     KEY('CompileOperation', 'key.compile_operation'),
     KEY('EffectiveAccess', 'key.effective_access'),
+    KEY('DeclarationLang', 'key.decl_lang'),
+    KEY('SecondarySymbols', 'key.secondary_symbols'),
 ]
 
 
@@ -450,6 +454,7 @@ UID_KINDS = [
     KIND('StatNumRequests', 'source.statistic.num-requests'),
     KIND('StatNumSemaRequests', 'source.statistic.num-semantic-requests'),
     KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
-    KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
     KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
+    KIND('Swift', 'source.lang.swift'),
+    KIND('ObjC', 'source.lang.objc'),
 ]

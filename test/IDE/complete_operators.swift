@@ -1,67 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_1 | %FileCheck %s -check-prefix=POSTFIX_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_2 > %t
-// RUN: %FileCheck %s -check-prefix=POSTFIX_2 < %t
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_POSTFIX_2 < %t
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_3 | %FileCheck %s -check-prefix=POSTFIX_3
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_4 | %FileCheck %s -check-prefix=POSTFIX_4
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_5 | %FileCheck %s -check-prefix=POSTFIX_5
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_6 | %FileCheck %s -check-prefix=POSTFIX_6
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_7 | %FileCheck %s -check-prefix=POSTFIX_7
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_8 | %FileCheck %s -check-prefix=POSTFIX_8
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_9 | %FileCheck %s -check-prefix=POSTFIX_9
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_10 | %FileCheck %s -check-prefix=POSTFIX_10
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=S_POSTFIX_SPACE | %FileCheck %s -check-prefix=S_POSTFIX_SPACE
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_1 > %t
-// RUN: %FileCheck %s -check-prefix=S2_INFIX < %t
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_S2_INFIX < %t
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_2 > %t
-// RUN: %FileCheck %s -check-prefix=S2_INFIX_LVALUE < %t
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_S2_INFIX_LVALUE < %t
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_3 | %FileCheck %s -check-prefix=S2_INFIX_LVALUE
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_4 | %FileCheck %s -check-prefix=S2_INFIX
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_5 | %FileCheck %s -check-prefix=S2_INFIX
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_6 | %FileCheck %s -check-prefix=S2_INFIX
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_7 > %t
-// RUN: %FileCheck %s -check-prefix=S2_INFIX_OPTIONAL < %t
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_S2_INFIX_OPTIONAL < %t
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_8 | %FileCheck %s -check-prefix=S3_INFIX_OPTIONAL
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_9 | %FileCheck %s -check-prefix=FOOABLE_INFIX
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_10 | %FileCheck %s -check-prefix=FOOABLE_INFIX
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_11 | %FileCheck %s -check-prefix=INFIX_11
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_12 | %FileCheck %s -check-prefix=INFIX_12
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_13 | %FileCheck %s -check-prefix=NO_OPERATORS
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_14 | %FileCheck %s -check-prefix=NO_OPERATORS
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_15 | %FileCheck %s -check-prefix=INFIX_15
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_16 | %FileCheck %s -check-prefix=INFIX_16
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_17 | %FileCheck %s -check-prefix=VOID_OPERATORS
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_18 | %FileCheck %s -check-prefix=NO_OPERATORS
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_19 | %FileCheck %s -check-prefix=EMPTYCLASS_INFIX
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_20 | %FileCheck %s -check-prefix=NO_OPERATORS
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_21 | %FileCheck %s -check-prefix=NO_OPERATORS
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_22 | %FileCheck %s -check-prefix=INFIX_22
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=S2_INFIX_SPACE | %FileCheck %s -check-prefix=S2_INFIX_SPACE
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_1 | %FileCheck %s -check-prefix=S2_INFIX
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_2 > %t.ext_infix_2
-// RUN: %FileCheck %s -check-prefix=S4_EXT_INFIX < %t.ext_infix_2
-// RUN: %FileCheck %s -check-prefix=S4_EXT_INFIX_NEG < %t.ext_infix_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_3 | %FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_4 | %FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_1| %FileCheck %s -check-prefix=ASSIGN_TUPLE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_2| %FileCheck %s -check-prefix=ASSIGN_TUPLE_2
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ASSIGN_TUPLE_3| %FileCheck %s -check-prefix=ASSIGN_TUPLE_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_1 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_2 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_3 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_AUTOCLOSURE_4 | %FileCheck %s -check-prefix=INFIX_AUTOCLOSURE_1
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 struct S {}
 postfix operator ++ {}
@@ -73,7 +11,7 @@ func testPostfix1(x: S) {
 // POSTFIX_1-NOT: ++
 
 func testPostfix2(x: inout S) {
-  x#^POSTFIX_2^#
+  x#^POSTFIX_2?check=POSTFIX_2;check=NEGATIVE_POSTFIX_2^#
 }
 // POSTFIX_2: Begin completions
 // POSTFIX_2-DAG: Decl[PostfixOperatorFunction]/CurrModule:  ++[#S#]
@@ -164,7 +102,7 @@ func **(x: S2, y: Int) -> S2 { return x }
 func **=(x: inout S2, y: Int) -> Void { return x }
 
 func testInfix1(x: S2) {
-  x#^INFIX_1^#
+  x#^INFIX_1?check=S2_INFIX;check=NEGATIVE_S2_INFIX^#
 }
 // S2_INFIX: Begin completions
 // FIXME: rdar://problem/22997089 - should be CurrModule
@@ -180,7 +118,7 @@ func testInfix1(x: S2) {
 // NEGATIVE_S2_INFIX-NOT: = {#
 
 func testInfix2(x: inout S2) {
-  x#^INFIX_2^#
+  x#^INFIX_2?check=S2_INFIX_LVALUE;check=NEGATIVE_S2_INFIX_LVALUE^#
 }
 // S2_INFIX_LVALUE: Begin completions
 // FIXME: rdar://problem/22997089 - should be CurrModule
@@ -196,23 +134,23 @@ func testInfix2(x: inout S2) {
 // NEGATIVE_S2_INFIX_LVALUE-NOT: ~>
 
 func testInfix3(x: inout S2) {
-  x#^INFIX_3^#
+  x#^INFIX_3?check=S2_INFIX_LVALUE^#
 }
 
 func testInfix4() {
-  S2()#^INFIX_4^#
+  S2()#^INFIX_4?check=S2_INFIX^#
 }
 
 func testInfix5() {
-  (S2() + S2())#^INFIX_5^#
+  (S2() + S2())#^INFIX_5?check=S2_INFIX^#
 }
 
 func testInfix6<T: P where T.T == S2>(x: T) {
-  x.foo()#^INFIX_6^#
+  x.foo()#^INFIX_6?check=S2_INFIX^#
 }
 
 func testInfix7(x: S2?) {
-  x#^INFIX_7^#
+  x#^INFIX_7?check=S2_INFIX_OPTIONAL;check=NEGATIVE_S2_INFIX_OPTIONAL^#
 }
 // S2_INFIX_OPTIONAL: Begin completions
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  != {#{{.*}}#}[#Bool#]
@@ -227,7 +165,7 @@ func ==(x: S3, y: S3) -> Bool { return true }
 func !=(x: S3, y: S3) -> Bool { return false}
 
 func testInfix8(x: S3?) {
-  x#^INFIX_8^#
+  x#^INFIX_8?check=S3_INFIX_OPTIONAL^#
 }
 // The equality operators come from equatable.
 // S3_INFIX_OPTIONAL: Begin completions
@@ -241,12 +179,12 @@ infix operator **** {
 func ****<T: Fooable>(x: T, y: T) -> T { return x }
 
 func testInfix9<T: P where T.T: Fooable>(x: T) {
-  x.foo()#^INFIX_9^#
+  x.foo()#^INFIX_9?check=FOOABLE_INFIX^#
 }
 // FOOABLE_INFIX: Decl[InfixOperatorFunction]/CurrModule:   **** {#T.T#}[#T.T#]
 
 func testInfix10<T: P where T.T: Fooable>(x: T) {
-  (x.foo() **** x.foo())#^INFIX_10^#
+  (x.foo() **** x.foo())#^INFIX_10?check=FOOABLE_INFIX^#
 }
 
 func testInfix11() {
@@ -270,12 +208,12 @@ func testInfix12() {
 // INFIX_12: End completions
 
 func testInfix13() {
-  P.foo#^INFIX_13^#
+  P.foo#^INFIX_13?check=NO_OPERATORS^#
 }
 // NO_OPERATORS-NOT: Decl[InfixOperatorFunction]
 
 func testInfix14() {
-  P.T#^INFIX_14^#
+  P.T#^INFIX_14?check=NO_OPERATORS^#
 }
 func testInfix15<T: P where T.T == S2>() {
   T#^INFIX_15^#
@@ -297,7 +235,7 @@ func testInfix16<T: P where T.T == S2>() {
 // INFIX_16: End completions
 
 func testInfix17(x: Void) {
-  x#^INFIX_17^#
+  x#^INFIX_17?check=VOID_OPERATORS^#
 }
 
 // VOID_OPERATORS: Begin completions
@@ -310,11 +248,11 @@ func testInfix17(x: Void) {
 // VOID_OPERATORS: End completions
 
 func testInfix18(x: (S2, S2) {
-  x#^INFIX_18^#
+  x#^INFIX_18?check=NO_OPERATORS^#
 }
 class EmptyClass {}
 func testInfix19(x: EmptyClass) {
-  x#^INFIX_19^#
+  x#^INFIX_19?check=EMPTYCLASS_INFIX^#
 }
 
 // EMPTYCLASS_INFIX: Begin completions
@@ -327,10 +265,10 @@ enum E {
   case B(S2)
 }
 func testInfix20(x: E) {
-  x#^INFIX_20^#
+  x#^INFIX_20?check=NO_OPERATORS^#
 }
 func testInfix21() {
-  E.A#^INFIX_21^#
+  E.A#^INFIX_21?check=NO_OPERATORS^#
 }
 func testInfix22() {
   E.B#^INFIX_22^#
@@ -348,7 +286,7 @@ func testSpace(x: S2) {
 // S2_INFIX_SPACE: End completions
 
 func testExtInfix1(x: inout S2) {
-  x + S2() + x + S2() + x + S2() + x#^EXT_INFIX_1^#
+  x + S2() + x + S2() + x + S2() + x#^EXT_INFIX_1?check=S2_INFIX^#
 }
 
 struct S4 {}
@@ -369,7 +307,7 @@ precedencegroup ReallyHighPrecedence {
 func &&&(x: Bool, y: Bool) -> S4 { return x }
 
 func testExtInfix2(x: S4) {
-  x + x == x + x#^EXT_INFIX_2^#
+  x + x == x + x#^EXT_INFIX_2?check=S4_EXT_INFIX;check=S4_EXT_INFIX_NEG^#
 }
 // S4_EXT_INFIX: Begin completions
 // S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  + {#S4#}[#S4#]
@@ -383,7 +321,7 @@ func testExtInfix2(x: S4) {
 // S4_EXT_INFIX_NEG-NOT: &&&
 
 func testExtInfix3(x: S4) {
-   x + x#^EXT_INFIX_3^#
+   x + x#^EXT_INFIX_3?check=S4_EXT_INFIX_SIMPLE^#
 }
 // S4_EXT_INFIX_SIMPLE: Begin completions
 // S4_EXT_INFIX_SIMPLE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  + {#S4#}[#S4#]
@@ -391,7 +329,7 @@ func testExtInfix3(x: S4) {
 // S4_EXT_INFIX_SIMPLE: End completions
 
 func testExtInfix4(x: S4) {
-   1 + 1.0 + x#^EXT_INFIX_4^#
+   1 + 1.0 + x#^EXT_INFIX_4?check=S4_EXT_INFIX_SIMPLE^#
 }
 
 func testAssignTuple1() {
@@ -399,7 +337,7 @@ func testAssignTuple1() {
 }
 func testAssignTuple3() {
   func void() {}
-  void()#^ASSIGN_TUPLE_3^#
+  void()#^ASSIGN_TUPLE_3?check=ASSIGN_TUPLE_1^#
 }
 // FIXME: technically this is sometimes legal, but we would need to
 // differentiate between cases like () = and print() =. Since it's not very
@@ -424,9 +362,9 @@ func ||||(x: Boolish, y: @autoclosure ()->Boolish) -> Boolish { return x }
 
 func testAutoclosure(x: Boolish, y: Boolish) {
   if x #^INFIX_AUTOCLOSURE_1^# {}
-  if x &&&& y #^INFIX_AUTOCLOSURE_2^# {}
-  if x |||| y #^INFIX_AUTOCLOSURE_3^# {}
-  if x &&&& x |||| y #^INFIX_AUTOCLOSURE_4^# {}
+  if x &&&& y #^INFIX_AUTOCLOSURE_2?check=INFIX_AUTOCLOSURE_1^# {}
+  if x |||| y #^INFIX_AUTOCLOSURE_3?check=INFIX_AUTOCLOSURE_1^# {}
+  if x &&&& x |||| y #^INFIX_AUTOCLOSURE_4?check=INFIX_AUTOCLOSURE_1^# {}
 }
 
 // INFIX_AUTOCLOSURE_1: Begin completions
@@ -434,3 +372,4 @@ func testAutoclosure(x: Boolish, y: Boolish) {
 // INFIX_AUTOCLOSURE_1-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']==== {#Boolish#}[#Boolish#];
 // INFIX_AUTOCLOSURE_1-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']|||| {#Boolish#}[#Boolish#];
 // INFIX_AUTOCLOSURE_1: End completions
+

@@ -135,6 +135,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
+  result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
 
   // We should print __consuming, __owned, etc for the module interface file.
@@ -236,6 +237,12 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
               return false;
           }
         }
+      }
+
+      // Skip stub constructors.
+      if (auto *ctor = dyn_cast<ConstructorDecl>(D)) {
+        if (ctor->hasStubImplementation())
+          return false;
       }
 
       return ShouldPrintChecker::shouldPrint(D, options);
@@ -528,6 +535,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
   unsigned IndentLevel = 0;
   Decl *Current = nullptr;
   Type CurrentType;
+
+  void setCurrentType(Type NewCurrentType) {
+    CurrentType = NewCurrentType;
+    assert(CurrentType.isNull() ||
+           !CurrentType->hasArchetype() &&
+               "CurrentType should be an interface type");
+  }
 
   friend DeclVisitor<PrintAST>;
 
@@ -907,8 +921,13 @@ private:
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
       : Printer(Printer), Options(Options) {
-    if (Options.TransformContext)
-      CurrentType = Options.TransformContext->getBaseType();
+    if (Options.TransformContext) {
+      Type CurrentType = Options.TransformContext->getBaseType();
+      if (CurrentType && CurrentType->hasArchetype()) {
+        CurrentType = CurrentType->mapTypeOutOfContext();
+      }
+      setCurrentType(CurrentType);
+    }
   }
 
   using ASTVisitor::visit;
@@ -935,11 +954,11 @@ public:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         auto Subs = CurrentType->getContextSubstitutionMap(
           Options.CurrentModule, NTD->getDeclContext());
-        CurrentType = NTD->getDeclaredInterfaceType().subst(Subs);
+        setCurrentType(NTD->getDeclaredInterfaceType().subst(Subs));
       }
     }
 
-    SWIFT_DEFER { CurrentType = OldType; };
+    SWIFT_DEFER { setCurrentType(OldType); };
 
     if (Synthesize) {
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
@@ -1010,6 +1029,24 @@ static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
   } else {
     return StaticSpellingKind::None;
   }
+}
+
+static bool hasAsyncGetter(const AbstractStorageDecl *ASD) {
+  if (auto getter = ASD->getAccessor(AccessorKind::Get)) {
+    assert(!getter->getAttrs().hasAttribute<ReasyncAttr>());
+    return getter->hasAsync();
+  }
+
+  return false;
+}
+
+static bool hasThrowsGetter(const AbstractStorageDecl *ASD) {
+  if (auto getter = ASD->getAccessor(AccessorKind::Get)) {
+    assert(!getter->getAttrs().hasAttribute<RethrowsAttr>());
+    return getter->hasThrows();
+  }
+
+  return false;
 }
 
 static bool hasMutatingGetter(const AbstractStorageDecl *ASD) {
@@ -1919,6 +1956,15 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     return;
   }
 
+  // prints with a space prefixed
+  auto printWithSpace = [&](StringRef word) {
+    Printer << " ";
+    Printer.printKeyword(word, Options);
+  };
+
+  const bool asyncGet = hasAsyncGetter(ASD);
+  const bool throwsGet = hasThrowsGetter(ASD);
+
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
@@ -1929,27 +1975,27 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     bool nonmutatingSetter = hasNonMutatingSetter(ASD);
 
     // We're about to print something like this:
-    //   { mutating? get (nonmutating? set)? }
+    //   { mutating? get async? throws? (nonmutating? set)? }
     // But don't print "{ get set }" if we don't have to.
     if (!inProtocol && !Options.PrintGetSetOnRWProperties &&
-        settable && !mutatingGetter && !nonmutatingSetter) {
+        settable && !mutatingGetter && !nonmutatingSetter
+        && !asyncGet && !throwsGet) {
       return;
     }
 
     Printer << " {";
-    if (mutatingGetter) {
-      Printer << " ";
-      Printer.printKeyword("mutating", Options);
-    }
-    Printer << " ";
-    Printer.printKeyword("get", Options);
+    if (mutatingGetter) printWithSpace("mutating");
+
+    printWithSpace("get");
+
+    if (asyncGet) printWithSpace("async");
+
+    if (throwsGet) printWithSpace("throws");
+
     if (settable) {
-      if (nonmutatingSetter) {
-        Printer << " ";
-        Printer.printKeyword("nonmutating", Options);
-      }
-      Printer << " ";
-      Printer.printKeyword("set", Options);
+      if (nonmutatingSetter) printWithSpace("nonmutating");
+
+      printWithSpace("set");
     }
     Printer << " }";
     return;
@@ -1977,7 +2023,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       !Options.PrintGetSetOnRWProperties &&
       !Options.FunctionDefinitions &&
       !ASD->isGetterMutating() &&
-      !ASD->getAccessor(AccessorKind::Set)->isExplicitNonMutating()) {
+      !ASD->getAccessor(AccessorKind::Set)->isExplicitNonMutating() &&
+      !asyncGet && !throwsGet) {
     return;
   }
 
@@ -1993,7 +2040,15 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (!PrintAccessorBody) {
       Printer << " ";
       printMutabilityModifiersIfNeeded(Accessor);
+
       Printer.printKeyword(getAccessorLabel(Accessor->getAccessorKind()), Options);
+
+      // handle any effects specifiers
+      if (Accessor->getAccessorKind() == AccessorKind::Get) {
+        if (asyncGet) printWithSpace("async");
+        if (throwsGet) printWithSpace("throws");
+      }
+
     } else {
       {
         IndentRAII IndentMore(*this);
@@ -2011,7 +2066,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool isOnlyGetter = impl.getReadImpl() == ReadImplKind::Get &&
                       ASD->getAccessor(AccessorKind::Get);
   bool isGetterMutating = ASD->supportsMutation() || ASD->isGetterMutating();
-  if (isOnlyGetter && !isGetterMutating && PrintAccessorBody &&
+  bool hasEffects = asyncGet || throwsGet;
+  if (isOnlyGetter && !isGetterMutating && !hasEffects && PrintAccessorBody &&
       Options.FunctionBody && Options.CollapseSingleGetterProperty) {
     Options.FunctionBody(ASD->getAccessor(AccessorKind::Get), Printer);
     indent();
@@ -2440,16 +2496,59 @@ static bool usesFeatureAsyncAwait(Decl *decl) {
 }
 
 static bool usesFeatureMarkerProtocol(Decl *decl) {
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          for (ProtocolType *protoTy : layout.getProtocols()) {
+            if (protoTy->getDecl()->isMarkerProtocol())
+              return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  // Check generic requirements for a marker protocol.
+  auto checkRequirements = [&](ArrayRef<Requirement> requirements) -> bool {
+    for (const auto &req: requirements) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl()
+              ->isMarkerProtocol())
+        return true;
+    }
+
+    return false;
+  };
+
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     if (proto->isMarkerProtocol())
+      return true;
+
+    // Swift.Error and Swift.CodingKey "don't" use the marker protocol.
+    if (proto->isSpecificProtocol(KnownProtocolKind::Error) ||
+        proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
+      return false;
+    }
+
+    if (checkInherited(proto->getInherited()))
+      return true;
+
+    if (checkRequirements(proto->getRequirementSignature()))
       return true;
   }
 
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto proto = ext->getSelfProtocolDecl())
-      if (proto->isMarkerProtocol())
-        return true;
-  }       
+    if (checkRequirements(ext->getGenericRequirements()))
+      return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
+  }
 
   return false;
 }
@@ -2487,24 +2586,28 @@ static bool usesFeatureActors(Decl *decl) {
 }
 
 static bool usesFeatureConcurrentFunctions(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureSendable(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    if (func->isConcurrent())
+    if (func->isSendable())
       return true;
   }
 
-  // Check for concurrent functions in the types of declarations.
+  // Check for sendable functions in the types of declarations.
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
-      bool hasConcurrent = type.findIf([](Type type) {
+      bool hasSendable = type.findIf([](Type type) {
         if (auto fnType = type->getAs<AnyFunctionType>()) {
-          if (fnType->isConcurrent())
+          if (fnType->isSendable())
             return true;
         }
 
         return false;
       });
 
-      if (hasConcurrent)
+      if (hasSendable)
         return true;
     }
   }
@@ -2518,23 +2621,47 @@ static bool usesFeatureRethrowsProtocol(
   if (!checked.insert(decl).second)
     return false;
 
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          for (ProtocolType *protoTy : layout.getProtocols()) {
+            if (usesFeatureRethrowsProtocol(protoTy->getDecl(), checked))
+              return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (checkInherited(nominal->getInherited()))
+      return true;
+  }
+
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     if (proto->getAttrs().hasAttribute<AtRethrowsAttr>())
       return true;
   }
 
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto proto = ext->getSelfProtocolDecl())
-      if (usesFeatureRethrowsProtocol(proto, checked))
+    if (auto nominal = ext->getSelfNominalTypeDecl())
+      if (usesFeatureRethrowsProtocol(nominal, checked))
         return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
   }
 
   if (auto genericSig = decl->getInnermostDeclContext()
           ->getGenericSignatureOfContext()) {
     for (const auto &req : genericSig->getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance &&
-          usesFeatureRethrowsProtocol(
-            req.getSecondType()->getAs<ProtocolType>()->getDecl(), checked))
+          usesFeatureRethrowsProtocol(req.getProtocolDecl(), checked))
         return true;
     }
   }
@@ -2606,6 +2733,14 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinContinuation(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinTaskGroup(Decl *decl) {
+  return false;
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll
@@ -2630,15 +2765,30 @@ static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
   if (features.empty())
     return features;
 
-  auto enclosingDecl = decl->getDeclContext()->getAsDecl();
-  if (!enclosingDecl)
-    return features;
+  // Gather the features used by all enclosing declarations.
+  Decl *enclosingDecl = decl;
+  std::vector<Feature> enclosingFeatures;
+  while (true) {
+    // Find the next outermost enclosing declaration.
+    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+      enclosingDecl = accessor->getStorage();
+    else
+      enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();
+    if (!enclosingDecl)
+      break;
 
-  if (!isa<NominalTypeDecl>(enclosingDecl) &&
-      !isa<ExtensionDecl>(enclosingDecl))
-    return features;
-  
-  auto enclosingFeatures = getFeaturesUsed(enclosingDecl);
+    auto outerEnclosingFeatures = getFeaturesUsed(enclosingDecl);
+    if (outerEnclosingFeatures.empty())
+      continue;
+
+    auto currentEnclosingFeatures = std::move(enclosingFeatures);
+    enclosingFeatures.clear();
+    std::merge(outerEnclosingFeatures.begin(), outerEnclosingFeatures.end(),
+               currentEnclosingFeatures.begin(), currentEnclosingFeatures.end(),
+               std::back_inserter(enclosingFeatures));
+  }
+
+  // If there were no enclosing features, we're done.
   if (enclosingFeatures.empty())
     return features;
 
@@ -4216,6 +4366,10 @@ public:
   }
 
   void visit(Type T) {
+    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+      return; // not needed for the parser library.
+    #endif
+
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
 
@@ -4274,6 +4428,7 @@ public:
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinRawPointerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinRawUnsafeContinuationType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinJobType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinExecutorType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinDefaultActorStorageType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinNativeObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinBridgeObjectType)
@@ -4465,6 +4620,10 @@ public:
   }
 
   void printFunctionExtInfo(AnyFunctionType *fnType) {
+    if (!fnType->hasExtInfo()) {
+      Printer << "@_NO_EXTINFO ";
+      return;
+    }
     auto &ctx = fnType->getASTContext();
     auto info = fnType->getExtInfo();
     if (Options.SkipAttributes)
@@ -4489,9 +4648,15 @@ public:
       }
     }
 
-    if (!Options.excludeAttrKind(TAK_concurrent) &&
-        info.isConcurrent()) {
-      Printer << "@concurrent ";
+    if (Type globalActor = info.getGlobalActor()) {
+      Printer << "@";
+      visit(globalActor);
+      Printer << " ";
+    }
+
+    if (!Options.excludeAttrKind(TAK_Sendable) &&
+        info.isSendable()) {
+      Printer << "@Sendable ";
     }
 
     SmallString<64> buf;
@@ -4631,8 +4796,8 @@ public:
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
     }
-    if (info.isConcurrent()) {
-      Printer.printSimpleAttr("@concurrent") << " ";
+    if (info.isSendable()) {
+      Printer.printSimpleAttr("@Sendable") << " ";
     }
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
@@ -4653,9 +4818,22 @@ public:
         Printer.printStructurePost(PrintStructureKind::FunctionParameter);
       };
 
-      if (printLabels && Param.hasLabel()) {
+      if ((Options.AlwaysTryPrintParameterLabels || printLabels) &&
+          Param.hasLabel()) {
+        // Label printing was requested and we have an external label. Print it
+        // and omit the internal label.
         Printer.printName(Param.getLabel(),
                           PrintNameContext::FunctionParameterExternal);
+        Printer << ": ";
+      } else if (Options.AlwaysTryPrintParameterLabels &&
+                 Param.hasInternalLabel()) {
+        // We didn't have an external parameter label but were requested to
+        // always try and print parameter labels. Print The internal label.
+        // If we have neither an external nor an internal label, only print the
+        // type.
+        Printer << "_ ";
+        Printer.printName(Param.getInternalLabel(),
+                          PrintNameContext::FunctionParameterLocal);
         Printer << ": ";
       }
 
@@ -4684,13 +4862,15 @@ public:
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
-    if (T->isAsync()) {
-      Printer << " ";
-      Printer.printKeyword("async", Options);
-    }
+    if (T->hasExtInfo()) {
+      if (T->isAsync()) {
+        Printer << " ";
+        Printer.printKeyword("async", Options);
+      }
 
-    if (T->isThrowing())
-      Printer << " " << tok::kw_throws;
+      if (T->isThrowing())
+        Printer << " " << tok::kw_throws;
+    }
 
     Printer << " -> ";
 
@@ -4729,13 +4909,15 @@ public:
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
 
-    if (T->isAsync()) {
-      Printer << " ";
-      Printer.printKeyword("async", Options);
-    }
+   if (T->hasExtInfo()) {
+     if (T->isAsync()) {
+       Printer << " ";
+       Printer.printKeyword("async", Options);
+     }
 
-    if (T->isThrowing())
-      Printer << " " << tok::kw_throws;
+     if (T->isThrowing())
+       Printer << " " << tok::kw_throws;
+   }
 
     Printer << " -> ";
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
@@ -5048,7 +5230,11 @@ public:
                           ->castTo<GenericTypeParamType>()
                           ->getIndex();
       
-      Printer << u8") \U0001F9B8";
+      // The identifier after the closing parenthesis is irrelevant and can be
+      // anything. It just needs to be there for the @_opaqueReturnTypeOf
+      // attribute to apply to, but the attribute alone references the opaque
+      // type.
+      Printer << ") __";
       printGenericArgs(T->getSubstitutions().getReplacementTypes());
       return;
     }

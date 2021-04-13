@@ -343,7 +343,8 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, StringRef labels) {
 
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
-    Type output, FunctionTypeFlags flags) {
+    Type output, FunctionTypeFlags flags,
+    FunctionMetadataDifferentiabilityKind diffKind) {
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -383,11 +384,11 @@ Type ASTBuilder::createFunctionType(
     break;
   }
 
-  DifferentiabilityKind diffKind;
-  switch (flags.getDifferentiabilityKind()) {
+  DifferentiabilityKind resultDiffKind;
+  switch (diffKind.Value) {
   #define SIMPLE_CASE(CASE) \
       case FunctionMetadataDifferentiabilityKind::CASE: \
-        diffKind = DifferentiabilityKind::CASE; break;
+        resultDiffKind = DifferentiabilityKind::CASE; break;
   SIMPLE_CASE(NonDifferentiable)
   SIMPLE_CASE(Forward)
   SIMPLE_CASE(Reverse)
@@ -406,9 +407,13 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
+  Type globalActor;
+  // FIXME: Demangle global actors.
+
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
-                                   diffKind, clangFunctionType)
+                                   resultDiffKind, clangFunctionType,
+                                   globalActor)
           .withAsync(flags.isAsync())
           .build();
 
@@ -565,7 +570,7 @@ Type ASTBuilder::createImplFunctionType(
   }
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
-                   flags.isConcurrent(), flags.isAsync(), diffKind, clangFnType)
+                   flags.isSendable(), flags.isAsync(), diffKind, clangFnType)
                    .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,

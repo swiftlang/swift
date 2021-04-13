@@ -17,49 +17,6 @@ using namespace swift::syntax;
 
 std::atomic<SyntaxIdentifier::RootIdType> SyntaxIdentifier::NextUnusedRootId(0);
 
-SyntaxIndexInTree
-SyntaxIndexInTree::advancedBy(const RC<RawSyntax> &Raw) const {
-  auto NewIndexInTree = IndexInTree;
-  if (Raw) {
-    NewIndexInTree += Raw->getTotalNodes();
-  }
-  return SyntaxIndexInTree(NewIndexInTree);
-}
-
-SyntaxIndexInTree
-SyntaxIndexInTree::reversedBy(const RC<RawSyntax> &Raw) const {
-  auto NewIndexInTree = IndexInTree;
-  if (Raw) {
-    NewIndexInTree -= Raw->getTotalNodes();
-  }
-  return SyntaxIndexInTree(NewIndexInTree);
-}
-
-SyntaxIndexInTree SyntaxIndexInTree::advancedToFirstChild() const {
-  auto NewIndexInTree = IndexInTree + 1;
-  return SyntaxIndexInTree(NewIndexInTree);
-}
-
-AbsoluteSyntaxPosition
-AbsoluteSyntaxPosition::advancedBy(const RC<RawSyntax> &Raw) const {
-  OffsetType NewOffset = Offset;
-  if (Raw) {
-    NewOffset += Raw->getTextLength();
-  }
-  IndexInParentType NewIndexInParent = IndexInParent + 1;
-  return AbsoluteSyntaxPosition(NewOffset, NewIndexInParent);
-}
-
-AbsoluteSyntaxPosition
-AbsoluteSyntaxPosition::reversedBy(const RC<RawSyntax> &Raw) const {
-  OffsetType NewOffset = Offset;
-  if (Raw) {
-    NewOffset -= Raw->getTextLength();
-  }
-  IndexInParentType NewIndexInParent = IndexInParent - 1;
-  return AbsoluteSyntaxPosition(NewOffset, NewIndexInParent);
-}
-
 raw_ostream &llvm::operator<<(raw_ostream &OS,
                               swift::syntax::AbsoluteOffsetPosition Pos) {
   OS << "Offset " << Pos.getOffset();

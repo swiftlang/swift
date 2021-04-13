@@ -334,7 +334,6 @@ public:
   ASTContext &SwiftContext;
 
   const bool ImportForwardDeclarations;
-  const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
@@ -405,9 +404,6 @@ private:
 
   /// Clang arguments used to create the Clang invocation.
   std::vector<std::string> ClangArgs;
-
-  /// The main actor type, populated the first time we look for it.
-  Optional<Type> MainActorType;
 
   /// Mapping from Clang swift_attr attribute text to the Swift source buffer
   /// IDs that contain that attribute text. These are re-used when parsing the
@@ -489,6 +485,15 @@ public:
   /// Keep track of subscript declarations based on getter/setter
   /// pairs.
   llvm::DenseMap<std::pair<FuncDecl *, FuncDecl *>, SubscriptDecl *> Subscripts;
+
+  /// Keep track of getter/setter pairs for functions imported from C++
+  /// subscript operators based on the type in which they are declared and
+  /// the type of their parameter.
+  ///
+  /// `.first` corresponds to a getter
+  /// `.second` corresponds to a setter
+  llvm::MapVector<std::pair<NominalTypeDecl *, Type>,
+                  std::pair<FuncDecl *, FuncDecl *>> cxxSubscripts;
 
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
@@ -678,6 +683,19 @@ public:
     decl->setImplicitlyUnwrappedOptional(true);
   }
 
+  void recordUnsafeConcurrencyForDecl(
+      ValueDecl *decl, bool isUnsafeSendable, bool isUnsafeMainActor) {
+    if (isUnsafeSendable) {
+      decl->getAttrs().add(
+          new (SwiftContext) UnsafeSendableAttr(/*implicit=*/true));
+    }
+
+    if (isUnsafeMainActor) {
+      decl->getAttrs().add(
+          new (SwiftContext) UnsafeMainActorAttr(/*implicit=*/true));
+    }
+  }
+
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
@@ -747,6 +765,30 @@ public:
                       bool fullyQualified,
                       llvm::raw_ostream &os);
 
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(std::forward<Args>(args)...);
+  }
+
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(SourceLoc loc, Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(loc, std::forward<Args>(args)...);
+  }
+
   /// Import the given Clang identifier into Swift.
   ///
   /// \param identifier The Clang identifier to map into Swift.
@@ -786,9 +828,6 @@ public:
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
 
-  /// Look for the MainActor type in the _Concurrency library.
-  Type getMainActorType();
-
   /// Retrieve the Swift source buffer ID that corresponds to the given
   /// swift_attr attribute text, creating one if necessary.
   unsigned getClangSwiftAttrSourceBuffer(StringRef attributeText);
@@ -806,6 +845,9 @@ public:
   /// being imported into, which may affect info from API notes.
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
+
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type,
+                            bool &isUnsafeSendable, bool &isUnsafeMainActor);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1157,6 +1199,13 @@ public:
   ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                   bool isFromSystemModule);
 
+  /// Determines what the type of an effectful, computed read-only property
+  /// would be, if the given method were imported as such a property.
+  ImportedType importEffectfulPropertyType(const clang::ObjCMethodDecl *decl,
+                                            DeclContext *dc,
+                                            importer::ImportedName name,
+                                            bool isFromSystemModule);
+
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
@@ -1462,12 +1511,20 @@ public:
 
 namespace importer {
 
+/// Whether this is a forward declaration of a type. We ignore forward
+/// declarations in certain cases, and instead process the real declarations.
+bool isForwardDeclOfType(const clang::Decl *decl);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// \returns true if this operator should be made a static function
+/// even if imported as a non-static member function.
+bool isImportedAsStatic(clang::OverloadedOperatorKind op);
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
@@ -1509,16 +1566,14 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ASTContext &swiftCtx;
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
-  const bool inferImportAsMember;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail, bool inferIAM)
+                           const PlatformAvailability &avail)
       : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        inferImportAsMember(inferIAM) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;
@@ -1532,6 +1587,14 @@ public:
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
 };
+
+/// Determines whether the given swift_attr attribute describes the main
+/// actor.
+///
+/// \returns None if this is not a main-actor attribute, and a Boolean
+/// indicating whether (unsafe) was provided in the attribute otherwise.
+Optional<bool> isMainActorAttr(
+    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr);
 
 }
 }

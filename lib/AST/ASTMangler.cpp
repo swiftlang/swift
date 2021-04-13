@@ -166,6 +166,14 @@ std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
   return finalize();
 }
 
+std::string ASTMangler::mangleInitFromProjectedValueEntity(const VarDecl *var,
+                                                           SymbolKind SKind) {
+  beginMangling();
+  appendInitFromProjectedValueEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   beginMangling();
   appendAnyGenericType(decl);
@@ -1039,6 +1047,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       return appendOperator("BI");
     case TypeKind::BuiltinJob:
       return appendOperator("Bj");
+    case TypeKind::BuiltinExecutor:
+      return appendOperator("Be");
     case TypeKind::BuiltinDefaultActorStorage:
       return appendOperator("BD");
     case TypeKind::BuiltinRawPointer:
@@ -1584,8 +1594,7 @@ static bool containsRetroactiveConformance(
   for (auto requirement : rootConformance->getConditionalRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
-    ProtocolDecl *proto =
-        requirement.getSecondType()->castTo<ProtocolType>()->getDecl();
+    ProtocolDecl *proto = requirement.getProtocolDecl();
     auto conformance = subMap.lookupConformance(
         requirement.getFirstType()->getCanonicalType(), proto);
     if (conformance.isInvalid()) {
@@ -1783,7 +1792,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
 
   // Concurrent functions.
-  if (fn->isConcurrent()) {
+  if (fn->isSendable()) {
     OpArgs.push_back('h');
   }
 
@@ -2108,6 +2117,19 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       }
       return;
     }
+
+    case InitializerKind::PropertyWrapper: {
+      auto wrapperInit = cast<PropertyWrapperInitializer>(ctx);
+      switch (wrapperInit->getKind()) {
+      case PropertyWrapperInitializer::Kind::WrappedValue:
+        appendBackingInitializerEntity(wrapperInit->getParam());
+        break;
+      case PropertyWrapperInitializer::Kind::ProjectedValue:
+        appendInitFromProjectedValueEntity(wrapperInit->getParam());
+        break;
+      }
+      return;
+    }
     }
     llvm_unreachable("bad initializer kind");
 
@@ -2123,13 +2145,15 @@ void ASTMangler::appendModule(const ModuleDecl *module,
                               StringRef useModuleName) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
+  StringRef ModName =
+      DWARFMangling ? module->getName().str() : module->getABIName().str();
+
   // Try the special 'swift' substitution.
-  if (module->isStdlibModule()) {
+  if (ModName == STDLIB_NAME) {
     assert(useModuleName.empty());
     return appendOperator("s");
   }
 
-  StringRef ModName = module->getName().str();
   if (ModName == MANGLING_MODULE_OBJC) {
     assert(useModuleName.empty());
     return appendOperator("So");
@@ -2382,18 +2406,6 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Reverse) {
-      if (fn->isNoEscape())
-        return appendOperator("XF");
-      else
-        return appendOperator("XG");
-    }
-    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
-      if (fn->isNoEscape())
-        return appendOperator("XH");
-      else
-        return appendOperator("XI");
-    }
     if (isAutoClosure) {
       if (fn->isNoEscape())
         return appendOperator("XK");
@@ -2436,11 +2448,27 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
-    appendOperator("Y");
-  if (fn->isConcurrent())
-    appendOperator("J");
+    appendOperator("Ya");
+  if (fn->isSendable())
+    appendOperator("Yb");
   if (fn->isThrowing())
     appendOperator("K");
+  switch (auto diffKind = fn->getDifferentiabilityKind()) {
+  case DifferentiabilityKind::NonDifferentiable:
+    break;
+  case DifferentiabilityKind::Forward:
+    appendOperator("Yjf");
+    break;
+  case DifferentiabilityKind::Reverse:
+    appendOperator("Yjr");
+    break;
+  case DifferentiabilityKind::Normal:
+    appendOperator("Yjd");
+    break;
+  case DifferentiabilityKind::Linear:
+    appendOperator("Yjl");
+    break;
+  }
 }
 
 void ASTMangler::appendFunctionInputType(
@@ -2513,6 +2541,9 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
   else
     appendType(elementType, forDecl);
 
+  if (flags.isNoDerivative()) {
+    appendOperator("Yk");
+  }
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
     /* nothing */
@@ -2598,8 +2629,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
   case RequirementKind::Layout: {
   } break;
   case RequirementKind::Conformance: {
-    Type SecondTy = reqt.getSecondType();
-    appendProtocolName(SecondTy->castTo<ProtocolType>()->getDecl());
+    appendProtocolName(reqt.getProtocolDecl());
   } break;
   case RequirementKind::Superclass:
   case RequirementKind::SameType: {
@@ -2806,6 +2836,11 @@ void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
   appendOperator("fP");
 }
 
+void ASTMangler::appendInitFromProjectedValueEntity(const VarDecl *var) {
+  appendEntity(var, "vp", var->isStatic());
+  appendOperator("fW");
+}
+
 /// Is this declaration a method for mangling purposes? If so, we'll leave the
 /// Self type out of its mangling.
 static bool isMethodDecl(const Decl *decl) {
@@ -2822,16 +2857,30 @@ CanType ASTMangler::getDeclTypeForMangling(
 
   auto &C = decl->getASTContext();
   if (decl->isInvalid()) {
-    if (isa<AbstractFunctionDecl>(decl))
+    if (isa<AbstractFunctionDecl>(decl)) {
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType);
+                                  C.TheErrorType, info);
+    }
     return C.TheErrorType;
   }
 
+  Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
 
-  auto canTy = decl->getInterfaceType()
-                   ->getReferenceStorageReferent()
-                   ->getCanonicalType();
+  // Strip the global actor out of the mangling.
+  ty = ty.transform([](Type type) {
+    if (auto fnType = type->getAs<AnyFunctionType>()) {
+      if (fnType->getGlobalActor()) {
+        return Type(fnType->withExtInfo(
+            fnType->getExtInfo().withGlobalActor(Type())));
+      }
+    }
+
+    return type;
+  });
+
+  auto canTy = ty->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
@@ -3047,7 +3096,7 @@ static unsigned conformanceRequirementIndex(
       continue;
 
     if (req.getFirstType()->isEqual(entry.first) &&
-        req.getSecondType()->castTo<ProtocolType>()->getDecl() == entry.second)
+        req.getProtocolDecl() == entry.second)
       return result;
 
     ++result;
@@ -3175,8 +3224,7 @@ void ASTMangler::appendConcreteProtocolConformance(
       if (type->hasArchetype())
         type = type->mapTypeOutOfContext();
       CanType canType = type->getCanonicalType(CurGenericSignature);
-      auto proto =
-        conditionalReq.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto proto = conditionalReq.getProtocolDecl();
       
       ProtocolConformanceRef conformance;
       

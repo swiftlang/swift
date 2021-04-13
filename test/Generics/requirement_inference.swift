@@ -114,8 +114,8 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) {
 }
 
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
-// expected-warning@-1{{redundant conformance constraint 'T.P3Assoc': 'P2'}}
-// expected-note@-2{{conformance constraint 'T.P3Assoc': 'P2' implied here}}
+// expected-warning@-1{{redundant conformance constraint 'U.P4Assoc' : 'P2'}}
+// expected-note@-2{{conformance constraint 'U.P4Assoc' : 'P2' implied here}}
 
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {
 }
@@ -134,8 +134,8 @@ protocol P7 : P6 {
 
 // CHECK-LABEL: P7@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
-extension P7 where AssocP6.Element : P6, // expected-note{{conformance constraint 'Self.AssocP6.Element': 'P6' written here}}
-        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element': 'P6'}}
+extension P7 where AssocP6.Element : P6, // expected-note{{conformance constraint 'Self.AssocP7.AssocP6.Element' : 'P6' implied here}}
+        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP7.AssocP6.Element' : 'P6'}}
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
 }
@@ -163,7 +163,7 @@ func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == I
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.B == X3, τ_0_0.C == X3>
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
 // expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
-// expected-note@-2{{same-type constraint 'T.C' == 'X3' written here}}
+// expected-note@-2{{superclass constraint 'T.B' : 'X3' implied here}}
 
 // Note: a standard-library-based stress test to make sure we don't inject
 // any additional requirements.
@@ -270,7 +270,7 @@ struct X18: P18, P17 {
 }
 
 // CHECK-LABEL: .X19.foo@
-// CHECK: Generic signature: <T, U where T == X18>
+// CHECK: Generic signature: <T, U where T == X18.A>
 struct X19<T: P18> where T == T.A {
   func foo<U>(_: U) where T == X18 { }
 }
@@ -327,8 +327,8 @@ struct X24<T: P20> : P24 {
 // CHECK-NEXT: Requirement signature: <Self where Self.A == X24<Self.B>, Self.B : P20>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X24<τ_0_0.B>, τ_0_0.B : P20>
 protocol P25a {
-  associatedtype A: P24 // expected-warning{{redundant conformance constraint 'Self.A': 'P24'}}
-  associatedtype B: P20 where A == X24<B> // expected-note{{conformance constraint 'Self.A': 'P24' implied here}}
+  associatedtype A: P24 // expected-warning{{redundant conformance constraint 'Self.A' : 'P24'}}
+  associatedtype B: P20 where A == X24<B> // expected-note{{conformance constraint 'Self.A' : 'P24' implied here}}
 }
 
 // CHECK-LABEL: .P25b@
@@ -362,8 +362,8 @@ struct X26<T: X3> : P26 {
 // CHECK-NEXT: Requirement signature: <Self where Self.A == X26<Self.B>, Self.B : X3>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X26<τ_0_0.B>, τ_0_0.B : X3>
 protocol P27a {
-  associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A': 'P26'}}
-  associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A': 'P26' implied here}}
+  associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A' : 'P26'}}
+  associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A' : 'P26' implied here}}
 }
 
 // CHECK-LABEL: .P27b@

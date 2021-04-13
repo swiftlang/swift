@@ -1,29 +1,28 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
+// REQUIRES: libdispatch
+
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_isEmpty() async {
-  _ = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  print("before all")
+  let result = await withTaskGroup(of: Int.self, returning: Int.self) { group in
     // CHECK: before add: isEmpty=true
     print("before add: isEmpty=\(group.isEmpty)")
 
-    await group.add {
-      sleep(2)
+    group.spawn {
+      await Task.sleep(2_000_000_000)
       return await asyncEcho(1)
     }
 
@@ -37,10 +36,14 @@ func test_taskGroup_isEmpty() async {
 
     // CHECK: after draining tasks: isEmpty=true
     print("after draining tasks: isEmpty=\(group.isEmpty)")
-    return 0
+    return 42
   }
+
+  // CHECK: result: 42
+  print("result: \(result)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_isEmpty()

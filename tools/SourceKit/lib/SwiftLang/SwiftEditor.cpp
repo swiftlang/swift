@@ -2016,7 +2016,8 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
           "same time is not supported. Use the syntax tree to compute the "
           "document structure.");
     }
-  } else {
+  } else if (Consumer.documentStructureEnabled() ||
+             Consumer.syntaxMapEnabled()) {
     ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
 
     SwiftEditorSyntaxWalker SyntaxWalker(
@@ -2348,9 +2349,7 @@ void SwiftLangSupport::editorOpen(
 
   if (Consumer.syntaxTreeEnabled()) {
     assert(EditorDoc->getSyntaxTree().hasValue());
-    std::unordered_set<unsigned> ReusedNodeIds;
-    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(), 
-                              ReusedNodeIds);
+    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue());
   }
 }
 
@@ -2379,14 +2378,10 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
 void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
                             unsigned EditOffset, unsigned EditLength,
                             StringRef PreEditText, StringRef ReplaceText) {
-  swift::json::Output::UserInfoMap JsonUserInfo;
-  JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
-      reinterpret_cast<void *>(true);
-
   // Dump the incremental syntax tree
   std::string IncrTreeString;
   llvm::raw_string_ostream IncrTreeStream(IncrTreeString);
-  swift::json::Output IncrTreeOutput(IncrTreeStream, JsonUserInfo);
+  swift::json::Output IncrTreeOutput(IncrTreeStream);
   IncrTreeOutput << *EditorDoc->getSyntaxTree()->getRaw();
 
   // Reparse the file from scratch
@@ -2401,7 +2396,7 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
   // Dump the from-scratch syntax tree
   std::string FromScratchTreeString;
   llvm::raw_string_ostream ScratchTreeStream(FromScratchTreeString);
-  swift::json::Output ScratchTreeOutput(ScratchTreeStream, JsonUserInfo);
+  swift::json::Output ScratchTreeOutput(ScratchTreeStream);
   auto SyntaxRoot = ScratchSyntaxInfo.getSourceFile().getSyntaxRoot();
   ScratchTreeOutput << *SyntaxRoot.getRaw();
 
@@ -2500,6 +2495,14 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
       SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
     }
 
+    // If client doesn't need any information, we doen't need to parse it.
+    if (!Consumer.documentStructureEnabled() &&
+        !Consumer.syntaxMapEnabled() &&
+        !Consumer.diagnosticsEnabled() &&
+        !Consumer.syntaxTreeEnabled()) {
+      return;
+    }
+
     SyntaxParsingCache *SyntaxCachePtr = nullptr;
     if (SyntaxCache.hasValue()) {
       SyntaxCachePtr = SyntaxCache.getPointer();
@@ -2530,14 +2533,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
 
     if (Consumer.syntaxTreeEnabled()) {
-      std::unordered_set<unsigned> ReusedNodeIds;
-      if (SyntaxCache.hasValue()) {
-        auto &ReusedVector = SyntaxCache->getReusedNodeIds();
-        ReusedNodeIds = std::unordered_set<unsigned>(ReusedVector.begin(),
-                                                     ReusedVector.end());
-      }
-      Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(),
-                                ReusedNodeIds);
+      Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue());
     }
 
     if (ValidateSyntaxTree) {

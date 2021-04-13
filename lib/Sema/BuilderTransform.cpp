@@ -1872,6 +1872,13 @@ public:
           E, DC, /*replaceInvalidRefsWithErrors=*/false);
       HasError |= transaction.hasErrors();
 
+      if (!HasError) {
+        E->forEachChildExpr([&](Expr *expr) {
+          HasError |= isa<ErrorExpr>(expr);
+          return HasError ? nullptr : expr;
+        });
+      }
+
       if (SuppressDiagnostics)
         transaction.abort();
 

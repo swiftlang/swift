@@ -102,6 +102,12 @@ public struct AnyDifferentiable: Differentiable {
   }
 }
 
+extension AnyDifferentiable: CustomReflectable {
+    public var customMirror: Mirror {
+        Mirror(reflecting: base)
+    }
+}
+
 //===----------------------------------------------------------------------===//
 // `AnyDerivative`
 //===----------------------------------------------------------------------===//
@@ -363,6 +369,12 @@ public struct AnyDerivative: Differentiable & AdditiveArithmetic {
     }
     _box._move(by: offset._box)
   }
+}
+
+extension AnyDerivative: CustomReflectable {
+    public var customMirror: Mirror {
+        Mirror(reflecting: base)
+    }
 }
 
 //===----------------------------------------------------------------------===//

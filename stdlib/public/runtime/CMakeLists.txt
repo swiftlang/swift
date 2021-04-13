@@ -26,20 +26,19 @@ set(swift_runtime_objc_sources
     ObjCRuntimeGetImageNameFromClass.mm)
 
 set(swift_runtime_sources
+    ../CompatibilityOverride/CompatibilityOverride.cpp
     AnyHashableSupport.cpp
     Array.cpp
     AutoDiffSupport.cpp
     BackDeployment.cpp
     Bincompat.cpp
     Casting.cpp
-    CompatibilityOverride.cpp
     CygwinPort.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
     EnvironmentVariables.cpp
     ErrorObjectCommon.cpp
-    ErrorObjectConstants.cpp
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp

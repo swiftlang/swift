@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 import Dispatch
 
 /// @returns true iff the expected answer is actually the case, i.e., correct.
@@ -56,7 +59,7 @@ actor A {
   return checkAnotherFn(count) + 1
 }
 
-@concurrent func someFunc() async -> Int {
+@Sendable func someFunc() async -> Int {
   // NOTE: the "return" counter is just to make sure we're properly returning values.
   // the expected number should be equal to the number of "plus-one" expressions.
   // since there are no loops or duplicate function calls
@@ -65,6 +68,8 @@ actor A {
 
 
 // CHECK: starting
+// CHECK-NOT: ERROR
+// CHECK: Hello from the main function
 // CHECK-NOT: ERROR
 // CHECK: hello from main actor!
 // CHECK-NOT: ERROR
@@ -77,6 +82,11 @@ actor A {
 @main struct RunIt {
   static func main() async {
     print("starting")
+    if checkIfMainQueue(expectedAnswer: true) {
+      print("Hello from the main function")
+    } else {
+      print("ERROR: not on the main queue")
+    }
     let result = await someFunc()
     print("finished with return counter = \(result)")
   }

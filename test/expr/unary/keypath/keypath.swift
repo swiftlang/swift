@@ -795,6 +795,7 @@ func test_keypath_with_method_refs() {
   }
 
   let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
+  // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
   let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static member 'bar()'}}
   let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
 
@@ -1051,4 +1052,62 @@ func testSyntaxErrors() {
   _ = \A[a];
   _ = \A.a?;
   _ = \A.a!;
+}
+
+// SR-13364 - keypath missing optional crashes compiler: "Inactive constraints left over?"
+func sr13364() {
+  let _: KeyPath<String?, Int?> = \.utf8.count // expected-error {{no exact matches in reference to property 'count'}}
+  // expected-note@-1 {{found candidate with type 'Int'}}
+}
+
+// rdar://74711236 - crash due to incorrect member access in key path
+func rdar74711236() {
+  struct S {
+    var arr: [V] = []
+  }
+
+  struct V : Equatable {
+  }
+
+  enum Type {
+  case store
+  }
+
+  struct Context {
+    func supported() -> [Type] {
+      return []
+    }
+  }
+
+  func test(context: Context?) {
+    var s = S()
+
+    s.arr = {
+      // FIXME: Missing member reference is pattern needs a better diagnostic
+      if let type = context?.store { // expected-error {{type of expression is ambiguous without more context}}
+        // `isSupported` should be an invalid declaration to trigger a crash in `map(\.option)`
+        let isSupported = context!.supported().contains(type) // expected-error {{missing argument label 'where:' in call}} expected-error {{converting non-escaping value to '(Type) throws -> Bool' may allow it to escape}}
+        return (isSupported ? [type] : []).map(\.option)
+        // expected-error@-1 {{value of type 'Any' has no member 'option'}}
+        // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+      }
+      return []
+    }()
+  }
+}
+
+extension String {
+  var filterOut : (Self) throws -> Bool {
+    { $0.contains("a") }
+  }
+}
+
+func test_kp_as_function_mismatch() {
+  let a : [String] = [ "asd", "bcd", "def" ]
+
+  let _ : (String) ->  Bool = \.filterOut // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+  _ = a.filter(\.filterOut) // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+  let _ : (String) ->  Bool = \String.filterOut // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+  _ = a.filter(\String.filterOut) // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+
 }

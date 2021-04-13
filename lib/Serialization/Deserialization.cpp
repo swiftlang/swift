@@ -1469,8 +1469,89 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   };
 
   if (values.empty()) {
+    // Couldn't resolve the reference. Try to explain the problem and leave it
+    // up to the caller to recover if possible.
+
+    // Look for types and value decls in other modules. This extra information
+    // is mostly for compiler engineers to understand a likely solution at a
+    // quick glance.
+    SmallVector<char> strScratch;
+    SmallVector<std::string, 2> notes;
+    auto declName = getXRefDeclNameForError();
+    if (recordID == XREF_TYPE_PATH_PIECE ||
+        recordID == XREF_VALUE_PATH_PIECE) {
+      auto &ctx = getContext();
+      for (auto nameAndModule : ctx.getLoadedModules()) {
+        auto baseModule = nameAndModule.second;
+
+        IdentifierID IID;
+        IdentifierID privateDiscriminator = 0;
+        TypeID TID = 0;
+        bool isType = (recordID == XREF_TYPE_PATH_PIECE);
+        bool inProtocolExt = false;
+        bool importedFromClang = false;
+        bool isStatic = false;
+        if (isType) {
+          XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
+                                              inProtocolExt, importedFromClang);
+        } else {
+          XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
+                                               importedFromClang, isStatic);
+        }
+
+        DeclBaseName name = getDeclBaseName(IID);
+        Type filterTy;
+        if (!isType) {
+          auto maybeType = getTypeChecked(TID);
+          // Any error here would have been handled previously.
+          if (maybeType) {
+            filterTy = maybeType.get();
+          }
+        }
+
+        values.clear();
+        if (privateDiscriminator) {
+          baseModule->lookupMember(values, baseModule, name,
+                                   getIdentifier(privateDiscriminator));
+        } else {
+          baseModule->lookupQualified(baseModule, DeclNameRef(name),
+                                      NL_QualifiedDefault,
+                                      values);
+        }
+
+        bool hadAMatchBeforeFiltering = !values.empty();
+        filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
+                     importedFromClang, isStatic, None, values);
+
+        strScratch.clear();
+        if (!values.empty()) {
+          // Found a full match in a different module. It should be a different
+          // one because otherwise it would have succeeded on the first search.
+          // This is usually caused by the use of poorly modularized headers.
+          auto line = "There is a matching '" +
+                      declName.getString(strScratch).str() +
+                      "' in module '" +
+                      std::string(nameAndModule.first.str()) +
+                      "'. If this is imported from clang, please make sure " +
+                      "the header is part of a single clang module.";
+          notes.emplace_back(line);
+        } else if (hadAMatchBeforeFiltering) {
+          // Found a match that was filtered out. This may be from the same
+          // expected module if there's a type difference. This can be caused
+          // by the use of different Swift language versions between a library
+          // with serialized SIL and a client.
+          auto line = "'" +
+                      declName.getString(strScratch).str() +
+                      "' in module '" +
+                      std::string(nameAndModule.first.str()) +
+                      "' was filtered out.";
+          notes.emplace_back(line);
+        }
+      }
+    }
+
     return llvm::make_error<XRefError>("top-level value not found", pathTrace,
-                                       getXRefDeclNameForError());
+                                       declName, notes);
   }
 
   // Filters for values discovered in the remaining path pieces.
@@ -2369,6 +2450,8 @@ class DeclDeserializer {
   ASTContext &ctx;
   Serialized<Decl *> &declOrOffset;
 
+  bool IsInvalid = false;
+
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
 
@@ -2421,6 +2504,22 @@ public:
     if (!decl)
       return;
 
+    if (IsInvalid) {
+      decl->setInvalidBit();
+
+      DeclName name;
+      if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+        name = VD->getName();
+      }
+
+      auto diagId = ctx.LangOpts.AllowModuleWithCompilerErrors
+                        ? diag::serialization_allowing_invalid_decl
+                        : diag::serialization_invalid_decl;
+      ctx.Diags.diagnose(SourceLoc(), diagId, name,
+                         decl->getDescriptiveKind(),
+                         MF.getAssociatedModule()->getNameStr());
+    }
+
     if (DAttrs)
       decl->getAttrs().setRawAttributeChain(DAttrs);
 
@@ -2436,10 +2535,9 @@ public:
     }
   }
 
-  /// Deserializes decl attribute and attribute-like records from
-  /// \c MF.DeclTypesCursor until a non-attribute record is found,
-  /// passing each one to AddAttribute.
-  llvm::Error deserializeDeclAttributes();
+  /// Deserializes records common to all decls from \c MF.DeclTypesCursor (ie.
+  /// the invalid flag, attributes, and discriminators)
+  llvm::Error deserializeDeclCommon();
 
   Expected<Decl *> getDeclCheckedImpl(
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
@@ -2938,10 +3036,12 @@ public:
         projectionVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
       }
 
-      PropertyWrapperBackingPropertyInfo info(
-          backingVar, projectionVar, nullptr, nullptr);
+      PropertyWrapperAuxiliaryVariables vars(backingVar, projectionVar);
       ctx.evaluator.cacheOutput(
-          PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
+          PropertyWrapperAuxiliaryVariablesRequest{var}, std::move(vars));
+      ctx.evaluator.cacheOutput(
+          PropertyWrapperInitializerInfoRequest{var},
+          PropertyWrapperInitializerInfo());
       ctx.evaluator.cacheOutput(
           PropertyWrapperBackingPropertyTypeRequest{var},
           backingVar->getInterfaceType());
@@ -3055,7 +3155,8 @@ public:
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
                                               isStatic, rawStaticSpelling, isObjC,
                                               rawMutModifier,
-                                              hasForcedStaticDispatch, throws,
+                                              hasForcedStaticDispatch,
+                                              async, throws,
                                               genericSigID,
                                               resultInterfaceTypeID,
                                               isIUO,
@@ -3173,7 +3274,7 @@ public:
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
           ctx, accessorKind, storage, staticSpelling.getValue(),
-          /*Throws=*/throws, genericParams, resultType, DC);
+          async, throws, genericParams, resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -4083,19 +4184,6 @@ ModuleFile::getDeclChecked(
         matchAttributes);
     if (!deserialized)
       return deserialized;
-
-    auto *decl = declOrOffset.get();
-    if (isAllowModuleWithCompilerErrorsEnabled() && decl->isInvalid()) {
-      if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
-        // The parent function will be invalid if the parameter is invalid,
-        // implicits should have an invalid explicit as well
-        if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-          getContext().Diags.diagnose(
-              VD->getLoc(), diag::serialization_allowing_invalid_decl,
-              VD->getName(), VD->getModuleContext()->getNameStr());
-        }
-      }
-    }
   } else if (matchAttributes) {
     // Decl was cached but we may need to filter it
     if (!matchAttributes(declOrOffset.get()->getAttrs()))
@@ -4115,7 +4203,7 @@ ModuleFile::getDeclChecked(
   return declOrOffset;
 }
 
-llvm::Error DeclDeserializer::deserializeDeclAttributes() {
+llvm::Error DeclDeserializer::deserializeDeclCommon() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 64> scratch;
@@ -4132,7 +4220,10 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
     unsigned recordID = MF.fatalIfUnexpected(
         MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
-    if (isDeclAttrRecord(recordID)) {
+    if (recordID == ERROR_FLAG) {
+      assert(!IsInvalid && "Error flag written multiple times");
+      IsInvalid = true;
+    } else if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
@@ -4396,9 +4487,10 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
       case decls_block::Custom_DECL_ATTR: {
         bool isImplicit;
+        bool isArgUnsafe;
         TypeID typeID;
         serialization::decls_block::CustomDeclAttrLayout::readRecord(
-          scratch, isImplicit, typeID);
+          scratch, isImplicit, typeID, isArgUnsafe);
 
         Expected<Type> deserialized = MF.getTypeChecked(typeID);
         if (!deserialized) {
@@ -4412,7 +4504,9 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
             return deserialized.takeError();
         } else {
           auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
-          Attr = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
+          auto custom = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
+          custom->setArgIsUnsafe(isArgUnsafe);
+          Attr = custom;
         }
         break;
       }
@@ -4456,7 +4550,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         // because it requires `DifferentiableAttr::setOriginalDeclaration` to
         // be called first. `DifferentiableAttr::setOriginalDeclaration` cannot
         // be called here because the original declaration is not accessible in
-        // this function (`DeclDeserializer::deserializeDeclAttributes`).
+        // this function (`DeclDeserializer::deserializeDeclCommon`).
         diffAttrParamIndicesMap[diffAttr] = indices;
         diffAttr->setDerivativeGenericSignature(derivativeGenSig);
         Attr = diffAttr;
@@ -4542,24 +4636,17 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-      case decls_block::HasAsyncAlternative_DECL_ATTR: {
-        bool isCompound;
-        ArrayRef<uint64_t> rawPieces;
-        serialization::decls_block::HasAsyncAlternativeDeclAttrLayout::readRecord(
-            scratch, isCompound, rawPieces);
+      case decls_block::CompletionHandlerAsync_DECL_ATTR: {
+        uint64_t handlerIndex;
+        uint64_t asyncFunctionDeclID;
+        serialization::decls_block::CompletionHandlerAsyncDeclAttrLayout::
+            readRecord(scratch, handlerIndex, asyncFunctionDeclID);
 
-        DeclNameRef name;
-        if (!rawPieces.empty()) {
-          auto baseName = MF.getDeclBaseName(rawPieces[0]);
-          SmallVector<Identifier, 4> pieces;
-          for (auto rawPiece : rawPieces.drop_front())
-            pieces.push_back(MF.getIdentifier(rawPiece));
-          name = !isCompound ? DeclNameRef({baseName})
-                             : DeclNameRef({ctx, baseName, pieces});
-        }
-
-        Attr = new (ctx) HasAsyncAlternativeAttr(name, SourceLoc(),
-                                                 SourceRange());
+        auto mappedFunctionDecl =
+            cast<AbstractFunctionDecl>(MF.getDecl(asyncFunctionDeclID));
+        Attr = new (ctx) CompletionHandlerAsyncAttr(
+            *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
+            /*atLoc*/ SourceLoc(), /*range*/ SourceRange());
         break;
       }
 
@@ -4613,9 +4700,9 @@ Expected<Decl *>
 DeclDeserializer::getDeclCheckedImpl(
   llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
 
-  auto attrError = deserializeDeclAttributes();
-  if (attrError)
-    return std::move(attrError);
+  auto commonError = deserializeDeclCommon();
+  if (commonError)
+    return std::move(commonError);
 
   if (matchAttributes) {
     // Deserialize the full decl only if matchAttributes finds a match.
@@ -5096,16 +5183,17 @@ public:
     bool noescape = false, concurrent, async, throws;
     GenericSignature genericSig;
     TypeID clangTypeID;
+    TypeID globalActorTypeID;
 
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(
           scratch, resultID, rawRepresentation, clangTypeID,
-          noescape, concurrent, async, throws, rawDiffKind);
+          noescape, concurrent, async, throws, rawDiffKind, globalActorTypeID);
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(
           scratch, resultID, rawRepresentation, concurrent, async, throws,
-          rawDiffKind, rawGenericSig);
+          rawDiffKind, globalActorTypeID, rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
       clangTypeID = 0;
     }
@@ -5126,8 +5214,18 @@ public:
       clangFunctionType = loadedClangType.get();
     }
 
+    Type globalActor;
+    if (globalActorTypeID) {
+      auto globalActorTy = MF.getTypeChecked(globalActorTypeID);
+      if (!globalActorTy)
+        return globalActorTy.takeError();
+
+      globalActor = globalActorTy.get();
+    }
+
     auto info = FunctionType::ExtInfoBuilder(*representation, noescape, throws,
-                                             *diffKind, clangFunctionType)
+                                             *diffKind, clangFunctionType,
+                                             globalActor)
                     .withConcurrent(concurrent)
                     .withAsync(async)
                     .build();
@@ -5150,12 +5248,13 @@ public:
         break;
 
       IdentifierID labelID;
+      IdentifierID internalLabelID;
       TypeID typeID;
       bool isVariadic, isAutoClosure, isNonEphemeral, isNoDerivative;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(
-          scratch, labelID, typeID, isVariadic, isAutoClosure, isNonEphemeral,
-          rawOwnership, isNoDerivative);
+          scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
+          isNonEphemeral, rawOwnership, isNoDerivative);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -5169,7 +5268,8 @@ public:
       params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isNonEphemeral, *ownership,
-                                             isNoDerivative));
+                                             isNoDerivative),
+                          MF.getIdentifier(internalLabelID));
     }
 
     if (!isGeneric) {
@@ -5761,19 +5861,28 @@ public:
 
   Expected<Type> deserializeErrorType(ArrayRef<uint64_t> scratch,
                                       StringRef blobData) {
-    if (!MF.isAllowModuleWithCompilerErrorsEnabled())
-      MF.fatal();
-
     TypeID origID;
     decls_block::ErrorTypeLayout::readRecord(scratch, origID);
 
-    auto origTy = MF.getTypeChecked(origID);
-    if (!origTy)
-      return origTy.takeError();
+    auto origTyOrError = MF.getTypeChecked(origID);
+    if (!origTyOrError)
+      return origTyOrError.takeError();
 
-    if (!origTy.get())
+    auto origTy = *origTyOrError;
+    auto diagId = ctx.LangOpts.AllowModuleWithCompilerErrors
+                      ? diag::serialization_allowing_error_type
+                      : diag::serialization_error_type;
+    // Generally not a super useful diagnostic, so only output once if there
+    // hasn't been any other diagnostic yet to ensure nothing slips by and
+    // causes SILGen to crash.
+    if (!ctx.hadError()) {
+      ctx.Diags.diagnose(SourceLoc(), diagId, StringRef(origTy.getString()),
+                         MF.getAssociatedModule()->getNameStr());
+    }
+
+    if (!origTy)
       return ErrorType::get(ctx);
-    return ErrorType::get(origTy.get());
+    return ErrorType::get(origTy);
   }
 };
 }
@@ -6190,8 +6299,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   using namespace decls_block;
 
   PrettyStackTraceModuleFile traceModule("While reading from", *this);
-  PrettyStackTraceConformance trace(getAssociatedModule()->getASTContext(),
-                                    "finishing conformance for",
+  PrettyStackTraceConformance trace("finishing conformance for",
                                     conformance);
   ++NumNormalProtocolConformancesCompleted;
 
@@ -6244,8 +6352,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     for (const auto &req : proto->getRequirementSignature()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
-      ProtocolDecl *proto =
-          req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      ProtocolDecl *proto = req.getProtocolDecl();
       auto iter = conformancesForProtocols.find(proto);
       if (iter != conformancesForProtocols.end()) {
         reqConformances.push_back(iter->getSecond());

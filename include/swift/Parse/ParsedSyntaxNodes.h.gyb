@@ -62,9 +62,13 @@ public:
   /// ${line}
 %       end
 %       if child.is_optional:
-  llvm::Optional<Parsed${child.type_name}> getDeferred${child.name}();
+  llvm::Optional<Parsed${child.type_name}> getDeferred${child.name}(
+      const SyntaxParsingContext *SyntaxContext
+  );
 %       else:
-  Parsed${child.type_name} getDeferred${child.name}();
+  Parsed${child.type_name} getDeferred${child.name}(
+      const SyntaxParsingContext *SyntaxContext
+  );
 %       end
 %     end
 

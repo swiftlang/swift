@@ -83,6 +83,19 @@ bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo, SILLoopInfo *loopInfo,
                 bool rotateSingleBlockLoops, SILBasicBlock *upToBB,
                 bool shouldVerify);
 
+//===----------------------------------------------------------------------===//
+//                             BasicBlock Cloning
+//===----------------------------------------------------------------------===//
+
+/// Return true if the \p termInst can be cloned. If termInst produces a
+/// guaranteed result, then it must be possible to create a nested borrow scope
+/// for that result when the cloner generates a guaranteed phi.
+///
+/// Note: if all the terminators uses will also be cloned, then a guaranteed phi
+/// won't be necessary. This is one of the reasons that cloning a region is much
+/// better than cloning a single block at a time.
+bool canCloneTerminator(TermInst *termInst);
+
 /// Sink address projections to their out-of-block uses. This is
 /// required after cloning a block and before calling
 /// updateSSAAfterCloning to avoid address-type phis.
@@ -173,6 +186,7 @@ public:
       if (!canCloneInstruction(&inst))
         return false;
     }
+    canCloneTerminator(origBB->getTerminator());
     return true;
   }
 
@@ -221,6 +235,19 @@ public:
     bi->eraseFromParent();
   }
 
+  /// Create phis and maintain OSSA invariants.
+  ///
+  /// Note: This must be called after calling cloneBlock or cloneBranchTarget,
+  /// before using any OSSA utilities.
+  ///
+  /// The client may perform arbitrary branch fixups and dead block removal
+  /// after cloning and before calling this.
+  ///
+  /// WARNING: If client converts terminator results to phis (e.g. replaces a
+  /// switch_enum with a branch), then it must call this before performing that
+  /// transformation, or fix the OSSA representation of that value itself.
+  void updateOSSAAfterCloning();
+
   /// Get the newly cloned block corresponding to `origBB`.
   SILBasicBlock *getNewBB() {
     return remapBasicBlock(origBB);
@@ -228,10 +255,14 @@ public:
 
   bool wasCloned() { return isBlockCloned(origBB); }
 
-  /// Helper function to perform SSA updates after calling cloneBranchTarget.
-  void updateSSAAfterCloning();
-
 protected:
+  /// Helper function to perform SSA updates used by updateOSSAAfterCloning.
+  void updateSSAAfterCloning(SmallVectorImpl<SILPhiArgument *> &newPhis);
+
+  /// Given a terminator result, either from the original or the cloned block,
+  /// update OSSA for any phis created for the result during edge splitting.
+  void updateOSSATerminatorResult(SILPhiArgument *termResult);
+
   // MARK: CRTP overrides.
 
   /// Override getMappedValue to allow values defined outside the block to be

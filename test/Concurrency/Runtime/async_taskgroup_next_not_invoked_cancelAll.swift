@@ -1,23 +1,26 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
+// REQUIRES: libdispatch
+
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_skipCallingNext_butInvokeCancelAll() async {
   let numbers = [1, 1]
 
-  let result = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  let result = try! await withTaskGroup(of: Int.self) { (group) async -> Int in
     for n in numbers {
-      print("group.add { \(n) }")
-      await group.add { () async -> Int in
-        sleep(1)
-        print("  inside group.add { \(n) }")
-        let cancelled = Task.isCancelled
-        print("  inside group.add { \(n) } (canceled: \(cancelled))")
+      print("group.spawn { \(n) }")
+      group.spawn { [group] () async -> Int in
+        await Task.sleep(1_000_000_000)
+        print("  inside group.spawn { \(n) }")
+        print("  inside group.spawn { \(n) } (group cancelled: \(group.isCancelled))")
+        print("  inside group.spawn { \(n) } (group child task cancelled: \(Task.isCancelled))")
         return n
       }
     }
@@ -25,26 +28,25 @@ func test_skipCallingNext_butInvokeCancelAll() async {
     group.cancelAll()
 
     // return immediately; the group should wait on the tasks anyway
-    let c = Task.isCancelled
-    print("return immediately 0 (canceled: \(c))")
+    print("return immediately 0 (group cancelled: \(group.isCancelled))")
+    print("return immediately 0 (task cancelled: \(Task.isCancelled))")
     return 0
   }
 
-  // CHECK: group.add { 1 }
-  // CHECK: group.add { 1 }
-  // CHECK: return immediately 0 (canceled: true)
-
-  // CHECK: inside group.add { 1 }
-  // CON: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
-
-  // CHECK: inside group.add { 1 }
-  // CON: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
+  // CHECK: group.spawn { 1 }
+  //
+  // CHECK: return immediately 0 (group cancelled: true)
+  // CHECK: return immediately 0 (task cancelled: false)
+  //
+  // CHECK: inside group.spawn { 1 } (group cancelled: true)
+  // CHECK: inside group.spawn { 1 } (group child task cancelled: true)
 
   // CHECK: result: 0
   print("result: \(result)")
   assert(result == 0)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_skipCallingNext_butInvokeCancelAll()

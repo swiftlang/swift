@@ -27,7 +27,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
 
@@ -46,6 +46,12 @@
 #define SHARED_CACHE_LOG_ENABLED 1
 #else
 #define SHARED_CACHE_LOG(fmt, ...) (void)0
+#endif
+
+// Enable dyld shared cache acceleration only when it's available and we have
+// ObjC interop.
+#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED && SWIFT_OBJC_INTEROP
+#define USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES 1
 #endif
 
 using namespace swift;
@@ -272,7 +278,7 @@ struct ConformanceState {
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
   bool scanSectionsBackwards;
 
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   uintptr_t dyldSharedCacheStart;
   uintptr_t dyldSharedCacheEnd;
   bool hasOverriddenImage;
@@ -285,29 +291,41 @@ struct ConformanceState {
     auto uintPtr = reinterpret_cast<uintptr_t>(ptr);
     return dyldSharedCacheStart <= uintPtr && uintPtr < dyldSharedCacheEnd;
   }
+
+  bool sharedCacheOptimizationsActive() { return dyldSharedCacheStart != 0; }
+#else
+  bool sharedCacheOptimizationsActive() { return false; }
 #endif
 
   ConformanceState() {
     scanSectionsBackwards =
         runtime::bincompat::workaroundProtocolConformanceReverseIteration();
 
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
-    if (_dyld_swift_optimizations_version() ==
-        DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION) {
-      size_t length;
-      dyldSharedCacheStart = (uintptr_t)_dyld_get_shared_cache_range(&length);
-      dyldSharedCacheEnd =
-          dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
-      validateSharedCacheResults = runtime::environment::
-          SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES();
-      SHARED_CACHE_LOG("Shared cache range is %#lx-%#lx", dyldSharedCacheStart,
-                       dyldSharedCacheEnd);
-    } else {
-      SHARED_CACHE_LOG("Disabling shared cache optimizations due to unknown "
-                       "optimizations version %u",
-                       _dyld_swift_optimizations_version());
-      dyldSharedCacheStart = 0;
-      dyldSharedCacheEnd = 0;
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
+    if (__builtin_available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)) {
+      if (runtime::environment::SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES()) {
+        if (&_dyld_swift_optimizations_version) {
+          if (_dyld_swift_optimizations_version() ==
+              DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION) {
+            size_t length;
+            dyldSharedCacheStart =
+                (uintptr_t)_dyld_get_shared_cache_range(&length);
+            dyldSharedCacheEnd =
+                dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
+            validateSharedCacheResults = runtime::environment::
+                SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES();
+            SHARED_CACHE_LOG("Shared cache range is %#lx-%#lx",
+                             dyldSharedCacheStart, dyldSharedCacheEnd);
+          } else {
+            SHARED_CACHE_LOG(
+                "Disabling shared cache optimizations due to unknown "
+                "optimizations version %u",
+                _dyld_swift_optimizations_version());
+            dyldSharedCacheStart = 0;
+            dyldSharedCacheEnd = 0;
+          }
+        }
+      }
     }
 #endif
 
@@ -390,7 +408,7 @@ void swift::addImageProtocolConformanceBlockCallbackUnsafe(
   // Conformance cache should always be sufficiently initialized by this point.
   auto &C = Conformances.unsafeGetAlreadyInitialized();
 
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   // If any image in the shared cache is overridden, we need to scan all
   // conformance sections in the shared cache. The pre-built table does NOT work
   // if the protocol, type, or descriptor are in overridden images. Example:
@@ -563,8 +581,8 @@ static void validateSharedCacheResults(
     const ProtocolDescriptor *protocol,
     const WitnessTable *dyldCachedWitnessTable,
     const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor) {
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
-  if (!C.validateSharedCacheResults)
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
+  if (!C.sharedCacheOptimizationsActive() || !C.validateSharedCacheResults)
     return;
 
   llvm::SmallVector<const ProtocolConformanceDescriptor *, 8> conformances;
@@ -592,8 +610,8 @@ static void validateSharedCacheResults(
   };
 
   if (dyldCachedConformanceDescriptor) {
-    if (!std::find(conformances.begin(), conformances.end(),
-                   dyldCachedConformanceDescriptor)) {
+    if (std::find(conformances.begin(), conformances.end(),
+                  dyldCachedConformanceDescriptor) == conformances.end()) {
       auto typeName = swift_getTypeName(type, true);
       swift::fatalError(
           0,
@@ -625,7 +643,7 @@ static std::tuple<const WitnessTable *, const ProtocolConformanceDescriptor *,
                   bool>
 findSharedCacheConformance(ConformanceState &C, const Metadata *type,
                            const ProtocolDescriptor *protocol) {
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   const ContextDescriptor *description;
   llvm::StringRef foreignTypeIdentity;
   std::tie(description, foreignTypeIdentity) = getContextDescriptor(type);
@@ -720,29 +738,30 @@ swift_conformsToProtocolImpl(const Metadata *const type,
 
   // Search the shared cache tables for a conformance for this type, and for
   // superclasses (if it's a class).
-  const Metadata *dyldSearchType = type;
-  do {
-    bool definitiveFailure;
-    std::tie(dyldCachedWitnessTable, dyldCachedConformanceDescriptor,
-             definitiveFailure) =
-        findSharedCacheConformance(C, dyldSearchType, protocol);
+  if (C.sharedCacheOptimizationsActive()) {
+    const Metadata *dyldSearchType = type;
+    do {
+      bool definitiveFailure;
+      std::tie(dyldCachedWitnessTable, dyldCachedConformanceDescriptor,
+               definitiveFailure) =
+          findSharedCacheConformance(C, dyldSearchType, protocol);
 
-    if (definitiveFailure)
-      return nullptr;
+      if (definitiveFailure)
+        return nullptr;
 
-    dyldSearchType = _swift_class_getSuperclass(dyldSearchType);
-  } while (dyldSearchType && !dyldCachedWitnessTable &&
-           !dyldCachedConformanceDescriptor);
+      dyldSearchType = _swift_class_getSuperclass(dyldSearchType);
+    } while (dyldSearchType && !dyldCachedWitnessTable &&
+             !dyldCachedConformanceDescriptor);
 
-  validateSharedCacheResults(C, type, protocol, dyldCachedWitnessTable,
-                             dyldCachedConformanceDescriptor);
-
-  // Return a cached result if we got a witness table. We can't do this if
-  // scanSectionsBackwards is set, since a scanned conformance can override a
-  // cached result in that case.
-  if (!C.scanSectionsBackwards)
-    if (dyldCachedWitnessTable)
-      return dyldCachedWitnessTable;
+    validateSharedCacheResults(C, type, protocol, dyldCachedWitnessTable,
+                               dyldCachedConformanceDescriptor);
+    // Return a cached result if we got a witness table. We can't do this if
+    // scanSectionsBackwards is set, since a scanned conformance can override a
+    // cached result in that case.
+    if (!C.scanSectionsBackwards)
+      if (dyldCachedWitnessTable)
+        return dyldCachedWitnessTable;
+  }
 
   // See if we have an authoritative cached conformance. The
   // ConcurrentReadableHashMap data structure allows us to search the map
@@ -758,7 +777,10 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   }
 
   if (dyldCachedConformanceDescriptor) {
-    auto witness = dyldCachedConformanceDescriptor->getWitnessTable(type);
+    ConformanceCandidate candidate(*dyldCachedConformanceDescriptor);
+    auto *matchingType = candidate.getMatchingType(type);
+    assert(matchingType);
+    auto witness = dyldCachedConformanceDescriptor->getWitnessTable(matchingType);
     C.cacheResult(type, protocol, witness, /*always cache*/ 0);
     SHARED_CACHE_LOG("Caching generic conformance to %s found in shared cache",
                      protocol->Name.get());
@@ -1102,4 +1124,4 @@ const Metadata *swift::findConformingSuperclass(
 }
 
 #define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

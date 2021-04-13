@@ -1164,16 +1164,25 @@ namespace swift {
 /// uninitialized.
 bool memInstMustInitialize(Operand *memOper);
 
-/// Is this an alloc_stack instruction that is:
+/// Is this an alloc_stack instruction that we can prove is:
 ///
 /// 1. Only initialized once in its own def block.
 /// 2. Never written to again except by destroy_addr.
 ///
-/// On return, destroyingUsers contains the list of users that destroy the
-/// alloc_stack. If the alloc_stack is destroyed in pieces, we do not guarantee
-/// that the list of destroying users is a minimal jointly post-dominating set.
-bool isSingleInitAllocStack(AllocStackInst *asi,
-                            SmallVectorImpl<Operand *> &destroyingUses);
+/// Then we return the single initializing use and if \p destroyingUsers was
+/// non-null, On return, if non-null, \p destroyingUsers contains the list of
+/// users that destroy the alloc_stack. If the alloc_stack is destroyed in
+/// pieces, we do not guarantee that the list of destroying users is a minimal
+/// jointly post-dominating set.
+Operand *getSingleInitAllocStackUse(
+    AllocStackInst *asi, SmallVectorImpl<Operand *> *destroyingUses = nullptr);
+
+/// Same as getSingleInitAllocStack except we throw away the single use and just
+/// provide a bool.
+inline bool isSingleInitAllocStack(AllocStackInst *asi,
+                                   SmallVectorImpl<Operand *> &destroyingUses) {
+  return getSingleInitAllocStackUse(asi, &destroyingUses);
+}
 
 /// Return true if the given address value is produced by a special address
 /// producer that is only used for local initialization, not formal access.
@@ -1283,7 +1292,9 @@ inline Operand *getAccessProjectionOperand(SingleValueInstruction *svi) {
 /// address must be at operand(0).
 ///
 /// Some of these casts, such as address_to_pointer, may also occur inside of a
-/// formal access. TODO: Add stricter structural guarantee such that these never
+/// formal access.
+///
+/// TODO: Add stricter structural guarantee such that these never
 /// occur within an access. It's important to be able to get the accessed
 /// address without looking though type casts or pointer_to_address [strict],
 /// which we can't do if those operations are behind access projections.
@@ -1361,7 +1372,7 @@ public:
   Result visitGlobalAccess(SILValue global) {
     return asImpl().visitBase(global, AccessedStorage::Global);
   }
-  Result visitYieldAccess(BeginApplyResult *yield) {
+  Result visitYieldAccess(MultipleValueInstructionResult *yield) {
     return asImpl().visitBase(yield, AccessedStorage::Yield);
   }
   Result visitStackAccess(AllocStackInst *stack) {
@@ -1437,8 +1448,10 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
 
   // A yield is effectively a nested access, enforced independently in
   // the caller and callee.
-  case ValueKind::BeginApplyResult:
-    return asImpl().visitYieldAccess(cast<BeginApplyResult>(sourceAddr));
+  case ValueKind::MultipleValueInstructionResult:
+    if (auto *baResult = isaResultOf<BeginApplyInst>(sourceAddr))
+      return asImpl().visitYieldAccess(baResult);
+    break;
 
   // A function argument is effectively a nested access, enforced
   // independently in the caller and callee.
@@ -1497,35 +1510,54 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
 
 namespace swift {
 
-/// Clone all projections and casts on the access use-def chain until either the
-/// specified predicate is true or the access base is reached.
+/// Clone all projections and casts on the access use-def chain until the
+/// checkBase predicate returns a valid base.
 ///
-/// This will not clone ref_element_addr or ref_tail_addr because those aren't
-/// part of the access chain.
-template <typename UnaryPredicate>
+/// See comments on the cloneUseDefChain() API.
+template <typename CheckBase>
 class AccessUseDefChainCloner
-    : public AccessUseDefChainVisitor<AccessUseDefChainCloner<UnaryPredicate>,
+    : public AccessUseDefChainVisitor<AccessUseDefChainCloner<CheckBase>,
                                       SILValue> {
-  UnaryPredicate predicate;
+  CheckBase checkBase;
   SILInstruction *insertionPoint;
+  SILValue placeHolder = SILValue();
 
 public:
-  AccessUseDefChainCloner(UnaryPredicate predicate,
-                          SILInstruction *insertionPoint)
-      : predicate(predicate), insertionPoint(insertionPoint) {}
+  AccessUseDefChainCloner(CheckBase checkBase, SILInstruction *insertionPoint)
+      : checkBase(checkBase), insertionPoint(insertionPoint) {}
 
-  // Recursive main entry point
+  // Main entry point
   SILValue cloneUseDefChain(SILValue addr) {
-    if (!predicate(addr))
-      return addr;
+    placeHolder = SILValue();
+    return cloneRecursive(addr);
+  }
+
+  // Secondary entry point to check that cloning will succeed.
+  bool canCloneUseDefChain(SILValue addr) {
+    // Use any valid address as a placeholder. It is innaccessible.
+    placeHolder = addr;
+    return cloneRecursive(addr);
+  }
+
+  SILValue cloneRecursive(SILValue addr) {
+    if (SILValue base = checkBase(addr))
+      return base;
 
     return this->visit(addr);
   }
 
   // Recursively clone an address on the use-def chain.
-  SingleValueInstruction *cloneProjection(SingleValueInstruction *projectedAddr,
-                                          Operand *sourceOper) {
-    SILValue projectedSource = cloneUseDefChain(sourceOper->get());
+  //
+  // Helper for cloneUseDefChain.
+  SILValue cloneProjection(SingleValueInstruction *projectedAddr,
+                           Operand *sourceOper) {
+    SILValue projectedSource = cloneRecursive(sourceOper->get());
+    if (!projectedSource)
+      return nullptr;
+
+    if (placeHolder)
+      return placeHolder;
+
     SILInstruction *clone = projectedAddr->clone(insertionPoint);
     clone->setOperand(sourceOper->getOperandNumber(), projectedSource);
     return cast<SingleValueInstruction>(clone);
@@ -1549,6 +1581,11 @@ public:
   }
 
   SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
+    // The cloner does not currently know how to create compensating
+    // end_borrows or fix mark_dependence operands.
+    if (isa<BeginBorrowInst>(cast) || isa<MarkDependenceInst>(cast))
+      return SILValue();
+
     return cloneProjection(cast, sourceOper);
   }
 
@@ -1558,12 +1595,35 @@ public:
   }
 };
 
-template <typename UnaryPredicate>
+/// Clone all projections and casts on the access use-def chain until the
+/// checkBase predicate returns a valid base.
+///
+/// This will not clone ref_element_addr or ref_tail_addr because those aren't
+/// part of the access chain.
+///
+/// CheckBase is a unary predicate that takes the next source address and either
+/// returns a valid SILValue to use as the base of the cloned access path, or an
+/// invalid SILValue to continue cloning.
+///
+/// CheckBase must return a valid SILValue either before attempting to clone the
+/// access base. The most basic valid predicate is:
+///
+///    auto checkBase = [&](SILValue srcAddr) {
+///      return (srcAddr == accessBase) ? srcAddr : SILValue();
+///    }
+template <typename CheckBase>
 SILValue cloneUseDefChain(SILValue addr, SILInstruction *insertionPoint,
-                          UnaryPredicate shouldFollowUse) {
-  return AccessUseDefChainCloner<UnaryPredicate>(shouldFollowUse,
-                                                 insertionPoint)
+                          CheckBase checkBase) {
+  return AccessUseDefChainCloner<CheckBase>(checkBase, insertionPoint)
       .cloneUseDefChain(addr);
+}
+
+/// Analog to cloneUseDefChain to check validity. begin_borrow and
+/// mark_dependence currently cannot be cloned.
+template <typename CheckBase>
+bool canCloneUseDefChain(SILValue addr, CheckBase checkBase) {
+  return AccessUseDefChainCloner<CheckBase>(checkBase, nullptr)
+      .canCloneUseDefChain(addr);
 }
 
 } // end namespace swift

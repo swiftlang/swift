@@ -198,6 +198,10 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
+    if (fnType->isAsync()) {
+      return options.AsyncSwiftFunctionPointers;
+    }
+
     return options.SwiftFunctionPointers;
 
   case SILFunctionTypeRepresentation::ObjCMethod:
@@ -399,17 +403,6 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
     // trivial.
     assert(!constant.isForeign &&
            "discriminator for foreign declaration not supported yet!");
-
-    // Special case: methods that are witnesses to Actor.enqueue(partialTask:)
-    // have their own discriminator, which is shared across all actor classes.
-    if (constant.hasFuncDecl()) {
-      auto func = dyn_cast<FuncDecl>(constant.getFuncDecl());
-      if (func->isActorEnqueuePartialTaskWitness()) {
-        cache = IGM.getSize(
-            Size(SpecialPointerAuthDiscriminators::ActorEnqueuePartialTask));
-        return cache;
-      }
-    }
 
     auto mangling = constant.mangle();
     cache = getDiscriminatorForString(IGM, mangling);

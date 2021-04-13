@@ -60,23 +60,26 @@ static bool isOSLogDynamicObject(NominalTypeDecl *nominal) {
 /// Return true iff the parameter \p param of function \c funDecl is required to
 /// be a constant. This is true if either the function is an os_log function or
 /// it is an atomics operation and the parameter represents the ordering.
-static bool isParamRequiredToBeConstant(FuncDecl *funcDecl, ParamDecl *param) {
+static bool isParamRequiredToBeConstant(AbstractFunctionDecl *funcDecl, ParamDecl *param) {
   assert(funcDecl && param && "funcDecl and param must not be null");
+  Type paramType;
+  NominalTypeDecl *nominal;
+  StructDecl *structDecl;
   if (hasSemanticsAttr(funcDecl, semantics::OSLOG_REQUIRES_CONSTANT_ARGUMENTS))
     return true;
   if (hasSemanticsAttr(funcDecl, semantics::OSLOG_LOG_WITH_LEVEL)) {
     // We are looking at a top-level os_log function that accepts level and
     // possibly custom log object. Those need not be constants, but every other
     // parameter must be.
-    Type paramType = param->getType();
-    NominalTypeDecl *nominal = paramType->getNominalOrBoundGenericNominal();
+    paramType = param->getType();
+    nominal = paramType->getNominalOrBoundGenericNominal();
     return !nominal || !isOSLogDynamicObject(nominal);
   }
   if (!hasSemanticsAttr(funcDecl,
                         semantics::ATOMICS_REQUIRES_CONSTANT_ORDERINGS))
     return false;
-  Type paramType = param->getType();
-  StructDecl *structDecl = paramType->getStructOrBoundGenericStruct();
+  paramType = param->getType();
+  structDecl = paramType->getStructOrBoundGenericStruct();
   if (!structDecl)
     return false;
   return isAtomicOrderingDecl(structDecl);
@@ -105,7 +108,7 @@ static Expr *checkConstantness(Expr *expr) {
   expressionsToCheck.push_back(expr);
   while (!expressionsToCheck.empty()) {
     Expr *expr = expressionsToCheck.pop_back_val();
-    // Lookthrough identity_expr, tuple and inject_into_optional expressions.
+    // Lookthrough identity_expr, tuple, binary_expr and inject_into_optional expressions.
     if (IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
       expressionsToCheck.push_back(identityExpr->getSubExpr());
       continue;
@@ -113,6 +116,10 @@ static Expr *checkConstantness(Expr *expr) {
     if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr)) {
       for (Expr *element : tupleExpr->getElements())
         expressionsToCheck.push_back(element);
+      continue;
+    }
+    if (BinaryExpr *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
+      expressionsToCheck.push_back(binaryExpr->getArg());
       continue;
     }
     if (InjectIntoOptionalExpr *optionalExpr =
@@ -156,7 +163,7 @@ static Expr *checkConstantness(Expr *expr) {
       Decl *declContext = paramDecl->getDeclContext()->getAsDecl();
       if (!declContext)
         return expr;
-      FuncDecl *funcDecl = dyn_cast<FuncDecl>(declContext);
+      AbstractFunctionDecl *funcDecl = dyn_cast<AbstractFunctionDecl>(declContext);
       if (!funcDecl || !isParamRequiredToBeConstant(funcDecl, paramDecl))
         return expr;
       continue;
@@ -243,7 +250,7 @@ static bool isStringType(Type type) {
 /// Otherwise, if the expression is a nominal type, report that it must be
 /// static member of the type.
 static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
-                          FuncDecl *funcDecl) {
+                          AbstractFunctionDecl *funcDecl) {
   DiagnosticEngine &diags = astContext.Diags;
   Type exprType = errorExpr->getType();
   SourceLoc errorLoc = errorExpr->getLoc();
@@ -318,9 +325,9 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
   assert(callExpr && callExpr->getType() &&
          "callExpr should have a valid type");
   ValueDecl *calledDecl = callExpr->getCalledValue();
-  if (!calledDecl || !isa<FuncDecl>(calledDecl))
+  if (!calledDecl || !isa<AbstractFunctionDecl>(calledDecl))
     return;
-  FuncDecl *callee = cast<FuncDecl>(calledDecl);
+  AbstractFunctionDecl *callee = cast<AbstractFunctionDecl>(calledDecl);
 
   // Collect argument indices that are required to be constants.
   SmallVector<unsigned, 4> constantArgumentIndices;

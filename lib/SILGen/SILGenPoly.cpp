@@ -3836,7 +3836,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 
   auto *linearMapArg = thunk->getArgumentsWithoutIndirectResults().back();
   auto *apply = thunkSGF.B.createApply(loc, linearMapArg, SubstitutionMap(),
-                                       arguments, /*isNonThrowing*/ false);
+                                       arguments);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -4476,17 +4476,6 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   // Now that the thunk body has been completely emitted, verify the
   // body early.
   F.verify();
-}
-
-//===----------------------------------------------------------------------===//
-// Concurrency
-//===----------------------------------------------------------------------===//
-
-/// If the current function is associated with an actor, then this
-/// function emits a hop_to_executor to that actor's executor at loc.
-void SILGenFunction::emitHopToCurrentExecutor(SILLocation loc) {
-  if (actor)
-    B.createHopToExecutor(loc, actor);
 }
 
 //===----------------------------------------------------------------------===//

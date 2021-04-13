@@ -4,21 +4,17 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// Remove with rdar://problem/72439642
-// UNSUPPORTED: asan
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Counter {
   private var value = 0
   private let scratchBuffer: UnsafeMutableBufferPointer<Int>
 
   init(maxCount: Int) {
     scratchBuffer = .allocate(capacity: maxCount)
+    scratchBuffer.initialize(repeating: 0)
   }
 
   func next() -> Int {
@@ -34,10 +30,8 @@ actor Counter {
 }
 
 
-func worker(
-  identity: Int, counters: [Counter], numIterations: Int,
-  scratchBuffer: UnsafeMutableBufferPointer<Int>
-) async {
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   for i in 0..<numIterations {
     let counterIndex = Int.random(in: 0 ..< counters.count)
     let counter = counters[counterIndex]
@@ -46,11 +40,8 @@ func worker(
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
-  let scratchBuffer = UnsafeMutableBufferPointer<Int>.allocate(
-    capacity: numCounters * numWorkers * numIterations
-  )
-
   // Create counter actors.
   var counters: [Counter] = []
   for i in 0..<numCounters {
@@ -61,12 +52,9 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   var workers: [Task.Handle<Void, Error>] = []
   for i in 0..<numWorkers {
     workers.append(
-      Task.runDetached { [counters] in
-        usleep(UInt32.random(in: 0..<100) * 1000)
-        await worker(
-          identity: i, counters: counters, numIterations: numIterations,
-          scratchBuffer: scratchBuffer
-        )
+      detach { [counters] in
+        await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
+        await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
   }
@@ -76,13 +64,18 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
     try! await worker.get()
   }
 
-  // Clear out the scratch buffer.
-  scratchBuffer.deallocate()
   print("DONE!")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
-    await runTest(numCounters: 10, numWorkers: 100, numIterations: 1000)
+    // Useful for debugging: specify counter/worker/iteration counts
+    let args = CommandLine.arguments
+    let counters = args.count >= 2 ? Int(args[1])! : 10
+    let workers = args.count >= 3 ? Int(args[2])! : 100
+    let iterations = args.count >= 4 ? Int(args[3])! : 1000
+    print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
+    await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
   }
 }

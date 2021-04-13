@@ -31,7 +31,7 @@
 namespace swift {
 namespace syntax {
 
-enum class SyntaxKind {
+enum class SyntaxKind : uint16_t {
   Token,
 % for name, nodes in grouped_nodes.items():
 %   for node in nodes:
@@ -47,9 +47,6 @@ enum class SyntaxKind {
 
   // NOTE: Unknown must be the last kind.
   Unknown,
-};
-enum : unsigned {
-  NumSyntaxKindBits = countBitsUsed(static_cast<unsigned>(SyntaxKind::Unknown))
 };
 
 void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind);

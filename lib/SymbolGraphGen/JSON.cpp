@@ -16,6 +16,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/USRGeneration.h"
 #include "JSON.h"
 
 void swift::symbolgraphgen::serialize(const llvm::VersionTuple &VT,
@@ -105,6 +106,16 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
     OS.attribute("kind", Kind);
     OS.attribute("lhs", Req.getFirstType()->getString());
     OS.attribute("rhs", Req.getSecondType()->getString());
+    
+    // If the RHS type has a USR we can link to, add it to the output
+    if (auto *TyDecl = Req.getSecondType()->getAnyNominal()) {
+      SmallString<256> USR;
+      {
+        llvm::raw_svector_ostream SOS(USR);
+        ide::printDeclUSR(TyDecl, SOS);
+      }
+      OS.attribute("rhsPrecise", USR.str());
+    }
   });
 }
 

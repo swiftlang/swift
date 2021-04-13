@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 
 // Utility functions for closure based operators to force them into throwing 
@@ -11,22 +14,27 @@ import StdlibUnittest
 // TODO: This crashes on linux for some strange reason
 #if os(macOS)
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func throwing<T>(_ value: T) throws -> T {
   return value
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asynchronous<T>(_ value: T) async -> T {
   return value
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asynchronousThrowing<T>(_ value: T) async throws -> T {
   return value
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 struct Failure: Error, Equatable { 
   var value = 1
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func failable<T, E: Error>(
   _ results: [Result<T, E>]
 ) -> AsyncThrowingMapSequence<AsyncLazySequence<[Result<T, E>]>, T> {
@@ -34,6 +42,7 @@ func failable<T, E: Error>(
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Sequence {
   @inlinable
   public var async: AsyncLazySequence<Self> {
@@ -43,6 +52,7 @@ extension Sequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct AsyncLazySequence<S: Sequence>: AsyncSequence {
   public typealias Element = S.Element
   public typealias AsyncIterator = Iterator
@@ -75,6 +85,7 @@ public struct AsyncLazySequence<S: Sequence>: AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   public func collect() async rethrows -> [Element] {
@@ -87,6 +98,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence where Element: Equatable {
   func `throw`(_ error: Error, on element: Element) -> AsyncThrowingMapSequence<Self, Element> {
     return map { (value: Element) throws -> Element in
@@ -96,6 +108,7 @@ extension AsyncSequence where Element: Equatable {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension TestSuite {
   @inline(never)
   public func test(
@@ -108,6 +121,8 @@ extension TestSuite {
     }
   }
 }
+
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
 var AsyncLazySequenceTests = TestSuite("AsyncLazySequence")
 
@@ -1048,6 +1063,8 @@ AsyncFlatMapSequenceTests.test("flat map throwing inner on throwing outer") {
   } catch {
     expectUnreachable()
   }
+}
+
 }
 
 #endif

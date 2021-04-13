@@ -176,13 +176,13 @@ AbstractionPattern
 AbstractionPattern::getCurriedCXXMethod(CanType origType,
                                         const AbstractFunctionDecl *function) {
   auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXMethod(origType, clangMethod);
+  return getCurriedCXXMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
 AbstractionPattern AbstractionPattern::getCurriedCXXOperatorMethod(
     CanType origType, const AbstractFunctionDecl *function) {
   auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXOperatorMethod(origType, clangMethod);
+  return getCurriedCXXOperatorMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
 AbstractionPattern
@@ -317,7 +317,7 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard: {
-    if (isTypeParameter())
+    if (isTypeParameterOrOpaqueArchetype())
       return true;
     auto type = getType();
     if (auto tuple = dyn_cast<TupleType>(type))
@@ -529,11 +529,12 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                                       getImportAsMemberStatus());
   case Kind::CurriedCXXMethodType:
     return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()), getCXXMethod());
+                                      getResultType(getType()), getCXXMethod(),
+                                      getImportAsMemberStatus());
   case Kind::CurriedCXXOperatorMethodType:
     return getPartialCurriedCXXOperatorMethod(
         getGenericSignatureForFunctionComponent(), getResultType(getType()),
-        getCXXMethod());
+        getCXXMethod(), getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType: {
     // If this is a foreign async function, the result type comes from the
@@ -753,10 +754,19 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     auto paramType = params[index].getParameterType();
 
-    // The first parameter holds the left-hand-side operand, which gets passed
-    // to the C++ function as the this pointer.
-    if (index == 0)
-      return getCXXMethodSelfPattern(paramType);
+    // See importer::isImportedAsStatic
+    bool isStatic = getImportAsMemberStatus().isStatic();
+    if (isStatic) {
+      // The first parameter holds the left-hand-side operand, which gets passed
+      // to the C++ function as the this pointer.
+      if (index == 0)
+        return getCXXMethodSelfPattern(paramType);
+    } else {
+      // The last parameter is 'self'.
+      if (getKind() == Kind::CXXOperatorMethodType &&
+          index == params.size() - 1)
+        return getCXXMethodSelfPattern(params.back().getParameterType());
+    }
 
     // A parameter of type () does not correspond to a Clang parameter.
     if (paramType->isVoid())
@@ -766,7 +776,7 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto methodType = getCXXMethod()->getType().getTypePtr();
     return AbstractionPattern(
         getGenericSignatureForFunctionComponent(), paramType,
-        getClangFunctionParameterType(methodType, index - 1));
+        getClangFunctionParameterType(methodType, index - (isStatic ? 1 : 0)));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();

@@ -2076,3 +2076,20 @@ struct OptionalWrapper<T> {
 struct UseOptionalWrapper {
   @OptionalWrapper var p: Int?? // Okay
 }
+
+@propertyWrapper
+struct WrapperWithFailableInit<Value> {
+  var wrappedValue: Value
+
+  init(_ base: WrapperWithFailableInit<Value>) { fatalError() }
+
+  init?(_ base: WrapperWithFailableInit<Value?>) { fatalError() }
+}
+
+struct TestInitError {
+  // FIXME: bad diagnostics when a wrapper does not support init from wrapped value
+
+  // expected-error@+2 {{extraneous argument label 'wrappedValue:' in call}}
+  // expected-error@+1 {{cannot convert value of type 'Int' to specified type 'WrapperWithFailableInit<Int>'}}
+  @WrapperWithFailableInit var value: Int = 10
+}

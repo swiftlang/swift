@@ -749,4 +749,4 @@ extension Optional: _ObjectiveCBridgeable {
 }
 #endif
 
-extension Optional: ConcurrentValue where Wrapped: ConcurrentValue { }
+extension Optional: Sendable where Wrapped: Sendable { }

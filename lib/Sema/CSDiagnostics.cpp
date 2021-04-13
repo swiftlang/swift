@@ -940,7 +940,7 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
       }
 
       // If there are no generic parameters involved, this could
-      // only mean that parameter is expecting @escaping/@concurrent function
+      // only mean that parameter is expecting @escaping/@Sendable function
       // type.
       diagnostic = diag::passing_noattrfunc_to_attrfunc;
     }
@@ -971,7 +971,7 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
     }
   }
   if (attributeKind == AttributeKind::Concurrent) {
-    note.fixItInsert(reprLoc, "@concurrent ");
+    note.fixItInsert(reprLoc, "@Sendable ");
   }
   else if (!PD->isAutoClosure()) {
     note.fixItInsert(reprLoc, "@escaping ");
@@ -1293,6 +1293,21 @@ public:
       : DC(DC), varDecl(varDecl),count(0) {}
   int referencesCount() { return count; }
 };
+
+bool DroppedGlobalActorFunctionAttr::diagnoseAsError() {
+  auto fromFnType = getFromType()->getAs<AnyFunctionType>();
+  if (!fromFnType)
+    return false;
+
+  Type fromGlobalActor = fromFnType->getGlobalActor();
+  if (!fromGlobalActor)
+    return false;
+
+  emitDiagnostic(
+      diag::converting_func_loses_global_actor, getFromType(), getToType(),
+      fromGlobalActor);
+  return true;
+}
 
 bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (!getUnwrappedType()->isBool()) {
@@ -2104,6 +2119,24 @@ Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
   }
 
   return diag::assignment_lhs_is_immutable_variable;
+}
+
+SourceLoc ContextualFailure::getLoc() const {
+  auto *locator = getLocator();
+
+  // `getSingleExpressionBody` can point to an implicit expression
+  // without source information in cases like `{ return }`.
+  if (locator->isLastElement<LocatorPathElt::ClosureBody>()) {
+    auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+    if (closure->hasSingleExpressionBody()) {
+      auto *body = closure->getSingleExpressionBody();
+      if (auto loc = body->getLoc())
+        return loc;
+    }
+    return closure->getLoc();
+  }
+
+  return FailureDiagnostic::getLoc();
 }
 
 bool ContextualFailure::diagnoseAsError() {
@@ -3297,6 +3330,38 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
   return true;
 }
 
+bool InvalidPropertyWrapperType::diagnoseAsError() {
+  // The property wrapper constraint is currently only used for
+  // implicit property wrappers on closure parameters.
+  auto *wrappedVar = getAsDecl<VarDecl>(getAnchor());
+  assert(wrappedVar->hasImplicitPropertyWrapper());
+
+  emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
+  return true;
+}
+
+bool InvalidProjectedValueArgument::diagnoseAsError() {
+  emitDiagnostic(diag::invalid_projection_argument, param->hasImplicitPropertyWrapper());
+
+  if (!param->hasAttachedPropertyWrapper()) {
+    param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
+  } else if (!param->hasImplicitPropertyWrapper() &&
+             param->getAttachedPropertyWrappers().front()->getArg()) {
+    param->diagnose(diag::property_wrapper_param_attr_arg);
+  } else {
+    Type backingType;
+    if (param->hasImplicitPropertyWrapper()) {
+      backingType = getType(param->getPropertyWrapperBackingProperty());
+    } else {
+      backingType = param->getPropertyWrapperBackingPropertyType();
+    }
+
+    param->diagnose(diag::property_wrapper_no_init_projected_value, backingType);
+  }
+
+  return true;
+}
+
 bool SubscriptMisuseFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto &sourceMgr = getASTContext().SourceMgr;
@@ -3950,7 +4015,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // If this is a reference to a static member by one of the key path
     // components, let's provide a tailored diagnostic and return because
     // that is unsupported so there is no fix-it.
-    if (locator->isForKeyPathComponent()) {
+    if (locator->isInKeyPathComponent()) {
       InvalidStaticMemberRefInKeyPath failure(getSolution(), Member, locator);
       return failure.diagnoseAsError();
     }
@@ -4424,7 +4489,15 @@ bool MissingArgumentsFailure::diagnoseClosure(const ClosureExpr *closure) {
       fixText += " ";
       interleave(
           funcType->getParams(),
-          [&fixText](const AnyFunctionType::Param &param) { fixText += '_'; },
+          [&fixText](const AnyFunctionType::Param &param) {
+            if (param.hasLabel()) {
+              fixText += param.getLabel().str();
+            } else if (param.hasInternalLabel()) {
+              fixText += param.getInternalLabel().str();
+            } else {
+              fixText += '_';
+            }
+          },
           [&fixText] { fixText += ','; });
       fixText += " in ";
     }
@@ -5933,6 +6006,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseTrailingClosureMismatch())
     return true;
 
+  if (diagnoseKeyPathAsFunctionResultMismatch())
+    return true;
+
   auto argType = getFromType();
   auto paramType = getToType();
 
@@ -6187,6 +6263,31 @@ bool ArgumentMismatchFailure::diagnoseTrailingClosureMismatch() const {
   return true;
 }
 
+bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
+  auto argExpr = getArgExpr();
+  if (!isExpr<KeyPathExpr>(argExpr))
+    return false;
+
+  auto argType = getFromType();
+  auto paramType = getToType();
+
+  if (!isKnownKeyPathType(argType))
+    return false;
+
+  auto kpType = argType->castTo<BoundGenericType>();
+  auto kpRootType = kpType->getGenericArgs()[0];
+  auto kpValueType = kpType->getGenericArgs()[1];
+
+  auto paramFnType = paramType->getAs<FunctionType>();
+  if (!(paramFnType && paramFnType->getNumParams() == 1 &&
+        paramFnType->getParams().front().getPlainType()->isEqual(kpRootType)))
+    return false;
+
+  emitDiagnostic(diag::expr_smart_keypath_value_covert_to_contextual_type,
+                 kpValueType, paramFnType->getResult());
+  return true;
+}
+
 void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(
     const Expr *anchor) const {
   // If this is an array literal, offer to remove the brackets and pass the
@@ -6381,6 +6482,8 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   case ConversionRestrictionKind::HashableToAnyHashable:
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+  case ConversionRestrictionKind::CGFloatToDouble:
+  case ConversionRestrictionKind::DoubleToCGFloat:
     llvm_unreachable("Expected an ephemeral conversion!");
   }
 }
@@ -6911,6 +7014,26 @@ void MissingRawRepresentableInitFailure::fixIt(
   }
 }
 
+bool MissingRawValueFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  if (locator->isLastElement<LocatorPathElt::AnyRequirement>()) {
+    MissingConformanceFailure failure(getSolution(), locator,
+                                      {RawReprType, ExpectedType});
+
+    auto diagnosed = failure.diagnoseAsError();
+    if (!diagnosed)
+      return false;
+
+    auto note = emitDiagnostic(diag::note_remapped_type, ".rawValue");
+    fixIt(note);
+
+    return true;
+  }
+
+  return AbstractRawRepresentableFailure::diagnoseAsError();
+}
+
 void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {
   auto *E = getAsExpr(getAnchor());
   if (!E)
@@ -7104,10 +7227,17 @@ bool MissingContextualTypeForNil::diagnoseAsError() {
 }
 
 bool ReferenceToInvalidDeclaration::diagnoseAsError() {
+  auto &DE = getASTContext().Diags;
+
+  // `resolveType` caches results, so there is no way
+  // to suppress and then re-request the diagnostic
+  // via calling `resolveType` on the same `TypeRepr`.
+  if (getAsDecl<ParamDecl>(getAnchor()))
+    return DE.hadAnyError();
+
   auto *decl = castToExpr<DeclRefExpr>(getAnchor())->getDecl();
   assert(decl);
 
-  auto &DE = getASTContext().Diags;
   // This problem should have been already diagnosed during
   // validation of the declaration.
   if (DE.hadAnyError())

@@ -44,6 +44,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -731,13 +732,15 @@ public:
   llvm::PointerType *AsyncFunctionPointerPtrTy;
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
+  llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::PointerType *SwiftJobPtrTy;
-  llvm::PointerType *SwiftExecutorPtrTy;
+  llvm::PointerType *ExecutorFirstTy;
+  llvm::IntegerType *ExecutorSecondTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
   llvm::StructType *AsyncTaskAndContextTy;
-  llvm::StructType *AsyncContinuationContextTy;
-  llvm::PointerType *AsyncContinuationContextPtrTy;
+  llvm::StructType *ContinuationAsyncContextTy;
+  llvm::PointerType *ContinuationAsyncContextPtrTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
@@ -754,6 +757,9 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
+
+  /// What kind of tail call should be used for async->async calls.
+  llvm::CallInst::TailCallKind AsyncTailCallKind;
 
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
 
@@ -772,6 +778,7 @@ public:
   Alignment getTypeMetadataAlignment() const {
     return getPointerAlignment();
   }
+  Alignment getAsyncContextAlignment() const;
 
   /// Return the offset, relative to the address point, of the start of the
   /// type-specific members of an enum metadata.
@@ -902,7 +909,7 @@ public:
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();
-  const TypeInfo &getSwiftExecutorPtrTypeInfo();
+  const LoadableTypeInfo &getExecutorTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size, Alignment align);
   const LoadableTypeInfo &
@@ -1289,7 +1296,7 @@ public:
   ClassDecl *getSwiftNativeNSObjectDecl();
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
-
+  llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
   bool isStandardLibrary() const;
 
 private:

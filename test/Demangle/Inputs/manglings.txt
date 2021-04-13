@@ -94,6 +94,7 @@ _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Sw
 _$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
 _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _$sTA.123 ---> {T:} partial apply forwarder with unmangled suffix ".123"
+$s4main3fooyySiFyyXEfU_TA.1 ---> {T:} closure #1 () -> () in main.foo(Swift.Int) -> ()partial apply forwarder with unmangled suffix ".1"
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim
@@ -369,11 +370,15 @@ $sS5fIertyyywddw_D ---> @escaping @differentiable(reverse) @convention(thin) (@u
 $syQo ---> $syQo
 $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee -> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
 $sx1td_t ---> (t: A...)
-$s7example1fyyYF -> example.f() async -> ()
-$s7example1fyyYKF -> example.f() async throws -> ()
+$s7example1fyyYaF -> example.f() async -> ()
+$s7example1fyyYaKF -> example.f() async throws -> ()
+s7example1fyyYjfYaKF -> example.f@differentiable(_forward) () async throws -> ()
+s7example1fyyYjrYaKF -> example.f@differentiable(reverse) () async throws -> ()
+s7example1fyyYjdYaKF -> example.f@differentiable () async throws -> ()
+s7example1fyyYjlYaKF -> example.f@differentiable(_linear) () async throws -> ()
 $s4main20receiveInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF ---> main.receiveInstantiation(inout __C.__CxxTemplateInst12MagicWrapperIiE) -> ()
 $s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF ---> main.returnInstantiation() -> __C.__CxxTemplateInst12MagicWrapperIiE
-$s4main6testityyYFTu ---> async function pointer to main.testit() async -> ()
+$s4main6testityyYaFTu ---> async function pointer to main.testit() async -> ()
 $s13test_mangling3fooyS2f_S2ftFTJfUSSpSr ---> forward-mode derivative of test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {1, 2} and results {0}
 $s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFAdERzAdER_AafGRpzAafHRQr0_lTJrSpSr ---> reverse-mode derivative of test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P>
 $s13test_mangling4foo21xq_x_t16_Differentiation14DifferentiableR_AA1P13TangentVectorRp_r0_lFAdERzAdER_AafGRpzAafHRQr0_lTJVrSpSr ---> vtable thunk for reverse-mode derivative of test_mangling.foo2<A, B where B: _Differentiation.Differentiable, B.TangentVector: test_mangling.P>(x: A) -> B with respect to parameters {0} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable, A.TangentVector: test_mangling.P, B.TangentVector: test_mangling.P>
@@ -387,4 +392,14 @@ $s39differentiation_subset_parameters_thunk19inoutIndirectCalleryq_x_q_q0_t16_Di
 $sS2f8mangling3FooV13TangentVectorVIegydd_SfAESfIegydd_TJOp ---> autodiff self-reordering reabstraction thunk for pullback from @escaping @callee_guaranteed (@unowned Swift.Float) -> (@unowned Swift.Float, @unowned mangling.Foo.TangentVector) to @escaping @callee_guaranteed (@unowned Swift.Float) -> (@unowned mangling.Foo.TangentVector, @unowned Swift.Float)
 $s13test_mangling3fooyS2f_S2ftFWJrSpSr ---> reverse-mode differentiability witness for test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {0} and results {0}
 $s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lWJrUSSpSr ---> reverse-mode differentiability witness for test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable>
-$s5async1hyyS2iJXEF ---> async.h(@concurrent (Swift.Int) -> Swift.Int) -> ()
+$s5async1hyyS2iYbXEF ---> async.h(@Sendable (Swift.Int) -> Swift.Int) -> ()
+$s5Actor02MyA0C17testAsyncFunctionyyYaKFTY0_ ---> (1) suspend resume partial function for Actor.MyActor.testAsyncFunction() async throws -> ()
+$s5Actor02MyA0C17testAsyncFunctionyyYaKFTQ1_ ---> (2) await resume partial function for Actor.MyActor.testAsyncFunction() async throws -> ()
+$s4diff1hyyS2iYjfXEF ---> diff.h(@differentiable(_forward) (Swift.Int) -> Swift.Int) -> ()
+$s4diff1hyyS2iYjrXEF ---> diff.h(@differentiable(reverse) (Swift.Int) -> Swift.Int) -> ()
+$s4diff1hyyS2iYjdXEF ---> diff.h(@differentiable (Swift.Int) -> Swift.Int) -> ()
+$s4diff1hyyS2iYjlXEF ---> diff.h(@differentiable(_linear) (Swift.Int) -> Swift.Int) -> ()
+$s4test3fooyyS2f_SfYkztYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, inout @noDerivative Swift.Float) -> Swift.Float) -> ()
+$s4test3fooyyS2f_SfYkntYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, __owned @noDerivative Swift.Float) -> Swift.Float) -> ()
+$s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> ()
+$s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> ()

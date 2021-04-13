@@ -101,6 +101,25 @@ getVersionedPrebuiltModulePath(Optional<llvm::VersionTuple> sdkVer,
   } while(true);
 }
 
+std::string CompilerInvocation::computePrebuiltCachePath(
+    StringRef RuntimeResourcePath, llvm::Triple target,
+    Optional<llvm::VersionTuple> sdkVer) {
+  SmallString<64> defaultPrebuiltPath{RuntimeResourcePath};
+  StringRef platform;
+  if (tripleIsMacCatalystEnvironment(target)) {
+    // The prebuilt cache for macCatalyst is the same as the one for macOS, not
+    // iOS or a separate location of its own.
+    platform = "macosx";
+  } else {
+    platform = getPlatformNameForTriple(target);
+  }
+  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+
+  // If the SDK version is given, we should check if SDK-versioned prebuilt
+  // module cache is available and use it if so.
+  return getVersionedPrebuiltModulePath(sdkVer, defaultPrebuiltPath);
+}
+
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
   if (!FrontendOpts.PrebuiltModuleCachePath.empty())
@@ -108,21 +127,8 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
   if (SearchPathOpts.RuntimeResourcePath.empty())
     return;
 
-  SmallString<64> defaultPrebuiltPath{SearchPathOpts.RuntimeResourcePath};
-  StringRef platform;
-  if (tripleIsMacCatalystEnvironment(LangOpts.Target)) {
-    // The prebuilt cache for macCatalyst is the same as the one for macOS, not iOS
-    // or a separate location of its own.
-    platform = "macosx";
-  } else {
-    platform = getPlatformNameForTriple(LangOpts.Target);
-  }
-  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-
-  // If the SDK version is given, we should check if SDK-versioned prebuilt
-  // module cache is available and use it if so.
-  FrontendOpts.PrebuiltModuleCachePath =
-    getVersionedPrebuiltModulePath(LangOpts.SDKVersion, defaultPrebuiltPath);
+  FrontendOpts.PrebuiltModuleCachePath = computePrebuiltCachePath(
+      SearchPathOpts.RuntimeResourcePath, LangOpts.Target, LangOpts.SDKVersion);
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -179,8 +185,10 @@ setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
   // Set the OutputKind for the given Action.
   IRGenOpts.OutputKind = [](FrontendOptions::ActionType Action) {
     switch (Action) {
+    case FrontendOptions::ActionType::EmitIRGen:
+      return IRGenOutputKind::LLVMAssemblyBeforeOptimization;
     case FrontendOptions::ActionType::EmitIR:
-      return IRGenOutputKind::LLVMAssembly;
+      return IRGenOutputKind::LLVMAssemblyAfterOptimization;
     case FrontendOptions::ActionType::EmitBC:
       return IRGenOutputKind::LLVMBitcode;
     case FrontendOptions::ActionType::EmitAssembly:
@@ -385,6 +393,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
+  Opts.EnableInferPublicSendable |=
+    Args.hasFlag(OPT_enable_infer_public_concurrent_value,
+                 OPT_disable_infer_public_concurrent_value,
+                 false);
+  Opts.EnableExperimentalAsyncHandler |=
+    Args.hasArg(OPT_enable_experimental_async_handler);
   Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
     Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
@@ -480,8 +494,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
-  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
-
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
@@ -531,6 +543,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_swift3_objc_inference,
                  OPT_disable_swift3_objc_inference, false);
 
+  if (const Arg *A = Args.getLastArg(OPT_library_level)) {
+    StringRef contents = A->getValue();
+    if (contents == "api") {
+      Opts.LibraryLevel = LibraryLevel::API;
+    } else if (contents == "spi") {
+      Opts.LibraryLevel = LibraryLevel::SPI;
+    } else {
+      Opts.LibraryLevel = LibraryLevel::Other;
+      if (contents != "other") {
+        // Error on unknown library levels.
+        auto inFlight = Diags.diagnose(SourceLoc(),
+                                       diag::error_unknown_library_level,
+                                       contents);
+
+        // Only warn for "ipi" as we may use it in the future.
+        if (contents == "ipi")
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+      }
+    }
+  }
+
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(
                                    OPT_warn_swift3_objc_inference_minimal,
@@ -541,6 +574,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
     }
   }
+
+  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
 
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
@@ -713,9 +748,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.EnableExperimentalHasAsyncAlternative |=
-      Args.hasArg(OPT_experimental_has_async_alternative_attribute);
-
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -863,7 +895,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                           {"-working-directory", workingDirectory.str()});
   }
 
-  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))
@@ -1185,6 +1216,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
+  Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
+  Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);

@@ -92,6 +92,12 @@ public struct ${Self} {
 ${Availability(bits)}
 extension ${Self}: CustomStringConvertible {
   /// A textual representation of the value.
+  ///
+  /// For any finite value, this property provides a string that can be
+  /// converted back to an instance of `${Self}` without rounding errors.  That
+  /// is, if `x` is an instance of `${Self}`, then `${Self}(x.description) ==
+  /// x` is always true.  For any NaN value, the property's value is "nan", and
+  /// for positive and negative infinity its value is "inf" and "-inf".
   public var description: String {
     if isNaN {
       return "nan"
@@ -108,6 +114,9 @@ extension ${Self}: CustomStringConvertible {
 ${Availability(bits)}
 extension ${Self}: CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
+  ///
+  /// This property has the same value as the `description` property, except
+  /// that NaN values are printed in an extended format.
   public var debugDescription: String {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
     return buffer.withBytes { (bufferPtr) in
@@ -1019,6 +1028,9 @@ extension ${Self} {
   }
 }
 
+${Availability(bits)}
+extension ${Self}: Sendable { }
+
 //===----------------------------------------------------------------------===//
 // Explicit conversions between types.
 //===----------------------------------------------------------------------===//
@@ -1343,9 +1355,6 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 }
 % end
 
-${Availability(bits)}
-extension ${Self} : ConcurrentValue { }
-
 //===----------------------------------------------------------------------===//
 // Deprecated operators
 //===----------------------------------------------------------------------===//
@@ -1369,6 +1378,17 @@ public struct ${Self} {
     fatalError("${Self} is not available")
   }
 }
+
+%  if bits == 16:
+// This is a workaround for a compiler bug that omits the macOS 11 availability
+// from the implicit conformance emitted into the generated .swiftinterface
+// file. See https://github.com/apple/swift/pull/36669 for details.
+// FIXME: rdar://76092800
+@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
+extension ${Self}: Sendable { }
+%  end
 
 #endif
 % end

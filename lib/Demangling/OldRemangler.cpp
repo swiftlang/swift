@@ -606,6 +606,13 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
 }
 
+void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleAsyncSuspendResumePartialFunction(Node *node) {
+  unreachable("unsupported");
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {
@@ -643,6 +650,10 @@ void Remangler::mangleAsyncAnnotation(Node *node) {
 
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << "z";
+}
+
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  Buffer << "D" << (char)node->getIndex(); // differentiability kind
 }
 
 void Remangler::mangleFieldOffset(Node *node) {
@@ -841,6 +852,11 @@ void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {
 void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
                                                         EntityContext &ctx) {
   mangleSimpleEntity(node, 'I', "P", ctx);
+}
+
+void Remangler::manglePropertyWrapperInitFromProjectedValue(Node *node,
+                                                            EntityContext &ctx) {
+  mangleSimpleEntity(node, 'I', "W", ctx);
 }
 
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
@@ -1214,26 +1230,6 @@ void Remangler::mangleThinFunctionType(Node *node) {
   mangleChildNodes(node); // argument tuple, result type
 }
 
-void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  Buffer << "XF";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
-  Buffer << "XG";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleLinearFunctionType(Node *node) {
-  Buffer << "XH";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleEscapingLinearFunctionType(Node *node) {
-  Buffer << "XI";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
 void Remangler::mangleArgumentTuple(Node *node) {
   mangleSingleChildNode(node);
 }
@@ -1287,7 +1283,7 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Buffer << "A";
   } else if (text == "@yield_many") {
     Buffer << "G";
-  } else if (text == "@concurrent") {
+  } else if (text == "@Sendable") {
     Buffer << "h";
   } else if (text == "@async") {
     Buffer << "H";
@@ -1486,6 +1482,11 @@ void Remangler::mangleOwned(Node *node) {
 
 void Remangler::mangleInOut(Node *node) {
   Buffer << 'R';
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleNoDerivative(Node *node) {
+  Buffer << 'k';
   mangleSingleChildNode(node); // type
 }
 

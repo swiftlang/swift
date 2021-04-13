@@ -123,6 +123,8 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
     case Node::Kind::AsyncFunctionPointer:
+    case Node::Kind::AsyncAwaitResumePartialFunction:
+    case Node::Kind::AsyncSuspendResumePartialFunction:
       return true;
     default:
       return false;
@@ -728,6 +730,22 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind) {
   return resolved;
 }
 
+NodePointer Demangler::demangleTypeAnnotation() {
+  switch (char c2 = nextChar()) {
+  case 'a':
+    return createNode(Node::Kind::AsyncAnnotation);
+  case 'b':
+    return createNode(Node::Kind::ConcurrentFunctionType);
+  case 'j':
+    return demangleDifferentiableFunctionType();
+  case 'k':
+    return createType(
+        createWithChild(Node::Kind::NoDerivative, popTypeAndGetChild()));
+  default:
+    return nullptr;
+  }
+}
+
 NodePointer Demangler::demangleOperator() {
 recur:
   switch (unsigned char c = nextChar()) {
@@ -765,7 +783,6 @@ recur:
       }
 
     case 'I': return demangleImplFunctionType();
-    case 'J': return createNode(Node::Kind::ConcurrentFunctionType);
     case 'K': return createNode(Node::Kind::ThrowsAnnotation);
     case 'L': return demangleLocalIdentifier();
     case 'M': return demangleMetatype();
@@ -780,7 +797,7 @@ recur:
     case 'V': return demangleAnyGenericType(Node::Kind::Structure);
     case 'W': return demangleWitness();
     case 'X': return demangleSpecialType();
-    case 'Y': return createNode(Node::Kind::AsyncAnnotation);
+    case 'Y': return demangleTypeAnnotation();
     case 'Z': return createWithChild(Node::Kind::Static, popNode(isEntity));
     case 'a': return demangleAnyGenericType(Node::Kind::TypeAlias);
     case 'c': return popFunctionType(Node::Kind::FunctionType);
@@ -1129,6 +1146,10 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName,
                               BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
       break;
+    case 'e':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                              BUILTIN_TYPE_NAME_EXECUTOR);
+      break;
     case 'f': {
       int size = demangleIndex() - 1;
       if (size <= 0 || size > maxTypeSize)
@@ -1251,6 +1272,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
+  addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
@@ -1286,6 +1308,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     return nullptr;
 
   unsigned FirstChildIdx = 0;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::DifferentiableFunctionType)
+    ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::ThrowsAnnotation)
     ++FirstChildIdx;
@@ -1614,6 +1639,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
       return false;
     default:
       return true;
@@ -1887,7 +1913,7 @@ NodePointer Demangler::demangleImplFunctionType() {
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, CoroAttr), *this);
 
   if (nextIf('h')) {
-    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@concurrent"),
+    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@Sendable"),
                    *this);
   }
 
@@ -2295,6 +2321,14 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'X': return createNode(Node::Kind::DynamicallyReplaceableFunctionVar);
     case 'x': return createNode(Node::Kind::DynamicallyReplaceableFunctionKey);
     case 'I': return createNode(Node::Kind::DynamicallyReplaceableFunctionImpl);
+    case 'Y':
+    case 'Q': {
+      NodePointer discriminator = demangleIndexAsNode();
+      return createWithChild(
+          c == 'Q' ? Node::Kind::AsyncAwaitResumePartialFunction :
+             /*'Y'*/ Node::Kind::AsyncSuspendResumePartialFunction,
+          discriminator);
+    }
     case 'C': {
       NodePointer type = popNode(Node::Kind::Type);
       return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
@@ -2613,6 +2647,19 @@ NodePointer Demangler::demangleIndexSubset() {
   if (str.empty())
     return nullptr;
   return createNode(Node::Kind::IndexSubset, str);
+}
+
+NodePointer Demangler::demangleDifferentiableFunctionType() {
+  MangledDifferentiabilityKind kind;
+  switch (auto c = nextChar()) {
+  case 'f': kind = MangledDifferentiabilityKind::Forward; break;
+  case 'r': kind = MangledDifferentiabilityKind::Reverse; break;
+  case 'd': kind = MangledDifferentiabilityKind::Normal; break;
+  case 'l': kind = MangledDifferentiabilityKind::Linear; break;
+  default: return nullptr;
+  }
+  return createNode(
+      Node::Kind::DifferentiableFunctionType, (Node::IndexType)kind);
 }
 
 std::string Demangler::demangleBridgedMethodParams() {
@@ -3067,14 +3114,6 @@ NodePointer Demangler::demangleSpecialType() {
       default:
         return nullptr;
       }
-    case 'F':
-      return popFunctionType(Node::Kind::DifferentiableFunctionType);
-    case 'G':
-      return popFunctionType(Node::Kind::EscapingDifferentiableFunctionType);
-    case 'H':
-      return popFunctionType(Node::Kind::LinearFunctionType);
-    case 'I':
-      return popFunctionType(Node::Kind::EscapingLinearFunctionType);
     case 'o':
       return createType(createWithChild(Node::Kind::Unowned,
                                         popNode(Node::Kind::Type)));
@@ -3274,6 +3313,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'P':
       Args = None;
       Kind = Node::Kind::PropertyWrapperBackingInitializer;
+      break;
+    case 'W':
+      Args = None;
+      Kind = Node::Kind::PropertyWrapperInitFromProjectedValue;
       break;
     default: return nullptr;
   }

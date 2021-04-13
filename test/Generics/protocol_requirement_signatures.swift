@@ -58,9 +58,9 @@ protocol Q5: Q2, Q3, Q4 {}
 // CHECK-LABEL: .Q6@
 // CHECK-NEXT: Requirement signature: <Self where Self : Q2, Self : Q3, Self : Q4>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0 : Q3, τ_0_0 : Q4>
-protocol Q6: Q2, // expected-note{{conformance constraint 'Self.X': 'P1' implied here}}
+protocol Q6: Q2, // expected-note{{conformance constraint 'Self.X' : 'P1' implied here}}
              Q3, Q4 {
-    associatedtype X: P1 // expected-warning{{redundant conformance constraint 'Self.X': 'P1'}}
+    associatedtype X: P1 // expected-warning{{redundant conformance constraint 'Self.X' : 'P1'}}
                    // expected-warning@-1{{redeclaration of associated type 'X' from protocol 'Q4' is}}
 }
 

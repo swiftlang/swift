@@ -95,13 +95,39 @@ public:
     setDiagnosticHandler(nullptr);
   }
 
-  swiftparse_client_node_t parse(const char *source);
+  swiftparse_client_node_t parse(const char *source, size_t len);
 };
 
-class CLibParseActions : public SyntaxParseActions {
+struct DeferredTokenNode {
+  bool IsMissing;
+  tok TokenKind;
+  StringRef LeadingTrivia;
+  StringRef TrailingTrivia;
+  /// The range of the token including trivia.
+  CharSourceRange Range;
+
+  DeferredTokenNode(bool IsMissing, tok TokenKind, StringRef LeadingTrivia,
+                    StringRef TrailingTrivia, CharSourceRange Range)
+      : IsMissing(IsMissing), TokenKind(TokenKind),
+        LeadingTrivia(LeadingTrivia), TrailingTrivia(TrailingTrivia),
+        Range(Range) {}
+};
+
+struct DeferredLayoutNode {
+  syntax::SyntaxKind Kind;
+  ArrayRef<RecordedOrDeferredNode> Children;
+  unsigned Length;
+
+  DeferredLayoutNode(syntax::SyntaxKind Kind,
+                     ArrayRef<RecordedOrDeferredNode> Children, unsigned Length)
+      : Kind(Kind), Children(Children), Length(Length) {}
+};
+
+class CLibParseActions final : public SyntaxParseActions {
   SynParser &SynParse;
   SourceManager &SM;
   unsigned BufferID;
+  llvm::BumpPtrAllocator DeferredNodeAllocator;
 
 public:
   CLibParseActions(SynParser &synParse, SourceManager &sm, unsigned bufID)
@@ -150,7 +176,7 @@ private:
     node.token_data.trailing_trivia_count = trailingTrivia.size();
     assert(node.token_data.trailing_trivia_count == trailingTrivia.size() &&
            "trailing trivia count value is too large");
-    makeCRange(node.range, range);
+    makeCRange(node.token_data.range, range);
     node.present = true;
   }
 
@@ -176,16 +202,16 @@ private:
     return getNodeHandler()(&node);
   }
 
-  OpaqueSyntaxNode recordRawSyntax(SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) override {
+  OpaqueSyntaxNode
+  recordRawSyntax(SyntaxKind kind,
+                  ArrayRef<OpaqueSyntaxNode> elements) override {
     CRawSyntaxNode node;
     auto numValue = serialization::getNumericValue(kind);
     node.kind = numValue;
     assert(node.kind == numValue && "syntax kind value is too large");
-    node.layout_data.nodes = elements.data();
+    node.layout_data.nodes =
+        const_cast<const swiftparse_client_node_t *>(elements.data());
     node.layout_data.nodes_count = elements.size();
-    makeCRange(node.range, range);
     node.present = true;
     return getNodeHandler()(&node);
   }
@@ -194,10 +220,6 @@ private:
                                                const SourceFile &SF) override {
     // We don't support realizing syntax nodes from the C layout.
     return None;
-  }
-
-  void discardRecordedNode(OpaqueSyntaxNode node) override {
-    // FIXME: This method should not be called at all.
   }
 
   std::pair<size_t, OpaqueSyntaxNode>
@@ -211,6 +233,174 @@ private:
     assert(ckind == numValue && "syntax kind value is too large");
     auto result = NodeLookup(lexerOffset, ckind);
     return {result.length, result.node};
+  }
+
+  OpaqueSyntaxNode makeDeferredToken(tok tokenKind, StringRef leadingTrivia,
+                                     StringRef trailingTrivia,
+                                     CharSourceRange range,
+                                     bool isMissing) override {
+    return new (DeferredNodeAllocator) DeferredTokenNode(
+        isMissing, tokenKind, leadingTrivia, trailingTrivia, range);
+  }
+
+  OpaqueSyntaxNode makeDeferredLayout(
+      syntax::SyntaxKind k, bool isMissing,
+      const MutableArrayRef<ParsedRawSyntaxNode> &parsedChildren) override {
+    assert(!isMissing && "Missing layout nodes not implemented yet");
+
+    auto childrenMem = DeferredNodeAllocator.Allocate<RecordedOrDeferredNode>(
+        parsedChildren.size());
+    auto children =
+        llvm::makeMutableArrayRef(childrenMem, parsedChildren.size());
+
+    // Compute the length of this node.
+    unsigned length = 0;
+    size_t index = 0;
+    for (auto &parsedChild : parsedChildren) {
+      auto child = parsedChild.takeRecordedOrDeferredNode();
+      children[index++] = child;
+
+      switch (child.getKind()) {
+      case RecordedOrDeferredNode::Kind::Null:
+        break;
+      case RecordedOrDeferredNode::Kind::Recorded:
+        llvm_unreachable("Children of deferred nodes must also be deferred");
+        break;
+      case RecordedOrDeferredNode::Kind::DeferredLayout:
+        length +=
+            static_cast<const DeferredLayoutNode *>(child.getOpaque())->Length;
+        break;
+      case RecordedOrDeferredNode::Kind::DeferredToken:
+        length += static_cast<const DeferredTokenNode *>(child.getOpaque())
+                      ->Range.getByteLength();
+        break;
+      }
+    }
+
+    return new (DeferredNodeAllocator) DeferredLayoutNode(k, children, length);
+  }
+
+  OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) override {
+    auto Data = static_cast<const DeferredTokenNode *>(deferred);
+    if (Data->IsMissing) {
+      return recordMissingToken(Data->TokenKind, Data->Range.getStart());
+    } else {
+      return recordToken(Data->TokenKind, Data->LeadingTrivia,
+                         Data->TrailingTrivia, Data->Range);
+    }
+  }
+
+  OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override {
+    auto Data = static_cast<const DeferredLayoutNode *>(deferred);
+
+    auto childrenStore =
+        DeferredNodeAllocator.Allocate<OpaqueSyntaxNode>(Data->Children.size());
+    MutableArrayRef<OpaqueSyntaxNode> children =
+        llvm::makeMutableArrayRef(childrenStore, Data->Children.size());
+
+    for (size_t i = 0; i < Data->Children.size(); ++i) {
+      auto Child = Data->Children[i];
+      switch (Child.getKind()) {
+      case RecordedOrDeferredNode::Kind::Null:
+        children[i] = Child.getOpaque();
+        break;
+      case RecordedOrDeferredNode::Kind::Recorded:
+        llvm_unreachable("Children of deferred nodes must also be deferred");
+        break;
+      case RecordedOrDeferredNode::Kind::DeferredLayout:
+        children[i] = recordDeferredLayout(Child.getOpaque());
+        break;
+      case RecordedOrDeferredNode::Kind::DeferredToken:
+        children[i] = recordDeferredToken(Child.getOpaque());
+        break;
+      }
+    }
+    return recordRawSyntax(Data->Kind, children);
+  }
+
+  DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
+                                    size_t ChildIndex) const override {
+    auto Data = static_cast<const DeferredLayoutNode *>(node);
+    auto Child = Data->Children[ChildIndex];
+    switch (Child.getKind()) {
+    case RecordedOrDeferredNode::Kind::Null:
+      return DeferredNodeInfo(
+          RecordedOrDeferredNode(nullptr, RecordedOrDeferredNode::Kind::Null),
+          syntax::SyntaxKind::Unknown, tok::NUM_TOKENS,
+          /*IsMissing=*/false);
+    case RecordedOrDeferredNode::Kind::Recorded:
+      llvm_unreachable("Children of deferred nodes must also be deferred");
+      break;
+    case RecordedOrDeferredNode::Kind::DeferredLayout: {
+      auto ChildData =
+          static_cast<const DeferredLayoutNode *>(Child.getOpaque());
+      return DeferredNodeInfo(
+          RecordedOrDeferredNode(ChildData,
+                                 RecordedOrDeferredNode::Kind::DeferredLayout),
+          ChildData->Kind, tok::NUM_TOKENS,
+          /*IsMissing=*/false);
+    }
+    case RecordedOrDeferredNode::Kind::DeferredToken: {
+      auto ChildData =
+          static_cast<const DeferredTokenNode *>(Child.getOpaque());
+      return DeferredNodeInfo(
+          RecordedOrDeferredNode(ChildData,
+                                 RecordedOrDeferredNode::Kind::DeferredToken),
+          syntax::SyntaxKind::Token, ChildData->TokenKind,
+          ChildData->IsMissing);
+    }
+    }
+  }
+
+  CharSourceRange getDeferredChildRange(OpaqueSyntaxNode node,
+                                        size_t ChildIndex,
+                                        SourceLoc StartLoc) const override {
+    auto Data = static_cast<const DeferredLayoutNode *>(node);
+
+    // Compute the start offset of the child node by advancing StartLoc by the
+    // length of all previous child nodes.
+    for (unsigned i = 0; i < ChildIndex; ++i) {
+      auto Child = Data->Children[i];
+      switch (Child.getKind()) {
+      case RecordedOrDeferredNode::Kind::Null:
+        break;
+      case RecordedOrDeferredNode::Kind::Recorded:
+        llvm_unreachable("Children of deferred nodes must also be deferred");
+      case RecordedOrDeferredNode::Kind::DeferredLayout:
+        StartLoc = StartLoc.getAdvancedLoc(
+            static_cast<const DeferredLayoutNode *>(Child.getOpaque())->Length);
+        break;
+      case RecordedOrDeferredNode::Kind::DeferredToken:
+        StartLoc = StartLoc.getAdvancedLoc(
+            static_cast<const DeferredTokenNode *>(Child.getOpaque())
+                ->Range.getByteLength());
+        break;
+      }
+    }
+
+    auto Child = Data->Children[ChildIndex];
+    switch (Child.getKind()) {
+    case RecordedOrDeferredNode::Kind::Null:
+      return CharSourceRange(StartLoc, /*Length=*/0);
+    case RecordedOrDeferredNode::Kind::Recorded:
+      llvm_unreachable("Children of deferred nodes must also be deferred");
+      break;
+    case RecordedOrDeferredNode::Kind::DeferredLayout: {
+      auto ChildData = static_cast<const DeferredLayoutNode *>(Child.getOpaque());
+      return CharSourceRange(StartLoc, ChildData->Length);
+    }
+    case RecordedOrDeferredNode::Kind::DeferredToken: {
+      auto ChildData = static_cast<const DeferredTokenNode *>(Child.getOpaque());
+      assert(ChildData->Range.getStart() == StartLoc &&
+             "Something broken in our StartLoc computation?");
+      return ChildData->Range;
+    }
+    }
+  }
+
+  size_t getDeferredNumChildren(OpaqueSyntaxNode node) override {
+    auto Data = static_cast<const DeferredLayoutNode *>(node);
+    return Data->Children.size();
   }
 };
 
@@ -277,10 +467,10 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   }
 };
 
-swiftparse_client_node_t SynParser::parse(const char *source) {
+swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   SourceManager SM;
-  unsigned bufID = SM.addNewSourceBuffer(
-    llvm::MemoryBuffer::getMemBuffer(source, "syntax_parse_source"));
+  unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
+      StringRef(source, len), "syntax_parse_source"));
   TypeCheckerOptions tyckOpts;
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
@@ -302,7 +492,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
     pConsumer = std::make_unique<SynParserDiagConsumer>(*this, bufID);
     PU.getDiagnosticEngine().addConsumer(*pConsumer);
   }
-  return PU.parse();
+  return const_cast<swiftparse_client_node_t>(PU.parse());
 }
 }
 //===--- C API ------------------------------------------------------------===//
@@ -332,10 +522,11 @@ swiftparse_parser_set_node_lookup(swiftparse_parser_t c_parser,
   parser->setNodeLookup(lookup);
 }
 
-swiftparse_client_node_t
-swiftparse_parse_string(swiftparse_parser_t c_parser, const char *source) {
+swiftparse_client_node_t swiftparse_parse_string(swiftparse_parser_t c_parser,
+                                                 const char *source,
+                                                 size_t len) {
   SynParser *parser = static_cast<SynParser*>(c_parser);
-  return parser->parse(source);
+  return parser->parse(source, len);
 }
 
 const char* swiftparse_syntax_structure_versioning_identifier(void) {

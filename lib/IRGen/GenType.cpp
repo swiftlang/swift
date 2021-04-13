@@ -1027,27 +1027,31 @@ namespace {
       return true;
     }
 
+    PointerInfo getPointerInfo() const {
+      return PointerInfo::forAligned(PointeeAlign);
+    }
+
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getAlignedPointerExtraInhabitantCount(IGM, PointeeAlign);
+      return getPointerInfo().getExtraInhabitantCount(IGM);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
                                        unsigned index) const override {
-      return getAlignedPointerExtraInhabitantValue(IGM, PointeeAlign,
-                                                   bits, index, 0);
+      return getPointerInfo()
+               .getFixedExtraInhabitantValue(IGM, bits, index, 0);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address src,
                                          SILType T,
                                          bool isOutlined) const override {
-      return getAlignedPointerExtraInhabitantIndex(IGF, PointeeAlign, src);
+      return getPointerInfo().getExtraInhabitantIndex(IGF, src);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T,
                               bool isOutlined) const override {
-      storeAlignedPointerExtraInhabitant(IGF, PointeeAlign, index, dest);
+      getPointerInfo().storeExtraInhabitant(IGF, index, dest);
     }
   };
 
@@ -1546,20 +1550,6 @@ const TypeInfo &TypeConverter::getTaskContinuationFunctionPtrTypeInfo() {
   TaskContinuationFunctionPtrTI->NextConverted = FirstType;
   FirstType = TaskContinuationFunctionPtrTI;
   return *TaskContinuationFunctionPtrTI;
-}
-
-const TypeInfo &IRGenModule::getSwiftExecutorPtrTypeInfo() {
-  return Types.getSwiftExecutorPtrTypeInfo();
-}
-
-const TypeInfo &TypeConverter::getSwiftExecutorPtrTypeInfo() {
-  if (SwiftExecutorPtrTI) return *SwiftExecutorPtrTI;
-  SwiftExecutorPtrTI = createUnmanagedStorageType(IGM.SwiftExecutorPtrTy,
-                                                  ReferenceCounting::Unknown,
-                                                  /*isOptional*/ false);
-  SwiftExecutorPtrTI->NextConverted = FirstType;
-  FirstType = SwiftExecutorPtrTI;
-  return *SwiftExecutorPtrTI;
 }
 
 const LoadableTypeInfo &
@@ -2081,6 +2071,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return &getRawUnsafeContinuationTypeInfo();
   case TypeKind::BuiltinJob:
     return &getJobTypeInfo();
+  case TypeKind::BuiltinExecutor:
+    return &getExecutorTypeInfo();
   case TypeKind::BuiltinIntegerLiteral:
     return &getIntegerLiteralTypeInfo();
   case TypeKind::BuiltinFloat:
@@ -2095,7 +2087,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinDefaultActorStorage: {
     // Builtin.DefaultActorStorage represents the extra storage
-    // (beyond the heap header) of a default actor class.  It is
+    // (beyond the heap header) of a default actor.  It is
     // fixed-size and totally opaque.
     auto numWords = NumWords_DefaultActor;
 

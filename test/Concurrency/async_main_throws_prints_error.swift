@@ -8,6 +8,9 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=ios
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 enum Err : Error { case noGood }
 
 func asyncFunc() async throws {

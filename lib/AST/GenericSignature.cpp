@@ -176,23 +176,9 @@ bool GenericSignatureImpl::isCanonical() const {
   return getCanonicalSignature().getPointer() == this;
 }
 
-#ifndef NDEBUG
-/// Determine the canonical ordering of requirements.
-static unsigned getRequirementKindOrder(RequirementKind kind) {
-  switch (kind) {
-  case RequirementKind::Conformance: return 2;
-  case RequirementKind::Superclass: return 0;
-  case RequirementKind::SameType: return 3;
-  case RequirementKind::Layout: return 1;
-  }
-  llvm_unreachable("unhandled kind");
-}
-#endif
-
 CanGenericSignature
 CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
-                                  ArrayRef<Requirement> requirements,
-                                  bool skipValidation) {
+                                  ArrayRef<Requirement> requirements) {
   // Canonicalize the parameters and requirements.
   SmallVector<GenericTypeParamType*, 8> canonicalParams;
   canonicalParams.reserve(params.size());
@@ -205,116 +191,8 @@ CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
   for (auto &reqt : requirements)
     canonicalRequirements.push_back(reqt.getCanonical());
 
-  (void)skipValidation;
   auto canSig = get(canonicalParams, canonicalRequirements,
                     /*isKnownCanonical=*/true);
-
-#ifndef NDEBUG
-  if (skipValidation)
-    return CanGenericSignature(canSig);
-
-  PrettyStackTraceGenericSignature debugStack("canonicalizing", canSig);
-
-  // Check that the signature is canonical.
-  for (unsigned idx : indices(canonicalRequirements)) {
-    debugStack.setRequirement(idx);
-
-    const auto &reqt = canonicalRequirements[idx];
-
-    // Left-hand side must be canonical in its context.
-    // Check canonicalization of requirement itself.
-    switch (reqt.getKind()) {
-    case RequirementKind::Superclass:
-      assert(canSig->isCanonicalTypeInContext(reqt.getFirstType()) &&
-             "Left-hand side is not canonical");
-      assert(canSig->isCanonicalTypeInContext(reqt.getSecondType()) &&
-             "Superclass type isn't canonical in its own context");
-      break;
-
-    case RequirementKind::Layout:
-      assert(canSig->isCanonicalTypeInContext(reqt.getFirstType()) &&
-             "Left-hand side is not canonical");
-      break;
-
-    case RequirementKind::SameType: {
-      auto isCanonicalAnchor = [&](Type type) {
-        if (auto *dmt = type->getAs<DependentMemberType>())
-          return canSig->isCanonicalTypeInContext(dmt->getBase());
-        return type->is<GenericTypeParamType>();
-      };
-
-      auto firstType = reqt.getFirstType();
-      auto secondType = reqt.getSecondType();
-      assert(isCanonicalAnchor(firstType));
-
-      if (reqt.getSecondType()->isTypeParameter()) {
-        assert(isCanonicalAnchor(secondType));
-        assert(compareDependentTypes(firstType, secondType) < 0 &&
-               "Out-of-order type parameters in same-type constraint");
-      } else {
-        assert(canSig->isCanonicalTypeInContext(secondType) &&
-               "Concrete same-type isn't canonical in its own context");
-      }
-      break;
-    }
-
-    case RequirementKind::Conformance:
-      assert(reqt.getFirstType()->isTypeParameter() &&
-             "Left-hand side must be a type parameter");
-      assert(isa<ProtocolType>(reqt.getSecondType().getPointer()) &&
-             "Right-hand side of conformance isn't a protocol type");
-      break;
-    }
-
-    // From here on, we're only interested in requirements beyond the first.
-    if (idx == 0) continue;
-
-    // Make sure that the left-hand sides are in nondecreasing order.
-    const auto &prevReqt = canonicalRequirements[idx-1];
-    int compareLHS =
-      compareDependentTypes(prevReqt.getFirstType(), reqt.getFirstType());
-    assert(compareLHS <= 0 && "Out-of-order left-hand sides");
-
-    // If we have two same-type requirements where the left-hand sides differ
-    // but fall into the same equivalence class, we can check the form.
-    if (compareLHS < 0 && reqt.getKind() == RequirementKind::SameType &&
-        prevReqt.getKind() == RequirementKind::SameType &&
-        canSig->areSameTypeParameterInContext(prevReqt.getFirstType(),
-                                              reqt.getFirstType())) {
-      // If it's a it's a type parameter, make sure the equivalence class is
-      // wired together sanely.
-      if (prevReqt.getSecondType()->isTypeParameter()) {
-        assert(prevReqt.getSecondType()->isEqual(reqt.getFirstType()) &&
-               "same-type constraints within an equiv. class are out-of-order");
-      } else {
-        // Otherwise, the concrete types must match up.
-        assert(prevReqt.getSecondType()->isEqual(reqt.getSecondType()) &&
-               "inconsistent concrete same-type constraints in equiv. class");
-      }
-    }
-
-    // From here on, we only care about cases where the previous and current
-    // requirements have the same left-hand side.
-    if (compareLHS != 0) continue;
-
-    // Check ordering of requirement kinds.
-    assert((getRequirementKindOrder(prevReqt.getKind()) <=
-            getRequirementKindOrder(reqt.getKind())) &&
-           "Requirements for a given kind are out-of-order");
-
-    // From here on, we only care about the same requirement kind.
-    if (prevReqt.getKind() != reqt.getKind()) continue;
-
-    assert(reqt.getKind() == RequirementKind::Conformance &&
-           "Only conformance requirements can have multiples");
-
-    auto prevProto =
-      prevReqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-    auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-    assert(TypeDecl::compare(prevProto, proto) < 0 &&
-           "Out-of-order conformance requirements");
-  }
-#endif
 
   return CanGenericSignature(canSig);
 }
@@ -520,7 +398,19 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
   if (type1.getPointer() == type2.getPointer())
     return true;
 
-  auto &builder = *getGenericSignatureBuilder();
+  return areSameTypeParameterInContext(type1, type2,
+                                       *getGenericSignatureBuilder());
+}
+
+bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
+                                                         Type type2,
+                                                         GenericSignatureBuilder &builder) const {
+  assert(type1->isTypeParameter());
+  assert(type2->isTypeParameter());
+
+  if (type1.getPointer() == type2.getPointer())
+    return true;
+
   auto equivClass1 =
     builder.resolveEquivalenceClass(
                              type1,
@@ -545,14 +435,12 @@ bool GenericSignatureImpl::isRequirementSatisfied(
 
   switch (requirement.getKind()) {
   case RequirementKind::Conformance: {
-    auto protocolType = requirement.getSecondType()->castTo<ProtocolType>();
-    auto protocol = protocolType->getDecl();
+    auto *protocol = requirement.getProtocolDecl();
 
     if (canFirstType->isTypeParameter())
       return requiresProtocol(canFirstType, protocol);
     else
-      return (bool)GSB->lookupConformance(/*dependentType=*/CanType(),
-                                          canFirstType, protocol);
+      return (bool)GSB->lookupConformance(canFirstType, protocol);
   }
 
   case RequirementKind::SameType: {
@@ -668,47 +556,6 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(
   });
 }
 
-CanType GenericSignatureImpl::getCanonicalTypeInContext(
-    Type type, GenericSignatureBuilder &builder) const {
-  type = type->getCanonicalType();
-
-  // All the contextual canonicality rules apply to type parameters, so if the
-  // type doesn't involve any type parameters, it's already canonical.
-  if (!type->hasTypeParameter())
-    return CanType(type);
-
-  // Replace non-canonical type parameters.
-  type = type.transformRec([&](TypeBase *component) -> Optional<Type> {
-    if (!isa<GenericTypeParamType>(component) &&
-        !isa<DependentMemberType>(component))
-      return None;
-
-    // Find the equivalence class for this dependent type.
-    auto resolved = builder.maybeResolveEquivalenceClass(
-                      Type(component),
-                      ArchetypeResolutionKind::CompleteWellFormed,
-                      /*wantExactPotentialArchetype=*/false);
-    if (!resolved) return None;
-
-    if (auto concrete = resolved.getAsConcreteType())
-      return getCanonicalTypeInContext(concrete, builder);
-
-    auto equivClass = resolved.getEquivalenceClass(builder);
-    if (!equivClass) return None;
-
-    if (equivClass->concreteType) {
-      return getCanonicalTypeInContext(equivClass->concreteType, builder);
-    }
-
-    return equivClass->getAnchor(builder, getGenericParams());
-  });
-  
-  auto result = type->getCanonicalType();
-
-  assert(isCanonicalTypeInContext(result, builder));
-  return result;
-}
-
 CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
   type = type->getCanonicalType();
 
@@ -718,7 +565,7 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
     return CanType(type);
 
   auto &builder = *getGenericSignatureBuilder();
-  return getCanonicalTypeInContext(type, builder);
+  return builder.getCanonicalTypeInContext(type, { })->getCanonicalType();
 }
 
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
@@ -746,8 +593,7 @@ static bool hasConformanceInSignature(ArrayRef<Requirement> requirements,
   for (const auto &req: requirements) {
     if (req.getKind() == RequirementKind::Conformance &&
         req.getFirstType()->isEqual(subjectType) &&
-        req.getSecondType()->castTo<ProtocolType>()->getDecl()
-          == proto) {
+        req.getProtocolDecl() == proto) {
       return true;
     }
   }
@@ -779,9 +625,21 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
   auto conforms = equivClass->conformsTo.find(protocol);
   assert(conforms != equivClass->conformsTo.end());
 
-  // Look at every requirement source for this conformance. If all sources are
-  // explicit, leave these three values empty. Otherwise, they are computed
-  // from the 'best' derived requirement source for this conformance.
+  auto rootType = equivClass->getAnchor(builder, { });
+  if (hasConformanceInSignature(getRequirements(), rootType, protocol)) {
+    ConformanceAccessPath::Entry root(rootType, protocol);
+    ArrayRef<ConformanceAccessPath::Entry> path(root);
+
+    ConformanceAccessPath result(builder.getASTContext().AllocateCopy(path));
+    equivClass->conformanceAccessPathCache.insert({protocol, result});
+
+    return result;
+  }
+
+  // This conformance comes from a derived source.
+  //
+  // To recover this the conformance, we recursively recover the conformance
+  // of the shortest parent type to the parent protocol first.
   Type shortestParentType;
   Type shortestSubjectType;
   ProtocolDecl *shortestParentProto = nullptr;
@@ -826,28 +684,13 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
 
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement: {
-      if (source->parent->kind == RequirementSource::RequirementSignatureSelf) {
-        // This is a top-level requirement in the requirement signature that is
-        // currently being computed. This is not a derived source, so it
-        // contributes nothing to the "shortest parent type" computation.
-        break;
-      }
-
-      auto constraintType = constraint.getSubjectDependentType({ });
-
-      // Skip self-recursive sources.
-      bool derivedViaConcrete = false;
-      if (source->getMinimalConformanceSource(builder, constraintType, protocol,
-                                              derivedViaConcrete) != source)
-        break;
-
+      assert(source->parent->kind != RequirementSource::RequirementSignatureSelf);
 
       // If we have a derived conformance requirement like T[.P].X : Q, we can
       // recursively compute the conformance access path for T : P, and append
       // the path element (Self.X : Q).
       auto parentType = source->parent->getAffectedType()->getCanonicalType();
       auto subjectType = source->getStoredType()->getCanonicalType();
-
       auto *parentProto = source->getProtocolDecl();
 
       // We might have multiple candidate parent types and protocols for the
@@ -864,33 +707,22 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
     }
   }
 
+  assert(shortestParentType);
+
   SmallVector<ConformanceAccessPath::Entry, 2> path;
 
-  if (!shortestParentType) {
-    // All requirement sources were explicit. This means we can recover the
-    // conformance directly from the generic signature; canonicalize the
-    // dependent type and add it as an initial path element.
-    auto rootType = equivClass->getAnchor(builder, { });
-    assert(hasConformanceInSignature(getRequirements(), rootType, protocol));
-    path.emplace_back(rootType, protocol);
-  } else {
-    // This conformance comes from a derived source.
-    //
-    // To recover this the conformance, we recursively recover the conformance
-    // of the parent type to the parent protocol first.
-    auto parentPath = getConformanceAccessPath(
-        shortestParentType, shortestParentProto);
-    for (auto entry : parentPath)
-      path.push_back(entry);
+  auto parentPath = getConformanceAccessPath(
+      shortestParentType, shortestParentProto);
+  for (auto entry : parentPath)
+    path.push_back(entry);
 
-    // Then, we add the subject type from the parent protocol's requirement
-    // signature.
-    path.emplace_back(shortestSubjectType, protocol);
-  }
+  // Then, we add the subject type from the parent protocol's requirement
+  // signature.
+  path.emplace_back(shortestSubjectType, protocol);
 
-  ConformanceAccessPath result(getASTContext().AllocateCopy(path));
-
+  ConformanceAccessPath result(builder.getASTContext().AllocateCopy(path));
   equivClass->conformanceAccessPathCache.insert({protocol, result});
+
   return result;
 }
 
@@ -1007,7 +839,6 @@ bool Requirement::isCanonical() const {
   return true;
 }
 
-
 /// Get the canonical form of this requirement.
 Requirement Requirement::getCanonical() const {
   Type firstType = getFirstType();
@@ -1028,4 +859,9 @@ Requirement Requirement::getCanonical() const {
     return Requirement(getKind(), firstType, getLayoutConstraint());
   }
   llvm_unreachable("Unhandled RequirementKind in switch");
+}
+
+ProtocolDecl *Requirement::getProtocolDecl() const {
+  assert(getKind() == RequirementKind::Conformance);
+  return getSecondType()->castTo<ProtocolType>()->getDecl();
 }

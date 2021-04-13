@@ -384,6 +384,16 @@ namespace {
       return true;
     }
     
+    bool visitDestroyValueInst(const DestroyValueInst *RHS) {
+      auto *left = cast<DestroyValueInst>(LHS);
+      return left->poisonRefs() == RHS->poisonRefs();
+    }
+
+    bool visitDebugValue(const DebugValueInst *RHS) {
+      auto *left = cast<DebugValueInst>(LHS);
+      return left->poisonRefs() == RHS->poisonRefs();
+    }
+
     bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {
       auto *left = cast<BeginCOWMutationInst>(LHS);
       return left->isNative() == RHS->isNative();
@@ -1529,9 +1539,8 @@ MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
 }
 
 MultipleValueInstructionResult::MultipleValueInstructionResult(
-    ValueKind valueKind, unsigned index, SILType type,
-    ValueOwnershipKind ownershipKind)
-    : ValueBase(valueKind, type) {
+    unsigned index, SILType type, ValueOwnershipKind ownershipKind)
+    : ValueBase(ValueKind::MultipleValueInstructionResult, type) {
   setOwnershipKind(ownershipKind);
   setIndex(index);
 }
@@ -1551,7 +1560,7 @@ ValueOwnershipKind MultipleValueInstructionResult::getOwnershipKind() const {
   return ValueOwnershipKind(Bits.MultipleValueInstructionResult.VOKind);
 }
 
-MultipleValueInstruction *MultipleValueInstructionResult::getParent() {
+MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const {
   char *Ptr = reinterpret_cast<char *>(
       const_cast<MultipleValueInstructionResult *>(this));
 

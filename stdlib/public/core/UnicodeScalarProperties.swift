@@ -19,7 +19,7 @@ extension Unicode.Scalar {
 
   /// A value that provides access to properties of a Unicode scalar that are
   /// defined by the Unicode standard.
-  public struct Properties: ConcurrentValue {
+  public struct Properties: Sendable {
     @usableFromInline
     internal var _scalar: Unicode.Scalar
 
@@ -821,7 +821,7 @@ extension Unicode {
   /// The general category of a scalar is its "first-order, most usual
   /// categorization". It does not attempt to cover multiple uses of some
   /// scalars, such as the use of letters to represent Roman numerals.
-  public enum GeneralCategory: ConcurrentValue {
+  public enum GeneralCategory: Sendable {
 
     /// An uppercase letter.
     ///
@@ -1208,7 +1208,7 @@ extension Unicode {
   ///     let overlayClassIsOverlay = overlayClass == .overlay
   ///     // overlayClassIsOverlay == true
   public struct CanonicalCombiningClass:
-    Comparable, Hashable, RawRepresentable, ConcurrentValue
+    Comparable, Hashable, RawRepresentable, Sendable
   {
     /// Base glyphs that occupy their own space and do not combine with others.
     public static let notReordered = CanonicalCombiningClass(rawValue: 0)
@@ -1332,7 +1332,7 @@ extension Unicode {
   /// Some letterlike scalars used in numeric systems, such as Greek or Latin
   /// letters, do not have a non-nil numeric type, in order to prevent programs
   /// from incorrectly interpreting them as numbers in non-numeric contexts.
-  public enum NumericType: ConcurrentValue {
+  public enum NumericType: Sendable {
 
     /// A digit that is commonly understood to form base-10 numbers.
     ///

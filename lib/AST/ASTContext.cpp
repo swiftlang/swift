@@ -164,6 +164,9 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
+  /// The set of top-level modules we have loaded, indexed by ABI name.
+  llvm::MapVector<Identifier, ModuleDecl *> LoadedModulesByABIName;
+
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -282,7 +285,7 @@ struct ASTContext::Implementation {
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
-  llvm::DenseMap<const Decl *, RawComment> RawComments;
+  llvm::DenseMap<const Decl *, std::pair<RawComment, bool>> RawComments;
 
   /// Map from Swift declarations to brief comments.
   llvm::DenseMap<const Decl *, StringRef> BriefComments;
@@ -709,8 +712,7 @@ FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
         continue;
       for (auto Req: FD->getGenericRequirements()) {
         if (Req.getKind() == RequirementKind::Conformance &&
-              Req.getSecondType()->getNominalOrBoundGenericNominal() ==
-            getRangeReplaceableCollectionDecl()) {
+              Req.getProtocolDecl() == getRangeReplaceableCollectionDecl()) {
           getImpl().PlusFunctionOnRangeReplaceableCollection = FD;
         }
       }
@@ -2018,7 +2020,7 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   return TheStdlibModule;
 }
 
-Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
+Optional<std::pair<RawComment, bool>> ASTContext::getRawComment(const Decl *D) {
   auto Known = getImpl().RawComments.find(D);
   if (Known == getImpl().RawComments.end())
     return None;
@@ -2026,8 +2028,8 @@ Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
   return Known->second;
 }
 
-void ASTContext::setRawComment(const Decl *D, RawComment RC) {
-  getImpl().RawComments[D] = RC;
+void ASTContext::setRawComment(const Decl *D, RawComment RC, bool FromSerialized) {
+  getImpl().RawComments[D] = std::make_pair(RC, FromSerialized);
 }
 
 Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
@@ -3083,11 +3085,15 @@ getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
 }
 
 static bool
-isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
+isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
                         Type result) {
   for (auto param : params) {
     if (!param.getPlainType()->isCanonical())
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return result->isCanonical();
@@ -3126,6 +3132,10 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
   for (auto param : params) {
     if (!sig->isCanonicalTypeInContext(param.getPlainType()))
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return sig->isCanonicalTypeInContext(result);
@@ -3229,35 +3239,41 @@ void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
   assert(params.size() == labels.size());
   for (auto i : indices(params)) {
     auto &param = params[i];
-    param = AnyFunctionType::Param(param.getPlainType(),
-                                   labels[i],
-                                   param.getParameterFlags());
+    param = AnyFunctionType::Param(param.getPlainType(), labels[i],
+                                   param.getParameterFlags(),
+                                   param.getInternalLabel());
   }
 }
 
+/// Profile \p params into \p ID. In contrast to \c == on \c Param, the profile
+/// *does* take the internal label into account and *does not* canonicalize
+/// the param's type.
 static void profileParams(llvm::FoldingSetNodeID &ID,
                           ArrayRef<AnyFunctionType::Param> params) {
   ID.AddInteger(params.size());
   for (auto param : params) {
     ID.AddPointer(param.getLabel().get());
+    ID.AddPointer(param.getInternalLabel().get());
     ID.AddPointer(param.getPlainType().getPointer());
     ID.AddInteger(param.getParameterFlags().toRaw());
   }
 }
 
 void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
-                           ArrayRef<AnyFunctionType::Param> params,
-                           Type result,
-                           ExtInfo info) {
+                           ArrayRef<AnyFunctionType::Param> params, Type result,
+                           Optional<ExtInfo> info) {
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  auto infoKey = info.getFuncAttrKey();
-  ID.AddInteger(infoKey.first);
-  ID.AddPointer(infoKey.second);
+  if (info.hasValue()) {
+    auto infoKey = info.getValue().getFuncAttrKey();
+    ID.AddInteger(std::get<0>(infoKey));
+    ID.AddPointer(std::get<1>(infoKey));
+    ID.AddPointer(std::get<2>(infoKey));
+  }
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, ExtInfo info) {
+                                Type result, Optional<ExtInfo> info) {
   auto properties = getFunctionRecursiveProperties(params, result);
   auto arena = getArena(properties);
 
@@ -3273,19 +3289,32 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  auto clangTypeInfo = info.getClangTypeInfo();
+  ClangTypeInfo clangTypeInfo;
+  if (info.hasValue())
+    clangTypeInfo = info.getValue().getClangTypeInfo();
 
-  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
-      params.size(), clangTypeInfo.empty() ? 0 : 1);
+  bool hasClangInfo =
+      info.hasValue() && !info.getValue().getClangTypeInfo().empty();
+
+  Type globalActor;
+  if (info.hasValue())
+    globalActor = info->getGlobalActor();
+
+  size_t allocSize = totalSizeToAlloc<
+      AnyFunctionType::Param, ClangTypeInfo, Type
+    >(params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
-  bool isCanonical = isFunctionTypeCanonical(params, result);
+  bool isCanonical = isAnyFunctionTypeCanonical(params, result);
   if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
       isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();
     else
       isCanonical = false;
   }
+
+  if (globalActor && !globalActor->isCanonical())
+    isCanonical = false;
 
   auto funcTy = new (mem) FunctionType(params, result, info,
                                        isCanonical ? &ctx : nullptr,
@@ -3295,36 +3324,41 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
-                           Type output, ExtInfo info,
-                           const ASTContext *ctx,
+FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
+                           Optional<ExtInfo> info, const ASTContext *ctx,
                            RecursiveTypeProperties properties)
-    : AnyFunctionType(TypeKind::Function, ctx,
-                      output, properties, params.size(), info) {
+    : AnyFunctionType(TypeKind::Function, ctx, output, properties,
+                      params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
-  auto clangTypeInfo = info.getClangTypeInfo();
-  if (!clangTypeInfo.empty())
-    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
+  if (info.hasValue()) {
+    auto clangTypeInfo = info.getValue().getClangTypeInfo();
+    if (!clangTypeInfo.empty())
+      *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
+    if (Type globalActor = info->getGlobalActor())
+      *getTrailingObjects<Type>() = globalActor;
+  }
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature sig,
                                   ArrayRef<AnyFunctionType::Param> params,
-                                  Type result,
-                                  ExtInfo info) {
+                                  Type result, Optional<ExtInfo> info) {
   ID.AddPointer(sig.getPointer());
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  auto infoKey = info.getFuncAttrKey();
-  ID.AddInteger(infoKey.first);
-  ID.AddPointer(infoKey.second);
+  if (info.hasValue()) {
+    auto infoKey = info.getValue().getFuncAttrKey();
+    ID.AddInteger(std::get<0>(infoKey));
+    ID.AddPointer(std::get<1>(infoKey));
+    ID.AddPointer(std::get<2>(infoKey));
+  }
 }
 
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Param> params,
                                               Type result,
-                                              ExtInfo info) {
+                                              Optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
   assert(!result->hasPlaceholder());
@@ -3347,15 +3381,23 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   // point.
   bool isCanonical = isGenericFunctionTypeCanonical(sig, params, result);
 
-  assert(info.getClangTypeInfo().empty() &&
+  assert((!info.hasValue() || info.getValue().getClangTypeInfo().empty()) &&
          "Generic functions do not have Clang types at the moment.");
 
   if (auto funcTy
         = ctx.getImpl().GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
     return funcTy;
   }
-  
-  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param>(params.size());
+
+  Type globalActor;
+  if (info.hasValue())
+    globalActor = info->getGlobalActor();
+
+  if (globalActor && !globalActor->isCanonical())
+    isCanonical = false;
+
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type>(
+      params.size(), globalActor ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
@@ -3371,13 +3413,17 @@ GenericFunctionType::GenericFunctionType(
                        GenericSignature sig,
                        ArrayRef<AnyFunctionType::Param> params,
                        Type result,
-                       ExtInfo info,
+                       Optional<ExtInfo> info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, result,
                     properties, params.size(), info), Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  if (info) {
+    if (Type globalActor = info->getGlobalActor())
+      *getTrailingObjects<Type>() = globalActor;
+  }
 }
 
 GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
@@ -4986,7 +5032,7 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   if (!kind)
     return original;
 
-  auto wrapperInfo = original->getPropertyWrapperBackingPropertyInfo();
+  auto wrapperInfo = original->getPropertyWrapperAuxiliaryVariables();
   switch (*kind) {
   case PropertyWrapperSynthesizedPropertyKind::Backing:
     return this == wrapperInfo.backingVar ? original : nullptr;

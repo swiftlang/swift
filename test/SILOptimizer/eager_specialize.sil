@@ -1,6 +1,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN --check-prefix=CHECK-IRGEN-%target-cpu %s
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
 // RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer -sil-inline-generics=true -inline %s | %FileCheck --check-prefix=CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE %s
+
+// XFAIL: CPU=arm64e
 
 sil_stage canonical
 

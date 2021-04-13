@@ -19,8 +19,10 @@
 
 #define DEBUG_TYPE "sil-opt-remark-gen"
 
-#include "swift/Basic/Defer.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Defer.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/Projection.h"
@@ -61,16 +63,17 @@ struct ValueToDeclInferrer {
   using Argument = OptRemark::Argument;
   using ArgumentKeyKind = OptRemark::ArgumentKeyKind;
 
-  RCIdentityFunctionInfo &rcfi;
   SmallVector<std::pair<SILType, Projection>, 32> accessPath;
   SmallVector<Operand *, 32> rcIdenticalSecondaryUseSearch;
+  RCIdentityFunctionInfo &rcfi;
 
   ValueToDeclInferrer(RCIdentityFunctionInfo &rcfi) : rcfi(rcfi) {}
 
   /// Given a value, attempt to infer a conservative list of decls that the
   /// passed in value could be referring to. This is done just using heuristics
   bool infer(ArgumentKeyKind keyKind, SILValue value,
-             SmallVectorImpl<Argument> &resultingInferredDecls);
+             SmallVectorImpl<Argument> &resultingInferredDecls,
+             bool allowSingleRefEltAddrPeek = false);
 
   /// Print out a note to \p stream that beings at decl and then if
   /// useProjectionPath is set to true iterates the accessPath we computed for
@@ -157,6 +160,7 @@ void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
       stream << "bitwise_cast<" << proj.getCastType(baseType) << ">";
       continue;
     case ProjectionKind::Struct:
+    case ProjectionKind::Class:
       stream << proj.getVarDecl(baseType)->getBaseName();
       continue;
     case ProjectionKind::Tuple:
@@ -165,8 +169,10 @@ void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
     case ProjectionKind::Enum:
       stream << proj.getEnumElementDecl(baseType)->getBaseName();
       continue;
-    // Object -> Address projections can never be looked through.
-    case ProjectionKind::Class:
+
+    // Object -> Address projections can never be looked through unless they are
+    // from a class where we have special logic for it only happening a single
+    // time.
     case ProjectionKind::Box:
     case ProjectionKind::Index:
     case ProjectionKind::TailElems:
@@ -213,21 +219,109 @@ static bool hasNonInlinedDebugScope(SILInstruction *i) {
   return false;
 }
 
+namespace {
+
+/// A helper struct that attempts to infer the decl associated with a value from
+/// one of its uses. It does this by searching the def-use graph locally for
+/// debug_value and debug_value_addr instructions.
+struct ValueUseToDeclInferrer {
+  using Argument = ValueToDeclInferrer::Argument;
+  using ArgumentKeyKind = ValueToDeclInferrer::ArgumentKeyKind;
+
+  SmallPtrSet<swift::SILInstruction *, 8> visitedDebugValueInsts;
+  ValueToDeclInferrer &object;
+  ArgumentKeyKind keyKind;
+  SmallVectorImpl<Argument> &resultingInferredDecls;
+
+  bool findDecls(Operand *use, SILValue value);
+};
+
+} // anonymous namespace
+
+bool ValueUseToDeclInferrer::findDecls(Operand *use, SILValue value) {
+  // Skip type dependent operands.
+  if (use->isTypeDependent())
+    return false;
+
+  // Then see if we have a debug_value that is associated with a non-inlined
+  // debug scope. Such an instruction is an instruction that is from the
+  // current function.
+  auto debugInst = DebugVarCarryingInst(use->getUser());
+  if (!debugInst)
+    return false;
+
+  LLVM_DEBUG(llvm::dbgs() << "Found DebugInst: " << **debugInst);
+  if (!hasNonInlinedDebugScope(*debugInst))
+    return false;
+
+  // See if we have already inferred this debug_value as a potential source
+  // for this instruction. In such a case, just return.
+  if (!visitedDebugValueInsts.insert(*debugInst).second)
+    return false;
+
+  if (auto *decl = debugInst.getDecl()) {
+    std::string msg;
+    {
+      llvm::raw_string_ostream stream(msg);
+      // If we are not a top level use, we must be a rc-identical transitive
+      // use. In such a case, we just print out the rc identical value
+      // without a projection path. This is because we now have a better
+      // name and the name is rc-identical to whatever was at the end of the
+      // projection path but is not at the end of that projection path.
+      object.printNote(stream, decl,
+                       use->get() == value /*print projection path*/);
+    }
+    resultingInferredDecls.emplace_back(
+        OptRemark::ArgumentKey{keyKind, "InferredValue"}, std::move(msg), decl);
+    return true;
+  }
+
+  // If we did not have a decl, see if we were asked for testing
+  // purposes to use SILDebugInfo to create a placeholder inferred
+  // value.
+  if (!DecllessDebugValueUseSILDebugInfo)
+    return false;
+
+  auto varInfo = debugInst.getVarInfo();
+  if (!varInfo)
+    return false;
+
+  auto name = varInfo->Name;
+  if (name.empty())
+    return false;
+
+  std::string msg;
+  {
+    llvm::raw_string_ostream stream(msg);
+    object.printNote(stream, name,
+                     use->get() == value /*print projection path*/);
+  }
+  resultingInferredDecls.push_back(Argument(
+      {keyKind, "InferredValue"}, std::move(msg), debugInst->getLoc()));
+  return true;
+}
+
 bool ValueToDeclInferrer::infer(
     ArgumentKeyKind keyKind, SILValue value,
-    SmallVectorImpl<Argument> &resultingInferredDecls) {
+    SmallVectorImpl<Argument> &resultingInferredDecls,
+    bool allowSingleRefEltAddrPeek) {
   // Clear the stored access path at end of scope.
   SWIFT_DEFER {
     accessPath.clear();
   };
-  SmallPtrSet<SILInstruction *, 8> visitedDebugValueInsts;
+  ValueUseToDeclInferrer valueUseInferrer{
+      {}, *this, keyKind, resultingInferredDecls};
+  bool foundSingleRefElementAddr = false;
 
   // This is a linear IR traversal using a 'falling while loop'. That means
   // every time through the loop we are trying to handle a case before we hit
   // the bottom of the while loop where we always return true (since we did not
   // hit a could not compute case). Reassign value and continue to go to the
   // next step.
+  LLVM_DEBUG(llvm::dbgs() << "Searching for decls!\n");
   while (true) {
+    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *value);
+
     // First check for "identified values" like arguments and global_addr.
     if (auto *arg = dyn_cast<SILArgument>(value))
       if (auto *decl = arg->getDecl()) {
@@ -280,6 +374,10 @@ bool ValueToDeclInferrer::infer(
       }
     }
 
+    // We prefer decls not from uses since these are inherently noisier. Still,
+    // it is better than nothing.
+    bool foundDeclFromUse = false;
+
     if (auto *asi = dyn_cast<AllocStackInst>(value)) {
       if (auto *decl = asi->getDecl()) {
         std::string msg;
@@ -291,6 +389,23 @@ bool ValueToDeclInferrer::infer(
             Argument({keyKind, "InferredValue"}, std::move(msg), decl));
         return true;
       }
+
+      // See if we have a single init alloc_stack and can infer a
+      // debug_value/debug_value_addr from that.
+      LLVM_DEBUG(llvm::dbgs() << "Checking for single init use!\n");
+      if (auto *initUse = getSingleInitAllocStackUse(asi)) {
+        LLVM_DEBUG(llvm::dbgs() << "Found one: " << *initUse->getUser());
+        if (auto *si = dyn_cast<StoreInst>(initUse->getUser())) {
+          for (auto *use : si->getSrc()->getUses()) {
+            foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
+          }
+        }
+        if (auto *cai = dyn_cast<CopyAddrInst>(initUse->getUser())) {
+          for (auto *use : cai->getSrc()->getUses()) {
+            foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
+          }
+        }
+      }
     }
 
     // Then visit our users (ignoring rc identical transformations) and see if
@@ -300,65 +415,8 @@ bool ValueToDeclInferrer::infer(
     // The reason why we do this is that sometimes we reform a struct from its
     // constituant parts and then construct the debug_value from that. For
     // instance, if we FSOed.
-    bool foundDeclFromUse = false;
     rcfi.visitRCUses(value, [&](Operand *use) {
-      // Skip type dependent uses.
-      if (use->isTypeDependent())
-        return;
-
-      // Then see if we have a debug_value that is associated with a non-inlined
-      // debug scope. Such an instruction is an instruction that is from the
-      // current function.
-      auto *dvi = dyn_cast<DebugValueInst>(use->getUser());
-      if (!dvi || !hasNonInlinedDebugScope(dvi))
-        return;
-
-      // See if we have already inferred this debug_value as a potential source
-      // for this instruction. In such a case, just return.
-      if (!visitedDebugValueInsts.insert(dvi).second)
-        return;
-
-      if (auto *decl = dvi->getDecl()) {
-        std::string msg;
-        {
-          llvm::raw_string_ostream stream(msg);
-          // If we are not a top level use, we must be a rc-identical transitive
-          // use. In such a case, we just print out the rc identical value
-          // without a projection path. This is because we now have a better
-          // name and the name is rc-identical to whatever was at the end of the
-          // projection path but is not at the end of that projection path.
-          printNote(stream, decl,
-                    use->get() == value /*print projection path*/);
-        }
-        resultingInferredDecls.emplace_back(
-            OptRemark::ArgumentKey{keyKind, "InferredValue"}, std::move(msg),
-            decl);
-        foundDeclFromUse = true;
-        return;
-      }
-
-      // If we did not have a decl, see if we were asked for testing
-      // purposes to use SILDebugInfo to create a placeholder inferred
-      // value.
-      if (!DecllessDebugValueUseSILDebugInfo)
-        return;
-
-      auto varInfo = dvi->getVarInfo();
-      if (!varInfo)
-        return;
-
-      auto name = varInfo->Name;
-      if (name.empty())
-        return;
-
-      std::string msg;
-      {
-        llvm::raw_string_ostream stream(msg);
-        printNote(stream, name, use->get() == value /*print projection path*/);
-      }
-      resultingInferredDecls.push_back(
-          Argument({keyKind, "InferredValue"}, std::move(msg), dvi->getLoc()));
-      foundDeclFromUse = true;
+      foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
     });
 
     // At this point, we could not infer any argument. See if we can look up the
@@ -374,6 +432,20 @@ bool ValueToDeclInferrer::infer(
         value = projInst->getOperand(0);
         accessPath.emplace_back(value->getType(), proj);
         continue;
+      }
+
+      // Check if we had a ref_element_addr and our caller said that they were
+      // ok with skipping a single one.
+      //
+      // Examples of users: begin_access, end_access.
+      if (allowSingleRefEltAddrPeek &&
+          proj.getKind() == ProjectionKind::Class) {
+        if (!foundSingleRefElementAddr) {
+          value = cast<RefElementAddrInst>(value)->getOperand();
+          accessPath.emplace_back(value->getType(), proj);
+          foundSingleRefElementAddr = true;
+          continue;
+        }
       }
     }
 
@@ -412,9 +484,106 @@ struct OptRemarkGeneratorInstructionVisitor
   void visitAllocRefInst(AllocRefInst *ari);
   void visitAllocBoxInst(AllocBoxInst *abi);
   void visitSILInstruction(SILInstruction *) {}
+  void visitBeginAccessInst(BeginAccessInst *bai);
+  void visitEndAccessInst(EndAccessInst *eai);
+  void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *ccabi);
+  void visitUnconditionalCheckedCastAddrInst(
+      UnconditionalCheckedCastAddrInst *uccai);
 };
 
 } // anonymous namespace
+
+void OptRemarkGeneratorInstructionVisitor::
+    visitUnconditionalCheckedCastAddrInst(
+        UnconditionalCheckedCastAddrInst *uccai) {
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, uccai->getSrc(), inferredArgs,
+        true /*allow single ref elt peek*/);
+    (void)foundArgs;
+
+    // Use the actual source loc of the
+    auto remark = RemarkMissed("memory", *uccai)
+                  << "unconditional runtime cast of value with type '"
+                  << NV("ValueType", uccai->getSrc()->getType()) << "' to '"
+                  << NV("CastType", uccai->getDest()->getType()) << "'";
+    for (auto arg : inferredArgs) {
+      remark << arg;
+    }
+    return remark;
+  });
+}
+
+void OptRemarkGeneratorInstructionVisitor::visitCheckedCastAddrBranchInst(
+    CheckedCastAddrBranchInst *ccabi) {
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, ccabi->getSrc(), inferredArgs,
+        true /*allow single ref elt peek*/);
+    (void)foundArgs;
+
+    // Use the actual source loc of the
+    auto remark = RemarkMissed("memory", *ccabi)
+                  << "conditional runtime cast of value with type '"
+                  << NV("ValueType", ccabi->getSrc()->getType()) << "' to '"
+                  << NV("CastType", ccabi->getDest()->getType()) << "'";
+    for (auto arg : inferredArgs) {
+      remark << arg;
+    }
+    return remark;
+  });
+}
+
+void OptRemarkGeneratorInstructionVisitor::visitBeginAccessInst(
+    BeginAccessInst *bai) {
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, bai->getOperand(), inferredArgs,
+        true /*allow single ref elt peek*/);
+    (void)foundArgs;
+
+    // Use the actual source loc of the
+    auto remark =
+        RemarkMissed("memory", *bai, SourceLocInferenceBehavior::ForwardScan)
+        << "begin exclusive access to value of type '"
+        << NV("ValueType", bai->getOperand()->getType()) << "'";
+    for (auto arg : inferredArgs) {
+      remark << arg;
+    }
+    return remark;
+  });
+}
+
+void OptRemarkGeneratorInstructionVisitor::visitEndAccessInst(
+    EndAccessInst *eai) {
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    auto *bai = cast<BeginAccessInst>(eai->getOperand());
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, bai->getOperand(), inferredArgs,
+        true /*allow single ref elt peek*/);
+    (void)foundArgs;
+
+    // Use the actual source loc of the begin_access if it works. Otherwise,
+    // scan backwards.
+    auto remark =
+        RemarkMissed("memory", *eai, SourceLocInferenceBehavior::BackwardScan,
+                     SourceLocPresentationKind::EndRange)
+        << "end exclusive access to value of type '"
+        << NV("ValueType", eai->getOperand()->getType()) << "'";
+    for (auto arg : inferredArgs) {
+      remark << arg;
+    }
+    return remark;
+  });
+}
 
 void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     StrongRetainInst *sri) {
@@ -450,7 +619,8 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
 
     auto remark =
         RemarkMissed("memory", *sri,
-                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer)
+                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer,
+                     SourceLocPresentationKind::EndRange)
         << "release of type '" << NV("ValueType", sri->getOperand()->getType())
         << "'";
     for (auto arg : inferredArgs) {

@@ -109,3 +109,19 @@ public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
   #endif
 }) {
 }
+
+// CHECK: func hasIfCompilerCheck
+// CHECK:      #if compiler(>=5.3)
+// CHECK-NEXT:   return true
+// CHECK-NEXT: #else
+// CHECK-NEXT:   return false
+// CHECK-NEXT: #endif
+@_alwaysEmitIntoClient
+public func hasIfCompilerCheck(_ x: () -> Bool = {
+#if compiler(>=5.3)
+  return true
+#else
+  return false
+#endif
+  }) {
+}

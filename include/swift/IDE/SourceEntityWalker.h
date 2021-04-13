@@ -41,6 +41,16 @@ namespace swift {
 /// An abstract class used to traverse the AST and provide source information.
 /// Visitation happens in source-order and compiler-generated semantic info,
 /// like implicit declarations, is ignored.
+///
+/// If \c walkTo*Pre returns \c true, the children are visited and \c
+/// walkTo*Post is called after all children have been visited.
+/// If \c walkTo*Pre returns \c false, the corresponding \c walkTo*Post call
+/// will not be issued.
+///
+/// If \c walkTo*Post returns \c false, the traversal is terminated. No more
+/// \c walk* calls are issued. Nodes that have already received a \c walkTo*Pre
+/// call will *not* receive a \c walkTo*Post call.
+/// If \c walkTo*Post returns \c true, the traversal continues.
 class SourceEntityWalker {
 public:
   /// Walks the provided source file.

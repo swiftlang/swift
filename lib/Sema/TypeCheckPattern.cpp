@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <utility>
@@ -1664,7 +1665,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
-void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
+void TypeChecker::coerceParameterListToType(ParameterList *P,
                                             AnyFunctionType *FN) {
 
   // Local function to check if the given type is valid e.g. doesn't have

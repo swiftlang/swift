@@ -7,10 +7,6 @@
 // RUN: %target-codesign %t/Dictionary && %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
 
-// rdar71933996
-// UNSUPPORTED: swift_test_mode_optimize
-// UNSUPPORTED: swift_test_mode_optimize_size
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
@@ -3891,6 +3887,8 @@ func checkGetObjectsAndKeys(
   values.deinitialize(count: storageSize) // noop
   values.deallocate()
   withExtendedLifetime(canary) {}
+  // [NSArray getObjects] does not retain the objects, so keep the dictionary alive.
+  withExtendedLifetime(dictionary) {}
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
@@ -5084,6 +5082,8 @@ DictionaryTestSuite.test("getObjects:andKeys:count:") {
   d.available_getObjects(vp, andKeys: kp, count: 2)
   expectEqual(expectedKeys, Array(keys))
   expectEqual(expectedValues, Array(values))
+  // [NSArray getObjects] does not retain the objects, so keep the dictionary alive.
+  withExtendedLifetime(d) {}
 }
 #endif
 

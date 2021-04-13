@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "silgen-cleanup"
 
+#include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -48,16 +49,54 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
 
   void notifyHasNewUsers(SILValue) override { changed = true; }
 
-  SILBasicBlock::iterator deleteDeadOperands(SILBasicBlock::iterator nextII) {
-    // Delete trivially dead instructions in non-determistic order.
+  /// Delete trivially dead instructions in non-determistic order.
+  ///
+  /// We either have that nextII is endII or if nextII is not endII then endII
+  /// is nextII->getParent()->end().
+  SILBasicBlock::iterator deleteDeadOperands(SILBasicBlock::iterator nextII,
+                                             SILBasicBlock::iterator endII) {
+    // Each iteration, we store the instructions that will be deleted in the
+    // iteration here and use it to ensure that nextII is moved past /all/
+    // instructions that we are going to delete no matter the order (since we
+    // are visiting instructions in non-deterministic order).
+    SmallPtrSet<SILInstruction *, 16> willBeDeletedInIteration;
+
     while (!deadOperands.empty()) {
       SILInstruction *deadOperInst = *deadOperands.begin();
+
       // Make sure at least the first instruction is removed from the set.
       deadOperands.erase(deadOperInst);
+
+      // Then add our initial instruction to the will be deleted set.
+      willBeDeletedInIteration.insert(deadOperInst);
+      SWIFT_DEFER { willBeDeletedInIteration.clear(); };
+
       eliminateDeadInstruction(deadOperInst, [&](SILInstruction *deadInst) {
         LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
-        if (nextII == deadInst->getIterator())
+
+        // Add our instruction to the will be deleted set.
+        willBeDeletedInIteration.insert(deadInst);
+
+        // Then look through /all/ instructions that we are going to delete in
+        // this iteration until we hit the end of the list. This ensures that in
+        // a situation like the following:
+        //
+        // ```
+        //   (%1, %2) = multi_result_inst %0   (a)
+        //   inst_to_delete %1                 (b)
+        //   inst_to_delete %2                 (c)
+        // ```
+        //
+        // If nextII is on (b), but we visit (c) before visiting (b), then we
+        // will end up with nextII on (c) after we are done and then delete
+        // (c). In contrast by using the set when we process (b) after (c), we
+        // first see that (b) is nextII [since it is in the set] so move to (c)
+        // and then see that (c) is in the set as well (since we inserted it
+        // previously) and skip that.
+        while (nextII != endII && willBeDeletedInIteration.count(&*nextII))
           ++nextII;
+
+        // Then remove the instruction from the set.
         deadOperands.erase(deadInst);
       });
     }
@@ -97,7 +136,7 @@ void SILGenCleanup::run() {
     for (auto &bb : function) {
       for (auto ii = bb.begin(), ie = bb.end(); ii != ie;) {
         ii = sgCanonicalize.canonicalize(&*ii);
-        ii = sgCanonicalize.deleteDeadOperands(ii);
+        ii = sgCanonicalize.deleteDeadOperands(ii, ie);
       }
     }
     if (sgCanonicalize.changed) {

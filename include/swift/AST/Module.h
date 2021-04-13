@@ -56,6 +56,7 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
+  enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -165,6 +166,9 @@ class OverlayFile;
 class ModuleDecl : public DeclContext, public TypeDecl {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
+
+  /// The ABI name of the module, if it differs from the module name.
+  mutable Identifier ModuleABIName;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -343,6 +347,15 @@ public:
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
 
+  /// Retrieve the ABI name of the module, which is used for metadata and
+  /// mangling.
+  Identifier getABIName() const;
+
+  /// Set the ABI name of the module;
+  void setABIName(Identifier name) {
+    ModuleABIName = name;
+  }
+
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
@@ -449,6 +462,9 @@ public:
   void setResilienceStrategy(ResilienceStrategy strategy) {
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
+
+  /// Distribution level of the module.
+  LibraryLevel getLibraryLevel() const;
 
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }

@@ -9,7 +9,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_NOMINAL_1 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_NOMINAL_1 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_NOMINAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAGlll
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_NOMINAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_GLOBAL_1 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_GLOBAL_2 | %FileCheck %s -check-prefix=CONDITION -check-prefix=NOFLAG
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONDITION_GLOBAL_2 -D FOO -D BAR | %FileCheck %s -check-prefix=CONDITION -check-prefix=WITHFLAG

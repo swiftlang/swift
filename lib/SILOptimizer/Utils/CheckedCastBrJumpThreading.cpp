@@ -657,7 +657,8 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     return;
 
   // Second phase: transformation.
-  Fn->verifyCriticalEdges();
+  if (Fn->getModule().getOptions().VerifyAll)
+    Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
     BasicBlockCloner Cloner(edit->CCBBlock);
@@ -672,7 +673,7 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     edit->modifyCFGForSuccessPreds(Cloner);
 
     if (Cloner.wasCloned()) {
-      Cloner.updateSSAAfterCloning();
+      Cloner.updateOSSAAfterCloning();
 
       if (!Cloner.getNewBB()->pred_empty())
         BlocksForWorklist.push_back(Cloner.getNewBB());

@@ -162,6 +162,7 @@ KNOWN_SETTINGS=(
 
     ## llbuild Options
     llbuild-enable-assertions                     "1"               "enable assertions in llbuild"
+    skip-clean-llbuild                            "0"               "skip cleaning up llbuild"
 
     ## LLDB Options
     lldb-assertions                               "1"               "build lldb with assertions enabled"
@@ -1415,7 +1416,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                           call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}"
+                           call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}" || call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                         else
                            call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                         fi
@@ -1431,7 +1432,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                           call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}"
+                           call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}" || call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                         else
                            call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                         fi
@@ -2188,6 +2189,15 @@ for host in "${ALL_HOSTS[@]}"; do
 
                         -DSQLite3_INCLUDE_DIR:PATH="$(xcrun -sdk macosx -show-sdk-path)/usr/include"
                     )
+                fi
+
+                if [[ "${SKIP_CLEAN_LLBUILD}" == "0" ]]
+                then
+                  # Ensure llbuild will rebuild from scratch, since
+                  # arbitrary changes to the compiler can prevent
+                  # a successful incremental build
+                  echo "Cleaning the llbuild build directory"
+                  call rm -rf "$(build_directory ${host} llbuild)"
                 fi
                 ;;
             xctest)
@@ -3246,11 +3256,11 @@ function build_and_test_installable_package() {
             with_pushd "${PKG_TESTS_SANDBOX_PARENT}" \
                 call tar xzf "${package_for_host}"
 
-            if python -c "import psutil" ; then
+            if python3 -c "import psutil" ; then
               TIMEOUT_ARGS=--timeout=1200 # 20 minutes
             fi
             with_pushd "${PKG_TESTS_SOURCE_DIR}" \
-                call python "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
+                call python3 "${LIT_EXECUTABLE_PATH}" . -sv --param package-path="${PKG_TESTS_SANDBOX}" --param test-exec-root="${PKG_TESTS_TEMPS}" --param llvm-bin-dir="${LLVM_BIN_DIR}" ${TIMEOUT_ARGS}
         fi
     fi
 }

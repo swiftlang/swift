@@ -591,28 +591,6 @@ Runtime.test("Struct layout with reference storage types") {
   print(malkovich)
 }
 
-#if !(canImport(Darwin) && !_runtime(_ObjC))
-Runtime.test("SwiftError layout constants for LLDB") {
-  let offsetof_SwiftError_typeMetadata = pointerToSwiftCoreSymbol(name: "_swift_lldb_offsetof_SwiftError_typeMetadata")!
-  let sizeof_SwiftError = pointerToSwiftCoreSymbol(name: "_swift_lldb_sizeof_SwiftError")!
-
-#if canImport(Darwin)
-#if arch(i386) || arch(arm)
-  expectEqual(20, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
-  expectEqual(36, sizeof_SwiftError.load(as: UInt.self))
-#else
-  expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
-  expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
-#endif
-#elseif os(Linux) || os(Android) || os(Windows) || os(OpenBSD)
-  expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
-  expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
-#else
-  _UnimplementedError()
-#endif
-}
-#endif
-
 var Reflection = TestSuite("Reflection")
 
 func wrap1   (_ x: Any) -> Any { return x }

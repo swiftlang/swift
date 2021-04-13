@@ -186,9 +186,9 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
   }
 }
 
-extension SIMD${n}: ConcurrentValue
-  where Scalar: ConcurrentValue,
-        Scalar.SIMD${storageN}Storage: ConcurrentValue { }
+extension SIMD${n}: Sendable
+  where Scalar: Sendable,
+        Scalar.SIMD${storageN}Storage: Sendable { }
 
 %end
 
@@ -221,7 +221,7 @@ extension ${Self}: SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} integers.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage, ConcurrentValue {
+  public struct SIMD${n}Storage: SIMDStorage, Sendable {
 
     public var _value: Builtin.Vec${n}x${BuiltinName}
 
@@ -233,6 +233,11 @@ extension ${Self}: SIMDScalar {
     @_transparent
     public init() {
       _value = Builtin.zeroInitializer()
+    }
+    
+    @_alwaysEmitIntoClient
+    internal init(_ _builtin: Builtin.Vec${n}x${BuiltinName}) {
+      _value = _builtin
     }
 
     public subscript(index: Int) -> ${Self} {
@@ -270,7 +275,7 @@ extension ${Self} : SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage, ConcurrentValue {
+  public struct SIMD${n}Storage: SIMDStorage, Sendable {
 
     public var _value: Builtin.Vec${n}xFPIEEE${bits}
 
@@ -282,6 +287,11 @@ extension ${Self} : SIMDScalar {
     @_transparent
     public init() {
       _value = Builtin.zeroInitializer()
+    }
+    
+    @_alwaysEmitIntoClient
+    internal init(_ _builtin: Builtin.Vec${n}xFPIEEE${bits}) {
+      _value = _builtin
     }
 
     public subscript(index: Int) -> ${Self} {

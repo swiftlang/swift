@@ -44,7 +44,7 @@ class DefaultArgumentExpr;
 class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
-struct PropertyWrapperBackingPropertyInfo;
+class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
@@ -712,11 +712,10 @@ public:
   bool isCached() const;
 };
 
-/// Request information about the backing property for properties that have
-/// attached property wrappers.
-class PropertyWrapperBackingPropertyInfoRequest :
-    public SimpleRequest<PropertyWrapperBackingPropertyInfoRequest,
-                         PropertyWrapperBackingPropertyInfo(VarDecl *),
+/// Request the synthesized auxiliary declarations for a wrapped property.
+class PropertyWrapperAuxiliaryVariablesRequest :
+    public SimpleRequest<PropertyWrapperAuxiliaryVariablesRequest,
+                         PropertyWrapperAuxiliaryVariables(VarDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -725,7 +724,28 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  PropertyWrapperBackingPropertyInfo
+  PropertyWrapperAuxiliaryVariables
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
+/// Request information about initialization of the backing property
+/// for properties that have attached property wrappers.
+class PropertyWrapperInitializerInfoRequest :
+    public SimpleRequest<PropertyWrapperInitializerInfoRequest,
+                         PropertyWrapperInitializerInfo(VarDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  PropertyWrapperInitializerInfo
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
@@ -897,10 +917,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether the given class is an actor.
+/// Determine whether the given nominal type is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,
-                         bool(ClassDecl *),
+                         bool(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -908,7 +928,7 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
   // Caching
@@ -918,7 +938,7 @@ public:
 /// Determine whether the given class is a default actor.
 class IsDefaultActorRequest :
     public SimpleRequest<IsDefaultActorRequest,
-                         bool(ClassDecl *),
+                         bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -926,7 +946,8 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl,
+                ModuleDecl *M, ResilienceExpansion expansion) const;
 
 public:
   // Caching
@@ -965,7 +986,8 @@ using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
 class GlobalActorAttributeRequest :
     public SimpleRequest<
         GlobalActorAttributeRequest,
-        Optional<CustomAttrNominalPair>(Decl *),
+        Optional<CustomAttrNominalPair>(
+            llvm::PointerUnion<Decl *, ClosureExpr *>),
         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -975,7 +997,8 @@ private:
 
   // Evaluation.
   Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-  evaluate(Evaluator &evaluator, Decl *decl) const;
+  evaluate(
+      Evaluator &evaluator, llvm::PointerUnion<Decl *, ClosureExpr *>) const;
 
 public:
   // Caching
@@ -2731,6 +2754,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Get the library level of a module.
+class ModuleLibraryLevelRequest
+    : public SimpleRequest<ModuleLibraryLevelRequest,
+                           LibraryLevel(const ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  LibraryLevel evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
                            Type(const TypeResolution *, TypeRepr *,
@@ -2870,6 +2911,62 @@ private:
 
   // Evaluation.
   FuncDecl *evaluate(Evaluator &evaluator, Decl *) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the implicit conformance for the given nominal type to
+/// the Sendable protocol.
+class GetImplicitSendableRequest :
+    public SimpleRequest<GetImplicitSendableRequest,
+                         NormalProtocolConformance *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NormalProtocolConformance *evaluate(
+      Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+class ConditionalRequirementsRequest
+    : public SimpleRequest<ConditionalRequirementsRequest,
+                           llvm::ArrayRef<Requirement>(
+                               NormalProtocolConformance *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::ArrayRef<Requirement> evaluate(Evaluator &evaluator,
+                                       NormalProtocolConformance *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class AsyncAlternativeRequest
+    : public SimpleRequest<AsyncAlternativeRequest,
+                           AbstractFunctionDecl *(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  AbstractFunctionDecl *evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *attachedFunctionDecl) const;
 
 public:
   bool isCached() const { return true; }

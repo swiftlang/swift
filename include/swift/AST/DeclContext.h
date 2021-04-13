@@ -159,6 +159,9 @@ enum class ConformanceLookupKind : unsigned {
   OnlyExplicit,
   /// All conformances except for inherited ones.
   NonInherited,
+  /// All conformances except structurally-derived conformances, of which
+  /// Sendable is the only one.
+  NonStructural,
 };
 
 /// Describes a diagnostic for a conflict between two protocol
@@ -733,6 +736,8 @@ class IterableDeclContext {
   friend struct ::llvm::cast_convert_val;
 
   static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
+
+  friend class LookupAllConformancesInContextRequest;
 
   /// Retrieve the \c ASTContext in which this iterable context occurs.
   ASTContext &getASTContext() const;

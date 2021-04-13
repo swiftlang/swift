@@ -2752,8 +2752,7 @@ public:
             abort();
           }
 
-          auto reqProto =
-            req.getSecondType()->castTo<ProtocolType>()->getDecl();
+          auto reqProto = req.getProtocolDecl();
           if (reqProto != conformances[idx].getRequirement()) {
             Out << "error: wrong protocol in signature conformances: have "
               << conformances[idx].getRequirement()->getName().str()

@@ -618,12 +618,14 @@ void SILBuilder::emitDestructureValueOperation(
 }
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
-                                             SILDebugVariable Var) {
+                                             SILDebugVariable Var,
+                                             bool poisonRefs) {
   assert(isLoadableOrOpaque(src->getType()));
   // Debug location overrides cannot apply to debug value instructions.
   DebugLocOverrideRAII LocOverride{*this, None};
   return insert(
-      DebugValueInst::create(getSILDebugLocation(Loc), src, getModule(), Var));
+    DebugValueInst::create(getSILDebugLocation(Loc), src, getModule(), Var,
+                           poisonRefs));
 }
 
 DebugValueAddrInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
@@ -656,13 +658,23 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
     SILType destLoweredTy, CanType destFormalTy,
     SILBasicBlock *successBB, SILBasicBlock *failureBB,
     ProfileCounter target1Count, ProfileCounter target2Count) {
+  return createCheckedCastBranch(Loc, isExact, op, destLoweredTy, destFormalTy,
+                                 successBB, failureBB, op.getOwnershipKind(),
+                                 target1Count, target2Count);
+}
+
+CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
+    SILLocation Loc, bool isExact, SILValue op, SILType destLoweredTy,
+    CanType destFormalTy, SILBasicBlock *successBB, SILBasicBlock *failureBB,
+    ValueOwnershipKind forwardingOwnershipKind, ProfileCounter target1Count,
+    ProfileCounter target2Count) {
   assert((!hasOwnership() || !failureBB->getNumArguments() ||
           failureBB->getArgument(0)->getType() == op->getType()) &&
          "failureBB's argument doesn't match incoming argument type");
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, op,
-      destLoweredTy, destFormalTy, successBB, failureBB,
-      getFunction(), C.OpenedArchetypes, target1Count, target2Count));
+      getSILDebugLocation(Loc), isExact, op, destLoweredTy, destFormalTy,
+      successBB, failureBB, getFunction(), C.OpenedArchetypes, target1Count,
+      target2Count, forwardingOwnershipKind));
 }
 
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,

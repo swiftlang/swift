@@ -74,6 +74,9 @@ enum class FixKind : uint8_t {
   /// Mark function type as explicitly '@escaping'.
   ExplicitlyEscaping,
 
+  /// Mark function type as having a particular global actor.
+  MarkGlobalActorFunction,
+
   /// Arguments have labeling failures - missing/extraneous or incorrect
   /// labels attached to the, fix it by suggesting proper labels.
   RelabelArguments,
@@ -118,6 +121,13 @@ enum class FixKind : uint8_t {
   /// Remove '$' or '_' to refer to the wrapped property type instead of
   /// the storage or property wrapper.
   UseWrappedValue,
+
+  /// Allow a type that is not a property wrapper to be used as a property
+  /// wrapper.
+  AllowInvalidPropertyWrapperType,
+
+  /// Remove the '$' prefix from an argument label or parameter name.
+  RemoveProjectedValueArgument,
 
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
@@ -621,6 +631,23 @@ public:
                                         Type rhs, ConstraintLocator *locator);
 };
 
+/// Mark function type as being part of a global actor.
+class MarkGlobalActorFunction final : public ContextualMismatch {
+  MarkGlobalActorFunction(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs,
+                           locator) {
+  }
+
+public:
+  std::string getName() const override { return "add @escaping"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static MarkGlobalActorFunction *create(ConstraintSystem &cs, Type lhs,
+                                         Type rhs, ConstraintLocator *locator);
+};
+
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ContextualMismatch {
   ForceOptional(ConstraintSystem &cs, Type fromType, Type toType,
@@ -641,21 +668,21 @@ public:
                                ConstraintLocator *locator);
 };
 
-/// This is a contextual mismatch between @concurrent and non-@concurrent
-/// function types, repair it by adding @concurrent attribute.
-class AddConcurrentAttribute final : public ContextualMismatch {
-  AddConcurrentAttribute(ConstraintSystem &cs, FunctionType *fromType,
+/// This is a contextual mismatch between @Sendable and non-@Sendable
+/// function types, repair it by adding @Sendable attribute.
+class AddSendableAttribute final : public ContextualMismatch {
+  AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
                      FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, fromType, toType, locator) {
-    assert(fromType->isConcurrent() != toType->isConcurrent());
+    assert(fromType->isSendable() != toType->isSendable());
   }
 
 public:
-  std::string getName() const override { return "add '@concurrent' attribute"; }
+  std::string getName() const override { return "add '@Sendable' attribute"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AddConcurrentAttribute *create(ConstraintSystem &cs,
+  static AddSendableAttribute *create(ConstraintSystem &cs,
                                     FunctionType *fromType,
                                     FunctionType *toType,
                                     ConstraintLocator *locator);
@@ -955,6 +982,45 @@ public:
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
                                  ConstraintLocator *locator);
+};
+
+class AllowInvalidPropertyWrapperType final : public ConstraintFix {
+  Type wrapperType;
+
+  AllowInvalidPropertyWrapperType(ConstraintSystem &cs, Type wrapperType,
+                                  ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPropertyWrapperType, locator),
+        wrapperType(wrapperType) {}
+
+public:
+  static AllowInvalidPropertyWrapperType *create(ConstraintSystem &cs, Type wrapperType,
+                                                 ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "allow invalid property wrapper type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+};
+
+class RemoveProjectedValueArgument final : public ConstraintFix {
+  Type wrapperType;
+  ParamDecl *param;
+
+  RemoveProjectedValueArgument(ConstraintSystem &cs, Type wrapper,
+                               ParamDecl *param, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveProjectedValueArgument, locator),
+        wrapperType(wrapper), param(param) {}
+
+public:
+  static RemoveProjectedValueArgument *create(ConstraintSystem &cs, Type wrapper,
+                                              ParamDecl *param, ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "remove '$' from argument label";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 };
 
 class UseSubscriptOperator final : public ConstraintFix {

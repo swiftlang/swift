@@ -1020,6 +1020,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       type.print(Printer, Options);
     else
       attr->getTypeRepr()->print(Printer, Options);
+    if (attr->isArgUnsafe() && Options.IsForSwiftInterface)
+      Printer << "(unsafe)";
     Printer.printNamePost(PrintNameContext::Attribute);
     break;
   }
@@ -1078,6 +1080,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
 #include "swift/AST/Attr.def"
     llvm_unreachable("handled above");
+
+  case DAK_CompletionHandlerAsync: {
+    auto *attr = cast<CompletionHandlerAsyncAttr>(this);
+    Printer.printAttrName("@completionHandlerAsync");
+    Printer << "(\"";
+    if (attr->AsyncFunctionDecl) {
+      Printer << attr->AsyncFunctionDecl->getName();
+    } else {
+      Printer << attr->AsyncFunctionName;
+    }
+    Printer << "\", completionHandleIndex: " <<
+        attr->CompletionHandlerIndex << ')';
+    break;
+  }
 
   default:
     assert(DeclAttribute::isDeclModifier(getKind()) &&
@@ -1223,8 +1239,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "derivative";
   case DAK_Transpose:
     return "transpose";
-  case DAK_HasAsyncAlternative:
-    return "hasAsyncAlternative";
+  case DAK_CompletionHandlerAsync:
+    return "completionHandlerAsync";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1330,6 +1346,7 @@ SourceLoc ObjCAttr::getRParenLoc() const {
 ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
   attr->setSwift3Inferred(isSwift3Inferred());
+  attr->setAddedByAccessNote(getAddedByAccessNote());
   return attr;
 }
 
@@ -1933,6 +1950,7 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
   assert(type);
   hasArgLabelLocs = !argLabelLocs.empty();
   numArgLabels = argLabels.size();
+  isArgUnsafeBit = false;
   initializeCallArguments(argLabels, argLabelLocs);
 }
 
@@ -1973,6 +1991,26 @@ void CustomAttr::resetTypeInformation(TypeExpr *info) { typeExpr = info; }
 void CustomAttr::setType(Type ty) {
   assert(ty);
   typeExpr->setType(MetatypeType::get(ty));
+}
+
+bool CustomAttr::isArgUnsafe() const {
+  if (isArgUnsafeBit)
+    return true;
+
+  auto arg = getArg();
+  if (!arg)
+    return false;
+
+  if (auto parenExpr = dyn_cast<ParenExpr>(arg)) {
+    if (auto declRef =
+            dyn_cast<UnresolvedDeclRefExpr>(parenExpr->getSubExpr())) {
+      if (declRef->getName().isSimpleName("unsafe")) {
+        isArgUnsafeBit = true;
+      }
+    }
+  }
+
+  return isArgUnsafeBit;
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

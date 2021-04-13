@@ -744,7 +744,7 @@ public:
   std::pair<PatternBindingDecl *, VarDecl *>
   buildPatternAndVariable(Expr *InitExpr) {
     SmallString<16> NameBuf;
-    (Twine("tmp") + Twine(TmpNameIndex)).toVector(NameBuf);
+    (Twine("tmp") + Twine(TmpNameIndex++)).toVector(NameBuf);
 
     Expr *MaybeLoadInitExpr = nullptr;
 

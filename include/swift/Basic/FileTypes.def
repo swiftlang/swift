@@ -79,8 +79,11 @@ TYPE("json-features",       JSONFeatures,              "features.json",   "")
 
 
 TYPE("index-data",          IndexData,                 "",                "")
+TYPE("index-unit-output-path", IndexUnitOutputPath,    "",                "")
 TYPE("yaml-opt-record",     YAMLOptRecord,             "opt.yaml",        "")
 TYPE("bitstream-opt-record",BitstreamOptRecord,        "opt.bitstream",   "")
+
+TYPE("symbol-graph-output-path", SymbolGraphOutputPath, "",               "")
 
 // Overlay files declare wrapper modules, called "separately-imported overlays",
 // that should be automatically imported when a particular module is imported.

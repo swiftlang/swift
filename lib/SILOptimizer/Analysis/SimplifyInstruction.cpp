@@ -146,39 +146,43 @@ SILValue InstSimplifier::visitTupleInst(TupleInst *TI) {
   return SILValue();
 }
 
-SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
+SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *tei) {
+  auto op = lookThroughOwnershipInsts(tei->getOperand());
+
   // tuple_extract(tuple(x, y), 0) -> x
-  if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
-    return TheTuple->getElement(TEI->getFieldIndex());
+  if (auto *tupleInst = dyn_cast<TupleInst>(op))
+    return tupleInst->getElement(tei->getFieldIndex());
 
   // tuple_extract(apply([add|sub|...]overflow(x,y)),  0) -> x
   // tuple_extract(apply(checked_trunc(ext(x))), 0) -> x
-  if (TEI->getFieldIndex() == 0)
-    if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
-      return simplifyOverflowBuiltin(BI);
+  if (tei->getFieldIndex() == 0)
+    if (auto *bi = dyn_cast<BuiltinInst>(tei->getOperand()))
+      return simplifyOverflowBuiltin(bi);
 
   return SILValue();
 }
 
-SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
+SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *sei) {
+  auto op = lookThroughOwnershipInsts(sei->getOperand());
+
   // struct_extract(struct(x, y), x) -> x
-  if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand()))
-    return Struct->getFieldValue(SEI->getField());
+  if (auto *si = dyn_cast<StructInst>(op))
+    return si->getFieldValue(sei->getField());
 
   return SILValue();
 }
 
 SILValue
-InstSimplifier::
-visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
+InstSimplifier::visitUncheckedEnumDataInst(UncheckedEnumDataInst *uedi) {
   // (unchecked_enum_data (enum payload)) -> payload
-  if (auto *EI = dyn_cast<EnumInst>(UEDI->getOperand())) {
-    if (EI->getElement() != UEDI->getElement())
+  auto opt = lookThroughOwnershipInsts(uedi->getOperand());
+  if (auto *ei = dyn_cast<EnumInst>(opt)) {
+    if (ei->getElement() != uedi->getElement())
       return SILValue();
 
-    assert(EI->hasOperand() &&
+    assert(ei->hasOperand() &&
            "Should only get data from an enum with payload.");
-    return EI->getOperand();
+    return lookThroughOwnershipInsts(ei->getOperand());
   }
 
   return SILValue();
@@ -322,17 +326,6 @@ SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw)
   return SILValue();
 }
 
-SILValue
-InstSimplifier::
-visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
-  if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
-    if (UCCI->getType() == upcast->getOperand()->getType())
-      return upcast->getOperand();
-
-  return SILValue();
-}
-
 /// If the only use of a cast is a destroy, just destroy the cast operand.
 static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
   if (!Cast->hasUsesOfAnyResult())
@@ -354,6 +347,17 @@ static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
     }
   }
   return Cast->getOperand(0);
+}
+
+SILValue
+InstSimplifier::
+visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+  // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
+  if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
+    if (UCCI->getType() == upcast->getOperand()->getType())
+      return upcast->getOperand();
+
+  return simplifyDeadCast(UCCI);
 }
 
 SILValue

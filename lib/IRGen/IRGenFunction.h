@@ -103,6 +103,9 @@ public:
   void emitBBForReturn();
   bool emitBranchToReturnBB();
 
+  void emitAllExtractValues(llvm::Value *aggValue, llvm::StructType *type,
+                            Explosion &out);
+
   /// Return the error result slot to be passed to the callee, given an error
   /// type.  There's always only one error type.
   ///
@@ -133,10 +136,11 @@ public:
   }
 
   llvm::Value *getAsyncTask();
-  llvm::Value *getAsyncExecutor();
   llvm::Value *getAsyncContext();
 
-  llvm::CallInst *emitSuspendAsyncCall(ArrayRef<llvm::Value *> args);
+  llvm::CallInst *emitSuspendAsyncCall(unsigned swiftAsyncContextIndex,
+                                       llvm::StructType *resultTy,
+                                       ArrayRef<llvm::Value *> args);
 
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -146,7 +150,8 @@ public:
 
   void emitGetAsyncContinuation(SILType resumeTy,
                                 StackAddress optionalResultAddr,
-                                Explosion &out);
+                                Explosion &out,
+                                bool canThrow);
 
   void emitAwaitAsyncContinuation(SILType resumeTy,
                                   bool isIndirectResult,
@@ -155,10 +160,18 @@ public:
                                   llvm::PHINode *&optionalErrorPhi,
                                   llvm::BasicBlock *&optionalErrorBB);
 
+  void emitResumeAsyncContinuationReturning(llvm::Value *continuation,
+                                            llvm::Value *srcPtr,
+                                            SILType valueTy,
+                                            bool throwing);
+
+  void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
+                                           llvm::Value *error);
+
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);
 
-  void emitSuspensionPoint(llvm::Value *toExecutor, llvm::Value *asyncResume);
+  void emitSuspensionPoint(Explosion &executor, llvm::Value *asyncResume);
   llvm::Function *getOrCreateResumeFromSuspensionFn();
   llvm::Function *createAsyncSuspendFn();
 
@@ -175,8 +188,6 @@ private:
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
-  Address asyncTaskLocation;
-  Address asyncExecutorLocation;
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
@@ -197,8 +208,8 @@ public:
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
 
-  void setupAsync();
-  bool isAsync() const { return asyncTaskLocation.isValid(); }
+  void setupAsync(unsigned asyncContextIndex);
+  bool isAsync() const { return asyncContextLocation.isValid(); }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");

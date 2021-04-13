@@ -43,8 +43,8 @@ extension _Either: Comparable where Left: Comparable, Right: Comparable {
   }
 }
 
-extension _Either: ConcurrentValue
-  where Left: ConcurrentValue, Right: ConcurrentValue { }
+extension _Either: Sendable
+  where Left: Sendable, Right: Sendable { }
 
 /// A sequence that type erases two sequences. A lighter-weight alternative to
 /// AnySequence when more can be statically known, and which is more easily

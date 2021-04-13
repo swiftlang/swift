@@ -144,8 +144,10 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
 
 SymbolicMangling
 IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
-                                      Type Ty) {
+                                      CanGenericSignature Sig,
+                                      CanType Ty) {
   return withSymbolicReferences(IGM, [&]{
+    bindGenericParameters(Sig);
     appendType(Ty);
   });
 }
@@ -179,20 +181,6 @@ std::string IRGenMangler::mangleProtocolConformanceInstantiationCache(
   }
   appendOperator("MK");
   return finalize();
-}
-
-SymbolicMangling
-IRGenMangler::mangleProtocolConformanceForReflection(IRGenModule &IGM,
-                                  Type ty, ProtocolConformanceRef conformance) {
-  return withSymbolicReferences(IGM, [&]{
-    if (conformance.isConcrete()) {
-      appendProtocolConformance(conformance.getConcrete());
-    } else {
-      // Use a special mangling for abstract conformances.
-      appendType(ty);
-      appendProtocolName(conformance.getAbstract());
-    }
-  });
 }
 
 std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {

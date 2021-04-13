@@ -967,10 +967,21 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol) {
+  // If we are recursively checking for implicit conformance of a nominal
+  // type to Sendable, fail without evaluating this request. This
+  // squashes cycles.
+  LookupConformanceInModuleRequest request{{this, type, protocol}};
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    if (auto nominal = type->getAnyNominal()) {
+      GetImplicitSendableRequest icvRequest{nominal};
+      if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
+          getASTContext().evaluator.hasActiveRequest(request))
+        return ProtocolConformanceRef::forInvalid();
+    }
+  }
+
   return evaluateOrDefault(
-      getASTContext().evaluator,
-      LookupConformanceInModuleRequest{{this, type, protocol}},
-      ProtocolConformanceRef::forInvalid());
+      getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
 }
 
 ProtocolConformanceRef
@@ -1035,8 +1046,20 @@ LookupConformanceInModuleRequest::evaluate(
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominal->lookupConformance(mod, protocol, conformances))
-    return ProtocolConformanceRef::forInvalid();
+  if (!nominal->lookupConformance(mod, protocol, conformances)) {
+    if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
+      return ProtocolConformanceRef::forInvalid();
+
+    // Try to infer Sendable conformance.
+    GetImplicitSendableRequest cvRequest{nominal};
+    if (auto conformance = evaluateOrDefault(
+            ctx.evaluator, cvRequest, nullptr)) {
+      conformances.clear();
+      conformances.push_back(conformance);
+    } else {
+      return ProtocolConformanceRef::forInvalid();
+    }
+  }
 
   // FIXME: Ambiguity resolution.
   auto conformance = conformances.front();
@@ -1333,6 +1356,22 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
+Identifier ModuleDecl::getABIName() const {
+  if (!ModuleABIName.empty())
+    return ModuleABIName;
+
+  // Hard code that the _Concurrency module has Swift as its ABI name.
+  // FIXME: This works around a backward-compatibility issue where
+  // -module-abi-name is not supported on existing Swift compilers. Remove
+  // this hack later and pass -module-abi-name when building the _Concurrency
+  // module.
+  if (getName().str() == SWIFT_CONCURRENCY_NAME) {
+    ModuleABIName = getASTContext().getIdentifier(STDLIB_NAME);
+    return ModuleABIName;
+  }
+
+  return getName();
+}
 
 StringRef ModuleDecl::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to
@@ -1380,6 +1419,7 @@ bool ModuleDecl::isBuiltinModule() const {
 }
 
 bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+  assert(mainDecl);
   if (mainDecl == MainDecl)
     return false;
 
@@ -1539,10 +1579,7 @@ void ModuleDecl::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   for (const FileUnit *fileUnit : getFiles()) {
     if (const auto *SF = dyn_cast<SourceFile>(fileUnit)) {
-      BasicSourceFileInfo info;
-      if (info.populate(SF))
-        continue;
-      callback(info);
+      callback(BasicSourceFileInfo(SF));
     } else if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
       serialized->collectBasicSourceFileInfo(callback);
     }
@@ -1553,7 +1590,9 @@ Fingerprint ModuleDecl::getFingerprint() const {
   StableHasher hasher = StableHasher::defaultHasher();
   SmallVector<Fingerprint, 16> FPs;
   collectBasicSourceFileInfo([&](const BasicSourceFileInfo &bsfi) {
-    FPs.emplace_back(bsfi.InterfaceHash);
+    // For incremental imports, the hash must be insensitive to type-body
+    // changes, so use the one without type members.
+    FPs.emplace_back(bsfi.getInterfaceHashExcludingTypeMembers());
   });
   
   // Sort the fingerprints lexicographically so we have a stable hash despite
@@ -2205,6 +2244,53 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
 
   auto &ctx = decl->getASTContext();
   return ctx.AllocateCopy(spiGroups.getArrayRef());
+}
+
+LibraryLevel ModuleDecl::getLibraryLevel() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ModuleLibraryLevelRequest{this},
+                           LibraryLevel::Other);
+}
+
+LibraryLevel
+ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
+                                    const ModuleDecl *module) const {
+  auto &ctx = module->getASTContext();
+
+  /// Is \p modulePath from System/Library/PrivateFrameworks/?
+  auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
+    if (!ctx.LangOpts.Target.isOSDarwin()) return false;
+
+    namespace path = llvm::sys::path;
+    SmallString<128> scratch;
+    scratch = ctx.SearchPathOpts.SDKPath;
+    path::append(scratch, "System", "Library", "PrivateFrameworks");
+    return hasPrefix(path::begin(modulePath), path::end(modulePath),
+                     path::begin(scratch), path::end(scratch));
+  };
+
+  if (module->isNonSwiftModule()) {
+    if (auto *underlying = module->findUnderlyingClangModule()) {
+      // Imported clangmodules are SPI if they are defined by a private
+      // modulemap or from the PrivateFrameworks folder in the SDK.
+      bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
+                         (underlying->isPartOfFramework() &&
+                          fromPrivateFrameworks(underlying->PresumedModuleMapFile));
+      return moduleIsSPI ? LibraryLevel::SPI : LibraryLevel::API;
+    }
+    return LibraryLevel::Other;
+
+  } else if (module->isMainModule()) {
+    // The current compilation target.
+    return ctx.LangOpts.LibraryLevel;
+
+  } else {
+    // Other Swift modules are SPI if they are from the PrivateFrameworks
+    // folder in the SDK.
+    auto modulePath = module->getModuleFilename();
+    return fromPrivateFrameworks(modulePath) ?
+      LibraryLevel::SPI : LibraryLevel::API;
+  }
 }
 
 bool SourceFile::shouldCrossImport() const {

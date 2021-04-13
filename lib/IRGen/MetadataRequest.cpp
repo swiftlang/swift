@@ -1310,6 +1310,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinExecutorType(CanBuiltinExecutorType type,
+                             DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
@@ -1376,13 +1382,14 @@ namespace {
         return ParameterFlags()
             .withValueOwnership(flags.getValueOwnership())
             .withVariadic(flags.isVariadic())
-            .withAutoClosure(flags.isAutoClosure());
+            .withAutoClosure(flags.isAutoClosure())
+            .withNoDerivative(flags.isNoDerivative());
       };
 
-      bool hasFlags = false;
+      bool hasParameterFlags = false;
       for (auto param : params) {
         if (!getABIParameterFlags(param.getParameterFlags()).isNone()) {
-          hasFlags = true;
+          hasParameterFlags = true;
           break;
         }
       }
@@ -1430,18 +1437,24 @@ namespace {
         break;
       }
 
-      auto flagsVal = FunctionTypeFlags()
-                          .withNumParameters(numParams)
-                          .withConvention(metadataConvention)
-                          .withAsync(type->isAsync())
-                          .withThrows(type->isThrowing())
-                          .withParameterFlags(hasFlags)
-                          .withEscaping(isEscaping)
-                          .withDifferentiabilityKind(
-                              metadataDifferentiabilityKind);
+      auto flags = FunctionTypeFlags()
+                       .withNumParameters(numParams)
+                       .withConvention(metadataConvention)
+                       .withAsync(type->isAsync())
+                       .withConcurrent(type->isSendable())
+                       .withThrows(type->isThrowing())
+                       .withParameterFlags(hasParameterFlags)
+                       .withEscaping(isEscaping)
+                       .withDifferentiable(type->isDifferentiable());
 
-      auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                          flagsVal.getIntValue());
+      auto flagsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                             flags.getIntValue());
+      llvm::Value *diffKindVal = nullptr;
+      if (type->isDifferentiable()) {
+        assert(metadataDifferentiabilityKind.isDifferentiable());
+        diffKindVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+                                             flags.getIntValue());
+      }
 
       auto collectParameters =
           [&](llvm::function_ref<void(unsigned, llvm::Value *,
@@ -1459,12 +1472,12 @@ namespace {
       auto constructSimpleCall =
           [&](llvm::SmallVectorImpl<llvm::Value *> &arguments)
           -> llvm::Constant * {
-        arguments.push_back(flags);
+        arguments.push_back(flagsVal);
 
         collectParameters([&](unsigned i, llvm::Value *typeRef,
                               ParameterFlags flags) {
           arguments.push_back(typeRef);
-          if (hasFlags)
+          if (hasParameterFlags)
             arguments.push_back(
                 llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags.getIntValue()));
         });
@@ -1494,7 +1507,7 @@ namespace {
       case 1:
       case 2:
       case 3: {
-        if (!hasFlags) {
+        if (!hasParameterFlags && !type->isDifferentiable()) {
           llvm::SmallVector<llvm::Value *, 8> arguments;
           auto *metadataFn = constructSimpleCall(arguments);
           auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
@@ -1502,18 +1515,25 @@ namespace {
           return setLocal(CanType(type), MetadataResponse::forComplete(call));
         }
 
-        // If function type has parameter flags, let's emit
+        // If function type has parameter flags or is differentiable, let's emit
         // the most general function to retrieve them.
         LLVM_FALLTHROUGH;
       }
 
       default:
-        assert(!params.empty() && "0 parameter case is specialized!");
+        assert(!params.empty() || type->isDifferentiable() &&
+               "0 parameter case should be specialized unless it is a "
+               "differentiable function");
 
         auto *const Int32Ptr = IGF.IGM.Int32Ty->getPointerTo();
         llvm::SmallVector<llvm::Value *, 8> arguments;
 
-        arguments.push_back(flags);
+        arguments.push_back(flagsVal);
+
+        if (type->isDifferentiable()) {
+          assert(diffKindVal);
+          arguments.push_back(diffKindVal);
+        }
 
         ConstantInitBuilder paramFlags(IGF.IGM);
         auto flagsArr = paramFlags.beginArray();
@@ -1534,11 +1554,11 @@ namespace {
           if (i == 0)
             arguments.push_back(argPtr.getAddress());
 
-          if (hasFlags)
+          if (hasParameterFlags)
             flagsArr.addInt32(flags.getIntValue());
         });
 
-        if (hasFlags) {
+        if (hasParameterFlags) {
           auto *flagsVar = flagsArr.finishAndCreateGlobal(
               "parameter-flags", IGF.IGM.getPointerAlignment(),
               /* constant */ true);
@@ -1550,8 +1570,11 @@ namespace {
 
         arguments.push_back(result);
 
-        auto call = IGF.Builder.CreateCall(IGF.IGM.getGetFunctionMetadataFn(),
-                                           arguments);
+        auto *getMetadataFn = type->isDifferentiable()
+            ? IGF.IGM.getGetFunctionMetadataDifferentiableFn()
+            : IGF.IGM.getGetFunctionMetadataFn();
+
+        auto call = IGF.Builder.CreateCall(getMetadataFn, arguments);
         call->setDoesNotThrow();
 
         if (parameters.isValid())
@@ -1722,7 +1745,7 @@ namespace {
       llvm_unreachable("error type should not appear in IRGen");
     }
 
-    // These types are artificial types used for for internal purposes and
+    // These types are artificial types used for internal purposes and
     // should never appear in a metadata request.
 #define INTERNAL_ONLY_TYPE(ID)                                               \
     MetadataResponse visit##ID##Type(Can##ID##Type type,                     \
@@ -2950,10 +2973,14 @@ public:
       // A thin function looks like a plain pointer.
       // FIXME: Except for extra inhabitants?
       return C.TheRawPointerType;
-    case SILFunctionType::Representation::Thick:
+    case SILFunctionType::Representation::Thick: {
       // All function types look like () -> ().
       // FIXME: It'd be nice not to have to call through the runtime here.
-      return CanFunctionType::get({}, C.TheEmptyTupleType);
+      //
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
+      return CanFunctionType::get({}, C.TheEmptyTupleType, info);
+    }
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
       return C.getAnyObjectType();
@@ -3149,10 +3176,13 @@ namespace {
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitFromValueWitnessTable(C.TheRawPointerType);
-      case SILFunctionType::Representation::Thick:
+      case SILFunctionType::Representation::Thick: {
         // All function types look like () -> ().
+        // FIXME: Verify ExtInfo state is correct, not working by accident.
+        CanFunctionType::ExtInfo info;
         return emitFromValueWitnessTable(
-                 CanFunctionType::get({}, C.TheEmptyTupleType));
+            CanFunctionType::get({}, C.TheEmptyTupleType, info));
+      }
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.
         return emitFromValueWitnessTable(C.getAnyObjectType());

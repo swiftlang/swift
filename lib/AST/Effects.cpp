@@ -20,11 +20,20 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
+
+bool AnyFunctionType::hasEffect(EffectKind kind) const {
+  switch (kind) {
+  case EffectKind::Throws: return getExtInfo().isThrowing();
+  case EffectKind::Async: return getExtInfo().isAsync();
+  }
+  llvm_unreachable("Bad effect kind");
+}
 
 void swift::simple_display(llvm::raw_ostream &out, const EffectKind kind) {
   switch (kind) {

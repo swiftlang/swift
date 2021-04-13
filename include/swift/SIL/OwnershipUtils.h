@@ -75,6 +75,31 @@ inline bool isForwardingConsume(SILValue value) {
   return canOpcodeForwardOwnedValues(value);
 }
 
+/// Find all "use points" of \p guaranteedValue that determine its lifetime
+/// requirement.
+///
+/// Precondition: \p guaranteedValue is not a BorrowedValue.
+///
+/// In general, if the client does not know whether \p guaranteed value
+/// introduces a borrow scope or not, it should instead call
+/// findTransitiveGuaranteedUses() which efficiently gathers use
+/// points for arbitrary guaranteed values, including those that introduce a
+/// borrow scope and may be reborrowed.
+///
+/// In valid OSSA, this should never be called on values that introduce a new
+/// scope (doing so would be extremely innefficient). The lifetime of a borrow
+/// introducing instruction is always determined by its direct EndBorrow uses
+/// (see BorrowedValue::visitLocalScopeEndingUses). None of the non-scope-ending
+/// uses are relevant, and there's no need to transively follow forwarding
+/// uses. However, this utility may be used on borrow-introducing values when
+/// updating OSSA form to place EndBorrow uses after introducing new phis.
+///
+/// When this is called on a value that does not introduce a new scope, none of
+/// the use points can be EndBorrows or Reborrows. Those uses are only allowed
+/// on borrow-introducing values.
+bool findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
+                                       SmallVectorImpl<Operand *> &usePoints);
+
 /// Find all "use points" of a guaranteed value within its enclosing borrow
 /// scope (without looking through reborrows). To find the use points of the
 /// extended borrow scope, after looking through reborrows, use
@@ -101,7 +126,7 @@ inline bool isForwardingConsume(SILValue value) {
 /// 2. If \p guaranteedValue does not introduce a borrow scope (it is not a
 /// valid BorrowedValue), then its uses are discovered transitively by looking
 /// through forwarding operations. If any use is a PointerEscape, then this
-/// returns false without adding more uses--the guaranteed values lifetime is
+/// returns false without adding more uses--the guaranteed value's lifetime is
 /// indeterminite. If a use introduces a nested borrow scope, it creates use
 /// points where the "extended" borrow scope ends. An extended borrow
 /// scope is found by looking through any reborrows that end the nested
@@ -869,8 +894,10 @@ public:
       ;
     case ValueKind::ApplyInst:
       return Kind::Apply;
-    case ValueKind::BeginApplyResult:
-      return Kind::BeginApply;
+    case ValueKind::MultipleValueInstructionResult:
+      if (isaResultOf<BeginApplyInst>(value))
+        return Kind::BeginApply;
+      return Kind::Invalid;
     case ValueKind::StructInst:
       return Kind::Struct;
     case ValueKind::TupleInst:

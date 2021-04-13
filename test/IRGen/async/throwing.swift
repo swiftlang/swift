@@ -1,11 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -module-name main -o %t/main
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+
+// https://bugs.swift.org/browse/SR-14333
+// UNSUPPORTED: OS=windows-msvc
 
 struct E : Error {}
 
@@ -125,6 +128,15 @@ func testSyncDoesntThrowThenAsyncDoesntThrow() async throws -> (Int, Int) {
   let sync = try syncCanThrowDoesntThrow()
   let async = try await asyncCanThrowDoesntThrow()
   return (sync, async)
+}
+
+public enum MyError : Error {
+    case a
+}
+
+// We used to crash on this.
+public func throwLarge() async throws -> (Int, Int, Int, Int, Int, Int, Int, Int) {
+    throw MyError.a
 }
 
 // CHECK: E()

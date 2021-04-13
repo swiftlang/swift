@@ -188,7 +188,8 @@ private:
   friend struct InterfaceSubContextDelegateImpl;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
-      ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
+      ArrayRef<SupplementaryOutputPaths> supplementaryOutputs,
+      ArrayRef<std::string> outputFilesForIndexUnits = None);
 
 public:
   unsigned countOfInputsProducingMainOutputs() const;
@@ -209,12 +210,17 @@ public:
       llvm::function_ref<bool(const InputFile &)> fn) const;
 
   std::vector<std::string> copyOutputFilenames() const;
+  std::vector<std::string> copyIndexUnitOutputFilenames() const;
 
   void forEachOutputFilename(llvm::function_ref<void(StringRef)> fn) const;
 
   /// Gets the name of the specified output filename.
   /// If multiple files are specified, the last one is returned.
   std::string getSingleOutputFilename() const;
+
+  /// Gets the name of the specified output filename to record in the index unit
+  /// output files. If multiple are specified, the last one is returned.
+  std::string getSingleIndexUnitOutputFilename() const;
 
   bool isOutputFilenameStdout() const;
   bool isOutputFileDirectory() const;

@@ -95,7 +95,10 @@ Type swift::getMemberTypeForComparison(const ValueDecl *member,
     // For subscripts, we don't have a 'Self' type, but turn it
     // into a monomorphic function type.
     auto funcTy = memberType->castTo<AnyFunctionType>();
-    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult());
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    memberType =
+        FunctionType::get(funcTy->getParams(), funcTy->getResult(), info);
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();
@@ -1446,7 +1449,7 @@ namespace  {
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
-    UNINTERESTING_ATTR(HasAsyncAlternative)
+    UNINTERESTING_ATTR(CompletionHandlerAsync)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
@@ -1534,12 +1537,15 @@ namespace  {
     UNINTERESTING_ATTR(ActorIndependent)
     UNINTERESTING_ATTR(GlobalActor)
     UNINTERESTING_ATTR(Async)
-    UNINTERESTING_ATTR(Concurrent)
+    UNINTERESTING_ATTR(Sendable)
 
     UNINTERESTING_ATTR(AtRethrows)
     UNINTERESTING_ATTR(Marker)
 
     UNINTERESTING_ATTR(AtReasync)
+    UNINTERESTING_ATTR(Nonisolated)
+    UNINTERESTING_ATTR(UnsafeSendable)
+    UNINTERESTING_ATTR(UnsafeMainActor)
 
 #undef UNINTERESTING_ATTR
 
@@ -1813,6 +1819,18 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
         diags.diagnose(baseASD, diag::property_override_here);
         return true;
       }
+    }
+
+    // Make sure an effectful storage decl is only overridden by a storage
+    // decl with the same or fewer effect kinds.
+    if (!overrideASD->isLessEffectfulThan(baseASD, EffectKind::Async)) {
+      diags.diagnose(overrideASD, diag::override_with_more_effects,
+                     overrideASD->getDescriptiveKind(), "async");
+      return true;
+    } else if (!overrideASD->isLessEffectfulThan(baseASD, EffectKind::Throws)) {
+      diags.diagnose(overrideASD, diag::override_with_more_effects,
+                     overrideASD->getDescriptiveKind(), "throws");
+      return true;
     }
   }
 

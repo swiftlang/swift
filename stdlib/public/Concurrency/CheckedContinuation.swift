@@ -1,10 +1,24 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import Swift
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_continuation_logFailedCheck")
 internal func logFailedCheck(_ message: UnsafeRawPointer)
 
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 internal final class CheckedContinuationCanary {
   // The instance state is stored in tail-allocated raw memory, so that
   // we can atomically check the continuation state.
@@ -95,6 +109,7 @@ internal final class CheckedContinuationCanary {
 /// of `withCheckedContinuation` or `withCheckedThrowingContinuation` should be
 /// enough to obtain the extra checking without further source modification in
 /// most circumstances.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct CheckedContinuation<T, E: Error> {
   private let canary: CheckedContinuationCanary
   
@@ -160,6 +175,7 @@ public struct CheckedContinuation<T, E: Error> {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension CheckedContinuation {
   /// Resume the task awaiting the continuation by having it either
   /// return normally or throw an error based on the state of the given
@@ -225,6 +241,7 @@ extension CheckedContinuation {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func withCheckedContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Never>) -> Void
@@ -234,6 +251,7 @@ public func withCheckedContinuation<T>(
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Error>) -> Void

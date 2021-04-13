@@ -156,7 +156,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   
-  if (opts.EmitSymbolGraph) {
+  if (!outs.SymbolGraphOutputDir.empty()) {
+    serializationOpts.SymbolGraphOutputDir = outs.SymbolGraphOutputDir;
+  } else if (opts.EmitSymbolGraph) {
     if (!opts.SymbolGraphOutputDir.empty()) {
       serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
     } else {
@@ -164,7 +166,6 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     }
     SmallString<256> OutputDir(serializationOpts.SymbolGraphOutputDir);
     llvm::sys::fs::make_absolute(OutputDir);
-    llvm::sys::path::remove_filename(OutputDir);
     serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
   }
   
@@ -178,8 +179,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.getValueOr(
           !isModuleExternallyConsumed(module));
 
-  serializationOpts.ExperimentalCrossModuleIncrementalInfo =
-      opts.EnableExperimentalCrossModuleIncrementalBuild;
+  serializationOpts.DisableCrossModuleIncrementalInfo =
+      opts.DisableCrossModuleIncrementalBuild;
 
   return serializationOpts;
 }
@@ -525,8 +526,9 @@ bool CompilerInstance::setUpModuleLoaders() {
   auto &FEOpts = Invocation.getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   Context->addModuleInterfaceChecker(
-    std::make_unique<ModuleInterfaceCheckerImpl>(*Context, ModuleCachePath,
-      FEOpts.PrebuiltModuleCachePath, LoaderOpts));
+      std::make_unique<ModuleInterfaceCheckerImpl>(
+          *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath, LoaderOpts,
+          RequireOSSAModules_t(Invocation.getSILOptions())));
   // If implicit modules are disabled, we need to install an explicit module
   // loader.
   bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
@@ -565,15 +567,14 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                        ->getClangModuleLoader()->getClangInstance());
     auto &FEOpts = Invocation.getFrontendOptions();
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-    InterfaceSubContextDelegateImpl ASTDelegate(Context->SourceMgr, Context->Diags,
-                                                Context->SearchPathOpts, Context->LangOpts,
-                                                Context->ClangImporterOpts,
-                                                LoaderOpts,
-                                                /*buildModuleCacheDirIfAbsent*/false,
-                                                ModuleCachePath,
-                                                FEOpts.PrebuiltModuleCachePath,
-                                                FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                                FEOpts.shouldTrackSystemDependencies());
+    InterfaceSubContextDelegateImpl ASTDelegate(
+        Context->SourceMgr, Context->Diags, Context->SearchPathOpts,
+        Context->LangOpts, Context->ClangImporterOpts, LoaderOpts,
+        /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+        FEOpts.PrebuiltModuleCachePath,
+        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        FEOpts.shouldTrackSystemDependencies(),
+        RequireOSSAModules_t(Invocation.getSILOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
       std::make_unique<PlaceholderSwiftModuleScanner>(*Context,
@@ -926,7 +927,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setPrivateImportsEnabled();
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
-
+    if (!Invocation.getFrontendOptions().ModuleABIName.empty()) {
+      MainModule->setABIName(getASTContext().getIdentifier(
+          Invocation.getFrontendOptions().ModuleABIName));
+    }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
 

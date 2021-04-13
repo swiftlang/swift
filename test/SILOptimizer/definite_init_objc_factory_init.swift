@@ -1,11 +1,15 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s -emit-sil -disable-copy-propagation | %FileCheck %s
+
+// Using -disable-copy-propagation to pattern match against older SIL
+// output. At least until -enable-copy-propagation has been around
+// long enough in the same form to be worth rewriting CHECK lines.
 
 // REQUIRES: objc_interop
 
 import Foundation
 import ImportAsMember.Class
 
-// CHECK-LABEL: sil shared [serializable] [thunk] @$sSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
+// CHECK-LABEL: sil shared [thunk] @$sSo4HiveC5queenABSgSo3BeeCSg_tcfCTO : $@convention(method) (@owned Optional<Bee>, @thick Hive.Type) -> @owned Optional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK: bb0([[QUEEN:%[0-9]+]] : $Optional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type

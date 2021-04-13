@@ -1142,6 +1142,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
+  // TODO: need to allocate the variable, stackalloc it? pass the address to the start()
+
   // If this is an async let, create a child task to compute the initializer
   // value.
   if (PBD->isAsyncLet()) {
@@ -1157,11 +1159,35 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
            "Could not find async let autoclosure");
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
+    // TODO: there's a builtin to make an address into a raw pointer
+    //       --- note dont need that; just have the builtin take it inout?
+    //       --- the builtin can take the address (for start())
+
+    // TODO: make a builtin start async let
+    // Builtin.startAsyncLet -- and in the builtin create the async let record
+
+    // TODO: make a builtin for end async let
+
+    // TODO: IRGen would make a local allocation for the builtins
+
+    // TODO: remember if we did an await already?
+
+    // TODO: force in typesystem that we always await; then end aysnc let does not have to be async
+    // the local let variable is actually owning the result
+    // - but since throwing we can't know; maybe we didnt await on a thing yet
+    // so we do need the tracking if we waited on a thing
+
+    // TODO: awaiting an async let should be able to take ownership
+    // that means we will not await on this async let again, maybe?
+    // it means that the async let destroy should not destroy the result anymore
+
     // Emit the closure for the child task.
     SILValue childTask;
     {
       FullExpr Scope(Cleanups, CleanupLocation(init));
       SILLocation loc(PBD);
+      // TODO: opaque object in the async context that represents the async let
+      //
       childTask = emitRunChildTask(
           loc,
           init->getType(),
@@ -1173,7 +1199,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     enterDestroyCleanup(childTask);
 
     // Push a cleanup that will cancel the child task at the end of the scope.
-    enterCancelAsyncTaskCleanup(childTask);
+    enterCancelAsyncTaskCleanup(childTask); // TODO: this is "went out scope" rather than just a cancel
 
     // Save the child task so we can await it as needed.
     AsyncLetChildTasks[{PBD, idx}] = { childTask, isThrowing };
@@ -1189,15 +1215,17 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     auto *var = PBD->getSingleVar();
     if (var && var->getDeclContext()->isLocalContext()) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
-        auto wrapperInfo = orig->getPropertyWrapperBackingPropertyInfo();
-        Init = wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue();
+        auto initInfo = orig->getPropertyWrapperInitializerInfo();
+        if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
+          Init = placeholder->getOriginalWrappedValue();
 
-        auto value = emitRValue(Init);
-        emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
-                                                     getForwardingSubstitutionMap(),
-                                                     std::move(value))
-          .forwardInto(*this, SILLocation(PBD), initialization.get());
-        return;
+          auto value = emitRValue(Init);
+          emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
+                                                       getForwardingSubstitutionMap(),
+                                                       std::move(value))
+            .forwardInto(*this, SILLocation(PBD), initialization.get());
+          return;
+        }
       }
     }
 
@@ -1224,8 +1252,8 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   // no wrapper.
   if (D->getAttrs().hasAttribute<CustomAttr>()) {
     // Emit the property wrapper backing initializer if necessary.
-    auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
-    if (wrapperInfo && wrapperInfo.initializeFromOriginal)
+    auto initInfo = D->getPropertyWrapperInitializerInfo();
+    if (initInfo.hasInitFromWrappedValue())
       SGM.emitPropertyWrapperBackingInitializer(D);
   }
 
@@ -1331,9 +1359,13 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
-      assert(!OSVersion.isEmpty());
-
-      if (OSVersion.isAll()) {
+      
+      // The OS version might be left empty if availability checking was
+      // disabled. Treat it as always-true in that case.
+      assert(!OSVersion.isEmpty()
+             || getASTContext().LangOpts.DisableAvailabilityChecking);
+        
+      if (OSVersion.isEmpty() || OSVersion.isAll()) {
         // If there's no check for the current platform, this condition is
         // trivially true.
         SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());

@@ -202,15 +202,13 @@ static void adjustPrintOptions(PrintOptions &AdjustedOptions) {
   AdjustedOptions.VarInitializers = false;
 }
 
-ArrayRef<StringRef>
-swift::ide::collectModuleGroups(ModuleDecl *M, std::vector<StringRef> &Scratch) {
+void swift::ide::collectModuleGroups(ModuleDecl *M,
+                                     SmallVectorImpl<StringRef> &Into) {
   for (auto File : M->getFiles()) {
-    File->collectAllGroups(Scratch);
+    File->collectAllGroups(Into);
   }
-  std::sort(Scratch.begin(), Scratch.end(), [](StringRef L, StringRef R) {
-    return L.compare_lower(R) < 0;
-  });
-  return llvm::makeArrayRef(Scratch);
+  std::sort(Into.begin(), Into.end(),
+            [](StringRef L, StringRef R) { return L.compare_lower(R) < 0; });
 }
 
 /// Determine whether the given extension has a Clang node that
@@ -810,7 +808,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
   for (auto D : File.getTopLevelDecls()) {
     if (tryUpdateStart(D->getStartLoc())) {
       tryUpdateStart(D->getAttrs().getStartLoc());
-      auto RawComment = D->getRawComment();
+      auto RawComment = D->getRawComment(/*SerializedOK=*/false);
       if (!RawComment.isEmpty())
         tryUpdateStart(RawComment.Comments.front().Range.getStart());
     }

@@ -24,6 +24,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
@@ -61,7 +62,7 @@ SingleRawComment::SingleRawComment(CharSourceRange Range,
     : Range(Range), RawText(SourceMgr.extractText(Range)),
       Kind(static_cast<unsigned>(getCommentKind(RawText))) {
   auto StartLineAndColumn =
-      SourceMgr.getPresumedLineAndColumnForLoc(Range.getStart());
+      SourceMgr.getLineAndColumnInBuffer(Range.getStart());
   StartLine = StartLineAndColumn.first;
   StartColumn = StartLineAndColumn.second;
   EndLine = SourceMgr.getLineAndColumnInBuffer(Range.getEnd()).first;
@@ -136,19 +137,27 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
 
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
-  if (Optional<RawComment> RC = Context.getRawComment(this))
-    return RC.getValue();
+  if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
+    auto P = RC.getValue();
+    if (!SerializedOK || P.second)
+      return P.first;
+  }
 
   // Check the declaration itself.
   if (auto *Attr = getAttrs().getAttribute<RawDocCommentAttr>()) {
     RawComment Result = toRawComment(Context, Attr->getCommentRange());
-    Context.setRawComment(this, Result);
+    Context.setRawComment(this, Result, true);
     return Result;
   }
 
-  // Ask the parent module.
-  if (auto *Unit =
-          dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+  if (!getDeclContext())
+    return RawComment();
+  auto *Unit = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  if (!Unit)
+    return RawComment();
+
+  switch (Unit->getKind()) {
+  case FileUnitKind::SerializedAST: {
     if (SerializedOK) {
       if (const auto *CachedLocs = getSerializedLocs()) {
         if (!CachedLocs->DocRanges.empty()) {
@@ -157,8 +166,8 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
             if (Range.isValid()) {
               SRCs.push_back({ Range, Context.SourceMgr });
             } else {
-              // if we've run into an invalid range, don't bother trying to load any of
-              // the other comments
+              // if we've run into an invalid range, don't bother trying to load
+              // any of the other comments
               SRCs.clear();
               break;
             }
@@ -166,7 +175,7 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
           auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
 
           if (!RC.isEmpty()) {
-            Context.setRawComment(this, RC);
+            Context.setRawComment(this, RC, true);
             return RC;
           }
         }
@@ -174,13 +183,20 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
     }
 
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      Context.setRawComment(this, C->Raw);
+      Context.setRawComment(this, C->Raw, false);
       return C->Raw;
     }
-  }
 
-  // Give up.
-  return RawComment();
+    return RawComment();
+  }
+  case FileUnitKind::Source:
+  case FileUnitKind::Builtin:
+  case FileUnitKind::Synthesized:
+  case FileUnitKind::ClangModule:
+  case FileUnitKind::DWARFModule:
+    return RawComment();
+  }
+  llvm_unreachable("invalid file kind");
 }
 
 static const Decl* getGroupDecl(const Decl *D) {
@@ -247,26 +263,42 @@ CharSourceRange RawComment::getCharSourceRange() {
   return CharSourceRange(Start, Length);
 }
 
-bool BasicSourceFileInfo::populate(const SourceFile *SF) {
+BasicSourceFileInfo::BasicSourceFileInfo(const SourceFile *SF)
+    : SFAndIsFromSF(SF, true) {
+  FilePath = SF->getFilename();
+}
+
+bool BasicSourceFileInfo::isFromSourceFile() const {
+  return SFAndIsFromSF.getInt();
+}
+
+void BasicSourceFileInfo::populateWithSourceFileIfNeeded() {
+  const auto *SF = SFAndIsFromSF.getPointer();
+  if (!SF)
+    return;
+  SWIFT_DEFER {
+    SFAndIsFromSF.setPointer(nullptr);
+  };
+
   SourceManager &SM = SF->getASTContext().SourceMgr;
 
-  auto filename = SF->getFilename();
-  if (filename.empty())
-    return true;
-  auto stat = SM.getFileSystem()->status(filename);
+  if (FilePath.empty())
+    return;
+  auto stat = SM.getFileSystem()->status(FilePath);
   if (!stat)
-    return true;
+    return;
 
-  FilePath = filename;
   LastModified = stat->getLastModificationTime();
   FileSize = stat->getSize();
 
   if (SF->hasInterfaceHash()) {
-    InterfaceHash = SF->getInterfaceHashIncludingTypeMembers();
+    InterfaceHashIncludingTypeMembers = SF->getInterfaceHashIncludingTypeMembers();
+    InterfaceHashExcludingTypeMembers = SF->getInterfaceHash();
   } else {
     // FIXME: Parse the file with EnableInterfaceHash option.
-    InterfaceHash = Fingerprint::ZERO();
+    InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
+    InterfaceHashExcludingTypeMembers = Fingerprint::ZERO();
   }
 
-  return false;
+  return;
 }
