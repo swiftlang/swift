@@ -284,6 +284,9 @@ struct ASTContext::Implementation {
   /// The module loader used to load Clang modules from DWARF.
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
 
+  /// Map from Swift declarations to deserialized locations
+  llvm::DenseMap<const Decl *, ExternalDeclLocs *> ExternalLocs;
+
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, std::pair<RawComment, bool>> RawComments;
 
@@ -2018,6 +2021,18 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
     TheStdlibModule = getLoadedModule(StdlibModuleName);
   }
   return TheStdlibModule;
+}
+
+Optional<ExternalDeclLocs *> ASTContext::getExternalLocs(const Decl *D) {
+  auto Known = getImpl().ExternalLocs.find(D);
+  if (Known == getImpl().ExternalLocs.end())
+    return None;
+
+  return Known->second;
+}
+
+void ASTContext::setExternalLocs(const Decl *D, ExternalDeclLocs *Locs) {
+  getImpl().ExternalLocs[D] = Locs;
 }
 
 Optional<std::pair<RawComment, bool>> ASTContext::getRawComment(const Decl *D) {

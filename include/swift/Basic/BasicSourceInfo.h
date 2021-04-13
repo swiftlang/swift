@@ -15,6 +15,7 @@
 
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/Chrono.h"
 
@@ -22,18 +23,38 @@ namespace swift {
 
 class SourceFile;
 
+struct LocationDirective {
+  uint32_t Offset = 0;
+  int32_t LineOffset = 0;
+  uint32_t Length = 0;
+  StringRef Name;
+
+  bool isValid() const { return Length > 0; }
+};
+
 struct SourcePosition {
+  uint32_t Offset = 0;
   uint32_t Line = 0;
   uint32_t Column = 0;
+  LocationDirective Directive;
+
   bool isValid() const { return Line && Column; }
 };
 
-struct BasicDeclLocs {
+struct BasicDeclPositions {
   StringRef SourceFilePath;
   SmallVector<std::pair<SourcePosition, uint32_t>, 4> DocRanges;
   SourcePosition Loc;
   SourcePosition StartLoc;
   SourcePosition EndLoc;
+};
+
+struct ExternalDeclLocs {
+  unsigned BufferID = 0;
+  SourceLoc Loc;
+  SmallVector<CharSourceRange, 4> DocRanges;
+  BasicDeclPositions *Positions = nullptr;
+  bool Resolved = false;
 };
 
 class BasicSourceFileInfo {

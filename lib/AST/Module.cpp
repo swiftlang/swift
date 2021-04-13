@@ -864,37 +864,49 @@ TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
   return nullptr;
 }
 
-Optional<BasicDeclLocs>
-SourceFile::getBasicLocsForDecl(const Decl *D) const {
+Optional<BasicDeclPositions>
+SourceFile::getBasicPositionsForDecl(const Decl *D) const {
   auto *FileCtx = D->getDeclContext()->getModuleScopeContext();
   assert(FileCtx == this && "D doesn't belong to this source file");
   if (FileCtx != this) {
     // D doesn't belong to this file. This shouldn't happen in practice.
     return None;
   }
-  if (D->getLoc().isInvalid())
+
+  SourceLoc Loc = D->getLoc(/*SerializedOK=*/false);
+  if (Loc.isInvalid())
     return None;
+
   SourceManager &SM = getASTContext().SourceMgr;
-  BasicDeclLocs Result;
-  Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
+  auto BufferID = SM.findBufferContainingLoc(Loc);
 
-  for (const auto &SRC : D->getRawComment(/*SerializedOK*/false).Comments) {
-    auto LineAndCol = SM.getLineAndColumnInBuffer(SRC.Range.getStart());
-    Result.DocRanges.push_back(
-        std::make_pair(SourcePosition{LineAndCol.first, LineAndCol.second},
-                       SRC.Range.getByteLength()));
-  }
+  BasicDeclPositions Result;
+  auto setPosition = [&](SourcePosition &Pos, SourceLoc Loc) {
+    if (!Loc.isValid())
+      return;
 
-  auto setLineColumn = [&SM](SourcePosition &Home, SourceLoc Loc) {
-    if (Loc.isValid()) {
-      std::tie(Home.Line, Home.Column) = SM.getPresumedLineAndColumnForLoc(Loc);
-    }
+    Pos.Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
+    std::tie(Pos.Line, Pos.Column) = SM.getLineAndColumnInBuffer(Loc);
+
+    const VirtualFile *VF = SM.getVirtualFile(Loc);
+    if (!VF)
+      return;
+
+    Pos.Directive.Offset = SM.getLocOffsetInBuffer(VF->Range.getStart(),
+                                                   BufferID);
+    Pos.Directive.LineOffset = VF->LineOffset;
+    Pos.Directive.Length = VF->Range.getByteLength();
+    Pos.Directive.Name = StringRef(VF->Name);
   };
-#define SET(X) setLineColumn(Result.X, D->get##X());
-  SET(Loc)
-  SET(StartLoc)
-  SET(EndLoc)
-#undef SET
+
+  Result.SourceFilePath = SM.getIdentifierForBuffer(BufferID);
+  for (const auto &SRC : D->getRawComment(/*SerializedOK*/false).Comments) {
+    Result.DocRanges.emplace_back(SourcePosition(), SRC.Range.getByteLength());
+    setPosition(Result.DocRanges.back().first, SRC.Range.getStart());
+  }
+  setPosition(Result.Loc, D->getLoc(/*SerializedOK=*/false));
+  setPosition(Result.StartLoc, D->getStartLoc());
+  setPosition(Result.EndLoc, D->getEndLoc());
   return Result;
 }
 

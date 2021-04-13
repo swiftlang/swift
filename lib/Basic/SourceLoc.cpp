@@ -83,6 +83,19 @@ unsigned SourceManager::addMemBufferCopy(StringRef InputData,
   return addNewSourceBuffer(std::move(Buffer));
 }
 
+void SourceManager::createVirtualFile(SourceLoc Loc, StringRef Name,
+                                      int LineOffset, unsigned Length) {
+  CharSourceRange Range = CharSourceRange(Loc, Length);
+  VirtualFiles[Range.getEnd().Value.getPointer()] = {
+    Range, Name.str(), LineOffset
+  };
+
+  if (CachedVFile.first && Range.contains(SourceLoc(
+      llvm::SMLoc::getFromPointer(CachedVFile.first)))) {
+    CachedVFile = {nullptr, nullptr};
+  }
+}
+
 bool SourceManager::openVirtualFile(SourceLoc loc, StringRef name,
                                     int lineOffset) {
   CharSourceRange fullRange = getRangeForBuffer(findBufferContainingLoc(loc));
@@ -135,8 +148,7 @@ void SourceManager::closeVirtualFile(SourceLoc end) {
   (void)existed;
 }
 
-const SourceManager::VirtualFile *
-SourceManager::getVirtualFile(SourceLoc Loc) const {
+const VirtualFile *SourceManager::getVirtualFile(SourceLoc Loc) const {
   const char *p = Loc.Value.getPointer();
 
   if (CachedVFile.first == p)
@@ -368,7 +380,7 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
   return Ptr - InputBuf->getBufferStart();
 }
 
-unsigned SourceManager::getExternalSourceBufferId(StringRef Path) {
+unsigned SourceManager::getExternalSourceBufferID(StringRef Path) {
   auto It = BufIdentIDMap.find(Path);
   if (It != BufIdentIDMap.end()) {
     return It->getSecond();
@@ -387,7 +399,7 @@ unsigned SourceManager::getExternalSourceBufferId(StringRef Path) {
 SourceLoc
 SourceManager::getLocFromExternalSource(StringRef Path, unsigned Line,
                                         unsigned Col) {
-  auto BufferId = getExternalSourceBufferId(Path);
+  auto BufferId = getExternalSourceBufferID(Path);
   if (BufferId == 0u)
     return SourceLoc();
   auto Offset = resolveFromLineCol(BufferId, Line, Col);

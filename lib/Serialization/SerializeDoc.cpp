@@ -523,14 +523,6 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 namespace {
-struct DeclLocationsTableData {
-  uint32_t SourceFileOffset;
-  uint32_t DocRangesOffset;
-  SourcePosition Loc;
-  SourcePosition StartLoc;
-  SourcePosition EndLoc;
-};
-
 class USRTableInfo {
 public:
   using key_type = StringRef;
@@ -618,6 +610,20 @@ public:
   }
 };
 
+static void writePosition(const SourcePosition &Pos, endian::Writer &Writer,
+                          StringWriter &Strings) {
+  Writer.write<uint32_t>(Pos.Offset);
+  Writer.write<uint32_t>(Pos.Line);
+  Writer.write<uint32_t>(Pos.Column);
+
+  Writer.write<uint32_t>(Pos.Directive.Offset);
+  Writer.write<int32_t>(Pos.Directive.LineOffset);
+  Writer.write<uint32_t>(Pos.Directive.Length);
+  llvm::SmallString<128> AbsName = Pos.Directive.Name;
+  if (!AbsName.empty())
+    llvm::sys::fs::make_absolute(AbsName);
+  Writer.write<uint32_t>(Strings.getTextOffset(AbsName.str()));
+}
 
 /**
  Records the locations of `SingleRawComment` pieces for a declaration
@@ -626,10 +632,11 @@ public:
  See: \c decl_locs_block::DocRangesLayout
  */
 class DocRangeWriter {
+  StringWriter &Strings;
   llvm::DenseMap<const Decl *, uint32_t> DeclOffsetMap;
   llvm::SmallString<1024> Buffer;
 public:
-  DocRangeWriter() {
+  DocRangeWriter(StringWriter &Strings) : Strings(Strings) {
     /**
      Offset 0 is reserved to mean "no offset", meaning that a declaration
      didn't have a doc comment.
@@ -655,13 +662,11 @@ public:
     }
 
     llvm::raw_svector_ostream OS(Buffer);
-
-    endian::write<uint32_t>(OS, DocRanges.size(), little);
-
-    for (const auto &LineColumnAndLength : DocRanges) {
-      endian::write<uint32_t>(OS, LineColumnAndLength.first.Line, little);
-      endian::write<uint32_t>(OS, LineColumnAndLength.first.Column, little);
-      endian::write<uint32_t>(OS, LineColumnAndLength.second, little);
+    endian::Writer Writer(OS, little);
+    Writer.write<uint32_t>(DocRanges.size());
+    for (const auto &DocRange : DocRanges) {
+      writePosition(DocRange.first, Writer, Strings);
+      Writer.write<uint32_t>(DocRange.second);
     }
 
     return StartOffset;
@@ -690,47 +695,12 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   bool walkToParameterListPre(ParameterList *PL) override { return false; }
 
-  void appendToBuffer(DeclLocationsTableData data) {
-    llvm::raw_svector_ostream out(Buffer);
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(data.SourceFileOffset);
-    writer.write<uint32_t>(data.DocRangesOffset);
-#define WRITE_LINE_COLUMN(X)                                                  \
-writer.write<uint32_t>(data.X.Line);                                          \
-writer.write<uint32_t>(data.X.Column);
-    WRITE_LINE_COLUMN(Loc)
-    WRITE_LINE_COLUMN(StartLoc);
-    WRITE_LINE_COLUMN(EndLoc);
-#undef WRITE_LINE_COLUMN
-  }
-
   Optional<uint32_t> calculateNewUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     if (ide::printDeclUSR(D, OS))
       return None;
     return USRWriter.getNewUSRId(OS.str());
-  }
-
-  Optional<DeclLocationsTableData> getLocData(Decl *D) {
-    auto *File = D->getDeclContext()->getModuleScopeContext();
-    auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
-    if (!Locs.hasValue())
-      return None;
-    DeclLocationsTableData Result;
-    llvm::SmallString<128> AbsolutePath = Locs->SourceFilePath;
-    llvm::sys::fs::make_absolute(AbsolutePath);
-    Result.SourceFileOffset = FWriter.getTextOffset(AbsolutePath.str());
-    Result.DocRangesOffset = DocWriter.getDocRangesOffset(D,
-      llvm::makeArrayRef(Locs->DocRanges));
-#define COPY_LINE_COLUMN(X)                                                   \
-Result.X.Line = Locs->X.Line;                                                 \
-Result.X.Column = Locs->X.Column;
-    COPY_LINE_COLUMN(Loc)
-    COPY_LINE_COLUMN(StartLoc)
-    COPY_LINE_COLUMN(EndLoc)
-#undef COPY_LINE_COLUMN
-    return Result;
   }
 
   bool shouldSerializeSourceLoc(Decl *D) {
@@ -740,11 +710,6 @@ Result.X.Column = Locs->X.Column;
   }
 
   bool walkToDeclPre(Decl *D) override {
-    SWIFT_DEFER {
-      assert(USRWriter.peekNextId() * sizeof(DeclLocationsTableData)
-             == Buffer.size() &&
-            "USR Id has a one-to-one mapping with DeclLocationsTableData");
-    };
     // .swiftdoc doesn't include comments for double underscored symbols, but
     // for .swiftsourceinfo, having the source location for these symbols isn't
     // a concern because these symbols are in .swiftinterface anyway.
@@ -752,15 +717,29 @@ Result.X.Column = Locs->X.Column;
       return false;
     if (!shouldSerializeSourceLoc(D))
       return true;
-    // If we cannot get loc data for D, don't proceed.
-    auto LocData = getLocData(D);
-    if (!LocData.hasValue())
+
+    auto *File = D->getDeclContext()->getModuleScopeContext();
+    auto Positions = cast<FileUnit>(File)->getBasicPositionsForDecl(D);
+    if (!Positions.hasValue())
       return true;
-    // If we have handled this USR before, don't proceed.
+
+    // If we have handled this USR before, don't proceed
     auto USR = calculateNewUSRId(D);
     if (!USR.hasValue())
       return true;
-    appendToBuffer(*LocData);
+
+    llvm::SmallString<128> AbsolutePath = Positions->SourceFilePath;
+    llvm::sys::fs::make_absolute(AbsolutePath);
+
+    llvm::raw_svector_ostream Out(Buffer);
+    endian::Writer Writer(Out, little);
+    Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
+    Writer.write<uint32_t>(DocWriter.getDocRangesOffset(
+        D, llvm::makeArrayRef(Positions->DocRanges)));
+    writePosition(Positions->Loc, Writer, FWriter);
+    writePosition(Positions->StartLoc, Writer, FWriter);
+    writePosition(Positions->EndLoc, Writer, FWriter);
+
     return true;
   }
 };
@@ -919,7 +898,7 @@ void serialization::writeSourceInfoToStream(raw_ostream &os,
       BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
       DeclUSRsTableWriter USRWriter;
       StringWriter FPWriter;
-      DocRangeWriter DocWriter;
+      DocRangeWriter DocWriter(FPWriter);
       emitFileListRecord(S.Out, DC, FPWriter);
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter, DocWriter);
       // Emit USR table mapping from a USR to USR Id.

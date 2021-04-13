@@ -62,6 +62,7 @@ namespace swift {
   class DynamicSelfType;
   class Type;
   class Expr;
+  struct ExternalDeclLocs;
   class CaptureListExpr;
   class DeclRefExpr;
   class ForeignAsyncConvention;
@@ -686,16 +687,8 @@ private:
 
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
-  SourceLoc getLocFromSource() const;
 
-  struct CachedExternalSourceLocs {
-    SourceLoc Loc;
-    SourceLoc StartLoc;
-    SourceLoc EndLoc;
-    SmallVector<CharSourceRange, 4> DocRanges;
-  };
-  mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
-  const CachedExternalSourceLocs *getSerializedLocs() const;
+  SourceLoc getLocFromSource() const;
 
   /// Directly set the invalid bit
   void setInvalidBit();
@@ -806,6 +799,15 @@ public:
   /// Returns the preferred location when referring to declarations
   /// in diagnostics.
   SourceLoc getLoc(bool SerializedOK = true) const;
+
+  /// Returns the serialized locations of this declaration from the
+  /// corresponding .swiftsourceinfo file. Empty if it is within the current
+  /// module and thus does not have any .swiftsourceinfo.
+  ///
+  /// By default the locations are simple file, offset, line, and column. To
+  /// resolve these into \c SourceLocs, set \p Resolve to \c true. Note that
+  /// this must load the external file, hence being off by default.
+  const ExternalDeclLocs &getSerializedLocs(bool Resolve = false) const;
 
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;

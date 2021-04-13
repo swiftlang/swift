@@ -145,10 +145,10 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
   switch (Unit->getKind()) {
   case FileUnitKind::SerializedAST: {
     if (SerializedOK) {
-      auto *CachedLocs = getSerializedLocs();
-      if (!CachedLocs->DocRanges.empty()) {
+      auto CachedLocs = getSerializedLocs(/*Resolve=*/true);
+      if (!CachedLocs.DocRanges.empty()) {
         SmallVector<SingleRawComment, 4> SRCs;
-        for (const auto &Range : CachedLocs->DocRanges) {
+        for (const auto &Range : CachedLocs.DocRanges) {
           if (Range.isValid()) {
             SRCs.push_back({Range, Context.SourceMgr});
           } else {

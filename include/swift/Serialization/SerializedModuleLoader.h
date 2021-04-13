@@ -392,7 +392,8 @@ public:
 
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const override;
 
-  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
+  Optional<BasicDeclPositions>
+  getBasicPositionsForDecl(const Decl *D) const override;
 
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const override;
 

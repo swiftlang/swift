@@ -610,37 +610,58 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
-  if (CachedSerializedLocs) {
-    return CachedSerializedLocs;
-  }
-  auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
-  assert(File->getKind() == FileUnitKind::SerializedAST &&
-         "getSerializedLocs() should only be called on decls in "
-         "a 'SerializedASTFile'");
-  auto Locs = File->getBasicLocsForDecl(this);
-  if (!Locs.hasValue()) {
-    static const Decl::CachedExternalSourceLocs NullLocs{};
-    return &NullLocs;
-  }
-  auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
-  auto &SM = getASTContext().SourceMgr;
-#define CASE(X)                                                               \
-Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
-                                       Locs->X.Column);
-  CASE(Loc)
-  CASE(StartLoc)
-  CASE(EndLoc)
-#undef CASE
+const ExternalDeclLocs &Decl::getSerializedLocs(bool Resolve) const {
+  auto &Context = getASTContext();
+  ExternalDeclLocs *Result = nullptr;
+  if (auto EL = Context.getExternalLocs(this)) {
+    Result = *EL;
+  } else {
+    static ExternalDeclLocs NullLocs{};
+    auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+    if (File->getKind() != FileUnitKind::SerializedAST)
+      return NullLocs;
 
-  for (const auto &LineColumnAndLength : Locs->DocRanges) {
-    auto Start = SM.getLocFromExternalSource(Locs->SourceFilePath,
-      LineColumnAndLength.first.Line,
-      LineColumnAndLength.first.Column);
-    Result->DocRanges.push_back({ Start, LineColumnAndLength.second });
+    auto Positions = File->getBasicPositionsForDecl(this);
+    if (!Positions.hasValue()) {
+      Result = &NullLocs;
+    } else {
+      Result = getASTContext().Allocate<ExternalDeclLocs>();
+      Result->Positions = getASTContext().AllocateObjectCopy(*Positions);
+    }
+    Context.setExternalLocs(this, Result);
   }
 
-  return Result;
+  // Not all callers need SourceLoc's. Creating them requires loading the file,
+  // so avoid that where we can.
+  if (Result->Positions && Resolve && !Result->Resolved) {
+    auto &SM = getASTContext().SourceMgr;
+    auto *Positions = Result->Positions;
+
+    auto ResolveLoc = [&](const SourcePosition &Pos) -> SourceLoc {
+      // If the decl had a presumed loc, create its virtual file so that
+      // getPresumedLineAndColForLoc works from serialized locations as well.
+      if (Pos.Directive.isValid()) {
+        auto &SL = Pos.Directive;
+        SourceLoc Loc = SM.getLocForOffset(Result->BufferID, SL.Offset);
+        SM.createVirtualFile(Loc, SL.Name, SL.LineOffset, SL.Length);
+      }
+      return SM.getLocForOffset(Result->BufferID, Pos.Offset);
+    };
+
+    Result->BufferID = SM.getExternalSourceBufferID(Positions->SourceFilePath);
+
+    // File might not exist since it could have moved since .swiftsourceinfo
+    // was created.
+    if (Result->BufferID) {
+      Result->Loc = ResolveLoc(Positions->Loc);
+      for (auto &Range : Positions->DocRanges) {
+        Result->DocRanges.emplace_back(ResolveLoc(Range.first), Range.second);
+      }
+    }
+
+    Result->Resolved = true;
+  }
+  return *Result;
 }
 
 StringRef Decl::getAlternateModuleName() const {
@@ -683,7 +704,7 @@ static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
   case FileUnitKind::SerializedAST: {
     if (!SerializedOK)
       return SourceLoc();
-    return getSerializedLocs()->Loc;
+    return getSerializedLocs(/*Resolve=*/true).Loc;
   }
   case FileUnitKind::Builtin:
   case FileUnitKind::Synthesized:

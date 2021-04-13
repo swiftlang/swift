@@ -1243,9 +1243,9 @@ SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
 
-Optional<BasicDeclLocs>
-SerializedASTFile::getBasicLocsForDecl(const Decl *D) const {
-  return File.getBasicDeclLocsForDecl(D);
+Optional<BasicDeclPositions>
+SerializedASTFile::getBasicPositionsForDecl(const Decl *D) const {
+  return File.getBasicPositionsForDecl(D);
 }
 
 Optional<StringRef>
