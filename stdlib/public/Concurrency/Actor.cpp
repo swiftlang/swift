@@ -45,7 +45,13 @@
 #endif
 
 #if defined(__ELF__)
-#include <unwind.h>
+#include <sys/syscall.h>
+#endif
+
+#include <pthread.h>
+
+#if defined(_WIN32)
+#include <io.h>
 #endif
 
 using namespace swift;
