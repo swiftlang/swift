@@ -13,6 +13,8 @@ import _Concurrency
 // CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor7Builtin15_filenameLength01_E7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 @MainActor public func onMainActor() { }
 
+func takeClosure(_ fn: @escaping () -> Int) { }
+
 public actor MyActor {
   var counter = 0
 
@@ -26,5 +28,12 @@ public actor MyActor {
       self.counter = self.counter + 1
       return self.counter
     }
+  }
+
+  // CHECK-RAW: sil private [ossa] @$s4test7MyActorCfdSiycfU_
+  // CHECK-RAW-NOT: extract_executor
+  // CHECK-RAW: return [[VALUE:%.*]] : $Int
+  deinit {
+    takeClosure { self.counter }
   }
 }
