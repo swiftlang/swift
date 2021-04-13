@@ -253,7 +253,7 @@ static bool isExecutingOnMainThread() {
                     DUPLICATE_SAME_ACCESS);
   }
 
-  return CompareObjectHandles(__initialPthread, GetCurrentThread());
+  return __initialPthread == GetCurrentThread();
 #else
   return pthread_main_np() == 1;
 #endif
