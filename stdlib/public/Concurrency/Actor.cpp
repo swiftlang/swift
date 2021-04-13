@@ -20,12 +20,43 @@
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ThreadLocal.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
+
+#if defined(__APPLE__)
+#include <asl.h>
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
+#if defined(__ELF__)
+#include <unwind.h>
+#endif
+
+#if defined(__APPLE__)
+#include <asl.h>
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
+#if defined(__ELF__)
+#include <sys/syscall.h>
+#endif
+
+#if HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
+
+#if defined(_WIN32)
+#include <io.h>
+#include <handleapi.h>
+#include <processthreadsapi.h>
+#endif
 
 using namespace swift;
 
@@ -204,6 +235,122 @@ static ExecutorRef swift_task_getCurrentExecutorImpl() {
   fprintf(stderr, "[%p] getting current executor %p\n", pthread_self(), result.getIdentity());
 #endif
   return result;
+}
+
+#if defined(_WIN32)
+static HANDLE __initialPthread = INVALID_HANDLE_VALUE;
+#endif
+
+/// Determine whether we are currently executing on the main thread
+/// independently of whether we know that we are on the main actor.
+static bool isExecutingOnMainThread() {
+#if defined(__linux__)
+  return syscall(SYS_gettid) == getpid();
+#elif defined(_WIN32)
+  if (__initialPthread == INVALID_HANDLE_VALUE) {
+    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
+                    GetCurrentProcess(), &__initialPthread, 0, FALSE,
+                    DUPLICATE_SAME_ACCESS);
+  }
+
+  return __initialPthread == GetCurrentThread();
+#else
+  return pthread_main_np() == 1;
+#endif
+}
+
+SWIFT_CC(swift)
+static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
+  if (auto currentTracking = ExecutorTrackingInfo::current()) {
+    return currentTracking->getActiveExecutor() == executor;
+  }
+
+  return executor.isMainExecutor() && isExecutingOnMainThread();
+}
+
+/// Logging level for unexpected executors:
+/// 0 - no logging
+/// 1 - warn on each instance
+/// 2 - fatal error
+static unsigned unexpectedExecutorLogLevel = 1;
+
+static void checkUnexpectedExecutorLogLevel(void *context) {
+  const char *levelStr = getenv("SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL");
+  if (!levelStr)
+    return;
+
+  long level = strtol(levelStr, nullptr, 0);
+  if (level >= 0 && level < 3)
+    unexpectedExecutorLogLevel = level;
+}
+
+SWIFT_CC(swift)
+void swift::swift_task_reportUnexpectedExecutor(
+    const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
+    uintptr_t line, ExecutorRef executor) {
+  // Make sure we have an appropriate log level.
+  static swift_once_t logLevelToken;
+  swift_once(&logLevelToken, checkUnexpectedExecutorLogLevel, nullptr);
+
+  bool isFatalError = false;
+  switch (unexpectedExecutorLogLevel) {
+  case 0:
+    return;
+
+  case 1:
+    isFatalError = false;
+    break;
+
+  case 2:
+    isFatalError = true;
+    break;
+  }
+
+  const char *functionIsolation;
+  const char *whereExpected;
+  if (executor.isMainExecutor()) {
+    functionIsolation = "@MainActor function";
+    whereExpected = "the main thread";
+  } else {
+    functionIsolation = "actor-isolated function";
+    whereExpected = "the same actor";
+  }
+
+  char *message;
+  swift_asprintf(
+      &message,
+      "%s: data race detected: %s at %.*s:%d was not called on %s\n",
+      isFatalError ? "error" : "warning", functionIsolation,
+      (int)fileLength, file, (int)line, whereExpected);
+
+  if (_swift_shouldReportFatalErrorsToDebugger()) {
+    RuntimeErrorDetails details = {
+        .version = RuntimeErrorDetails::currentVersion,
+        .errorType = "actor-isolation-violation",
+        .currentStackDescription = "Actor-isolated function called from another thread",
+        .framesToSkip = 1,
+    };
+    _swift_reportToDebugger(
+        isFatalError ? RuntimeErrorFlagFatal : RuntimeErrorFlagNone, message,
+        &details);
+  }
+
+#if defined(_WIN32)
+#define STDERR_FILENO 2
+  _write(STDERR_FILENO, message, strlen(message));
+#else
+  write(STDERR_FILENO, message, strlen(message));
+#endif
+#if defined(__APPLE__)
+  asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#elif defined(__ANDROID__)
+  __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
+#endif
+
+  free(message);
+
+  if (isFatalError)
+    abort();
 }
 
 /*****************************************************************************/

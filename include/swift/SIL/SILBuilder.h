@@ -2168,6 +2168,13 @@ public:
                                                       Actor, hasOwnership()));
   }
 
+  ExtractExecutorInst *createExtractExecutor(SILLocation Loc, SILValue Actor) {
+    auto resultType = SILType::getPrimitiveObjectType(getASTContext().TheExecutorType);
+    return insert(new (getModule()) ExtractExecutorInst(getSILDebugLocation(Loc),
+                                                        Actor, hasOwnership(),
+                                                        resultType));
+  }
+
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//

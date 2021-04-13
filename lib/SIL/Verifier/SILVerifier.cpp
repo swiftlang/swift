@@ -4789,7 +4789,14 @@ public:
                         "Builtin.Executor in lowered SIL");
     }
   }
-  
+
+  void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    if (EEI->getModule().getStage() == SILStage::Lowered) {
+      require(false,
+              "extract_executor instruction should have been lowered away");
+    }
+  }
+
   void checkObjCProtocolInst(ObjCProtocolInst *OPI) {
     require(OPI->getProtocol()->isObjC(),
             "objc_protocol must be applied to an @objc protocol");
