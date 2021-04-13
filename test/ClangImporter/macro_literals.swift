@@ -120,37 +120,45 @@ func testIntegerComparisons() {
   // CHECK: %0 = integer_literal $Builtin.Int1, 0, loc {{.*}}
   // CHECK-NEXT: %1 = struct $Bool (%0 : $Builtin.Int1), loc {{.*}}
   _ = EQUAL_FALSE
-  // CHECK-NEXT: %2 = integer_literal $Builtin.Int1, -1, loc {{.*}}
-  // CHECK-NEXT: %3 = struct $Bool (%2 : $Builtin.Int1), loc {{.*}}
+  // CHECK-NEXT: debug_value %1 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %3 = integer_literal $Builtin.Int1, -1, loc {{.*}}
+  // CHECK-NEXT: %4 = struct $Bool (%3 : $Builtin.Int1), loc {{.*}}
   _ = EQUAL_TRUE
-  // CHECK-NEXT: %4 = integer_literal $Builtin.Int1, -1, loc {{.*}}
-  // CHECK-NEXT: %5 = struct $Bool (%4 : $Builtin.Int1), loc {{.*}}
-  _ = EQUAL_TRUE_MIXED_TYPES
-
-  // CHECK-NEXT: %6 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: debug_value %4 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %6 = integer_literal $Builtin.Int1, -1, loc {{.*}}
   // CHECK-NEXT: %7 = struct $Bool (%6 : $Builtin.Int1), loc {{.*}}
+  _ = EQUAL_TRUE_MIXED_TYPES
+  // CHECK-NEXT: debug_value %7 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %9 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %10 = struct $Bool (%9 : $Builtin.Int1), loc {{.*}}
   _ = GT_FALSE
-  // CHECK-NEXT: %8 = integer_literal $Builtin.Int1, -1, loc {{.*}}
-  // CHECK-NEXT: %9 = struct $Bool (%8 : $Builtin.Int1), loc {{.*}}
-  _ = GT_TRUE
-  // CHECK-NEXT: %10 = integer_literal $Builtin.Int1, 0, loc {{.*}}
-  // CHECK-NEXT: %11 = struct $Bool (%10 : $Builtin.Int1), loc {{.*}}
-  _ = GTE_FALSE
+  // CHECK-NEXT: debug_value %10 : $Bool, loc {{.*}}
   // CHECK-NEXT: %12 = integer_literal $Builtin.Int1, -1, loc {{.*}}
   // CHECK-NEXT: %13 = struct $Bool (%12 : $Builtin.Int1), loc {{.*}}
-  _ = GTE_TRUE
-
-  // CHECK-NEXT: %14 = integer_literal $Builtin.Int1, 0, loc {{.*}}
-  // CHECK-NEXT: %15 = struct $Bool (%14 : $Builtin.Int1), loc {{.*}}
-  _ = LT_FALSE
-  // CHECK-NEXT: %16 = integer_literal $Builtin.Int1, -1, loc {{.*}}
-  // CHECK-NEXT: %17 = struct $Bool (%16 : $Builtin.Int1), loc {{.*}}
-  _ = LT_TRUE
-  // CHECK-NEXT: %18 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  _ = GT_TRUE
+  // CHECK-NEXT: debug_value %13 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %15 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %16 = struct $Bool (%15 : $Builtin.Int1), loc {{.*}}
+  _ = GTE_FALSE
+  // CHECK-NEXT: debug_value %16 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %18 = integer_literal $Builtin.Int1, -1, loc {{.*}}
   // CHECK-NEXT: %19 = struct $Bool (%18 : $Builtin.Int1), loc {{.*}}
+  _ = GTE_TRUE
+  // CHECK-NEXT: debug_value %19 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %21 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %22 = struct $Bool (%21 : $Builtin.Int1), loc {{.*}}
+  _ = LT_FALSE
+  // CHECK-NEXT: debug_value %22 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %24 = integer_literal $Builtin.Int1, -1, loc {{.*}}
+  // CHECK-NEXT: %25 = struct $Bool (%24 : $Builtin.Int1), loc {{.*}}
+  _ = LT_TRUE
+  // CHECK-NEXT: debug_value %25 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %27 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %28 = struct $Bool (%27 : $Builtin.Int1), loc {{.*}}
   _ = LTE_FALSE
-  // CHECK-NEXT: %20 = integer_literal $Builtin.Int1, -1, loc {{.*}}
-  // CHECK-NEXT: %21 = struct $Bool (%20 : $Builtin.Int1), loc {{.*}}
+  // CHECK-NEXT: debug_value %28 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %30 = integer_literal $Builtin.Int1, -1, loc {{.*}}
+  // CHECK-NEXT: %31 = struct $Bool (%30 : $Builtin.Int1), loc {{.*}}
   _ = LTE_TRUE
 }
 
@@ -160,26 +168,32 @@ func testLogicalComparisons() {
   // CHECK: %0 = integer_literal $Builtin.Int1, -1, loc {{.*}}
   // CHECK-NEXT: %1 = struct $Bool (%0 : $Builtin.Int1), loc {{.*}}
   _ = L_AND_TRUE
-  // CHECK-NEXT: %2 = integer_literal $Builtin.Int1, 0, loc {{.*}}
-  // CHECK-NEXT: %3 = struct $Bool (%2 : $Builtin.Int1), loc {{.*}}
+  // CHECK-NEXT: debug_value %1 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %3 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %4 = struct $Bool (%3 : $Builtin.Int1), loc {{.*}}
   _ = L_AND_FALSE
-  // CHECK-NEXT: %4 = integer_literal $Builtin.Int1, -1, loc {{.*}}
-  // CHECK-NEXT: %5 = struct $Bool (%4 : $Builtin.Int1), loc {{.*}}
-  _ = L_AND_TRUE_B
-  // CHECK-NEXT: %6 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: debug_value %4 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %6 = integer_literal $Builtin.Int1, -1, loc {{.*}}
   // CHECK-NEXT: %7 = struct $Bool (%6 : $Builtin.Int1), loc {{.*}}
+  _ = L_AND_TRUE_B
+  // CHECK-NEXT: debug_value %7 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %9 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %10 = struct $Bool (%9 : $Builtin.Int1), loc {{.*}}
   _ = L_AND_FALSE_B
-
-  // CHECK-NEXT: %8 = integer_literal $Builtin.Int1, -1, loc {{.*}}
-  // CHECK-NEXT: %9 = struct $Bool (%8 : $Builtin.Int1), loc {{.*}}
-  _ = L_OR_TRUE
-  // CHECK-NEXT: %10 = integer_literal $Builtin.Int1, 0, loc {{.*}}
-  // CHECK-NEXT: %11 = struct $Bool (%10 : $Builtin.Int1), loc {{.*}}
-  _ = L_OR_FALSE
+  // CHECK-NEXT: debug_value %10 : $Bool, loc {{.*}}
   // CHECK-NEXT: %12 = integer_literal $Builtin.Int1, -1, loc {{.*}}
   // CHECK-NEXT: %13 = struct $Bool (%12 : $Builtin.Int1), loc {{.*}}
+  _ = L_OR_TRUE
+  // CHECK-NEXT: debug_value %13 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %15 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %16 = struct $Bool (%15 : $Builtin.Int1), loc {{.*}}
+  _ = L_OR_FALSE
+  // CHECK-NEXT: debug_value %16 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %18 = integer_literal $Builtin.Int1, -1, loc {{.*}}
+  // CHECK-NEXT: %19 = struct $Bool (%18 : $Builtin.Int1), loc {{.*}}
   _ = L_OR_TRUE_B
-  // CHECK-NEXT: %14 = integer_literal $Builtin.Int1, 0, loc {{.*}}
-  // CHECK-NEXT: %15 = struct $Bool (%14 : $Builtin.Int1), loc {{.*}}
+  // CHECK-NEXT: debug_value %19 : $Bool, loc {{.*}}
+  // CHECK-NEXT: %21 = integer_literal $Builtin.Int1, 0, loc {{.*}}
+  // CHECK-NEXT: %22 = struct $Bool (%21 : $Builtin.Int1), loc {{.*}}
   _ = L_OR_FALSE_B
 }
