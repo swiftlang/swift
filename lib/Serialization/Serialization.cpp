@@ -4345,6 +4345,7 @@ public:
       FunctionParamLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
+          S.addDeclBaseNameRef(param.getInternalLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isNoDerivative());
