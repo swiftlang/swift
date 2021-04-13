@@ -2890,7 +2890,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If we're choosing an asynchronous declaration within a synchronous
     // context, or vice-versa, increase the async/async mismatch score.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->isAsyncContext() != isAsynchronousContext(useDC)) {
+      if (!func->hasPolymorphicEffect(EffectKind::Async) &&
+          func->isAsyncContext() != isAsynchronousContext(useDC)) {
         increaseScore(
             func->isAsyncContext() ? SK_AsyncInSyncMismatch : SK_SyncInAsync);
       }
