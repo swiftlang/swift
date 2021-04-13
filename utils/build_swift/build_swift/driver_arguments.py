@@ -1076,6 +1076,20 @@ def create_argument_parser():
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
            help='LLVM target generators to build')
 
+    option('--llvm-ninja-targets', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of ninja targets to build for LLVM '
+                'instead of the default ones. Only supported when using '
+                'ninja to build. Can be called multiple times '
+                'to add multiple such options.')
+
+    option('--llvm-ninja-targets-for-cross-compile-hosts', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of ninja targets to build for LLVM '
+                'in cross compile hosts. Requires --llvm-ninja-targets to '
+                'be specified to be applied. Can be called multiple times '
+                'to add multiple such options.')
+
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')
 

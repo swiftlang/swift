@@ -179,6 +179,8 @@ KNOWN_SETTINGS=(
     llvm-install-components                       ""                "a semicolon-separated list of LLVM components to install"
     llvm-lit-args                                 ""                "If set, override the lit args passed to LLVM"
     enable-llvm-assertions                        "1"               "set to enable llvm assertions"
+    llvm-ninja-targets                            ""                "list of ninja targets to build for LLVM"
+    llvm-ninja-targets-for-cross-compile-hosts    ""                "list of ninja targets to build for LLVM for hosts that are cross-compiled"
 
     ## Swift Options
     swift-analyze-code-coverage                   "not-merged"      "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
@@ -1636,23 +1638,31 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             llvm)
-                if [ "${BUILD_LLVM}" == "0" ] ; then
-                    build_targets=(clean)
-                fi
-                if [[ "${SKIP_BUILD}" || "${SKIP_BUILD_LLVM}" ]] ; then
-                    # We can't skip the build completely because the standalone
-                    # build of Swift depend on these for building and testing.
-                    build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
-                    # If we are not performing a toolchain only build, then we
-                    # also want to include FileCheck, not, llvm-nm for testing
-                    # purposes.
-                    if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
-                      build_targets=(
-                          "${build_targets[@]}"
-                          FileCheck
-                          not
-                          llvm-nm
-                      )
+                if [ "${LLVM_NINJA_TARGETS}" != "" ] ; then
+                    if [[ $(is_cross_tools_host ${host}) && "${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS}" != "" ]] ; then
+                        build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
+                    else
+                        build_targets=("${LLVM_NINJA_TARGETS[@]}")
+                    fi
+                else
+                    if [ "${BUILD_LLVM}" == "0" ] ; then
+                        build_targets=(clean)
+                    fi
+                    if [[ "${SKIP_BUILD}" || "${SKIP_BUILD_LLVM}" ]] ; then
+                        # We can't skip the build completely because the standalone
+                        # build of Swift depend on these for building and testing.
+                        build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
+                        # If we are not performing a toolchain only build, then we
+                        # also want to include FileCheck, not, llvm-nm for testing
+                        # purposes.
+                        if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
+                          build_targets=(
+                              "${build_targets[@]}"
+                              FileCheck
+                              not
+                              llvm-nm
+                          )
+                        fi
                     fi
                 fi
 
