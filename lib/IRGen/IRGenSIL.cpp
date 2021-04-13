@@ -1329,6 +1329,9 @@ public:
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i);
 
   void visitHopToExecutorInst(HopToExecutorInst *i);
+  void visitExtractExecutorInst(ExtractExecutorInst *i) {
+    llvm_unreachable("extract_executor should never be seen in Lowered SIL");
+  }
 
   void visitKeyPathInst(KeyPathInst *I);
 
