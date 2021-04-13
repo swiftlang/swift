@@ -1359,9 +1359,13 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
-      assert(!OSVersion.isEmpty());
-
-      if (OSVersion.isAll()) {
+      
+      // The OS version might be left empty if availability checking was
+      // disabled. Treat it as always-true in that case.
+      assert(!OSVersion.isEmpty()
+             || getASTContext().LangOpts.DisableAvailabilityChecking);
+        
+      if (OSVersion.isEmpty() || OSVersion.isAll()) {
         // If there's no check for the current platform, this condition is
         // trivially true.
         SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
