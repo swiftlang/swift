@@ -31,7 +31,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
@@ -206,7 +206,7 @@ static llvm::cl::opt<bool> EnableCanonicalizationAndTrivialDCE(
                    "dead code and canonicalizing SIL"));
 
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
-  BasicBlockWorklist<32> blockWorklist(function.getEntryBlock());
+  BasicBlockWorklist blockWorklist(function.getEntryBlock());
   SmallVector<SILInstruction *, 128> initialInstructionWorklist;
 
   while (SILBasicBlock *block = blockWorklist.pop()) {
