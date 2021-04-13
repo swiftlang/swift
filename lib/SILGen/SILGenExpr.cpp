@@ -4523,7 +4523,7 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
     // If we're assigning to a discard, just emit the operand as ignored.
     dest = dest->getSemanticsProvidingExpr();
     if (isa<DiscardAssignmentExpr>(dest)) {
-      SGF.emitIgnoredExpr(src);
+      SGF.emitIgnoredExpr(src, true);
       return;
     }
     
@@ -5651,7 +5651,7 @@ RValue SILGenFunction::emitPlusZeroRValue(Expr *E) {
 }
 
 // Evaluate the expression as an lvalue or rvalue, discarding the result.
-void SILGenFunction::emitIgnoredExpr(Expr *E) {
+void SILGenFunction::emitIgnoredExpr(Expr *E, bool isAssignment) {
   // If this is a tuple expression, recursively ignore its elements.
   // This may let us recursively avoid work.
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
@@ -5668,7 +5668,10 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   if (E->getType()->hasLValueType()) {
     // Emit the l-value, but don't perform an access.
     FormalEvaluationScope scope(*this);
+    // ManagedValue mv = 
     emitLValue(E, SGFAccessKind::IgnoredRead);
+//    SILDebugVariable dbgVar(true, /*ArgNo=*/0);
+//    SGF.B.emitDebugDescription(E, mv.forward(SGF), dbgVar);
     return;
   }
 
@@ -5677,6 +5680,9 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope scope(*this);
     LValue lv = emitLValue(LE->getSubExpr(), SGFAccessKind::IgnoredRead);
+    
+//    ManagedValue value;
+//    SILDebugVariable dbgVar(true, /*ArgNo=*/0);
 
     // If loading from the lvalue is guaranteed to have no side effects, we
     // don't need to drill into it.
@@ -5687,12 +5693,15 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
     // side effects in the lvalue, but don't need to perform the final load.
     if (lv.isLastComponentPhysical()) {
       emitAddressOfLValue(E, std::move(lv));
+//      B.emitDebugDescription(E, value.forward(*this), dbgVar);
       return;
     }
 
     // Otherwise, we must call the ultimate getter to get its potential side
     // effect.
     emitLoadOfLValue(E, std::move(lv), SGFContext::AllowImmediatePlusZero);
+    //.getAsSingleValue(*this, LE);
+//    B.emitDebugDescription(E, value.forward(*this), dbgVar);
     return;
   }
 
@@ -5720,6 +5729,9 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
       value = emitLoadOfLValue(LE, std::move(lv),
           SGFContext::AllowImmediatePlusZero).getAsSingleValue(*this, LE);
     }
+    
+//    SILDebugVariable dbgVar(true, /*ArgNo=*/0);
+//    B.emitDebugDescription(E, value.forward(*this), dbgVar);
 
     for (auto &FVE : llvm::reverse(forceValueExprs)) {
       const TypeLowering &optTL = getTypeLowering(FVE->getSubExpr()->getType());
@@ -5733,6 +5745,20 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 
   // Otherwise, emit the result (to get any side effects), but produce it at +0
   // if that allows simplification.
+//  
+//  // If the RHS references a declaration, create a debug value
+//  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
+//    if (isAssignment &&
+//        !E->isImplicit() &&
+//        isa<VarDecl>(DRE->getDecl())) {
+//      ManagedValue mv = emitRValue(E, SGFContext::AllowImmediatePlusZero)
+//                        .getAsSingleValue(*this, E);
+//      SILDebugVariable dbgVar(true, /*ArgNo=*/0);
+//      B.emitDebugDescription(E, mv.copy(*this, E).getValue(), dbgVar);
+//      return;
+//    }
+//  }
+//  
   emitRValue(E, SGFContext::AllowImmediatePlusZero);
 }
 
