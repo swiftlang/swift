@@ -19,6 +19,7 @@
 //
 // Behaviors below are different in old Swift runtime libraries
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // ================================================================
 //
