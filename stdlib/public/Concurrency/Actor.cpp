@@ -246,7 +246,7 @@ static _CFThreadRef __initialPthread = INVALID_HANDLE_VALUE;
 static bool isExecutingOnMainThread() {
 #if defined(__linux__)
   return syscall(SYS_gettid) == getpid();
-#elseif defined(_WIN32)
+#elif defined(_WIN32)
   if (__initialPthread == INVALID_HANDLE_VALUE) {
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
                     GetCurrentProcess(), &__initialPthread, 0, FALSE,
