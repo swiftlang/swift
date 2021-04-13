@@ -10,7 +10,13 @@
 
 import _Concurrency
 import Dispatch
+
+// For sleep
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 @MainActor func onMainActor() {
   print("I'm on the main actor!")
