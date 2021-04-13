@@ -36,7 +36,7 @@ class Presidio : GolfCourse {
     set { yardsFromBackTees = newValue }
   }
 
-  override var holes : Int {  // expected-error {{cannot override non-'async' property with 'async' property}}
+  override var holes : Int {  // expected-error {{cannot override non-async property with async property}}
     get async { 18 }
   }
 
@@ -50,11 +50,11 @@ class Presidio : GolfCourse {
 }
 
 class PresidioBackNine : Presidio {
-  override var par : Int { // expected-error{{cannot override non-'throws' property with 'throws' property}}
+  override var par : Int { // expected-error{{cannot override non-throwing property with throwing property}}
     get throws { 36 } // attempts to put the 'throws' effect back
   }
 
-  override subscript(_ i : Int) -> Int { // expected-error{{cannot override non-'async' subscript with 'async' subscript}}
+  override subscript(_ i : Int) -> Int { // expected-error{{cannot override non-async subscript with async subscript}}
     get async throws { 0 }
   }
 }
