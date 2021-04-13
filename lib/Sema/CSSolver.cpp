@@ -1878,15 +1878,14 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
   }
 }
 
-void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constraints,
-                                                 SmallVectorImpl<unsigned>::iterator first,
-                                                 SmallVectorImpl<unsigned>::iterator last,
-                                                 ConstraintLocator *locator) {
-  auto *argFnType = AppliedDisjunctions[locator];
-  if (!isOperatorBindOverload(constraints[0]) || !argFnType)
+void DisjunctionChoiceProducer::partitionGenericOperators(
+    SmallVectorImpl<unsigned>::iterator first,
+    SmallVectorImpl<unsigned>::iterator last) {
+  auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
+  if (!isOperatorBindOverload(Choices.front()) || !argFnType)
     return;
 
-  auto operatorName = constraints[0]->getOverloadChoice().getName();
+  auto operatorName = Choices[0]->getOverloadChoice().getName();
   if (!operatorName.getBaseIdentifier().isArithmeticOperator())
     return;
 
@@ -1899,7 +1898,8 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
     if (!nominal)
       return false;
 
-    auto *protocol = TypeChecker::getProtocol(getASTContext(), SourceLoc(), kind);
+    auto *protocol =
+        TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
 
     if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
       return refined->inheritsFrom(protocol);
@@ -1911,7 +1911,7 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
   // Gather Numeric and Sequence overloads into separate buckets.
   for (auto iter = first; iter != last; ++iter) {
     unsigned index = *iter;
-    auto *decl = constraints[index]->getOverloadChoice().getDecl();
+    auto *decl = Choices[index]->getOverloadChoice().getDecl();
     auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
     if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
       concreteOverloads.push_back(index);
@@ -1926,8 +1926,10 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
 
   auto sortPartition = [&](SmallVectorImpl<unsigned> &partition) {
     llvm::sort(partition, [&](unsigned lhs, unsigned rhs) -> bool {
-      auto *declA = dyn_cast<ValueDecl>(constraints[lhs]->getOverloadChoice().getDecl());
-      auto *declB = dyn_cast<ValueDecl>(constraints[rhs]->getOverloadChoice().getDecl());
+      auto *declA =
+          dyn_cast<ValueDecl>(Choices[lhs]->getOverloadChoice().getDecl());
+      auto *declB =
+          dyn_cast<ValueDecl>(Choices[rhs]->getOverloadChoice().getDecl());
 
       return TypeChecker::isDeclRefinementOf(declA, declB);
     });
@@ -1946,19 +1948,22 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
   // overload choices first.
   for (auto arg : argFnType->getParams()) {
     auto argType = arg.getPlainType();
-    argType = getFixedTypeRecursive(argType, /*wantRValue=*/true);
+    argType = CS.getFixedTypeRecursive(argType, /*wantRValue=*/true);
 
     if (argType->isTypeVariableOrMember())
       continue;
 
-    if (conformsToKnownProtocol(DC, argType, KnownProtocolKind::AdditiveArithmetic)) {
-      first = std::copy(numericOverloads.begin(), numericOverloads.end(), first);
+    if (conformsToKnownProtocol(CS.DC, argType,
+                                KnownProtocolKind::AdditiveArithmetic)) {
+      first =
+          std::copy(numericOverloads.begin(), numericOverloads.end(), first);
       numericOverloads.clear();
       break;
     }
 
-    if (conformsToKnownProtocol(DC, argType, KnownProtocolKind::Sequence)) {
-      first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
+    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::Sequence)) {
+      first =
+          std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
       sequenceOverloads.clear();
       break;
     }
@@ -1969,16 +1974,22 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
   first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
 }
 
-void ConstraintSystem::partitionDisjunction(
-    ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
+void DisjunctionChoiceProducer::partitionDisjunction(
+    SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
   // Apply a special-case rule for favoring one generic function over
   // another.
-  if (auto favored = tryOptimizeGenericDisjunction(DC, Choices)) {
-    favorConstraint(favored);
+  if (auto favored = tryOptimizeGenericDisjunction(CS.DC, Choices)) {
+    CS.favorConstraint(favored);
   }
 
   SmallSet<Constraint *, 16> taken;
+
+  using ConstraintMatcher = std::function<bool(unsigned index, Constraint *)>;
+  using ConstraintMatchLoop =
+      std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>;
+  using PartitionAppendCallback =
+      std::function<void(SmallVectorImpl<unsigned> & options)>;
 
   // Local function used to iterate over the untaken choices from the
   // disjunction and use a higher-order function to determine if they
@@ -2006,7 +2017,7 @@ void ConstraintSystem::partitionDisjunction(
 
   // Add existing operator bindings to the main partition first. This often
   // helps the solver find a solution fast.
-  existingOperatorBindingsForDisjunction(*this, Choices, everythingElse);
+  existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
   for (auto index : everythingElse)
     taken.insert(Choices[index]);
 
@@ -2026,7 +2037,7 @@ void ConstraintSystem::partitionDisjunction(
   });
 
   // Then unavailable constraints if we're skipping them.
-  if (!shouldAttemptFixes()) {
+  if (!CS.shouldAttemptFixes()) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (constraint->getKind() != ConstraintKind::BindOverload)
         return false;
@@ -2036,7 +2047,7 @@ void ConstraintSystem::partitionDisjunction(
       if (!funcDecl)
         return false;
 
-      if (!isDeclUnavailable(funcDecl, constraint->getLocator()))
+      if (!CS.isDeclUnavailable(funcDecl, constraint->getLocator()))
         return false;
 
       unavailable.push_back(index);
