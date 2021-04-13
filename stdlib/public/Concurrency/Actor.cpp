@@ -54,6 +54,8 @@
 
 #if defined(_WIN32)
 #include <io.h>
+#include <handleapi.h>
+#include <processthreadsapi.h>
 #endif
 
 using namespace swift;
@@ -235,11 +237,23 @@ static ExecutorRef swift_task_getCurrentExecutorImpl() {
   return result;
 }
 
+#if defined(_WIN32)
+static _CFThreadRef __initialPthread = INVALID_HANDLE_VALUE;
+#endif
+
 /// Determine whether we are currently executing on the main thread
 /// independently of whether we know that we are on the main actor.
 static bool isExecutingOnMainThread() {
 #if defined(__linux__)
   return syscall(SYS_gettid) == getpid();
+#elseif defined(_WIN32)
+  if (__initialPthread == INVALID_HANDLE_VALUE) {
+    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
+                    GetCurrentProcess(), &__initialPthread, 0, FALSE,
+                    DUPLICATE_SAME_ACCESS);
+  }
+
+  return CompareObjectHandles(__initialPthread, GetCurrentThread());
 #else
   return pthread_main_np() == 1;
 #endif
