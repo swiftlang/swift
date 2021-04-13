@@ -5620,6 +5620,10 @@ void performSyntacticDiagnosticsForTarget(
 /// generic requirement and if so return that type or null type otherwise.
 Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
 
+/// Determine whether given disjunction constraint represents a set
+/// of operator overload choices.
+bool isOperatorDisjunction(Constraint *disjunction);
+
 } // end namespace constraints
 
 template<typename ...Args>
