@@ -1525,11 +1525,25 @@ static ValueDecl *getDestroyTaskGroup(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
-static ValueDecl *getBuildSerialExecutorRef(ASTContext &ctx, Identifier id) {
-  // TODO: restrict the generic parameter to the SerialExecutor protocol
+static ValueDecl *getBuildMainActorExecutorRef(ASTContext &ctx,
+                                               Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _executor);
+}
+
+static ValueDecl *getBuildDefaultActorExecutorRef(ASTContext &ctx,
+                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
                                       _layout(_typeparam(0), _classLayout())),
+                            _parameters(_typeparam(0)),
+                            _executor);
+}
+
+static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
+                                                    Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                              _conformsTo(_typeparam(0), _serialExecutor)),
                             _parameters(_typeparam(0)),
                             _executor);
 }
@@ -2736,8 +2750,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
 
-  case BuiltinValueKind::BuildSerialExecutorRef:
-    return getBuildSerialExecutorRef(Context, Id);
+  case BuiltinValueKind::BuildMainActorExecutorRef:
+    return getBuildMainActorExecutorRef(Context, Id);
+
+  case BuiltinValueKind::BuildDefaultActorExecutorRef:
+    return getBuildDefaultActorExecutorRef(Context, Id);
+
+  case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    return getBuildOrdinarySerialExecutorRef(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

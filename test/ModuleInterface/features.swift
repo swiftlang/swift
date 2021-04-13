@@ -11,7 +11,10 @@
 
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: public actor MyActor
-// CHECK: }
+// CHECK:        @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+// CHECK-NEXT:     get
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
 // CHECK-NEXT: #endif
 public actor MyActor {
 }

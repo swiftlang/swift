@@ -1844,20 +1844,30 @@ public:
               "default-actor builtin can only operate on a single object");
       auto argType = arguments[0]->getType().getASTType();
       auto argClass = argType.getClassOrBoundGenericClass();
-      require((argClass && argClass->isRootDefaultActor()) ||
+      require((argClass && argClass->isRootDefaultActor(M,
+                                        F.getResilienceExpansion())) ||
               isa<BuiltinNativeObjectType>(argType),
               "default-actor builtin can only operate on default actors");
       return;
     }
 
-    if (builtinKind == BuiltinValueKind::BuildSerialExecutorRef) {
+    if (builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
+        builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of building a serial executor");
+      auto arguments = BI->getArguments();
+      require(arguments.size() == 1,
+              "builtin expects one argument");
+      require(arguments[0]->getType().isObject(),
+              "operand of builtin should have object type");
+    }
+
+    if (builtinKind == BuiltinValueKind::BuildMainActorExecutorRef) {
       requireObjectType(BuiltinExecutorType, BI,
                         "result of buildSerialExecutorRef");
       auto arguments = BI->getArguments();
-      require(arguments.size() == 1,
-              "buildSerialExecutorRef expects one argument");
-      require(arguments[0]->getType().isObject(),
-              "operand of buildSerialExecutorRef should have object type");
+      require(arguments.size() == 0,
+              "buildMainActorExecutorRef expects no arguments");
     }
   }
   
@@ -5851,6 +5861,7 @@ void SILVTable::verify(const SILModule &M) const {
         assert(!superEntry->isNonOverridden()
                && "vtable entry overrides an entry that claims to have no overrides");
         // TODO: Check the root vtable entry for the method too.
+
         break;
       }
     }

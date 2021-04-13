@@ -49,6 +49,7 @@ enum SingletonTypeSynthesizer {
   _rawUnsafeContinuation,
   _void,
   _word,
+  _serialExecutor,
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -65,6 +66,9 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _void: return SC.Context.TheEmptyTupleType;
   case _word: return BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                              SC.Context);
+  case _serialExecutor:
+    return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
+      ->getDeclaredInterfaceType();
   }
 }
 

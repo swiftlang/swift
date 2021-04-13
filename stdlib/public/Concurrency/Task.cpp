@@ -198,7 +198,7 @@ static ExecutorRef executorForEnqueuedJob(Job *job) {
   if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
     return ExecutorRef::generic();
   else if (jobQueue == DISPATCH_QUEUE_MAIN_EXECUTOR)
-    return ExecutorRef::mainExecutor();
+    return _swift_task_getMainExecutor();
   else
     swift_unreachable("jobQueue was not a known value.");
 }

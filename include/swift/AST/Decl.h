@@ -3779,9 +3779,8 @@ public:
   /// Get the closest-to-root superclass that's an actor class.
   const ClassDecl *getRootActorClass() const;
 
-  /// Does this class explicitly declare any of the methods that
-  /// would prevent it from being a default actor?
-  bool hasExplicitCustomActorMethods() const;
+  /// Fetch this class's unownedExecutor property, if it has one.
+  const VarDecl *getUnownedExecutorProperty() const;
 
   /// Is this the NSObject class type?
   bool isNSObject() const;
@@ -4007,6 +4006,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  Actor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:

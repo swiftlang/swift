@@ -47,6 +47,9 @@ constexpr static const StringLiteral CXX_TEMPLATE_INST_PREFIX =
 constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
     "programtermination_point";
 
+constexpr static const StringLiteral SEMANTICS_DEFAULT_ACTOR =
+    "defaultActor";
+
 constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
     "$defaultActor";
 

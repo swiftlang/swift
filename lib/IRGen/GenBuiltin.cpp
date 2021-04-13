@@ -337,9 +337,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::BuildSerialExecutorRef) {
+  if (Builtin.ID == BuiltinValueKind::BuildMainActorExecutorRef) {
+    emitBuildMainActorExecutorRef(IGF, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildDefaultActorExecutorRef) {
     auto actor = args.claimNext();
-    emitBuildSerialExecutorRef(IGF, actor, argTypes[0], out);
+    emitBuildDefaultActorExecutorRef(IGF, actor, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildOrdinarySerialExecutorRef) {
+    auto actor = args.claimNext();
+    auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto conf = substitutions.getConformances()[0];
+    emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
     return;
   }
 

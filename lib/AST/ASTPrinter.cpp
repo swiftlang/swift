@@ -2717,11 +2717,11 @@ static bool usesFeatureGlobalActors(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinJob(Decl *decl) {
-  auto typeHasBuiltinJob = [](Type type) {
+static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
+  auto typeMatches = [kind](Type type) {
     return type.findIf([&](Type type) {
       if (auto builtinTy = type->getAs<BuiltinType>())
-        return builtinTy->getBuiltinTypeKind() == BuiltinTypeKind::BuiltinJob;
+        return builtinTy->getBuiltinTypeKind() == kind;
 
       return false;
     });
@@ -2729,7 +2729,7 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
 
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
-      if (typeHasBuiltinJob(type))
+      if (typeMatches(type))
         return true;
     }
   }
@@ -2737,7 +2737,7 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
   if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
     for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
       if (Type type = patternBinding->getPattern(idx)->getType())
-        if (typeHasBuiltinJob(type))
+        if (typeMatches(type))
           return true;
     }
   }
@@ -2745,32 +2745,15 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinJob(Decl *decl) {
+  return usesBuiltinType(decl, BuiltinTypeKind::BuiltinJob);
+}
+
 static bool usesFeatureBuiltinExecutor(Decl *decl) {
-  auto typeHasBuiltinExecutor = [](Type type) {
-    return type.findIf([&](Type type) {
-      if (auto builtinTy = type->getAs<BuiltinType>())
-        return builtinTy->getBuiltinTypeKind()
-            == BuiltinTypeKind::BuiltinExecutor;
+  return usesBuiltinType(decl, BuiltinTypeKind::BuiltinExecutor);
+}
 
-      return false;
-    });
-  };
-
-  if (auto value = dyn_cast<ValueDecl>(decl)) {
-    if (Type type = value->getInterfaceType()) {
-      if (typeHasBuiltinExecutor(type))
-        return true;
-    }
-  }
-
-  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-    for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
-      if (Type type = patternBinding->getPattern(idx)->getType())
-        if (typeHasBuiltinExecutor(type))
-          return true;
-    }
-  }
-
+static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
 }
 
@@ -5812,6 +5795,11 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
       if (!options.shouldPrint(proto))
+        continue;
+      // The SerialExecutor conformance is only synthesized on the root
+      // actor class, so we can just test resilience immediately.
+      if (proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor) &&
+          cast<ClassDecl>(decl)->isResilient())
         continue;
       if (attr->getProtocolKind() == KnownProtocolKind::RawRepresentable &&
           isa<EnumDecl>(decl) &&

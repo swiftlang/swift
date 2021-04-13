@@ -75,6 +75,9 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveHashable(Nominal);
   }
 
+  if (*derivableKind == KnownDerivableProtocolKind::Actor)
+    return canDeriveActor(DC, Nominal);
+
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
@@ -307,6 +310,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
+    // Actor.unownedExecutor
+    if (name.isSimpleName(ctx.Id_unownedExecutor))
+      return getRequirement(KnownProtocolKind::Actor);
+
     return nullptr;
   }
 
@@ -397,6 +404,41 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 
   auto selfDecl = fn->getImplicitSelfDecl();
   return new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+}
+
+CallExpr *
+DerivedConformance::createBuiltinCall(ASTContext &ctx,
+                                      BuiltinValueKind builtin,
+                                      ArrayRef<Type> typeArgs,
+                                      ArrayRef<ProtocolConformanceRef>
+                                        conformances,
+                                      ArrayRef<Expr *> args) {
+  auto name = ctx.getIdentifier(getBuiltinName(builtin));
+  auto decl = getBuiltinValueDecl(ctx, name);
+  assert(decl);
+
+  ConcreteDeclRef declRef = decl;
+  auto fnType = decl->getInterfaceType();
+  if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
+    auto generics = genericFnType->getGenericSignature();
+    auto subs = SubstitutionMap::get(generics, typeArgs, conformances);
+    declRef = ConcreteDeclRef(decl, subs);
+    fnType = genericFnType->substGenericArgs(subs);
+  } else {
+    assert(typeArgs.empty());
+  }
+
+  auto resultType = fnType->castTo<FunctionType>()->getResult();
+
+  Expr *ref = new (ctx) DeclRefExpr(declRef, DeclNameLoc(),
+                                    /*Implicit=*/true,
+                                    AccessSemantics::Ordinary, fnType);
+  CallExpr *call =
+    CallExpr::createImplicit(ctx, ref, args, /*labels*/ {});
+  call->setType(resultType);
+  call->setThrows(false);
+
+  return call;
 }
 
 AccessorDecl *DerivedConformance::

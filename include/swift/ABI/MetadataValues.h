@@ -2207,10 +2207,7 @@ enum class ExecutorRefFlags : size_t {
   // pointer
 
   /// The executor is a default actor.
-  DefaultActor = 0x1,
-
-  /// TODO: remove this
-  MainActorIdentity = 0x2,
+  DefaultActor = 0x1
 };
 
 } // end namespace swift

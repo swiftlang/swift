@@ -13,10 +13,14 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// A partial task is a unit of scheduleable work.
+/// TODO: remove this before shipping
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public typealias PartialAsyncTask = UnownedJob
+
+/// A job is a unit of scheduleable work.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct PartialAsyncTask {
+public struct UnownedJob {
   private var context: Builtin.Job
 
   public func run() { }
