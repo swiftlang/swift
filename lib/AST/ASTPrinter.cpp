@@ -923,6 +923,18 @@ public:
     if (Options.TransformContext) {
       Type CurrentType = Options.TransformContext->getBaseType();
       if (CurrentType && CurrentType->hasArchetype()) {
+        // OpenedArchetypeTypes get replaced by a GenericTypeParamType without a
+        // name in mapTypeOutOfContext. The GenericTypeParamType has no children
+        // so we can't use it for TypeTransformContext.
+        // To work around this, replace the OpenedArchetypeType with the type of
+        // the protocol itself.
+        CurrentType = CurrentType.transform([](Type T) -> Type {
+          if (auto *Opened = T->getAs<OpenedArchetypeType>()) {
+            return Opened->getOpenedExistentialType();
+          } else {
+            return T;
+          }
+        });
         CurrentType = CurrentType->mapTypeOutOfContext();
       }
       setCurrentType(CurrentType);
