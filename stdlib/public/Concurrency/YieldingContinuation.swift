@@ -12,13 +12,147 @@
 
 import Swift
 
-internal final class _YieldingContinuationStorage: UnsafeSendable {
-  var continuation: Builtin.RawUnsafeContinuation?
-}
+@_silgen_name("swift_yielding_continuation_lock_size")
+func _lockWordCount() -> Int
+
+@_silgen_name("swift_yielding_continuation_lock_init")
+func _lockInit(_ ptr: UnsafeRawPointer)
+
+@_silgen_name("swift_yielding_continuation_lock_lock")
+func _lock(_ ptr: UnsafeRawPointer)
+
+@_silgen_name("swift_yielding_continuation_lock_unlock")
+func _unlock(_ ptr: UnsafeRawPointer)
 
 @available(SwiftStdlib 5.5, *)
 public struct YieldingContinuation<Element, Failure: Error>: Sendable {
-  let storage = _YieldingContinuationStorage()
+  internal final class Storage: UnsafeSendable {
+    struct State {
+      // continuation can be either of two types:
+      // UnsafeContinuation<Element, Error>
+      // UnsafeContinuation<Element, Never>
+      var continuation: Builtin.RawUnsafeContinuation?
+      var pending: [Element]
+    }
+    // Stored as a singular structured assignment for initialization
+    var state: State
+    
+    private init(_doNotCallMe: ()) {
+      fatalError()
+    }
+
+    func lock() {
+      let ptr = 
+        UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
+      _lock(ptr)
+    }
+
+    func unlock() {
+      let ptr = 
+        UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
+      _unlock(ptr)
+    }
+
+    func yield(_ value: __owned Element) {
+      lock()
+      state.pending.append(value)
+      if let raw = state.continuation {
+        state.continuation = nil
+        let continuation =
+          unsafeBitCast(raw, to: UnsafeContinuation<Element, Error>.self)
+        let toSend = state.pending.removeFirst()
+        unlock()
+        continuation.resume(returning: toSend)
+      } else {
+        unlock()
+      }
+    }
+    
+    func yield(_ value: __owned Element) where Failure == Never {
+      lock()
+      state.pending.append(value)
+      if let raw = state.continuation {
+        state.continuation = nil
+        let continuation =
+          unsafeBitCast(raw, to: UnsafeContinuation<Element, Never>.self)
+        let toSend = state.pending.removeFirst()
+        unlock()
+        continuation.resume(returning: toSend)
+      } else {
+        unlock()
+      }
+    }
+    
+    func yield(throwing error: __owned Failure) {
+      lock()
+      if let raw = state.continuation {
+        state.continuation = nil
+        let continuation =
+          unsafeBitCast(raw, to: UnsafeContinuation<Element, Error>.self)
+        unlock()
+        continuation.resume(throwing: error)
+      } else {
+        unlock()
+      }
+    }
+    
+    func next(_ continuation: UnsafeContinuation<Element, Never>) {
+      lock()
+      let raw = 
+        unsafeBitCast(continuation, to: Builtin.RawUnsafeContinuation.self)
+      if state.continuation == nil {
+        if state.pending.count > 0 {
+          let toSend = state.pending.removeFirst()
+          unlock()
+          continuation.resume(returning: toSend)
+        } else {
+          state.continuation = raw
+          unlock()
+        }
+      } else {
+        unlock()
+        fatalError("attempt to await next() on more than one task")
+      }
+    }
+    
+    func next(_ continuation: UnsafeContinuation<Element, Error>) {
+      lock()
+      let raw = 
+        unsafeBitCast(continuation, to: Builtin.RawUnsafeContinuation.self)
+      if state.continuation == nil {
+        if state.pending.count > 0 {
+          let toSend = state.pending.removeFirst()
+          unlock()
+          continuation.resume(returning: toSend)
+        } else {
+          state.continuation = raw
+          unlock()
+        }
+      } else {
+        unlock()
+        fatalError("attempt to await next() on more than one task")
+      }
+    }
+    
+    static func create() -> Storage {
+      let minimumCapacity = _lockWordCount()
+      let storage = Builtin.allocWithTailElems_1(
+          Storage.self,
+          minimumCapacity._builtinWordValue,
+          UnsafeRawPointer.self
+      )
+      
+      let state = 
+        UnsafeMutablePointer<Storage.State>(Builtin.addressof(&storage.state))
+      state.initialize(to: State(continuation: nil, pending: []))
+      let ptr = UnsafeRawPointer(
+        Builtin.projectTailElems(storage, UnsafeRawPointer.self))
+      _lockInit(ptr)
+      return storage
+    }
+  }
+  
+  let storage = Storage.create()
 
   /// Construct a YieldingContinuation.
   ///
@@ -35,24 +169,8 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   /// awaiter on the next function. This type is inherently sendable and can
   /// safely be used and stored in multiple task contexts.
   public init(yielding: Element.Type, throwing: Failure.Type) { }
-
-  internal func _extract() -> UnsafeContinuation<Element, Error>? {
-    let raw = Builtin.atomicrmw_xchg_acqrel_Word(
-      Builtin.addressof(&storage.continuation),
-      UInt(bitPattern: 0)._builtinWordValue)
-    return unsafeBitCast(raw, to: UnsafeContinuation<Element, Error>?.self)
-  }
-
-  internal func _inject(
-    _ continuation: UnsafeContinuation<Element, Error>
-  ) -> UnsafeContinuation<Element, Error>? {
-    let rawContinuation = unsafeBitCast(continuation, to: Builtin.Word.self)
-    let raw = Builtin.atomicrmw_xchg_acqrel_Word(
-      Builtin.addressof(&storage.continuation), rawContinuation)
-    return unsafeBitCast(raw, to: UnsafeContinuation<Element, Error>?.self)
-  }
   
-  /// Resume the task awaiting next by having it return normally from its 
+  /// Resume the task awaiting next by having it return normally from its
   /// suspension point.
   ///
   /// - Parameter value: The value to return from an awaiting call to next.
@@ -61,12 +179,12 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   /// once. However if there are no potential awaiting calls to `next` this
   /// function will return false, indicating that the caller needs to decide how
   /// the behavior should be handled.
-  public func yield(_ value: __owned Element) -> Bool {
-    if let continuation = _extract() {
-      continuation.resume(returning: value)
-      return true
-    }
-    return false
+  public func yield(_ value: __owned Element) {
+    storage.yield(value)
+  }
+  
+  public func yield(_ value: __owned Element) where Failure == Never {
+    storage.yield(value)
   }
   
   /// Resume the task awaiting the continuation by having it throw an error
@@ -78,12 +196,8 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   /// once. However if there are no potential awaiting calls to `next` this
   /// function will return false, indicating that the caller needs to decide how
   /// the behavior should be handled.
-  public func yield(throwing error: __owned Failure) -> Bool {
-    if let continuation = _extract() {
-      continuation.resume(throwing: error)
-      return true
-    }
-    return false
+  public func yield(throwing error: __owned Failure) {
+    storage.yield(throwing: error)
   }
 }
 
@@ -94,19 +208,11 @@ extension YieldingContinuation where Failure == Error {
   /// - Return: The element that was yielded or a error that was thrown.
   ///
   /// When multiple calls are awaiting a produced value from next any call to
-  /// yield will resume all awaiting calls to next with that value. 
+  /// yield will resume all awaiting calls to next with that value.
   public func next() async throws -> Element {
-    var existing: UnsafeContinuation<Element, Error>?
-    do {
-      let result = try await withUnsafeThrowingContinuation {
-        (continuation: UnsafeContinuation<Element, Error>) in
-        existing = _inject(continuation)
-      }
-      existing?.resume(returning: result)
-      return result
-    } catch {
-      existing?.resume(throwing: error)
-      throw error
+    return try await withUnsafeThrowingContinuation {
+      (continuation: UnsafeContinuation<Element, Error>) in
+      storage.next(continuation)
     }
   }
 }
@@ -125,13 +231,10 @@ extension YieldingContinuation where Failure == Never {
   ///
   /// - Return: The element that was yielded.
   public func next() async -> Element {
-    var existing: UnsafeContinuation<Element, Error>?
-    let result = try! await withUnsafeThrowingContinuation {
-      (continuation: UnsafeContinuation<Element, Error>) in
-      existing = _inject(continuation)
+    return await withUnsafeContinuation {
+      (continuation: UnsafeContinuation<Element, Never>) in
+      storage.next(continuation)
     }
-    existing?.resume(returning: result)
-    return result
   }
 }
 
@@ -150,12 +253,12 @@ extension YieldingContinuation {
   /// the behavior should be handled.
   public func yield<Er: Error>(
     with result: Result<Element, Er>
-  ) -> Bool where Failure == Error {
+  ) where Failure == Error {
     switch result {
       case .success(let val):
-        return self.yield(val)
+        self.yield(val)
       case .failure(let err):
-        return self.yield(throwing: err)
+        self.yield(throwing: err)
     }
   }
   
@@ -170,12 +273,12 @@ extension YieldingContinuation {
   /// once. However if there are no potential awaiting calls to `next` this
   /// function will return false, indicating that the caller needs to decide how
   /// the behavior should be handled.
-  public func yield(with result: Result<Element, Failure>) -> Bool {
+  public func yield(with result: Result<Element, Failure>) {
     switch result {
       case .success(let val):
-        return self.yield(val)
+        self.yield(val)
       case .failure(let err):
-        return self.yield(throwing: err)
+        self.yield(throwing: err)
     }
   }
   
@@ -186,8 +289,8 @@ extension YieldingContinuation {
   /// once. However if there are no potential awaiting calls to `next` this
   /// function will return false, indicating that the caller needs to decide how
   /// the behavior should be handled.
-  public func yield() -> Bool where Element == Void {
-    return self.yield(())
+  public func yield() where Element == Void {
+    self.yield(())
   }
 }
 
