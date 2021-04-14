@@ -496,7 +496,7 @@ bool ImplicitSerializedModuleLoader::maybeDiagnoseTargetMismatch(
   }
 
   Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
-                     target, foundArchs);
+                     target, foundArchs, dir);
   return true;
 }
 
