@@ -6,6 +6,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 class StringLike: CustomStringConvertible {

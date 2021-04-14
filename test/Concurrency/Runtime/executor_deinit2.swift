@@ -6,6 +6,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // this needs to match with the check count below.
 let NUM_TASKS : Int = 100
