@@ -131,6 +131,7 @@ EXPECTED_DEFAULTS = {
     'cmark_build_variant': 'Debug',
     'compiler_vendor': defaults.COMPILER_VENDOR,
     'coverage_db': None,
+    'cross_compile_deps_path': None,
     'cross_compile_hosts': [],
     'darwin_deployment_version_ios':
         defaults.DARWIN_DEPLOYMENT_VERSION_IOS,
@@ -694,6 +695,7 @@ EXPECTED_OPTIONS = [
     PathOption('--clang-profile-instr-use'),
     PathOption('--cmake'),
     PathOption('--coverage-db'),
+    PathOption('--cross-compile-deps-path'),
     PathOption('--host-cc'),
     PathOption('--host-cxx'),
     PathOption('--host-libtool'),

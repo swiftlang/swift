@@ -181,6 +181,10 @@ class BuildScriptInvocation(object):
         if args.cross_compile_hosts:
             impl_args += [
                 "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
+        if args.cross_compile_deps_path is not None:
+            impl_args += [
+                "--cross-compile-deps-path=%s" % args.cross_compile_deps_path
+            ]
 
         if args.test_paths:
             impl_args += ["--test-paths", " ".join(args.test_paths)]
@@ -664,12 +668,14 @@ class BuildScriptInvocation(object):
                 self._execute_impl(pipeline, all_hosts, perform_epilogue_opts)
             else:
                 assert(index != last_impl_index)
-                # Once we have performed our last impl pipeline, we no longer
-                # support cross compilation.
-                #
-                # This just maintains current behavior.
                 if index > last_impl_index:
-                    self._execute(pipeline, [self.args.host_target])
+                    non_darwin_cross_compile_hostnames = [
+                        target for target in self.args.cross_compile_hosts if not
+                        StdlibDeploymentTarget.get_target_for_name(
+                            target).platform.is_darwin
+                    ]
+                    self._execute(pipeline, [self.args.host_target] +
+                                  non_darwin_cross_compile_hostnames)
                 else:
                     self._execute(pipeline, all_host_names)
 
@@ -727,6 +733,8 @@ class BuildScriptInvocation(object):
 
     def _execute(self, pipeline, all_host_names):
         for host_target in all_host_names:
+            if self.args.skip_local_build and host_target == self.args.host_target:
+                continue
             for product_class in pipeline:
                 # Execute clean, build, test, install
                 self.execute_product_build_steps(product_class, host_target)
