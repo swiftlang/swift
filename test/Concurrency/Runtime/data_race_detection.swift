@@ -35,7 +35,7 @@ func launchTask(_ fn: @escaping () -> Void) {
   }
 }
 
-@MainActor func launchFromMainThread() {
+func launchFromMainThread() {
   launchTask(promiseMainThread(onMainActor))
 }
 
@@ -55,7 +55,7 @@ actor MyActor {
 
 @main
 struct Runner {
-  @MainActor static func main() async {
+  static func main() async {
     print("Launching a main-actor task")
     // CHECK: warning: data race detected: @MainActor function at main/data_race_detection.swift:21 was not called on the main thread
     launchFromMainThread()
