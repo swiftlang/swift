@@ -123,6 +123,8 @@ SILModule::~SILModule() {
   assert(numAllocatedSlabs == freeSlabs.size() && "leaking slabs in SILModule");
 #endif
 
+  assert(!hasUnresolvedOpenedArchetypeDefinitions());
+
   // Decrement ref count for each SILGlobalVariable with static initializers.
   for (SILGlobalVariable &v : silGlobals)
     v.dropAllReferences();
@@ -169,6 +171,9 @@ void SILModule::checkForLeaks() const {
     llvm::errs() << "Instructions in module: " << instsInModule << '\n';
     llvm_unreachable("leaking instructions");
   }
+  
+  assert(PlaceholderValue::getNumPlaceholderValuesAlive() == 0 &&
+         "leaking placeholders");
 }
 
 void SILModule::checkForLeaksAfterDestruction() {
@@ -719,6 +724,47 @@ void SILModule::registerDeserializationNotificationHandler(
   deserializationNotificationHandlers.add(std::move(handler));
 }
 
+SILValue SILModule::getOpenedArchetypeDef(CanArchetypeType archetype) {
+  SILValue &def = openedArchetypeDefs[archetype];
+  if (!def) {
+    numUnresolvedOpenedArchetypes++;
+    def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
+  }
+
+  return def;
+}
+
+bool SILModule::hasUnresolvedOpenedArchetypeDefinitions() {
+  return numUnresolvedOpenedArchetypes != 0;
+}
+
+void SILModule::notifyAddedInstruction(SILInstruction *inst) {
+  if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
+    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+      SILValue &val = openedArchetypeDefs[archeTy];
+      if (val) {
+        if (!isa<PlaceholderValue>(val)) {
+          // Print a useful error message (and not just abort with an assert).
+          llvm::errs() << "re-definition of opened archetype in function "
+                       << svi->getFunction()->getName() << ":\n";
+          svi->print(llvm::errs());
+          llvm::errs() << "previously defined in function "
+                       << val->getFunction()->getName() << ":\n";
+          val->print(llvm::errs());
+          abort();
+        }
+        // The opened archetype was unresolved so far. Replace the placeholder
+        // by inst.
+        auto *placeholder = cast<PlaceholderValue>(val);
+        placeholder->replaceAllUsesWith(svi);
+        ::delete placeholder;
+        numUnresolvedOpenedArchetypes--;
+      }
+      val = svi;
+    }
+  }
+}
+
 void SILModule::registerDeleteNotificationHandler(
     DeleteNotificationHandler *handler) {
   // Ask the handler (that can be an analysis, a pass, or some other data
@@ -734,6 +780,15 @@ removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
 }
 
 void SILModule::notifyDeleteHandlers(SILNode *node) {
+  // Update openedArchetypeDefs.
+  if (auto *svi = dyn_cast<SingleValueInstruction>(node)) {
+    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+      assert(openedArchetypeDefs.lookup(archeTy) == svi &&
+             "archetype def was not registered");
+      openedArchetypeDefs.erase(archeTy);
+    }
+  }
+
   for (auto *Handler : NotificationHandlers) {
     Handler->handleDeleteNotification(node);
   }

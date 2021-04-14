@@ -381,8 +381,7 @@ private:
   void buildConcreteOpenedExistentialInfos(
       FullApplySite Apply,
       llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
-      SILBuilderContext &BuilderCtx,
-      SILOpenedArchetypesTracker &OpenedArchetypesTracker);
+      SILBuilderContext &BuilderCtx);
 
   bool canReplaceArg(FullApplySite Apply, const OpenedArchetypeInfo &OAI,
                      const ConcreteExistentialInfo &CEI, unsigned ArgIdx);

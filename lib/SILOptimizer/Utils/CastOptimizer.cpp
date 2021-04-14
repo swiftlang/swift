@@ -1349,8 +1349,6 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
         SILBuilderWithScope B(Inst, builderContext);
-        B.getOpenedArchetypes().addOpenedArchetypeOperands(
-            FoundIEI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
         auto *NewI = replaceCastHelper(B, dynamicCast, MI);
         eraseInstAction(Inst);
@@ -1405,8 +1403,6 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
         SILBuilderWithScope B(Inst, builderContext);
-        B.getOpenedArchetypes().addOpenedArchetypeOperands(
-            FoundIERI->getTypeDependentOperands());
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);
         auto *NewI = replaceCastHelper(B, dynamicCast, MI);
         eraseInstAction(Inst);

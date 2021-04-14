@@ -5915,8 +5915,6 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   }
 #endif
 
-  // Invoke the callback on the deserialized type.
-  DeserializedTypeCallback(typeOrOffset.get());
   return typeOrOffset.get();
 }
 

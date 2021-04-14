@@ -288,6 +288,11 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *arg) {
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::
+visitPlaceholderValue(PlaceholderValue *v) {
+  return OwnershipKind::None;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::
 visitMultipleValueInstructionResult(MultipleValueInstructionResult *Result) {
   return Result->getOwnershipKind();
 }
