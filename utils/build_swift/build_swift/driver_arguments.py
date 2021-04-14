@@ -563,6 +563,11 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--cross-compile-deps-path', store_path,
+           help='The path to a directory that contains prebuilt cross-compiled '
+                'library dependencies of the corelibs and other Swift repos, '
+                'such as the libcurl dependency of FoundationNetworking')
+
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,

@@ -85,8 +85,7 @@ def run_build_script_helper(action, host_target, product, args,
         install_destdir = swiftpm.SwiftPM.get_install_destdir(args,
                                                               host_target,
                                                               product.build_dir)
-    toolchain_path = targets.toolchain_path(install_destdir,
-                                            args.install_prefix)
+    toolchain_path = product.native_toolchain_path(host_target)
     is_release = product.is_release()
     configuration = 'release' if is_release else 'debug'
     helper_cmd = [
@@ -109,5 +108,23 @@ def run_build_script_helper(action, host_target, product, args,
         helper_cmd.extend(['--sanitize', 'undefined'])
     elif args.enable_tsan:
         helper_cmd.extend(['--sanitize', 'thread'])
+
+    if not product.is_darwin_host(
+            host_target) and product.is_cross_compile_target(host_target):
+        helper_cmd.extend(['--cross-compile-host', host_target])
+        build_toolchain_path = install_destdir + args.install_prefix
+        resource_dir = '%s/lib/swift' % build_toolchain_path
+        helper_cmd += [
+            '--cross-compile-config',
+            targets.StdlibDeploymentTarget.get_target_for_name(host_target).platform
+            .swiftpm_config(args, output_dir=build_toolchain_path,
+                            swift_toolchain=toolchain_path,
+                            resource_path=resource_dir)
+        ]
+
+    if action == 'install' and product.product_name() == "sourcekitlsp":
+        helper_cmd.extend([
+            '--prefix', install_destdir + args.install_prefix
+        ])
 
     shell.call(helper_cmd)
