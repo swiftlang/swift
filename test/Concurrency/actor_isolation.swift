@@ -136,8 +136,8 @@ extension MyActor {
     _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
 
     // Global actors
-    syncGlobalActorFunc() /// expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
-    _ = syncGlobalActorFunc // expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated context}}
+    syncGlobalActorFunc() /// expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'syncGlobalActorFunc()' in a synchronous nonisolated context}}
+    _ = syncGlobalActorFunc
 
     // Global data is okay if it is immutable.
     _ = immutableGlobal
@@ -335,7 +335,7 @@ struct GenericGlobalActor<T> {
 @SomeGlobalActor func onions() {} // expected-note{{calls to global function 'onions()' from outside of its actor context are implicitly asynchronous}}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@MainActor func beets() { onions() } // expected-error{{global function 'onions()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'MainActor' in a synchronous context}}
+@MainActor func beets() { onions() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'onions()' in a synchronous main actor-isolated context}}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Crystal {
@@ -349,7 +349,6 @@ actor Crystal {
     set {}
   }
 
-  // expected-note@+1 {{calls to instance method 'foo' from outside of its actor context are implicitly asynchronous}}
   @SomeGlobalActor func foo(_ x : inout Int) {}
 
   func referToGlobProps() async {
@@ -363,12 +362,12 @@ actor Crystal {
     // expected-error@+1 {{actor-isolated property 'globActorVar' cannot be passed 'inout' to implicitly 'async' function call}}
     await self.foo(&globActorVar)
 
-    _ = self.foo // expected-error {{instance method 'foo' isolated to global actor 'SomeGlobalActor' can not be referenced from actor 'Crystal'}}
+    _ = self.foo
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@SomeGlobalActor func syncGlobalActorFunc() { syncGlobalActorFunc() } // expected-note 2{{calls to global function 'syncGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
+@SomeGlobalActor func syncGlobalActorFunc() { syncGlobalActorFunc() } // expected-note {{calls to global function 'syncGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @SomeGlobalActor func asyncGlobalActorFunc() async { await asyncGlobalActorFunc() }
 
@@ -385,7 +384,7 @@ actor Crystal {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @SomeGlobalActor func goo1() async {
   let _ = goo2
-  goo2()
+  goo2() // expected-error{{call is 'async' but is not marked with 'await'}}
 }
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @asyncHandler @SomeOtherGlobalActor func goo2() { await goo1() }
@@ -455,15 +454,16 @@ extension MyActor {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 struct GenericStruct<T> {
-  @GenericGlobalActor<T> func f() { } // expected-note 2{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  @GenericGlobalActor<T> func f() { } // expected-note {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> func g() {
     f() // okay
   }
 
   @GenericGlobalActor<String> func h() {
-    f() // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
-    _ = f // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
+    f() // expected-error{{call to global actor 'GenericGlobalActor<T>'-isolated instance method 'f()' in a synchronous global actor 'GenericGlobalActor<String>'-isolated context}}
+    let fn = f // expected-note{{calls to let 'fn' from outside of its actor context are implicitly asynchronous}}
+    fn() // expected-error{{call to global actor 'GenericGlobalActor<T>'-isolated let 'fn' in a synchronous global actor 'GenericGlobalActor<String>'-isolated context}}
   }
 }
 
@@ -658,7 +658,7 @@ class SomeClassInActor {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension SomeClassInActor.ID {
   func f(_ object: SomeClassInActor) { // expected-note{{add '@MainActor' to make instance method 'f' part of global actor 'MainActor'}}
-    object.inActor() // expected-error{{instance method 'inActor()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    object.inActor() // expected-error{{call to main actor-isolated instance method 'inActor()' in a synchronous nonisolated context}}
   }
 }
 
@@ -719,9 +719,9 @@ class SomeClassWithInits {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make global function 'outsideSomeClassWithInits()' part of global actor 'MainActor'}}
-  _ = SomeClassWithInits() // expected-error{{initializer 'init()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+  _ = SomeClassWithInits() // expected-error{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
   _ = SomeClassWithInits.shared // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
-  SomeClassWithInits.staticIsolated() // expected-error{{static method 'staticIsolated()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+  SomeClassWithInits.staticIsolated() // expected-error{{call to main actor-isolated static method 'staticIsolated()' in a synchronous nonisolated context}}
 }
 
 // ----------------------------------------------------------------------
