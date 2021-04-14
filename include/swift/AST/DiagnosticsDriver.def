@@ -49,6 +49,9 @@ ERROR(error_static_emit_executable_disallowed,none,
 ERROR(error_unable_to_load_output_file_map, none,
       "unable to load output file map '%1': %0", (StringRef, StringRef))
 
+ERROR(error_unable_to_load_batch_weight_hint_file, none,
+      "unable to load batch weight file map '%1': %0", (StringRef, StringRef))
+
 ERROR(error_no_output_file_map_specified,none,
       "no output file map specified", ())
 

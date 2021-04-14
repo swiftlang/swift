@@ -18,6 +18,7 @@
 #define SWIFT_DRIVER_DRIVER_H
 
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/BatchWeightHintFileMap.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -321,6 +322,12 @@ public:
   Optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                      StringRef workingDirectory) const;
+
+  /// Construct the BatchWeightHintFileMap for the driver from the given \p
+  /// Args arguments. BatchWeightHints are provided in a json/yaml file.
+  Optional<BatchWeightHintFileMap>
+  buildBatchWeightHintFileMap(const llvm::opt::DerivedArgList &Args,
+                              StringRef workingDirectory) const;
 
   /// Add top-level Jobs to Compilation \p C for the given \p Actions and
   /// OutputInfo.
