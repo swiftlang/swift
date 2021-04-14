@@ -743,6 +743,8 @@ public:
                          llvm::VersionTuple Obsoleted
                          = llvm::VersionTuple());
 
+  AvailableAttr *clone(ASTContext &C, bool implicit) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;
   }
