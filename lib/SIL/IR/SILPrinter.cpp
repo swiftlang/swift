@@ -1043,6 +1043,12 @@ public:
       printSILUndef(cast<SILUndef>(node));
       return;
 
+    case SILNodeKind::PlaceholderValue:
+      // This should really only happen during debugging.
+      *this << "placeholder<" << cast<PlaceholderValue>(node)->getType()
+            << ">\n";
+      return;
+
     case SILNodeKind::MultipleValueInstructionResult:
       printSILMultipleValueInstructionResult(
           cast<MultipleValueInstructionResult>(node));

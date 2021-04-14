@@ -67,14 +67,10 @@ struct OwnershipModelEliminatorVisitor
   /// builderCtxStorage.
   SILBuilderContext builderCtx;
 
-  SILOpenedArchetypesTracker openedArchetypesTracker;
-
   /// Construct an OME visitor for eliminating ownership from \p fn.
   OwnershipModelEliminatorVisitor(SILFunction &fn)
       : trackingList(), instructionsToSimplify(),
-        builderCtx(fn.getModule(), &trackingList),
-        openedArchetypesTracker(&fn) {
-    builderCtx.setOpenedArchetypesTracker(&openedArchetypesTracker);
+        builderCtx(fn.getModule(), &trackingList) {
   }
 
   /// A "syntactic" high level function that combines our insertPt with a

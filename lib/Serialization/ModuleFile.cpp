@@ -91,8 +91,7 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
 }
 
 ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
-    : Core(core),
-      DeserializedTypeCallback([](Type ty) {}) {
+    : Core(core) {
   assert(!core->hasError());
 
   DeclTypeCursor = core->DeclTypeCursor;

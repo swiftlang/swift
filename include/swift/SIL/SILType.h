@@ -39,6 +39,16 @@ namespace Lowering {
   
 namespace swift {
 
+/// Find an opened archetype represented by this type.
+/// It is assumed by this method that the type contains
+/// at most one opened archetype.
+/// Typically, it would be called from a type visitor.
+/// It checks only the type itself, but does not try to
+/// recursively check any children of this type, because
+/// this is the task of the type visitor invoking it.
+/// \returns The found archetype or empty type otherwise.
+CanArchetypeType getOpenedArchetypeOf(CanType Ty);
+
 /// How an existential type container is represented.
 enum class ExistentialRepresentation {
   /// The type is not existential.

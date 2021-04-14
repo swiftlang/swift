@@ -77,9 +77,6 @@ class ModuleFile
 
   friend StringRef getNameOfModule(const ModuleFile *);
 
-  /// A callback to be invoked every time a type was deserialized.
-  std::function<void(Type)> DeserializedTypeCallback;
-
 public:
   static std::unique_ptr<llvm::MemoryBuffer> getModuleName(ASTContext &Ctx,
                                                            StringRef modulePath,
