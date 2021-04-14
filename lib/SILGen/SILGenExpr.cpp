@@ -5770,16 +5770,12 @@ void SILGenFunction::emitIgnoredExpr(Expr *E, bool isAssignment) {
   
   // If the RHS of an underscore assignment references a VarDecl, create a
   // debug value
-  if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    if (isAssignment &&
-        !E->isImplicit() &&
-        isa<VarDecl>(DRE->getDecl())) {
-      ManagedValue mv = emitRValue(E, SGFContext::AllowImmediatePlusZero)
-                        .getAsSingleValue(*this, E);
-      SILDebugVariable dbgVar(true, /*ArgNo=*/0);
-      B.emitDebugDescription(E, mv.copy(*this, E).getValue(), dbgVar);
-      return;
-    }
+  if (isAssignment && !E->isImplicit()) {
+    ManagedValue mv = emitRValue(E, SGFContext::AllowImmediatePlusZero)
+                      .getAsSingleValue(*this, E);
+    SILDebugVariable dbgVar("_", true, /*ArgNo=*/0);
+    B.emitDebugDescription(E, mv.copy(*this, E).getValue(), dbgVar);
+    return;
   }
   
   emitRValue(E, SGFContext::AllowImmediatePlusZero);
