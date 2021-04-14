@@ -5690,17 +5690,18 @@ TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
              : binding;
 }
 
+ValueDecl *constraints::getOverloadChoiceDecl(Constraint *choice) {
+  if (choice->getKind() != ConstraintKind::BindOverload)
+    return nullptr;
+  return choice->getOverloadChoice().getDeclOrNull();
+}
+
 bool constraints::isOperatorDisjunction(Constraint *disjunction) {
   assert(disjunction->getKind() == ConstraintKind::Disjunction);
 
   auto choices = disjunction->getNestedConstraints();
-  if (choices.empty())
-    return false;
+  assert(!choices.empty());
 
-  auto *choice = choices.front();
-  if (choice->getKind() != ConstraintKind::BindOverload)
-    return false;
-
-  auto *decl = choice->getOverloadChoice().getDeclOrNull();
+  auto *decl = getOverloadChoiceDecl(choices.front());
   return decl ? decl->isOperator() : false;
 }

@@ -1734,18 +1734,6 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   return result->first;
 }
 
-static bool isOperatorBindOverload(Constraint *bindOverload) {
-  if (bindOverload->getKind() != ConstraintKind::BindOverload)
-    return false;
-
-  auto choice = bindOverload->getOverloadChoice();
-  if (!choice.isDecl())
-    return false;
-
-  auto *funcDecl = dyn_cast<FuncDecl>(choice.getDecl());
-  return funcDecl && funcDecl->getOperatorDecl();
-}
-
 // Performance hack: if there are two generic overloads, and one is
 // more specialized than the other, prefer the more-specialized one.
 static Constraint *tryOptimizeGenericDisjunction(
@@ -1882,7 +1870,7 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
     SmallVectorImpl<unsigned>::iterator first,
     SmallVectorImpl<unsigned>::iterator last) {
   auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
-  if (!isOperatorBindOverload(Choices.front()) || !argFnType)
+  if (!isOperatorDisjunction(Disjunction) || !argFnType)
     return;
 
   auto operatorName = Choices[0]->getOverloadChoice().getName();
@@ -2056,11 +2044,8 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (isOperatorBindOverload(Choices[0])) {
+  if (isOperatorDisjunction(Disjunction)) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-      if (!isOperatorBindOverload(constraint))
-        return false;
-
       if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
         simdOperators.push_back(index);
         return true;
@@ -2114,8 +2099,7 @@ Constraint *ConstraintSystem::selectDisjunction() {
         unsigned firstFavored = first->countFavoredNestedConstraints();
         unsigned secondFavored = second->countFavoredNestedConstraints();
 
-        if (!isOperatorBindOverload(first->getNestedConstraints().front()) ||
-            !isOperatorBindOverload(second->getNestedConstraints().front()))
+        if (!isOperatorDisjunction(first) || !isOperatorDisjunction(second))
           return firstActive < secondActive;
 
         if (firstFavored == secondFavored) {

@@ -5307,6 +5307,8 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type,
 Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
                                    ConstraintLocator *memberLocator);
 
+ValueDecl *getOverloadChoiceDecl(Constraint *choice);
+
 class DisjunctionChoice {
   ConstraintSystem &CS;
   unsigned Index;
@@ -5332,7 +5334,7 @@ public:
   }
 
   bool isUnavailable() const {
-    if (auto *decl = getDecl(Choice))
+    if (auto *decl = getOverloadChoiceDecl(Choice))
       return CS.isDeclUnavailable(decl, Choice->getLocator());
     return false;
   }
@@ -5360,22 +5362,11 @@ private:
   void propagateConversionInfo(ConstraintSystem &cs) const;
 
   static ValueDecl *getOperatorDecl(Constraint *choice) {
-    auto *decl = getDecl(choice);
+    auto *decl = getOverloadChoiceDecl(choice);
     if (!decl)
       return nullptr;
 
     return decl->isOperator() ? decl : nullptr;
-  }
-
-  static ValueDecl *getDecl(Constraint *constraint) {
-    if (constraint->getKind() != ConstraintKind::BindOverload)
-      return nullptr;
-
-    auto choice = constraint->getOverloadChoice();
-    if (choice.getKind() != OverloadChoiceKind::Decl)
-      return nullptr;
-
-    return choice.getDecl();
   }
 };
 
