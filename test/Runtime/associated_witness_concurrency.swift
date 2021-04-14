@@ -3,6 +3,7 @@
 // RUN: %target-run %t
 // REQUIRES: libdispatch
 // REQUIRES: executable_test
+// REQUIRES: rdar76605026
 
 import Dispatch
 
