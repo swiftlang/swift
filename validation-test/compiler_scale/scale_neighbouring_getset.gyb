@@ -1,6 +1,10 @@
 // RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select TypeCheckFunctionBodyRequest %s
 // REQUIRES: asserts
 
+// rdar://76608076
+// UNSUPPORTED: CPU=arm64
+// UNSUPPORTED: CPU=arm64e
+
 struct Struct${N} {
 % if int(N) > 1:
     var Field : Struct${int(N)-1}?
