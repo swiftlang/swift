@@ -350,11 +350,11 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   SILValue selfLV = VarLocs[selfDecl].value;
 
   // Emit the prolog.
-  emitProlog(ctor->getParameters(),
-             /*selfParam=*/nullptr,
-             ctor->getResultInterfaceType(), ctor,
-             ctor->hasThrows(),
-             ctor->getThrowsLoc());
+  emitBasicProlog(ctor->getParameters(),
+                  /*selfParam=*/nullptr,
+                  ctor->getResultInterfaceType(), ctor,
+                  ctor->hasThrows(),
+                  ctor->getThrowsLoc());
   emitConstructorMetatypeArg(*this, ctor);
 
   // Create a basic block to jump to for the implicit 'self' return.
@@ -717,9 +717,9 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   // Emit the prolog for the non-self arguments.
   // FIXME: Handle self along with the other body patterns.
-  uint16_t ArgNo = emitProlog(ctor->getParameters(), /*selfParam=*/nullptr,
-                              TupleType::getEmpty(F.getASTContext()), ctor,
-                              ctor->hasThrows(), ctor->getThrowsLoc());
+  uint16_t ArgNo = emitBasicProlog(ctor->getParameters(), /*selfParam=*/nullptr,
+                                   TupleType::getEmpty(F.getASTContext()), ctor,
+                                   ctor->hasThrows(), ctor->getThrowsLoc());
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);

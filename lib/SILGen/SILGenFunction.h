@@ -876,10 +876,11 @@ public:
                   ParameterList *paramList, ParamDecl *selfParam,
                   DeclContext *DC, Type resultType,
                   bool throws, SourceLoc throwsLoc);
-  /// returns the number of variables in paramPatterns.
-  uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
-                      Type resultType, DeclContext *DC,
-                      bool throws, SourceLoc throwsLoc);
+  /// A simpler version of emitProlog
+  /// \returns the number of variables in paramPatterns.
+  uint16_t emitBasicProlog(ParameterList *paramList, ParamDecl *selfParam,
+                           Type resultType, DeclContext *DC,
+                           bool throws, SourceLoc throwsLoc);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
