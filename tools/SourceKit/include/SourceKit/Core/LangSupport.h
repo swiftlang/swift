@@ -405,6 +405,14 @@ struct ReferencedDeclInfo {
         IsSPI(SPI), ParentContexts(Parents) {}
 };
 
+struct LocationInfo {
+  StringRef Filename;
+  unsigned Offset = 0;
+  unsigned Length = 0;
+  unsigned Line = 0;
+  unsigned Column = 0;
+};
+
 struct CursorSymbolInfo {
   UIdent Kind;
   UIdent DeclarationLang;
@@ -430,11 +438,8 @@ struct CursorSymbolInfo {
   /// Non-empty if a generated interface editor document has previously been
   /// opened for the module the symbol came from.
   StringRef ModuleInterfaceName;
-  /// This is an (offset,length) pair. It is set only if the declaration has a
-  /// source location.
-  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc = None;
-  /// Set only if the declaration has a source location.
-  StringRef Filename;
+  /// Filename is non-empty if there's a source location.
+  LocationInfo Location;
   /// For methods this lists the USRs of the overrides in the class hierarchy.
   ArrayRef<StringRef> OverrideUSRs;
   /// Related declarations, overloaded functions etc., in annotated XML form.
