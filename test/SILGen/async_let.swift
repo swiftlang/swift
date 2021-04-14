@@ -4,6 +4,7 @@
 import Swift
 import _Concurrency
 
+
 func getInt() async -> Int { 0 }
 func getString() async -> String { "" }
 func getStringThrowingly() async throws -> String { "" }
@@ -18,25 +19,20 @@ func testAsyncLetInt() async -> Int {
   // CHECK: [[I:%.*]] = mark_uninitialized [var] %0
   // CHECK: [[CLOSURE:%.*]] = function_ref @$s4test0A11AsyncLetIntSiyYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async () -> Int
   // CHECK: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) @Sendable @async () -> Int to $@Sendable @async @callee_guaranteed () -> Int
-  // CHECK: [[REABSTRACT_THUNK:%.*]] = function_ref @$sSiIeghHd_Sis5Error_pIeghHrzo_TR : $@convention(thin) @Sendable @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
-  // CHECK: [[REABSTRACT_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[THICK_CLOSURE]]) : $@convention(thin) @Sendable @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
-  // CHECK: [[CLOSURE_ARG:%.*]] = convert_function [[REABSTRACT_CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out Int, @error Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
-  // CHECK: [[ASYNC_LET_START:%.*]] = function_ref @$ss14_asyncLetStart9operationBpxyYaYbKc_tYalF : $@convention(thin) @async <τ_0_0> (@guaranteed @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> Builtin.RawPointer
-  // CHECK: [[CHILD_TASK:%.*]] = apply [[ASYNC_LET_START]]<Int>([[CLOSURE_ARG]]) : $@convention(thin) @async <τ_0_0> (@guaranteed @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> Builtin.RawPointer
+  // CHECK: [[REABSTRACT_THUNK:%.*]] = function_ref @$sSiIeghHd_Sis5Error_pIegHrzo_TR : $@convention(thin) @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
+  // CHECK: [[REABSTRACT_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[THICK_CLOSURE]]) : $@convention(thin) @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
+  // CHECK: [[CLOSURE_ARG:%.*]] = convert_function [[REABSTRACT_CLOSURE]] : $@async @callee_guaranteed () -> (@out Int, @error Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
+  // CHECK: [[ASYNC_LET_START:%.*]] = builtin "startAsyncLet"<Int>([[CLOSURE_ARG]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>) : $Builtin.RawPointer
   async let i = await getInt()
 
-  // TODO: do we need @guaranteed Builtin.RawPointer???
   // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
   // CHECK: [[INT_RESULT:%.*]] = alloc_stack $Int
-  // CHECK: apply [[ASYNC_LET_GET]]<Int>([[INT_RESULT]], [[CHILD_TASK]]) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
+  // CHECK: apply [[ASYNC_LET_GET]]<Int>([[INT_RESULT]], [[ASYNC_LET_START]]) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
   // CHECK: [[INT_RESULT_VALUE:%.*]] = load [trivial] [[INT_RESULT]] : $*Int
   // CHECK: assign [[INT_RESULT_VALUE]] to [[I]] : $*Int
   return await i
 
-  // CHECK: builtin "endAsyncLet"(%8 : $Builtin.RawPointer) : $()
-
-  // CHECK: [[CLOSURE_ARG]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
-  // TODO: destroy_value [[CHILD_TASK]] : $Builtin.RawPointer ???
+  // CHECK: [[ASYNC_LET_END:%.*]] = builtin "endAsyncLet"([[ASYNC_LET_START]] : $Builtin.RawPointer) : $()
 }
 
 func testAsyncLetWithThrows(cond: Bool) async throws -> String {

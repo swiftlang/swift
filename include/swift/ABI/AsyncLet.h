@@ -1,4 +1,4 @@
-//===--- TaskGroup.h - ABI structures for task groups -00--------*- C++ -*-===//
+//===--- AsyncLet.h - ABI structures for async let -00-----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -32,15 +32,14 @@ class alignas(Alignment_AsyncLet) AsyncLet {
 public:
   // These constructors do not initialize the AsyncLet instance, and the
   // destructor does not destroy the AsyncLet instance; you must call
-  // swift_asyncLet_{initialize,destroy} yourself.
+  // swift_asyncLet_{start,end} yourself.
   constexpr AsyncLet()
     : PrivateData{} {}
 
-  // TODO: not sure how many words we should reserve
+  // FIXME: not sure how many words we should reserve
   void *PrivateData[NumWords_AsyncLet];
 
-  /// Returns true if the `async let` was already awaited on at-least once.
-  bool wasAwaitedOn() const;
+  // TODO: we could offer a "was awaited on" check here
 
   /// Returns the child task that is associated with this async let.
   /// The tasks completion is used to fulfil the value represented by this async let.

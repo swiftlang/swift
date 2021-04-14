@@ -21,38 +21,42 @@ import Swift
 //func _asyncLetCreate(task: Builtin.NativeObject) -> Builtin.RawPointer
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_silgen_name("swift_asyncLet_start")
 public func _asyncLetStart<T>(
+  asyncLet: Builtin.RawPointer,
   operation: __owned @Sendable @escaping () async throws -> T
-) async -> Builtin.RawPointer {
-  let currentTask = Builtin.getCurrentAsyncTask()
+)
 
-  // Set up the job flags for a new task.
-  var flags = Task.JobFlags()
-  flags.kind = .task
-  flags.priority = getJobFlags(currentTask).priority
-  flags.isFuture = true
-  flags.isChildTask = true
-
-  print("\(#function) - FLAGS = \(flags.bits)")
-//  // Create the asynchronous task future.
-//  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+//{
+//  let currentTask = Builtin.getCurrentAsyncTask()
 //
-//  // Initialization of an async let already takes care of registering it with the parent task.
-//  let asyncLet = Builtin.createAsyncLet(operation)
-//  let asyncLet = Builtin.createAsyncLet(flags.bits, operation)
-//  let (asyncLet, task) = Builtin.createAsyncLet(flags.bits, operation)
-  let (asyncLet, _) = Builtin.createAsyncLet(flags.bits, operation)
-//  assert(unsafeBitCast(asyncLet, to: Int64.self) == unsafeBitCast(two, to: Int64.self))
-
-  // Enqueue the resulting job.
+//  // Set up the job flags for a new task.
+//  var flags = Task.JobFlags()
+//  flags.kind = .task
+//  flags.priority = getJobFlags(currentTask).priority
+//  flags.isFuture = true
+//  flags.isChildTask = true
+//
+//  print("\(#function) - FLAGS = \(flags.bits)")
+////  // Create the asynchronous task future.
+////  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+////
+////  // Initialization of an async let already takes care of registering it with the parent task.
+////  let asyncLet = Builtin.createAsyncLet(operation)
+////  let asyncLet = Builtin.createAsyncLet(flags.bits, operation)
+////  let (asyncLet, task) = Builtin.createAsyncLet(flags.bits, operation)
+//  let (asyncLet, _) = Builtin.createAsyncLet(flags.bits, operation)
+////  assert(unsafeBitCast(asyncLet, to: Int64.self) == unsafeBitCast(two, to: Int64.self))
+//
+//  // Enqueue the resulting job.
 //  _enqueueJobGlobal(
 //      Builtin.convertTaskToJob(
 //          _asyncLetExtractTask(of: asyncLet)))
-
-//  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-  return asyncLet
-}
+//
+////  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+//
+//  return asyncLet
+//}
 
 /// Similar to _taskFutureGet but for AsyncLet
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

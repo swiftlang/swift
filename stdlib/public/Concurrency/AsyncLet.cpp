@@ -1,4 +1,4 @@
-//===--- Task.cpp - Task object and management ----------------------------===//
+//===--- AsyncLet.h - async let object management -00------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -34,12 +34,7 @@ using namespace swift;
 namespace {
 class AsyncLetImpl: public ChildTaskStatusRecord {
 public:
-  /// Describes the status of the async let.
-  enum class Status : uintptr_t {
-//    /// True if the `async let` declared variable was awaited on at least once.
-//    /// This means that subsequent asyncLetGet operations need not suspend.
-//    HasBeenAwaited = 0b01,
-  };
+  // This is where we could define a Status or other types important for async-let
 
 private:
 
@@ -47,6 +42,7 @@ private:
   AsyncTask *task;
 
   // TODO: more additional flags here, we can use them for future optimizations.
+  //       e.g. "was awaited on" or "needs free"
 
   friend class AsyncTask;
 
@@ -57,20 +53,15 @@ public:
     assert(task->hasChildFragment() && "async let task must be a child task.");
   }
 
+  /// Returns the task record representing this async let task.
+  /// The record is stored in the parent task, and should be removed when the
+  /// async let goes out of scope.
   ChildTaskStatusRecord *getTaskRecord() {
     return reinterpret_cast<ChildTaskStatusRecord *>(this);
   }
 
-  bool wasAwaitedOn() const {
-    return false; // FIXME: implement this
-  }
-
   AsyncTask *getTask() const {
     return task;
-  }
-
-  Status *getStatus() const {
-    assert(false);
   }
 
 }; // end AsyncLetImpl
@@ -100,18 +91,19 @@ static AsyncLet *asAbstract(AsyncLetImpl *alet) {
 }
 
 // =============================================================================
-// ==== initialize -------------------------------------------------------------
+// ==== start ------------------------------------------------------------------
 
 SWIFT_CC(swift)
-static void swift_asyncLet_initializeImpl(AsyncLet *alet,
-                                          JobFlags flags,
-                                          const Metadata *futureResultType,
-                                          void *closureEntryPoint,
-                                          HeapObject * /* +1 */ closureContext) {
-  assert(flags.task_isFuture());
-  assert(flags.task_isChildTask());
+static void swift_asyncLet_startImpl(AsyncLet *alet,
+                                     const Metadata *futureResultType,
+                                     void *closureEntryPoint,
+                                     HeapObject * /* +1 */ closureContext) {
+  AsyncTask *parent = swift_task_getCurrent();
+  assert(parent && "async-let cannot be created without parent task");
 
-  fprintf(stderr, "[%s:%d] (%s) flags==%d\n", __FILE__, __LINE__, __FUNCTION__, flags);
+  auto flags = JobFlags(JobKind::Task, parent->getPriority());
+  flags.task_setIsFuture(true);
+  flags.task_setIsChildTask(true);
 
   auto childTaskAndContext = swift_task_create_future(
       flags,
@@ -120,32 +112,21 @@ static void swift_asyncLet_initializeImpl(AsyncLet *alet,
       closureContext);
 
   AsyncTask *childTask = childTaskAndContext.Task;
-  fprintf(stderr, "[%s:%d] (%s) created async-let task:%d \n", __FILE__, __LINE__, __FUNCTION__, childTask);
   swift_retain(childTask);
+
+  assert(childTask->isFuture());
+  assert(childTask->hasChildFragment());
   AsyncLetImpl *impl = new (alet) AsyncLetImpl(childTask);
-  fprintf(stderr, "[%s:%d] (%s) created async-let alet:%d \n", __FILE__, __LINE__, __FUNCTION__, alet);
-  fprintf(stderr, "[%s:%d] (%s) created async-let impl:%d \n", __FILE__, __LINE__, __FUNCTION__, impl);
 
   auto record = impl->getTaskRecord();
   assert(impl == record && "the async-let IS the task record");
-  assert(alet->getTask() == childTask);
 
   // ok, now that the group actually is initialized: attach it to the task
   swift_task_addStatusRecord(record);
-}
 
-//// =============================================================================
-//// ==== create -----------------------------------------------------------------
-//
-//// TODO: remove and replace by calling initialize directly from SILGenDecl
-////       this way we can allocate in SIL and pass the storage into initialize
-//SWIFT_CC(swift)
-//static AsyncLet *swift_asyncLet_createImpl(AsyncTask *task) {
-//  void *allocation = malloc(sizeof(AsyncLet));
-//  auto alet = reinterpret_cast<AsyncLet *>(allocation);
-//  swift_asyncLet_initialize(alet, task);
-//  return alet;
-//}
+  // schedule the task
+  swift_task_enqueueGlobal(childTask);
+}
 
 // =============================================================================
 // ==== wait -------------------------------------------------------------------
@@ -154,9 +135,8 @@ SWIFT_CC(swiftasync)
 static void swift_asyncLet_waitImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
     AsyncLet *alet, Metadata *T) {
-  fprintf(stderr, "[%s:%d] (%s) wait, alet:%d\n", __FILE__, __LINE__, __FUNCTION__, alet);
+  auto waitingTask = swift_task_getCurrent();
   auto task = alet->getTask();
-  fprintf(stderr, "[%s:%d] (%s) wait, task:%d\n", __FILE__, __LINE__, __FUNCTION__, task);
   swift_task_future_wait(result, rawContext, task, T);
 }
 
@@ -174,7 +154,6 @@ static void swift_asyncLet_wait_throwingImpl(
 SWIFT_CC(swift)
 static void swift_asyncLet_endImpl(AsyncLet *alet) {
   auto task = alet->getTask();
-//  assert(alet->wasAwaitedOn() && "async let was never awaited yet is about to be destroyed!");
 
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
@@ -182,15 +161,10 @@ static void swift_asyncLet_endImpl(AsyncLet *alet) {
 
   // and finally, release the task and free the async-let
   swift_release(task);
-  free(alet);
 }
 
 // =============================================================================
 // ==== AsyncLet Implementation ------------------------------------------------
-
-bool AsyncLet::wasAwaitedOn() const {
-  return asImpl(this)->wasAwaitedOn();
-}
 
 AsyncTask* AsyncLet::getTask() const {
   return asImpl(this)->getTask();

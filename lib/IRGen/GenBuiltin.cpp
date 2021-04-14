@@ -227,25 +227,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  // emitCreateAsyncLet takes the child task it is associated with.
-  if (Builtin.ID == BuiltinValueKind::CreateAsyncLet) {
-    // out.add(emitCreateAsyncLet(IGF, args.claimNext()));
-
-    fprintf(stderr, "[%s:%d] (%s) args count:%d\n", __FILE__, __LINE__, __FUNCTION__, args.size());
-    auto flags = args.claimNext();
-    fprintf(stderr, "[%s:%d] (%s) flags:%d\n", __FILE__, __LINE__, __FUNCTION__, flags);
-    auto futureResultType = args.claimNext();
-    fprintf(stderr, "[%s:%d] (%s) futureResultType:%d\n", __FILE__, __LINE__, __FUNCTION__, futureResultType);
+  if (Builtin.ID == BuiltinValueKind::StartAsyncLet) {
     auto taskFunction = args.claimNext();
-    fprintf(stderr, "[%s:%d] (%s) taskFunction:%d\n", __FILE__, __LINE__, __FUNCTION__, taskFunction);
     auto taskContext = args.claimNext();
-    fprintf(stderr, "[%s:%d] (%s) taskContext:%d\n", __FILE__, __LINE__, __FUNCTION__, taskContext);
 
-    fprintf(stderr, "[%s:%d] (%s) emitCreateAsyncLet...\n", __FILE__, __LINE__, __FUNCTION__);
-    auto asyncLet = emitCreateAsyncLet(
+    auto asyncLet = emitBuiltinStartAsyncLet(
         IGF,
-        flags,
-        futureResultType,
         taskFunction,
         taskContext,
         substitutions

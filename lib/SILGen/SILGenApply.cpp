@@ -5764,28 +5764,33 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
 
 ManagedValue SILGenFunction::emitAsyncLetStart(
     SILLocation loc, Type functionType, ManagedValue taskFunction) {
-  auto asyncLetStartFn = SGM.getAsyncLetStart();
-
+  ASTContext &ctx = getASTContext();
   Type resultType = functionType->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
-  auto subs = SubstitutionMap::get(asyncLetStartFn->getGenericSignature(),
+  auto startBuiltin = cast<FuncDecl>(
+      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLet")));
+  auto subs = SubstitutionMap::get(startBuiltin->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
 
-  CanType origParamType = asyncLetStartFn->getParameters()->get(0)
+  CanType origParamType = startBuiltin->getParameters()->get(1)
       ->getInterfaceType()->getCanonicalType();
   CanType substParamType = origParamType.subst(subs)->getCanonicalType();
 
   // Ensure that the closure has the appropriate type.
   AbstractionPattern origParam(
-      asyncLetStartFn->getGenericSignature().getCanonicalSignature(),
+      startBuiltin->getGenericSignature().getCanonicalSignature(),
       origParamType);
   taskFunction = emitSubstToOrigValue(
       loc, taskFunction, origParam, substParamType);
 
-  return emitApplyOfLibraryIntrinsic(
-      loc, asyncLetStartFn, subs, {taskFunction}, SGFContext()
-  ).getScalarValue();
+  auto apply = B.createBuiltin(
+      loc,
+      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StartAsyncLet)),
+      getLoweredType(ctx.TheRawPointerType), subs,
+      { taskFunction.forward(*this) });
+
+  return ManagedValue::forUnmanaged(apply);
 }
 
 ManagedValue SILGenFunction::emitRunChildTask(
