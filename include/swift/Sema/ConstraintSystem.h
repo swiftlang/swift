@@ -4983,27 +4983,6 @@ public:
     return getExpressionTooComplex(solutionMemory);
   }
 
-  typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
-  typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
-      ConstraintMatchLoop;
-  typedef std::function<void(SmallVectorImpl<unsigned> &options)>
-      PartitionAppendCallback;
-
-  // Partition the choices in the disjunction into groups that we will
-  // iterate over in an order appropriate to attempt to stop before we
-  // have to visit all of the options.
-  void partitionDisjunction(ArrayRef<Constraint *> Choices,
-                            SmallVectorImpl<unsigned> &Ordering,
-                            SmallVectorImpl<unsigned> &PartitionBeginning);
-
-  /// Partition the choices in the range \c first to \c last into groups and
-  /// order the groups in the best order to attempt based on the argument
-  /// function type that the operator is applied to.
-  void partitionGenericOperators(ArrayRef<Constraint *> Choices,
-                                 SmallVectorImpl<unsigned>::iterator first,
-                                 SmallVectorImpl<unsigned>::iterator last,
-                                 ConstraintLocator *locator);
-
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
   const FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
@@ -5328,6 +5307,8 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type,
 Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
                                    ConstraintLocator *memberLocator);
 
+ValueDecl *getOverloadChoiceDecl(Constraint *choice);
+
 class DisjunctionChoice {
   ConstraintSystem &CS;
   unsigned Index;
@@ -5353,7 +5334,7 @@ public:
   }
 
   bool isUnavailable() const {
-    if (auto *decl = getDecl(Choice))
+    if (auto *decl = getOverloadChoiceDecl(Choice))
       return CS.isDeclUnavailable(decl, Choice->getLocator());
     return false;
   }
@@ -5381,22 +5362,11 @@ private:
   void propagateConversionInfo(ConstraintSystem &cs) const;
 
   static ValueDecl *getOperatorDecl(Constraint *choice) {
-    auto *decl = getDecl(choice);
+    auto *decl = getOverloadChoiceDecl(choice);
     if (!decl)
       return nullptr;
 
     return decl->isOperator() ? decl : nullptr;
-  }
-
-  static ValueDecl *getDecl(Constraint *constraint) {
-    if (constraint->getKind() != ConstraintKind::BindOverload)
-      return nullptr;
-
-    auto choice = constraint->getOverloadChoice();
-    if (choice.getKind() != OverloadChoiceKind::Decl)
-      return nullptr;
-
-    return choice.getDecl();
   }
 };
 
@@ -5560,7 +5530,7 @@ public:
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
     // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
+    partitionDisjunction(Ordering, PartitionBeginning);
   }
 
   void setNeedsGenericOperatorOrdering(bool flag) {
@@ -5586,16 +5556,27 @@ public:
     if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
       unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
                                      PartitionBeginning[PartitionIndex] : Ordering.size());
-      CS.partitionGenericOperators(Choices,
-                                   Ordering.begin() + currIndex,
-                                   Ordering.begin() + nextPartitionIndex,
-                                   Disjunction->getLocator());
+      partitionGenericOperators(Ordering.begin() + currIndex,
+                                Ordering.begin() + nextPartitionIndex);
       needsGenericOperatorOrdering = false;
     }
 
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
   }
+
+private:
+  // Partition the choices in the disjunction into groups that we will
+  // iterate over in an order appropriate to attempt to stop before we
+  // have to visit all of the options.
+  void partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
+                            SmallVectorImpl<unsigned> &PartitionBeginning);
+
+  /// Partition the choices in the range \c first to \c last into groups and
+  /// order the groups in the best order to attempt based on the argument
+  /// function type that the operator is applied to.
+  void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
+                                 SmallVectorImpl<unsigned>::iterator last);
 };
 
 /// Determine whether given type is a known one
@@ -5619,6 +5600,10 @@ void performSyntacticDiagnosticsForTarget(
 /// protocol is contextually bound to some concrete type via same-type
 /// generic requirement and if so return that type or null type otherwise.
 Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
+
+/// Determine whether given disjunction constraint represents a set
+/// of operator overload choices.
+bool isOperatorDisjunction(Constraint *disjunction);
 
 } // end namespace constraints
 
