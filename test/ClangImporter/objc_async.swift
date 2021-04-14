@@ -152,7 +152,7 @@ class MyButton : NXButton {
   }
 
   @SomeGlobalActor func testOther() {
-    onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
+    onButtonPress() // expected-error{{call to main actor-isolated instance method 'onButtonPress()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
   }
 
   func test() {
