@@ -782,12 +782,17 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 /// Cancel the given asynchronous task.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
-/// createAsyncLet(): (
-///     Int, @escaping () async throws -> T
+/// startAsyncLet()<T>: (
+///     __owned @Sendable @escaping () async throws -> T
 /// ) -> Builtin.RawPointer
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncLet, "createAsyncLet", "", Special)
+///
+/// Create, initialize and start a new async-let and associated task.
+/// Returns an AsyncLet* that must be passed to endAsyncLet for destruction.
+BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 
 /// asyncLetEnd(): (Builtin.RawPointer) -> Void
+///
+/// Ends and destroys an async-let.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
 
 /// createAsyncTaskFuture(): (

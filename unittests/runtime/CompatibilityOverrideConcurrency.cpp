@@ -175,8 +175,8 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
   swift_continuation_throwingResumeWithError(nullptr, nullptr);
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_initialize) {
-  swift_asyncLet_initialize(nullptr, 0, nullptr, nullptr, nullptr);
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_start) {
+  swift_asyncLet_start(nullptr, nullptr, nullptr, nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_wait) {
@@ -185,6 +185,10 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_wait) {
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_wait_throwing) {
   swift_asyncLet_wait(nullptr, nullptr, nullptr, nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_end) {
+  swift_asyncLet_end(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initialize) {

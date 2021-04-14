@@ -745,7 +745,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
-//BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, CreateAsyncLet)
+BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
@@ -760,20 +760,6 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
   if (&op == &bi->getOperandRef(2))
     return OperandOwnership::DestroyingConsume;
   
-  // FIXME: These are considered InteriorPointer because they may propagate a
-  // pointer into a borrowed values. If they do not propagate an interior pointer,
-  // then they should be InstantaneousUse instead and should not require a
-  // guaranteed value.
-  return OperandOwnership::InteriorPointer;
-}
-
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncLet(BuiltinInst *bi,
-                                                       StringRef attr) {
-  // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(2))
-    return OperandOwnership::DestroyingConsume;
-
   // FIXME: These are considered InteriorPointer because they may propagate a
   // pointer into a borrowed values. If they do not propagate an interior pointer,
   // then they should be InstantaneousUse instead and should not require a

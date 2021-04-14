@@ -137,7 +137,7 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   }
 
   // Add storage for data used by runtime entry points.
-  // See TaskFutureWaitAsyncContext.
+  // See TaskFutureWaitAsyncContext and TaskGroupNextAsyncContext.
   if (kind.isSpecial()) {
     switch (kind.getSpecialKind()) {
     case FunctionPointer::SpecialKind::TaskFutureWait:

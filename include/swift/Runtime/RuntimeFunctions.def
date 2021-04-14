@@ -1678,23 +1678,15 @@ FUNCTION(DefaultActorDeallocateResilient,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_asyncLet_initialize(
-//      AsyncLet *alet,
-//      size_t flags,
-//      // FIXME: or is it TaskContinuationFunction* function   ?????? like in TaskCreateFunc
-//      const Metadata *futureResultType,
-//      void *closureEntry,
-//      // TODO: do we need the context after all???? HeapObject *closureContext
-// );
-FUNCTION(AsyncLetInitialize,
-         swift_asyncLet_initialize, SwiftCC,
+// THE RUNTIME FUNCTION
+FUNCTION(AsyncLetStart,
+         swift_asyncLet_start, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(SwiftAsyncLetPtrTy, // AsyncLet*, alias for Int8PtrTy
-              SizeTy, // flags
-              TypeMetadataPtrTy, // futureResultType
-              Int8PtrTy, // closureEntry
-              RefCountedPtrTy, // closureContext
+              TypeMetadataPtrTy,  // futureResultType
+              Int8PtrTy,          // closureEntry
+              RefCountedPtrTy,    // closureContext
          ),
          ATTRS(NoUnwind, ArgMemOnly))
 

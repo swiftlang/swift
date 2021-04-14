@@ -78,7 +78,7 @@ AsyncTaskAndContext swift_task_create_group_future(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_group_future_f(
     JobFlags flags,
-        TaskGroup *group,
+    TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize);
@@ -276,33 +276,20 @@ bool swift_taskGroup_isCancelled(TaskGroup *group);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_taskGroup_isEmpty(TaskGroup *group);
 
-/// Initialize an `AsyncLet` in the passed `asyncLet` memory location.
-/// The caller is responsible for retaining and managing the asyncLet's lifecycle.
-///
 /// Its Swift signature is
 ///
 /// \code
-/// func swift_asyncLet_initialize(
-///  .... // TODO: fill in
+/// func swift_asyncLet_start<T>(
+///     _ alet: Builtin.RawPointer,
+///     operation: __owned @Sendable @escaping () async throws -> T
 /// )
 /// \endcode
-//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-//void swift_asyncLet_initialize(AsyncLet *alet, AsyncTask *task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_asyncLet_initialize(
+void swift_asyncLet_start(
     AsyncLet *alet,
-    JobFlags flags,
     const Metadata *futureResultType,
     void *closureEntryPoint,
     HeapObject * /* +1 */ closureContext);
-
-/// Its Swift signature is
-///
-/// \code
-/// func swift_asyncLet_start(_ alet: Builtin.RawPointer)
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_asyncLet_start(AsyncLet *alet, void* operation);
 
 /// This matches the ABI of a closure `<T>(Builtin.RawPointer) async -> T`
 using AsyncLetWaitSignature =
@@ -336,7 +323,7 @@ void swift_asyncLet_wait(OpaqueValue *,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_wait_throwing(OpaqueValue *,
                                   SWIFT_ASYNC_CONTEXT AsyncContext *,
-AsyncLet *, Metadata *);
+                                  AsyncLet *, Metadata *);
 
 /// Its Swift signature is
 ///

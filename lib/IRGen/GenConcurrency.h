@@ -46,12 +46,10 @@ void emitBuildSerialExecutorRef(IRGenFunction &IGF, llvm::Value *actor,
 void emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out);
 
 /// Emit the createAsyncLet builtin.
-llvm::Value *emitCreateAsyncLet(IRGenFunction &IGF,
-                                llvm::Value *flags,
-                                llvm::Value *futureResultType,
-                                llvm::Value *taskFunction,
-                                llvm::Value *localContextInfo,
-                                SubstitutionMap subs);
+llvm::Value *emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                      llvm::Value *taskFunction,
+                                      llvm::Value *localContextInfo,
+                                      SubstitutionMap subs);
 
 /// Emit the endAsyncLet builtin.
 void emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet);

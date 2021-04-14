@@ -732,6 +732,7 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 public func _runChildTask<T>(
   operation: @Sendable @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
+  assert(false);
   let currentTask = Builtin.getCurrentAsyncTask()
 
   // Set up the job flags for a new task.
