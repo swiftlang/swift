@@ -836,15 +836,17 @@ static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
   return SM.getByteDistance(TokenRange.Start, CharEndLoc);
 }
 
-void swift::ide::getLocationInfo(const ValueDecl *VD,
-                  llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-                                 StringRef &Filename) {
+void swift::ide::getLocationInfo(
+    const ValueDecl *VD,
+    llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
+    StringRef &Filename) {
   ASTContext &Ctx = VD->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
 
   auto ClangNode = VD->getClangNode();
 
-  if (VD->getLoc().isValid()) {
+  SourceLoc Loc = VD->getLoc(/*SerializedOK=*/false);
+  if (Loc.isValid()) {
     auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
       if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
         SourceRange R = FD->getSignatureSourceRange();
@@ -859,14 +861,18 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
     } else if (VD->hasName()) {
       NameLen = VD->getBaseName().userFacingName().size();
     } else {
-      NameLen = getCharLength(SM, VD->getLoc());
+      NameLen = getCharLength(SM, Loc);
     }
 
-    unsigned DeclBufID = SM.findBufferContainingLoc(VD->getLoc());
-    DeclarationLoc = { SM.getLocOffsetInBuffer(VD->getLoc(), DeclBufID),
+    unsigned DeclBufID = SM.findBufferContainingLoc(Loc);
+    DeclarationLoc = { SM.getLocOffsetInBuffer(Loc, DeclBufID),
                        NameLen };
     Filename = SM.getIdentifierForBuffer(DeclBufID);
 
+  } else if (auto *Positions =
+             VD->getSerializedLocs(/*Resolve=*/false).Positions) {
+    Filename = Positions->SourceFilePath;
+    // TODO: Add location if it is up-to-date
   } else if (ClangNode) {
     ClangImporter *Importer =
         static_cast<ClangImporter*>(Ctx.getClangModuleLoader());

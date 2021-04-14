@@ -444,7 +444,7 @@ struct CursorSymbolInfo {
   /// Stores the Symbol Graph title, kind, and USR of the parent contexts of the
   /// symbol under the cursor.
   ArrayRef<ParentInfo> ParentContexts;
-  /// The set of decls referenced in the symbol graph delcaration fragments.
+  /// The set of decls referenced in the symbol graph declaration fragments.
   ArrayRef<ReferencedDeclInfo> ReferencedSymbols;
   /// For calls this lists the USRs of the receiver types (multiple only in the
   /// case that the base is a protocol composition).

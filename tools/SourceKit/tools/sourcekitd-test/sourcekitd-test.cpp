@@ -1728,16 +1728,18 @@ struct ResponseSymbolInfo {
     }
 
     OS << Kind << " (";
+    if (CurrentFilename != StringRef(FilePath))
+      OS << FilePath;
     if (Offset.hasValue()) {
       if (CurrentFilename != StringRef(FilePath))
-        OS << FilePath << ":";
+        OS << ':';
       auto LineCol = resolveToLineCol(Offset.getValue(), FilePath, VFSFiles);
       OS << LineCol.first << ':' << LineCol.second;
       auto EndLineCol =
           resolveToLineCol(Offset.getValue() + Length, FilePath, VFSFiles);
       OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
     }
-    OS << ")" << '\n';
+    OS << ")\n";
 
     OS << Name << '\n';
     if (USR)

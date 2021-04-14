@@ -899,8 +899,11 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
       ASTContext &Ctx = FI.VD->getASTContext();
       StringRef Filename = "";
-      if (auto Loc = FI.VD->getLoc(/*SerializedOK=*/true)) {
+      if (auto Loc = FI.VD->getLoc(/*SerializedOK=*/false)) {
         Filename = Ctx.SourceMgr.getDisplayNameForLoc(Loc);
+      } else if (auto *Positions =
+                 FI.VD->getSerializedLocs(/*Resolve=*/false).Positions) {
+        Filename = Positions->SourceFilePath;
       } else if (auto ClangNode = FI.VD->getClangNode()) {
         auto Loc = ClangNode.getLocation();
         if (Loc.isValid()) {

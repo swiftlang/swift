@@ -1764,11 +1764,11 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.set(KeyModuleName, Symbol.ModuleName);
   if (!Symbol.ModuleInterfaceName.empty())
     Elem.set(KeyModuleInterfaceName, Symbol.ModuleInterfaceName);
+  if (!Symbol.Filename.empty())
+    Elem.set(KeyFilePath, Symbol.Filename);
   if (Symbol.DeclarationLoc.hasValue()) {
     Elem.set(KeyOffset, Symbol.DeclarationLoc.getValue().first);
     Elem.set(KeyLength, Symbol.DeclarationLoc.getValue().second);
-    if (!Symbol.Filename.empty())
-      Elem.set(KeyFilePath, Symbol.Filename);
   }
 
   if (!Symbol.OverrideUSRs.empty()) {
