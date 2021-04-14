@@ -28,6 +28,7 @@
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"

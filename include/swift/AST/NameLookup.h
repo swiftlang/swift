@@ -25,6 +25,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
 
 namespace swift {
 class ASTContext;

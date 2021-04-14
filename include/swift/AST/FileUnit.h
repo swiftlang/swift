@@ -14,6 +14,8 @@
 #define SWIFT_AST_FILEUNIT_H
 
 #include "swift/AST/Module.h"
+#include "swift/AST/RawComment.h"
+#include "swift/Basic/BasicSourceInfo.h"
 
 namespace swift {
 static inline unsigned alignOfFileUnit();
