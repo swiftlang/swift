@@ -101,6 +101,14 @@ foreach(sdk ${DISPATCH_SDKS})
                           # ensure that we strip out the DESTDIR environment
                           # from the sub-build
                           ${CMAKE_COMMAND} -E env --unset=DESTDIR ${CMAKE_COMMAND} --build . --target install
+                        COMMAND
+                          ${CMAKE_COMMAND} -E copy
+                          <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                          ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                        COMMAND
+                          ${CMAKE_COMMAND} -E copy
+                          <INSTALL_DIR>/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
+                          ${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}BlocksRuntime${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
                         STEP_TARGETS
                           install
                         BUILD_BYPRODUCTS

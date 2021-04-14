@@ -759,6 +759,8 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
     return true;
   if (target.isOSWindows())
     return true;
+  if (target.isOSLinux())
+    return true;
   return false;
 }
 
