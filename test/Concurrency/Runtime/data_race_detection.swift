@@ -8,6 +8,9 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 
+// https://bugs.swift.org/browse/SR-14486
+// UNSUPPORTED: linux
+
 import _Concurrency
 import Dispatch
 
