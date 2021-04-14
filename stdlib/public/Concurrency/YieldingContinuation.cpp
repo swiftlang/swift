@@ -13,9 +13,12 @@
 #include "swift/Runtime/Mutex.h"
 
 namespace swift {
+// return the size in words for the given mutex primitive
 extern "C"
 size_t swift_yielding_continuation_lock_size() {
-  return sizeof(MutexHandle);
+  size_t words = sizeof(MutexHandle) / sizeof(void *);
+  if (words < 1) { return 1; }
+  return words;
 }
 
 extern "C"
