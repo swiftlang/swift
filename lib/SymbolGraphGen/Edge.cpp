@@ -64,7 +64,7 @@ void Edge::serialize(llvm::json::OStream &OS) const {
         InheritingDecl = ID;
     }
     
-    // If our source symbol is a synthesized decl, write in information about
+    // If our source symbol is a inheriting decl, write in information about
     // where it's inheriting docs from.
     if (InheritingDecl) {
       Symbol inheritedSym(Graph, InheritingDecl, nullptr);
