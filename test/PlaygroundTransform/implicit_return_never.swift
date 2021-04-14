@@ -7,6 +7,7 @@
 
 // The runtime error format changed after the 5.3 release.
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // NOTE: not.py is used above instead of "not --crash" because simctl's exit
 // status doesn't reflect whether its child process crashed or not. So "not

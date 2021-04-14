@@ -4,6 +4,7 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // https://bugs.swift.org/browse/SR-14461
 // UNSUPPORTED: linux
