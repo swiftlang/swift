@@ -19,6 +19,7 @@
 #ifndef SWIFT_SIL_SILREMARKSTREAMER_H
 #define SWIFT_SIL_SILREMARKSTREAMER_H
 
+#include "swift/Basic/SourceManager.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 

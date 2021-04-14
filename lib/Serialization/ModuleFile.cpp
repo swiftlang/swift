@@ -1078,7 +1078,7 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
     assert(NumLocs);
 
     for (uint32_t i = 0; i < NumLocs; ++i) {
-      LineColumn LC;
+      SourcePosition LC;
       LC.Line = endian::readNext<uint32_t, little, unaligned>(Data);
       LC.Column = endian::readNext<uint32_t, little, unaligned>(Data);
       auto Length = endian::readNext<uint32_t, little, unaligned>(Data);
