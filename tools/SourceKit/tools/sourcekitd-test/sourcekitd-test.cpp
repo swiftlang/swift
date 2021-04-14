@@ -1609,9 +1609,11 @@ struct ResponseSymbolInfo {
   const char *SymbolGraph = nullptr;
   const char *ModuleName = nullptr;
   const char *ModuleInterfaceName = nullptr;
-  llvm::Optional<int64_t> Offset;
-  unsigned Length = 0;
   const char *FilePath = nullptr;
+  unsigned Offset = 0;
+  unsigned Length = 0;
+  unsigned Line = 0;
+  unsigned Column = 0;
   std::vector<const char *> OverrideUSRs;
   std::vector<const char *> AnnotatedRelatedDeclarations;
   std::vector<const char *> ModuleGroups;
@@ -1665,15 +1667,14 @@ struct ResponseSymbolInfo {
     Symbol.ModuleInterfaceName =
         sourcekitd_variant_dictionary_get_string(Info, KeyModuleInterfaceName);
 
-    sourcekitd_variant_t OffsetObj =
-        sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
-    if (sourcekitd_variant_get_type(OffsetObj) !=
-        SOURCEKITD_VARIANT_TYPE_NULL) {
-      Symbol.Offset = sourcekitd_variant_int64_get_value(OffsetObj);
-      Symbol.Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
-    }
     Symbol.FilePath =
         sourcekitd_variant_dictionary_get_string(Info, KeyFilePath);
+    if (Symbol.FilePath) {
+      Symbol.Offset = sourcekitd_variant_dictionary_get_int64(Info, KeyOffset);
+      Symbol.Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
+      Symbol.Line = sourcekitd_variant_dictionary_get_int64(Info, KeyLine);
+      Symbol.Column = sourcekitd_variant_dictionary_get_int64(Info, KeyColumn);
+    }
 
     Symbol.OverrideUSRs = readStringArray(Info, KeyOverrides, KeyUSR);
     Symbol.AnnotatedRelatedDeclarations =
@@ -1728,14 +1729,19 @@ struct ResponseSymbolInfo {
     }
 
     OS << Kind << " (";
-    if (Offset.hasValue()) {
+    if (FilePath) {
       if (CurrentFilename != StringRef(FilePath))
-        OS << FilePath << ":";
-      auto LineCol = resolveToLineCol(Offset.getValue(), FilePath, VFSFiles);
-      OS << LineCol.first << ':' << LineCol.second;
-      auto EndLineCol =
-          resolveToLineCol(Offset.getValue() + Length, FilePath, VFSFiles);
-      OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
+        OS << FilePath << ':';
+
+      auto LineCol = resolveToLineCol(Offset, FilePath, VFSFiles);
+      if (LineCol.first != Line || LineCol.second != Column) {
+        OS << "*offset does not match line/column in response*";
+      } else {
+        OS << LineCol.first << ':' << LineCol.second;
+        auto EndLineCol = resolveToLineCol(Offset + Length, FilePath,
+                                           VFSFiles);
+        OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
+      }
     }
     OS << ")" << '\n';
 
