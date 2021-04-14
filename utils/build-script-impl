@@ -1638,12 +1638,10 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             llvm)
-                if [ "${LLVM_NINJA_TARGETS}" != "" ] ; then
-                    if [[ $(is_cross_tools_host ${host}) && "${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS}" != "" ]] ; then
-                        build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
-                    else
-                        build_targets=("${LLVM_NINJA_TARGETS[@]}")
-                    fi
+                if [[ -n "${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS}" && $(is_cross_tools_host ${host}) ]] ; then
+                    build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
+                elif [[ -n "${LLVM_NINJA_TARGETS}" ]] ; then
+                    build_targets=("${LLVM_NINJA_TARGETS[@]}")
                 else
                     if [ "${BUILD_LLVM}" == "0" ] ; then
                         build_targets=(clean)

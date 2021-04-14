@@ -1086,8 +1086,9 @@ def create_argument_parser():
     option('--llvm-ninja-targets-for-cross-compile-hosts', append,
            type=argparse.ShellSplitType(),
            help='Space separated list of ninja targets to build for LLVM '
-                'in cross compile hosts. Requires --llvm-ninja-targets to '
-                'be specified to be applied. Can be called multiple times '
+                'in cross compile hosts instead of the ones specified in '
+                'llvm-ninja-targets (or the default ones). '
+                'Can be called multiple times '
                 'to add multiple such options.')
 
     # -------------------------------------------------------------------------
