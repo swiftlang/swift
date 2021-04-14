@@ -28,7 +28,7 @@ func promiseMainThread(_ fn: @escaping @MainActor () -> Void) -> (() -> Void) {
 }
 
 func launchTask(_ fn: @escaping () -> Void) {
-  if #available(macOS 10.10, iOS 7.0, watchOS 2.0, tvOS 8.0, *) {
+  if #available(macOS 10.10, iOS 8.0, watchOS 2.0, tvOS 8.0, *) {
     DispatchQueue.global().async {
       fn()
     }
