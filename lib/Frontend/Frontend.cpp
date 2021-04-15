@@ -754,9 +754,20 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+/// Enable Swift concurrency on a per-target basis
+static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
+  if (target.isOSDarwin())
+    return true;
+  if (target.isOSWindows())
+    return true;
+  if (target.isOSLinux())
+    return true;
+  return false;
+}
+
 bool CompilerInvocation::shouldImportSwiftConcurrency() const {
-  return getLangOptions().EnableExperimentalConcurrency
-      && !getLangOptions().DisableImplicitConcurrencyModuleImport &&
+  return shouldImportConcurrencyByDefault(getLangOptions().Target) &&
+      !getLangOptions().DisableImplicitConcurrencyModuleImport &&
       getFrontendOptions().InputMode !=
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
