@@ -8,9 +8,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// https://bugs.swift.org/browse/SR-14486
-// UNSUPPORTED: linux
-
 import Dispatch
 
 /// @returns true iff the expected answer is actually the case, i.e., correct.
