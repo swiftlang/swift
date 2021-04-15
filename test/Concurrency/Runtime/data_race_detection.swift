@@ -9,7 +9,7 @@
 // UNSUPPORTED: use_os_stdlib
 
 // https://bugs.swift.org/browse/SR-14486
-// REQUIRES: sr14486
+// UNSUPPORTED: linux
 
 import _Concurrency
 import Dispatch
