@@ -1642,25 +1642,26 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
                 elif [[ -n "${LLVM_NINJA_TARGETS}" ]] ; then
                     build_targets=("${LLVM_NINJA_TARGETS[@]}")
-                else
-                    if [ "${BUILD_LLVM}" == "0" ] ; then
-                        build_targets=(clean)
-                    fi
-                    if [[ "${SKIP_BUILD}" || "${SKIP_BUILD_LLVM}" ]] ; then
-                        # We can't skip the build completely because the standalone
-                        # build of Swift depend on these for building and testing.
-                        build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
-                        # If we are not performing a toolchain only build, then we
-                        # also want to include FileCheck, not, llvm-nm for testing
-                        # purposes.
-                        if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
-                          build_targets=(
-                              "${build_targets[@]}"
-                              FileCheck
-                              not
-                              llvm-nm
-                          )
-                        fi
+                fi
+                # indicating we don't want to build LLVM should
+                # override any custom ninja target we specified
+                if [ "${BUILD_LLVM}" == "0" ] ; then
+                    build_targets=(clean)
+                fi
+                if [[ "${SKIP_BUILD}" || "${SKIP_BUILD_LLVM}" ]] ; then
+                    # We can't skip the build completely because the standalone
+                    # build of Swift depend on these for building and testing.
+                    build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
+                    # If we are not performing a toolchain only build, then we
+                    # also want to include FileCheck, not, llvm-nm for testing
+                    # purposes.
+                    if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
+                      build_targets=(
+                          "${build_targets[@]}"
+                          FileCheck
+                          not
+                          llvm-nm
+                      )
                     fi
                 fi
 
