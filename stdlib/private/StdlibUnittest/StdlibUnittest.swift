@@ -875,6 +875,7 @@ func _childProcess() {
   }
 }
 
+// Avoid serializing references to objc_setUncaughtExceptionHandler in SIL.
 @inline(never)
 func _childProcessAsync() async {
   _installTrapInterceptor()
@@ -1853,7 +1854,7 @@ public final class TestSuite {
     _testTearDownCode = code
   }
 
-  func _runTest(name testName: String, parameter: Int?) {
+  internal func _runTestPrelude(name testName: String) -> _Test {
     PersistentState.ranSomething = true
     for r in _allResettables {
       r.reset()
@@ -1862,7 +1863,11 @@ public final class TestSuite {
     if let f = _testSetUpCode {
       f()
     }
-    let test = _testByName(testName)
+    return _testByName(testName)
+  }
+
+  func _runTest(name testName: String, parameter: Int?) {
+    let test =  _runTestPrelude(name: testName)
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     startTrackingObjects(name)
@@ -1895,15 +1900,7 @@ public final class TestSuite {
   }
 
   func _runTestAsync(name testName: String, parameter: Int?) async {
-    PersistentState.ranSomething = true
-    for r in _allResettables {
-      r.reset()
-    }
-    LifetimeTracked.instances = 0
-    if let f = _testSetUpCode {
-      f()
-    }
-    let test = _testByName(testName)
+    let test = _runTestPrelude(name: testName)
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     startTrackingObjects(name)
