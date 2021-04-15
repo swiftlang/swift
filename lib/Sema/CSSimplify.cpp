@@ -4353,15 +4353,14 @@ bool ConstraintSystem::repairFailures(
         if (rhs->is<TupleType>() && closureAnchor &&
             closureAnchor->getParameters()->size() > 1) {
           auto callee = getCalleeLocator(loc);
-          auto overload = findSelectedOverloadFor(callee);
-          if (overload) {
-            auto fnType = overload->openedType->getAs<FunctionType>();
+          if (auto overload = findSelectedOverloadFor(callee)) {
+            auto fnType =
+                simplifyType(overload->openedType)->castTo<FunctionType>();
             auto paramIdx = argToParamElt->getParamIdx();
-            if (auto paramType = fnType->getParams()[paramIdx]
-                                     .getOldType()
-                                     ->getAs<FunctionType>()) {
-              conversionsOrFixes.push_back(
-                  RemoveExtraneousArguments::create(*this, paramType, {}, loc));
+            auto paramType = fnType->getParams()[paramIdx].getParameterType();
+            if (auto paramFnType = paramType->getAs<FunctionType>()) {
+              conversionsOrFixes.push_back(RemoveExtraneousArguments::create(
+                  *this, paramFnType, {}, loc));
               break;
             }
           }
