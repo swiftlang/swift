@@ -462,10 +462,10 @@ public func detach<T>(
 ///     throw the error the operation has thrown when awaited on.
 @discardableResult
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func detach<T, Failure>(
+public func detach<T>(
   priority: Task.Priority = .unspecified,
   operation: __owned @Sendable @escaping () async throws -> T
-) -> Task.Handle<T, Failure> {
+) -> Task.Handle<T, Error> {
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
   flags.kind = .task
@@ -478,7 +478,7 @@ public func detach<T, Failure>(
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
-  return Task.Handle<T, Failure>(task)
+  return Task.Handle<T, Error>(task)
 }
 
 // ==== Async Handler ----------------------------------------------------------
