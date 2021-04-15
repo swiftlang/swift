@@ -32,7 +32,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       let series = Series(buffering: String.self) { continuation in
         continuation.resume(yielding: "hello")
       }
-      let iterator = series.makeAsyncIterator()
+      var iterator = series.makeAsyncIterator()
       expectEqual(await iterator.next(), "hello")
     }
   }
@@ -43,7 +43,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         continuation.resume(yielding: "hello")
         continuation.resume(yielding: "world")
       }
-      let iterator = series.makeAsyncIterator()
+      var iterator = series.makeAsyncIterator()
       expectEqual(await iterator.next(), "hello")
       expectEqual(await iterator.next(), "world")
     }
@@ -56,7 +56,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         continuation.resume(yielding: "world")
         continuation.finish()
       }
-      let iterator = series.makeAsyncIterator()
+      var iterator = series.makeAsyncIterator()
       expectEqual(await iterator.next(), "hello")
       expectEqual(await iterator.next(), "world")
       expectEqual(await iterator.next(), nil)
@@ -81,7 +81,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
           continuation.resume(yielding: "hello")
         }
       }
-      let iterator = series.makeAsyncIterator()
+      var iterator = series.makeAsyncIterator()
       expectEqual(await iterator.next(), "hello")
     }
   }
@@ -94,7 +94,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
           continuation.resume(yielding: "world")
         }
       }
-      let iterator = series.makeAsyncIterator()
+      var iterator = series.makeAsyncIterator()
       expectEqual(await iterator.next(), "hello")
       expectEqual(await iterator.next(), "world")
     }
@@ -109,7 +109,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
           continuation.finish()
         }
       }
-      let iterator = series.makeAsyncIterator()
+      var iterator = series.makeAsyncIterator()
       expectEqual(await iterator.next(), "hello")
       expectEqual(await iterator.next(), "world")
       expectEqual(await iterator.next(), nil)
