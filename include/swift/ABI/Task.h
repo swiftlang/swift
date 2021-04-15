@@ -46,12 +46,18 @@ public:
     /// The next waiting task link, an AsyncTask that is waiting on a future.
     NextWaitingTaskIndex = 0,
 
+    // The Dispatch object header is one pointer and two ints, which is
+    // equvialent to three pointers on 32-bit and two pointers 64-bit. Set the
+    // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
+    // expects.
+    DispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
+
     /// An opaque field used by Dispatch when enqueueing Jobs directly.
-    DispatchLinkageIndex = 0,
+    DispatchLinkageIndex = DispatchHasLongObjectHeader ? 1 : 0,
 
     /// The dispatch queue being used when enqueueing a Job directly with
     /// Dispatch.
-    DispatchQueueIndex = 1,
+    DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
   // Reserved for the use of the scheduler.
