@@ -181,6 +181,8 @@ EXPECTED_DEFAULTS = {
     'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
+    'llvm_ninja_targets': [],
+    'llvm_ninja_targets_for_cross_compile_hosts': [],
     'llvm_max_parallel_lto_link_jobs':
         defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
@@ -681,6 +683,8 @@ EXPECTED_OPTIONS = [
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
     AppendOption('--test-paths'),
+    AppendOption('--llvm-ninja-targets'),
+    AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
 
     UnsupportedOption('--build-jobs'),
     UnsupportedOption('--common-cmake-options'),
