@@ -1058,6 +1058,12 @@ namespace {
 
     void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
                               const CaseStmt *unknownCase = nullptr) {
+      if (!Switch->getLBraceLoc().isValid()) {
+        // There is no '{' in the switch statement, which we already diagnosed
+        // in the parser. So there's no real body to speak of and it doesn't
+        // make sense to emit diagnostics about missing cases.
+        return;
+      }
       auto &DE = Context.Diags;
       SourceLoc startLoc = Switch->getStartLoc();
       SourceLoc insertLoc;

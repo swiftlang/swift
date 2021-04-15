@@ -234,7 +234,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     auto *selfRef = DerivedConformance::createSelfDeclRef(strValDecl);
     auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),
                                           selfRef, SourceLoc(), cases,
-                                          SourceLoc(), C);
+                                          SourceLoc(), SourceLoc(), C);
     body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
   }
 
@@ -314,7 +314,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
                                              /*Implicit=*/true);
   auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),
                                         stringValueRef, SourceLoc(), cases,
-                                        SourceLoc(), C);
+                                        SourceLoc(), SourceLoc(), C);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };

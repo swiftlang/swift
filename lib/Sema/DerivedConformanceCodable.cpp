@@ -1164,7 +1164,8 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
                           /*implicit*/ true, AccessSemantics::Ordinary);
 
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
@@ -1801,7 +1802,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
     auto switchStmt =
         SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), firstExpr,
-                           SourceLoc(), cases, SourceLoc(), C);
+                           SourceLoc(), cases, SourceLoc(), SourceLoc(), C);
 
     statements.push_back(switchStmt);
   }
