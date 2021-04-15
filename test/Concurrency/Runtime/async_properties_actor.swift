@@ -8,9 +8,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// https://bugs.swift.org/browse/SR-14486
-// UNSUPPORTED: linux
-
 @propertyWrapper
 struct SuccessTracker {
     private var _stored: Bool
