@@ -30,6 +30,7 @@ from__ABAdditionsCAdditions()
 // MAIN-NEXT: is-debug: 1
 // MAIN-NEXT: DEPEND START
 // MAIN-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
+// MAIN-NEXT: Unit | system | _Concurrency | {{.*}}{{/|\\}}_Concurrency.swiftmodule
 // MAIN-NEXT: Unit | system | B | {{.*}}{{/|\\}}B.swiftmodule{{/|\\}}{{.*}}
 // MAIN-NEXT: Unit | system | C | {{.*}}{{/|\\}}C.swiftmodule{{/|\\}}{{.*}}
 // MAIN-NEXT: Unit | system | A | {{.*}}{{/|\\}}__ABAdditionsCAdditions.swiftmodule{{/|\\}}{{.*}}

@@ -1,4 +1,5 @@
 import SwiftOnoneSupport
+import _Concurrency
 
 func %%% (lhs: Int, rhs: Int) -> Int
 

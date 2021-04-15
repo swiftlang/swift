@@ -101,6 +101,10 @@ def interested_usr : Separate<["-"], "interested-usr">,
 def async : Flag<["-"], "async">,
   HelpText<"Perform request asynchronously">;
 
+def disable_implicit_concurrency_module_import : Flag<["-"],
+    "disable-implicit-concurrency-module-import">,
+  HelpText<"Disable implicit import of the _Concurrency module">;
+
 def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
 def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
 
