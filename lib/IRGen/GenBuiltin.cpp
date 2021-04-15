@@ -223,7 +223,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   // emitGetCurrentExecutor has no arguments.
   if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
     emitGetCurrentExecutor(IGF, out);
-
     return;
   }
 

@@ -1,0 +1,27 @@
+// RUN: %target-swift-frontend -enable-experimental-concurrency -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_none()
+sil @test_none : $() -> Optional<Builtin.Executor> {
+bb0:
+  // CHECK: ret { [[INT]], [[INT]] } zeroinitializer
+  %0 = enum $Optional<Builtin.Executor>, #Optional.none
+  return %0 : $Optional<Builtin.Executor>
+}
+
+// CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_some([[INT]] %0, [[INT]] %1)
+sil @test_some : $(Builtin.Executor) -> Optional<Builtin.Executor> {
+bb0(%0 : $Builtin.Executor):
+  // CHECK:      [[T0:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] %0, 0
+  // CHECK-NEXT: [[T1:%.*]] = insertvalue { [[INT]], [[INT]] } [[T0]], [[INT]] %1, 1
+  // CHECK-NEXT: ret { [[INT]], [[INT]] } [[T1]]
+  %1 = enum $Optional<Builtin.Executor>, #Optional.some, %0 : $Builtin.Executor
+  return %1 : $Optional<Builtin.Executor>
+}

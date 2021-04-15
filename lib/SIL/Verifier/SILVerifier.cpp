@@ -839,6 +839,15 @@ public:
             valueDescription + " cannot apply to a function type");
   }
 
+  /// Require the operand to be `$Optional<Builtin.Executor>`.
+  void requireOptionalExecutorType(SILValue value, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+    auto objectType = type.getASTType().getOptionalObjectType();
+    require(objectType && objectType == M->getASTContext().TheExecutorType,
+            what + " must be Optional<Builtin.Executor>");
+  }
+
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
@@ -1829,6 +1838,7 @@ public:
     }
 
     auto builtinKind = BI->getBuiltinKind();
+    auto arguments = BI->getArguments();
 
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
     if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
@@ -1839,7 +1849,6 @@ public:
 
     if (builtinKind == BuiltinValueKind::InitializeDefaultActor ||
         builtinKind == BuiltinValueKind::DestroyDefaultActor) {
-      auto arguments = BI->getArguments();
       require(arguments.size() == 1,
               "default-actor builtin can only operate on a single object");
       auto argType = arguments[0]->getType().getASTType();
@@ -1851,23 +1860,32 @@ public:
       return;
     }
 
+    // Check that 'getCurrentAsyncTask' only occurs within an async function.
+    if (builtinKind == BuiltinValueKind::GetCurrentExecutor) {
+      require(F.isAsync(),
+              "getCurrentExecutor can only be used in an async function");
+      require(arguments.empty(), "getCurrentExecutor takes no arguments");
+      requireOptionalExecutorType(BI, "result of getCurrentExecutor");
+      return;
+    }
+
     if (builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
         builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {
-      requireObjectType(BuiltinExecutorType, BI,
-                        "result of building a serial executor");
-      auto arguments = BI->getArguments();
       require(arguments.size() == 1,
               "builtin expects one argument");
       require(arguments[0]->getType().isObject(),
               "operand of builtin should have object type");
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of build*ExecutorRef");
+      return;
     }
 
     if (builtinKind == BuiltinValueKind::BuildMainActorExecutorRef) {
-      requireObjectType(BuiltinExecutorType, BI,
-                        "result of buildSerialExecutorRef");
-      auto arguments = BI->getArguments();
       require(arguments.size() == 0,
               "buildMainActorExecutorRef expects no arguments");
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of build*ExecutorRef");
+      return;
     }
   }
   
@@ -4799,9 +4817,8 @@ public:
   void checkHopToExecutorInst(HopToExecutorInst *HI) {
     auto executor = HI->getTargetExecutor();
     if (HI->getModule().getStage() == SILStage::Lowered) {
-      requireObjectType(BuiltinExecutorType, executor->getType(),
-                        "hop_to_executor instruction must take a "
-                        "Builtin.Executor in lowered SIL");
+      requireOptionalExecutorType(executor,
+                                  "hop_to_executor operand in lowered SIL");
     }
   }
 

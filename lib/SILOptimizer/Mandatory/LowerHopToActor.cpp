@@ -57,7 +57,7 @@ class LowerHopToActor {
   bool processHop(HopToExecutorInst *hop);
   bool processExtract(ExtractExecutorInst *extract);
 
-  SILValue emitGetExecutor(SILLocation loc, SILValue actor);
+  SILValue emitGetExecutor(SILLocation loc, SILValue actor, bool makeOptional);
 
 public:
   LowerHopToActor(SILFunction *f, DominanceInfo *dominance)
@@ -85,19 +85,25 @@ bool LowerHopToActor::run() {
   return changed;
 }
 
+static bool isOptionalBuiltinExecutor(SILType type) {
+  if (auto objectType = type.getOptionalObjectType())
+    return objectType.is<BuiltinExecutorType>();
+  return false;
+}
+
 /// Search for hop_to_executor instructions with actor-typed operands.
 bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
   auto actor = hop->getTargetExecutor();
 
-  // Ignore hops that are already to Builtin.Executor.
-  if (actor->getType().is<BuiltinExecutorType>())
+  // Ignore hops that are already to Optional<Builtin.Executor>.
+  if (isOptionalBuiltinExecutor(actor->getType()))
     return false;
 
   B.setInsertionPoint(hop);
 
   // Get the dominating executor value for this actor, if available,
   // or else emit code to derive it.
-  SILValue executor = emitGetExecutor(hop->getLoc(), actor);
+  SILValue executor = emitGetExecutor(hop->getLoc(), actor, /*optional*/true);
 
   B.createHopToExecutor(hop->getLoc(), executor);
 
@@ -109,12 +115,12 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
 bool LowerHopToActor::processExtract(ExtractExecutorInst *extract) {
   // Dig out the executor.
   auto executor = extract->getExpectedExecutor();
-  if (!executor->getType().is<BuiltinExecutorType>()) {
+  if (!isOptionalBuiltinExecutor(executor->getType())) {
     B.setInsertionPoint(extract);
-
-    executor = emitGetExecutor(extract->getLoc(), executor);
+    executor = emitGetExecutor(extract->getLoc(), executor, /*optional*/false);
   }
 
+  // Unconditionally replace the extract with the executor.
   extract->replaceAllUsesWith(executor);
   extract->eraseFromParent();
   return true;
@@ -138,12 +144,17 @@ static AccessorDecl *getUnownedExecutorGetter(ASTContext &ctx,
   return nullptr;
 }
 
-SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor) {
+SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor,
+                                          bool makeOptional) {
   // Get the dominating executor value for this actor, if available,
   // or else emit code to derive it.
   SILValue executor = ExecutorForActor.lookup(actor);
-  if (executor)
+  if (executor) {
+    if (makeOptional)
+      executor = B.createOptionalSome(loc, executor,
+                           SILType::getOptionalType(executor->getType()));
     return executor;
+  }
 
   // This is okay because actor types have to be classes and so never
   // have multiple abstraction patterns.
@@ -197,8 +208,13 @@ SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor) {
   // force the actor to stay alive.
   executor = B.createMarkDependence(loc, unmarkedExecutor, actor);
 
-  // Cache the result for later.
+  // Cache the non-optional result for later.
   ExecutorForActor.insert(actor, executor);
+
+  // Inject the result into an optional if requested.
+  if (makeOptional)
+    executor = B.createOptionalSome(loc, executor,
+                           SILType::getOptionalType(executor->getType()));
 
   return executor;
 }

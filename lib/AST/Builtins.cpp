@@ -1407,7 +1407,7 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
 static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _async(_thin),
                             _parameters(),
-                            _executor);
+                            _optional(_executor));
 }
 
 static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
