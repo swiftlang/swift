@@ -411,8 +411,8 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 Type resultType,
                                 bool throws,
                                 SourceLoc throwsLoc) {
-  uint16_t ArgNo = emitProlog(paramList, selfParam, resultType,
-                              DC, throws, throwsLoc);
+  uint16_t ArgNo = emitBasicProlog(paramList, selfParam, resultType,
+                                   DC, throws, throwsLoc);
   
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
@@ -733,12 +733,12 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   (void)arg;
 }
 
-uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
-                                    ParamDecl *selfParam,
-                                    Type resultType,
-                                    DeclContext *DC,
-                                    bool throws,
-                                    SourceLoc throwsLoc) {
+uint16_t SILGenFunction::emitBasicProlog(ParameterList *paramList,
+                                         ParamDecl *selfParam,
+                                         Type resultType,
+                                         DeclContext *DC,
+                                         bool throws,
+                                         SourceLoc throwsLoc) {
   // Create the indirect result parameters.
   auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getCanonicalType(genericSig);

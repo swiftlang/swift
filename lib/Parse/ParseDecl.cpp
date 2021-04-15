@@ -8005,19 +8005,12 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
 
-  // Initializers cannot be 'async'.
-  // FIXME: We should be able to lift this restriction.
-  if (asyncLoc.isValid()) {
-    diagnose(asyncLoc, diag::async_init)
-      .fixItRemove(asyncLoc);
-    asyncLoc = SourceLoc();
-  }
-
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failable, FailabilityLoc,
+                                           asyncLoc.isValid(), asyncLoc,
                                            throwsLoc.isValid(), throwsLoc,
                                            Params.get(), GenericParams,
                                            CurDeclContext);
