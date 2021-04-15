@@ -203,9 +203,14 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
             getSwiftInterfaceCompilerVersionForCurrentCompiler(
                 SubInstance.getASTContext());
         StringRef emittedByCompiler = info.CompilerVersion;
-        diagnose(diag::module_interface_build_failed, isTypeChecking,
-                 moduleName, emittedByCompiler == builtByCompiler,
-                 emittedByCompiler, builtByCompiler);
+        if (!isTypeChecking && emittedByCompiler != builtByCompiler) {
+          diagnose(diag::module_interface_build_failed_mismatching_compiler,
+                   moduleName, emittedByCompiler, builtByCompiler);
+        } else {
+          diagnose(diag::module_interface_build_failed, isTypeChecking,
+                   moduleName, emittedByCompiler == builtByCompiler,
+                   emittedByCompiler, builtByCompiler);
+        }
       }
     };
 

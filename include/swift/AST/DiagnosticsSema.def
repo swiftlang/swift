@@ -728,6 +728,10 @@ ERROR(module_interface_build_failed,Fatal,
       "the textual interface may be broken by project issues"
       "%select{, differences between compilers (the producer '%3' and this compiler '%4')|}2 or a compiler bug",
       (bool, StringRef, bool, StringRef, StringRef))
+ERROR(module_interface_build_failed_mismatching_compiler,Fatal,
+      "failed to build module '%0'; this SDK is not supported by the compiler "
+      "(the SDK is built with '%1', while this compiler is '%2'). Please select a toolchain which matches the SDK.",
+      (StringRef, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
