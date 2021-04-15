@@ -22,7 +22,8 @@ bb0(%0 : @guaranteed $MyActor):
 // CHECK:      bb0(%0 : @guaranteed $MyActor):
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]] : $()
   hop_to_executor %0 : $MyActor
@@ -36,10 +37,12 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
 // CHECK:      bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%1 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %1 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]] : $()
   hop_to_executor %0 : $MyActor
@@ -54,8 +57,10 @@ bb0(%0 : @guaranteed $MyActor):
 // CHECK:      bb0(%0 : @guaranteed $MyActor):
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]] : $()
   hop_to_executor %0 : $MyActor
@@ -72,12 +77,14 @@ bb0(%0 : @guaranteed $MyActor, %1 : $Builtin.Int1):
 // CHECK:      bb1:
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
@@ -102,20 +109,24 @@ bb0(%0 : @guaranteed $MyActor, %1 : $Builtin.Int1):
 // CHECK:      bb0(%0 : @guaranteed $MyActor, %1 : $Builtin.Int1):
 // CHECK-NEXT:   br bb5
 // CHECK:      bb1:
-// CHECK-NEXT:   hop_to_executor [[DEPEND:%.*]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND:%.*]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb6
 // CHECK:      bb2:
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb1
 // CHECK:      bb3:
-// CHECK-NEXT:   hop_to_executor [[DEPEND:%.*]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND:%.*]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb6
 // CHECK:      bb4:
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
 // CHECK-NEXT:   [[DEPEND]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb3
 // CHECK:      bb5:
 // CHECK-NEXT:   cond_br %1, bb2, bb4
@@ -149,21 +160,26 @@ bb0(%0 : @guaranteed $MyActor, %1 : $Builtin.Int1):
 // CHECK:      bb0(%0 : @guaranteed $MyActor, %1 : $Builtin.Int1):
 // CHECK-NEXT:   br bb5
 // CHECK:      bb1:
-// CHECK-NEXT:   hop_to_executor [[DEPEND:%.*]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND:%.*]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb6
 // CHECK:      bb2:
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb1
 // CHECK:      bb3:
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb6
 // CHECK:      bb4:
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   br bb3
 // CHECK:      bb5:
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>(%0 : $MyActor) : $Builtin.Executor
-// CHECK-NEXT:   [[DEPEND]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $MyActor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   cond_br %1, bb2, bb4
 // CHECK:      bb6:
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
@@ -197,7 +213,8 @@ bb0(%0 : @guaranteed $CustomActor):
 // CHECK-NEXT:   [[WRAPPED_EXECUTOR:%.*]] = apply [[WITNESS_METHOD]]<CustomActor>(%0)
 // CHECK-NEXT:   [[EXECUTOR:%.*]] = struct_extract [[WRAPPED_EXECUTOR]] : $UnownedSerialExecutor, #UnownedSerialExecutor.executor
 // CHECK-NEXT:   [[DEPEND:%.*]] = mark_dependence [[EXECUTOR]] : $Builtin.Executor on %0 : $CustomActor
-// CHECK-NEXT:   hop_to_executor [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   [[SOME:%.*]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[DEPEND]] : $Builtin.Executor
+// CHECK-NEXT:   hop_to_executor [[SOME]] : $Optional<Builtin.Executor>
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]] : $()
   hop_to_executor %0 : $CustomActor

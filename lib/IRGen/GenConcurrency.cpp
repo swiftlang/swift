@@ -65,14 +65,12 @@ public:
     return ".impl";
   }
 
-  // The identity pointer is a heap object reference, but it's
-  // nullable because of the generic executor.
+  // The identity pointer is a heap object reference.
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
     return true;
   }
-
   PointerInfo getPointerInfo(IRGenModule &IGM) const {
-    return PointerInfo::forHeapObject(IGM).withNullable(IsNullable);
+    return PointerInfo::forHeapObject(IGM);
   }
   unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
     return getPointerInfo(IGM).getExtraInhabitantCount(IGM);
@@ -89,18 +87,17 @@ public:
     src = projectFirstElement(IGF, src);
     return getPointerInfo(IGF.IGM).getExtraInhabitantIndex(IGF, src);
   }
-  APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-    auto pointerSize = IGM.getPointerSize();
-    auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
-    mask.appendSetBits(pointerSize.getValueInBits());
-    mask.appendClearBits(pointerSize.getValueInBits());
-    return mask.build().getValue();
-  }
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                             Address dest, SILType T,
                             bool isOutlined) const override {
-    dest = projectFirstElement(IGF, dest);
-    getPointerInfo(IGF.IGM).storeExtraInhabitant(IGF, index, dest);
+    // Store the extra-inhabitant value in the first (identity) word.
+    auto first = projectFirstElement(IGF, dest);
+    getPointerInfo(IGF.IGM).storeExtraInhabitant(IGF, index, first);
+
+    // Zero the second word.
+    auto second = projectSecondElement(IGF, dest);
+    IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, 0),
+                            second);
   }
 };
 
@@ -139,9 +136,9 @@ void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
   unsigned flags = unsigned(ExecutorRefFlags::DefaultActor);
 
   llvm::Value *identity =
-    IGF.Builder.CreateBitCast(actor, IGF.IGM.ExecutorFirstTy);
+    IGF.Builder.CreatePtrToInt(actor, IGF.IGM.ExecutorFirstTy);
   llvm::Value *impl =
-    IGF.IGM.getSize(Size(flags));
+    llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, flags);
 
   out.add(identity);
   out.add(impl);
@@ -153,10 +150,10 @@ void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
                                        ProtocolConformanceRef executorConf,
                                                Explosion &out) {
   llvm::Value *identity =
-    IGF.Builder.CreateBitCast(executor, IGF.IGM.ExecutorFirstTy);
+    IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
   llvm::Value *impl =
     emitWitnessTableRef(IGF, executorType, executorConf);
-  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.SizeTy);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
 
   out.add(identity);
   out.add(impl);
