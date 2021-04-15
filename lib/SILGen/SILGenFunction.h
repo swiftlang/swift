@@ -839,6 +839,17 @@ public:
                             Optional<ActorIsolation> actorIso,
                             Optional<ManagedValue> actorSelf);
 
+  /// A version of `emitHopToTargetActor` that is specialized to the needs
+  /// of various types of ConstructorDecls, like class or value initializers,
+  /// because their prolog emission is not the same as for regular functions.
+  ///
+  /// This function emits the appropriate hop_to_executor for a constructor's
+  /// prologue.
+  ///
+  /// NOTE: this does not support actor initializers!
+  void emitConstructorPrologActorHop(SILLocation loc,
+                                     Optional<ActorIsolation> actorIso);
+
   /// Emit the executor for the given actor isolation.
   Optional<SILValue> emitExecutor(SILLocation loc,
                                   ActorIsolation isolation,

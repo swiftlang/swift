@@ -12,6 +12,7 @@
 
 #include "ArgumentSource.h"
 #include "Conversion.h"
+#include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -357,6 +358,13 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                   ctor->getThrowsLoc());
   emitConstructorMetatypeArg(*this, ctor);
 
+  // Make sure we've hopped to the right global actor, if any.
+  if (ctor->hasAsync()) {
+    SILLocation prologueLoc(selfDecl);
+    prologueLoc.markAsPrologue();
+    emitConstructorPrologActorHop(prologueLoc, getActorIsolation(ctor));
+  }
+
   // Create a basic block to jump to for the implicit 'self' return.
   // We won't emit this until after we've emitted the body.
   // The epilog takes a void return because the return of 'self' is implicit.
@@ -662,6 +670,18 @@ static void emitDefaultActorInitialization(SILGenFunction &SGF,
                       { self.borrow(SGF, loc).getValue() });
 }
 
+void SILGenFunction::emitConstructorPrologActorHop(
+                                           SILLocation loc,
+                                           Optional<ActorIsolation> maybeIso) {
+  if (!maybeIso)
+    return;
+
+  if (auto executor = emitExecutor(loc, *maybeIso, None)) {
+    ExpectedExecutor = *executor;
+    B.createHopToExecutor(loc, *executor);
+  }
+}
+
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ctor);
 
@@ -723,6 +743,13 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getType());
   ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
+
+  // Make sure we've hopped to the right global actor, if any.
+  if (ctor->hasAsync() && !selfClassDecl->isActor()) {
+    SILLocation prologueLoc(selfDecl);
+    prologueLoc.markAsPrologue();
+    emitConstructorPrologActorHop(prologueLoc, getActorIsolation(ctor));
+  }
 
   if (!NeedsBoxForSelf) {
     SILLocation PrologueLoc(selfDecl);
