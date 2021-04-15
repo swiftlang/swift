@@ -8517,6 +8517,17 @@ static Optional<SolutionApplicationTarget> applySolutionToForEachStmt(
 
 Optional<SolutionApplicationTarget>
 ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
+  // Rewriting the target might abort in case one of visit methods returns
+  // nullptr. In this case, no more walkToExprPost calls are issues and thus
+  // nodes which were pushed on the Rewriter's ExprStack in walkToExprPre are
+  // not popped of the stack again in walkTokExprPost. Usually, that's not an
+  // issue if rewriting completely terminates because the ExprStack is never
+  // used again. Here, however, we recover from a rewriting failure and continue
+  // using the Rewriter. To make sure we don't continue with an ExprStack that
+  // is still in the state when rewriting was aborted, save it here and restore
+  // it once rewritingt this target has finished.
+  llvm::SaveAndRestore<SmallVector<Expr *, 8>> RestoreExprStack(
+      Rewriter.ExprStack);
   auto &solution = Rewriter.solution;
 
   // Apply the solution to the target.
