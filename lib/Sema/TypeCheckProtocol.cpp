@@ -4990,6 +4990,14 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   // Existential types don't need to conform, i.e., they only need to
   // contain the protocol.
   if (T->isExistentialType()) {
+    // Handle the special case of the Error protocol, which self-conforms
+    // *and* has a witness table.
+    if (T->isEqual(Proto->getDeclaredInterfaceType()) &&
+        Proto->requiresSelfConformanceWitnessTable()) {
+      auto &ctx = DC->getASTContext();
+      return ProtocolConformanceRef(ctx.getSelfConformance(Proto));
+    }
+
     auto layout = T->getExistentialLayout();
 
     // First, if we have a superclass constraint, the class may conform
