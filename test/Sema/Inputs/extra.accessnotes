@@ -5,3 +5,9 @@ Notes:
 - Name: 'fn()'
   CorinthianLeather: 'rich'
   # expected-remark@-1 {{ignored invalid content in access notes file: unknown key 'CorinthianLeather'}}
+  
+# These notes should apply, or attempt to apply, despite the other problems.
+- Name: 'Extant.good(_:)'
+  ObjC: true
+- Name: 'Extant.bad(_:)'
+  ObjC: true

@@ -55,7 +55,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
     return DiagnosticBehavior::Ignore;
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
-    return DiagnosticBehavior::Remark;
+    return ctx.LangOpts.getAccessNoteFailureLimit();
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:

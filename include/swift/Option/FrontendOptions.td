@@ -196,6 +196,12 @@ def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-send
 def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
     HelpText<"Disable inference of Sendable conformances for public structs and enums">;
 
+def Raccess_note : Separate<["-"], "Raccess-note">,
+    MetaVarName<"none|failures|all|all-validate">,
+    HelpText<"Control access note remarks (default: all)">;
+def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
+    Alias<Raccess_note>;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;

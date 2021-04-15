@@ -1456,9 +1456,10 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
       SF->AttrsAddedByAccessNotes.emplace_back(VD, attr);
   } else {
     VD->getAttrs().removeAttribute(attr);
-    diagnoseChangeByAccessNote(diag::attr_removed_by_access_note,
-                               diag::fixit_attr_removed_by_access_note)
-      .fixItRemove(attr->getRangeWithAt());
+    if (VD->getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess())
+      diagnoseChangeByAccessNote(diag::attr_removed_by_access_note,
+                                 diag::fixit_attr_removed_by_access_note)
+        .fixItRemove(attr->getRangeWithAt());
   }
 }
 
@@ -1468,9 +1469,11 @@ swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
   if (!attr || !attr->getAddedByAccessNote())
     return std::move(diag);
 
+  auto behavior = D->getASTContext().LangOpts.getAccessNoteFailureLimit();
   return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
                                D->getModuleContext()->getAccessNotes().Reason,
-                               attr->isDeclModifier(), attr->getAttrName()));
+                               attr->isDeclModifier(), attr->getAttrName())
+                        .limitBehavior(behavior));
 }
 
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
@@ -1491,6 +1494,10 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
 
     if (!attr->hasName()) {
       attr->setName(*note.ObjCName, true);
+
+      if (!ctx.LangOpts.shouldRemarkOnAccessNoteSuccess())
+        return;
+
       diagnoseAtAttrOrDecl(attr, VD,
                            diag::attr_objc_name_changed_by_access_note,
                            notes.Reason, VD->getDescriptiveKind(),
@@ -1512,10 +1519,12 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
         note.fixItInsertAfter(attr->getLocation(), newNameString);
     }
     else if (attr->getName() != *note.ObjCName) {
+      auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
       diagnoseAtAttrOrDecl(attr, VD,
                            diag::attr_objc_name_conflicts_with_access_note,
                            notes.Reason, VD->getDescriptiveKind(),
-                           *note.ObjCName, *attr->getName());
+                           *note.ObjCName, *attr->getName())
+          .limitBehavior(behavior);
     }
   }
 }
@@ -1526,6 +1535,9 @@ void TypeChecker::applyAccessNote(ValueDecl *VD) {
 }
 
 void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
+  if (!SF.getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess())
+    return;
+
   for (auto declAndAttr : SF.AttrsAddedByAccessNotes) {
     auto VD = std::get<0>(declAndAttr);
     auto attr = std::get<1>(declAndAttr);
