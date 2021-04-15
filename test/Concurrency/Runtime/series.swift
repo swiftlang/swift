@@ -20,8 +20,8 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with no awaiting next") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
-        continuation.yield("hello")
+      let series = Series(buffering: String.self) { continuation in
+        continuation.resume(yielding: "hello")
       }
       await forceBeingAsync()
     }
@@ -29,7 +29,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with awaiting next") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
+      let series = Series(buffering: String.self) { continuation in
         continuation.resume(yielding: "hello")
       }
       let iterator = series.makeAsyncIterator()
@@ -39,7 +39,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with awaiting next 2") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
+      let series = Series(buffering: String.self) { continuation in
         continuation.resume(yielding: "hello")
         continuation.resume(yielding: "world")
       }
@@ -51,7 +51,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with awaiting next 2 and finish") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
+      let series = Series(buffering: String.self) { continuation in
         continuation.resume(yielding: "hello")
         continuation.resume(yielding: "world")
         continuation.finish()
@@ -65,7 +65,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with no awaiting next detached") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
+      let series = Series(buffering: String.self) { continuation in
         detach {
           continuation.resume(yielding: "hello")
         }
@@ -76,7 +76,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with awaiting next detached") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
+      let series = Series(buffering: String.self) { continuation in
         detach {
           continuation.resume(yielding: "hello")
         }
@@ -88,7 +88,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with awaiting next 2 detached") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
+      let series = Series(buffering: String.self) { continuation in
         detach {
           continuation.resume(yielding: "hello")
           continuation.resume(yielding: "world")
@@ -102,7 +102,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 
   tests.test("yield with awaiting next 2 and finish detached") {
     runAsyncAndBlock {
-      let series = Series(buffering: String.self) {
+      let series = Series(buffering: String.self) { continuation in
         detach {
           continuation.resume(yielding: "hello")
           continuation.resume(yielding: "world")
