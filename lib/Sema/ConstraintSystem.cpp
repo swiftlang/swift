@@ -3345,7 +3345,7 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
 static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
                                                 const SolutionDiff &diff,
                                                 ArrayRef<Solution> solutions) {
-  if (!diff.overloads.empty())
+  if (!diff.getOverloads().empty())
     return false;
 
   bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
@@ -3549,12 +3549,12 @@ static bool diagnoseAmbiguityWithContextualType(
   auto *calleeLocator = solution.getCalleeLocator(locator);
 
   auto result =
-      llvm::find_if(solutionDiff.overloads,
+      llvm::find_if(solutionDiff.getOverloads(),
                     [&calleeLocator](const SolutionDiff::OverloadDiff &entry) {
                       return entry.locator == calleeLocator;
                     });
 
-  if (result == solutionDiff.overloads.end())
+  if (result == solutionDiff.getOverloads().end())
     return false;
 
   auto &DE = cs.getASTContext().Diags;
@@ -3823,7 +3823,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // All of the fixes which have been considered already.
   llvm::SmallSetVector<Fix, 4> consideredFixes;
 
-  for (const auto &ambiguity : solutionDiff.overloads) {
+  for (const auto &ambiguity : solutionDiff.getOverloads()) {
     auto fixes = fixesByCallee.find(ambiguity.locator);
     if (fixes == fixesByCallee.end())
       continue;
@@ -3954,8 +3954,9 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
     extendPreorderIndexMap(expr, indexMap);
   }
 
-  for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
-    auto &overload = diff.overloads[i];
+  auto overloads = diff.getOverloads();
+  for (unsigned i = 0, n = overloads.size(); i != n; ++i) {
+    auto &overload = overloads[i];
 
     // If we can't resolve the locator to an anchor expression with no path,
     // we can't diagnose this well.
@@ -3999,7 +4000,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   // FIXME: Should be able to pick the best locator, e.g., based on some
   // depth-first numbering of expressions.
   if (bestOverload) {
-    auto &overload = diff.overloads[*bestOverload];
+    auto &overload = overloads[*bestOverload];
     // FIXME: We would prefer to emit the name as written, but that information
     // is not sufficiently centralized in the AST.
     DeclNameRef name(getOverloadChoiceName(overload.choices));

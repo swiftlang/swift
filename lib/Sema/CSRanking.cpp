@@ -838,7 +838,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     return 1;
   };
 
-  SmallVector<SolutionDiff::OverloadDiff, 4> overloadDiff(diff.overloads);
+  SmallVector<SolutionDiff::OverloadDiff, 4> overloadDiff(
+      diff.getOverloads().begin(),  diff.getOverloads().end());
   // Single type of keypath dynamic member lookup could refer to different
   // member overloads, we have to do a pair-wise comparison in such cases
   // otherwise ranking would miss some viable information e.g.
@@ -1458,7 +1459,9 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   return None;
 }
 
-SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
+void SolutionDiff::populateOverloads() const {
+  overloads.emplace();
+
   if (solutions.size() <= 1)
     return;
 
@@ -1501,7 +1504,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
         continue;
 
       // We have a difference. Add this set of overload choices to the diff.
-      this->overloads.push_back(SolutionDiff::OverloadDiff{
+      overloads->push_back(SolutionDiff::OverloadDiff{
           overloadChoice.first, std::move(overloadChoice.second)});
       break;
     }

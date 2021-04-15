@@ -1345,14 +1345,27 @@ public:
     SmallVector<OverloadChoice, 2> choices;
   };
 
+private:
+  ArrayRef<Solution> solutions;
+
   /// The differences between the overload choices between the
   /// solutions.
-  SmallVector<OverloadDiff, 4> overloads;
+  mutable Optional<SmallVector<OverloadDiff, 4>> overloads;
 
+  /// Populate 'overloads'.
+  void populateOverloads() const;
+
+public:
   /// Compute the differences between the given set of solutions.
   ///
   /// \param solutions The set of solutions.
-  explicit SolutionDiff(ArrayRef<Solution> solutions);
+  explicit SolutionDiff(ArrayRef<Solution> solutions) : solutions(solutions) {};
+
+  ArrayRef<OverloadDiff> getOverloads() const {
+    if (!overloads.hasValue())
+      populateOverloads();
+    return *overloads;
+  }
 };
 
 /// An intrusive, doubly-linked list of constraints.
