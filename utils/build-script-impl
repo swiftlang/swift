@@ -179,6 +179,8 @@ KNOWN_SETTINGS=(
     llvm-install-components                       ""                "a semicolon-separated list of LLVM components to install"
     llvm-lit-args                                 ""                "If set, override the lit args passed to LLVM"
     enable-llvm-assertions                        "1"               "set to enable llvm assertions"
+    llvm-ninja-targets                            ""                "list of ninja targets to build for LLVM"
+    llvm-ninja-targets-for-cross-compile-hosts    ""                "list of ninja targets to build for LLVM for hosts that are cross-compiled"
 
     ## Swift Options
     swift-analyze-code-coverage                   "not-merged"      "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
@@ -1636,6 +1638,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             llvm)
+                if [[ -n "${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS}" && $(is_cross_tools_host ${host}) ]] ; then
+                    build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
+                elif [[ -n "${LLVM_NINJA_TARGETS}" ]] ; then
+                    build_targets=("${LLVM_NINJA_TARGETS[@]}")
+                fi
+                # indicating we don't want to build LLVM should
+                # override any custom ninja target we specified
                 if [ "${BUILD_LLVM}" == "0" ] ; then
                     build_targets=(clean)
                 fi
