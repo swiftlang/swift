@@ -164,3 +164,26 @@ public func testComposition2(@InternalWrapper @PublicWrapper value: Int) {}
 // expected-error@+2 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
 @inlinable func testComposition6(@InternalWrapper @PublicWrapper value: Int) {}
+
+protocol Q {
+  associatedtype A
+}
+
+// expected-note@+1 {{where 'T' = 'Int'}}
+func takesClosure<T: Q>(type: T.Type, _ closure: (T.A) -> Void) {}
+
+func testMissingWrapperType() {
+  // expected-error@+1 {{global function 'takesClosure(type:_:)' requires that 'Int' conform to 'Q'}}
+  takesClosure(type: Int.self) { $value in
+    return
+  }
+
+  struct S: Q {
+    typealias A = (Int, Int)
+  }
+
+  // expected-error@+1 {{inferred projection type 'S.A' (aka '(Int, Int)') is not a property wrapper}}
+  takesClosure(type: S.self) { $value in
+    return
+  }
+}
