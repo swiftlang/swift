@@ -609,6 +609,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
 
+  if (Arg *A = Args.getLastArg(OPT_Raccess_note)) {
+    auto value = llvm::StringSwitch<Optional<AccessNoteDiagnosticBehavior>>(A->getValue())
+      .Case("none", AccessNoteDiagnosticBehavior::Ignore)
+      .Case("failures", AccessNoteDiagnosticBehavior::RemarkOnFailure)
+      .Case("all", AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess)
+      .Case("all-validate", AccessNoteDiagnosticBehavior::ErrorOnFailureRemarkOnSuccess)
+      .Default(None);
+
+    if (value)
+      Opts.AccessNoteBehavior = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
   Opts.EnableConcisePoundFile =
       Args.hasArg(OPT_enable_experimental_concise_pound_file);
   Opts.EnableFuzzyForwardScanTrailingClosureMatching =
