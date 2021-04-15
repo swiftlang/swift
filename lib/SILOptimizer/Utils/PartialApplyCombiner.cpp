@@ -168,9 +168,6 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   SILValue callee = pai->getCallee();
   SubstitutionMap subs = pai->getSubstitutionMap();
 
-  // The partial_apply might be substituting in an open existential type.
-  builder.addOpenedArchetypeOperands(pai);
-
   if (auto *tai = dyn_cast<TryApplyInst>(paiAI)) {
     builder.createTryApply(paiAI.getLoc(), callee, subs, argList,
                            tai->getNormalBB(), tai->getErrorBB(),

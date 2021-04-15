@@ -4793,6 +4793,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
 
   if (isMultiLineClosure)
     OS << '\n' << indent;
+  else if (closure->getBody()->empty())
+    OS << ' ';
 
   // Let's form 'let <name> : [<type>]? = arg' expression.
   OS << "let " << parameterOS.str() << " = arg"

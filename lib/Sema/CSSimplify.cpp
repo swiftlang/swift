@@ -3667,6 +3667,12 @@ bool ConstraintSystem::repairFailures(
                                TMF_ApplyingFix, locator);
 
       if (result.isSuccess()) {
+        // If left side is a hole, let's not record a fix since hole can
+        // assume any type and already represents a problem elsewhere in
+        // the expression.
+        if (lhs->isPlaceholder())
+          return true;
+
         conversionsOrFixes.push_back(
             TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
         return true;

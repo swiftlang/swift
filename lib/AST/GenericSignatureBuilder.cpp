@@ -36,6 +36,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/DenseMap.h"

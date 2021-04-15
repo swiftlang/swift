@@ -704,7 +704,7 @@ ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
 ERROR(sema_no_import_target,Fatal,
       "could not find module '%0' for target '%1'; "
-      "found: %2", (StringRef, StringRef, StringRef))
+      "found: %2, at: %3", (StringRef, StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
 NOTE(sema_no_import_no_sdk,none,

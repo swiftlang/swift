@@ -40,14 +40,13 @@ using namespace Lowering;
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                DeclContext *DC)
     : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
-      StartOfPostmatter(F.end()), B(*this), OpenedArchetypesTracker(&F),
+      StartOfPostmatter(F.end()), B(*this),
       CurrentSILLoc(F.getLocation()), Cleanups(*this),
       StatsTracer(SGM.M.getASTContext().Stats,
                   "SILGen-function", &F) {
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
-  B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 }
 
 /// SILGenFunction destructor - called after the entire function's AST has been

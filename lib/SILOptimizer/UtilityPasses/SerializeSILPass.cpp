@@ -339,6 +339,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::GetAsyncContinuationAddrInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
+  case SILInstructionKind::ExtractExecutorInst:
     // Handle by operand and result check.
     break;
 

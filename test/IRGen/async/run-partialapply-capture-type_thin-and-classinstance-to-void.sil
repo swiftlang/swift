@@ -9,7 +9,8 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
-// UNSUPPORTED: use_oC_stdlib
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Builtin
 import Swift

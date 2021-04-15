@@ -1862,7 +1862,7 @@ derived from the ARC object. As an example, consider the following Swift/SIL::
   bb0(%0 : @guaranteed Klass):
     // Definition of '%1'
     %1 = copy_value %0 : $Klass
-    
+
     // Consume '%1'. This means '%1' can no longer be used after this point. We
     // rebind '%1' in the destination blocks (bbYes, bbNo).
     checked_cast_br %1 : $Klass to $OtherKlass, bbYes, bbNo
@@ -3316,6 +3316,24 @@ SIL generation emits this instruction with operands of actor type as
 well as of type ``Builtin.Executor``.  The former are expected to be
 lowered by the SIL pipeline, so that IR generation only operands of type
 ``Builtin.Executor`` remain.
+
+The operand is a guaranteed operand, i.e. not consumed.
+
+extract_executor
+````````````````
+
+::
+
+  sil-instruction ::= 'extract_executor' sil-operand
+
+  %1 = extract_executor %0 : $T
+  // $T must be Builtin.Executor or conform to the Actor protocol
+  // %1 will be of type Builtin.Executor
+
+Extracts the executor from the executor or actor operand. SIL generation
+emits this instruction to produce executor values when needed (e.g.,
+to provide to a runtime function). It will be lowered away by the SIL
+pipeline.
 
 The operand is a guaranteed operand, i.e. not consumed.
 

@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: linux
 // XFAIL: windows
 

@@ -2890,7 +2890,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If we're choosing an asynchronous declaration within a synchronous
     // context, or vice-versa, increase the async/async mismatch score.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->isAsyncContext() != isAsynchronousContext(useDC)) {
+      if (!func->hasPolymorphicEffect(EffectKind::Async) &&
+          func->isAsyncContext() != isAsynchronousContext(useDC)) {
         increaseScore(
             func->isAsyncContext() ? SK_AsyncInSyncMismatch : SK_SyncInAsync);
       }
@@ -5687,4 +5688,20 @@ TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
   return requiresOptionalAdjustment(binding)
              ? binding.withType(OptionalType::get(type))
              : binding;
+}
+
+ValueDecl *constraints::getOverloadChoiceDecl(Constraint *choice) {
+  if (choice->getKind() != ConstraintKind::BindOverload)
+    return nullptr;
+  return choice->getOverloadChoice().getDeclOrNull();
+}
+
+bool constraints::isOperatorDisjunction(Constraint *disjunction) {
+  assert(disjunction->getKind() == ConstraintKind::Disjunction);
+
+  auto choices = disjunction->getNestedConstraints();
+  assert(!choices.empty());
+
+  auto *decl = getOverloadChoiceDecl(choices.front());
+  return decl ? decl->isOperator() : false;
 }

@@ -68,7 +68,6 @@ class SILDifferentiabilityWitness;
 class SILFunction;
 class SILGlobalVariable;
 class SILInstructionResultArray;
-class SILOpenedArchetypesState;
 class SILType;
 class SILArgument;
 class SILPhiArgument;
@@ -980,6 +979,10 @@ public:
     return node->getKind() >= SILNodeKind::First_SingleValueInstruction &&
            node->getKind() <= SILNodeKind::Last_SingleValueInstruction;
   }
+
+  /// If this is an instruction which "defines" an opened archetype, it is
+  /// returned.
+  CanArchetypeType getOpenedArchetype() const;
 };
 
 struct SILNodeOffsetChecker {
@@ -1801,7 +1804,6 @@ class AllocStackInst final
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F,
-                                SILOpenedArchetypesState &OpenedArchetypes,
                                 Optional<SILDebugVariable> Var,
                                 bool hasDynamicLifetime);
 
@@ -1958,8 +1960,7 @@ class AllocRefInst final
                               SILType ObjectType,
                               bool objc, bool canBeOnStack,
                               ArrayRef<SILType> ElementTypes,
-                              ArrayRef<SILValue> ElementCountOperands,
-                              SILOpenedArchetypesState &OpenedArchetypes);
+                              ArrayRef<SILValue> ElementCountOperands);
 
 public:
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -2001,8 +2002,7 @@ class AllocRefDynamicInst final
   create(SILDebugLocation DebugLoc, SILFunction &F,
          SILValue metatypeOperand, SILType ty, bool objc,
          ArrayRef<SILType> ElementTypes,
-         ArrayRef<SILValue> ElementCountOperands,
-         SILOpenedArchetypesState &OpenedArchetypes);
+         ArrayRef<SILValue> ElementCountOperands);
 
 public:
   SILValue getMetatypeOperand() const {
@@ -2032,7 +2032,7 @@ class AllocValueBufferInst final
 
   static AllocValueBufferInst *
   create(SILDebugLocation DebugLoc, SILType valueType, SILValue operand,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 
 public:
   SILType getValueType() const { return getType().getObjectType(); }
@@ -2059,7 +2059,6 @@ class AllocBoxInst final
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F,
-                              SILOpenedArchetypesState &OpenedArchetypes,
                               Optional<SILDebugVariable> Var,
                               bool hasDynamicLifetime);
 
@@ -2113,7 +2112,7 @@ class AllocExistentialBoxInst final
   static AllocExistentialBoxInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
          CanType ConcreteType, ArrayRef<ProtocolConformanceRef> Conformances,
-         SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction *Parent);
 
 public:
   CanType getFormalConcreteType() const { return ConcreteType; }
@@ -2605,7 +2604,7 @@ class ApplyInst final
          SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
          ApplyOptions options,
          Optional<SILModuleConventions> ModuleConventions,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo);
 };
 
@@ -2635,7 +2634,7 @@ private:
   static PartialApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee, ArrayRef<SILValue> Args,
          SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
          OnStackKind onStack);
 
@@ -2691,7 +2690,7 @@ class BeginApplyInst final
   create(SILDebugLocation debugLoc, SILValue Callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options, Optional<SILModuleConventions> moduleConventions,
-         SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
+         SILFunction &F,
          const GenericSpecializationInformation *specializationInfo);
 
 public:
@@ -3469,6 +3468,21 @@ class HopToExecutorInst
 
 public:
   SILValue getTargetExecutor() const { return getOperand(); }
+};
+
+/// Extract the ex that the code is executing on the operand executor already.
+class ExtractExecutorInst
+    : public UnaryInstructionBase<SILInstructionKind::ExtractExecutorInst,
+                                  SingleValueInstruction>
+{
+  friend SILBuilder;
+
+  ExtractExecutorInst(SILDebugLocation debugLoc, SILValue executor,
+                      bool hasOwnership, SILType Ty)
+      : UnaryInstructionBase(debugLoc, executor, Ty) { }
+
+public:
+  SILValue getExpectedExecutor() const { return getOperand(); }
 };
 
 /// Instantiates a key path object.
@@ -4713,7 +4727,7 @@ class BindMemoryInst final :
 
   static BindMemoryInst *create(
     SILDebugLocation Loc, SILValue Base, SILValue Index, SILType BoundType,
-    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+    SILFunction &F);
 
   BindMemoryInst(SILDebugLocation Loc, SILValue Base, SILValue Index,
                  SILType BoundType,
@@ -4828,7 +4842,7 @@ class ConvertFunctionInst final
 
   static ConvertFunctionInst *create(
       SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
-      SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes,
+      SILFunction *F,
       bool WithoutActuallyEscaping, ValueOwnershipKind forwardingOwnershipKind);
 
 public:
@@ -4873,8 +4887,7 @@ class ConvertEscapeToNoEscapeInst final
 
   static ConvertEscapeToNoEscapeInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         bool lifetimeGuaranteed);
+         SILFunction &F, bool lifetimeGuaranteed);
 public:
   /// Return true if we have extended the lifetime of the argument of the
   /// convert_escape_to_no_escape to be over all uses of the trivial type.
@@ -4919,7 +4932,7 @@ class PointerToThinFunctionInst final
 
   static PointerToThinFunctionInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 };
 
 /// UpcastInst - Perform a conversion of a class instance to a supertype.
@@ -4938,7 +4951,6 @@ class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
 
   static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                             SILType Ty, SILFunction &F,
-                            SILOpenedArchetypesState &OpenedArchetypes,
                             ValueOwnershipKind forwardingOwnershipKind);
 };
 
@@ -5000,8 +5012,7 @@ class UncheckedRefCastInst final
 
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         ValueOwnershipKind forwardingOwnershipKind);
+         SILFunction &F, ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Convert a value's binary representation to a trivial type of the same size.
@@ -5021,7 +5032,7 @@ class UncheckedTrivialBitCastInst final
 
   static UncheckedTrivialBitCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 };
   
 /// Bitwise copy a value into another value of the same size or smaller.
@@ -5040,7 +5051,7 @@ class UncheckedBitwiseCastInst final
                                                TypeDependentOperands, Ty) {}
   static UncheckedBitwiseCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 };
 
 /// Bitwise copy a value into another value of the same size.
@@ -5060,8 +5071,7 @@ class UncheckedValueCastInst final
 
   static UncheckedValueCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
-         ValueOwnershipKind forwardingOwnershipKind);
+         SILFunction &F, ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Build a Builtin.BridgeObject from a heap object reference by bitwise-or-ing
@@ -5192,7 +5202,6 @@ class ThinToThickFunctionInst final
   static ThinToThickFunctionInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
          SILModule &Mod, SILFunction *F,
-         SILOpenedArchetypesState &OpenedArchetypes,
          ValueOwnershipKind forwardingOwnershipKind);
 
 public:
@@ -5294,7 +5303,6 @@ class UnconditionalCheckedCastInst final
   static UnconditionalCheckedCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestLoweredTy,
          CanType DestFormalTy, SILFunction &F,
-         SILOpenedArchetypesState &OpenedArchetypes,
          ValueOwnershipKind forwardingOwnershipKind);
 
 public:
@@ -5328,8 +5336,7 @@ class UnconditionalCheckedCastValueInst final
   static UnconditionalCheckedCastValueInst *
   create(SILDebugLocation DebugLoc,
          SILValue Operand, CanType SourceFormalTy,
-         SILType DestLoweredTy, CanType DestFormalTy,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILType DestLoweredTy, CanType DestFormalTy, SILFunction &F);
 
 public:
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
@@ -6138,8 +6145,7 @@ class MetatypeInst final
                                           Metatype) {}
 
   static MetatypeInst *create(SILDebugLocation DebugLoc, SILType Metatype,
-                              SILFunction *F,
-                              SILOpenedArchetypesState &OpenedArchetypes);
+                              SILFunction *F);
 
 public:
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -6485,8 +6491,7 @@ class ObjCMethodInst final
 
   static ObjCMethodInst *
   create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILDeclRef Member, SILType Ty, SILFunction *F,
-         SILOpenedArchetypesState &OpenedArchetypes);
+         SILDeclRef Member, SILType Ty, SILFunction *F);
 };
 
 /// ObjCSuperMethodInst - Given the address of a value of class type and a method
@@ -6536,7 +6541,7 @@ class WitnessMethodInst final
   static WitnessMethodInst *
   create(SILDebugLocation DebugLoc, CanType LookupType,
          ProtocolConformanceRef Conformance, SILDeclRef Member, SILType Ty,
-         SILFunction *Parent, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction *Parent);
 
 public:
   CanType getLookupType() const { return LookupType; }
@@ -6672,8 +6677,7 @@ class InitExistentialAddrInst final
   static InitExistentialAddrInst *
   create(SILDebugLocation DebugLoc, SILValue Existential, CanType ConcreteType,
          SILType ConcreteLoweredType,
-         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent,
-         SILOpenedArchetypesState &OpenedArchetypes);
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
 
 public:
   ArrayRef<ProtocolConformanceRef> getConformances() const {
@@ -6713,8 +6717,7 @@ class InitExistentialValueInst final
   static InitExistentialValueInst *
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
          CanType ConcreteType, SILValue Instance,
-         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent,
-         SILOpenedArchetypesState &OpenedArchetypes);
+         ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent);
 
 public:
   CanType getFormalConcreteType() const { return ConcreteType; }
@@ -6750,7 +6753,6 @@ class InitExistentialRefInst final
   create(SILDebugLocation DebugLoc, SILType ExistentialType,
          CanType ConcreteType, SILValue Instance,
          ArrayRef<ProtocolConformanceRef> Conformances, SILFunction *Parent,
-         SILOpenedArchetypesState &OpenedArchetypes,
          ValueOwnershipKind forwardingOwnershipKind);
 
 public:
@@ -6786,7 +6788,7 @@ class InitExistentialMetatypeInst final
   static InitExistentialMetatypeInst *
   create(SILDebugLocation DebugLoc, SILType existentialMetatypeType,
          SILValue metatype, ArrayRef<ProtocolConformanceRef> conformances,
-         SILFunction *parent, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction *parent);
 
 public:
   /// Return the object type which was erased.  That is, if this
@@ -8699,7 +8701,6 @@ class CheckedCastBranchInst final
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
          SILType DestLoweredTy, CanType DestFormalTy, SILBasicBlock *SuccessBB,
          SILBasicBlock *FailureBB, SILFunction &F,
-         SILOpenedArchetypesState &OpenedArchetypes,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
          ValueOwnershipKind forwardingOwnershipKind);
 
@@ -8742,7 +8743,7 @@ class CheckedCastValueBranchInst final
          SILValue Operand, CanType SourceFormalTy,
          SILType DestLoweredTy, CanType DestFormalTy,
          SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 
 public:
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
@@ -8773,7 +8774,7 @@ class CheckedCastAddrBranchInst final
          SILValue src, CanType srcType, SILValue dest, CanType targetType,
          SILBasicBlock *successBB, SILBasicBlock *failureBB,
          ProfileCounter Target1Count, ProfileCounter Target2Count,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 };
 
 /// Converts a heap object reference to a different type without any runtime
@@ -8791,8 +8792,7 @@ public:
   
   static UncheckedRefCastAddrInst *
   create(SILDebugLocation Loc, SILValue src, CanType srcType,
-         SILValue dest, CanType targetType,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILValue dest, CanType targetType, SILFunction &F);
 };
 
 class UncheckedAddrCastInst final
@@ -8809,7 +8809,7 @@ class UncheckedAddrCastInst final
                                                TypeDependentOperands, Ty) {}
   static UncheckedAddrCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 };
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
@@ -8828,7 +8828,7 @@ class UnconditionalCheckedCastAddrInst final
   static UnconditionalCheckedCastAddrInst *
   create(SILDebugLocation DebugLoc, SILValue src, CanType sourceType,
          SILValue dest, CanType targetType,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F);
 };
 
 /// A private abstract class to store the destinations of a TryApplyInst.
@@ -8887,7 +8887,6 @@ class TryApplyInst final
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          SILBasicBlock *normalBB, SILBasicBlock *errorBB,
          ApplyOptions options, SILFunction &F,
-         SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
 
 

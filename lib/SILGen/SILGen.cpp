@@ -404,6 +404,11 @@ SILGenModule::getRunAsyncHandler() {
   return lookupConcurrencyIntrinsic(getASTContext(), RunAsyncHandler,
                                     "_runAsyncHandler");
 }
+FuncDecl *
+SILGenModule::getCheckExpectedExecutor() {
+  return lookupConcurrencyIntrinsic(getASTContext(), CheckExpectedExecutor,
+                                    "_checkExpectedExecutor");
+}
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   if (NSErrorConformanceToError)

@@ -4,6 +4,10 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
+// UNSUPPORTED: use_os_stdlib
+
+// https://bugs.swift.org/browse/SR-14486
+// UNSUPPORTED: linux
 
 import Dispatch
 

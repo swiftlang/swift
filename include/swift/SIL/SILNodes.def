@@ -415,6 +415,10 @@ VALUE(MultipleValueInstructionResult, ValueBase)
 
 VALUE(SILUndef, ValueBase)
 
+/// Used internally in e.g. the SIL parser and deserializer.
+/// A PlaceholderValue must not appear in valid SIL.
+VALUE(PlaceholderValue, ValueBase)
+
 ABSTRACT_NODE(SILInstruction, SILNode)
 
 ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
@@ -831,6 +835,8 @@ NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
 
 NON_VALUE_INST(HopToExecutorInst, hop_to_executor,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
+SINGLE_VALUE_INST(ExtractExecutorInst, extract_executor,
+                  SILInstruction, MayRead, DoesNotRelease)
 
 NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)

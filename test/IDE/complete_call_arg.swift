@@ -888,3 +888,14 @@ func testCompleteLabelAfterVararg() {
     // COMPLETE_MEMBER_IN_VARARG: End completions
   }
 }
+
+func testGenericConstructor() {
+  public struct TextField<Label> {
+    init(label: String, text: String) {}
+  }
+
+  _ = TextField(label: "Encoded", #^GENERIC_INITIALIZER^#)
+// GENERIC_INITIALIZER: Begin completions, 1 item
+// GENERIC_INITIALIZER-DAG: Pattern/ExprSpecific:               {#text: String#}[#String#]
+// GENERIC_INITIALIZER: End completions
+}

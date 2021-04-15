@@ -295,8 +295,6 @@ public:
   /// the notion of the current block being emitted into.
   SILGenBuilder B;
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
-
   struct BreakContinueDest {
     LabeledStmt *Target;
     JumpDest BreakDest;
@@ -840,6 +838,16 @@ public:
   ExecutorBreadcrumb emitHopToTargetActor(SILLocation loc,
                             Optional<ActorIsolation> actorIso,
                             Optional<ManagedValue> actorSelf);
+
+  /// Emit the executor for the given actor isolation.
+  Optional<SILValue> emitExecutor(SILLocation loc,
+                                  ActorIsolation isolation,
+                                  Optional<ManagedValue> maybeSelf);
+
+  /// Emit a precondition check to ensure that the function is executing in
+  /// the expected isolation context.
+  void emitPreconditionCheckExpectedExecutor(
+      SILLocation loc, SILValue executor);
 
   /// Gets a reference to the current executor for the task.
   /// \returns a value of type Builtin.Executor
