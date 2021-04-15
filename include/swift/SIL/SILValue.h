@@ -37,6 +37,7 @@ class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
 class SILInstruction;
+class SILArgument;
 class SILLocation;
 class DeadEndBlocks;
 class ValueBaseUseIterator;
@@ -1352,6 +1353,25 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
   V->print(OS);
   return OS;
 }
+
+/// Used internally in e.g. the SIL parser and deserializer to handle forward-
+/// referenced values.
+/// A PlaceholderValue must not appear in valid SIL.
+class PlaceholderValue : public ValueBase {
+  static int numPlaceholderValuesAlive;
+
+public:
+  PlaceholderValue(SILType type);
+  ~PlaceholderValue();
+
+  static int getNumPlaceholderValuesAlive() { return numPlaceholderValuesAlive; }
+
+  static bool classof(const SILArgument *) = delete;
+  static bool classof(const SILInstruction *) = delete;
+  static bool classof(SILNodePointer node) {
+    return node->getKind() == SILNodeKind::PlaceholderValue;
+  }
+};
 
 } // end namespace swift
 

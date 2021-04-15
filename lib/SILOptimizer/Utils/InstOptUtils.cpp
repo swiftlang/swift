@@ -1901,7 +1901,6 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
   llvm::copy(applySite.getArguments(), std::back_inserter(arguments));
 
   SILBuilderWithScope builder(applySite.getInstruction(), builderCtx);
-  builder.addOpenedArchetypeOperands(applySite.getInstruction());
 
   switch (applySite.getKind()) {
   case FullApplySiteKind::TryApplyInst: {

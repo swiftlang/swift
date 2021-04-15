@@ -510,6 +510,7 @@ struct PrintOptions {
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
+    result.AlwaysTryPrintParameterLabels = true;
     return result;
   }
 
@@ -655,6 +656,7 @@ struct PrintOptions {
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;
     PO.SkipImplicit = true;
+    PO.AlwaysTryPrintParameterLabels = true;
     return PO;
   }
 };

@@ -317,7 +317,7 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::ClangType:
   case Kind::Type:
   case Kind::Discard: {
-    if (isTypeParameter())
+    if (isTypeParameterOrOpaqueArchetype())
       return true;
     auto type = getType();
     if (auto tuple = dyn_cast<TupleType>(type))

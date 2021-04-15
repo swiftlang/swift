@@ -3,9 +3,13 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // https://bugs.swift.org/browse/SR-14461
 // UNSUPPORTED: linux
+// rdar://76611676
+// UNSUPPORTED: CPU=x86_64 && OS=ios
 
 
 // doesn't matter that it's bool identity function or not

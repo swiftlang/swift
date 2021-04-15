@@ -21,6 +21,7 @@
 #define DEBUG_TYPE "sil-mem2reg"
 
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
@@ -28,12 +29,13 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
+#include "swift/SILOptimizer/Utils/ScopeOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -41,12 +43,13 @@
 #include "llvm/Support/Debug.h"
 #include <algorithm>
 #include <queue>
+
 using namespace swift;
+using namespace swift::siloptimizer;
 
 STATISTIC(NumAllocStackFound,    "Number of AllocStack found");
 STATISTIC(NumAllocStackCaptured, "Number of AllocStack captured");
 STATISTIC(NumInstRemoved,        "Number of Instructions removed");
-STATISTIC(NumPhiPlaced,          "Number of Phi blocks placed");
 
 namespace {
 
@@ -142,6 +145,7 @@ static void replaceLoad(LoadInst *li, SILValue newValue, AllocStackInst *asi,
   ProjectionPath projections(newValue->getType());
   SILValue op = li->getOperand();
   SILBuilderWithScope builder(li, ctx);
+  SILOptScope scope;
 
   while (op != asi) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
@@ -151,29 +155,28 @@ static void replaceLoad(LoadInst *li, SILValue newValue, AllocStackInst *asi,
     op = inst->getOperand(0);
   }
 
-  SmallVector<SILValue, 4> borrowedVals;
-  for (auto iter = projections.rbegin(); iter != projections.rend(); ++iter) {
-    const Projection &projection = *iter;
-    assert(projection.getKind() == ProjectionKind::BitwiseCast ||
-           projection.getKind() == ProjectionKind::Struct ||
-           projection.getKind() == ProjectionKind::Tuple);
+  for (const auto &proj : llvm::reverse(projections)) {
+    assert(proj.getKind() == ProjectionKind::BitwiseCast ||
+           proj.getKind() == ProjectionKind::Struct ||
+           proj.getKind() == ProjectionKind::Tuple);
 
     // struct_extract and tuple_extract expect guaranteed operand ownership
-    // non-trivial RunningVal is owned. Insert borrow operation to convert
-    if (projection.getKind() == ProjectionKind::Struct ||
-        projection.getKind() == ProjectionKind::Tuple) {
-      SILValue opVal = builder.emitBeginBorrowOperation(li->getLoc(), newValue);
-      if (opVal != newValue) {
-        borrowedVals.push_back(opVal);
-        newValue = opVal;
+    // non-trivial RunningVal is owned. Insert borrow operation to convert them
+    // to guaranteed!
+    if (proj.getKind() == ProjectionKind::Struct ||
+        proj.getKind() == ProjectionKind::Tuple) {
+      if (auto opVal = scope.borrowValue(li, newValue)) {
+        assert(*opVal != newValue &&
+               "Valid value should be different from input value");
+        newValue = *opVal;
       }
     }
     newValue =
-        projection.createObjectProjection(builder, li->getLoc(), newValue)
-            .get();
+        proj.createObjectProjection(builder, li->getLoc(), newValue).get();
   }
 
   op = li->getOperand();
+
   // Replace users of the loaded value with `val`
   // If we have a load [copy], replace the users with copy_value of `val`
   if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
@@ -184,9 +187,8 @@ static void replaceLoad(LoadInst *li, SILValue newValue, AllocStackInst *asi,
     li->replaceAllUsesWith(newValue);
   }
 
-  for (auto borrowedVal : borrowedVals) {
-    builder.emitEndBorrowOperation(li->getLoc(), borrowedVal);
-  }
+  // Pop the scope so that we emit cleanups.
+  std::move(scope).popAtEndOfScope(&*builder.getInsertionPoint());
 
   // Delete the load
   li->eraseFromParent();
@@ -224,7 +226,7 @@ namespace {
 
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
-  using BlockSet = BasicBlockSetVector<16>;
+  using BlockSet = BasicBlockSetVector;
   using BlockToInstMap = llvm::DenseMap<SILBasicBlock *, SILInstruction *>;
 
   // Use a priority queue keyed on dominator tree level so that inserted nodes
@@ -707,10 +709,6 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
           worklist.push_back(child);
     }
   }
-
-  LLVM_DEBUG(llvm::dbgs() << "*** Found: " << phiBlocks.size()
-                          << " new PHIs\n");
-  NumPhiPlaced += phiBlocks.size();
 
   // At this point we calculated the locations of all of the new Phi values.
   // Next, add the Phi values and promote all of the loads and stores into the

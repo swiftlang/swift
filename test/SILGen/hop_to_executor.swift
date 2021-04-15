@@ -14,7 +14,7 @@ actor MyActor {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC14throwingCalleeyySiYaKF : $@convention(method) @async (Int, @guaranteed MyActor) -> @error Error {
-  // CHECK-NOT:   hop_to_executor
+  // CHECK-NOT:   hop_to_executor{{ }}
   // CHECK:     } // end sil function '$s4test7MyActorC14throwingCalleeyySiYaKF'
   nonisolated func throwingCallee(_ x: Int) async throws {
     print(x)
@@ -171,7 +171,7 @@ struct BlueActor {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test5redFnyySiF : $@convention(thin) (Int) -> () {
-// CHECK-NOT: hop_to_executor
+// CHECK-NOT: hop_to_executor{{ }}
 // CHECK: } // end sil function '$s4test5redFnyySiF'
 @RedActor func redFn(_ x : Int) {}
 

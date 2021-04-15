@@ -542,7 +542,7 @@ extension String {
       if _fastPath(smol.isASCII) {
         self = String(_StringGuts(smol))
       } else {
-        //We succeeded in making a _SmallString, but may need to repair UTF8
+        // We succeeded in making a _SmallString, but may need to repair UTF8
         self = smol.withUTF8 { String._fromUTF8Repairing($0).result }
       }
       return

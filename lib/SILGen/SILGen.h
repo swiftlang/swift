@@ -128,6 +128,7 @@ public:
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
   Optional<FuncDecl*> RunAsyncHandler;
+  Optional<FuncDecl*> CheckExpectedExecutor;
 
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
@@ -500,6 +501,8 @@ public:
   FuncDecl *getRunAsyncHandler();
   /// Retrieve the _Concurrency._runTaskForBridgedAsyncMethod intrinsic.
   FuncDecl *getRunTaskForBridgedAsyncMethod();
+  /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.
+  FuncDecl *getCheckExpectedExecutor();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);

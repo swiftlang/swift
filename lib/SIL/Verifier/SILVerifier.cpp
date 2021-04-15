@@ -36,7 +36,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILVisitor.h"
@@ -668,7 +667,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
-  SILOpenedArchetypesTracker OpenedArchetypes;
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
@@ -917,7 +915,7 @@ public:
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
-        OpenedArchetypes(&F), Dominance(nullptr),
+        Dominance(nullptr),
         InstNumbers(numInstsInFunction(F)), DEBlocks(&F),
         loadBorrowImmutabilityAnalysis(DEBlocks, &F),
         SingleFunction(SingleFunction) {
@@ -948,6 +946,8 @@ public:
   // blocks it would result in quadratic behavior.
   bool properlyDominates(SILInstruction *a, SILInstruction *b) {
     auto aBlock = a->getParent(), bBlock = b->getParent();
+    require(aBlock->getParent() == bBlock->getParent(),
+            "instructions are not in the same function");
 
     // If the blocks are different, it's as easy as whether A's block
     // dominates B's block.
@@ -1035,7 +1035,6 @@ public:
 
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
-    OpenedArchetypes.registerOpenedArchetypes(I);
     checkSILInstruction(I);
 
     // Check the SILLLocation attached to the instruction.
@@ -1111,6 +1110,8 @@ public:
     // Verify some basis structural stuff about an instruction's operands.
     for (auto &operand : I->getAllOperands()) {
       require(operand.get(), "instruction has null operand");
+      require(!isa<PlaceholderValue>(operand.get()),
+              "instruction has placeholder operand");
 
       if (auto *valueI = operand.get()->getDefiningInstruction()) {
         require(valueI->getParent(),
@@ -1328,10 +1329,9 @@ public:
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
       if (auto OpenedA = getOpenedArchetypeOf(A)) {
-        auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
-        require (Def, "Opened archetype should be registered in SILFunction");
-        require(I == nullptr || Def == I ||
-                properlyDominates(cast<SILInstruction>(Def), I),
+        auto *openingInst = F->getModule().getOpenedArchetypeInst(OpenedA);
+        require(I == nullptr || openingInst == I ||
+                properlyDominates(openingInst, I),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -1463,10 +1463,9 @@ public:
         FoundOpenedArchetypes.insert(A);
         // Also check that they are properly tracked inside the current
         // function.
-        auto Def = OpenedArchetypes.getOpenedArchetypeDef(A);
-        require(Def, "Opened archetype should be registered in SILFunction");
-        require(Def == AI ||
-                properlyDominates(cast<SILInstruction>(Def), AI),
+        auto *openingInst = F.getModule().getOpenedArchetypeInst(A);
+        require(openingInst == AI ||
+                properlyDominates(openingInst, AI),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -1498,7 +1497,7 @@ public:
       } else {
         require(isa<SingleValueInstruction>(V),
                 "opened archetype operand should refer to a SIL instruction");
-        auto Archetype = getOpenedArchetypeOf(cast<SingleValueInstruction>(V));
+        auto Archetype = cast<SingleValueInstruction>(V)->getOpenedArchetype();
         require(Archetype,
                 "opened archetype operand should define an opened archetype");
         require(FoundOpenedArchetypes.count(Archetype),
@@ -3412,7 +3411,7 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
 
@@ -3445,7 +3444,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_ref result must be an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
             "SILFunction");
   }
@@ -3467,7 +3466,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box result must be an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
             "Archetype opened by open_existential_box should be registered in "
             "SILFunction");
   }
@@ -3489,7 +3488,7 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box_value result not an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
             "Archetype opened by open_existential_box_value should be "
             "registered in SILFunction");
   }
@@ -3535,7 +3534,7 @@ public:
     require(archetype, "open_existential_metatype result must be an opened "
                        "existential metatype");
     require(
-        OpenedArchetypes.getOpenedArchetypeDef(archetype) == I,
+        I->getModule().getOpenedArchetypeInst(archetype) == I,
         "Archetype opened by open_existential_metatype should be registered in "
         "SILFunction");
   }
@@ -3554,7 +3553,7 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype, "open_existential_value result must be an opened "
                        "existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
             "Archetype opened by open_existential should be registered in "
             "SILFunction");
   }
@@ -3842,8 +3841,8 @@ public:
       SILValue Def;
       if (t->isOpenedExistential()) {
         auto archetypeTy = cast<ArchetypeType>(t);
-        Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
-        require(Def, "Opened archetype should be registered in SILFunction");
+        Def = I->getModule().getOpenedArchetypeInst(archetypeTy);
+        require(Def, "Opened archetype should be registered in SILModule");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam() ||
                 I->getFunction()->hasDynamicSelfMetadata(),
@@ -4789,7 +4788,14 @@ public:
                         "Builtin.Executor in lowered SIL");
     }
   }
-  
+
+  void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    if (EEI->getModule().getStage() == SILStage::Lowered) {
+      require(false,
+              "extract_executor instruction should have been lowered away");
+    }
+  }
+
   void checkObjCProtocolInst(ObjCProtocolInst *OPI) {
     require(OPI->getProtocol()->isObjC(),
             "objc_protocol must be applied to an @objc protocol");
@@ -5449,22 +5455,6 @@ public:
     }
   }
 
-  void verifyOpenedArchetypes(SILFunction *F) {
-    require(OpenedArchetypes.getFunction() == F,
-           "Wrong SILFunction provided to verifyOpenedArchetypes");
-    // Check that definitions of all opened archetypes from
-    // OpenedArchetypesDefs are existing instructions
-    // belonging to the function F.
-    for (auto KV: OpenedArchetypes.getOpenedArchetypeDefs()) {
-      require(getOpenedArchetypeOf(CanType(KV.first)),
-              "Only opened archetypes should be registered in SILFunction");
-      auto Def = cast<SILInstruction>(KV.second);
-      require(Def->getFunction() == F, 
-              "Definition of every registered opened archetype should be an"
-              " existing instruction in a current SILFunction");
-    }
-  }
-
   /// This pass verifies that there are no hole in debug scopes at -Onone.
   void verifyDebugScopeHoles(SILBasicBlock *BB) {
     if (!VerifyDIHoles)
@@ -5625,11 +5615,6 @@ public:
     verifyBranches(F);
 
     visitSILBasicBlocks(F);
-
-    // Verify archetypes after all basic blocks are visited,
-    // because we build the map of archetypes as we visit the
-    // instructions.
-    verifyOpenedArchetypes(F);
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !F->getModule().getASTContext().hadError()) {
