@@ -6769,6 +6769,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   bool Failable, SourceLoc FailabilityLoc,
+                  bool Async, SourceLoc AsyncLoc,
                   bool Throws, SourceLoc ThrowsLoc,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
@@ -6776,8 +6777,10 @@ public:
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
-                 SourceLoc constructorLoc, bool failable,
-                 SourceLoc failabilityLoc, bool throws, SourceLoc throwsLoc,
+                 SourceLoc constructorLoc, 
+                 bool failable, SourceLoc failabilityLoc, 
+                 bool async, SourceLoc asyncLoc,
+                 bool throws, SourceLoc throwsLoc,
                  ParameterList *bodyParams, GenericParamList *genericParams,
                  DeclContext *parent);
 

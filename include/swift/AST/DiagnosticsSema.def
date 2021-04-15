@@ -2605,12 +2605,8 @@ ERROR(override_dynamic_self_mismatch,none,
 ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
-ERROR(override_throws,none,
-      "cannot override non-throwing %select{method|initializer}0 with "
-      "throwing %select{method|initializer}0", (bool))
-// TODO: this really could be merged with the above.
 ERROR(override_with_more_effects,none,
-      "cannot override non-'%1' %0 with '%1' %0",
+      "cannot override non-%1 %0 with %1 %0",
       (DescriptiveDeclKind, StringRef))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
@@ -3903,6 +3899,11 @@ ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
+ERROR(implicit_async_super_init,none,
+      "missing call to superclass's initializer; "
+      "'super.init' is 'async' and requires an explicit call",
+      ())
+
 WARNING(if_always_true,none,
         "'if' condition is always true", ())
 WARNING(while_always_true,none,
@@ -4285,7 +4286,7 @@ NOTE(note_add_globalactor_to_function,none,
      (StringRef, DescriptiveDeclKind, DeclName, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
 ERROR(not_objc_function_async,none,
-      "'async' function cannot be represented in Objective-C", ())
+      "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
 ERROR(actor_isolated_objc,none,

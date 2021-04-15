@@ -535,6 +535,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto *ctorDecl =
     new (C) ConstructorDecl(name, enumDecl->getLoc(),
                             /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
+                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramPL,
                             /*GenericParams=*/nullptr, enumDecl);
@@ -1305,6 +1306,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(),
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), emptyPL,
       /*GenericParams=*/nullptr, structDecl);
 
@@ -1432,6 +1434,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(),
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
       /*GenericParams=*/nullptr, structDecl);
 
@@ -4132,9 +4135,11 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            clangNode, AccessLevel::Public, ctorName, loc, /*failable=*/false,
-            /*FailabilityLoc=*/SourceLoc(), /*Throws=*/false,
-            /*ThrowsLoc=*/SourceLoc(), bodyParams, genericParams, dc);
+            clangNode, AccessLevel::Public, ctorName, loc, 
+            /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
+            bodyParams, genericParams, dc);
       } else {
         auto resultTy = importedType.getType();
 
@@ -6514,6 +6519,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(),
       failable, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), parameterList,
       /*GenericParams=*/nullptr, dc);
   result->setImplicitlyUnwrappedOptional(isIUO);
@@ -6998,6 +7004,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
       /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), bodyParams,
       /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
