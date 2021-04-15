@@ -4540,7 +4540,7 @@ prev_dynamic_function_ref
   // $@convention(thin) T -> U must be a thin function type
   // %1 has type $T -> U
 
-Creates a reference to a previous implemenation of a `dynamic_replacement` SIL
+Creates a reference to a previous implementation of a `dynamic_replacement` SIL
 function.
 
 For the following Swift code::
