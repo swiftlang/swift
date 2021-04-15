@@ -67,7 +67,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
     if let value = value {
       if state.terminal == nil {
         state.pending.append(value)
-        if state.pending.count > state.limit + 1 {
+        if state.limit < .max && state.pending.count > state.limit + 1 {
           state.pending.remove(at: 0)
         }
       }
