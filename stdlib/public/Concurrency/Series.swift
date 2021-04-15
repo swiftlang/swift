@@ -38,6 +38,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
     var continuation: Builtin.RawUnsafeContinuation?
     var pending = [Element]()
     var terminal: Terminal?
+    var onCancel: (@Sendable () -> Void)?
     let limit: Int
 
     init(limit: Int) {
@@ -52,17 +53,33 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
   }
 
   private func lock() {
-    let ptr = 
+    let ptr =
       UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
     _lock(ptr)
   }
 
   private func unlock() {
-    let ptr = 
+    let ptr =
       UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
     _unlock(ptr)
   }
-
+  
+  var onCancel: (@Sendable () -> Void)? {
+    get {
+      lock()
+      let handler = state.onCancel
+      unlock()
+      return handler
+    }
+    set {
+      lock()
+      withExtendedLifetime(state.onCancel) {
+        state.onCancel = newValue
+        unlock()
+      }
+    }
+  }
+  
   private func enqueue(_ value: __owned Element?) {
     if let value = value {
       if state.terminal == nil {
@@ -71,6 +88,15 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
           state.pending.remove(at: 0)
         }
       }
+    } else {
+      terminate()
+    }
+  }
+  
+  private func terminate(error: __owned Failure? = nil) {
+    state.onCancel = nil
+    if let failure = error {
+      state.terminal = .failed(failure)
     } else {
       state.terminal = .finished
     }
@@ -93,8 +119,10 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
         state.continuation = nil
         let continuation =
           unsafeBitCast(raw, to: UnsafeContinuation<Element?, Error>.self)
-        state .terminal = .finished
-        unlock()
+        withExtendedLifetime((state.onCancel, state.terminal)) {
+          terminate()
+          unlock()
+        }
         switch terminal {
         case .finished:
           continuation.resume(returning: nil)
@@ -129,8 +157,10 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
         state.continuation = nil
         let continuation =
           unsafeBitCast(raw, to: UnsafeContinuation<Element?, Never>.self)
-        state .terminal = .finished
-        unlock()
+        withExtendedLifetime((state.onCancel, state.terminal)) {
+          terminate()
+          unlock()
+        }
         switch terminal {
         case .finished:
           continuation.resume(returning: nil)
@@ -151,20 +181,24 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
   func yield(throwing error: __owned Failure) {
     lock()
     if let raw = state.continuation {
-      state.terminal = .finished
       state.continuation = nil
       let continuation =
         unsafeBitCast(raw, to: UnsafeContinuation<Element?, Error>.self)
-      unlock()
+      withExtendedLifetime((state.onCancel, state.terminal)) {
+        terminate()
+        unlock()
+      }
       continuation.resume(throwing: error)
     } else {
-      state.terminal = .failed(error)
-      unlock()
+      withExtendedLifetime((state.onCancel, state.terminal)) {
+        terminate(error: error)
+        unlock()
+      }
     }
   }
   
   func next(_ continuation: UnsafeContinuation<Element?, Never>) {
-    let raw = 
+    let raw =
       unsafeBitCast(continuation, to: Builtin.RawUnsafeContinuation.self)
 
     lock()
@@ -175,8 +209,10 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
         unlock()
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
-        state .terminal = .finished
-        unlock()
+        withExtendedLifetime((state.onCancel, state.terminal)) {
+          terminate()
+          unlock()
+        }
         switch terminal {
         case .finished:
           continuation.resume(returning: nil)
@@ -194,7 +230,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
   }
   
   func next(_ continuation: UnsafeContinuation<Element?, Error>) {
-    let raw = 
+    let raw =
       unsafeBitCast(continuation, to: Builtin.RawUnsafeContinuation.self)
 
     lock()
@@ -205,8 +241,10 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
         unlock()
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
-        state .terminal = .finished
-        unlock()
+        withExtendedLifetime((state.onCancel, state.terminal)) {
+          terminate()
+          unlock()
+        }
         switch terminal {
         case .finished:
           continuation.resume(returning: nil)
@@ -231,7 +269,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
         UnsafeRawPointer.self
     )
     
-    let state = 
+    let state =
       UnsafeMutablePointer<State>(Builtin.addressof(&storage.state))
     state.initialize(to: State(limit: limit))
     let ptr = UnsafeRawPointer(
@@ -302,6 +340,15 @@ public struct Series<Element> {
     public func finish() {
       storage.yield(nil)
     }
+
+    public var onCancel: (@Sendable () -> Void)? {
+      get {
+        return storage.onCancel
+      }
+      nonmutating set {
+        storage.onCancel = newValue
+      }
+    }
   }
 
   let produce: (UnsafeContinuation<Element?, Never>) -> Void
@@ -330,6 +377,7 @@ public struct Series<Element> {
     let storage: _SeriesBufferedStorage<Element, Never> = .create(limit: limit)
     produce = storage.next
     cancel = {
+      storage.onCancel?()
       storage.yield(nil)
     }
     build(YieldingContinuation(storage: storage))
@@ -407,6 +455,15 @@ public struct ThrowingSeries<Element> {
         storage.yield(nil)
       }
     }
+
+    public var onCancel: (@Sendable () -> Void)? {
+      get {
+        return storage.onCancel
+      }
+      set {
+        storage.onCancel = newValue
+      }
+    }
   }
 
   let produce: (UnsafeContinuation<Element?, Error>) -> Void
@@ -420,6 +477,7 @@ public struct ThrowingSeries<Element> {
     let storage: _SeriesBufferedStorage<Element, Error> = .create(limit: limit)
     produce = storage.next
     cancel = {
+      storage.onCancel?()
       storage.yield(nil)
     }
     build(YieldingContinuation(storage: storage))
