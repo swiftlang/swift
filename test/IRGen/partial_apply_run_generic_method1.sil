@@ -16,7 +16,7 @@ import Swift
 import SwiftShims
 
 // CHECK-LL-LABEL: define hidden swiftcc void @call_generic_function
-//       CHECK-LL:   call swiftcc void @"$sTA"
+//       CHECK-LL:   call swiftcc void{{(.*)}} @"$sTA
 sil hidden [ossa] @call_generic_function : $@convention(thin) <On, T where On : C> (@guaranteed On, @in_guaranteed T) -> @out T {
 bb0(%out : $*T, %on_guaranteed : @guaranteed $On, %in : $*T):
   %on = copy_value %on_guaranteed : $On
