@@ -133,12 +133,10 @@ void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
 void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
                                              llvm::Value *actor,
                                              Explosion &out) {
-  unsigned flags = unsigned(ExecutorRefFlags::DefaultActor);
-
+  // The implementation word of a default actor is just a null pointer.
   llvm::Value *identity =
     IGF.Builder.CreatePtrToInt(actor, IGF.IGM.ExecutorFirstTy);
-  llvm::Value *impl =
-    llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, flags);
+  llvm::Value *impl = llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, 0);
 
   out.add(identity);
   out.add(impl);
@@ -149,6 +147,8 @@ void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
                                                CanType executorType,
                                        ProtocolConformanceRef executorConf,
                                                Explosion &out) {
+  // The implementation word of an "ordinary" serial executor is
+  // just the witness table pointer with no flags set.
   llvm::Value *identity =
     IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
   llvm::Value *impl =

@@ -2187,17 +2187,6 @@ enum class ContinuationStatus : size_t {
   Resumed = 2
 };
 
-/// Flags describing the executor implementation that are stored
-/// in the ExecutorRef.
-enum class ExecutorRefFlags : size_t {
-  // The number of bits available here is very limited because it's
-  // potentially just the alignment bits of a protocol witness table
-  // pointer
-
-  /// The executor is a default actor.
-  DefaultActor = 0x1
-};
-
 } // end namespace swift
 
 #endif // SWIFT_ABI_METADATAVALUES_H

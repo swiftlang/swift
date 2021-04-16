@@ -29,24 +29,36 @@ class DefaultActor;
 class Job;
 class SerialExecutorWitnessTable;
 
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-Metadata* MainActorMetadata;
-
 /// An unmanaged reference to an executor.
 ///
-/// The representation is two words: identity and implementation.
-/// The identity word is a reference to the executor object; for
-/// default actors, this is the actor object.  The implementation
-/// word describes how the executor works; it carries a witness table
-/// as well as a small number of bits indicating various special
-/// implementation properties.  As an exception to both of these
-/// rules, a null identity represents a generic executor and
-/// implies a null implementation word.
+/// This type corresponds to the type Optional<Builtin.Executor> in
+/// Swift.  The representation of nil in Optional<Builtin.Executor>
+/// aligns with what this type calls the generic executor, so the
+/// notional subtype of this type which is never generic corresponds
+/// to the type Builtin.Executor.
+///
+/// An executor reference is divided into two pieces:
+///
+/// - The identity, which is just a (potentially ObjC) object
+///   reference; when this is null, the reference is generic.
+///   Equality of executor references is based solely on equality
+///   of identity.
+///
+/// - The implementation, which is an optional reference to a
+///   witness table for the SerialExecutor protocol.  When this
+///   is null, but the identity is non-null, the reference is to
+///   a default actor.  The low bits of the implementation pointer
+///   are reserved for the use of marking interesting properties
+///   about the executor's implementation.  The runtime masks these
+///   bits off before accessing the witness table, so setting them
+///   in the future should back-deploy as long as the witness table
+///   reference is still present.
 class ExecutorRef {
   HeapObject *Identity; // Not necessarily Swift reference-countable
   uintptr_t Implementation;
 
+  // We future-proof the ABI here by masking the low bits off the
+  // implementation pointer before using it as a witness table.
   enum: uintptr_t {
     WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
   };
@@ -67,7 +79,7 @@ public:
   /// for it.
   static ExecutorRef forDefaultActor(DefaultActor *actor) {
     assert(actor);
-    return ExecutorRef(actor, unsigned(ExecutorRefFlags::DefaultActor));
+    return ExecutorRef(actor, 0);
   }
 
   HeapObject *getIdentity() const {
@@ -81,7 +93,7 @@ public:
 
   /// Is this a default-actor executor reference?
   bool isDefaultActor() const {
-    return Implementation & unsigned(ExecutorRefFlags::DefaultActor);
+    return !isGeneric() && Implementation == 0;
   }
   DefaultActor *getDefaultActor() const {
     assert(isDefaultActor());
