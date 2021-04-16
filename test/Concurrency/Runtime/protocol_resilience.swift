@@ -3,7 +3,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_protocol)) -Xfrontend -enable-experimental-concurrency -enable-library-evolution %S/Inputs/resilient_protocol.swift -emit-module -emit-module-path %t/resilient_protocol.swiftmodule -module-name resilient_protocol
 // RUN: %target-codesign %t/%target-library-name(resilient_protocol)
 
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -lresilient_protocol -I %t -L %t -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift -parse-as-library -Xfrontend -enable-experimental-concurrency %s -lresilient_protocol -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_protocol)
@@ -60,20 +60,21 @@ func genericWait<T : Awaitable>(orThrow: Bool, _ t: T) async throws {
   return try await t.wait(orThrow: orThrow)
 }
 
-var AsyncProtocolRequirementSuite = TestSuite("ResilientProtocol")
+@main struct Main {
+  static func main() async {
+    var AsyncProtocolRequirementSuite = TestSuite("ResilientProtocol")
 
-AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
-  runAsyncAndBlock {
-    let x = IntAwaitable()
+    AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
+      let x = IntAwaitable()
 
-    await genericWaitForNothing(x)
+      await genericWaitForNothing(x)
 
-    expectEqual(123, await genericWait(x))
-    expectEqual(321, await genericWaitForInt(x))
+      expectEqual(123, await genericWait(x))
+      expectEqual(321, await genericWaitForInt(x))
 
-    expectNil(try? await genericWait(orThrow: true, x))
-    try! await genericWait(orThrow: false, x)
+      expectNil(try? await genericWait(orThrow: true, x))
+      try! await genericWait(orThrow: false, x)
+    }
+    await runAllTestsAsync()
   }
 }
-
-runAllTests()
