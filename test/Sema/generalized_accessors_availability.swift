@@ -110,3 +110,42 @@ func testInferredAvailability(x: inout LessAvailable) { // expected-error {{'Les
     x.nested.$wrapped_modify_more_available = 0
   }
 }
+
+@propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(wrappedValue: Value) { self.stored = wrappedValue }
+
+  @available(*, unavailable)
+  var wrappedValue: Value {
+    get { fatalError() }
+    set { fatalError() }
+  }
+
+  static subscript<EnclosingSelf>(
+    _enclosingInstance observed: EnclosingSelf,
+    wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+    storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+  ) -> Value {
+    get { observed[keyPath: storageKeyPath].stored }
+    set { observed[keyPath: storageKeyPath].stored = newValue }
+  }
+}
+
+protocol P {}
+
+class Base<T: P> {
+  @Observable var item: T?
+}
+
+struct Item: P {}
+
+class Subclass: Base<Item> {
+  // Make sure this override isn't incorrectly diagnosed as
+  // unavailable. Wrapper availability inference should infer
+  // availability from the static subscript in this case.
+  override var item: Item? {
+    didSet {}
+  }
+}
