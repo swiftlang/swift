@@ -349,6 +349,61 @@ SequenceTypeTests.test("enumerated()/RandomAccessCollection") {
 }
 
 //===----------------------------------------------------------------------===//
+// indexed()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeTests.test("indexed/Collection") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+
+  for test in indexedTests {
+    let s = MinimalCollection<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    var result = s.indexed()
+    expectType(Indexed<MinimalCollection<OpaqueValue<Int>>>.self, &result)
+    
+    checkCollection(
+      test.expected,
+      result,
+      resiliencyChecks: .none,
+      sameValue: { $0.0 == $1.0.position && $0.1 == $1.1.value })
+  }
+}
+
+SequenceTypeTests.test("indexed/BidirectionalCollection") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+
+  for test in indexedTests {
+    let s = MinimalBidirectionalCollection<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    var result = s.indexed()
+    expectType(Indexed<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self, &result)
+    
+    checkBidirectionalCollection(
+      test.expected,
+      result,
+      resiliencyChecks: .none,
+      sameValue: { $0.0 == $1.0.position && $0.1 == $1.1.value })
+  }
+}
+
+SequenceTypeTests.test("indexed/RandomAccessCollection") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+
+  for test in indexedTests {
+    let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    var result = s.indexed()
+    expectType(Indexed<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self, &result)
+    
+    checkRandomAccessCollection(
+      test.expected,
+      result,
+      resiliencyChecks: .none,
+      sameValue: { $0.0 == $1.0.position && $0.1 == $1.1.value })
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // starts(with:)
 //===----------------------------------------------------------------------===//
 
