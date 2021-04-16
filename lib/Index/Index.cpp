@@ -16,6 +16,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -439,6 +440,57 @@ private:
     return true;
   }
 
+  /// Extensions redeclare all generic parameters of their extended type to add
+  /// their additional restrictions. There are two issues with this model for
+  /// indexing:
+  ///  - The generic paramter declarations of the extension are implicit so we
+  ///    wouldn't report them in the index. Any usage of the generic param in
+  ///    the extension references this implicit declaration so we don't include
+  ///    it in the index either.
+  ///  - The implicit re-declarations have their own USRs so any usage of a
+  ///    generic parameter inside an extension would use a different USR than
+  ///    declaration of the param in the extended type.
+  ///
+  /// To fix these issues, we replace the reference to the implicit generic
+  /// parameter defined in the extension by a reference to the generic paramter
+  /// defined in the extended type.
+  ///
+  /// \returns the canonicalized replaced generic param decl if it can be found
+  ///          or \p GenParam otherwise.
+  ValueDecl *
+  canonicalizeGenericTypeParamDeclForIndex(GenericTypeParamDecl *GenParam) {
+    auto Extension = dyn_cast_or_null<ExtensionDecl>(
+        GenParam->getDeclContext()->getAsDecl());
+    if (!Extension) {
+      // We are not referencing a generic paramter defined in an extension.
+      // Nothing to do.
+      return GenParam;
+    }
+    assert(GenParam->isImplicit() &&
+           "Generic param decls in extension should always be implicit and "
+           "shadow a generic param in the extended type.");
+    assert(Extension->getExtendedNominal() &&
+           "The implict generic types on the extension should only be created "
+           "if the extended type was found");
+
+    auto ExtendedTypeGenSig =
+        Extension->getExtendedNominal()->getGenericSignature();
+    assert(ExtendedTypeGenSig && "Extension is generic but extended type not?");
+
+    // The generic parameter in the extension has the same depths and index
+    // as the one in the extended type.
+    for (auto ExtendedTypeGenParam : ExtendedTypeGenSig->getGenericParams()) {
+      if (ExtendedTypeGenParam->getIndex() == GenParam->getIndex() &&
+          ExtendedTypeGenParam->getDepth() == GenParam->getDepth()) {
+        assert(ExtendedTypeGenParam->getDecl() &&
+               "The generic parameter defined on the extended type cannot be "
+               "implicit.");
+        return ExtendedTypeGenParam->getDecl();
+      }
+    }
+    llvm_unreachable("Can't find the generic parameter in the extended type");
+  }
+
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
@@ -455,6 +507,11 @@ private:
     if (CtorTyRef)
       if (!reportRef(CtorTyRef, Loc, Info, Data.AccKind))
         return false;
+
+    if (auto *GenParam = dyn_cast<GenericTypeParamDecl>(D)) {
+      D = canonicalizeGenericTypeParamDeclForIndex(GenParam);
+    }
+
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
 
