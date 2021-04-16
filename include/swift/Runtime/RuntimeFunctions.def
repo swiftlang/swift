@@ -1678,7 +1678,12 @@ FUNCTION(DefaultActorDeallocateResilient,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// THE RUNTIME FUNCTION
+/// void swift_asyncLet_start(
+///     AsyncLet *alet,
+///     const Metadata *futureResultType,
+///     void *closureEntryPoint,
+///     HeapObject *closureContext
+/// );
 FUNCTION(AsyncLetStart,
          swift_asyncLet_start, SwiftCC,
          ConcurrencyAvailability,
