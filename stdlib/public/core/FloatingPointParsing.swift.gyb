@@ -56,12 +56,11 @@ extension ${Self}: LosslessStringConvertible {
   /// hexadecimal format or special floating-point values for infinity and NaN
   /// ("not a number").
   ///
-  /// The given string may begin with a plus or minus sign character (`+` or
-  /// `-`). The allowed formats for each of these representations is then as
-  /// follows:
+  /// The `text` string may begin with a plus or minus sign character (`+` or
+  /// `-`) followed by one of the following formats:
   ///
-  /// - A *decimal value* contains the significand, a sequence of decimal
-  ///   digits that may include a decimal point.
+  /// - A *decimal value* contains a significand consisting of one
+  ///   or more decimal digits that may include a decimal point:
   ///
   ///       let c = ${Self}("-1.0")
   ///       // c == -1.0
@@ -78,15 +77,35 @@ extension ${Self}: LosslessStringConvertible {
   ///       let e = ${Self}("2837.5e-2")
   ///       // e == 28.375
   ///
-  /// - A *hexadecimal value* contains the significand, either `0X` or `0x`,
-  ///   followed by a sequence of hexadecimal digits. The significand may
+  ///   A decimal string is converted into a correctly-rounded ${Self}
+  ///   value using IEEE 754 round-to-nearest
+  ///   conventions. Very small values will be converted to positive or
+  ///   negative zero, very large values will be converted
+  ///   to plus or minus infinity.
+  ///
+  ///       let y = ${Self}("1.23e-9999")
+  ///       // y == 0.0
+  ///       // y?.sign == .plus
+  ///
+  ///       let z = ${Self}("-7.89e-7206")
+  ///       // z == -0.0
+  ///       // z?.sign == .minus
+  ///
+  ///       let r = ${Self}("1.23e17802")
+  ///       // r == ${Self}.infinity
+  ///
+  ///       let s = ${Self}("-7.89e7206")
+  ///       // s == ${Self}.-infinity
+  ///
+  /// - A *hexadecimal value* contains a significand consisting of
+  //    `0X` or `0x` followed by one or more hexadecimal digits that may
   ///   include a decimal point.
   ///
   ///       let f = ${Self}("0x1c.6")
   ///       // f == 28.375
   ///
-  ///   A hexadecimal value may also include an exponent following the
-  ///   significand, indicating the power of 2 by which the significand should
+  ///   A hexadecimal value may also include an exponent
+  ///   indicating the power of 2 by which the significand should
   ///   be multiplied. If included, the exponent is separated by a single
   ///   character, `p` or `P`, and consists of an optional plus or minus sign
   ///   character and a sequence of decimal digits.
@@ -94,8 +113,13 @@ extension ${Self}: LosslessStringConvertible {
   ///       let g = ${Self}("0x1.c6p4")
   ///       // g == 28.375
   ///
-  /// - A value of *infinity* contains one of the strings `"inf"` or
-  ///   `"infinity"`, case insensitive.
+  ///   As with decimal strings, hexadecimal strings are converted
+  ///   to the closest ${Self} value to the real number.  Very small
+  ///   or very large values are converted to plus or minus zero or plus
+  ///   or minus infinity.
+  ///
+  /// - The input strings `"inf"` or `"infinity"` (case insensitive)
+  ///   are converted to an infinite result:
   ///
   ///       let i = ${Self}("inf")
   ///       // i == ${Self}.infinity
@@ -103,7 +127,8 @@ extension ${Self}: LosslessStringConvertible {
   ///       let j = ${Self}("-Infinity")
   ///       // j == -${Self}.infinity
   ///
-  /// - A value of *NaN* contains the string `"nan"`, case insensitive.
+  /// - An input string of `"nan"` (case insensitive) is converted
+  ///   into a *NaN* value:
   ///
   ///       let n = ${Self}("-nan")
   ///       // n?.isNaN == true
@@ -120,18 +145,16 @@ extension ${Self}: LosslessStringConvertible {
   ///       // p?.isNaN == true
   ///       // String(p!) == "nan(0x10)"
   ///
-  /// Passing any other format or any additional characters as `text` results
-  /// in `nil`. For example, the following conversions result in `nil`:
+  /// - A value in any other format or containing additional characters
+  ///   results in a `nil` value. For example, the following conversions
+  ///   result in `nil`:
   ///
-  ///     ${Self}(" 5.0")      // Includes whitespace
-  ///     ${Self}("±2.0")      // Invalid character
-  ///     ${Self}("0x1.25e4")  // Incorrect exponent format
+  ///       ${Self}(" 5.0")      // Includes whitespace
+  ///       ${Self}("±2.0")      // Invalid character
+  ///       ${Self}("0x1.25e4")  // Incorrect exponent format
   ///
-  /// - Parameter text: The input string to convert to a `${Self}` instance. If
-  ///   `text` has invalid characters or is in an invalid format, the result is
-  ///   `nil`.  If the input is valid but the parsed value would be too small
-  ///   or large for the type, the result will be a zero or infinity with the
-  ///   appropriate sign.
+  /// - Parameter text: The input string to convert to a `${Self}?` instance.
+  ///   The value will be `nil` if the input is incorrectly formatted.
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
   %if bits == 16:
