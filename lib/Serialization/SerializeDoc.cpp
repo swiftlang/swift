@@ -247,7 +247,7 @@ public:
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
     for (auto C : data.Raw.Comments) {
-      writer.write<uint32_t>(C.StartColumn);
+      writer.write<uint32_t>(C.ColumnIndent);
       writer.write<uint32_t>(C.RawText.size());
       out << C.RawText;
     }

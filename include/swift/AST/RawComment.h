@@ -34,12 +34,10 @@ struct SingleRawComment {
   StringRef RawText;
 
   unsigned Kind : 8;
-  unsigned StartColumn : 16;
-  unsigned StartLine;
-  unsigned EndLine;
+  unsigned ColumnIndent : 16;
 
   SingleRawComment(CharSourceRange Range, const SourceManager &SourceMgr);
-  SingleRawComment(StringRef RawText, unsigned StartColumn);
+  SingleRawComment(StringRef RawText, unsigned ColumnIndent);
 
   SingleRawComment(const SingleRawComment &) = default;
   SingleRawComment &operator=(const SingleRawComment &) = default;
