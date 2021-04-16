@@ -4340,8 +4340,33 @@ bool ConstraintSystem::repairFailures(
     // as a narrow exception to SE-0110, see `matchFunctionTypes`.
     //
     // But if `T.Element` didn't get resolved to `Void` we'd like
-    // to diagnose this as a missing argument which can't be ignored.
+    // to diagnose this as a missing argument which can't be ignored or
+    // a tuple is trying to be inferred as a tuple for destructuring but
+    // contextual argument does not match(in this case we remove the extra
+    // closure arguments).
     if (arg != getTypeVariables().end()) {
+      if (auto argToParamElt =
+              path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
+        auto loc = getConstraintLocator(anchor, path);
+        auto closureAnchor =
+            getAsExpr<ClosureExpr>(simplifyLocatorToAnchor(loc));
+        if (rhs->is<TupleType>() && closureAnchor &&
+            closureAnchor->getParameters()->size() > 1) {
+          auto callee = getCalleeLocator(loc);
+          if (auto overload = findSelectedOverloadFor(callee)) {
+            auto fnType =
+                simplifyType(overload->openedType)->castTo<FunctionType>();
+            auto paramIdx = argToParamElt->getParamIdx();
+            auto paramType = fnType->getParams()[paramIdx].getParameterType();
+            if (auto paramFnType = paramType->getAs<FunctionType>()) {
+              conversionsOrFixes.push_back(RemoveExtraneousArguments::create(
+                  *this, paramFnType, {}, loc));
+              break;
+            }
+          }
+        }
+      }
+
       conversionsOrFixes.push_back(AddMissingArguments::create(
           *this, {SynthesizedArg{0, AnyFunctionType::Param(*arg)}},
           getConstraintLocator(anchor, path)));
@@ -11228,7 +11253,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
   case FixKind::AllowAlwaysSucceedCheckedCast:
-  case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype: {
+  case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
+  case FixKind::RemoveExtraneousArguments: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -11377,7 +11403,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
-  case FixKind::RemoveExtraneousArguments:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
