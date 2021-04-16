@@ -79,8 +79,8 @@ extension ${Self}: LosslessStringConvertible {
   ///
   ///   A decimal string is converted into a correctly-rounded ${Self}
   ///   value using IEEE 754 round-to-nearest
-  ///   conventions. Very small values will be converted to positive or
-  ///   negative zero, very large values will be converted
+  ///   conventions. Very small values are converted to positive or
+  ///   negative zero, very large values are converted
   ///   to plus or minus infinity.
   ///
   ///       let y = ${Self}("1.23e-9999")
