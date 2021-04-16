@@ -41,6 +41,46 @@ class Pattern;
 class SourceManager;
 class ProtocolConformance;
 
+/// This specifies the purpose of the contextual type, when specified to
+/// typeCheckExpression.  This is used for diagnostic generation to produce more
+/// specified error messages when the conversion fails.
+///
+enum ContextualTypePurpose : uint8_t {
+  CTP_Unused,           ///< No contextual type is specified.
+  CTP_Initialization,   ///< Pattern binding initialization.
+  CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
+  CTP_ReturnSingleExpr, ///< Value implicitly returned from a function.
+  CTP_YieldByValue,     ///< By-value yield operand.
+  CTP_YieldByReference, ///< By-reference yield operand.
+  CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
+  CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
+  CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
+
+  /// Default value in @autoclosure parameter
+  /// 'foo(a : @autoclosure () -> Int = 42)'.
+  CTP_AutoclosureDefaultParameter,
+
+  CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
+  CTP_CallArgument,     ///< Call to function or operator requires type.
+  CTP_ClosureResult,    ///< Closure result expects a specific type.
+  CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
+  CTP_DictionaryKey,    ///< DictionaryExpr keys should have a specific type.
+  CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
+  CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
+  CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
+  CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
+                             ///< result type.
+  CTP_Condition,        ///< Condition expression of various statements e.g.
+                        ///< `if`, `for`, `while` etc.
+  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
+                        ///< is expected to conform to 'Sequence' protocol.
+  CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
+  CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
+                               ///< former 'wrappedValue' type
+
+  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
+};
+
 namespace constraints {
 
 class ConstraintSystem;
@@ -823,6 +863,25 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ImplicitConversion;
+  }
+};
+
+class LocatorPathElt::ContextualType final : public StoredIntegerElement<1> {
+public:
+  ContextualType(ContextualTypePurpose purpose)
+      : StoredIntegerElement(ConstraintLocator::ContextualType,
+                             static_cast<unsigned>(purpose)) {}
+
+  ContextualTypePurpose getPurpose() const {
+    return static_cast<ContextualTypePurpose>(getValue());
+  }
+
+  bool isFor(ContextualTypePurpose purpose) const {
+    return getPurpose() == purpose;
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ContextualType;
   }
 };
 

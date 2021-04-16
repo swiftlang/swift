@@ -4778,14 +4778,14 @@ bool ConstraintSystem::repairFailures(
     // truth and produce a contextual mismatch instead of  per-branch failure,
     // because it's a better pointer than potential then-to-else type mismatch.
     if (auto contextualType = getContextualType(anchor)) {
+      auto purpose = getContextualTypePurpose(anchor);
       if (contextualType->isEqual(rhs)) {
-        auto *loc =
-            getConstraintLocator(anchor, LocatorPathElt::ContextualType());
+        auto *loc = getConstraintLocator(
+            anchor, LocatorPathElt::ContextualType(purpose));
         if (hasFixFor(loc, FixKind::ContextualMismatch))
           return true;
 
-        if (contextualType->isVoid() &&
-            getContextualTypePurpose(anchor) == CTP_ReturnStmt) {
+        if (contextualType->isVoid() && purpose == CTP_ReturnStmt) {
           conversionsOrFixes.push_back(RemoveReturn::create(*this, lhs, loc));
           break;
         }
@@ -6130,7 +6130,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (auto *Nil = getAsExpr<NilLiteralExpr>(anchor)) {
       auto *fixLocator = getConstraintLocator(
           getContextualType(Nil)
-              ? locator.withPathElement(LocatorPathElt::ContextualType())
+              ? locator.withPathElement(LocatorPathElt::ContextualType(
+                    getContextualTypePurpose(Nil)))
               : locator);
 
       // Here the roles are reversed - `nil` is something we are trying to
@@ -11786,7 +11787,7 @@ void ConstraintSystem::addContextualConversionConstraint(
 
   // Add the constraint.
   auto *convertTypeLocator =
-      getConstraintLocator(expr, LocatorPathElt::ContextualType());
+      getConstraintLocator(expr, LocatorPathElt::ContextualType(purpose));
   addConstraint(constraintKind, getType(expr), conversionType,
                 convertTypeLocator, /*isFavored*/ true);
 }

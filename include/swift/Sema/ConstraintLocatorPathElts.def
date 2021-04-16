@@ -61,7 +61,7 @@ CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)
 
 /// The desired contextual type passed in to the constraint system.
-SIMPLE_LOCATOR_PATH_ELT(ContextualType)
+CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 
 /// A result of an expression involving dynamic lookup.
 SIMPLE_LOCATOR_PATH_ELT(DynamicLookupResult)

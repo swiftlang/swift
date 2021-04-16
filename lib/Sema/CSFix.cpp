@@ -1328,7 +1328,8 @@ bool IgnoreAssignmentDestinationType::diagnose(const Solution &solution,
 
   AssignmentTypeMismatchFailure failure(
       solution, CTP, getFromType(), getToType(),
-      cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
+      cs.getConstraintLocator(AE->getSrc(),
+                              LocatorPathElt::ContextualType(CTP)));
   return failure.diagnose(asNote);
 }
 

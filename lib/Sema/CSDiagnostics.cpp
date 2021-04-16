@@ -6691,8 +6691,9 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
 
     // If there is a contextual mismatch associated with this
     // closure, let's not diagnose any parameter type issues.
-    if (hasFixFor(solution, getConstraintLocator(
-                                closure, LocatorPathElt::ContextualType())))
+    if (hasFixFor(solution,
+                  getConstraintLocator(closure, LocatorPathElt::ContextualType(
+                                                    CTP_Initialization))))
       return false;
 
     if (auto *parentExpr = findParentExpr(closure)) {

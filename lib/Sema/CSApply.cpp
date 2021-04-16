@@ -8343,8 +8343,8 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
 
   // Convert the initializer to the type of the pattern.
   auto &cs = solution.getConstraintSystem();
-  auto locator =
-      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  auto locator = cs.getConstraintLocator(
+      initializer, LocatorPathElt::ContextualType(CTP_Initialization));
   initializer = solution.coerceToType(initializer, initType, locator);
   if (!initializer)
     return None;
