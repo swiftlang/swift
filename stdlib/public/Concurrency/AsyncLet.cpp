@@ -155,9 +155,14 @@ SWIFT_CC(swift)
 static void swift_asyncLet_endImpl(AsyncLet *alet) {
   auto task = alet->getTask();
 
+  // Cancel the task as we exit the scope
+  swift_task_cancel(task);
+
   // Remove the child record from the parent task
   auto record = asImpl(alet)->getTaskRecord();
   swift_task_removeStatusRecord(record);
+
+  // TODO: we need to implicitly await either before the end or here somehow.
 
   // and finally, release the task and free the async-let
   swift_release(task);
