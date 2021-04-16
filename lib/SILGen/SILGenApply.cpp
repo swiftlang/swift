@@ -5769,32 +5769,6 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
   return ManagedValue::forUnmanaged(apply);
 }
 
-ManagedValue SILGenFunction::emitRunChildTask(
-    SILLocation loc, Type functionType, ManagedValue taskFunction) {
-  auto runChildTaskFn = SGM.getRunChildTask();
-
-  Type resultType = functionType->castTo<FunctionType>()->getResult();
-  Type replacementTypes[] = {resultType};
-  auto subs = SubstitutionMap::get(runChildTaskFn->getGenericSignature(),
-                                   replacementTypes,
-                                   ArrayRef<ProtocolConformanceRef>{});
-
-  CanType origParamType = runChildTaskFn->getParameters()->get(0)
-      ->getInterfaceType()->getCanonicalType();
-  CanType substParamType = origParamType.subst(subs)->getCanonicalType();
-
-  // Ensure that the closure has the appropriate type.
-  AbstractionPattern origParam(
-      runChildTaskFn->getGenericSignature().getCanonicalSignature(),
-      origParamType);
-  taskFunction = emitSubstToOrigValue(
-      loc, taskFunction, origParam, substParamType);
-
-  return emitApplyOfLibraryIntrinsic(
-      loc, runChildTaskFn, subs, {taskFunction}, SGFContext()
-    ).getScalarValue();
-}
-
 ManagedValue SILGenFunction::emitCancelAsyncTask(
     SILLocation loc, SILValue task) {
   ASTContext &ctx = getASTContext();

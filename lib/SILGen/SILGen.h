@@ -119,8 +119,6 @@ public:
 
   Optional<ProtocolConformance *> NSErrorConformanceToError;
 
-  Optional<FuncDecl*> RunChildTask;
-
   Optional<FuncDecl*> AsyncLetStart;
   Optional<FuncDecl*> AsyncLetGet;
   Optional<FuncDecl*> AsyncLetGetThrowing;
@@ -496,9 +494,6 @@ public:
   FuncDecl *getAsyncLetGetThrowing();
   /// Retrieve the _Concurrency._asyncLetEnd intrinsic.
   FuncDecl *getEndAsyncLet();
-
-  /// Retrieve the _Concurrency._runChildTask intrinsic.
-  FuncDecl *getRunChildTask();
 
   /// Retrieve the _Concurrency._taskFutureGet intrinsic.
   FuncDecl *getTaskFutureGet();

@@ -1369,9 +1369,6 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
-  ManagedValue emitRunChildTask(
-      SILLocation loc, Type functionType, ManagedValue taskFunction);
-
   ManagedValue emitAsyncLetStart(
       SILLocation loc, Type functionType, ManagedValue taskFunction);
 

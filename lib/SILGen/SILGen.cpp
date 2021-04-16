@@ -355,13 +355,6 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
 }
 
 FuncDecl *
-SILGenModule::getRunChildTask() {
-  return lookupConcurrencyIntrinsic(getASTContext(),
-                                    RunChildTask,
-                                    "_runChildTask");
-}
-
-FuncDecl *
 SILGenModule::getAsyncLetStart() {
   return lookupConcurrencyIntrinsic(getASTContext(),
                                     AsyncLetStart,
