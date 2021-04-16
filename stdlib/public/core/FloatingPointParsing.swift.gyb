@@ -128,8 +128,10 @@ extension ${Self}: LosslessStringConvertible {
   ///     ${Self}("0x1.25e4")  // Incorrect exponent format
   ///
   /// - Parameter text: The input string to convert to a `${Self}` instance. If
-  ///   `text` has invalid characters or is in an invalid format, the result
-  ///   is `nil`.
+  ///   `text` has invalid characters or is in an invalid format, the result is
+  ///   `nil`.  If the input is valid but the parsed value would be too small
+  ///   or large for the type, the result will be a zero or infinity with the
+  ///   appropriate sign.
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
   %if bits == 16:
