@@ -641,7 +641,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       Lines.clear();
 
       StringRef RawText = SRC.RawText.rtrim("\n\r");
-      unsigned WhitespaceToTrim = SRC.StartColumn - 1;
+      unsigned WhitespaceToTrim = SRC.ColumnIndent - 1;
       trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
       for (auto Line : Lines) {
