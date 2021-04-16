@@ -395,3 +395,27 @@ SourceManager::getLocFromExternalSource(StringRef Path, unsigned Line,
     return SourceLoc();
   return getLocForOffset(BufferId, *Offset);
 }
+
+SourceLoc
+SourceManager::getLocForForeignLoc(SourceLoc otherLoc,
+                                   SourceManager &otherMgr) {
+  if (&otherMgr == this || otherLoc.isInvalid())
+    return otherLoc;
+
+  assert(otherMgr.isOwning(otherLoc));
+
+  if (auto otherBufferID = otherMgr.findBufferContainingLocInternal(otherLoc)) {
+    auto offset = otherMgr.getLocOffsetInBuffer(otherLoc, *otherBufferID);
+
+    auto otherBufferName = otherMgr.getIdentifierForBuffer(*otherBufferID);
+    auto thisBufferID = getIDForBufferIdentifier(otherBufferName);
+    if (!thisBufferID) {
+      thisBufferID = addMemBufferCopy(
+              otherMgr.getEntireTextForBuffer(*otherBufferID), otherBufferName);
+    }
+
+    return getLocForOffset(*thisBufferID, offset);
+  }
+
+  return SourceLoc();
+}

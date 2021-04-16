@@ -1051,7 +1051,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                              SemaName.c_str());
   }
 
-  if (!Opts.CompilerArgs.empty()) {
+  if (!Opts.CompilerArgs.empty() ||
+      !Opts.ModuleCachePath.empty() ||
+      Opts.DisableImplicitConcurrencyModuleImport) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
     if (!Opts.ModuleCachePath.empty()) {
       if (compilerArgsAreClang) {
@@ -1069,6 +1071,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
         sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
       }
     }
+    if (Opts.DisableImplicitConcurrencyModuleImport && !compilerArgsAreClang) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+          "-disable-implicit-concurrency-module-import");
+    }
+
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);

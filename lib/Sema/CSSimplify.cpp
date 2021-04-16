@@ -8369,32 +8369,41 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
     return SolutionKind::Unsolved;
   }
 
-  ConstraintFix *fix = nullptr;
+  // If the wrapper type is a hole or a dependent member with no type variables,
+  // don't record a fix, because this indicates that there was an error
+  // elsewhere in the constraint system.
+  if (wrapperType->isPlaceholder() || wrapperType->is<DependentMemberType>())
+    return SolutionKind::Solved;
+
   auto *wrappedVar = getAsDecl<VarDecl>(locator.getAnchor());
   assert(wrappedVar && wrappedVar->hasAttachedPropertyWrapper());
 
   // The wrapper type must be a property wrapper.
   auto *nominal = wrapperType->getDesugaredType()->getAnyNominal();
   if (!(nominal && nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())) {
-    fix = AllowInvalidPropertyWrapperType::create(*this, wrapperType,
-                                                  getConstraintLocator(locator));
+    if (shouldAttemptFixes()) {
+      auto *fix = AllowInvalidPropertyWrapperType::create(
+          *this, wrapperType, getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Error;
   }
 
   auto typeInfo = nominal->getPropertyWrapperTypeInfo();
 
   // Implicit property wrappers must support projected-value initialization.
-  if (!fix && wrappedVar->hasImplicitPropertyWrapper()) {
-    if (!(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
-      fix = RemoveProjectedValueArgument::create(*this, wrapperType, cast<ParamDecl>(wrappedVar),
-                                                 getConstraintLocator(locator));
+  if (wrappedVar->hasImplicitPropertyWrapper() &&
+      !(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
+    if (shouldAttemptFixes()) {
+      auto *fix = RemoveProjectedValueArgument::create(
+          *this, wrapperType, cast<ParamDecl>(wrappedVar), getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
     }
-  }
 
-  if (fix) {
-    if (!shouldAttemptFixes() || recordFix(fix))
-      return SolutionKind::Error;
-
-    return SolutionKind::Solved;
+    return SolutionKind::Error;
   }
 
   auto resolvedType = wrapperType->getTypeOfMember(DC->getParentModule(), typeInfo.valueVar);
@@ -9630,10 +9639,13 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
           return false;
         });
 
-    // If all of the arguments are holes, let's disable all but one
-    // overload to make sure holes don't cause performance problems
-    // because hole could be bound to any type.
-    if (allHoles) {
+    // If this is an operator application and all of the arguments are holes,
+    // let's disable all but one overload to make sure holes don't cause
+    // performance problems because hole could be bound to any type.
+    //
+    // Non-operator calls are exempted because they have fewer overloads,
+    // and it's possible to filter them based on labels.
+    if (allHoles && isOperatorDisjunction(disjunction)) {
       auto choices = disjunction->getNestedConstraints();
       for (auto *choice : choices.slice(1))
         choice->setDisabled();

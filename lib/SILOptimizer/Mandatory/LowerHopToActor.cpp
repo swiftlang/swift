@@ -75,8 +75,7 @@ bool LowerHopToActor::run() {
       SILInstruction *inst = &*ii++;
       if (auto *hop = dyn_cast<HopToExecutorInst>(inst)) {
         changed |= processHop(hop);
-      }
-      if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
+      } else if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
         changed |= processExtract(extract);
       }
     }

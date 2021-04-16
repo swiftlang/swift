@@ -1,4 +1,4 @@
-// RUN: %sourcekitd-test -req=index %s -- -Xfrontend -serialize-diagnostics-path -Xfrontend %t.dia %s | %sed_clean | sed -e 's/key.usr: \".*\"/key.usr: <usr>/g' > %t.response
+// RUN: %sourcekitd-test -req=index %s -- -Xfrontend -serialize-diagnostics-path -Xfrontend %t.dia -Xfrontend -disable-implicit-concurrency-module-import %s | %sed_clean | sed -e 's/key.usr: \".*\"/key.usr: <usr>/g' > %t.response
 // RUN: %diff -u %s.response %t.response
 
 var globV: Int

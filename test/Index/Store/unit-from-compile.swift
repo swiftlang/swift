@@ -16,6 +16,7 @@
 
 // CHECK: DEPEND START
 // CHECK: Unit | system | {{.*}}{{/|\\}}Swift.swiftmodule
-// CHECK: DEPEND END (1)
+// CHECK: Unit | system | _Concurrency
+// CHECK: DEPEND END (2)
 
 // OPT: is-debug: 1

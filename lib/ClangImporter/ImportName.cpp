@@ -1286,6 +1286,7 @@ NameImporter::considerAsyncImport(
 
   // Initializers cannot be 'async'.
   // FIXME: We might eventually allow this.
+  // TODO: should the restriction be lifted in ClangImporter?
   if (isInitializer)
     return notAsync("initializers cannot be async");
 

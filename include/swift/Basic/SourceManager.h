@@ -290,6 +290,11 @@ public:
   bool isLocInVirtualFile(SourceLoc Loc) const {
     return getVirtualFile(Loc) != nullptr;
   }
+
+  /// Return a SourceLoc in \c this corresponding to \p otherLoc, which must be
+  /// owned by \p otherManager. Returns an invalid SourceLoc if it cannot be
+  /// translated.
+  SourceLoc getLocForForeignLoc(SourceLoc otherLoc, SourceManager &otherMgr);
 };
 
 } // end namespace swift
