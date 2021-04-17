@@ -2447,8 +2447,9 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 
   Optional<ContextualTypePurpose> CTP;
   // Easy case were failure has been identified as contextual already.
-  if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
-    CTP = getContextualTypePurpose();
+  if (auto contextualTy =
+          locator->getLastElementAs<LocatorPathElt::ContextualType>()) {
+    CTP = contextualTy->getPurpose();
   } else {
     // Here we need to figure out where where `nil` is located.
     // It could be e.g. an argument to a subscript/call, assignment
