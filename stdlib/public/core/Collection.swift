@@ -899,7 +899,7 @@ extension Collection {
 
     var start = start
     var count = 0
-    while start != end {
+    while start < end {
       count = count + 1
       formIndex(after: &start)
     }
@@ -989,7 +989,7 @@ extension Collection {
 
     var i = i
     for _ in stride(from: 0, to: n, by: 1) {
-      if i == limit {
+      guard i < limit else {
         return nil
       }
       formIndex(after: &i)
@@ -1279,7 +1279,7 @@ extension Collection {
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var start = startIndex
-    while try start != endIndex && predicate(self[start]) {
+    while try start < endIndex && predicate(self[start]) {
       formIndex(after: &start)
     } 
     return self[start..<endIndex]
@@ -1329,7 +1329,7 @@ extension Collection {
     while predicate: (Element) throws -> Bool
   ) rethrows -> SubSequence {
     var end = startIndex
-    while try end != endIndex && predicate(self[end]) {
+    while try end < endIndex && predicate(self[end]) {
       formIndex(after: &end)
     }
     return self[startIndex..<end]
@@ -1552,7 +1552,7 @@ extension Collection {
 
     var subSequenceEnd = subSequenceStart
     let cachedEndIndex = endIndex
-    while subSequenceEnd != cachedEndIndex {
+    while subSequenceEnd < cachedEndIndex {
       if try isSeparator(self[subSequenceEnd]) {
         let didAppend = appendSubsequence(end: subSequenceEnd)
         formIndex(after: &subSequenceEnd)
@@ -1565,7 +1565,7 @@ extension Collection {
       formIndex(after: &subSequenceEnd)
     }
 
-    if subSequenceStart != cachedEndIndex || !omittingEmptySubsequences {
+    if subSequenceStart < cachedEndIndex || !omittingEmptySubsequences {
       result.append(self[subSequenceStart..<cachedEndIndex])
     }
 
