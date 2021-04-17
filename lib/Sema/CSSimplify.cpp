@@ -5749,12 +5749,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       // Single expression function with implicit `return`.
-      if (elt->is<LocatorPathElt::ContextualType>()) {
-        auto anchor = locator.getAnchor();
-        auto contextualInfo = getContextualTypeInfo(anchor);
-        assert(contextualInfo &&
-               "Found contextual type locator without additional information");
-        if (contextualInfo->purpose == CTP_ReturnSingleExpr) {
+      if (auto contextualType = elt->getAs<LocatorPathElt::ContextualType>()) {
+        if (contextualType->isFor(CTP_ReturnSingleExpr)) {
           increaseScore(SK_FunctionConversion);
           return getTypeMatchSuccess();
         }
