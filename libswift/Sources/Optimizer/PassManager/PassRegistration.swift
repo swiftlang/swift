@@ -28,4 +28,5 @@ private func registerPass(
 }
 
 private func registerSwiftPasses() {
+  registerPass(silPrinterPass, { silPrinterPass.run($0) })
 }
