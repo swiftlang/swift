@@ -3,7 +3,7 @@
 // RUN: cp -r %S/../Inputs/CrossImport %t/CrossImport
 // RUN: %{python} %S/../../CrossImport/Inputs/rewrite-module-triples.py %t/CrossImport %module-target-triple
 
-// RUN: %target-swift-frontend -c -index-store-path %t/idx -module-cache-path %t/mcp -index-system-modules -index-ignore-stdlib -enable-cross-import-overlays %s -Fsystem %t/CrossImport -o %t/file1.o -module-name cross_import_overlay
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -c -index-store-path %t/idx -module-cache-path %t/mcp -index-system-modules -index-ignore-stdlib -enable-cross-import-overlays %s -Fsystem %t/CrossImport -o %t/file1.o -module-name cross_import_overlay
 // RUN: c-index-test core -print-unit %t/idx > %t/units
 
 import A
@@ -30,7 +30,6 @@ from__ABAdditionsCAdditions()
 // MAIN-NEXT: is-debug: 1
 // MAIN-NEXT: DEPEND START
 // MAIN-NEXT: Unit | system | Swift | {{.*}}{{/|\\}}Swift.swiftmodule
-// MAIN-NEXT: Unit | system | _Concurrency | {{.*}}{{/|\\}}_Concurrency.swiftmodule
 // MAIN-NEXT: Unit | system | B | {{.*}}{{/|\\}}B.swiftmodule{{/|\\}}{{.*}}
 // MAIN-NEXT: Unit | system | C | {{.*}}{{/|\\}}C.swiftmodule{{/|\\}}{{.*}}
 // MAIN-NEXT: Unit | system | A | {{.*}}{{/|\\}}__ABAdditionsCAdditions.swiftmodule{{/|\\}}{{.*}}
