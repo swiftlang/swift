@@ -64,7 +64,7 @@ extension Collection where Element: Equatable {
     }
 
     var i = self.startIndex
-    while i != self.endIndex {
+    while i < self.endIndex {
       if self[i] == element {
         return i
       }
@@ -102,7 +102,7 @@ extension Collection {
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index? {
     var i = self.startIndex
-    while i != self.endIndex {
+    while i < self.endIndex {
       if try predicate(self[i]) {
         return i
       }
@@ -169,7 +169,7 @@ extension BidirectionalCollection {
     where predicate: (Element) throws -> Bool
   ) rethrows -> Index? {
     var i = endIndex
-    while i != startIndex {
+    while i > startIndex {
       formIndex(before: &i)
       if try predicate(self[i]) {
         return i
@@ -269,7 +269,7 @@ extension MutableCollection {
     else { return endIndex }
     
     var j = index(after: i)
-    while j != endIndex {
+    while j < endIndex {
       if try !isSuffixElement(self[j]) { swapAt(i, j); formIndex(after: &i) }
       formIndex(after: &j)
     }
