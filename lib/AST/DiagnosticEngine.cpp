@@ -475,6 +475,18 @@ static Type getAkaTypeForDisplay(Type type) {
   });
 }
 
+/// Determine whether this is the main actor type.
+static bool isMainActor(Type type) {
+  if (auto nominal = type->getAnyNominal()) {
+    if (nominal->getName().is("MainActor") &&
+        nominal->getParentModule()->getName() ==
+          nominal->getASTContext().Id_Concurrency)
+      return true;
+  }
+
+  return false;
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier, 
@@ -710,18 +722,21 @@ static void formatDiagnosticArgument(StringRef Modifier,
       break;
 
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      Out << "global actor " << FormatOpts.OpeningQuotationMark
-        << isolation.getGlobalActor().getString()
-        << FormatOpts.ClosingQuotationMark << "-isolated";
+    case ActorIsolation::GlobalActorUnsafe: {
+      Type globalActor = isolation.getGlobalActor();
+      if (isMainActor(globalActor)) {
+        Out << "main actor-isolated";
+      } else {
+        Out << "global actor " << FormatOpts.OpeningQuotationMark
+          << globalActor.getString()
+          << FormatOpts.ClosingQuotationMark << "-isolated";
+      }
       break;
+    }
 
     case ActorIsolation::Independent:
-      Out << "actor-independent";
-      break;
-
     case ActorIsolation::Unspecified:
-      Out << "unspecified";
+      Out << "nonisolated";
       break;
     }
   }
