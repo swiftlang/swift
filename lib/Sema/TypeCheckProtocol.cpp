@@ -2751,7 +2751,8 @@ bool ConformanceChecker::checkActorIsolation(
   bool witnessIsUnsafe = false;
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
-              ActorIsolationRestriction::forDeclaration(witness)) {
+              ActorIsolationRestriction::forDeclaration(
+                  witness, /*fromExpression=*/false)) {
   case ActorIsolationRestriction::ActorSelf: {
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.

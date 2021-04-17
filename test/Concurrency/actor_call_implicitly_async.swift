@@ -262,9 +262,9 @@ func blender(_ peeler : () -> Void) {
 // expected-note@+1 2 {{mutation of this var is only permitted within the actor}}
 @BananaActor var dollarsInBananaStand : Int = 250000
 
-@BananaActor func wisk(_ something : Any) { } // expected-note 5 {{calls to global function 'wisk' from outside of its actor context are implicitly asynchronous}}
+@BananaActor func wisk(_ something : Any) { }
 
-@BananaActor func peelBanana() { } // expected-note 2 {{calls to global function 'peelBanana()' from outside of its actor context are implicitly asynchronous}}
+@BananaActor func peelBanana() { }
 
 @BananaActor func takeInout(_ x : inout Int) {}
 
@@ -279,7 +279,7 @@ func blender(_ peeler : () -> Void) {
   // expected-error@+1 {{var 'dollarsInBananaStand' isolated to global actor 'BananaActor' can not be used 'inout' from different global actor 'OrangeActor'}}
   await takeInout(&dollarsInBananaStand)
 
-  _ = wisk // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  _ = wisk
 
 
   await wisk({})
@@ -291,21 +291,20 @@ func blender(_ peeler : () -> Void) {
   await (((wisk)))((wisk)((wisk)(1)))
   // expected-warning@-1 3{{cannot pass argument of non-sendable type 'Any' across actors}}
 
-  blender((peelBanana)) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
-  await wisk(peelBanana) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  blender((peelBanana))
+  // expected-error@-1{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
+  await wisk(peelBanana)
   // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
 
-  await wisk(wisk)  // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  await wisk(wisk)
   // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
-  await (((wisk)))(((wisk))) // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  await (((wisk)))(((wisk)))
   // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
 
-  // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-  // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
   await {wisk}()(1)
 
-  // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-  // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
   await (true ? wisk : {n in return})(1)
 }
 

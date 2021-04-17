@@ -908,7 +908,11 @@ private:
     assert(param->getInterfaceType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
-               ->hasEffect(kind));
+               ->hasEffect(kind) ||
+           !param->getInterfaceType()
+               ->lookThroughAllOptionalTypes()
+               ->castTo<AnyFunctionType>()
+               ->getGlobalActor().isNull());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.

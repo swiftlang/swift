@@ -3651,7 +3651,7 @@ class CallEmission {
 
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
-  bool implicitlyAsync;
+  Optional<ActorIsolation> implicitAsyncIsolation;
 
 public:
   /// Create an emission for a call of the given callee.
@@ -3659,7 +3659,7 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        implicitlyAsync(false) {}
+        implicitAsyncIsolation(None) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
   /// emission.
@@ -3699,7 +3699,9 @@ public:
   /// Sets a flag that indicates whether this call be treated as being 
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
-  void setImplicitlyAsync(bool flag) { implicitlyAsync = flag; }
+  void setImplicitlyAsync(Optional<ActorIsolation> implicitAsyncIsolation) {
+    this->implicitAsyncIsolation = implicitAsyncIsolation;
+  }
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
@@ -3920,15 +3922,11 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
 
   auto mv = callee.getFnValue(SGF, borrowedSelf);
 
-  Optional<ValueDecl*> calleeDeclInfo;
-  if (implicitlyAsync)
-    calleeDeclInfo = callee.getDecl();
-
   // Emit the uncurried call.
   return SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo, options,
-      uncurriedContext, calleeDeclInfo);
+      uncurriedContext, implicitAsyncIsolation);
 }
 
 static void emitPseudoFunctionArguments(SILGenFunction &SGF,
@@ -4243,7 +4241,28 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
                          apply.callSite->isNoThrows(),
                          apply.callSite->isNoAsync());
 
-    emission.setImplicitlyAsync(apply.callSite->implicitlyAsync());
+    // For an implicitly-async call, determine the actor isolation.
+    if (apply.callSite->implicitlyAsync()) {
+      Optional<ActorIsolation> isolation;
+
+      // Check for global-actor isolation on the function type.
+      if (auto fnType = apply.callSite->getFn()->getType()
+              ->castTo<FunctionType>()) {
+        if (Type globalActor = fnType->getGlobalActor()) {
+          isolation = ActorIsolation::forGlobalActor(globalActor, false);
+        }
+      }
+
+      // If there was no global-actor isolation on the function type, find
+      // the callee declaration and retrieve the isolation from it.
+      if (!isolation) {
+        if (auto decl = emission.callee.getDecl())
+          isolation = getActorIsolation(decl);
+      }
+
+      assert(isolation && "Implicitly asynchronous call without isolation");
+      emission.setImplicitlyAsync(isolation);
+    }
   }
 
   return emission;
@@ -4302,7 +4321,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
                                  ArrayRef<ManagedValue> args,
                                  const CalleeTypeInfo &calleeTypeInfo,
                                  ApplyOptions options, SGFContext evalContext,
-                                 Optional<ValueDecl *> implicitlyAsyncApply) {
+                                 Optional<ActorIsolation> implicitAsyncIsolation) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
 
@@ -4390,22 +4409,27 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   ExecutorBreadcrumb breadcrumb;
   
-  // The presence of `implicitlyAsyncApply` indicates that the callee is a 
+  // The presence of `implicitAsyncIsolation` indicates that the callee is a
   // synchronous function isolated to an actor other than our own.
   // Such functions require the caller to hop to the callee's executor
   // prior to invoking the callee.
-  if (implicitlyAsyncApply.hasValue()) {
+  if (implicitAsyncIsolation) {
     assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
 
-    auto calleeVD = implicitlyAsyncApply.getValue();
-    if (auto *funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(calleeVD)) {
-      Optional<ManagedValue> actorSelf;
+    switch (*implicitAsyncIsolation) {
+    case ActorIsolation::ActorInstance:
+      breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation,
+                                        args.back());
+      break;
 
-      if (args.size() > 0)
-        actorSelf = args.back();
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation, None);
+      break;
 
-      breadcrumb = emitHopToTargetActor(loc, getActorIsolation(funcDecl),
-                                        actorSelf);
+    case ActorIsolation::Independent:
+    case ActorIsolation::Unspecified:
+      llvm_unreachable("Not actor-isolated");
     }
   } else if (ExpectedExecutor && substFnType->isAsync()) {
     // Otherwise, if we're in an actor method ourselves, and we're calling into
