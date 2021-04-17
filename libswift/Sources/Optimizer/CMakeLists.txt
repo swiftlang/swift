@@ -6,5 +6,6 @@ add_swift_host_library(LibSwiftOptimizer
 
 target_link_libraries(LibSwiftOptimizer PRIVATE LibSwiftSIL)
 
+add_subdirectory(InstructionPasses)
 add_subdirectory(PassManager)
 add_subdirectory(FunctionPasses)

@@ -326,10 +326,11 @@ public:
       
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
-  SILInstruction *visitGlobalValueInst(GlobalValueInst *globalValue);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
+
+  SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 
 #define PASS(ID, TAG, DESCRIPTION)
 #define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)

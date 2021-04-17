@@ -38,4 +38,5 @@ private func registerPass<InstType: Instruction>(
 private func registerSwiftPasses() {
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
+  registerPass(simplifyGlobalValuePass, { simplifyGlobalValuePass.run($0) })
 }
