@@ -54,7 +54,6 @@ int STDOUT_FILENO = _fileno(stdout);
 }
 #endif
 
-static bool sendGlobalConfigRequest();
 static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts,
                                 bool IsFirstInvocation);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
@@ -475,16 +474,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
 
-  if (firstInvocation && Opts.Request != SourceKitRequest::GlobalConfiguration &&
-      !Opts.SuppressDefaultConfigRequest) {
-    // We don't fail if this request fails for now so that sourcekitd-test is
-    // still usable with older versions of sourcekitd that don't have the
-    // global-configuration request.
-    if (sendGlobalConfigRequest()) {
-      llvm::outs() << "warning: global configuration request failed\n";
-    }
-  }
-
   if (Opts.ShellExecution)
     return performShellExecution(Opts.CompilerArgs);
 
@@ -498,28 +487,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     printBufferedNotifications(/*syncWithService=*/false);
   }
   return 0;
-}
-
-static bool sendGlobalConfigRequest() {
-  TestOptions Opts;
-  sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
-                                                                 nullptr, 0);
-  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
-
-  // For test invocations we default to setting OptimizeForIDE to true. This
-  // matches the use case of the most popular clients of sourcekitd (editors)
-  // and also disables loading locations from .swiftsourceinfo files. This is
-  // desirable for testing because the .swiftsourceinfo for the stdlib is
-  // available when sourcekitd is tested, and can make some stdlib-dependent
-  // sourcekitd tests unstable due to changing source locations from the stdlib
-  // module.
-  sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(true));
-  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
-  bool IsError = sourcekitd_response_is_error(Resp);
-  if (IsError)
-    sourcekitd_response_description_dump(Resp);
-  sourcekitd_request_release(Req);
-  return IsError;
 }
 
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {

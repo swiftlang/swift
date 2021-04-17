@@ -462,9 +462,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
 
-    Optional<bool> OptimizeForIDE =
-        Req.getOptionalInt64(KeyOptimizeForIDE)
-            .map([](int64_t v) -> bool { return v; });
     Optional<unsigned> CompletionMaxASTContextReuseCount =
         Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
             .map([](int64_t v) -> unsigned { return v; });
@@ -473,12 +470,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
             .map([](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
-        Config->update(OptimizeForIDE, CompletionMaxASTContextReuseCount,
+        Config->update(CompletionMaxASTContextReuseCount,
                        CompletionCheckDependencyInterval);
 
     getGlobalContext().getSwiftLangSupport().globalConfigurationUpdated(Config);
 
-    dict.set(KeyOptimizeForIDE, UpdatedConfig.OptimizeForIDE);
     dict.set(KeyCompletionMaxASTContextReuseCount,
              UpdatedConfig.CompletionOpts.MaxASTContextReuseCount);
     dict.set(KeyCompletionCheckDependencyInterval,

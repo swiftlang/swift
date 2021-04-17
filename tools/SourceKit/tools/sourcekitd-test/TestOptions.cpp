@@ -372,10 +372,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       VFSName = InputArg->getValue();
       break;
 
-    case OPT_suppress_config_request:
-      SuppressDefaultConfigRequest = true;
-      break;
-
     case OPT_module_cache_path:
       ModuleCachePath = InputArg->getValue();
       break;

@@ -276,8 +276,8 @@ bool ide::initCompilerInvocation(
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath,
-    bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error) {
+    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
+    std::string &Error) {
   SmallVector<const char *, 16> Args;
   // Make sure to put '-resource-dir' and '-diagnostic-documentation-path' at
   // the top to allow overriding them with the passed in arguments.
@@ -347,15 +347,6 @@ bool ide::initCompilerInvocation(
 
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
-
-  // SwiftSourceInfo files provide source location information for decls coming
-  // from loaded modules. For most IDE use cases it either has an undesirable
-  // impact on performance with no benefit (code completion), results in stale
-  // locations being used instead of more up-to-date indexer locations (cursor
-  // info), or has no observable effect (diagnostics, which are filtered to just
-  // those with a location in the primary file, and everything else).
-  if (shouldOptimizeForIDE)
-    FrontendOpts.IgnoreSwiftSourceInfo = true;
 
   // To save the time for module validation, consider the lifetime of ASTManager
   // as a single build session.

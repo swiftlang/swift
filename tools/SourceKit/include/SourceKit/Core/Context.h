@@ -31,12 +31,6 @@ namespace SourceKit {
 class GlobalConfig {
 public:
   struct Settings {
-    /// When true, the default compiler options and other configuration flags
-    /// will be chosen to optimize for usage from an IDE.
-    ///
-    /// At the time of writing this just means ignoring .swiftsourceinfo files.
-    bool OptimizeForIDE = false;
-
     struct CompletionOptions {
 
       /// Max count of reusing ASTContext for cached code completion.
@@ -52,10 +46,8 @@ private:
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  Settings update(Optional<bool> OptimizeForIDE,
-                  Optional<unsigned> CompletionMaxASTContextReuseCount,
+  Settings update(Optional<unsigned> CompletionMaxASTContextReuseCount,
                   Optional<unsigned> CompletionCheckDependencyInterval);
-  bool shouldOptimizeForIDE() const;
   Settings::CompletionOptions getCompletionOpts() const;
 };
 
