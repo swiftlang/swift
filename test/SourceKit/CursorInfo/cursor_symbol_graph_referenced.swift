@@ -133,7 +133,7 @@ extension Parent {
 
 
 // References to unsupported types (like generic parameters) should be ignored.
-// RUN: %sourcekitd-test -req=global-config -req-opts=optimize_for_ide=0 == -req=cursor -pos=11:14 -req-opts=retrieve_symbol_graph=1 %s -- %s -target %target-triple -I %t | %FileCheck -check-prefixes=NESTED %s
+// RUN: %sourcekitd-test -req=cursor -pos=11:14 -req-opts=retrieve_symbol_graph=1 %s -- %s -target %target-triple -I %t | %FileCheck -check-prefixes=NESTED %s
 //
 // NESTED:      SYMBOL GRAPH BEGIN
 // NESTED:        "declarationFragments": [

@@ -283,7 +283,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK5-NEXT: source.lang.swift
 // CHECK5-NEXT: (Int) -> (){{$}}
 
-// RUN: %sourcekitd-test -req=global-config -req-opts=optimize_for_ide=0 == -req=cursor -pos=9:32 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK6 %s
+// RUN: %sourcekitd-test -req=cursor -pos=9:32 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK6 %s
 // CHECK6:      source.lang.swift.ref.function.free ({{.*}}/FooSwiftModule.swift:2:13-2:25)
 // CHECK6-NEXT: fooSwiftFunc
 // CHECK6-NEXT: s:14FooSwiftModule03fooB4FuncSiyF
