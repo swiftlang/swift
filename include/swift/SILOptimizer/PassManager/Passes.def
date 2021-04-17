@@ -421,6 +421,8 @@ PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
+SWIFT_INSTRUCTION_PASS_WITH_LEGACY(GlobalValueInst, "simplify-global_value")
+
 #undef IRGEN_PASS
 #undef SWIFT_FUNCTION_PASS
 #undef SWIFT_FUNCTION_PASS_WITH_LEGACY
