@@ -29,4 +29,5 @@ private func registerPass(
 
 private func registerSwiftPasses() {
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
+  registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
 }

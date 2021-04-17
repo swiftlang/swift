@@ -271,7 +271,7 @@ PASS(MemBehaviorDumper, "mem-behavior-dump",
      "Print SIL Instruction MemBehavior from Alias Analysis over all Pairs")
 PASS(LSLocationPrinter, "lslocation-dump",
      "Print Load-Store Location Results Covering all Accesses")
-PASS(MergeCondFails, "merge-cond_fails",
+SWIFT_FUNCTION_PASS_WITH_LEGACY(MergeCondFails, "merge-cond_fails",
      "Merge SIL cond_fail to Eliminate Redundant Overflow Checks")
 PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
      "Move SIL cond_fail by Hoisting Checks")
