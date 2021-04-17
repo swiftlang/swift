@@ -339,6 +339,8 @@ PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
      "Generate Debug Information with Source Locations into Textual SIL")
 PASS(EarlySROA, "early-sroa",
      "Scalar Replacement of Aggregate Stack Objects on high-level SIL")
+SWIFT_FUNCTION_PASS(SILPrinter, "sil-printer",
+     "Test pass which prints the SIL of a function")
 PASS(SROA, "sroa",
      "Scalar Replacement of Aggregate Stack Objects")
 PASS(SROABBArgs, "sroa-bb-args",
