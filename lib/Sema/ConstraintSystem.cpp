@@ -3074,6 +3074,16 @@ Type ConstraintSystem::simplifyType(Type type) const {
       });
 }
 
+void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
+  auto &cs = getConstraintSystem();
+  assert(argumentMatchingChoices.find(locator) ==
+             argumentMatchingChoices.end() &&
+         "recording multiple bindings for same locator");
+  argumentMatchingChoices.insert(
+      {cs.getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
+       MatchCallArgumentResult::forArity(1)});
+}
+
 Type Solution::simplifyType(Type type) const {
   if (!(type->hasTypeVariable() || type->hasPlaceholder()))
     return type;

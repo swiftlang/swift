@@ -137,12 +137,10 @@ Solution ConstraintSystem::finalize() {
     solution.DisjunctionChoices.insert(choice);
   }
 
-  // Remember all of the trailing closure matching choices we made.
-  for (auto &trailingClosureMatch : trailingClosureMatchingChoices) {
-    auto inserted = solution.trailingClosureMatchingChoices.insert(
-        trailingClosureMatch);
-    assert((inserted.second ||
-            inserted.first->second == trailingClosureMatch.second));
+  // Remember all of the argument/parameter matching choices we made.
+  for (auto &argumentMatch : argumentMatchingChoices) {
+    auto inserted = solution.argumentMatchingChoices.insert(argumentMatch);
+    assert(inserted.second || inserted.first->second == argumentMatch.second);
     (void)inserted;
   }
 
@@ -234,9 +232,9 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     DisjunctionChoices.push_back(choice);
   }
 
-  // Remember all of the trailing closure matching choices we made.
-  for (auto &trailingClosureMatch : solution.trailingClosureMatchingChoices) {
-    trailingClosureMatchingChoices.push_back(trailingClosureMatch);
+  // Remember all of the argument/parameter matching choices we made.
+  for (auto &argumentMatch : solution.argumentMatchingChoices) {
+    argumentMatchingChoices.push_back(argumentMatch);
   }
 
   // Register the solution's opened types.
@@ -483,7 +481,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numAppliedDisjunctions = cs.AppliedDisjunctions.size();
-  numTrailingClosureMatchingChoices = cs.trailingClosureMatchingChoices.size();
+  numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
@@ -542,9 +540,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any applied disjunctions.
   truncate(cs.AppliedDisjunctions, numAppliedDisjunctions);
 
-  // Remove any trailing closure matching choices;
-  truncate(
-      cs.trailingClosureMatchingChoices, numTrailingClosureMatchingChoices);
+  // Remove any argument matching choices;
+  truncate(cs.argumentMatchingChoices, numArgumentMatchingChoices);
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
