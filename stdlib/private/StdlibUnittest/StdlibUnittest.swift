@@ -875,6 +875,7 @@ func _childProcess() {
   }
 }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 @inline(never)
 func _childProcessAsync() async {
   _installTrapInterceptor()
@@ -928,6 +929,7 @@ func _childProcessAsync() async {
     }
   }
 }
+#endif
 
 class _ParentProcess {
 #if os(Windows)
@@ -1367,6 +1369,7 @@ class _ParentProcess {
     }
   }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   internal func runOneTestAsync(
     fullTestName: String,
     testSuite: TestSuite,
@@ -1457,6 +1460,7 @@ class _ParentProcess {
       return .xFail
     }
   }
+#endif
 
 
   func run() {
@@ -1531,6 +1535,7 @@ class _ParentProcess {
     }
   }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   func runAsync() async {
     if let filter = _filter {
       print("StdlibUnittest: using filter: \(filter)")
@@ -1602,6 +1607,7 @@ class _ParentProcess {
       _testSuiteFailedCallback()
     }
   }
+#endif
 
 }
 
@@ -1713,6 +1719,7 @@ public func runAllTests() {
   }
 }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 public func runAllTestsAsync() async {
   if PersistentState.runNoTestsWasCalled {
     print("runAllTests() called after runNoTests(). Aborting.")
@@ -1780,6 +1787,7 @@ public func runAllTestsAsync() async {
     await parent.runAsync()
   }
 }
+#endif
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
@@ -1816,6 +1824,7 @@ public final class TestSuite {
     .code(testFunction)
   }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   // This method is prohibited from inlining because inlining the test harness
   // into the test is not interesting from the runtime performance perspective.
   // And it does not really make the test cases more effectively at testing the
@@ -1830,6 +1839,7 @@ public final class TestSuite {
     _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
     .code(testFunction)
   }
+#endif
 
   // This method is prohibited from inlining because inlining the test harness
   // into the test is not interesting from the runtime performance perspective.
@@ -1876,10 +1886,12 @@ public final class TestSuite {
       code()
     case .parameterized(code: let code, _):
       code(parameter!)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
     case .singleAsync(_):
       fatalError("Cannot call async code, use `runAllTestsAsync`")
     case .parameterizedAsync(code: _, _):
       fatalError("Cannot call async code, use `runAllTestsAsync`")
+#endif
     }
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -1894,6 +1906,7 @@ public final class TestSuite {
       file: test.testLoc.file, line: test.testLoc.line)
   }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   func _runTestAsync(name testName: String, parameter: Int?) async {
     PersistentState.ranSomething = true
     for r in _allResettables {
@@ -1917,6 +1930,7 @@ public final class TestSuite {
       code()
     case .parameterized(code: let code, _):
       code(parameter!)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
     case .singleAsync(let code):
       precondition(
         parameter == nil,
@@ -1924,6 +1938,7 @@ public final class TestSuite {
       await code()
     case .parameterizedAsync(code: let code, _):
       await code(parameter!)
+#endif
     }
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -1937,6 +1952,7 @@ public final class TestSuite {
       0, LifetimeTracked.instances, "Found leaked LifetimeTracked instances.",
       file: test.testLoc.file, line: test.testLoc.line)
   }
+#endif
 
   func _testByName(_ testName: String) -> _Test {
     return _tests[_testNameToIndex[testName]!]
@@ -1956,8 +1972,10 @@ public final class TestSuite {
   internal enum _TestCode {
     case single(code: () -> Void)
     case parameterized(code: (Int) -> Void, count: Int)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
     case singleAsync(code: () async -> Void)
     case parameterizedAsync(code: (Int) async -> Void, count: Int)
+#endif
   }
 
   internal struct _Test {
@@ -1991,10 +2009,12 @@ public final class TestSuite {
         return [nil]
       case .parameterized(code: _, count: let count):
         return Array(0..<count)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
       case .singleAsync:
         return [nil]
       case .parameterizedAsync(code: _, count: let count):
         return Array(0..<count)
+#endif
       }
     }
   }
@@ -2063,9 +2083,11 @@ public final class TestSuite {
       _build(.single(code: testFunction))
     }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
     public func code(_ testFunction: @escaping () async -> Void) {
       _build(.singleAsync(code: testFunction))
     }
+#endif
 
     public func forEach<Data>(
       in parameterSets: [Data],
@@ -2076,6 +2098,7 @@ public final class TestSuite {
         count: parameterSets.count))
     }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
     public func forEach<Data>(
       in parameterSets: [Data],
       testFunction: @escaping (Data) async -> Void
@@ -2084,6 +2107,7 @@ public final class TestSuite {
         code: { (i: Int) in await testFunction(parameterSets[i]) },
         count: parameterSets.count))
     }
+#endif
 
   }
 
