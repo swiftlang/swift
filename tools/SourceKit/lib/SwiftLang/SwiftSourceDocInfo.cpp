@@ -839,7 +839,7 @@ static void setLocationInfoForClangNode(ClangNode ClangNode,
           ClangSM.getDecomposedLoc(CharRange.getEnd());
 
       Location.Offset = Decomp.second;
-      Location.Length = EndDecomp.second-Decomp.second;
+      Location.Length = EndDecomp.second - Decomp.second;
       Location.Line = ClangSM.getLineNumber(Decomp.first, Decomp.second);
       Location.Column = ClangSM.getColumnNumber(Decomp.first, Decomp.second);
     }

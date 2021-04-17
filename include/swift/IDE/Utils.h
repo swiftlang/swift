@@ -87,8 +87,8 @@ bool initCompilerInvocation(
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath,
-    bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error);
+    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
+    std::string &Error);
 
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                     CompilerInvocation &Invok,
