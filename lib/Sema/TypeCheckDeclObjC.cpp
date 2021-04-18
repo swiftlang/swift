@@ -535,7 +535,7 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
     // Special case: If the type is Unmanaged<T>, then return true, because
     // Unmanaged<T> can be represented in Objective-C (if T can be).
     if (auto BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->getDecl() == dc->getASTContext().getUnmanagedDecl()) {
+      if (BGT->isUnmanaged()) {
         return true;
       }
     }

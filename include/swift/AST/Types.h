@@ -792,8 +792,10 @@ public:
   /// Check if this type is equal to the empty tuple type.
   bool isVoid();
 
-  /// Check if this type is equal to Swift.Bool.
-  bool isBool();
+  #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+  /** Check if this type is equal to Swift.NAME. */ \
+  bool is##NAME();
+  #include "swift/AST/KnownStdlibTypes.def"
 
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
@@ -804,9 +806,6 @@ public:
   /// Check if this is a CGFloat type from CoreGraphics framework
   /// on macOS or Foundation on Linux.
   bool isCGFloatType();
-
-  /// Check if this is a Double type from standard library.
-  bool isDoubleType();
 
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module

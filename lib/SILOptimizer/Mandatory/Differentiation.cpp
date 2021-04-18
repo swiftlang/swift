@@ -864,9 +864,9 @@ static void emitFatalError(ADContext &context, SILFunction *f,
     if (arg->getOwnershipKind() == OwnershipKind::Owned)
       builder.emitDestroyOperation(loc, arg);
   // Fatal error with a nice message.
-  auto neverResultInfo =
-      SILResultInfo(context.getModule().getASTContext().getNeverType(),
-                    ResultConvention::Unowned);
+  auto neverTy =
+      context.getModule().getASTContext().getNeverType()->getCanonicalType();
+  auto neverResultInfo = SILResultInfo(neverTy, ResultConvention::Unowned);
   // Fatal error function must have type `@convention(thin) () -> Never`.
   auto fatalErrorFnType = SILFunctionType::get(
       /*genericSig*/ nullptr, SILFunctionType::ExtInfo::getThin(),

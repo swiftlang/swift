@@ -893,15 +893,6 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
   return None;
 }
 
-bool ConstraintSystem::isAnyHashableType(Type type) {
-  if (auto st = type->getAs<StructType>()) {
-    auto &ctx = type->getASTContext();
-    return st->getDecl() == ctx.getAnyHashableDecl();
-  }
-
-  return false;
-}
-
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
                                              bool wantRValue) const {
@@ -2651,7 +2642,7 @@ void ConstraintSystem::bindOverloadType(
         fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
-    assert(isKnownKeyPathDecl(getASTContext(), keyPathDecl) &&
+    assert(isKnownKeyPathType(keyPathTy) &&
            "parameter is supposed to be a keypath");
 
     auto *keyPathLoc = getConstraintLocator(
@@ -2721,8 +2712,8 @@ void ConstraintSystem::bindOverloadType(
       // form additional `applicable fn` constraint here and bind it to a
       // function type, but it would create inconsistency with how properties
       // are handled, which means more special handling in CSApply.
-      if (keyPathDecl == getASTContext().getWritableKeyPathDecl() ||
-          keyPathDecl == getASTContext().getReferenceWritableKeyPathDecl())
+      if (keyPathTy->isWritableKeyPath() ||
+          keyPathTy->isReferenceWritableKeyPath())
         dynamicResultTy->getImpl().setCanBindToLValue(getSavedBindings(),
                                                       /*enabled=*/true);
 
@@ -4737,15 +4728,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
-  if (auto *BGT = type->getAs<BoundGenericType>())
-    return isKnownKeyPathDecl(type->getASTContext(), BGT->getDecl());
-  return false;
-}
-
-bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
-  return decl == ctx.getKeyPathDecl() || decl == ctx.getWritableKeyPathDecl() ||
-         decl == ctx.getReferenceWritableKeyPathDecl() ||
-         decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
+  return type->isKeyPath() || type->isWritableKeyPath() ||
+         type->isReferenceWritableKeyPath() || type->isPartialKeyPath() ||
+         type->isAnyKeyPath();
 }
 
 bool constraints::hasExplicitResult(ClosureExpr *closure) {

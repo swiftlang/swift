@@ -620,13 +620,17 @@ bool TypeBase::isVoid() {
   return false;
 }
 
-/// Check if this type is equal to Swift.Bool.
-bool TypeBase::isBool() {
-  if (auto NTD = getAnyNominal())
-    if (isa<StructDecl>(NTD))
-      return getASTContext().getBoolDecl() == NTD;
-  return false;
+#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+/** Check if this type is equal to Swift.NAME. */ \
+bool TypeBase::is##NAME() { \
+  if (auto generic = getAnyGeneric()) { \
+    if (isa<DECL_CLASS>(generic)) { \
+      return getASTContext().get##NAME##Decl() == generic; \
+    } \
+  } \
+  return false; \
 }
+#include "swift/AST/KnownStdlibTypes.def"
 
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
@@ -656,24 +660,20 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   auto &C = getASTContext();
-  if (auto nominalTy = getAs<NominalType>()) {
-    if (nominalTy->getDecl() == C.getUnsafeMutableRawPointerDecl()) {
-      PTK = PTK_UnsafeMutableRawPointer;
-      return C.TheEmptyTupleType;
-    }
-    if (nominalTy->getDecl() == C.getUnsafeRawPointerDecl()) {
-      PTK = PTK_UnsafeRawPointer;
-      return C.TheEmptyTupleType;
-    }
+  if (isUnsafeMutableRawPointer()) {
+    PTK = PTK_UnsafeMutableRawPointer;
+    return C.TheEmptyTupleType;
+  }
+  if (isUnsafeRawPointer()) {
+    PTK = PTK_UnsafeRawPointer;
+    return C.TheEmptyTupleType;
   }
   if (auto boundTy = getAs<BoundGenericType>()) {
-    if (boundTy->getDecl() == C.getUnsafeMutablePointerDecl()) {
+    if (boundTy->isUnsafeMutablePointer()) {
       PTK = PTK_UnsafeMutablePointer;
-    } else if (boundTy->getDecl() == C.getUnsafePointerDecl()) {
+    } else if (boundTy->isUnsafePointer()) {
       PTK = PTK_UnsafePointer;
-    } else if (
-      boundTy->getDecl() == C.getAutoreleasingUnsafeMutablePointerDecl()
-    ) {
+    } else if (boundTy->isAutoreleasingUnsafeMutablePointer()) {
       PTK = PTK_AutoreleasingUnsafeMutablePointer;
     } else {
       return Type();
@@ -706,20 +706,18 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
 
 Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
   auto &C = getASTContext();
-  if (auto nominalTy = getAs<NominalType>()) {
-    if (nominalTy->getDecl() == C.getUnsafeMutableRawBufferPointerDecl()) {
-      BPTK = BPTK_UnsafeMutableRawBufferPointer;
-    } else if (nominalTy->getDecl() == C.getUnsafeRawBufferPointerDecl()) {
-      BPTK = BPTK_UnsafeRawBufferPointer;
-    } else {
-      return Type();
-    }
+  if (isUnsafeMutableRawBufferPointer()) {
+    BPTK = BPTK_UnsafeMutableRawBufferPointer;
+    return C.TheEmptyTupleType;
+  }
+  if (isUnsafeRawBufferPointer()) {
+    BPTK = BPTK_UnsafeRawBufferPointer;
     return C.TheEmptyTupleType;
   }
   if (auto boundTy = getAs<BoundGenericType>()) {
-    if (boundTy->getDecl() == C.getUnsafeMutableBufferPointerDecl()) {
+    if (boundTy->isUnsafeMutableBufferPointer()) {
       BPTK = BPTK_UnsafeMutableBufferPointer;
-    } else if (boundTy->getDecl() == C.getUnsafeBufferPointerDecl()) {
+    } else if (boundTy->isUnsafeBufferPointer()) {
       BPTK = BPTK_UnsafeBufferPointer;
     } else {
       return Type();
@@ -830,18 +828,11 @@ bool TypeBase::isCGFloatType() {
          NTD->getName().is("CGFloat");
 }
 
-bool TypeBase::isDoubleType() {
-  auto *NTD = getAnyNominal();
-  return NTD ? NTD->getDecl() == getASTContext().getDoubleDecl() : false;
-}
-
 bool TypeBase::isKnownStdlibCollectionType() {
-  if (auto *structType = getAs<BoundGenericStructType>()) {
-    auto &ctx = getASTContext();
-    auto *decl = structType->getDecl();
-    return decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
-           decl == ctx.getSetDecl();
+  if (isArray() || isDictionary() || isSet()) {
+    return true;
   }
+
   return false;
 }
 
@@ -1475,12 +1466,11 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
         return arg;
       };
 
-      auto &ctx = boundGeneric->getASTContext();
-      if (boundGeneric->getDecl() == ctx.getArrayDecl())
+      if (boundGeneric->isArray())
         return ArraySliceType::get(getGenericArg(0));
-      if (boundGeneric->getDecl() == ctx.getDictionaryDecl())
+      if (boundGeneric->isDictionary())
         return DictionaryType::get(getGenericArg(0), getGenericArg(1));
-      if (boundGeneric->getDecl() == ctx.getOptionalDecl())
+      if (boundGeneric->isOptional())
         return OptionalType::get(getGenericArg(0));
     }
     return Ty;
@@ -2494,8 +2484,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   // Unmanaged<T> can be trivially represented in Objective-C if T
   // is trivially represented in Objective-C.
-  if (language == ForeignLanguage::ObjectiveC &&
-      nominal == ctx.getUnmanagedDecl()) {
+  if (language == ForeignLanguage::ObjectiveC && type->isUnmanaged()) {
     auto boundGenericType = type->getAs<BoundGenericType>();
 
     // Note: works around a broken Unmanaged<> definition.

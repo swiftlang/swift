@@ -2876,11 +2876,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(ctx.getInt8Decl()->getDeclaredInterfaceType()))
+  if (baseType->isInt8())
     return true;
-  if (baseType->isEqual(ctx.getUInt8Decl()->getDeclaredInterfaceType()))
+  if (baseType->isUInt8())
     return true;
-  if (baseType->isEqual(ctx.TheEmptyTupleType))
+  if (baseType->isVoid())
     return true;
   
   return false;
@@ -5194,7 +5194,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
-           (nominal1->isDoubleType() || nominal2->isDoubleType()))) {
+           (nominal1->isDouble() || nominal2->isDouble()))) {
         ConstraintLocatorBuilder location{locator};
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
@@ -5490,7 +5490,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     // T -> AnyHashable.
-    if (isAnyHashableType(desugar2)) {
+    if (desugar2->isAnyHashable()) {
       // Don't allow this in operator contexts or we'll end up allowing
       // 'T() == U()' for unrelated T and U that just happen to be Hashable.
       // We can remove this special case when we implement operator hiding.
@@ -5673,8 +5673,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
                 auto &ctx = getASTContext();
-                if (type1->isEqual(
-                        ctx.getStringDecl()->getDeclaredInterfaceType())) {
+                if (type1->isString()) {
                   auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
@@ -7098,7 +7097,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
-  if (baseObjTy->getAnyNominal() == ctx.getStringDecl()) {
+  if (baseObjTy->isString()) {
     if (Type classType = ctx.getBridgedToObjC(DC, instanceTy)) {
       bridgedType = classType;
     }
@@ -9071,13 +9070,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // FIXME: This should be an associated type of the protocol.
       auto &ctx = getASTContext();
       if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
-        if (fromBGT->getDecl() == ctx.getArrayDecl()) {
+        if (fromBGT->isArray()) {
           // [AnyObject]
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
                         ctx.getAnyObjectType(),
                         getConstraintLocator(locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
-        } else if (fromBGT->getDecl() == ctx.getDictionaryDecl()) {
+        } else if (fromBGT->isDictionary()) {
           // [NSObject : AnyObject]
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
@@ -9096,7 +9095,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(1))));
-        } else if (fromBGT->getDecl() == ctx.getSetDecl()) {
+        } else if (fromBGT->isSet()) {
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
@@ -9239,12 +9238,12 @@ ConstraintSystem::simplifyKeyPathConstraint(
       definitelyKeyPathType = true;
 
       // We can get root and value from a concrete key path type.
-      if (bgt->getDecl() == getASTContext().getKeyPathDecl() ||
-          bgt->getDecl() == getASTContext().getWritableKeyPathDecl() ||
-          bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+      if (bgt->isKeyPath() ||
+          bgt->isWritableKeyPath() ||
+          bgt->isReferenceWritableKeyPath()) {
         boundRoot = bgt->getGenericArgs()[0];
         boundValue = bgt->getGenericArgs()[1];
-      } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
+      } else if (bgt->isPartialKeyPath()) {
         if (!allowPartial)
           return false;
 
@@ -9480,11 +9479,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
   // FIXME: Allow the type to be upcast if the type system has a concrete
   // KeyPath type assigned to the expression already.
   if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
-    if (keyPathBGT->getDecl() == getASTContext().getKeyPathDecl())
+    if (keyPathBGT->isKeyPath())
       kpDecl = getASTContext().getKeyPathDecl();
-    else if (keyPathBGT->getDecl() ==
-                 getASTContext().getWritableKeyPathDecl() &&
-             capability >= Writable)
+    else if (keyPathBGT->isWritableKeyPath() && capability >= Writable)
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
 
@@ -9534,16 +9531,14 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Error;
   }
   
-  if (auto clas = keyPathTy->getAs<NominalType>()) {
-    if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
-      // Read-only keypath, whose projected value is upcast to `Any?`.
-      // The root type can be anything.
-      Type resultTy = ProtocolCompositionType::get(getASTContext(), {},
-                                                  /*explicit AnyObject*/ false);
-      resultTy = OptionalType::get(resultTy);
-      return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
-                        subflags, locator);
-    }
+  if (keyPathTy->isAnyKeyPath()) {
+    // Read-only keypath, whose projected value is upcast to `Any?`.
+    // The root type can be anything.
+    Type resultTy = ProtocolCompositionType::get(getASTContext(), {},
+                                                /*explicit AnyObject*/ false);
+    resultTy = OptionalType::get(resultTy);
+    return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
+                      subflags, locator);
   }
   
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
@@ -9568,7 +9563,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       llvm_unreachable("unhandled match");
     };
 
-    if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
+    if (bgt->isPartialKeyPath()) {
       // Read-only keypath, whose projected value is upcast to `Any`.
       auto resultTy = ProtocolCompositionType::get(getASTContext(), {},
                                                   /*explicit AnyObject*/ false);
@@ -9603,14 +9598,14 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                         ConstraintKind::Bind, subflags, locator);
     };
   
-    if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
+    if (bgt->isKeyPath()) {
       // Read-only keypath.
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
 
       return solveRValue();
     }
-    if (bgt->getDecl() == getASTContext().getWritableKeyPathDecl()) {
+    if (bgt->isWritableKeyPath()) {
       // Writable keypath. The result can be an lvalue if the root was.
       // We can't convert the base without giving up lvalue-ness, though.
       if (!matchRoot(ConstraintKind::Equal))
@@ -9623,7 +9618,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
         return solveUnknown();
       return solveRValue();
     }
-    if (bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+    if (bgt->isReferenceWritableKeyPath()) {
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
 
@@ -10740,11 +10735,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2,
-                                          ctx.getInt8Decl()->getDeclaredInterfaceType(),
+                                          ctx.getInt8Type(),
                                           getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                            baseType2,
-                                           ctx.getUInt8Decl()->getDeclaredInterfaceType(),
+                                           ctx.getUInt8Type(),
                                            getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2, ctx.TheEmptyTupleType,
@@ -10857,8 +10852,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::HashableToAnyHashable: {
     // We never want to do this if the LHS is already AnyHashable.
     type1 = simplifyType(type1);
-    if (isAnyHashableType(
-            type1->getRValueType()->lookThroughAllOptionalTypes())) {
+    if (type1->getRValueType()->lookThroughAllOptionalTypes()->isAnyHashable()) {
       return SolutionKind::Error;
     }
 

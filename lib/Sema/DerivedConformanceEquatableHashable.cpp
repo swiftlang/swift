@@ -398,7 +398,7 @@ deriveEquatable_eq(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
+  auto boolTy = C.getBoolType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -863,7 +863,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
+  Type intType = C.getIntType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.

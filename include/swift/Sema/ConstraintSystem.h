@@ -3793,9 +3793,6 @@ public:
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
 
-  /// Determine if the type in question is AnyHashable.
-  static bool isAnyHashableType(Type t);
-
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
   /// type from the ConstraintSystem expression type map.
