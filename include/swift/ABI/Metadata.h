@@ -1170,6 +1170,26 @@ public:
 
   /// Is this class an artificial subclass, such as one dynamically
   /// created for various dynamic purposes like KVO?
+  //
+  // [NOTE: Dynamic-subclass-KVO]
+  // To implement Key-Value Observing without any code that notifies the
+  // observer, the KVO infrastructure uses dynamic subclassing with Objective-C
+  // runtime. When a variable is observed, KVO creates a secret dynamic subclass
+  // of that class under the hood which are defined with a prefix of
+  // `NSKVONotifying_`.
+  //
+  // While the observed variables have the type of the dynamic subclass, they
+  // must appear like their non-observed counterparts for the front-end user. To
+  // achieve this, the dynamic subclass overrides `-class` method which returns
+  // the original class type, and internally refers to the subclass in the
+  // runtime.
+  //
+  // In the created subclass, `-set` methods for observed variables are
+  // overridden, where the calls to the observer notifications are triggered.
+  // KVO only generates one dynamic subclass for each class which overrides all
+  // setter methods of variables being observed. That is, setters of variables
+  // that are not observed are also not overridden in the dynamic subclass for
+  // efficiency.
   bool isArtificialSubclass() const {
     assert(isTypeMetadata());
     return Description == nullptr;
