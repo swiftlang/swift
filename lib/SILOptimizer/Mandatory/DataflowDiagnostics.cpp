@@ -65,19 +65,18 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
     if (auto expr = element.dyn_cast<Expr *>()) {
       if (expr->getType()->getRValueType()->isEqual(ResTy)) {
         if (FLoc.isASTNode<ClosureExpr>()) {
-          Context.Diags
-              .diagnose(expr->getStartLoc(),
-                        diag::missing_return_last_expr_closure, ResTy)
-              .fixItInsert(expr->getStartLoc(), "return ");
+          Context.Diags.diagnose(expr->getStartLoc(),
+                                 diag::missing_return_closure, ResTy);
         } else {
           auto *DC = FLoc.getAsDeclContext();
           assert(DC && DC->getAsDecl() && "not a declaration?");
-          Context.Diags
-              .diagnose(expr->getStartLoc(),
-                        diag::missing_return_last_expr_decl, ResTy,
-                        DC->getAsDecl()->getDescriptiveKind())
-              .fixItInsert(expr->getStartLoc(), "return ");
+          Context.Diags.diagnose(expr->getStartLoc(), diag::missing_return_decl,
+                                 ResTy, DC->getAsDecl()->getDescriptiveKind());
         }
+        Context.Diags
+            .diagnose(expr->getStartLoc(), diag::missing_return_last_expr_note)
+            .fixItInsert(expr->getStartLoc(), "return ");
+
         return;
       }
     }
