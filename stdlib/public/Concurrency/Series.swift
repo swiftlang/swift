@@ -315,7 +315,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
 ///
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct Series<Element> {
-  public struct YieldingContinuation: Sendable {
+  public struct Continuation: Sendable {
     fileprivate let storage: _SeriesBufferedStorage<Element, Never>
 
     /// Resume the task awaiting the next iteration point by having it return 
@@ -365,14 +365,14 @@ public struct Series<Element> {
   /// value when a new value comes in if the buffer would excede the limit 
   /// placed upon it. By default this limit is unlimited.
   /// 
-  /// The build closure passes in a YieldingContinuation which can be used in
+  /// The build closure passes in a Continuation which can be used in
   /// concurrent contexts. It is thread safe to send and finish; all calls are 
   /// to the continuation are serialized, however calling this from multiple 
   /// concurrent contexts could result in out of order delivery.
   public init(
     buffering: Element.Type = Element.self,
     maxBufferedPendingElements limit: Int = .max,
-    _ build: (YieldingContinuation) -> Void
+    _ build: (Continuation) -> Void
   ) {
     let storage: _SeriesBufferedStorage<Element, Never> = .create(limit: limit)
     produce = storage.next
@@ -380,7 +380,7 @@ public struct Series<Element> {
       storage.onCancel?()
       storage.yield(nil)
     }
-    build(YieldingContinuation(storage: storage))
+    build(Continuation(storage: storage))
   }
 }
 
@@ -424,7 +424,7 @@ extension Series: AsyncSequence {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Series.YieldingContinuation {
+extension Series.Continuation {
   public func yield(
     with result: Result<Element, Never>
   ) {
@@ -441,7 +441,7 @@ extension Series.YieldingContinuation {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct ThrowingSeries<Element> {
-  public struct YieldingContinuation: Sendable {
+  public struct Continuation: Sendable {
     fileprivate let storage: _SeriesBufferedStorage<Element, Error>
 
     public func resume(yielding value: __owned Element) {
@@ -472,7 +472,7 @@ public struct ThrowingSeries<Element> {
   public init(
     buffering: Element.Type,
     maxBufferedPendingElements limit: Int = .max,
-    _ build: (YieldingContinuation) -> Void
+    _ build: (Continuation) -> Void
   ) {
     let storage: _SeriesBufferedStorage<Element, Error> = .create(limit: limit)
     produce = storage.next
@@ -480,7 +480,7 @@ public struct ThrowingSeries<Element> {
       storage.onCancel?()
       storage.yield(nil)
     }
-    build(YieldingContinuation(storage: storage))
+    build(Continuation(storage: storage))
   }
 }
 
@@ -508,7 +508,7 @@ extension ThrowingSeries: AsyncSequence {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension ThrowingSeries.YieldingContinuation {
+extension ThrowingSeries.Continuation {
   public func resume<Failure: Error>(
     with result: Result<Element, Failure>
   ) {
