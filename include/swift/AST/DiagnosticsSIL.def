@@ -251,10 +251,10 @@ NOTE(designated_init_c_struct_fix,none,
 
 // Control flow diagnostics.
 ERROR(missing_return_closure,none,
-      "missing return in a closure expected to return %0",
+      "missing return in closure expected to return %0",
       (Type))
 ERROR(missing_return_last_expr_closure,none,
-      "missing return in a closure expected to return %0; "
+      "missing return in closure expected to return %0; "
       "did you mean to return the last expression?",
       (Type))
 ERROR(missing_never_call_closure,none,
@@ -263,10 +263,10 @@ ERROR(missing_never_call_closure,none,
       (Type))
 
 ERROR(missing_return_decl,none,
-      "missing return in a %1 expected to return %0",
+      "missing return in %1 expected to return %0",
       (Type, DescriptiveDeclKind))
 ERROR(missing_return_last_expr_decl,none,
-      "missing return in a %1 expected to return %0; "
+      "missing return in %1 expected to return %0; "
       "did you mean to return the last expression?",
       (Type, DescriptiveDeclKind))
 ERROR(missing_never_call_decl,none,
