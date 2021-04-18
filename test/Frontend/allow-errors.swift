@@ -70,9 +70,9 @@ func test(s: ValidStructInvalidMember) {
 // Check SIL diagnostics are still output (no reason not to output SIL since
 // there were no errors)
 func other() -> Int {}
-// CHECK-VALID: allow-errors.swift:[[@LINE-1]]:22: error: missing return in a function expected to return 'Int'
+// CHECK-VALID: allow-errors.swift:[[@LINE-1]]:22: error: missing return in a global function expected to return 'Int'
 func other2() -> Bool {}
-// CHECK-VALID: allow-errors.swift:[[@LINE-1]]:24: error: missing return in a function expected to return 'Bool'
+// CHECK-VALID: allow-errors.swift:[[@LINE-1]]:24: error: missing return in a global function expected to return 'Bool'
 #endif
 
 // All invalid uses should have no errors in the file itself, all referenced
