@@ -516,18 +516,12 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto *tangentEqualsSelfAlias = new (C) TypeAliasDecl(
       SourceLoc(), SourceLoc(), C.Id_TangentVector, SourceLoc(),
       /*GenericParams*/ nullptr, structDecl);
-  tangentEqualsSelfAlias->setUnderlyingType(structDecl->getSelfTypeInContext());
-  tangentEqualsSelfAlias->setAccess(structDecl->getFormalAccess());
+  tangentEqualsSelfAlias->setUnderlyingType(structDecl->getDeclaredInterfaceType());
+  tangentEqualsSelfAlias->copyFormalAccessFrom(structDecl,
+                                               /*sourceIsParentContext*/ true);
   tangentEqualsSelfAlias->setImplicit();
   tangentEqualsSelfAlias->setSynthesized();
   structDecl->addMember(tangentEqualsSelfAlias);
-
-  // If nominal type is `@usableFromInline`, also mark `TangentVector` struct.
-  if (nominal->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    structDecl->getAttrs().add(new (C) UsableFromInlineAttr(/*implicit*/ true));
-    tangentEqualsSelfAlias->getAttrs().add(
-        new (C) UsableFromInlineAttr(/*implicit*/ true));
-  }
 
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
