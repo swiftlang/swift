@@ -28,19 +28,16 @@ struct SwiftError;
 class TaskStatusRecord;
 class TaskGroup;
 
+extern FullMetadata<HeapMetadata> taskLocalHeapItemHeapMetadata;
+
 // ==== Task Locals Values ---------------------------------------------------
 
 class TaskLocal {
 public:
   /// Type of the pointed at `next` task local item.
   enum class NextLinkType : uintptr_t {
-    /// This task is known to be a "terminal" node in the lookup of task locals.
-    /// In other words, even if it had a parent, the parent (and its parents)
-    /// are known to not contain any any more task locals, and thus any further
-    /// search beyond this task.
-    IsTerminal = 0b00,
     /// The storage pointer points at the next TaskLocal::Item in this task.
-    IsNext = 0b01,
+    IsNext = 0b00,
     /// The storage pointer points at a item stored by another AsyncTask.
     ///
     /// Note that this may not necessarily be the same as the task's parent
@@ -48,7 +45,10 @@ public:
     /// does not "contribute" any task local values. This is to speed up
     /// lookups by skipping empty parent tasks during get(), and explained
     /// in depth in `createParentLink`.
-    IsParent = 0b11
+    IsParent = 0b01,
+
+    /// The next item is "unstructured" and must be ref-counted.
+    ThisItemIsHeapItem = 0b10
   };
 
   /// Values must match `TaskLocalInheritance` declared in `TaskLocal.swift`.
@@ -70,7 +70,7 @@ public:
     /// - specifically from the current task itself
     ///
     /// Such values are *not* accessible from child tasks or detached tasks.
-    Never   = 1
+    Never = 1
   };
 
   class Item {
@@ -78,29 +78,33 @@ public:
     /// Mask used for the low status bits in a task local chain item.
     static const uintptr_t statusMask = 0x03;
 
-    /// Pointer to the next task local item; be it in this task or in a parent.
-    /// Low bits encode `NextLinkType`.
-    /// Item *next = nullptr;
+    /// Pointer to one of the following:
+    /// - next task local item as OpaqueValue* if it is task-local allocated
+    /// - next task local item as HeapObject* if it is heap allocated "heavy"
+    /// - the parent task's TaskLocal::Storage
+    ///
+    /// Low bits encode `NextLinkType`, based on which the type of the pointer
+    /// is determined.
     uintptr_t next;
 
   public:
     /// The type of the key with which this value is associated.
-    const Metadata *keyType;
+    const HeapObject *key;
     /// The type of the value stored by this item.
     const Metadata *valueType;
 
     // Trailing storage for the value itself. The storage will be
     // uninitialized or contain an instance of \c valueType.
 
-  private:
+  protected:
     explicit Item()
       : next(0),
-        keyType(nullptr),
+        key(nullptr),
         valueType(nullptr) {}
 
-    explicit Item(const Metadata *keyType, const Metadata *valueType)
+    explicit Item(const HeapObject *key, const Metadata *valueType)
       : next(0),
-        keyType(keyType),
+        key(key),
         valueType(valueType) {}
 
   public:
@@ -116,7 +120,7 @@ public:
     static Item *createParentLink(AsyncTask *task, AsyncTask *parent);
 
     static Item *createLink(AsyncTask *task,
-                            const Metadata *keyType,
+                            const HeapObject *key,
                             const Metadata *valueType);
 
     void destroy(AsyncTask *task);
@@ -125,25 +129,32 @@ public:
       return reinterpret_cast<Item *>(next & ~statusMask);
     }
 
-    NextLinkType getNextLinkType() {
+    NextLinkType getNextLinkType() const {
       return static_cast<NextLinkType>(next & statusMask);
+    }
+
+    bool isHeapItem() const {
+      return getNextLinkType() == NextLinkType::ThisItemIsHeapItem;
     }
 
     /// Item does not contain any actual value, and is only used to point at
     /// a specific parent item.
-    bool isEmpty() {
+    bool isEmpty() const {
       return !valueType;
     }
 
     /// Retrieve a pointer to the storage of the value.
     OpaqueValue *getStoragePtr() {
+      fprintf(stderr, "[%s:%d] (%s) GET STORAGE\n", __FILE__, __LINE__, __FUNCTION__);
       return reinterpret_cast<OpaqueValue *>(
-        reinterpret_cast<char *>(this) + storageOffset(valueType));
+        reinterpret_cast<char *>(this) + storageOffset(isHeapItem(), valueType));
     }
 
     /// Compute the offset of the storage from the base of the item.
-    static size_t storageOffset(const Metadata *valueType) {
+    static size_t storageOffset(bool isHeapItem, const Metadata *valueType) {
       size_t offset = sizeof(Item);
+
+
       if (valueType) {
         size_t alignment = valueType->vw_alignment();
         return (offset + alignment - 1) & ~(alignment - 1);
@@ -153,8 +164,10 @@ public:
     }
 
     /// Determine the size of the item given a particular value type.
-    static size_t itemSize(const Metadata *valueType) {
-      size_t offset = storageOffset(valueType);
+    static size_t itemSize(bool isHeapItem, const Metadata *valueType) {
+      size_t offset = storageOffset(isHeapItem, valueType);
+      size_t headerSize = isHeapItem ? sizeof(HeapObject) : 0;
+      offset += headerSize;
       if (valueType) {
         offset += valueType->vw_size();
       }
@@ -162,6 +175,42 @@ public:
     }
   };
 
+  /// Heap allocated version of TaskLocal::Item.
+  /// It is used in limited un-structured concurrency cases, where the task
+  /// local must be stored on the heap for the time being.
+  ///
+  /// MUST HAVE THE SAME LAYOUT AS TaskLocal::Item.
+  /// FIXME: how to actually make this work...
+  ///        get the address of "after heap object" and cast that to Item?
+  class HeapItem : public HeapObject, public Item {
+  public:
+
+    explicit HeapItem(const HeapMetadata *metadata = &taskLocalHeapItemHeapMetadata)
+        : HeapObject(metadata),
+          Item() {}
+
+    explicit HeapItem(const HeapObject *key, const Metadata *valueType)
+        : HeapItem(&taskLocalHeapItemHeapMetadata, key, valueType) {}
+
+    explicit HeapItem(const HeapMetadata *metadata,
+                      const HeapObject *key, const Metadata *valueType)
+        : HeapObject(metadata),
+          Item(key, valueType) {}
+
+
+    /// Retrieve a pointer to the `Item` that is part of this object.
+    TaskLocal::Item *getItem() {
+      fprintf(stderr, "[%s:%d] (%s) GET ITEM PTR, heapItem:%p\n", __FILE__, __LINE__, __FUNCTION__, this);
+      return reinterpret_cast<TaskLocal::Item *>(
+          reinterpret_cast<char *>(this) + itemOffset());
+    }
+
+    /// Compute the offset of `Item` part of this object.
+    static size_t itemOffset() {
+      size_t offset = sizeof(HeapObject);
+      return offset;
+    }
+  };
 
   class Storage {
     friend class TaskLocal::Item;
@@ -202,11 +251,11 @@ public:
     void initializeLinkParent(AsyncTask *task, AsyncTask *parent);
 
     void pushValue(AsyncTask *task,
-                   const Metadata *keyType,
+                   const HeapObject *key,
                    /* +1 */ OpaqueValue *value, const Metadata *valueType);
 
     OpaqueValue* getValue(AsyncTask *task,
-                          const Metadata *keyType,
+                          const HeapObject *key,
                           TaskLocalInheritance inheritance);
 
     void popValue(AsyncTask *task);

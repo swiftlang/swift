@@ -47,7 +47,7 @@ public:
     NextWaitingTaskIndex = 0,
 
     // The Dispatch object header is one pointer and two ints, which is
-    // equvialent to three pointers on 32-bit and two pointers 64-bit. Set the
+    // equivalent to three pointers on 32-bit and two pointers 64-bit. Set the
     // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
     // expects.
     DispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
@@ -217,14 +217,14 @@ public:
 
   // ==== Task Local Values ----------------------------------------------------
 
-  void localValuePush(const Metadata *keyType,
+  void localValuePush(const HeapObject *key,
                       /* +1 */ OpaqueValue *value, const Metadata *valueType) {
-    Local.pushValue(this, keyType, value, valueType);
+    Local.pushValue(this, key, value, valueType);
   }
 
-  OpaqueValue* localValueGet(const Metadata *keyType,
+  OpaqueValue* localValueGet(const HeapObject *key,
                              TaskLocal::TaskLocalInheritance inherit) {
-    return Local.getValue(this, keyType, inherit);
+    return Local.getValue(this, key, inherit);
   }
 
   void localValuePop() {

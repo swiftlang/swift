@@ -233,6 +233,10 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_removeStatusRecord)
   swift_task_removeStatusRecord(nullptr);
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest, task_hasTaskGroupStatusRecord) {
+  task_hasTaskGroupStatusRecord();
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_attachChild) {
   swift_task_attachChild(nullptr);
 }

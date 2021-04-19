@@ -13,15 +13,80 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// Namespace for declaring `TaskLocalKey`s.
+/// This type must be a `class` so it has a stable identity, that is used as key
+/// value for lookups in the task local storage.
+@propertyWrapper
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public enum TaskLocalValues {}
+public final class TaskLocal<Value>: CustomStringConvertible {
+  var defaultValue: Value
+  var inherit: TaskLocalInheritance
+
+  // Note: could overload with additional parameters to support other features
+  public init(wrappedValue: Value) {
+    self.defaultValue = wrappedValue
+    self.inherit = .default
+  }
+
+  public init(wrappedValue: Value, inherit: TaskLocalInheritance) {
+    self.defaultValue = wrappedValue
+    self.inherit = inherit
+  }
+
+  public var wrappedValue: Value {
+    get {
+      return withUnsafeCurrentTask { task in
+        guard let task = task else {
+          return self.defaultValue
+        }
+
+        let value = _taskLocalValueGet(
+            task._task, key: unsafeBitCast(self, to: Builtin.RawPointer.self), inheritance: inherit.rawValue)
+
+        guard let rawValue = value else {
+          return self.defaultValue
+        }
+
+        // Take the value; The type should be correct by construction
+        let storagePtr =
+            rawValue.bindMemory(to: Value.self, capacity: 1)
+        return UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
+      }
+    }
+
+    @available(*, unavailable, message: "use ‘$myTaskLocal.withValue(_:do:)’ instead")
+    set {
+      fatalError("Illegal attempt to set a \(Self.self) value, use `withValue(...) { ... }` instead.")
+    }
+  }
+
+  public var projectedValue: TaskLocal<Value> {
+    self
+  }
+
+  public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R) async rethrows -> R {
+    // we need to escape the `_task` since the withUnsafeCurrentTask closure is not `async`.
+    // this is safe, since we know the task will remain alive because we are running inside of it.
+    let _task = withUnsafeCurrentTask { task in
+      task!._task // !-safe, guaranteed to have task available inside async function
+    }
+
+    _taskLocalValuePush(_task, key: unsafeBitCast(self, to: Builtin.RawPointer.self), value: valueDuringBody)
+    defer { _taskLocalValuePop(_task) }
+
+    return try await body()
+  }
+
+  public var description: String {
+    "\(Self.self)(\(wrappedValue))"
+  }
+
+}
 
 /// A `TaskLocalKey` is used to identify, bind and get a task local value from
 /// a `Task` in which a function is currently executing.
 ///
 /// - SeeAlso: `Task.withLocal(_:boundTo:operation:)`
-/// - SeeAlso: `Task.local(_:)`
+/// - SeeAlso: `TaskLocal(_:)`
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol TaskLocalKey {
   /// The type of `Value` uniquely identified by this key.
@@ -66,65 +131,15 @@ public enum TaskLocalInheritance: UInt8, Equatable {
   case never = 1
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Task {
-
-  /// Read a task-local value, bound to the specified key.
-  ///
-  /// - Parameter keyPath: key path to the `TaskLocalKey` to be used for lookup
-  /// - Returns: the value bound to the key, or its default value it if was not
-  ///            bound in the current (or any parent) tasks.
-  public static func local<Key>(
-    _ keyPath: KeyPath<TaskLocalValues, Key>
-  ) -> Key.Value where Key: TaskLocalKey {
-    guard let task = Task.current else {
-      return Key.defaultValue
-    }
-
-    let value = _taskLocalValueGet(
-      task._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
-    guard let rawValue = value else {
-      return Key.defaultValue
-    }
-
-    // Take the value; The type should be correct by construction
-    let storagePtr =
-      rawValue.bindMemory(to: Key.Value.self, capacity: 1)
-    return UnsafeMutablePointer<Key.Value>(mutating: storagePtr).pointee
-  }
-
-  /// Bind the task local key to the given value for the scope of the `body` function.
-  /// Any child tasks spawned within this scope will inherit the binding.
-  ///
-  /// - Parameters:
-  ///   - keyPath: key path to the `TaskLocalKey` to be used for lookup
-  ///   - value: value to bind the task local to for the scope of `operation`
-  ///   - operation: the operation to run with the task local value bound
-  /// - Returns: the value returned by the `body` function.
-  public static func withLocal<Key, BodyResult>(
-    _ keyPath: KeyPath<TaskLocalValues, Key>,
-    boundTo value: Key.Value,
-    operation: () async throws -> BodyResult
-  ) async rethrows -> BodyResult where Key: TaskLocalKey {
-    let _task = Task.current!._task // !-safe, guaranteed to have task available inside async function
-
-    _taskLocalValuePush(_task, keyType: Key.self, value: value)
-    defer { _taskLocalValuePop(_task) }
-
-    return try await operation()
-  }
-
-}
-
 // ==== ------------------------------------------------------------------------
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_localValuePush")
 public func _taskLocalValuePush<Value>(
   _ task: Builtin.NativeObject,
-  keyType: Any.Type/*Key.Type*/,
+  key: Builtin.RawPointer/*: Key*/,
   value: __owned Value
-) // where Key: TaskLocalKey
+) // where Key: TaskLocal
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_localValuePop")
@@ -136,6 +151,6 @@ public func _taskLocalValuePop(
 @_silgen_name("swift_task_localValueGet")
 public func _taskLocalValueGet(
   _ task: Builtin.NativeObject,
-  keyType: Any.Type/*Key.Type*/,
+  key: Builtin.RawPointer/*Key*/,
   inheritance: UInt8/*TaskLocalInheritance*/
-) -> UnsafeMutableRawPointer? // where Key: TaskLocalKey
+) -> UnsafeMutableRawPointer? // where Key: TaskLocal

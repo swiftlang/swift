@@ -215,7 +215,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       priority: Task.Priority = .unspecified,
       operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) async -> Bool {
-    return try self.spawnUnlessCancelled(priority: priority) {
+    return self.spawnUnlessCancelled(priority: priority) {
       await operation()
     }
   }
@@ -467,7 +467,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     priority: Task.Priority = .unspecified,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) async -> Bool {
-    return try self.spawnUnlessCancelled(priority: priority) {
+    return self.spawnUnlessCancelled(priority: priority) {
       try await operation()
     }
   }
