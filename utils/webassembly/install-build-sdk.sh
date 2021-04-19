@@ -40,6 +40,14 @@ pushd "$workdir"
 
 mkdir -p "$BUILD_SDK_PATH"
 
-install_libxml2
-install_icu
-install_wasi-sdk
+if [ ! -e "$BUILD_SDK_PATH/libxml2" ]; then
+  install_libxml2
+fi
+
+if [ ! -e "$BUILD_SDK_PATH/icu" ]; then
+  install_icu
+fi
+
+if [ ! -e "$BUILD_SDK_PATH/wasi-sdk" ]; then
+  install_wasi-sdk
+fi
