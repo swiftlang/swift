@@ -277,11 +277,12 @@ class ToolchainTestCase(unittest.TestCase):
             'build_tvos_simulator',
             'test_tvos_simulator')
     # NOTE: test_watchos_host is not supported in open-source Swift
-    test_should_skip_testing_watchos_sim =\
-        generate_should_skip_testing_platform(
-            'watchsimulator-i386',
-            'build_watchos_simulator',
-            'test_watchos_simulator')
+    # FIXME: Re-enable this test with x86_64 (76823842)
+    # test_should_skip_testing_watchos_sim =\
+    #     generate_should_skip_testing_platform(
+    #         'watchsimulator-i386',
+    #         'build_watchos_simulator',
+    #         'test_watchos_simulator')
 
     def test_should_skip_testing_32bit_ios(self):
         host_target = 'iphonesimulator-i386'
