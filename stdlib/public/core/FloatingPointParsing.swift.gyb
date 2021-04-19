@@ -53,13 +53,14 @@ extension ${Self}: LosslessStringConvertible {
   /// Creates a new instance from the given string.
   ///
   /// The string passed as `text` can represent a real number in decimal or
-  /// hexadecimal format or special floating-point values for infinity and NaN
-  /// ("not a number").
+  /// hexadecimal format or can be in a special format representing infinity
+  /// or NaN ("not a number"). If the `text` is not in a recognized format,
+  /// the optional initializer will fail and return `nil`.
   ///
   /// The `text` string may begin with a plus or minus sign character (`+` or
   /// `-`) followed by one of the following formats:
   ///
-  /// - A *decimal value* contains a significand consisting of one
+  /// - A *decimal string* contains a significand consisting of one
   ///   or more decimal digits that may include a decimal point:
   ///
   ///       let c = ${Self}("-1.0")
@@ -68,9 +69,9 @@ extension ${Self}: LosslessStringConvertible {
   ///       let d = ${Self}("28.375")
   ///       // d == 28.375
   ///
-  ///   A decimal value may also include an exponent following the significand,
-  ///   indicating the power of 10 by which the significand should be
-  ///   multiplied. If included, the exponent is separated by a single
+  ///   A decimal string may also include an exponent following the
+  ///   significand, indicating the power of 10 by which the significand should
+  ///   be multiplied. If included, the exponent is separated by a single
   ///   character, `e` or `E`, and consists of an optional plus or minus sign
   ///   character and a sequence of decimal digits.
   ///
@@ -78,9 +79,9 @@ extension ${Self}: LosslessStringConvertible {
   ///       // e == 28.375
   ///
   ///   A decimal string is converted into a correctly-rounded ${Self}
-  ///   value using IEEE 754 round-to-nearest
-  ///   conventions. Very small values are converted to positive or
-  ///   negative zero, very large values are converted
+  ///   instance using IEEE 754 round-to-nearest
+  ///   conventions. Very small values are rounded to positive or
+  ///   negative zero, very large values are rounded
   ///   to plus or minus infinity.
   ///
   ///       let y = ${Self}("1.23e-9999")
@@ -97,14 +98,14 @@ extension ${Self}: LosslessStringConvertible {
   ///       let s = ${Self}("-7.89e7206")
   ///       // s == ${Self}.-infinity
   ///
-  /// - A *hexadecimal value* contains a significand consisting of
-  //    `0X` or `0x` followed by one or more hexadecimal digits that may
+  /// - A *hexadecimal string* contains a significand consisting of
+  ///   `0X` or `0x` followed by one or more hexadecimal digits that may
   ///   include a decimal point.
   ///
   ///       let f = ${Self}("0x1c.6")
   ///       // f == 28.375
   ///
-  ///   A hexadecimal value may also include an exponent
+  ///   A hexadecimal string may also include an exponent
   ///   indicating the power of 2 by which the significand should
   ///   be multiplied. If included, the exponent is separated by a single
   ///   character, `p` or `P`, and consists of an optional plus or minus sign
@@ -113,9 +114,9 @@ extension ${Self}: LosslessStringConvertible {
   ///       let g = ${Self}("0x1.c6p4")
   ///       // g == 28.375
   ///
-  ///   As with decimal strings, hexadecimal strings are converted
-  ///   to the closest ${Self} value to the real number.  Very small
-  ///   or very large values are converted to plus or minus zero or plus
+  ///   As with decimal strings, hexadecimal strings are rounded
+  ///   to the closest ${Self} instance to the real number.  Very small
+  ///   or very large values are rounded to plus or minus zero or plus
   ///   or minus infinity.
   ///
   /// - The input strings `"inf"` or `"infinity"` (case insensitive)
@@ -134,7 +135,7 @@ extension ${Self}: LosslessStringConvertible {
   ///       // n?.isNaN == true
   ///       // n?.sign == .minus
   ///
-  ///   A NaN value may also include a payload in parentheses following the
+  ///   A NaN string may also include a payload in parentheses following the
   ///   `"nan"` keyword. The payload consists of a sequence of decimal digits,
   ///   or the characters `0X` or `0x` followed by a sequence of hexadecimal
   ///   digits. If the payload contains any other characters, it is ignored.
@@ -145,7 +146,7 @@ extension ${Self}: LosslessStringConvertible {
   ///       // p?.isNaN == true
   ///       // String(p!) == "nan(0x10)"
   ///
-  /// - A value in any other format or containing additional characters
+  /// - A string in any other format or containing additional characters
   ///   results in a `nil` value. For example, the following conversions
   ///   result in `nil`:
   ///
@@ -153,8 +154,7 @@ extension ${Self}: LosslessStringConvertible {
   ///       ${Self}("±2.0")      // Invalid character
   ///       ${Self}("0x1.25e4")  // Incorrect exponent format
   ///
-  /// - Parameter text: The input string to convert to a `${Self}?` instance.
-  ///   The value will be `nil` if the input is incorrectly formatted.
+  /// - Parameter text: An input string to convert to a `${Self}?` instance.
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
   %if bits == 16:
