@@ -741,6 +741,13 @@ namespace {
 
 /// Promote memory to registers
 class MemoryToRegisters {
+  /// Lazily initialized map from DomTreeNode to DomTreeLevel.
+  ///
+  /// DomTreeLevelMap is a DenseMap implying that if we initialize it, we always
+  /// will initialize a heap object with 64 objects. Thus by using an optional,
+  /// computing this lazily, we only do this if we actually need to do so.
+  Optional<DomTreeLevelMap> domTreeLevels;
+
   /// The function that we are optimizing.
   SILFunction &f;
 
@@ -750,6 +757,32 @@ class MemoryToRegisters {
   /// The builder context used when creating new instructions during register
   /// promotion.
   SILBuilderContext ctx;
+
+  /// Returns the dom tree levels for the current function. Computes these
+  /// lazily.
+  DomTreeLevelMap &getDomTreeLevels() {
+    // If we already computed our levels, just return it.
+    if (auto &levels = domTreeLevels) {
+      return *levels;
+    }
+
+    // Otherwise, emplace the map and compute it.
+    domTreeLevels.emplace();
+    auto &levels = *domTreeLevels;
+    SmallVector<DomTreeNode *, 32> worklist;
+    DomTreeNode *rootNode = domInfo->getRootNode();
+    levels[rootNode] = 0;
+    worklist.push_back(rootNode);
+    while (!worklist.empty()) {
+      DomTreeNode *domNode = worklist.pop_back_val();
+      unsigned childLevel = levels[domNode] + 1;
+      for (auto *childNode : domNode->children()) {
+        levels[childNode] = childLevel;
+        worklist.push_back(childNode);
+      }
+    }
+    return *domTreeLevels;
+  }
 
   /// Check if the AllocStackInst \p ASI is only written into.
   bool isWriteOnlyAllocation(AllocStackInst *asi);
@@ -763,8 +796,7 @@ class MemoryToRegisters {
   /// Attempt to promote the specified stack allocation, returning true if so
   /// or false if not.  On success, all uses of the AllocStackInst have been
   /// removed, but the ASI itself is still in the program.
-  bool promoteSingleAllocation(AllocStackInst *asi,
-                               DomTreeLevelMap &domTreeLevels);
+  bool promoteSingleAllocation(AllocStackInst *asi);
 
 public:
   /// C'tor
@@ -1001,30 +1033,11 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
   }
 }
 
-/// Compute the dominator tree levels for domInfo.
-static void computeDomTreeLevels(DominanceInfo *domInfo,
-                                 DomTreeLevelMap &domTreeLevels) {
-  // TODO: This should happen once per function.
-  SmallVector<DomTreeNode *, 32> worklist;
-  DomTreeNode *rootNode = domInfo->getRootNode();
-  domTreeLevels[rootNode] = 0;
-  worklist.push_back(rootNode);
-  while (!worklist.empty()) {
-    DomTreeNode *domNode = worklist.pop_back_val();
-    unsigned childLevel = domTreeLevels[domNode] + 1;
-    for (auto *childNode : domNode->children()) {
-      domTreeLevels[childNode] = childLevel;
-      worklist.push_back(childNode);
-    }
-  }
-}
-
 /// Attempt to promote the specified stack allocation, returning true if so
 /// or false if not.  On success, this returns true and usually drops all of the
 /// uses of the AllocStackInst, but never deletes the ASI itself.  Callers
 /// should check to see if the ASI is dead after this and remove it if so.
-bool MemoryToRegisters::promoteSingleAllocation(
-    AllocStackInst *alloc, DomTreeLevelMap &domTreeLevels) {
+bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
   LLVM_DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
   ++NumAllocStackFound;
 
@@ -1064,7 +1077,9 @@ bool MemoryToRegisters::promoteSingleAllocation(
 
   LLVM_DEBUG(llvm::dbgs() << "*** Need to insert BB arguments for " << *alloc);
 
-  // Promote this allocation.
+  // Promote this allocation, lazily computing dom tree levels for this function
+  // if we have not done so yet.
+  auto &domTreeLevels = getDomTreeLevels();
   StackAllocationPromoter(alloc, domInfo, domTreeLevels, ctx).run();
 
   // Make sure that all of the allocations were promoted into registers.
@@ -1080,10 +1095,6 @@ bool MemoryToRegisters::run() {
   if (f.getModule().getOptions().VerifyAll)
     f.verifyCriticalEdges();
 
-  // Compute dominator tree node levels for the function.
-  DomTreeLevelMap domTreeLevels;
-  computeDomTreeLevels(domInfo, domTreeLevels);
-
   for (auto &block : f) {
     auto ii = block.begin(), ie = block.end();
     while (ii != ie) {
@@ -1094,7 +1105,7 @@ bool MemoryToRegisters::run() {
         continue;
       }
 
-      bool promoted = promoteSingleAllocation(asi, domTreeLevels);
+      bool promoted = promoteSingleAllocation(asi);
       ++ii;
       if (promoted) {
         if (asi->use_empty())
