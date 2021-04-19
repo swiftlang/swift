@@ -685,7 +685,7 @@ final class TestRunner {
   }
 }
 
-public func main() async {
+public func runBenchmarks() async {
   let config = TestConfig(registeredBenchmarks)
   switch (config.action) {
   case .listTests:
