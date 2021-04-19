@@ -689,7 +689,8 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
     switch (kind) {
     case PTK_UnsafeMutableRawPointer:
     case PTK_UnsafeRawPointer:
-      llvm_unreachable("these pointer types don't take arguments");
+      // these pointer types don't take arguments.
+      return (NominalTypeDecl*)nullptr;
     case PTK_UnsafePointer:
       return ctx.getUnsafePointerDecl();
     case PTK_UnsafeMutablePointer:
@@ -701,6 +702,10 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
   }());
 
   assert(pointerDecl);
+  // Don't fail hard on null pointerDecl.
+  if (!pointerDecl) {
+    return Type();
+  }
   return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
 }
 
