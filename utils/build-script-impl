@@ -423,6 +423,7 @@ function verify_host_is_supported() {
       | watchsimulator-x86_64   \
       | watchsimulator-arm64    \
       | watchos-armv7k          \
+      | watchos-arm64_32        \
       | android-armv7           \
       | android-aarch64         \
       | android-x86_64)
@@ -654,6 +655,13 @@ function set_build_options_for_host() {
                 watchos-armv7k)
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     llvm_target_arch="ARM"
+
+                    SWIFT_HOST_VARIANT_SDK="WATCHOS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                watchos-arm64_32)
+                    SWIFT_HOST_TRIPLE="arm64_32-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                    llvm_target_arch="AArch64"
 
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
                     cmake_osx_deployment_target=""
