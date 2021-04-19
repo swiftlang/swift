@@ -600,11 +600,12 @@ public:
   };
 
   enum NotRecommendedReason {
-    Redundant,
+    None = 0,
+    RedundantImport,
     Deprecated,
-    InvalidContext,
+    InvalidAsyncContext,
     CrossActorReference,
-    NoReason,
+    VariableUsedInOwnDefinition,
   };
 
 private:
@@ -612,8 +613,7 @@ private:
   unsigned AssociatedKind : 8;
   unsigned KnownOperatorKind : 6;
   unsigned SemanticContext : 3;
-  unsigned NotRecommended : 1;
-  unsigned NotRecReason : 3;
+  unsigned NotRecommended : 4;
   unsigned IsSystem : 1;
 
   /// The number of bytes to the left of the code completion point that
@@ -644,11 +644,9 @@ public:
                            CodeCompletionOperatorKind::None,
                        StringRef BriefDocComment = StringRef())
       : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
-        NotRecReason(NotRecommendedReason::NoReason),
+        SemanticContext(unsigned(SemanticContext)), NotRecommended(None),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        BriefDocComment(BriefDocComment),
-        TypeDistance(TypeDistance) {
+        BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
     if (isOperator() && KnownOperatorKind == CodeCompletionOperatorKind::None)
@@ -670,8 +668,7 @@ public:
                        ExpectedTypeRelation TypeDistance,
                        StringRef BriefDocComment = StringRef())
       : Kind(Keyword), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
-        NotRecReason(NotRecommendedReason::NoReason),
+        SemanticContext(unsigned(SemanticContext)), NotRecommended(None),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
     assert(CompletionString);
@@ -688,8 +685,7 @@ public:
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
       : Kind(Literal), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)), NotRecommended(false),
-        NotRecReason(NotRecommendedReason::NoReason),
+        SemanticContext(unsigned(SemanticContext)), NotRecommended(None),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
@@ -706,7 +702,6 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl, StringRef ModuleName,
-                       bool NotRecommended,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
@@ -714,11 +709,10 @@ public:
                        enum ExpectedTypeRelation TypeDistance)
       : Kind(ResultKind::Declaration), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(NotRecommended), NotRecReason(NotRecReason),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
-        TypeDistance(TypeDistance) {
+        NotRecommended(NotRecReason), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        DocWords(DocWords), TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     IsSystem = getDeclIsSystem(AssociatedDecl);
@@ -735,7 +729,7 @@ public:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
-                       StringRef ModuleName, bool NotRecommended,
+                       StringRef ModuleName,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
@@ -745,11 +739,11 @@ public:
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)),
-        NotRecommended(NotRecommended), NotRecReason(NotRecReason),
-        IsSystem(IsSystem), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        DocWords(DocWords), TypeDistance(TypeDistance) {
+        NotRecommended(NotRecReason), IsSystem(IsSystem),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
+        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
+        TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     assert(!isOperator() ||
@@ -800,16 +794,14 @@ public:
   }
 
   NotRecommendedReason getNotRecommendedReason() const {
-    return static_cast<NotRecommendedReason>(NotRecReason);
+    return static_cast<NotRecommendedReason>(NotRecommended);
   }
 
   SemanticContextKind getSemanticContext() const {
     return static_cast<SemanticContextKind>(SemanticContext);
   }
 
-  bool isNotRecommended() const {
-    return NotRecommended;
-  }
+  bool isNotRecommended() const { return NotRecommended != None; }
 
   unsigned getNumBytesToErase() const {
     return NumBytesToErase;

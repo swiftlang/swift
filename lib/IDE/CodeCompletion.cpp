@@ -1294,8 +1294,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
-        /*NotRecommended=*/IsNotRecommended, NotRecReason,
-        copyString(*Sink.Allocator, BriefComment),
+        NotRecReason, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
   }
@@ -2090,8 +2089,8 @@ public:
       Builder.addBaseName(MD->getNameStr());
       Builder.addTypeAnnotation("Module");
       if (Pair.second)
-        Builder.setNotRecommended(CodeCompletionResult::NotRecommendedReason::
-                                    Redundant);
+        Builder.setNotRecommended(
+            CodeCompletionResult::NotRecommendedReason::RedundantImport);
     }
   }
 
@@ -2155,7 +2154,7 @@ public:
 
       // Imported modules are not recommended.
       if (ImportedModules.count(MD->getNameStr()) != 0)
-        Reason = CodeCompletionResult::NotRecommendedReason::Redundant;
+        Reason = CodeCompletionResult::NotRecommendedReason::RedundantImport;
 
       addModuleName(MD, Reason);
     }
@@ -2582,13 +2581,13 @@ public:
     if (Kind == LookupKind::ValueInDeclContext) {
       if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
         if (accessor->getStorage() == VD && accessor->isGetter())
-          NotRecommended = CodeCompletionResult::NoReason;
+          NotRecommended = CodeCompletionResult::VariableUsedInOwnDefinition;
       }
     }
     bool implicitlyAsync = false;
     analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
     if (!NotRecommended && implicitlyAsync && !CanCurrDeclContextHandleAsync) {
-      NotRecommended = CodeCompletionResult::InvalidContext;
+      NotRecommended = CodeCompletionResult::InvalidAsyncContext;
     }
 
     CommandWordsPairs Pairs;
@@ -2930,7 +2929,7 @@ public:
 
       if (AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(
-            CodeCompletionResult::NotRecommendedReason::InvalidContext);
+            CodeCompletionResult::NotRecommendedReason::InvalidAsyncContext);
       }
     };
 
@@ -3046,7 +3045,7 @@ public:
     if (!NotRecommended && !IsImplicitlyCurriedInstanceMethod &&
         ((AFT && AFT->isAsync()) || implictlyAsync) &&
         !CanCurrDeclContextHandleAsync) {
-      NotRecommended = CodeCompletionResult::InvalidContext;
+      NotRecommended = CodeCompletionResult::InvalidAsyncContext;
     }
 
     // Add the method, possibly including any default arguments.
@@ -3245,7 +3244,7 @@ public:
 
       if (ConstructorType->isAsync() && !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(
-            CodeCompletionResult::NotRecommendedReason::InvalidContext);
+            CodeCompletionResult::NotRecommendedReason::InvalidAsyncContext);
       }
     };
 
@@ -3296,7 +3295,7 @@ public:
     analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
     if (!NotRecommended && implictlyAsync && !CanCurrDeclContextHandleAsync) {
-      NotRecommended = CodeCompletionResult::InvalidContext;
+      NotRecommended = CodeCompletionResult::InvalidAsyncContext;
     }
 
     CommandWordsPairs Pairs;
