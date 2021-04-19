@@ -175,7 +175,8 @@ class StdlibDeploymentTarget(object):
     AppleWatch = DarwinPlatform("watchos", archs=["armv7k"],
                                 sdk_name="WATCHOS")
 
-    AppleWatchSimulator = DarwinPlatform("watchsimulator", archs=["i386", "arm64"],
+    AppleWatchSimulator = DarwinPlatform("watchsimulator",
+                                         archs=["i386", "x86_64", "arm64"],
                                          sdk_name="WATCHOS_SIMULATOR",
                                          is_simulator=True)
 

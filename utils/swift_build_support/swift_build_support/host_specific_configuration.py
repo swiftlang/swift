@@ -283,6 +283,8 @@ class HostSpecificConfiguration(object):
                 StdlibDeploymentTarget.AppleTVSimulator.x86_64)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.i386)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator.x86_64)
 
         return platforms_archs_to_skip_test
 
