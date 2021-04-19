@@ -57,8 +57,9 @@ extension ${Self}: LosslessStringConvertible {
   /// or NaN ("not a number"). If the `text` is not in a recognized format,
   /// the optional initializer will fail and return `nil`.
   ///
-  /// The `text` string may begin with a plus or minus sign character (`+` or
-  /// `-`) followed by one of the following formats:
+  /// The `text` string consists of an optional
+  /// plus or minus sign character (`+` or `-`)
+  /// followed by one of the following formats:
   ///
   /// - A *decimal string* contains a significand consisting of one
   ///   or more decimal digits that may include a decimal point:
