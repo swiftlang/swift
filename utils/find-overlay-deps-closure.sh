@@ -15,7 +15,7 @@
 set -o pipefail
 set -e
 
-OVERLAY_NAME_ALTERNATION="AppKit|AssetsLibrary|AVFoundation|CallKit|CloudKit|Compression|Contacts|CoreAudio|CoreData|CoreGraphics|CoreImage|CoreLocation|CoreMedia|CryptoTokenKit|dispatch|Foundation|GameplayKit|GLKit|HomeKit|IOKit|Intents|MapKit|objc|OpenCL|os|Photos|QuartzCore|SafariServices|SceneKit|simd|SpriteKit|UIKit|WatchKit|XCTest|xpc"
+OVERLAY_NAME_ALTERNATION="AppKit|AssetsLibrary|AVFoundation|CallKit|CloudKit|Compression|Contacts|CoreAudio|CoreData|CoreGraphics|CoreImage|CoreLocation|CoreMedia|CoreML|CryptoTokenKit|dispatch|Foundation|GameplayKit|GLKit|HomeKit|IOKit|Intents|MapKit|objc|OpenCL|os|Photos|QuartzCore|SafariServices|SceneKit|simd|SpriteKit|UIKit|WatchKit|XCTest|xpc"
 
 function find_deps() {
     local OVERLAY_ARG=$1
