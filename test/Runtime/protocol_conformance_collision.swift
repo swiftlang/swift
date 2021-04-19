@@ -16,8 +16,6 @@
 
 // UNSUPPORTED: use_os_stdlib
 
-// REQUIRES: rdar73049300
-
 import Accelerate
 import Foundation
 import StdlibUnittest
@@ -48,10 +46,7 @@ func firstHashValue(_ x: P) -> Int {
 }
 
 let osHasWorkaround: Bool
-// These are deliberately NOT version 9999, as we don't want to hit the special
-// case where development runtimes always return true for 9999. This check needs
-// to be false until real version numbers are put in.
-if #available(macOS 99990, iOS 99990, tvOS 99990, watchOS 99990, *) {
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
   osHasWorkaround = true
 } else {
   osHasWorkaround = false

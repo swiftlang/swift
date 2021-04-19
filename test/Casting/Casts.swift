@@ -342,7 +342,7 @@ CastsTests.test("Dynamic cast to ObjC protocol") {
 #endif
 
 // SR-6126
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Nil handling for Optionals and Arrays (SR-6126)") {
   func check(_ arg: Int??) -> String {
     switch arg {
@@ -621,6 +621,7 @@ CastsTests.test("NSNull?.none -> Any? should set outer nil") {
 }
 #endif
 
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Int??.some(nil) => Int??? should inject naturally") {
   let a: Int?? = .some(nil)
   let b = a as? Int???
@@ -629,7 +630,9 @@ CastsTests.test("Int??.some(nil) => Int??? should inject naturally") {
   let e = d!
   expectNil(e)
 }
+}
 
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Int??.some(nil) => String??? should inject naturally") {
   let a: Int?? = .some(nil)
   let b = runtimeCast(a, to: String???.self)
@@ -638,7 +641,9 @@ CastsTests.test("Int??.some(nil) => String??? should inject naturally") {
   let e = d!
   expectNil(e)
 }
+}
 
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
 CastsTests.test("Int??.some(nil) => Any??? should inject naturally") {
   let a: Int?? = .some(nil)
   let b = a as? Any???
@@ -646,6 +651,7 @@ CastsTests.test("Int??.some(nil) => Any??? should inject naturally") {
   let d = c!
   let e = d!
   expectNil(e)
+}
 }
 
 #if _runtime(_ObjC)
