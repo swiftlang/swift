@@ -2119,6 +2119,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// context.
   ConditionalEffectKind MaxThrowingKind;
 
+  llvm::DenseMap<Expr *, Expr *> parentMap;
+
   void flagInvalidCode() {
     // Suppress warnings about useless try or catch.
     Flags.set(ContextFlags::HasAnyThrowSite);
@@ -2297,7 +2299,11 @@ public:
   }
 
 private:
-  void visitExprPre(Expr *expr) { return; }
+  void visitExprPre(Expr *expr) {
+    if (parentMap.count(expr) == 0)
+      parentMap = expr->getParentMap();
+    return;
+  }
 
   ShouldRecurse_t checkClosure(ClosureExpr *E) {
     ContextScope scope(*this, Context::forClosure(E));
