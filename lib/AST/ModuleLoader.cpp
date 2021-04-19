@@ -20,6 +20,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/SourceManager.h"
 #include "clang/Frontend/Utils.h"
 #include "swift/ClangImporter/ClangImporter.h"
 

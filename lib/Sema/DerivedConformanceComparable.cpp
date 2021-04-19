@@ -211,7 +211,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());

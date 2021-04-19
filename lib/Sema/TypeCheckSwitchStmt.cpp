@@ -131,7 +131,7 @@ namespace {
         case SpaceKind::UnknownCase:
           return isAllowedButNotRequired() ? 0 : 1;
         case SpaceKind::Type: {
-          if (!canDecompose(getType(), DC)) {
+          if (!canDecompose(getType())) {
             return 1;
           }
           cache.insert(getType().getPointer());
@@ -316,14 +316,14 @@ namespace {
           }
 
           // (_ : Ty1) <= (_ : Ty2) iff D(Ty1) == D(Ty2)
-          if (canDecompose(this->getType(), DC)) {
+          if (canDecompose(this->getType())) {
             Space or1Space = decompose(DC, this->getType());
             if (or1Space.isSubspace(other, DC)) {
               return true;
             }
           }
 
-          if (canDecompose(other.getType(), DC)) {
+          if (canDecompose(other.getType())) {
             Space or2Space = decompose(DC, other.getType());
             return this->isSubspace(or2Space, DC);
           }
@@ -339,7 +339,7 @@ namespace {
           }
 
           // (_ : Ty1) <= (S1 | ... | Sn) iff D(Ty1) <= (S1 | ... | Sn)
-          if (!canDecompose(this->getType(), DC)) {
+          if (!canDecompose(this->getType())) {
             return false;
           }
           Space or1Space = decompose(DC, this->getType());
@@ -347,7 +347,7 @@ namespace {
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           // (_ : Ty1) <= H(p1 | ... | pn) iff D(Ty1) <= H(p1 | ... | pn)
-          if (canDecompose(this->getType(), DC)) {
+          if (canDecompose(this->getType())) {
             Space or1Space = decompose(DC, this->getType());
             return or1Space.isSubspace(other, DC);
           }
@@ -465,7 +465,7 @@ namespace {
           return *this;
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
-          if (canDecompose(this->getType(), DC)) {
+          if (canDecompose(this->getType())) {
             auto decomposition = decompose(DC, this->getType());
             return decomposition.minus(other, DC, minusCount);
           } else {
@@ -627,7 +627,7 @@ namespace {
             return (getKind() == SpaceKind::BooleanConstant)  ? Space() : *this;
           }
 
-          if (canDecompose(other.getType(), DC)) {
+          if (canDecompose(other.getType())) {
             auto decomposition = decompose(DC, other.getType());
             return this->minus(decomposition, DC, minusCount);
           }
@@ -639,7 +639,7 @@ namespace {
           return *this;
 
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-          if (canDecompose(this->getType(), DC)) {
+          if (canDecompose(this->getType())) {
             auto orSpace = decompose(DC, this->getType());
             return orSpace.minus(other, DC, minusCount);
           } else {
@@ -781,7 +781,7 @@ namespace {
       // Decompose a type into its component spaces.
       static void decompose(const DeclContext *DC, Type tp,
                             SmallVectorImpl<Space> &arr) {
-        assert(canDecompose(tp, DC) && "Non-decomposable type?");
+        assert(canDecompose(tp) && "Non-decomposable type?");
 
         if (tp->isBool()) {
           arr.push_back(Space::forBool(true));
@@ -844,7 +844,7 @@ namespace {
         return Space::forDisjunct(spaces);
       }
 
-      static bool canDecompose(Type tp, const DeclContext *DC) {
+      static bool canDecompose(Type tp) {
         return tp->is<TupleType>() || tp->isBool() ||
                tp->getEnumOrBoundGenericEnum();
       }
@@ -1032,7 +1032,7 @@ namespace {
       // decompose the type space and offer them as fixits, or simply offer
       // to insert a `default` clause.
       if (uncovered.getKind() == SpaceKind::Type) {
-        if (Space::canDecompose(uncovered.getType(), DC)) {
+        if (Space::canDecompose(uncovered.getType())) {
           SmallVector<Space, 4> spaces;
           Space::decompose(DC, uncovered.getType(), spaces);
           diagnoseMissingCases(RequiresDefault::No, Space::forDisjunct(spaces),
@@ -1058,6 +1058,12 @@ namespace {
 
     void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
                               const CaseStmt *unknownCase = nullptr) {
+      if (!Switch->getLBraceLoc().isValid()) {
+        // There is no '{' in the switch statement, which we already diagnosed
+        // in the parser. So there's no real body to speak of and it doesn't
+        // make sense to emit diagnostics about missing cases.
+        return;
+      }
       auto &DE = Context.Diags;
       SourceLoc startLoc = Switch->getStartLoc();
       SourceLoc insertLoc;

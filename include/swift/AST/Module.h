@@ -23,8 +23,8 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
@@ -56,6 +56,7 @@ namespace swift {
   class FileUnit;
   class FuncDecl;
   class InfixOperatorDecl;
+  enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
   class NominalTypeDecl;
@@ -461,6 +462,9 @@ public:
   void setResilienceStrategy(ResilienceStrategy strategy) {
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
+
+  /// Distribution level of the module.
+  LibraryLevel getLibraryLevel() const;
 
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }

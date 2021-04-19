@@ -14,6 +14,5 @@ target_sources(swiftSIL PRIVATE
   PrettyStackTrace.cpp
   Projection.cpp
   SILInstructionWorklist.cpp
-  SILOpenedArchetypesTracker.cpp
   SILRemarkStreamer.cpp
   ValueUtils.cpp)

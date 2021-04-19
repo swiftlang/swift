@@ -1050,6 +1050,8 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
     return SyntaxKind::TupleTypeElement;
   case SyntaxKind::TuplePatternElementList:
     return SyntaxKind::TuplePatternElement;
+  case SyntaxKind::AvailabilitySpecList:
+    return SyntaxKind::AvailabilityArgument;
   default:
     return SyntaxKind::Unknown;
   }

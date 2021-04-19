@@ -80,8 +80,7 @@ class NullEditorConsumer : public EditorConsumer {
   void recordFormattedText(StringRef Text) override {}
 
   void handleSourceText(StringRef Text) override {}
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                        std::unordered_set<unsigned> &ReusedNodeIds) override {}
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override {}
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return SyntaxTreeTransferMode::Off;
@@ -159,10 +158,13 @@ public:
           return;
         }
         const CursorInfoData &Info = Result.value();
-        TestInfo.Name = Info.Name.str();
-        TestInfo.Typename = Info.TypeName.str();
-        TestInfo.Filename = Info.Filename.str();
-        TestInfo.DeclarationLoc = Info.DeclarationLoc;
+        if (!Info.Symbols.empty()) {
+          const CursorSymbolInfo &MainSymbol = Info.Symbols[0];
+          TestInfo.Name = std::string(MainSymbol.Name.str());
+          TestInfo.Typename = MainSymbol.TypeName.str();
+          TestInfo.Filename = MainSymbol.Filename.str();
+          TestInfo.DeclarationLoc = MainSymbol.DeclarationLoc;
+        }
         sema.signal();
       });
 

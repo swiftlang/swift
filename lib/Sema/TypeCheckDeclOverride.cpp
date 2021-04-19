@@ -1544,6 +1544,8 @@ namespace  {
 
     UNINTERESTING_ATTR(AtReasync)
     UNINTERESTING_ATTR(Nonisolated)
+    UNINTERESTING_ATTR(UnsafeSendable)
+    UNINTERESTING_ATTR(UnsafeMainActor)
 
 #undef UNINTERESTING_ATTR
 
@@ -1827,7 +1829,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       return true;
     } else if (!overrideASD->isLessEffectfulThan(baseASD, EffectKind::Throws)) {
       diags.diagnose(overrideASD, diag::override_with_more_effects,
-                     overrideASD->getDescriptiveKind(), "throws");
+                     overrideASD->getDescriptiveKind(), "throwing");
       return true;
     }
   }
@@ -1911,12 +1913,19 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     }
   }
   // If the overriding declaration is 'throws' but the base is not,
-  // complain.
+  // complain. Do the same for 'async'
   if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
     if (overrideFn->hasThrows() &&
         !cast<AbstractFunctionDecl>(base)->hasThrows()) {
-      diags.diagnose(override, diag::override_throws,
-                  isa<ConstructorDecl>(override));
+      diags.diagnose(override, diag::override_with_more_effects,
+                     override->getDescriptiveKind(), "throwing");
+      diags.diagnose(base, diag::overridden_here);
+    }
+
+    if (overrideFn->hasAsync() &&
+        !cast<AbstractFunctionDecl>(base)->hasAsync()) {
+      diags.diagnose(override, diag::override_with_more_effects,
+                     override->getDescriptiveKind(), "async");
       diags.diagnose(base, diag::overridden_here);
     }
 

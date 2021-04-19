@@ -13,12 +13,12 @@ class B : A {
 
 class Other { }
 
-func f1<T : A>(_: T) where T : Other {} // expected-error{{generic parameter 'T' cannot be a subclass of both 'Other' and 'A'}}
-// expected-note@-1{{superclass constraint 'T' : 'A' written here}}
+func f1<T : A>(_: T) where T : Other {} // expected-error{{type 'T' cannot be a subclass of both 'Other' and 'A'}}
+// expected-note@-1{{constraint conflicts with 'T' : 'A'}}
 
 func f2<T : A>(_: T) where T : B {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'A'}}
-// expected-note@-2{{superclass constraint 'T' : 'B' written here}}
+// expected-note@-2{{superclass constraint 'T' : 'A' implied here}}
 
 
 class GA<T> {}
@@ -32,16 +32,16 @@ func f5<T, U : GA<T>>(_: T, _: U) {}
 func f6<U : GA<T>, T : P>(_: T, _: U) {}
 func f7<U, T>(_: T, _: U) where U : GA<T>, T : P {}
 
-func f8<T : GA<A>>(_: T) where T : GA<B> {} // expected-error{{generic parameter 'T' cannot be a subclass of both 'GA<B>' and 'GA<A>'}}
-// expected-note@-1{{superclass constraint 'T' : 'GA<A>' written here}}
+func f8<T : GA<A>>(_: T) where T : GA<B> {} // expected-error{{type 'T' cannot be a subclass of both 'GA<B>' and 'GA<A>'}}
+// expected-note@-1{{constraint conflicts with 'T' : 'GA<A>'}}
 
 func f9<T : GA<A>>(_: T) where T : GB<A> {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'GA<A>'}}
-// expected-note@-2{{superclass constraint 'T' : 'GB<A>' written here}}
+// expected-note@-2{{superclass constraint 'T' : 'GA<A>' implied here}}
 
 func f10<T : GB<A>>(_: T) where T : GA<A> {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'GA<A>'}}
-// expected-note@-2{{superclass constraint 'T' : 'GB<A>' written here}}
+// expected-note@-2{{superclass constraint 'T' : 'GA<A>' implied here}}
 
 func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'T' : 'GA<T>' is recursive}}
 func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'U' : 'GB<T>' is recursive}} // expected-error{{superclass constraint 'T' : 'GA<U>' is recursive}}
@@ -69,16 +69,16 @@ class S : P2 {
 // CHECK: superclassConformance1
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T>(t: T)
-  where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
-        T : P3 {} // expected-warning{{redundant conformance constraint 'T': 'P3'}}
+  where T : C, // expected-note{{conformance constraint 'T' : 'P3' implied here}}
+        T : P3 {} // expected-warning{{redundant conformance constraint 'T' : 'P3'}}
 
 
 
 // CHECK: superclassConformance2
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T>(t: T)
-  where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
-   T : P3 {} // expected-warning{{redundant conformance constraint 'T': 'P3'}}
+  where T : C, // expected-note{{conformance constraint 'T' : 'P3' implied here}}
+   T : P3 {} // expected-warning{{redundant conformance constraint 'T' : 'P3'}}
 
 protocol P4 { }
 
@@ -88,15 +88,15 @@ class C2 : C, P4 { }
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C2>
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'C'}}
-// expected-note@-2{{superclass constraint 'T' : 'C2' written here}}
-// expected-warning@-3{{redundant conformance constraint 'T': 'P4'}}
-// expected-note@-4{{conformance constraint 'T': 'P4' implied here}}
+// expected-note@-2{{superclass constraint 'T' : 'C' implied here}}
+// expected-warning@-3{{redundant conformance constraint 'T' : 'P4'}}
+// expected-note@-4{{conformance constraint 'T' : 'P4' implied here}}
 
 protocol P5: A { }
 
-protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot require 'Self' to be a subclass of both 'Other' and 'A'}}
+protocol P6: A, Other { } // expected-error {{type 'Self' cannot be a subclass of both 'Other' and 'A'}}
 // expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
-// expected-note@-2 {{superclass constraint 'Self' : 'A' written here}}
+// expected-note@-2 {{constraint conflicts with 'Self' : 'A'}}
 
 func takeA(_: A) { }
 func takeP5<T: P5>(_ t: T) {
@@ -105,14 +105,14 @@ func takeP5<T: P5>(_ t: T) {
 
 protocol P7 {
 	associatedtype Assoc: A, Other 
-	// expected-note@-1{{superclass constraint 'Self.Assoc' : 'A' written here}}
+	// expected-note@-1{{constraint conflicts with 'Self.Assoc' : 'A'}}
 	// expected-error@-2{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
 }
 
 // CHECK: superclassConformance4
 // CHECK: Generic signature: <T, U where T : P3, U : P3, T.T : C, T.T == U.T>
 func superclassConformance4<T: P3, U: P3>(_: T, _: U)
-  where T.T: C, // expected-note{{superclass constraint 'T.T' : 'C' written here}}
+  where T.T: C, // expected-note{{superclass constraint 'U.T' : 'C' implied here}}
         U.T: C, // expected-warning{{redundant superclass constraint 'U.T' : 'C'}}
         T.T == U.T { }
 
@@ -175,8 +175,8 @@ protocol Rump : Tail {
 class Horse<T>: Rump { }
 
 func hasRedundantConformanceConstraint<X : Horse<T>, T>(_: X) where X : Rump {}
-// expected-warning@-1 {{redundant conformance constraint 'X': 'Rump'}}
-// expected-note@-2 {{conformance constraint 'X': 'Rump' implied here}}
+// expected-warning@-1 {{redundant conformance constraint 'X' : 'Rump'}}
+// expected-note@-2 {{conformance constraint 'X' : 'Rump' implied here}}
 
 // SR-5862
 protocol X {

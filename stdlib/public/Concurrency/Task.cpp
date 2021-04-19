@@ -65,11 +65,17 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
     switch (queueHead.getStatus()) {
     case Status::Error:
     case Status::Success:
+#if SWIFT_TASK_PRINTF_DEBUG
+      fprintf(stderr, "[%p] task %p waiting on task %p, completed immediately\n", pthread_self(), waitingTask, this);
+#endif
       _swift_tsan_acquire(static_cast<Job *>(this));
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
     case Status::Executing:
+#if SWIFT_TASK_PRINTF_DEBUG
+      fprintf(stderr, "[%p] task %p waiting on task %p, going to sleep\n", pthread_self(), waitingTask, this);
+#endif
       _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is now complete. We'll need to add ourselves to the queue.
       break;
@@ -102,7 +108,6 @@ void AsyncTask::completeFuture(AsyncContext *context) {
       reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
   bool hadErrorResult = false;
   auto errorObject = asyncContextPrefix->errorResult;
-  printf("asyncTask::completeFuture errorObject: %p\n", errorObject);
   fragment->getError() = errorObject;
   if (errorObject) {
     hadErrorResult = true;
@@ -129,10 +134,20 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
+
+#if SWIFT_TASK_PRINTF_DEBUG
+  if (!waitingTask)
+    fprintf(stderr, "[%p] task %p had no waiting tasks\n", pthread_self(), this);
+#endif
+
   while (waitingTask) {
     // Find the next waiting task before we invalidate it by resuming
     // the task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
+
+#if SWIFT_TASK_PRINTF_DEBUG
+    fprintf(stderr, "[%p] waking task %p from future of task %p\n", pthread_self(), waitingTask, this);
+#endif
 
     // Fill in the return context.
     auto waitingContext =
@@ -180,9 +195,25 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   free(task);
 }
 
-static void dummyVTableFunction(void) {
-  abort();
+static ExecutorRef executorForEnqueuedJob(Job *job) {
+  void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
+  if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
+    return ExecutorRef::generic();
+  else if (jobQueue == DISPATCH_QUEUE_MAIN_EXECUTOR)
+    return ExecutorRef::mainExecutor();
+  else
+    swift_unreachable("jobQueue was not a known value.");
 }
+
+static void jobInvoke(void *obj, void *unused, uint32_t flags) {
+  (void)unused;
+  Job *job = reinterpret_cast<Job *>(obj);
+
+  swift_job_run(job, executorForEnqueuedJob(job));
+}
+
+// Magic constant to identify Swift Job vtables to Dispatch.
+static const unsigned long dispatchSwiftObjectType = 1;
 
 FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
   {
@@ -195,7 +226,8 @@ FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
   },
   {
     MetadataKind::Job,
-    dummyVTableFunction
+    dispatchSwiftObjectType,
+    jobInvoke
   }
 };
 
@@ -211,7 +243,8 @@ static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   },
   {
     MetadataKind::Task,
-    dummyVTableFunction
+    dispatchSwiftObjectType,
+    jobInvoke
   }
 };
 
@@ -239,6 +272,10 @@ static void completeTask(SWIFT_ASYNC_CONTEXT AsyncContext *context,
   // Tear down the task-local allocator immediately;
   // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
+
+#if SWIFT_TASK_PRINTF_DEBUG
+  fprintf(stderr, "[%p] task %p completed\n", pthread_self(), task);
+#endif
 
   // Complete the future.
   if (task->isFuture()) {
@@ -309,6 +346,10 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   if (flags.task_isChildTask()) {
     parent = swift_task_getCurrent();
     assert(parent != nullptr && "creating a child task with no active task");
+
+    // Inherit the priority of the parent task if unspecified.
+    if (flags.getPriority() == JobPriority::Unspecified)
+      flags.setPriority(parent->getPriority());
   }
 
   // Figure out the size of the header.
@@ -406,7 +447,10 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
             sizeof(FutureAsyncContextPrefix));
     futureAsyncContextPrefix->indirectResult = futureFragment->getStoragePtr();
   }
-  
+
+#if SWIFT_TASK_PRINTF_DEBUG
+  fprintf(stderr, "[%p] creating task %p with parent %p\n", pthread_self(), task, parent);
+#endif
 
   // Perform additional linking between parent and child task.
   if (parent) {
@@ -490,7 +534,7 @@ getAsyncClosureEntryPointAndContextSize(void *function,
       reinterpret_cast<const AsyncFunctionPointer<AsyncSignature> *>(function);
 #if SWIFT_PTRAUTH
   fnPtr = (const AsyncFunctionPointer<AsyncSignature> *)ptrauth_auth_data(
-      (void *)fnPtr, ptrauth_key_process_independent_code, AuthDiscriminator);
+      (void *)fnPtr, ptrauth_key_process_independent_data, AuthDiscriminator);
 #endif
   return {reinterpret_cast<typename AsyncSignature::FunctionType *>(
               fnPtr->Function.get()),
@@ -729,56 +773,84 @@ size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
 }
 
-namespace {
-  
-/// Structure that gets filled in when a task is suspended by `withUnsafeContinuation`.
-struct AsyncContinuationContext {
-  // These fields are unnecessary for resuming a continuation.
-  void *Unused1;
-  void *Unused2;
-  // Storage slot for the error result, if any.
-  SwiftError *ErrorResult;
-  // Pointer to where to store a normal result.
-  OpaqueValue *NormalResult;
-  
-  // Executor on which to resume execution.
-  ExecutorRef ResumeExecutor;
-};
+AsyncTask *swift::swift_continuation_init(ContinuationAsyncContext *context,
+                                          AsyncContinuationFlags flags) {
+  context->Flags = AsyncContextKind::Continuation;
+  if (flags.canThrow()) context->Flags.setCanThrow(true);
+  context->ErrorResult = nullptr;
 
-static void resumeTaskAfterContinuation(AsyncTask *task,
-                                        AsyncContinuationContext *context) {
-  swift_task_enqueue(task, context->ResumeExecutor);
+  // Set the current executor as the target executor unless there's
+  // an executor override.
+  if (!flags.hasExecutorOverride())
+    context->ResumeToExecutor = swift_task_getCurrentExecutor();
+
+  // We can initialize this with a relaxed store because resumption
+  // must happen-after this call.
+  context->AwaitSynchronization.store(flags.isPreawaited()
+                                        ? ContinuationStatus::Awaited
+                                        : ContinuationStatus::Pending, 
+                                      std::memory_order_relaxed);
+
+  auto task = swift_task_getCurrent();
+  assert(task && "initializing a continuation with no current task");
+  task->ResumeContext = context;
+  task->ResumeTask = context->ResumeParent;
+
+  return task;
 }
 
+static void resumeTaskAfterContinuation(AsyncTask *task,
+                                        ContinuationAsyncContext *context) {
+  auto &sync = context->AwaitSynchronization;
+  auto status = sync.load(std::memory_order_acquire);
+  assert(status != ContinuationStatus::Resumed &&
+         "continuation was already resumed");
+
+  // Make sure TSan knows that the resume call happens-before the task
+  // restarting.
+  _swift_tsan_release(task);
+
+  // The status should be either Pending or Awaited.  If it's Awaited,
+  // which is probably the most likely option, then we should immediately
+  // enqueue; we don't need to update the state because there shouldn't
+  // be a racing attempt to resume the continuation.  If it's Pending,
+  // we need to set it to Resumed; if that fails (with a strong cmpxchg),
+  // it should be because the original thread concurrently set it to
+  // Awaited, and so we need to enqueue.
+  if (status == ContinuationStatus::Pending &&
+      sync.compare_exchange_strong(status, ContinuationStatus::Resumed,
+                                   /*success*/ std::memory_order_release,
+                                   /*failure*/ std::memory_order_relaxed)) {
+    return;
+  }
+  assert(status == ContinuationStatus::Awaited &&
+         "detected concurrent attempt to resume continuation");
+
+  // TODO: maybe in some mode we should set the status to Resumed here
+  // to make a stronger best-effort attempt to catch racing attempts to
+  // resume the continuation?
+
+  swift_task_enqueue(task, context->ResumeToExecutor);
 }
 
 SWIFT_CC(swift)
-static void swift_continuation_resumeImpl(/* +1 */ OpaqueValue *result,
-                                          void *continuation,
-                                          const Metadata *resumeType) {
-  auto task = reinterpret_cast<AsyncTask*>(continuation);
-  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
-  resumeType->vw_initializeWithTake(context->NormalResult, result);
-  
+static void swift_continuation_resumeImpl(AsyncTask *task) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
   resumeTaskAfterContinuation(task, context);
 }
 
 SWIFT_CC(swift)
-static void swift_continuation_throwingResumeImpl(/* +1 */ OpaqueValue *result,
-                                                  void *continuation,
-                                                  const Metadata *resumeType) {
-  return swift_continuation_resume(result, continuation, resumeType);
+static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
+  resumeTaskAfterContinuation(task, context);
 }
 
 
 SWIFT_CC(swift)
-void static swift_continuation_throwingResumeWithErrorImpl(/* +1 */ SwiftError *error,
-                                                           void *continuation,
-                                                           const Metadata *resumeType) {
-  auto task = reinterpret_cast<AsyncTask*>(continuation);
-  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
+static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
+                                                /* +1 */ SwiftError *error) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
   context->ErrorResult = error;
-  
   resumeTaskAfterContinuation(task, context);
 }
 
@@ -793,9 +865,9 @@ swift_task_addCancellationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
-  auto *record =
-      new (allocation) CancellationNotificationStatusRecord(
-          handler, context);
+  auto unsigned_handler = swift_auth_code(handler, 3848);
+  auto *record = new (allocation)
+      CancellationNotificationStatusRecord(unsigned_handler, context);
 
   swift_task_addStatusRecord(record);
   return record;

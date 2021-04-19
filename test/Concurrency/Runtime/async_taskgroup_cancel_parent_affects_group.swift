@@ -4,24 +4,30 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_cancel_parent_affects_group() async {
 
-  let x = Task.runDetached {
-    try! await Task.withGroup(resultType: Int.self) { group -> Void in
-      await group.add {
+  let x = detach {
+    await withTaskGroup(of: Int.self, returning: Void.self) { group in
+      group.spawn {
         await Task.sleep(3_000_000_000)
         let c = Task.isCancelled
         print("group task isCancelled: \(c)")
         return 0
       }
 
-      _ = try! await group.next()
+      _ = await group.next()
       let c = Task.isCancelled
       print("group isCancelled: \(c)")
     }
@@ -41,6 +47,7 @@ func test_taskGroup_cancel_parent_affects_group() async {
 
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_parent_affects_group()

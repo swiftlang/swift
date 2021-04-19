@@ -128,25 +128,17 @@ internal func _getClassPlaygroundQuickLook(
 #endif
 
 extension Mirror {
-  internal struct ReflectedChildren: RandomAccessCollection {
-    let subject: Any
-    let subjectType: Any.Type
-    var startIndex: Int { 0 }
-    var endIndex: Int { _getChildCount(subject, type: subjectType) }
-    subscript(index: Int) -> Child {
-      getChild(of: subject, type: subjectType, index: index)
-    }
-  }
-
-  internal init(
-    internalReflecting subject: Any,
-    subjectType: Any.Type? = nil,
-    customAncestor: Mirror? = nil
-  ) {
+  internal init(internalReflecting subject: Any,
+              subjectType: Any.Type? = nil,
+              customAncestor: Mirror? = nil)
+  {
     let subjectType = subjectType ?? _getNormalizedType(subject, type: type(of: subject))
     
-    self._children = _Children(
-      ReflectedChildren(subject: subject, subjectType: subjectType))
+    let childCount = _getChildCount(subject, type: subjectType)
+    let children = (0 ..< childCount).lazy.map({
+      getChild(of: subject, type: subjectType, index: $0)
+    })
+    self.children = Children(children)
     
     self._makeSuperclassMirror = {
       guard let subjectClass = subjectType as? AnyClass,

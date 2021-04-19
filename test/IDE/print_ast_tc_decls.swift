@@ -12,7 +12,7 @@
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
-// RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefixes=PASS_PRINT_AST,PASS_PRINT_AST_TYPE -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
@@ -23,7 +23,7 @@
 //
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -swift-version 4 -skip-deinit=false -print-ast-typechecked -source-filename %s -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -enable-objc-interop -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
-// RUN: %FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
+// RUN: %FileCheck %s -check-prefixes=PASS_PRINT_AST,PASS_PRINT_AST_TYPEREPR -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_2200 -strict-whitespace < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=PASS_2500 -strict-whitespace < %t.printed.txt
@@ -619,7 +619,7 @@ struct d0200_EscapedIdentifiers {
 
   func `func`<`let`: `protocol`, `where`>(
       class: Int, struct: `protocol`, foo: `let`, bar: `where`) where `where` : `protocol` {}
-// PASS_COMMON-NEXT: {{^}}  func `func`<`let`, `where`>(class: Int, struct: {{(d0200_EscapedIdentifiers.)?}}`protocol`, foo: `let`, bar: `where`) where `let` : {{(d0200_EscapedIdentifiers.)?}}`protocol`, `where` : {{(d0200_EscapedIdentifiers.)?}}`protocol`{{$}}
+// PASS_COMMON-NEXT: {{^}}  func `func`<`let`, `where`>(class: Int, struct: {{(d0200_EscapedIdentifiers.)?}}`protocol`, foo: `let`, bar: `where`) where `let` : {{(d0200_EscapedIdentifiers.)?}}`class`, `where` : {{(d0200_EscapedIdentifiers.)?}}`class`{{$}}
 
   var `var`: `struct` = `struct`()
 // PASS_COMMON-NEXT: {{^}}  @_hasInitialValue var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
@@ -1343,8 +1343,15 @@ public func ParamAttrs5(a : (@escaping () -> ()) -> ()) {
 // PASS_PRINT_AST: public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 public typealias ParamAttrs6 = (@autoclosure () -> ()) -> ()
 
-// PASS_PRINT_AST: public var ParamAttrs7: (@escaping () -> ()) -> ()
+// The following type only has the internal paramter name inferred from the
+// closure on the right-hand side of `=`. Thus, it is only part of the `Type`
+// and not part of the `TypeRepr`.
+// PASS_PRINT_AST_TYPE: public var ParamAttrs7: (_ f: @escaping () -> ()) -> ()
+// PASS_PRINT_AST_TYPEREPR: public var ParamAttrs7: (@escaping () -> ()) -> ()
 public var ParamAttrs7: (@escaping () -> ()) -> () = { f in f() }
+
+// PASS_PRINT_AST: public var ParamAttrs8: (_ f: @escaping () -> ()) -> ()
+public var ParamAttrs8: (_ f: @escaping () -> ()) -> () = { f in f() }
 
 // Setter
 // PASS_PRINT_AST: class FooClassComputed {

@@ -92,7 +92,7 @@ func globalTestMain(nc: NotConcurrent) async {
   await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   _ = await ClassWithGlobalActorInits(nc) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
-  _ = await ClassWithGlobalActorInits()
+  _ = await ClassWithGlobalActorInits() // expected-warning{{cannot call function returning non-sendable type 'ClassWithGlobalActorInits' across actors}}
 }
 
 @SomeGlobalActor
@@ -120,6 +120,24 @@ func testConcurrency() {
     print(x) // expected-warning{{cannot use let 'x' with a non-sendable type 'NotConcurrent' from concurrently-executed code}}
     print(y) // expected-error{{reference to captured var 'y' in concurrently-executing code}}
   }
+}
+
+func acceptUnsafeSendable(@_unsafeSendable _ fn: () -> Void) { }
+
+func testUnsafeSendableNothing() {
+  var x = 5
+  acceptUnsafeSendable {
+    x = 17
+  }
+  print(x)
+}
+
+func testUnsafeSendableInAsync() async {
+  var x = 5
+  acceptUnsafeSendable {
+    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+  }
+  print(x)
 }
 
 // ----------------------------------------------------------------------

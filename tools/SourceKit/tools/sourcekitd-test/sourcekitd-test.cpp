@@ -1051,7 +1051,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                              SemaName.c_str());
   }
 
-  if (!Opts.CompilerArgs.empty()) {
+  if (!Opts.CompilerArgs.empty() ||
+      !Opts.ModuleCachePath.empty() ||
+      Opts.DisableImplicitConcurrencyModuleImport) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
     if (!Opts.ModuleCachePath.empty()) {
       if (compilerArgsAreClang) {
@@ -1069,6 +1071,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
         sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
       }
     }
+    if (Opts.DisableImplicitConcurrencyModuleImport && !compilerArgsAreClang) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+          "-disable-implicit-concurrency-module-import");
+    }
+
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);
@@ -1568,6 +1577,257 @@ static std::vector<const char *> readStringArray(
   });
 }
 
+struct ResponseSymbolInfo {
+  struct ParentInfo {
+    const char *Title;
+    const char *Kind;
+    const char *USR;
+  };
+  struct ReferencedSymbol {
+    const char *USR;
+    const char *AccessLevel;
+    const char *Filename;
+    const char *ModuleName;
+    const char *DeclLang;
+    bool IsSystem;
+    bool IsSPI;
+    std::vector<ParentInfo> ParentContexts;
+  };
+
+  const char *Kind = nullptr;
+  const char *Lang = nullptr;
+  const char *Name = nullptr;
+  const char *USR = nullptr;
+  const char *TypeName = nullptr;
+  const char *TypeUSR = nullptr;
+  const char *ContainerTypeUSR = nullptr;
+  const char *DocComment = nullptr;
+  const char *GroupName = nullptr;
+  const char *LocalizationKey = nullptr;
+  const char *AnnotatedDeclaration = nullptr;
+  const char *FullyAnnotatedDeclaration = nullptr;
+  const char *SymbolGraph = nullptr;
+  const char *ModuleName = nullptr;
+  const char *ModuleInterfaceName = nullptr;
+  llvm::Optional<int64_t> Offset;
+  unsigned Length = 0;
+  const char *FilePath = nullptr;
+  std::vector<const char *> OverrideUSRs;
+  std::vector<const char *> AnnotatedRelatedDeclarations;
+  std::vector<const char *> ModuleGroups;
+  std::vector<ParentInfo> ParentContexts;
+  std::vector<ReferencedSymbol> ReferencedSymbols;
+
+  std::vector<const char *> ReceiverUSRs;
+  bool IsSystem = false;
+  bool IsDynamic = false;
+  unsigned ParentOffset = 0;
+
+  static ResponseSymbolInfo read(sourcekitd_variant_t Info) {
+    ResponseSymbolInfo Symbol;
+
+    sourcekitd_uid_t KindUID =
+        sourcekitd_variant_dictionary_get_uid(Info, KeyKind);
+    if (KindUID == nullptr)
+      return Symbol;
+    Symbol.Kind = sourcekitd_uid_get_string_ptr(KindUID);
+
+    sourcekitd_uid_t LangUID =
+        sourcekitd_variant_dictionary_get_uid(Info, KeyDeclarationLang);
+    if (LangUID)
+      Symbol.Lang = sourcekitd_uid_get_string_ptr(LangUID);
+
+    Symbol.Name = sourcekitd_variant_dictionary_get_string(Info, KeyName);
+    Symbol.USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
+
+    Symbol.TypeName =
+        sourcekitd_variant_dictionary_get_string(Info, KeyTypeName);
+    Symbol.TypeUSR = sourcekitd_variant_dictionary_get_string(Info, KeyTypeUsr);
+    Symbol.ContainerTypeUSR =
+        sourcekitd_variant_dictionary_get_string(Info, KeyContainerTypeUsr);
+
+    Symbol.DocComment =
+        sourcekitd_variant_dictionary_get_string(Info, KeyDocFullAsXML);
+    Symbol.GroupName =
+        sourcekitd_variant_dictionary_get_string(Info, KeyGroupName);
+    Symbol.LocalizationKey =
+        sourcekitd_variant_dictionary_get_string(Info, KeyLocalizationKey);
+
+    Symbol.AnnotatedDeclaration =
+        sourcekitd_variant_dictionary_get_string(Info, KeyAnnotatedDecl);
+    Symbol.FullyAnnotatedDeclaration =
+        sourcekitd_variant_dictionary_get_string(Info, KeyFullyAnnotatedDecl);
+    Symbol.SymbolGraph =
+        sourcekitd_variant_dictionary_get_string(Info, KeySymbolGraph);
+
+    Symbol.ModuleName =
+        sourcekitd_variant_dictionary_get_string(Info, KeyModuleName);
+    Symbol.ModuleInterfaceName =
+        sourcekitd_variant_dictionary_get_string(Info, KeyModuleInterfaceName);
+
+    sourcekitd_variant_t OffsetObj =
+        sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
+    if (sourcekitd_variant_get_type(OffsetObj) !=
+        SOURCEKITD_VARIANT_TYPE_NULL) {
+      Symbol.Offset = sourcekitd_variant_int64_get_value(OffsetObj);
+      Symbol.Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
+    }
+    Symbol.FilePath =
+        sourcekitd_variant_dictionary_get_string(Info, KeyFilePath);
+
+    Symbol.OverrideUSRs = readStringArray(Info, KeyOverrides, KeyUSR);
+    Symbol.AnnotatedRelatedDeclarations =
+        readStringArray(Info, KeyRelatedDecls, KeyAnnotatedDecl);
+    Symbol.ModuleGroups = readStringArray(Info, KeyModuleGroups, KeyGroupName);
+
+    Symbol.ParentContexts = readArray<ParentInfo>(
+        Info, KeyParentContexts, [&](sourcekitd_variant_t Entry) {
+          return ParentInfo{
+              sourcekitd_variant_dictionary_get_string(Entry, KeyName),
+              sourcekitd_variant_dictionary_get_string(Entry, KeyKind),
+              sourcekitd_variant_dictionary_get_string(Entry, KeyUSR)};
+        });
+    Symbol.ReferencedSymbols = readArray<ReferencedSymbol>(
+        Info, KeyReferencedSymbols, [&](sourcekitd_variant_t Entry){
+          return ReferencedSymbol{
+            sourcekitd_variant_dictionary_get_string(Entry, KeyUSR),
+            sourcekitd_variant_dictionary_get_string(Entry, KeyAccessLevel),
+            sourcekitd_variant_dictionary_get_string(Entry, KeyFilePath),
+            sourcekitd_variant_dictionary_get_string(Entry, KeyModuleName),
+            sourcekitd_uid_get_string_ptr(
+              sourcekitd_variant_dictionary_get_uid(Entry, KeyDeclarationLang)),
+            sourcekitd_variant_dictionary_get_bool(Entry, KeyIsSystem),
+            sourcekitd_variant_dictionary_get_bool(Entry, KeyIsSPI),
+            readArray<ParentInfo>(Entry, KeyParentContexts,
+                                  [&](sourcekitd_variant_t Entry){
+              return ParentInfo{
+                  sourcekitd_variant_dictionary_get_string(Entry, KeyName),
+                  sourcekitd_variant_dictionary_get_string(Entry, KeyKind),
+                  sourcekitd_variant_dictionary_get_string(Entry, KeyUSR)};
+            })
+          };
+        });
+
+    Symbol.ReceiverUSRs = readStringArray(Info, KeyReceivers, KeyUSR);
+
+    Symbol.IsSystem = sourcekitd_variant_dictionary_get_bool(Info, KeyIsSystem);
+    Symbol.IsDynamic =
+        sourcekitd_variant_dictionary_get_bool(Info, KeyIsDynamic);
+
+    Symbol.ParentOffset =
+        sourcekitd_variant_dictionary_get_int64(Info, KeyParentLoc);
+
+    return Symbol;
+  }
+
+  void print(llvm::raw_ostream &OS, StringRef CurrentFilename,
+             const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
+    if (Kind == nullptr) {
+      OS << "<empty symbol info>\n";
+      return;
+    }
+
+    OS << Kind << " (";
+    if (Offset.hasValue()) {
+      if (CurrentFilename != StringRef(FilePath))
+        OS << FilePath << ":";
+      auto LineCol = resolveToLineCol(Offset.getValue(), FilePath, VFSFiles);
+      OS << LineCol.first << ':' << LineCol.second;
+      auto EndLineCol =
+          resolveToLineCol(Offset.getValue() + Length, FilePath, VFSFiles);
+      OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
+    }
+    OS << ")" << '\n';
+
+    OS << Name << '\n';
+    if (USR)
+      OS << USR << '\n';
+    if (Lang)
+      OS << Lang << '\n';
+    if (TypeName)
+      OS << TypeName << '\n';
+    if (TypeUSR)
+      OS << TypeUSR << '\n';
+    if (ContainerTypeUSR)
+      OS << "<Container>" << ContainerTypeUSR << "</Container>" << '\n';
+    if (ModuleName)
+      OS << ModuleName << '\n';
+    if (GroupName)
+      OS << "<Group>" << GroupName << "</Group>" << '\n';
+    if (ModuleInterfaceName)
+      OS << ModuleInterfaceName << '\n';
+    if (IsSystem)
+      OS << "SYSTEM" << '\n';
+    if (AnnotatedDeclaration)
+      OS << AnnotatedDeclaration << '\n';
+    if (FullyAnnotatedDeclaration)
+      OS << FullyAnnotatedDeclaration << '\n';
+    if (DocComment)
+      OS << DocComment << '\n';
+    if (LocalizationKey) {
+      OS << "<LocalizationKey>" << LocalizationKey;
+      OS << "</LocalizationKey>" << '\n';
+    }
+    if (IsDynamic)
+      OS << "DYNAMIC\n";
+    if (ParentOffset) {
+      OS << "PARENT OFFSET: " << ParentOffset << "\n";
+    }
+
+    OS << "SYMBOL GRAPH BEGIN\n";
+    if (SymbolGraph) {
+      if (auto PrettyJsonOrErr = json::parse(StringRef(SymbolGraph))) {
+        OS << formatv("{0:2}", *PrettyJsonOrErr);
+      } else {
+        llvm::handleAllErrors(PrettyJsonOrErr.takeError(),
+                              [&](const llvm::ErrorInfoBase &E) {});
+        OS << SymbolGraph;
+      }
+      OS << "\n";
+    }
+    OS << "SYMBOL GRAPH END\n";
+
+    OS << "PARENT CONTEXTS BEGIN\n";
+    for (auto Parent : ParentContexts)
+      OS << Parent.Title << " " << Parent.Kind << " " << Parent.USR << '\n';
+    OS << "PARENT CONTEXTS END\n";
+
+    OS << "REFERENCED DECLS BEGIN\n";
+    for (auto Ref : ReferencedSymbols) {
+      OS << Ref.USR << " | " << Ref.AccessLevel << " | "
+         << (strlen(Ref.Filename) ? Ref.Filename : "<empty>") << " | "
+         << (strlen(Ref.ModuleName) ? Ref.ModuleName : "<empty>") << " | "
+         << (Ref.IsSystem ? "System" : "User") << " | "
+         << (Ref.IsSPI ? "SPI" : "NonSPI") << " | "
+         << Ref.DeclLang << "\n";
+      for (auto Parent: Ref.ParentContexts)
+        OS << "  " << Parent.Title << " " << Parent.Kind << " " << Parent.USR
+           << '\n';
+    }
+    OS << "REFERENCED DECLS END\n";
+
+    OS << "OVERRIDES BEGIN\n";
+    for (auto OverUSR : OverrideUSRs)
+      OS << OverUSR << '\n';
+    OS << "OVERRIDES END\n";
+
+    OS << "RELATED BEGIN\n";
+    for (auto RelDecl : AnnotatedRelatedDeclarations)
+      OS << RelDecl << '\n';
+    OS << "RELATED END\n";
+
+    OS << "MODULE GROUPS BEGIN\n";
+    for (auto Group : ModuleGroups)
+      OS << Group << '\n';
+    OS << "MODULE GROUPS END\n";
+
+    OS << "RECEIVERS BEGIN\n";
+    for (auto Receiver : ReceiverUSRs)
+      OS << Receiver << '\n';
+    OS << "RECEIVERS END\n";
+  }
+};
+
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                             const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS) {
@@ -1578,92 +1838,12 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
        << InternalDiagnostic << "\">\n";
     return;
   }
-  sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
-                                      sourcekitd_uid_get_from_cstr("key.kind"));
-  if (KindUID == nullptr) {
-    OS << "<empty cursor info>\n";
-    return;
-  }
 
-  std::string Filename = FilenameIn.str();
-  llvm::SmallString<256> output;
-  if (!llvm::sys::fs::real_path(Filename, output))
-    Filename = std::string(output.str());
-
-  const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
-  const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
-  const char *Name = sourcekitd_variant_dictionary_get_string(Info, KeyName);
-  const char *Typename = sourcekitd_variant_dictionary_get_string(Info,
-                                                                  KeyTypeName);
-  const char *TypeUsr = sourcekitd_variant_dictionary_get_string(Info,
-                                                                 KeyTypeUsr);
-  const char *ContainerTypeUsr = sourcekitd_variant_dictionary_get_string(Info,
-                                                          KeyContainerTypeUsr);
-  const char *ModuleName = sourcekitd_variant_dictionary_get_string(Info,
-                                                              KeyModuleName);
-  const char *GroupName = sourcekitd_variant_dictionary_get_string(Info,
-                                                                   KeyGroupName);
-  
-  sourcekitd_uid_t LangUID =
-      sourcekitd_variant_dictionary_get_uid(Info, KeyDeclarationLang);
-  const char *DeclLang = nullptr;
-  if (LangUID)
-    DeclLang = sourcekitd_uid_get_string_ptr(LangUID);
-
-  const char *LocalizationKey =
-    sourcekitd_variant_dictionary_get_string(Info, KeyLocalizationKey);
-  const char *ModuleInterfaceName =
-      sourcekitd_variant_dictionary_get_string(Info, KeyModuleInterfaceName);
-  const char *TypeInterface =
-      sourcekitd_variant_dictionary_get_string(Info, KeyTypeInterface);
-  bool IsSystem = sourcekitd_variant_dictionary_get_bool(Info, KeyIsSystem);
-  bool IsDynamic = sourcekitd_variant_dictionary_get_bool(Info, KeyIsDynamic);
-
-  const char *AnnotDecl = sourcekitd_variant_dictionary_get_string(Info,
-                                                              KeyAnnotatedDecl);
-  const char *FullAnnotDecl =
-      sourcekitd_variant_dictionary_get_string(Info, KeyFullyAnnotatedDecl);
-  const char *SymbolGraph =
-      sourcekitd_variant_dictionary_get_string(Info, KeySymbolGraph);
-  const char *DocFullAsXML =
-      sourcekitd_variant_dictionary_get_string(Info, KeyDocFullAsXML);
-  sourcekitd_variant_t OffsetObj =
-      sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
-  llvm::Optional<int64_t> Offset;
-  unsigned Length = 0;
-  if (sourcekitd_variant_get_type(OffsetObj) != SOURCEKITD_VARIANT_TYPE_NULL) {
-    Offset = sourcekitd_variant_int64_get_value(OffsetObj);
-    Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
-  }
-  const char *FilePath = sourcekitd_variant_dictionary_get_string(Info, KeyFilePath);
-
-  std::vector<const char *> OverrideUSRs = readStringArray(Info, KeyOverrides,
-                                                           KeyUSR);
-
-  struct ParentInfo {
-    const char *Title;
-    const char *Kind;
-    const char *USR;
-  };
-  std::vector<ParentInfo> Parents = readArray<ParentInfo>(
-      Info,KeyParentContexts, [&](sourcekitd_variant_t Entry) {
-    return ParentInfo {
-      sourcekitd_variant_dictionary_get_string(Entry, KeyName),
-      sourcekitd_variant_dictionary_get_string(Entry, KeyKind),
-      sourcekitd_variant_dictionary_get_string(Entry, KeyUSR)
-    };
-  });
-
-  std::vector<const char *> GroupNames = readStringArray(Info, KeyModuleGroups,
-                                                         KeyGroupName);
-
-  std::vector<const char *> RelatedDecls = readStringArray(
-      Info, KeyRelatedDecls, KeyAnnotatedDecl);
-
+  auto SymbolInfo = ResponseSymbolInfo::read(Info);
   struct ActionInfo {
-    const char* KindUID;
-    const char* KindName;
-    const char* UnavailReason;
+    const char *KindUID;
+    const char *KindName;
+    const char *UnavailReason;
   };
   std::vector<ActionInfo> AvailableActions = readArray<ActionInfo>(
       Info, KeyRefactorActions, [&](sourcekitd_variant_t Entry) {
@@ -1676,85 +1856,18 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     };
   });
 
-  std::vector<const char *> Receivers = readStringArray(
-      Info, KeyReceivers, KeyUSR);
+  std::vector<ResponseSymbolInfo> SecondarySymbols =
+      readArray<ResponseSymbolInfo>(Info, KeySecondarySymbols,
+                                    [&](sourcekitd_variant_t Entry) {
+                                      return ResponseSymbolInfo::read(Entry);
+                                    });
 
-  uint64_t ParentOffset =
-    sourcekitd_variant_dictionary_get_int64(Info, KeyParentLoc);
+  std::string Filename = FilenameIn.str();
+  llvm::SmallString<256> output;
+  if (!llvm::sys::fs::real_path(Filename, output))
+    Filename = std::string(output.str());
 
-  OS << Kind << " (";
-  if (Offset.hasValue()) {
-    if (Filename != FilePath)
-      OS << FilePath << ":";
-    auto LineCol = resolveToLineCol(Offset.getValue(), FilePath, VFSFiles);
-    OS << LineCol.first << ':' << LineCol.second;
-    auto EndLineCol =
-        resolveToLineCol(Offset.getValue() + Length, FilePath, VFSFiles);
-    OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
-  }
-  OS << ")\n";
-  OS << Name << '\n';
-  if (USR)
-    OS << USR << '\n';
-  if (DeclLang)
-    OS << DeclLang << "\n";
-  if (Typename)
-    OS << Typename << '\n';
-  if (TypeUsr)
-    OS << TypeUsr << '\n';
-  if (ContainerTypeUsr)
-    OS << "<Container>" << ContainerTypeUsr << "</Container>" << '\n';
-  if (ModuleName)
-    OS << ModuleName << '\n';
-  if (GroupName)
-    OS << "<Group>" << GroupName << "</Group>" << '\n';
-  if (ModuleInterfaceName)
-    OS << ModuleInterfaceName << '\n';
-  if (IsSystem)
-    OS << "SYSTEM\n";
-  if (AnnotDecl)
-    OS << AnnotDecl << '\n';
-  if (FullAnnotDecl)
-    OS << FullAnnotDecl << '\n';
-  if (DocFullAsXML)
-    OS << DocFullAsXML << '\n';
-  if (LocalizationKey) {
-    OS << "<LocalizationKey>" << LocalizationKey;
-    OS << "</LocalizationKey>" << '\n';
-  }
-  if (IsDynamic)
-    OS << "DYNAMIC\n";
-  if (SymbolGraph) {
-    OS << "SYMBOL GRAPH BEGIN\n";
-    if (auto Val = json::parse(StringRef(SymbolGraph))) {
-      OS << formatv("{0:2}", Val.get());
-    } else {
-      OS << SymbolGraph;
-    }
-    OS << "\nSYMBOL GRAPH END\n";
-  }
-  if (!Parents.empty()) {
-    OS << "PARENT CONTEXTS BEGIN\n";
-    for (auto parent: Parents)
-      OS << parent.Title << " " << parent.Kind << " " << parent.USR << '\n';
-    OS << "PARENT CONTEXTS END\n";
-  }
-  OS << "OVERRIDES BEGIN\n";
-  for (auto OverUSR : OverrideUSRs)
-    OS << OverUSR << '\n';
-  OS << "OVERRIDES END\n";
-  OS << "RELATED BEGIN\n";
-  for (auto RelDecl : RelatedDecls)
-    OS << RelDecl << '\n';
-  OS << "RELATED END\n";
-  OS << "TYPE INTERFACE BEGIN\n";
-  if (TypeInterface)
-    OS << TypeInterface << '\n';
-  OS << "TYPE INTERFACE END\n";
-  OS << "MODULE GROUPS BEGIN\n";
-  for (auto Group : GroupNames)
-    OS << Group << '\n';
-  OS << "MODULE GROUPS END\n";
+  SymbolInfo.print(OS, Filename, VFSFiles);
   OS << "ACTIONS BEGIN\n";
   for (auto Action : AvailableActions) {
     OS << Action.KindUID << '\n';
@@ -1764,13 +1877,13 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     }
   }
   OS << "ACTIONS END\n";
-  OS << "RECEIVERS BEGIN\n";
-  for (auto Receiver : Receivers)
-    OS << Receiver << '\n';
-  OS << "RECEIVERS END\n";
-  if (ParentOffset) {
-    OS << "PARENT OFFSET: " << ParentOffset << "\n";
+
+  OS << "SECONDARY SYMBOLS BEGIN\n";
+  for (auto Secondary : SecondarySymbols) {
+    Secondary.print(OS, Filename, VFSFiles);
+    OS << "-----\n";
   }
+  OS << "SECONDARY SYMBOLS END\n";
 }
 
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,

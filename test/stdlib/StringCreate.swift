@@ -80,3 +80,48 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     expectTrue(empty.isEmpty)
   }
 }
+
+if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  StringCreateTests.test("Small string unsafeUninitializedCapacity") {
+    let str1 = "42"
+    let str2 = String(42)
+    expectEqual(str1, str2)
+
+    let str3 = String(unsafeUninitializedCapacity: 2) {
+      $0[0] = UInt8(ascii: "4")
+      $0[1] = UInt8(ascii: "2")
+      return 2
+    }
+    expectEqual(str1, str3)
+
+    // Write into uninitialized space.
+    let str4 = String(unsafeUninitializedCapacity: 3) {
+      $0[0] = UInt8(ascii: "4")
+      $0[1] = UInt8(ascii: "2")
+      $0[2] = UInt8(ascii: "X")
+      // Deinitialize memory used for scratch space before returning.
+      ($0.baseAddress! + 2).deinitialize(count: 1)
+      return 2
+    }
+    expectEqual(str1, str4)
+
+    let str5 = String(unsafeUninitializedCapacity: 3) {
+      $0[1] = UInt8(ascii: "4")
+      $0[2] = UInt8(ascii: "2")
+      // Move the initialized UTF-8 code units to the start of the buffer,
+      // leaving the non-overlapping source memory uninitialized.
+      $0.baseAddress!.moveInitialize(from: $0.baseAddress! + 1, count: 2)
+      return 2
+    }
+    expectEqual(str1, str5)
+
+    // Ensure reasonable behavior despite a deliberate API contract violation.
+    let str6 = String(unsafeUninitializedCapacity: 3) {
+      $0[0] = UInt8(ascii: "4")
+      $0[1] = UInt8(ascii: "2")
+      $0[2] = UInt8(ascii: "X")
+      return 2
+    }
+    expectEqual(str1, str6)
+  }
+}

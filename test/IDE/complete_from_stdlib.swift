@@ -1,84 +1,18 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
-// RUN: %FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.toplevel.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_1 > %t.members1.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_1 < %t.members1.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members1.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2A > %t.members2a.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2A < %t.members2a.txt
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2A < %t.members2a.txt
-// FIXME: filter?
-// RUN-disabled: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2a.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2B > %t.members2b.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2B < %t.members2b.txt
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2B < %t.members2b.txt
-// FIXME: filter?
-// RUN-disabled: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2b.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_3 > %t.members3.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
-// FIXME: filter?
-// RUN-disabled: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members3.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_4 > %t.members4.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_4 < %t.members4.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members4.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_5 > %t.members5.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_5 < %t.members5.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members5.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_6 > %t.members6.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_6 < %t.members6.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members6.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_7 > %t.members7.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_7 < %t.members7.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members7.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_8 > %t.members8.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_8 < %t.members8.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members8.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_9 > %t.members9.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_9 < %t.members9.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members9.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_10 > %t.members10.txt
-// RUN: %FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_10 < %t.members10.txt
-// RUN: %FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members10.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_1 | %FileCheck %s -check-prefix=POSTFIX_RVALUE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_2 | %FileCheck %s -check-prefix=POSTFIX_LVALUE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_OPTIONAL_1 | %FileCheck %s -check-prefix=POSTFIX_OPTIONAL
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_1 > %t
-// RUN: %FileCheck %s -check-prefix=INFIX_INT < %t
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_INFIX_INT < %t
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_2 | %FileCheck %s -check-prefix=INFIX_LVALUE_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_STRING_1 | %FileCheck %s -check-prefix=INFIX_STRING
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_EXT_STRING_1 | %FileCheck %s -check-prefix=INFIX_EXT_STRING
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONFORM_SEQUENCE | %FileCheck %s -check-prefix=CONFORM_SEQUENCE
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_CLOSUREARG | %FileCheck %s -check-prefix=GENERIC_CLOSUREARG
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -disable-implicit-concurrency-module-import -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 // NO_STDLIB_PRIVATE: Begin completions
+// NO_STDLIB_PRIVATE-NOT: Decl{{[^:]*}}/IsSystem: _
 // NO_STDLIB_PRIVATE: End completions
 
-#^PLAIN_TOP_LEVEL_1^#
+#^PLAIN_TOP_LEVEL_1?check=PLAIN_TOP_LEVEL;check=NO_STDLIB_PRIVATE^#
 
 // PLAIN_TOP_LEVEL: Begin completions
 // PLAIN_TOP_LEVEL-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Array[#Array#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
 func privateNominalMembers(_ a: String) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_1^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_1?check=PRIVATE_NOMINAL_MEMBERS_1;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_1: Begin completions
@@ -89,7 +23,7 @@ func privateNominalMembers(_ a: String) {
 // PRIVATE_NOMINAL_MEMBERS_1: End completions
 
 func protocolExtCollection1a<C : Collection>(_ a: C) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_2A^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_2A?check=PRIVATE_NOMINAL_MEMBERS_2A;check=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2A;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_2A: Begin completions
@@ -98,7 +32,7 @@ func protocolExtCollection1a<C : Collection>(_ a: C) {
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2A-NOT: Decl{{.*}}: index({#before: Comparable#})
 
 func protocolExtCollection1b(_ a: Collection) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_2B^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_2B?check=PRIVATE_NOMINAL_MEMBERS_2B;check=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2B;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_2B: Begin completions
@@ -107,7 +41,7 @@ func protocolExtCollection1b(_ a: Collection) {
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_2B-NOT: Decl{{.*}}: index({#before: Comparable#})
 
 func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_ a: C) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_3^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_3?check=PRIVATE_NOMINAL_MEMBERS_3;check=NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_3: Begin completions
@@ -118,7 +52,7 @@ func protocolExtCollection2<C : Collection where C.Index : BidirectionalIndex>(_
 // NEGATIVE_PRIVATE_NOMINAL_MEMBERS_3-NOT: Decl{{.*}}:         firstIndex({#({{.*}}): Self.Iterator.Element
 
 func protocolExtArray<T : Equatable>(_ a: [T]) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_4^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_4?check=PRIVATE_NOMINAL_MEMBERS_4;check=NO_STDLIB_PRIVATE^#
 }
 // PRIVATE_NOMINAL_MEMBERS_4: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super/IsSystem:         map({#(transform): (Equatable) throws -> T##(Equatable) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
@@ -128,7 +62,7 @@ func protocolExtArray<T : Equatable>(_ a: [T]) {
 // PRIVATE_NOMINAL_MEMBERS_4: End completions
 
 func testArchetypeReplacement1<FOO : Equatable>(_ a: [FOO]) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_5^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_5?check=PRIVATE_NOMINAL_MEMBERS_5;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_5: Begin completions
@@ -143,7 +77,7 @@ func testArchetypeReplacement1<FOO : Equatable>(_ a: [FOO]) {
 
 
 func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_6^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_6?check=PRIVATE_NOMINAL_MEMBERS_6;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_6: Begin completions
@@ -155,12 +89,12 @@ func testArchetypeReplacement2<BAR : Equatable>(_ a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         min({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         max({#by: (Equatable, Equatable) throws -> Bool##(Equatable, Equatable) throws -> Bool#})[' rethrows'][#Equatable?#]{{; name=.+}}
 // FIXME: The following should include 'partialResult' as local parameter name: "(nextPartialResult): (_ partialResult: Result, Equatable)"
-// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (Result, Equatable) throws -> Result##(Result, Equatable) throws -> Result#})[' rethrows'][#Result#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         reduce({#(initialResult): Result#}, {#(nextPartialResult): (Result, Equatable) throws -> Result##(_ partialResult: Result, Equatable) throws -> Result#})[' rethrows'][#Result#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super/IsSystem:         dropFirst({#(k): Int#})[#ArraySlice<Equatable>#]{{; name=.+}}
 // FIXME: restore Decl[InstanceMethod]/Super:         flatMap({#(transform): (Equatable) throws -> Sequence##(Equatable) throws -> Sequence#})[' rethrows'][#[IteratorProtocol.Element]#]{{; name=.+}}
 
 func testArchetypeReplacement3 (_ a : [Int]) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_7^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_7?check=PRIVATE_NOMINAL_MEMBERS_7;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_7: Begin completions
@@ -198,13 +132,13 @@ class MyClass3 {
 }
 
 func testArchetypeReplacement4(_ a : MyClass1) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_8^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_8?check=PRIVATE_NOMINAL_MEMBERS_8;check=NO_STDLIB_PRIVATE^#
 }
 // PRIVATE_NOMINAL_MEMBERS_8: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super: foo({#(x): MyInt#})[#Void#]{{; name=.+}}
 
 func testArchetypeReplacement5(_ a : MyClass2) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_9^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_9?check=PRIVATE_NOMINAL_MEMBERS_9;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_9: Begin completions
@@ -212,31 +146,31 @@ func testArchetypeReplacement5(_ a : MyClass2) {
 
 func testArchetypeReplacement6() {
   var a = MyClass3()
-  a.#^PRIVATE_NOMINAL_MEMBERS_10^#
+  a.#^PRIVATE_NOMINAL_MEMBERS_10?check=PRIVATE_NOMINAL_MEMBERS_10;check=NO_STDLIB_PRIVATE^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_10: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_10-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#(t): P1 & P2#})[#Void#]{{; name=.+}}
 
 func testPostfixOperator1(_ x: Int) {
-  x#^POSTFIX_INT_1^#
+  x#^POSTFIX_INT_1?check=POSTFIX_RVALUE_INT^#
 }
 // POSTFIX_RVALUE_INT-NOT: ++
 // POSTFIX_RVALUE_INT-NOT: --
 
 func testPostfixOperator2(_ x: inout Int) {
-  x#^POSTFIX_INT_2^#
+  x#^POSTFIX_INT_2?check=POSTFIX_LVALUE_INT^#
 }
 // POSTFIX_LVALUE_INT-NOT: Decl[PostfixOperatorFunction]/OtherModule[Swift]/IsSystem: ++[#Int#]; name=
 // POSTFIX_LVALUE_INT-NOT: Decl[PostfixOperatorFunction]/OtherModule[Swift]/IsSystem: --[#Int#]; name=
 
 func testPostfixOperator3(_ x: MyInt??) {
-  x#^POSTFIX_OPTIONAL_1^#
+  x#^POSTFIX_OPTIONAL_1?check=POSTFIX_OPTIONAL^#
 }
 // POSTFIX_OPTIONAL: BuiltinOperator/None: ![#MyInt?#]; name=!
 
 func testInfixOperator1(_ x: Int) {
-  x#^INFIX_INT_1^#
+  x#^INFIX_INT_1?check=INFIX_INT;check=NEGATIVE_INFIX_INT^#
 }
 // INFIX_INT: Begin completions
 // INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  ... {#Int#}[#ClosedRange<Int>#]
@@ -249,7 +183,7 @@ func testInfixOperator1(_ x: Int) {
 // NEGATIVE_INFIX_INT-NOT: &&
 // NEGATIVE_INFIX_INT-NOT: +=
 func testInfixOperator2(_ x: inout Int) {
-  x#^INFIX_INT_2^#
+  x#^INFIX_INT_2?check=INFIX_LVALUE_INT^#
 }
 // INFIX_LVALUE_INT: Begin completions
 // INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  ... {#Int#}[#ClosedRange<Int>#]
@@ -263,7 +197,7 @@ func testInfixOperator2(_ x: inout Int) {
 // INFIX_LVALUE_INT: End completions
 
 func testInfixOperator3(_ x: String) {
-  x#^INFIX_STRING_1^#
+  x#^INFIX_STRING_1?check=INFIX_STRING^#
 }
 // INFIX_STRING: Begin completions
 // INFIX_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  + {#String#}[#String#]
@@ -274,7 +208,7 @@ func testInfixOperator3(_ x: String) {
 // INFIX_STRING: End completions
 
 func testInfixOperator4(_ x: String) {
-  x == ""#^INFIX_EXT_STRING_1^#
+  x == ""#^INFIX_EXT_STRING_1?check=INFIX_EXT_STRING^#
 }
 // INFIX_EXT_STRING: Begin completions
 // INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  + {#String#}[#String#]

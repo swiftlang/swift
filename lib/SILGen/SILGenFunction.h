@@ -295,8 +295,6 @@ public:
   /// the notion of the current block being emitted into.
   SILGenBuilder B;
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
-
   struct BreakContinueDest {
     LabeledStmt *Target;
     JumpDest BreakDest;
@@ -453,11 +451,11 @@ public:
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
-  /// If set, the current function is an async function which is isolated to
-  /// this actor.
-  /// If set, hop_to_executor instructions must be inserted at the begin of the
-  /// function and after all suspension points.
-  SILValue actor;
+  /// If set, the current function is an async function which is formally
+  /// isolated to the given executor, and hop_to_executor instructions must
+  /// be inserted at the begin of the function and after all suspension
+  /// points.
+  SILValue ExpectedExecutor;
 
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
@@ -841,16 +839,39 @@ public:
                             Optional<ActorIsolation> actorIso,
                             Optional<ManagedValue> actorSelf);
 
+  /// A version of `emitHopToTargetActor` that is specialized to the needs
+  /// of various types of ConstructorDecls, like class or value initializers,
+  /// because their prolog emission is not the same as for regular functions.
+  ///
+  /// This function emits the appropriate hop_to_executor for a constructor's
+  /// prologue.
+  ///
+  /// NOTE: this does not support actor initializers!
+  void emitConstructorPrologActorHop(SILLocation loc,
+                                     Optional<ActorIsolation> actorIso);
+
+  /// Emit the executor for the given actor isolation.
+  Optional<SILValue> emitExecutor(SILLocation loc,
+                                  ActorIsolation isolation,
+                                  Optional<ManagedValue> maybeSelf);
+
+  /// Emit a precondition check to ensure that the function is executing in
+  /// the expected isolation context.
+  void emitPreconditionCheckExpectedExecutor(
+      SILLocation loc, SILValue executor);
+
   /// Gets a reference to the current executor for the task.
+  /// \returns a value of type Builtin.Executor
   SILValue emitGetCurrentExecutor(SILLocation loc);
   
-  /// Generates code to obtain the executor given the actor's decl.
-  /// \returns a SILValue representing the executor.
-  SILValue emitLoadActorExecutor(VarDecl *actorDecl);
+  /// Generates code to obtain an actor's executor given a reference
+  /// to the actor.
+  /// \returns a value which can be used with hop_to_executor
+  SILValue emitLoadActorExecutor(SILLocation loc, ManagedValue actor);
 
   /// Generates the code to obtain the executor for the shared instance 
   /// of the \p globalActor based on the type.
-  /// \returns a SILValue representing the executor.
+  /// \returns a value which can be used with hop_to_executor
   SILValue emitLoadGlobalActorExecutor(Type globalActor);
 
   //===--------------------------------------------------------------------===//
@@ -866,10 +887,11 @@ public:
                   ParameterList *paramList, ParamDecl *selfParam,
                   DeclContext *DC, Type resultType,
                   bool throws, SourceLoc throwsLoc);
-  /// returns the number of variables in paramPatterns.
-  uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
-                      Type resultType, DeclContext *DC,
-                      bool throws, SourceLoc throwsLoc);
+  /// A simpler version of emitProlog
+  /// \returns the number of variables in paramPatterns.
+  uint16_t emitBasicProlog(ParameterList *paramList, ParamDecl *selfParam,
+                           Type resultType, DeclContext *DC,
+                           bool throws, SourceLoc throwsLoc);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1562,7 +1584,7 @@ public:
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext, 
-                   Optional<ValueDecl *> implicitlyAsyncApply);
+                   Optional<ActorIsolation> implicitAsyncIsolation);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -1624,11 +1646,12 @@ public:
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  std::pair<SILValue, CleanupHandle>
+  std::pair<MultipleValueInstructionResult *, CleanupHandle>
   emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
                             SubstitutionMap subs, ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
-  void emitEndApplyWithRethrow(SILLocation loc, SILValue token);
+  void emitEndApplyWithRethrow(SILLocation loc,
+                               MultipleValueInstructionResult *token);
 
   /// Emit a literal that applies the various initializers.
   RValue emitLiteral(LiteralExpr *literal, SGFContext C);

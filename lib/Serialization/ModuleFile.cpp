@@ -91,8 +91,7 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
 }
 
 ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
-    : Core(core),
-      DeserializedTypeCallback([](Type ty) {}) {
+    : Core(core) {
   assert(!core->hasError());
 
   DeclTypeCursor = core->DeclTypeCursor;
@@ -1078,7 +1077,7 @@ ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
     assert(NumLocs);
 
     for (uint32_t i = 0; i < NumLocs; ++i) {
-      LineColumn LC;
+      SourcePosition LC;
       LC.Line = endian::readNext<uint32_t, little, unaligned>(Data);
       LC.Column = endian::readNext<uint32_t, little, unaligned>(Data);
       auto Length = endian::readNext<uint32_t, little, unaligned>(Data);
@@ -1157,7 +1156,7 @@ ModuleFile::getSourceOrderForDecl(const Decl *D) const {
   return Triple.getValue().SourceOrder;
 }
 
-void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
+void ModuleFile::collectAllGroups(SmallVectorImpl<StringRef> &Names) const {
   if (!Core->GroupNamesMap)
     return;
   for (auto It = Core->GroupNamesMap->begin(); It != Core->GroupNamesMap->end();

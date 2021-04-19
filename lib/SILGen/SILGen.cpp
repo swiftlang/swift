@@ -404,6 +404,11 @@ SILGenModule::getRunAsyncHandler() {
   return lookupConcurrencyIntrinsic(getASTContext(), RunAsyncHandler,
                                     "_runAsyncHandler");
 }
+FuncDecl *
+SILGenModule::getCheckExpectedExecutor() {
+  return lookupConcurrencyIntrinsic(getASTContext(), CheckExpectedExecutor,
+                                    "_checkExpectedExecutor");
+}
 
 ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   if (NSErrorConformanceToError)
@@ -755,6 +760,12 @@ bool SILGenModule::hasFunction(SILDeclRef constant) {
 void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
+
+  if (!f->empty()) {
+    diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
+             f->getName());
+    return;
+  }
 
   if (constant.isForeignToNativeThunk()) {
     f->setThunk(IsThunk);

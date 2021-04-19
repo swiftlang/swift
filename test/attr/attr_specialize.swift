@@ -100,6 +100,7 @@ func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
 @_specialize(where T == Sub)
 @_specialize(where T == NonSub) // expected-error{{'T' requires that 'NonSub' inherit from 'Base'}}
+// expected-note@-1 {{same-type constraint 'T' == 'NonSub' implied here}}
 func superTypeRequirement<T : Base>(_ t: T) {}
 
 @_specialize(where X:_Trivial(8), Y == Int) // expected-error{{trailing 'where' clause in '_specialize' attribute of non-generic function 'requirementOnNonGenericFunction(x:y:)'}}
@@ -171,16 +172,17 @@ func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
 @_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject)
-// expected-error@-1{{generic parameter 'T' has conflicting constraints '_Trivial(64)' and '_Trivial(32)'}}
-// expected-error@-2{{generic parameter 'T' has conflicting constraints '_RefCountedObject' and '_Trivial(32)'}}
+// expected-error@-1{{type 'T' has conflicting constraints '_Trivial(64)' and '_Trivial(32)'}}
+// expected-error@-2{{type 'T' has conflicting constraints '_RefCountedObject' and '_Trivial(32)'}}
 // expected-warning@-3{{redundant constraint 'T' : '_Trivial'}}
-// expected-note@-4 3{{constraint 'T' : '_Trivial(32)' written here}}
+// expected-note@-4 {{constraint 'T' : '_Trivial' implied here}}
+// expected-note@-5 2{{constraint conflicts with 'T' : '_Trivial(32)'}}
 @_specialize(where T: _Trivial, T: _Trivial(64))
 // expected-warning@-1{{redundant constraint 'T' : '_Trivial'}}
-// expected-note@-2 1{{constraint 'T' : '_Trivial(64)' written here}}
+// expected-note@-2 1{{constraint 'T' : '_Trivial' implied here}}
 @_specialize(where T: _RefCountedObject, T: _NativeRefCountedObject)
 // expected-warning@-1{{redundant constraint 'T' : '_RefCountedObject'}}
-// expected-note@-2 1{{constraint 'T' : '_NativeRefCountedObject' written here}}
+// expected-note@-2 1{{constraint 'T' : '_RefCountedObject' implied here}}
 @_specialize(where Array<T> == Int) // expected-error{{generic signature requires types 'Array<T>' and 'Int' to be the same}}
 // expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
 // expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
@@ -193,14 +195,15 @@ public protocol Proto: class {
 }
 
 @_specialize(where T: _RefCountedObject)
-// expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
-// expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
+// expected-warning@-1 {{redundant constraint 'T' : '_RefCountedObject'}}
+// expected-error@-2 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
+// expected-note@-3 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: _Trivial)
-// expected-error@-1{{generic parameter 'T' has conflicting constraints '_Trivial' and '_NativeClass'}}
+// expected-error@-1{{type 'T' has conflicting constraints '_Trivial' and '_NativeClass'}}
 // expected-error@-2 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
 // expected-note@-3 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: _Trivial(64))
-// expected-error@-1{{generic parameter 'T' has conflicting constraints '_Trivial(64)' and '_NativeClass'}}
+// expected-error@-1{{type 'T' has conflicting constraints '_Trivial(64)' and '_NativeClass'}}
 // expected-error@-2 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
 // expected-note@-3 {{missing constraint for 'T' in '_specialize' attribute}}
 public func funcWithABaseClassRequirement<T>(t: T) -> Int where T: C1 {

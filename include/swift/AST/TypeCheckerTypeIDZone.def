@@ -99,7 +99,8 @@ SWIFT_REQUEST(TypeChecker, CanBeAsyncHandlerRequest, bool(FuncDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest, bool(ClassDecl *),
+SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,
+              bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, GlobalActorInstanceRequest,
               VarDecl *(NominalTypeDecl *),
@@ -126,6 +127,8 @@ SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
               bool(SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ModuleLibraryLevelRequest,
+              LibraryLevel(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, const GenericSignatureImpl *,
                                  GenericParamSource,
@@ -323,6 +326,6 @@ SWIFT_REQUEST(TypeChecker, SynthesizeMainFunctionRequest,
 SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
               NormalProtocolConformance *(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckCompletionHandlerAsyncAttrRequest,
-              bool (AbstractFunctionDecl *, CompletionHandlerAsyncAttr *),
+SWIFT_REQUEST(TypeChecker, AsyncAlternativeRequest,
+              AbstractFunctionDecl *(AbstractFunctionDecl *),
               Cached, NoLocationInfo)

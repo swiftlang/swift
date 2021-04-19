@@ -43,6 +43,10 @@ ERROR(bridging_objcbridgeable_broken,none,
       "broken definition of '_ObjectiveCBridgeable' protocol: missing %0",
       (DeclName))
 
+ERROR(sil_function_redefinition,none,
+      "multiple definitions of symbol '%0'",
+      (StringRef))
+
 ERROR(invalid_sil_builtin,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
       (StringRef))

@@ -19,6 +19,7 @@
 #define SWIFT_SIL_DOMINANCE_H
 
 #include "llvm/Support/GenericDomTree.h"
+#include "swift/Basic/ScopedTracking.h"
 #include "swift/SIL/CFG.h"
 
 extern template class llvm::DominatorTreeBase<swift::SILBasicBlock, false>;
@@ -184,6 +185,62 @@ public:
   using super::properlyDominates;
 };
 
+/// Invoke the given callback for all the reachable blocks
+/// in a function.  It will be called in a depth-first,
+/// dominance-consistent order.
+///
+/// Furthermore, prior to running each block, a tracking scope will
+/// be entered for each of the trackers passed in, as if by:
+///
+///   typename ScopedTrackingTraits<Tracker>::scope_type scope(tracker);
+///
+/// This allows state to be saved and restored for each of the trackers,
+/// such that each tracker will only represent state that was computed
+/// in a dominating block.
+template <class... Trackers, class Fn>
+void runInDominanceOrderWithScopes(DominanceInfo *dominance, Fn &&fn,
+                                   Trackers &...trackers) {
+  using TrackingStackNode = TrackingScopes<Trackers...>;
+  llvm::SmallVector<std::unique_ptr<TrackingStackNode>, 8> trackingStack;
+
+  // The stack of work to do.  A null item means to pop the top
+  // entry off the tracking stack.
+  llvm::SmallVector<DominanceInfoNode *, 16> workStack;
+  workStack.push_back(dominance->getRootNode());
+
+  while (!workStack.empty()) {
+    auto node = workStack.pop_back_val();
+
+    // If the node is null, pop the top entry off the tracking stack.
+    if (node == nullptr) {
+      (void) trackingStack.pop_back_val();
+      continue;
+    }
+
+    auto bb = node->getBlock();
+
+    // If the node has no children, build the stack node in local
+    // storage to avoid having to heap-allocate it.
+    if (node->isLeaf()) {
+      TrackingStackNode stackNode(trackers...);
+
+      fn(bb);
+
+    // Otherwise, we have to use the more general approach.
+    } else {
+      // Push a tracking stack node.
+      trackingStack.emplace_back(new TrackingStackNode(trackers...));
+      // Push a work command to pop the tracking stack node.
+      workStack.push_back(nullptr);
+      // Push all the child nodes as work items.
+      workStack.append(node->begin(), node->end());
+
+      fn(bb);
+    }
+  }
+
+  assert(trackingStack.empty());
+}
 
 } // end namespace swift
 

@@ -137,6 +137,11 @@ struct IndentDebug {
   unsigned width;
 };
 
+enum class SourceLocPresentationKind {
+  StartRange,
+  EndRange,
+};
+
 enum class SourceLocInferenceBehavior : unsigned {
   None = 0,
   ForwardScan = 0x1,
@@ -165,7 +170,9 @@ inline SourceLocInferenceBehavior operator&(SourceLocInferenceBehavior lhs,
 /// surrounding code. If we can not find any surrounding code, we return an
 /// invalid SourceLoc.
 SourceLoc inferOptRemarkSourceLoc(SILInstruction &i,
-                                  SourceLocInferenceBehavior inferBehavior);
+                                  SourceLocInferenceBehavior inferBehavior,
+                                  SourceLocPresentationKind presentationKind =
+                                      SourceLocPresentationKind::StartRange);
 
 /// The base class for remarks.  This can be created by optimization passed to
 /// report successful and unsuccessful optimizations. CRTP is used to preserve
@@ -197,9 +204,11 @@ class Remark {
 
 protected:
   Remark(StringRef identifier, SILInstruction &i,
-         SourceLocInferenceBehavior inferenceBehavior)
+         SourceLocInferenceBehavior inferenceBehavior,
+         SourceLocPresentationKind locPresentationKind)
       : identifier((Twine("sil.") + identifier).str()),
-        location(inferOptRemarkSourceLoc(i, inferenceBehavior)),
+        location(
+            inferOptRemarkSourceLoc(i, inferenceBehavior, locPresentationKind)),
         function(i.getParent()->getParent()),
         demangledFunctionName(Demangle::demangleSymbolAsString(
             function->getName(),
@@ -238,18 +247,30 @@ public:
 /// Remark to report a successful optimization.
 struct RemarkPassed : public Remark<RemarkPassed> {
   RemarkPassed(StringRef id, SILInstruction &i)
-      : Remark(id, i, SourceLocInferenceBehavior::None) {}
+      : Remark(id, i, SourceLocInferenceBehavior::None,
+               SourceLocPresentationKind::StartRange) {}
   RemarkPassed(StringRef id, SILInstruction &i,
                SourceLocInferenceBehavior inferenceBehavior)
-      : Remark(id, i, inferenceBehavior) {}
+      : Remark(id, i, inferenceBehavior,
+               SourceLocPresentationKind::StartRange) {}
+  RemarkPassed(StringRef id, SILInstruction &i,
+               SourceLocInferenceBehavior inferenceBehavior,
+               SourceLocPresentationKind locPresentationKind)
+      : Remark(id, i, inferenceBehavior, locPresentationKind) {}
 };
 /// Remark to report a unsuccessful optimization.
 struct RemarkMissed : public Remark<RemarkMissed> {
   RemarkMissed(StringRef id, SILInstruction &i)
-      : Remark(id, i, SourceLocInferenceBehavior::None) {}
+      : Remark(id, i, SourceLocInferenceBehavior::None,
+               SourceLocPresentationKind::StartRange) {}
   RemarkMissed(StringRef id, SILInstruction &i,
                SourceLocInferenceBehavior inferenceBehavior)
-      : Remark(id, i, inferenceBehavior) {}
+      : Remark(id, i, inferenceBehavior,
+               SourceLocPresentationKind::StartRange) {}
+  RemarkMissed(StringRef id, SILInstruction &i,
+               SourceLocInferenceBehavior inferenceBehavior,
+               SourceLocPresentationKind locPresentationKind)
+      : Remark(id, i, inferenceBehavior, locPresentationKind) {}
 };
 
 /// Used to emit the remarks.  Passes reporting remarks should create an

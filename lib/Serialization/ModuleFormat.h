@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 607; // async / throws property decls
+const uint16_t SWIFTMODULE_VERSION_MINOR = 610; // async initializers for nominal types
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1007,6 +1007,7 @@ namespace decls_block {
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
     IdentifierIDField,   // name
+    IdentifierIDField,   // internal label
     TypeIDField,         // type
     BCFixed<1>,          // vararg?
     BCFixed<1>,          // autoclosure?
@@ -1263,6 +1264,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // stub implementation?
+    BCFixed<1>,  // async?
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
     GenericSignatureIDField, // generic environment

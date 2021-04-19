@@ -10,14 +10,14 @@ struct SomeGlobalActor {
   static var shared: TestActor { TestActor() }
 }
 
-// expected-note@+1 13 {{calls to global function 'syncGlobActorFn()' from outside of its actor context are implicitly asynchronous}}
+// expected-note@+1 6 {{calls to global function 'syncGlobActorFn()' from outside of its actor context are implicitly asynchronous}}
 @SomeGlobalActor func syncGlobActorFn() { }
 @SomeGlobalActor func asyncGlobalActFn() async { }
 
 actor Alex {
   @SomeGlobalActor let const_memb = 20
   @SomeGlobalActor var mut_memb = 30
-  @SomeGlobalActor func method() {} // expected-note 2 {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  @SomeGlobalActor func method() {}
 
   // expected-note@+1 2 {{mutation of this subscript is only permitted within the actor}}
   @SomeGlobalActor subscript(index : Int) -> Int {
@@ -30,7 +30,7 @@ actor Alex {
 
 func referenceGlobalActor() async {
   let a = Alex()
-  _ = a.method // expected-error {{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  _ = a.method
   _ = a.const_memb
   _ = a.mut_memb  // expected-error{{property access is 'async' but is not marked with 'await'}}
 
@@ -41,63 +41,59 @@ func referenceGlobalActor() async {
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'referenceGlobalActor2()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func referenceGlobalActor2() {
-  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
-  let x = syncGlobActorFn
-  x()
+  let x = syncGlobActorFn // expected-note{{calls to let 'x' from outside of its actor context are implicitly asynchronous}}
+  x() // expected-error{{call to global actor 'SomeGlobalActor'-isolated let 'x' in a synchronous nonisolated context}}
 }
 
 
-// expected-note@+1 {{add 'async' to function 'referenceAsyncGlobalActor()' to make it asynchronous}} {{33-33= async}}
+// expected-note@+2 {{add 'async' to function 'referenceAsyncGlobalActor()' to make it asynchronous}} {{33-33= async}}
+// expected-note@+1 {{add '@SomeGlobalActor' to make global function 'referenceAsyncGlobalActor()' part of global actor 'SomeGlobalActor'}}
 func referenceAsyncGlobalActor() {
-  let y = asyncGlobalActFn
+  let y = asyncGlobalActFn // expected-note{{calls to let 'y' from outside of its actor context are implicitly asynchronous}}
   y() // expected-error{{'async' call in a function that does not support concurrency}}
+  // expected-error@-1{{call to global actor 'SomeGlobalActor'-isolated let 'y' in a synchronous nonisolated context}}
 }
 
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'callGlobalActor()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func callGlobalActor() {
-  syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  syncGlobActorFn() // expected-error {{call to global actor 'SomeGlobalActor'-isolated global function 'syncGlobActorFn()' in a synchronous nonisolated context}}
 }
 
 func fromClosure() {
   { () -> Void in
-    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated context}}
-    let x = syncGlobActorFn
-    x()
+    let x = syncGlobActorFn // expected-note{{calls to let 'x' from outside of its actor context are implicitly asynchronous}}
+    x() // expected-error{{call to global actor 'SomeGlobalActor'-isolated let 'x' in a synchronous nonisolated context}}
   }()
 
-  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
+  // expected-error@+1 {{call to global actor 'SomeGlobalActor'-isolated global function 'syncGlobActorFn()' in a synchronous nonisolated context}}
   let _ = { syncGlobActorFn() }()
 }
 
 class Taylor {
   init() {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+    syncGlobActorFn() // expected-error {{call to global actor 'SomeGlobalActor'-isolated global function 'syncGlobActorFn()' in a synchronous nonisolated context}}
 
-    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
   }
 
   deinit {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+    syncGlobActorFn() // expected-error {{call to global actor 'SomeGlobalActor'-isolated global function 'syncGlobActorFn()' in a synchronous nonisolated context}}
 
-    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
   }
 
-  // expected-note@+1 2 {{add '@SomeGlobalActor' to make instance method 'method1()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
+  // expected-note@+1 {{add '@SomeGlobalActor' to make instance method 'method1()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
   func method1() {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+    syncGlobActorFn() // expected-error {{call to global actor 'SomeGlobalActor'-isolated global function 'syncGlobActorFn()' in a synchronous nonisolated context}}
 
-    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
   }
 
-  // expected-note@+1 2 {{add '@SomeGlobalActor' to make instance method 'cannotBeHandler()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
+  // expected-note@+1 {{add '@SomeGlobalActor' to make instance method 'cannotBeHandler()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
   func cannotBeHandler() -> Int {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+    syncGlobActorFn() // expected-error {{call to global actor 'SomeGlobalActor'-isolated global function 'syncGlobActorFn()' in a synchronous nonisolated context}}
 
-    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
     return 0
   }
@@ -105,16 +101,15 @@ class Taylor {
 
 
 func fromAsync() async {
-  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
   let x = syncGlobActorFn
-  x()
+  x() // expected-error{{call is 'async' but is not marked with 'await'}}
 
   let y = asyncGlobalActFn
   y() // expected-error{{call is 'async' but is not marked with 'await'}}
 
   let a = Alex()
-  // expected-error@+1 {{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
-  _ = a.method
+  let fn = a.method
+  fn() // expected-error{{call is 'async' but is not marked with 'await'}}
   _ = a.const_memb
   _ = a.mut_memb  // expected-error{{property access is 'async' but is not marked with 'await'}}
 

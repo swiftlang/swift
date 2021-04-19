@@ -27,3 +27,15 @@ int AddressOnlyIntWrapper::operator()(int x) const {
 int AddressOnlyIntWrapper::operator()(int x, int y) const {
   return value + x * y;
 }
+
+const int& ReadWriteIntArray::operator[](int x) const {
+  return values[x];
+}
+
+int& ReadWriteIntArray::operator[](int x) {
+  return values[x];
+}
+
+int NonTrivialIntArrayByVal::operator[](int x) {
+  return values[x];
+}

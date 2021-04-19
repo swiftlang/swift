@@ -787,13 +787,29 @@ enum class FunctionMetadataConvention: uint8_t {
 
 /// Differentiability kind for function type metadata.
 /// Duplicates `DifferentiabilityKind` in AST/AutoDiff.h.
-enum class FunctionMetadataDifferentiabilityKind: uint8_t {
-  NonDifferentiable = 0b00000,
-  Forward           = 0b00001,
-  Reverse           = 0b00010,
-  Normal            = 0b00011,
-  Linear            = 0b10000,
+template <typename int_type>
+struct TargetFunctionMetadataDifferentiabilityKind {
+  enum Value : int_type {
+    NonDifferentiable = 0,
+    Forward           = 1,
+    Reverse           = 2,
+    Normal            = 3,
+    Linear            = 4,
+  } Value;
+
+  constexpr TargetFunctionMetadataDifferentiabilityKind(
+      enum Value value = NonDifferentiable) : Value(value) {}
+
+  int_type getIntValue() const {
+    return (int_type)Value;
+  }
+
+  bool isDifferentiable() const {
+    return Value != NonDifferentiable;
+  }
 };
+using FunctionMetadataDifferentiabilityKind =
+    TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
 /// Flags in a function type metadata record.
 template <typename int_type>
@@ -808,8 +824,7 @@ class TargetFunctionTypeFlags {
     ThrowsMask             = 0x01000000U,
     ParamFlagsMask         = 0x02000000U,
     EscapingMask           = 0x04000000U,
-    DifferentiabilityMask  = 0x98000000U,
-    DifferentiabilityShift = 27U,
+    DifferentiableMask     = 0x08000000U,
     AsyncMask              = 0x20000000U,
     SendableMask           = 0x40000000U,
   };
@@ -842,10 +857,10 @@ public:
                                              (throws ? ThrowsMask : 0));
   }
 
-  constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
-      FunctionMetadataDifferentiabilityKind differentiabilityKind) const {
-    return TargetFunctionTypeFlags((Data & ~DifferentiabilityMask)
-        | (int_type(differentiabilityKind) << DifferentiabilityShift));
+  constexpr TargetFunctionTypeFlags<int_type>
+  withDifferentiable(bool differentiable) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~DifferentiableMask) |
+                                     (differentiable ? DifferentiableMask : 0));
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
@@ -888,13 +903,7 @@ public:
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
 
   bool isDifferentiable() const {
-    return getDifferentiabilityKind() !=
-        FunctionMetadataDifferentiabilityKind::NonDifferentiable;
-  }
-
-  FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
-    return FunctionMetadataDifferentiabilityKind(
-        (Data & DifferentiabilityMask) >> DifferentiabilityShift);
+    return bool (Data & DifferentiableMask);
   }
 
   int_type getIntValue() const {
@@ -945,6 +954,12 @@ public:
   withAutoClosure(bool isAutoClosure) const {
     return TargetParameterTypeFlags<int_type>(
         (Data & ~AutoClosureMask) | (isAutoClosure ? AutoClosureMask : 0));
+  }
+
+  constexpr TargetParameterTypeFlags<int_type>
+  withNoDerivative(bool isNoDerivative) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~NoDerivativeMask) | (isNoDerivative ? NoDerivativeMask : 0));
   }
 
   bool isNone() const { return Data == 0; }
@@ -1194,6 +1209,10 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t OpaqueReadResumeFunction = 56769;
   const uint16_t OpaqueModifyResumeFunction = 3909;
 
+  /// ObjC class pointers.
+  const uint16_t ObjCISA = 0x6AE1;
+  const uint16_t ObjCSuperclass = 0xB5AB;
+
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
 
@@ -1212,6 +1231,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
+
+  /// Dispatch integration.
+  const uint16_t DispatchInvokeFunction = 0xf493; // = 62611
 }
 
 /// The number of arguments that will be passed directly to a generic
@@ -1367,6 +1389,14 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
 
     // Type-specific flags:
 
+    /// Set if the class is a default actor class.  Note that this is
+    /// based on the best knowledge available to the class; actor
+    /// classes with resilient superclassess might be default actors
+    /// without knowing it.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_IsDefaultActor = 8,
+
     /// The kind of reference that this class makes to its resilient superclass
     /// descriptor.  A TypeReferenceKind.
     ///
@@ -1446,6 +1476,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_AreImmediateMembersNegative,
                                 class_areImmediateMembersNegative,
                                 class_setAreImmediateMembersNegative)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsDefaultActor,
+                                class_isDefaultActor,
+                                class_setIsDefaultActor)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -2052,6 +2085,9 @@ enum class AsyncContextKind {
   /// A context which can yield to its caller.
   Yielding         = 1,
 
+  /// A continuation context.
+  Continuation     = 2,
+
   // Other kinds are reserved for interesting special
   // intermediate contexts.
 
@@ -2094,6 +2130,69 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(ShouldNotDeallocate,
                                 shouldNotDeallocateInCallee,
                                 setShouldNotDeallocateInCallee)
+};
+
+/// Flags passed to swift_continuation_init.
+class AsyncContinuationFlags : public FlagSet<size_t> {
+public:
+  enum {
+    CanThrow            = 0,
+    HasExecutorOverride = 1,
+    IsPreawaited        = 2,
+  };
+
+  explicit AsyncContinuationFlags(size_t bits) : FlagSet(bits) {}
+  constexpr AsyncContinuationFlags() {}
+
+  /// Whether the continuation is permitted to throw.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
+
+  /// Whether the continuation should be resumed on a different
+  /// executor than the current one.  swift_continuation_init
+  /// will not initialize ResumeToExecutor if this is set.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasExecutorOverride,
+                                hasExecutorOverride,
+                                setHasExecutorOverride)
+
+  /// Whether the continuation is "pre-awaited".  If so, it should
+  /// be set up in the already-awaited state, and so resumptions
+  /// will immediately schedule the continuation to begin
+  /// asynchronously.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsPreawaited,
+                                isPreawaited,
+                                setIsPreawaited)
+};
+
+/// Status values for a continuation.  Note that the "not yet"s in
+/// the description below aren't quite right because the system
+/// does not actually promise to update the status before scheduling
+/// the task.  This is because the continuation context is immediately
+/// invalidated once the task starts running again, so the window in
+/// which we can usefully protect against (say) double-resumption may
+/// be very small.
+enum class ContinuationStatus : size_t {
+  /// The continuation has not yet been awaited or resumed.
+  Pending = 0,
+
+  /// The continuation has already been awaited, but not yet resumed.
+  Awaited = 1,
+
+  /// The continuation has already been resumed, but not yet awaited.
+  Resumed = 2
+};
+
+/// Flags describing the executor implementation that are stored
+/// in the ExecutorRef.
+enum class ExecutorRefFlags : size_t {
+  // The number of bits available here is very limited because it's
+  // potentially just the alignment bits of a protocol witness table
+  // pointer
+
+  /// The executor is a default actor.
+  DefaultActor = 0x1,
+
+  /// TODO: remove this
+  MainActorIdentity = 0x2,
 };
 
 } // end namespace swift

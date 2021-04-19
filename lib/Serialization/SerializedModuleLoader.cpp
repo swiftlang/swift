@@ -496,7 +496,7 @@ bool ImplicitSerializedModuleLoader::maybeDiagnoseTargetMismatch(
   }
 
   Ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_target, moduleName,
-                     target, foundArchs);
+                     target, foundArchs, dir);
   return true;
 }
 
@@ -1264,8 +1264,8 @@ SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
   return File.getSourceOrderForDecl(D);
 }
 
-void
-SerializedASTFile::collectAllGroups(std::vector<StringRef> &Names) const {
+void SerializedASTFile::collectAllGroups(
+    SmallVectorImpl<StringRef> &Names) const {
   File.collectAllGroups(Names);
 };
 

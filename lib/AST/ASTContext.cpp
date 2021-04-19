@@ -285,7 +285,7 @@ struct ASTContext::Implementation {
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
-  llvm::DenseMap<const Decl *, RawComment> RawComments;
+  llvm::DenseMap<const Decl *, std::pair<RawComment, bool>> RawComments;
 
   /// Map from Swift declarations to brief comments.
   llvm::DenseMap<const Decl *, StringRef> BriefComments;
@@ -2020,7 +2020,7 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   return TheStdlibModule;
 }
 
-Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
+Optional<std::pair<RawComment, bool>> ASTContext::getRawComment(const Decl *D) {
   auto Known = getImpl().RawComments.find(D);
   if (Known == getImpl().RawComments.end())
     return None;
@@ -2028,8 +2028,8 @@ Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
   return Known->second;
 }
 
-void ASTContext::setRawComment(const Decl *D, RawComment RC) {
-  getImpl().RawComments[D] = RC;
+void ASTContext::setRawComment(const Decl *D, RawComment RC, bool FromSerialized) {
+  getImpl().RawComments[D] = std::make_pair(RC, FromSerialized);
 }
 
 Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
@@ -3075,21 +3075,27 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                               Type result) {
+                               Type result, Type globalActor) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
   properties |= result->getRecursiveProperties();
+  if (globalActor)
+    properties |= globalActor->getRecursiveProperties();
   properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
 
 static bool
-isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
+isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
                         Type result) {
   for (auto param : params) {
     if (!param.getPlainType()->isCanonical())
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return result->isCanonical();
@@ -3128,6 +3134,10 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
   for (auto param : params) {
     if (!sig->isCanonicalTypeInContext(param.getPlainType()))
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return sig->isCanonicalTypeInContext(result);
@@ -3231,17 +3241,21 @@ void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
   assert(params.size() == labels.size());
   for (auto i : indices(params)) {
     auto &param = params[i];
-    param = AnyFunctionType::Param(param.getPlainType(),
-                                   labels[i],
-                                   param.getParameterFlags());
+    param = AnyFunctionType::Param(param.getPlainType(), labels[i],
+                                   param.getParameterFlags(),
+                                   param.getInternalLabel());
   }
 }
 
+/// Profile \p params into \p ID. In contrast to \c == on \c Param, the profile
+/// *does* take the internal label into account and *does not* canonicalize
+/// the param's type.
 static void profileParams(llvm::FoldingSetNodeID &ID,
                           ArrayRef<AnyFunctionType::Param> params) {
   ID.AddInteger(params.size());
   for (auto param : params) {
     ID.AddPointer(param.getLabel().get());
+    ID.AddPointer(param.getInternalLabel().get());
     ID.AddPointer(param.getPlainType().getPointer());
     ID.AddInteger(param.getParameterFlags().toRaw());
   }
@@ -3262,7 +3276,11 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, Optional<ExtInfo> info) {
-  auto properties = getFunctionRecursiveProperties(params, result);
+  Type globalActor;
+  if (info.hasValue())
+    globalActor = info->getGlobalActor();
+
+  auto properties = getFunctionRecursiveProperties(params, result, globalActor);
   auto arena = getArena(properties);
 
   llvm::FoldingSetNodeID id;
@@ -3284,16 +3302,12 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.hasValue() && !info.getValue().getClangTypeInfo().empty();
 
-  Type globalActor;
-  if (info.hasValue())
-    globalActor = info->getGlobalActor();
-
   size_t allocSize = totalSizeToAlloc<
       AnyFunctionType::Param, ClangTypeInfo, Type
     >(params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
-  bool isCanonical = isFunctionTypeCanonical(params, result);
+  bool isCanonical = isAnyFunctionTypeCanonical(params, result);
   if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
       isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();
@@ -3381,7 +3395,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (info.hasValue())
     globalActor = info->getGlobalActor();
 
-  if (globalActor && !globalActor->isCanonical())
+  if (globalActor && !sig->isCanonicalTypeInContext(globalActor))
     isCanonical = false;
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type>(

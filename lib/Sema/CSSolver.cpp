@@ -137,12 +137,10 @@ Solution ConstraintSystem::finalize() {
     solution.DisjunctionChoices.insert(choice);
   }
 
-  // Remember all of the trailing closure matching choices we made.
-  for (auto &trailingClosureMatch : trailingClosureMatchingChoices) {
-    auto inserted = solution.trailingClosureMatchingChoices.insert(
-        trailingClosureMatch);
-    assert((inserted.second ||
-            inserted.first->second == trailingClosureMatch.second));
+  // Remember all of the argument/parameter matching choices we made.
+  for (auto &argumentMatch : argumentMatchingChoices) {
+    auto inserted = solution.argumentMatchingChoices.insert(argumentMatch);
+    assert(inserted.second || inserted.first->second == argumentMatch.second);
     (void)inserted;
   }
 
@@ -193,6 +191,11 @@ Solution ConstraintSystem::finalize() {
     solution.appliedPropertyWrappers.insert(appliedWrapper);
   }
 
+  // Remember implicit value conversions.
+  for (const auto &valueConversion : ImplicitValueConversions) {
+    solution.ImplicitValueConversions.push_back(valueConversion);
+  }
+
   return solution;
 }
 
@@ -229,9 +232,9 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     DisjunctionChoices.push_back(choice);
   }
 
-  // Remember all of the trailing closure matching choices we made.
-  for (auto &trailingClosureMatch : solution.trailingClosureMatchingChoices) {
-    trailingClosureMatchingChoices.push_back(trailingClosureMatch);
+  // Remember all of the argument/parameter matching choices we made.
+  for (auto &argumentMatch : solution.argumentMatchingChoices) {
+    argumentMatchingChoices.push_back(argumentMatch);
   }
 
   // Register the solution's opened types.
@@ -280,6 +283,10 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
     appliedPropertyWrappers.insert(appliedWrapper);
+  }
+
+  for (auto &valueConversion : solution.ImplicitValueConversions) {
+    ImplicitValueConversions.push_back(valueConversion);
   }
 
   // Register any fixes produced along this path.
@@ -474,7 +481,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numAppliedDisjunctions = cs.AppliedDisjunctions.size();
-  numTrailingClosureMatchingChoices = cs.trailingClosureMatchingChoices.size();
+  numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
@@ -488,6 +495,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numContextualTypes = cs.contextualTypes.size();
   numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
   numCaseLabelItems = cs.caseLabelItems.size();
+  numImplicitValueConversions = cs.ImplicitValueConversions.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -532,9 +540,8 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any applied disjunctions.
   truncate(cs.AppliedDisjunctions, numAppliedDisjunctions);
 
-  // Remove any trailing closure matching choices;
-  truncate(
-      cs.trailingClosureMatchingChoices, numTrailingClosureMatchingChoices);
+  // Remove any argument matching choices;
+  truncate(cs.argumentMatchingChoices, numArgumentMatchingChoices);
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
@@ -577,6 +584,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any case label item infos.
   truncate(cs.caseLabelItems, numCaseLabelItems);
+
+  // Remove any implicit value conversions.
+  truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -729,6 +739,14 @@ void ConstraintSystem::Candidate::applySolutions(
   llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSetVector<ValueDecl *, 2>>
     domains;
   for (auto &solution : solutions) {
+    auto &score = solution.getFixedScore();
+
+    // Avoid any solutions with implicit value conversions
+    // because they might get reverted later when more context
+    // becomes available.
+    if (score.Data[SK_ImplicitValueConversion] > 0)
+      continue;
+
     for (auto choice : solution.overloadChoices) {
       // Some of the choices might not have locators.
       if (!choice.getFirst())
@@ -1713,18 +1731,6 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   return result->first;
 }
 
-static bool isOperatorBindOverload(Constraint *bindOverload) {
-  if (bindOverload->getKind() != ConstraintKind::BindOverload)
-    return false;
-
-  auto choice = bindOverload->getOverloadChoice();
-  if (!choice.isDecl())
-    return false;
-
-  auto *funcDecl = dyn_cast<FuncDecl>(choice.getDecl());
-  return funcDecl && funcDecl->getOperatorDecl();
-}
-
 // Performance hack: if there are two generic overloads, and one is
 // more specialized than the other, prefer the more-specialized one.
 static Constraint *tryOptimizeGenericDisjunction(
@@ -1857,15 +1863,14 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
   }
 }
 
-void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constraints,
-                                                 SmallVectorImpl<unsigned>::iterator first,
-                                                 SmallVectorImpl<unsigned>::iterator last,
-                                                 ConstraintLocator *locator) {
-  auto *argFnType = AppliedDisjunctions[locator];
-  if (!isOperatorBindOverload(constraints[0]) || !argFnType)
+void DisjunctionChoiceProducer::partitionGenericOperators(
+    SmallVectorImpl<unsigned>::iterator first,
+    SmallVectorImpl<unsigned>::iterator last) {
+  auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
+  if (!isOperatorDisjunction(Disjunction) || !argFnType)
     return;
 
-  auto operatorName = constraints[0]->getOverloadChoice().getName();
+  auto operatorName = Choices[0]->getOverloadChoice().getName();
   if (!operatorName.getBaseIdentifier().isArithmeticOperator())
     return;
 
@@ -1878,7 +1883,8 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
     if (!nominal)
       return false;
 
-    auto *protocol = TypeChecker::getProtocol(getASTContext(), SourceLoc(), kind);
+    auto *protocol =
+        TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
 
     if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
       return refined->inheritsFrom(protocol);
@@ -1890,7 +1896,7 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
   // Gather Numeric and Sequence overloads into separate buckets.
   for (auto iter = first; iter != last; ++iter) {
     unsigned index = *iter;
-    auto *decl = constraints[index]->getOverloadChoice().getDecl();
+    auto *decl = Choices[index]->getOverloadChoice().getDecl();
     auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
     if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
       concreteOverloads.push_back(index);
@@ -1905,8 +1911,10 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
 
   auto sortPartition = [&](SmallVectorImpl<unsigned> &partition) {
     llvm::sort(partition, [&](unsigned lhs, unsigned rhs) -> bool {
-      auto *declA = dyn_cast<ValueDecl>(constraints[lhs]->getOverloadChoice().getDecl());
-      auto *declB = dyn_cast<ValueDecl>(constraints[rhs]->getOverloadChoice().getDecl());
+      auto *declA =
+          dyn_cast<ValueDecl>(Choices[lhs]->getOverloadChoice().getDecl());
+      auto *declB =
+          dyn_cast<ValueDecl>(Choices[rhs]->getOverloadChoice().getDecl());
 
       return TypeChecker::isDeclRefinementOf(declA, declB);
     });
@@ -1925,19 +1933,22 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
   // overload choices first.
   for (auto arg : argFnType->getParams()) {
     auto argType = arg.getPlainType();
-    argType = getFixedTypeRecursive(argType, /*wantRValue=*/true);
+    argType = CS.getFixedTypeRecursive(argType, /*wantRValue=*/true);
 
     if (argType->isTypeVariableOrMember())
       continue;
 
-    if (conformsToKnownProtocol(DC, argType, KnownProtocolKind::AdditiveArithmetic)) {
-      first = std::copy(numericOverloads.begin(), numericOverloads.end(), first);
+    if (conformsToKnownProtocol(CS.DC, argType,
+                                KnownProtocolKind::AdditiveArithmetic)) {
+      first =
+          std::copy(numericOverloads.begin(), numericOverloads.end(), first);
       numericOverloads.clear();
       break;
     }
 
-    if (conformsToKnownProtocol(DC, argType, KnownProtocolKind::Sequence)) {
-      first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
+    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::Sequence)) {
+      first =
+          std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
       sequenceOverloads.clear();
       break;
     }
@@ -1948,16 +1959,22 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
   first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
 }
 
-void ConstraintSystem::partitionDisjunction(
-    ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
+void DisjunctionChoiceProducer::partitionDisjunction(
+    SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
   // Apply a special-case rule for favoring one generic function over
   // another.
-  if (auto favored = tryOptimizeGenericDisjunction(DC, Choices)) {
-    favorConstraint(favored);
+  if (auto favored = tryOptimizeGenericDisjunction(CS.DC, Choices)) {
+    CS.favorConstraint(favored);
   }
 
   SmallSet<Constraint *, 16> taken;
+
+  using ConstraintMatcher = std::function<bool(unsigned index, Constraint *)>;
+  using ConstraintMatchLoop =
+      std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>;
+  using PartitionAppendCallback =
+      std::function<void(SmallVectorImpl<unsigned> & options)>;
 
   // Local function used to iterate over the untaken choices from the
   // disjunction and use a higher-order function to determine if they
@@ -1985,7 +2002,7 @@ void ConstraintSystem::partitionDisjunction(
 
   // Add existing operator bindings to the main partition first. This often
   // helps the solver find a solution fast.
-  existingOperatorBindingsForDisjunction(*this, Choices, everythingElse);
+  existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
   for (auto index : everythingElse)
     taken.insert(Choices[index]);
 
@@ -2005,7 +2022,7 @@ void ConstraintSystem::partitionDisjunction(
   });
 
   // Then unavailable constraints if we're skipping them.
-  if (!shouldAttemptFixes()) {
+  if (!CS.shouldAttemptFixes()) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (constraint->getKind() != ConstraintKind::BindOverload)
         return false;
@@ -2015,7 +2032,7 @@ void ConstraintSystem::partitionDisjunction(
       if (!funcDecl)
         return false;
 
-      if (!isDeclUnavailable(funcDecl, constraint->getLocator()))
+      if (!CS.isDeclUnavailable(funcDecl, constraint->getLocator()))
         return false;
 
       unavailable.push_back(index);
@@ -2024,11 +2041,8 @@ void ConstraintSystem::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (isOperatorBindOverload(Choices[0])) {
+  if (isOperatorDisjunction(Disjunction)) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-      if (!isOperatorBindOverload(constraint))
-        return false;
-
       if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
         simdOperators.push_back(index);
         return true;
@@ -2082,8 +2096,7 @@ Constraint *ConstraintSystem::selectDisjunction() {
         unsigned firstFavored = first->countFavoredNestedConstraints();
         unsigned secondFavored = second->countFavoredNestedConstraints();
 
-        if (!isOperatorBindOverload(first->getNestedConstraints().front()) ||
-            !isOperatorBindOverload(second->getNestedConstraints().front()))
+        if (!isOperatorDisjunction(first) || !isOperatorDisjunction(second))
           return firstActive < secondActive;
 
         if (firstFavored == secondFavored) {
@@ -2154,6 +2167,15 @@ bool DisjunctionChoice::isSymmetricOperator() const {
   return firstType->isEqual(secondType);
 }
 
+bool DisjunctionChoice::isUnaryOperator() const {
+  auto *decl = getOperatorDecl(Choice);
+  if (!decl)
+    return false;
+
+  auto func = cast<FuncDecl>(decl);
+  return func->getParameters()->size() == 1;
+}
+
 void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   assert(ExplicitConversion);
 
@@ -2202,6 +2224,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
         case ConstraintKind::Defaultable:
         case ConstraintKind::ConformsTo:
         case ConstraintKind::LiteralConformsTo:
+        case ConstraintKind::TransitivelyConformsTo:
           return false;
 
         default:

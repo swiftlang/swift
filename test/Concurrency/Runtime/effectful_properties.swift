@@ -4,6 +4,10 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 enum GeneralError : Error {
   case UnknownBallKind
   case Todo
@@ -16,6 +20,7 @@ enum BallKind {
   case KirksandLignature
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 class Specs {
   // obtains the number of dimples
   subscript(_ bk : BallKind) -> Int {
@@ -32,10 +37,11 @@ class Specs {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Database {
   var currentData : Specs {
     get async {
-      let handle = Task.runDetached { Specs() }
+      let handle = detach { Specs() }
       print("obtaining specs...")
       return await handle.get()
     }
@@ -46,18 +52,21 @@ actor Database {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 protocol SphericalObject {
   var name : String { get async throws }
   var dimples : Int { get async throws }
   var description : String { get async throws }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 class Ball : SphericalObject {
   var name : String { get async throws { throw GeneralError.Todo } }
   var dimples : Int { get async throws { throw GeneralError.Todo } }
   var description : String { get async throws { throw GeneralError.Todo } }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 class GolfBall : Ball {
   private static let db : Database = Database()
 
@@ -101,14 +110,17 @@ class GolfBall : Ball {
 // CHECK: obtaining specs...
 // CHECK: this golf ball has 0 dimples
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printAsBall(_ b : Ball) async {
   print(try! await b.description)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printAsAsSphericalObject(_ b : SphericalObject) async {
   print(try! await b.description)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct RunIt {
   static func main() async {
     let balls : [(Bool, Ball)] = [

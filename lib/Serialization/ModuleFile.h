@@ -20,10 +20,10 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
-#include "swift/Serialization/Validation.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/Validation.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -76,9 +76,6 @@ class ModuleFile
   llvm::BitstreamCursor DeclMemberTablesCursor;
 
   friend StringRef getNameOfModule(const ModuleFile *);
-
-  /// A callback to be invoked every time a type was deserialized.
-  std::function<void(Type)> DeserializedTypeCallback;
 
 public:
   static std::unique_ptr<llvm::MemoryBuffer> getModuleName(ASTContext &Ctx,
@@ -696,7 +693,7 @@ public:
   Optional<StringRef> getGroupNameForDecl(const Decl *D) const;
   Optional<StringRef> getSourceFileNameForDecl(const Decl *D) const;
   Optional<unsigned> getSourceOrderForDecl(const Decl *D) const;
-  void collectAllGroups(std::vector<StringRef> &Names) const;
+  void collectAllGroups(SmallVectorImpl<StringRef> &Names) const;
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;

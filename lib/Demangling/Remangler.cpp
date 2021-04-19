@@ -753,6 +753,8 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 'j';
   } else if (text == BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE) {
     Buffer << 'D';
+  } else if (text == BUILTIN_TYPE_NAME_EXECUTOR) {
+    Buffer << 'e';
   } else if (text == BUILTIN_TYPE_NAME_SILTOKEN) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_INTLITERAL) {
@@ -1258,26 +1260,6 @@ void Remangler::mangleFunctionType(Node *node) {
   Buffer << 'c';
 }
 
-void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XF";
-}
-
-void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XG";
-}
-
-void Remangler::mangleLinearFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XH";
-}
-
-void Remangler::mangleEscapingLinearFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XI";
-}
-
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "WG";
@@ -1396,7 +1378,6 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
       case Node::Kind::AsyncFunctionPointer:
-      case Node::Kind::AsyncNonconstantPartialApplyThunk:
       case Node::Kind::AsyncAwaitResumePartialFunction:
       case Node::Kind::AsyncSuspendResumePartialFunction:
         mangleInReverseOrder = true;
@@ -1697,6 +1678,11 @@ void Remangler::mangleOwned(Node *node) {
   Buffer << 'n';
 }
 
+void Remangler::mangleNoDerivative(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Yk";
+}
+
 void Remangler::mangleInfixOperator(Node *node) {
   mangleIdentifierImpl(node, /*isOperator*/ true);
   Buffer << "oi";
@@ -1905,11 +1891,6 @@ void Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node) {
 
 void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
-}
-
-void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
-  Buffer << "Tw";
-  mangleChildNode(node, 0);
 }
 
 void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
@@ -2486,11 +2467,15 @@ void Remangler::mangleFullObjCResilientClassStub(Node *node) {
 }
 
 void Remangler::mangleConcurrentFunctionType(Node *node) {
-  Buffer << 'J';
+  Buffer << "Yb";
 }
 
 void Remangler::mangleAsyncAnnotation(Node *node) {
-  Buffer << 'Y';
+  Buffer << "Ya";
+}
+
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  Buffer << "Yj" << (char)node->getIndex(); // differentiability kind
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {

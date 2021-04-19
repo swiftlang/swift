@@ -4,45 +4,47 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_isEmpty() async {
-  do {
-    print("before all")
-    let result = try await Task.withGroup(resultType: Int.self) {
-      (group) async -> Int in
-      // CHECK: before add: isEmpty=true
-      print("before add: isEmpty=\(group.isEmpty)")
+  print("before all")
+  let result = await withTaskGroup(of: Int.self, returning: Int.self) { group in
+    // CHECK: before add: isEmpty=true
+    print("before add: isEmpty=\(group.isEmpty)")
 
-      await group.add {
-        await Task.sleep(2_000_000_000)
-        return await asyncEcho(1)
-      }
-
-      // CHECK: while add running, outside: isEmpty=false
-      print("while add running, outside: isEmpty=\(group.isEmpty)")
-
-      // CHECK: next: 1
-      while let value = try! await group.next() {
-        print("next: \(value)")
-      }
-
-      // CHECK: after draining tasks: isEmpty=true
-      print("after draining tasks: isEmpty=\(group.isEmpty)")
-      return 42
+    group.spawn {
+      await Task.sleep(2_000_000_000)
+      return await asyncEcho(1)
     }
 
-    // CHECK: result: 42
-    print("result: \(result)")
-  } catch {
-    fatalError("\(error)")
+    // CHECK: while add running, outside: isEmpty=false
+    print("while add running, outside: isEmpty=\(group.isEmpty)")
+
+    // CHECK: next: 1
+    while let value = try! await group.next() {
+      print("next: \(value)")
+    }
+
+    // CHECK: after draining tasks: isEmpty=true
+    print("after draining tasks: isEmpty=\(group.isEmpty)")
+    return 42
   }
+
+  // CHECK: result: 42
+  print("result: \(result)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_isEmpty()

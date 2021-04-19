@@ -594,9 +594,9 @@ enum class ConditionalEffectKind {
 static void simple_display(llvm::raw_ostream &out, ConditionalEffectKind kind) {
   out << "ConditionalEffectKind::";
   switch(kind) {
-    case ConditionalEffectKind::None:         out << "None"; break;
-    case ConditionalEffectKind::Conditional:  out << "Conditional"; break;
-    case ConditionalEffectKind::Always:       out << "Always"; break;
+    case ConditionalEffectKind::None:         out << "None"; return;
+    case ConditionalEffectKind::Conditional:  out << "Conditional"; return;
+    case ConditionalEffectKind::Always:       out << "Always"; return;
   }
   llvm_unreachable("Bad conditional effect kind");
 }
@@ -908,7 +908,11 @@ private:
     assert(param->getInterfaceType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
-               ->hasEffect(kind));
+               ->hasEffect(kind) ||
+           !param->getInterfaceType()
+               ->lookThroughAllOptionalTypes()
+               ->castTo<AnyFunctionType>()
+               ->getGlobalActor().isNull());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
@@ -1153,17 +1157,14 @@ private:
       return ShouldNotRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
-      // FIXME
-      llvm_unreachable("Test me");
-      // return ShouldRecurse;
+      AsyncKind = ConditionalEffectKind::Always;
+      return ShouldRecurse;
     }
     ShouldRecurse_t checkThrow(ThrowStmt *E) {
       return ShouldRecurse;
     }
     ShouldRecurse_t checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
-      // FIXME
-      llvm_unreachable("Test me");
-      //return ShouldRecurse;
+      return ShouldRecurse;
     }
 
     ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
@@ -1176,12 +1177,7 @@ private:
 
     ShouldRecurse_t checkForEach(ForEachStmt *S) {
       if (S->getAwaitLoc().isValid()) {
-        auto classification = Self.classifyConformance(
-            S->getSequenceConformance(),
-            EffectKind::Async);
-        IsInvalid |= classification.isInvalid();
-        AsyncKind = std::max(AsyncKind,
-                             classification.getConditionalKind(EffectKind::Async));
+        AsyncKind = std::max(AsyncKind, ConditionalEffectKind::Always);
       }
 
       return ShouldRecurse;
@@ -1247,7 +1243,16 @@ private:
   Classification classifyArgument(Expr *arg, Type paramType, EffectKind kind) {
     arg = arg->getValueProvidingExpr();
 
-    if (isa<DefaultArgumentExpr>(arg)) {
+    if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(arg)) {
+      // Special-case a 'nil' default argument, which is known not to throw.
+      if (defaultArg->isCallerSide()) {
+        auto *callerSideArg = defaultArg->getCallerSideDefaultExpr();
+        if (isa<NilLiteralExpr>(callerSideArg)) {
+          if (callerSideArg->getType()->getOptionalObjectType())
+            return Classification();
+        }
+      }
+
       return classifyArgumentByType(arg->getType(),
                                     PotentialEffectReason::forDefaultClosure(),
                                     kind);
@@ -1423,6 +1428,9 @@ public:
   void setDiagnoseErrorOnTry(bool b) {
     DiagnoseErrorOnTry = b;
   }
+
+  /// Stores the location of the innermost await
+  SourceLoc awaitLoc = SourceLoc();
 
   /// Whether this is a function that rethrows.
   bool hasPolymorphicEffect(EffectKind kind) const {
@@ -1683,7 +1691,7 @@ public:
     auto loc = E.getStartLoc();
     SourceLoc insertLoc;
     SourceRange highlight;
-    
+
     // Generate more specific messages in some cases.
     if (auto e = dyn_cast_or_null<ApplyExpr>(E.dyn_cast<Expr*>())) {
       if (isa<PrefixUnaryExpr>(e) || isa<PostfixUnaryExpr>(e) ||
@@ -1693,7 +1701,7 @@ public:
       }
       insertLoc = loc;
       highlight = e->getSourceRange();
-      
+
       if (InterpolatedString &&
           e->getCalledValue() &&
           e->getCalledValue()->getBaseName() ==
@@ -1702,7 +1710,7 @@ public:
         insertLoc = InterpolatedString->getLoc();
       }
     }
-    
+
     Diags.diagnose(loc, message).highlight(highlight);
     maybeAddRethrowsNote(Diags, loc, reason);
 
@@ -1715,6 +1723,10 @@ public:
     // because complete context is unavailable.
     if (!suggestTryFixIt)
       return;
+
+    // 'try' should go before 'await'
+    if (awaitLoc.isValid())
+      insertLoc = awaitLoc;
 
     Diags.diagnose(loc, diag::note_forgot_try)
         .fixItInsert(insertLoc, "try ");
@@ -2115,6 +2127,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     DeclContext *OldReasyncDC;
     ContextFlags OldFlags;
     ConditionalEffectKind OldMaxThrowingKind;
+    SourceLoc OldAwaitLoc;
 
   public:
     ContextScope(CheckEffectsCoverage &self, Optional<Context> newContext)
@@ -2122,7 +2135,8 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
         OldRethrowsDC(self.RethrowsDC),
         OldReasyncDC(self.ReasyncDC),
         OldFlags(self.Flags),
-        OldMaxThrowingKind(self.MaxThrowingKind) {
+        OldMaxThrowingKind(self.MaxThrowingKind),
+        OldAwaitLoc(self.CurContext.awaitLoc) {
       if (newContext) self.CurContext = *newContext;
     }
 
@@ -2140,9 +2154,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.clear(ContextFlags::HasTryThrowSite);
     }
 
-    void enterAwait() {
+    void enterAwait(SourceLoc awaitLoc) {
       Self.Flags.set(ContextFlags::IsAsyncCovered);
       Self.Flags.clear(ContextFlags::HasAnyAsyncSite);
+      Self.CurContext.awaitLoc = awaitLoc;
     }
 
     void enterAsyncLet() {
@@ -2239,6 +2254,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.ReasyncDC = OldReasyncDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;
+      Self.CurContext.awaitLoc = OldAwaitLoc;
     }
   };
 
@@ -2647,12 +2663,13 @@ private:
       break;
     }
   }
+
   ShouldRecurse_t checkAwait(AwaitExpr *E) {
 
     // Walk the operand.
     ContextScope scope(*this, None);
-    scope.enterAwait();
-    
+    scope.enterAwait(E->getAwaitLoc());
+
     E->getSubExpr()->walk(*this);
 
     // Warn about 'await' expressions that weren't actually needed, unless of
@@ -2665,7 +2682,7 @@ private:
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, None,
                                               /*forAwait=*/ true);
     }
-    
+
     // Inform the parent of the walk that an 'await' exists here.
     scope.preserveCoverageFromAwaitOperand();
     return ShouldNotRecurse;
@@ -2729,10 +2746,19 @@ private:
     if (!S->getAwaitLoc().isValid())
       return ShouldRecurse;
 
+    // A 'for await' is always async. There's no effect polymorphism
+    // via the conformance in a 'reasync' function body.
+    Flags.set(ContextFlags::HasAnyAsyncSite);
+
+    if (!CurContext.handlesAsync(ConditionalEffectKind::Always))
+      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, None);
+
     ApplyClassifier classifier;
     classifier.RethrowsDC = RethrowsDC;
     classifier.ReasyncDC = ReasyncDC;
 
+    // A 'for try await' might be effect polymorphic via the conformance
+    // in a 'rethrows' function body.
     if (S->getTryLoc().isValid()) {
       auto classification = classifier.classifyConformance(
           S->getSequenceConformance(), EffectKind::Throws);
@@ -2744,16 +2770,6 @@ private:
       if (!CurContext.handlesThrows(throwsKind))
         CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
     }
-
-    auto classification = classifier.classifyConformance(
-        S->getSequenceConformance(), EffectKind::Async);
-    auto asyncKind = classification.getConditionalKind(EffectKind::Async);
-
-    if (asyncKind != ConditionalEffectKind::None)
-      Flags.set(ContextFlags::HasAnyAsyncSite);
-
-    if (!CurContext.handlesAsync(asyncKind))
-      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, None);
 
     return ShouldRecurse;
   }

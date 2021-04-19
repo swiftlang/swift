@@ -31,7 +31,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
@@ -3885,6 +3884,7 @@ public:
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
+                                  ctor->hasAsync(),
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
@@ -4345,6 +4345,7 @@ public:
       FunctionParamLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
+          S.addDeclBaseNameRef(param.getInternalLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isNoDerivative());
@@ -5633,6 +5634,7 @@ void swift::serialize(ModuleOrSourceFile DC,
         /* PrettyPrint */false,
         AccessLevel::Public,
         /*EmitSynthesizedMembers*/true,
+        /*PrintMessages*/false,
       };
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }

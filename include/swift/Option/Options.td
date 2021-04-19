@@ -184,7 +184,8 @@ def help_hidden : Flag<["-", "--"], "help-hidden">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Display available options, including hidden options">;
 
-def v : Flag<["-"], "v">, Flags<[DoesNotAffectIncrementalBuild]>,
+def v : Flag<["-"], "v">,
+  Flags<[DoesNotAffectIncrementalBuild, SwiftSymbolGraphExtractOption]>,
   HelpText<"Show commands to run and use verbose output">;
 def version : Flag<["-", "--"], "version">, Flags<[FrontendOption]>,
   HelpText<"Print version information and exit">;
@@ -300,8 +301,7 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
   HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 def track_system_dependencies : Flag<["-"], "track-system-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -344,17 +344,14 @@ def embed_tbd_for_module : Separate<["-"], "embed-tbd-for-module">,
   HelpText<"Embed symbols from the module in the emitted tbd file">;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Serialize diagnostics in a binary format">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
-  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoBatchOption, ArgumentIsPath, SupplementaryOutput]>,
   HelpText<"Emit a serialized diagnostics file to <path>">,
   MetaVarName<"<path>">;
 def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
-  Flags<[FrontendOption, NoBatchOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoBatchOption, ArgumentIsPath, SupplementaryOutput]>,
   Alias<serialize_diagnostics_path>;
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -426,45 +423,42 @@ def module_abi_name : Separate<["-"], "module-abi-name">,
   HelpText<"ABI name to use for the contents of this module">;
 
 def emit_module : Flag<["-"], "emit-module">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit an importable module">;
 def emit_module_path : Separate<["-"], "emit-module-path">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   HelpText<"Emit an importable module to <path>">,
   MetaVarName<"<path>">;
 def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   Alias<emit_module_path>;
 
 def emit_module_summary :
   Flag<["-"], "emit-module-summary">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput]>,
+  Flags<[NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Output module summary file">;
 def emit_module_summary_path :
   Separate<["-"], "emit-module-summary-path">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output module summary file to <path>">;
 
 def emit_module_interface :
   Flag<["-"], "emit-module-interface">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput]>,
+  Flags<[NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Output module interface file">;
 def emit_module_interface_path :
   Separate<["-"], "emit-module-interface-path">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
 
 def emit_private_module_interface_path :
   Separate<["-"], "emit-private-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
-         DoesNotAffectIncrementalBuild, ArgumentIsPath, SupplementaryOutput]>,
+         ArgumentIsPath, SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
 
 def verify_emitted_module_interface :
@@ -483,28 +477,26 @@ def avoid_emit_module_source_info :
 
 def emit_module_source_info_path :
   Separate<["-"], "emit-module-source-info-path">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
 
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
   Alias<emit_module_interface>,
-  Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput]>;
+  Flags<[NoInteractiveOption, HelpHidden, SupplementaryOutput]>;
 def emit_parseable_module_interface_path :
   Separate<["-"], "emit-parseable-module-interface-path">,
   Alias<emit_module_interface_path>,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         HelpHidden, ArgumentIsPath, SupplementaryOutput]>;
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden, ArgumentIsPath,
+         SupplementaryOutput]>;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit an Objective-C header file">;
 def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
 def static : Flag<["-"], "static">,
@@ -916,8 +908,11 @@ def emit_assembly : Flag<["-"], "emit-assembly">,
 def emit_bc : Flag<["-"], "emit-bc">,
   HelpText<"Emit LLVM BC file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_irgen : Flag<["-"], "emit-irgen">,
+  HelpText<"Emit LLVM IR file(s) before LLVM optimizations">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_ir : Flag<["-"], "emit-ir">,
-  HelpText<"Emit LLVM IR file(s)">, ModeOpt,
+  HelpText<"Emit LLVM IR file(s) after LLVM optimizations">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_sil : Flag<["-"], "emit-sil">,
   HelpText<"Emit canonical SIL file(s)">, ModeOpt,
@@ -1191,13 +1186,12 @@ def disable_autolinking_runtime_compatibility_dynamic_replacements
                "compatibility library">;
 
 def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         SupplementaryOutput, HelpHidden]>,
+  Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph">;
 
 def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
-         ArgumentIsPath, SupplementaryOutput, HelpHidden]>,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, HelpHidden]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
 

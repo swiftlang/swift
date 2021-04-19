@@ -57,6 +57,23 @@ tests.test("Iterator") {
   expectEqualSequence(opaque.utf8.reversed(), native.utf8.reversed())
 }
 
+tests.test("String-to-integer parsing") {
+  let native = "1234"
+  let opaque = NSSlowString(string: "1234") as String
+  
+  expectEqual(Int(opaque, radix: 16)!, Int(native, radix: 16)!)
+  expectEqual(Int(opaque, radix: 15)!, Int(native, radix: 15)!)
+  expectEqual(Int(opaque, radix: 10)!, Int(native, radix: 10)!)
+  expectEqual(Int(opaque, radix:  8)!, Int(native, radix:  8)!)
+  expectEqual(Int(opaque, radix:  5)!, Int(native, radix:  5)!)
+  
+  expectEqual(UInt16(opaque, radix: 16)!, UInt16(native, radix: 16)!)
+  expectEqual(UInt16(opaque, radix: 15)!, UInt16(native, radix: 15)!)
+  expectEqual(UInt16(opaque, radix: 10)!, UInt16(native, radix: 10)!)
+  expectEqual(UInt16(opaque, radix:  8)!, UInt16(native, radix:  8)!)
+  expectEqual(UInt16(opaque, radix:  5)!, UInt16(native, radix:  5)!)
+}
+
 tests.test("Unicode 9 grapheme breaking")
     .xfail(.osxMinor(10, 9, reason: "Mac OS X 10.9 has an old version of ICU"))
     .xfail(.iOSMajor(7, reason: "iOS 7 has an old version of ICU"))

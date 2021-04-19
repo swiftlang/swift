@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir %s -swift-version 4 -enable-experimental-enum-codable-derivation | %FileCheck %s
+// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir %s -swift-version 4 | %FileCheck %s
 
 struct Struct<T> {
     var x: T

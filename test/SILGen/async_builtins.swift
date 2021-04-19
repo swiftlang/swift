@@ -4,7 +4,7 @@
 import Swift
 
 public struct X {
-  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV14getCurrentTaskBoyYF
+  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV14getCurrentTaskBoyYaF
   func getCurrentTask() async -> Builtin.NativeObject {
     // CHECK: builtin "getCurrentAsyncTask"() : $Builtin.NativeObject
     return Builtin.getCurrentAsyncTask()
@@ -37,12 +37,12 @@ public struct X {
   }
 }
 
-// CHECK-LABEL: sil [ossa] @$s4test26usesWithUnsafeContinuationyyYF : $@convention(thin) @async () -> () {
+// CHECK-LABEL: sil [ossa] @$s4test26usesWithUnsafeContinuationyyYaF : $@convention(thin) @async () -> () {
 public func usesWithUnsafeContinuation() async {
   // trivial resume type
   let _: Int = await Builtin.withUnsafeContinuation { c in }
 
-  // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYFyBcXEfU_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYaFyBcXEfU_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $Int
@@ -57,7 +57,7 @@ public func usesWithUnsafeContinuation() async {
   // loadable resume type
   let _: String = await Builtin.withUnsafeContinuation { c in }
 
-  // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYFyBcXEfU0_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYaFyBcXEfU0_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $String
@@ -73,7 +73,7 @@ public func usesWithUnsafeContinuation() async {
   // address-only resume type
   let _: Any = await Builtin.withUnsafeContinuation { c in }
 
-  // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYFyBcXEfU1_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$s4test26usesWithUnsafeContinuationyyYaFyBcXEfU1_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $Any
@@ -89,11 +89,11 @@ public func usesWithUnsafeContinuation() async {
   // CHECK: dealloc_stack [[BOX]]
 }
 
-// CHECK-LABEL: sil [ossa] @$s4test34usesWithUnsafeThrowingContinuationyyYKF : $@convention(thin) @async () -> @error Error {
+// CHECK-LABEL: sil [ossa] @$s4test34usesWithUnsafeThrowingContinuationyyYaKF : $@convention(thin) @async () -> @error Error {
 public func usesWithUnsafeThrowingContinuation() async throws {
   let _: Int = try await Builtin.withUnsafeThrowingContinuation { c in }
 
-  // CHECK: [[FN:%.*]] = function_ref @$s4test34usesWithUnsafeThrowingContinuationyyYKFyBcXEfU_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
+  // CHECK: [[FN:%.*]] = function_ref @$s4test34usesWithUnsafeThrowingContinuationyyYaKFyBcXEfU_ : $@convention(thin) (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[TMP:%.*]] = convert_function [[FN]] : $@convention(thin) (Builtin.RawUnsafeContinuation) -> () to $@convention(thin) @noescape (Builtin.RawUnsafeContinuation) -> ()
   // CHECK: [[CLOSURE:%.*]] = thin_to_thick_function [[TMP]]
   // CHECK: [[BOX:%.*]] = alloc_stack $Int
@@ -115,4 +115,40 @@ public func usesWithUnsafeThrowingContinuation() async throws {
 // because it has captures and was formed by a partial_apply.
 public func usesWithUnsafeContinuationCaptures(fn: (Builtin.RawUnsafeContinuation) -> ()) async throws {
   let _: Int = await Builtin.withUnsafeContinuation { c in fn(c) }
+}
+
+// CHECK-LABEL: sil [ossa] @$s4test29resumeNonThrowingContinuationyyBc_SSntF
+public func resumeNonThrowingContinuation(_ cont: Builtin.RawUnsafeContinuation,
+                                          _ value: __owned String) {
+  // CHECK: bb0(%0 : $Builtin.RawUnsafeContinuation, %1 : @owned $String):
+  // CHECK:      [[BORROW:%.*]] = begin_borrow %1 : $String
+  // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $String
+  // CHECK-NEXT: builtin "resumeNonThrowingContinuationReturning"<String>(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $String)
+  // CHECK-NEXT: end_borrow [[BORROW]] : $String
+  // CHECK-NEXT: destroy_value %1 : $String
+  Builtin.resumeNonThrowingContinuationReturning(cont, value)
+}
+
+// CHECK-LABEL: sil [ossa] @$s4test26resumeThrowingContinuationyyBc_SSntF
+public func resumeThrowingContinuation(_ cont: Builtin.RawUnsafeContinuation,
+                                       _ value: __owned String) {
+  // CHECK: bb0(%0 : $Builtin.RawUnsafeContinuation, %1 : @owned $String):
+  // CHECK:      [[BORROW:%.*]] = begin_borrow %1 : $String
+  // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $String
+  // CHECK-NEXT: builtin "resumeThrowingContinuationReturning"<String>(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $String)
+  // CHECK-NEXT: end_borrow [[BORROW]] : $String
+  // CHECK-NEXT: destroy_value %1 : $String
+  Builtin.resumeThrowingContinuationReturning(cont, value)
+}
+
+// CHECK-LABEL: sil [ossa] @$s4test026resumeThrowingContinuationC0yyBc_s5Error_pntF
+public func resumeThrowingContinuationThrowing(_ cont: Builtin.RawUnsafeContinuation,
+                                               _ error: __owned Error) {
+  // CHECK: bb0(%0 : $Builtin.RawUnsafeContinuation, %1 : @owned $Error):
+  // CHECK:      [[BORROW:%.*]] = begin_borrow %1 : $Error
+  // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $Error
+  // CHECK-NEXT: builtin "resumeThrowingContinuationThrowing"(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $Error)
+  // CHECK-NEXT: end_borrow [[BORROW]] : $Error
+  // CHECK-NEXT: destroy_value %1 : $Error
+  Builtin.resumeThrowingContinuationThrowing(cont, error)
 }

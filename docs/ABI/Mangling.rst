@@ -147,7 +147,6 @@ Globals
   // TODO check this::
   global ::= mangled-name 'TA'                     // partial application forwarder
   global ::= mangled-name 'Ta'                     // ObjC partial application forwarder
-  global ::= mangled-name 'Tw' index               // async partial apply thunk for a non-constant function
   global ::= mangled-name 'TQ' index               // Async await continuation partial function
   global ::= mangled-name 'TY' index               // Async suspend continuation partial function
 
@@ -515,12 +514,17 @@ Types
 
   type ::= 'Bb'                              // Builtin.BridgeObject
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
-  type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
-  type ::= 'BD'                              // Builtin.DefaultActorStorage
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    type ::= 'Bc'                              // Builtin.RawUnsafeContinuation
+    type ::= 'BD'                              // Builtin.DefaultActorStorage
+    type ::= 'Be'                              // Builtin.Executor
+  #endif
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
   type ::= 'BI'                              // Builtin.IntLiteral
-  type ::= 'Bj'                              // Builtin.Job
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    type ::= 'Bj'                              // Builtin.Job
+  #endif
   type ::= 'BO'                              // Builtin.UnknownObject (no longer a distinct type, but still used for AnyObject)
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
@@ -559,30 +563,32 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer type with with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
-  FUNCTION-KIND ::= 'F'                      // @differentiable function type
-  FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
-  FUNCTION-KIND ::= 'H'                      // @differentiable(_linear) function type
-  FUNCTION-KIND ::= 'I'                      // @differentiable(_linear) function type (escaping)
 
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? // results and parameters
 
-  params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
+  params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
-  params-type ::= empty-list                  // shortcut for no parameters
+  params-type ::= empty-list                 // shortcut for no parameters
 
-  sendable ::= 'J'                         // @Sendable on function types
-  async ::= 'Y'                              // 'async' annotation on function types
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    async ::= 'Ya'                             // 'async' annotation on function types
+    sendable ::= 'Yb'                          // @Sendable on function types
+  #endif
   throws ::= 'K'                             // 'throws' annotation on function types
+  differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
+  differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
+  differentiable ::= 'Yjd'                   // @differentiable on function type
+  differentiable ::= 'Yjl'                   // @differentiable(_linear) on function type
 
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'z'? 'h'? 'n'? 'd'?   // type with optional label, inout convention, shared convention, owned convention, and variadic specifier
+  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -666,8 +672,10 @@ mangled in to disambiguate.
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
-  SENDABLE ::= 'h'                         // @Sendable
-  ASYNC ::= 'H'                              // @async
+  #if SWIFT_RUNTIME_VERSION >= 5.5
+    SENDABLE ::= 'h'                           // @Sendable
+    ASYNC ::= 'H'                              // @async
+  #endif
 
   PARAM-CONVENTION ::= 'i'                   // indirect in
   PARAM-CONVENTION ::= 'c'                   // indirect in constant

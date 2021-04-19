@@ -3577,6 +3577,7 @@ namespace {
 
     TRIVIAL_TYPE_PRINTER(BuiltinIntegerLiteral, builtin_integer_literal)
     TRIVIAL_TYPE_PRINTER(BuiltinJob, builtin_job)
+    TRIVIAL_TYPE_PRINTER(BuiltinExecutor, builtin_executor_ref)
     TRIVIAL_TYPE_PRINTER(BuiltinDefaultActorStorage, builtin_default_actor_storage)
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinRawUnsafeContinuation, builtin_raw_unsafe_continuation)
@@ -3807,6 +3808,8 @@ namespace {
         PrintWithColorRAII(OS, TypeFieldColor) << "param";
         if (param.hasLabel())
           printField("name", param.getLabel().str());
+        if (param.hasInternalLabel())
+          printField("internal_name", param.getInternalLabel().str());
         dumpParameterFlags(param.getParameterFlags());
         printRec(param.getPlainType());
         OS << ")";

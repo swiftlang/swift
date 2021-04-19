@@ -117,6 +117,9 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 
+// TODO: "async let wait" and "async let destroy" would be expressed
+//       similar to like TaskFutureWait;
+
 /// This matches the ABI of a closure `<T>(Builtin.NativeObject) async -> T`
 using TaskFutureWaitSignature =
     SWIFT_CC(swiftasync)
@@ -175,17 +178,6 @@ void swift_taskGroup_wait_next_throwing(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
     TaskGroup *group, const Metadata *successType);
 
-/// Create a new `TaskGroup`.
-/// The caller is responsible for retaining and managing the group's lifecycle.
-///
-/// Its Swift signature is
-///
-/// \code
-/// func swift_taskGroup_create() -> Builtin.RawPointer
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-TaskGroup* swift_taskGroup_create(); // TODO: probably remove this call, and just use the initialize always
-
 /// Initialize a `TaskGroup` in the passed `group` memory location.
 /// The caller is responsible for retaining and managing the group's lifecycle.
 ///
@@ -237,11 +229,12 @@ void swift_taskGroup_destroy(TaskGroup *group);
 ///
 /// \code
 /// func swift_taskGroup_addPending(
-///     group: Builtin.RawPointer
+///     group: Builtin.RawPointer,
+///     unconditionally: Bool
 /// ) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_taskGroup_addPending(TaskGroup *group);
+bool swift_taskGroup_addPending(TaskGroup *group, bool unconditionally);
 
 /// Cancel all tasks in the group.
 /// This also prevents new tasks from being added.
@@ -508,6 +501,14 @@ void swift_defaultActor_initialize(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_destroy(DefaultActor *actor);
 
+/// Deallocate an instance of a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_deallocate(DefaultActor *actor);
+
+/// Deallocate an instance of what might be a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_deallocateResilient(HeapObject *actor);
+
 /// Enqueue a job on the default actor implementation.
 ///
 /// The job must be ready to run.  Notably, if it's a task, that
@@ -523,23 +524,35 @@ void swift_defaultActor_destroy(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
-/// Resume a task from its continuation, given a normal result value.
+/// Prepare a continuation in the current task.
+///
+/// The caller should initialize the Parent, ResumeParent,
+/// and NormalResult fields.  This function will initialize the other
+/// fields with appropriate defaaults; the caller may then overwrite
+/// them if desired.
+///
+/// This function is provided as a code-size and runtime-usage
+/// optimization; calling it is not required if code is willing to
+/// do all its work inline.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_resume(/* +1 */ OpaqueValue *result,
-                               void *continuation,
-                               const Metadata *resumeType);
+AsyncTask *swift_continuation_init(ContinuationAsyncContext *context,
+                                   AsyncContinuationFlags flags);
 
-/// Resume a task from its throwing continuation, given a normal result value.
+/// Resume a task from a non-throwing continuation, given a normal
+/// result which has already been stored into the continuation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_throwingResume(/* +1 */ OpaqueValue *result,
-                                       void *continuation,
-                                       const Metadata *resumeType);
+void swift_continuation_resume(AsyncTask *continuation);
 
-/// Resume a task from its throwing continuation by throwing an error.
+/// Resume a task from a potentially-throwing continuation, given a
+/// normal result which has already been stored into the continuation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
-                                                void *continuation,
-                                                const Metadata *resumeType);
+void swift_continuation_throwingResume(AsyncTask *continuation);
+
+/// Resume a task from a potentially-throwing continuation by throwing
+/// an error.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
+                                                /* +1 */ SwiftError *error);
 
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)
@@ -564,6 +577,13 @@ AsyncTask *swift_task_getCurrent(void);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 ExecutorRef swift_task_getCurrentExecutor(void);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCurrentExecutor(ExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_reportUnexpectedExecutor(
+    const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
+    uintptr_t line, ExecutorRef executor);
 }
 
 #pragma clang diagnostic pop

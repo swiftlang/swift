@@ -658,8 +658,9 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   Selector selector(method);
   llvm::Value *selectorValue = IGF.emitObjCSelectorRefLoad(selector.str());
 
-  auto fn = FunctionPointer::forDirect(FunctionPointer::Kind::Function,
-                                       messenger, sig);
+  auto fn =
+      FunctionPointer::forDirect(FunctionPointer::Kind::Function, messenger,
+                                 /*secondaryValue*/ nullptr, sig);
   return Callee(std::move(info), fn, receiverValue, selectorValue);
 }
 
@@ -1184,10 +1185,11 @@ irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// with numbers that used to represent stack offsets for each of these
   /// elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  descriptor.typeEncoding =
-      getObjCEncodingForMethod(IGM, methodType, /*extended*/ method->hasAsync(),
-                               method);
   
+  bool useExtendedEncoding =
+    method->hasAsync() && !isa<ProtocolDecl>(method->getDeclContext());
+  descriptor.typeEncoding = getObjCEncodingForMethod(
+      IGM, methodType, /*extended*/ useExtendedEncoding, method);
   /// The third element is the method implementation pointer.
   if (!concrete) {
     descriptor.impl = nullptr;

@@ -4,13 +4,16 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 // REQUIRES: rdar75096485
 
 import Dispatch
 
 func completeSlowly(n: Int) async -> Int {
   await Task.sleep(UInt64((n * 1_000_000_000) + 1_000_000_000))
-  print("  complete group.add { \(n) }")
+  print("  complete group.spawn { \(n) }")
   return n
 }
 
@@ -19,9 +22,9 @@ func test_sum_nextOnPending() async {
   let numbers = [1, 2, 3]
   let expected = 6 // FIXME: numbers.reduce(0, +) this hangs?
 
-  let sum = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  let sum = try! await withTaskGroup(of: Int.self) { (group) async -> Int in
     for n in numbers {
-      await group.add {
+      group.spawn {
         let res = await completeSlowly(n: n)
         return res
       }
@@ -43,11 +46,11 @@ func test_sum_nextOnPending() async {
   // The completions are set apart by n seconds, so we expect them to arrive
   // in the order as the numbers (and delays) would suggest:
   //
-  // CHECK: complete group.add { 1 }
+  // CHECK: complete group.spawn { 1 }
   // CHECK: next: 1
-  // CHECK: complete group.add { 2 }
+  // CHECK: complete group.spawn { 2 }
   // CHECK: next: 2
-  // CHECK: complete group.add { 3 }
+  // CHECK: complete group.spawn { 3 }
   // CHECK: next: 3
 
   // CHECK: task group returning: 6

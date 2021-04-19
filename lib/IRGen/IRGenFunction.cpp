@@ -524,124 +524,131 @@ static llvm::Value *unsafeContinuationFromTask(IRGenFunction &IGF,
   return Builder.CreateBitOrPointerCast(currTask, rawPointerTI.getStorageType());
 }
 
+static llvm::Value *emitLoadOfResumeContextFromTask(IRGenFunction &IGF,
+                                                    llvm::Value *task) {
+  auto addr = Address(task, IGF.IGM.getPointerAlignment());
+  auto resumeContextAddr =
+    IGF.Builder.CreateStructGEP(addr, 5, 6 * IGF.IGM.getPointerSize());
+  llvm::Value *resumeContext = IGF.Builder.CreateLoad(resumeContextAddr);
+  if (auto &schema = IGF.getOptions().PointerAuth.TaskResumeContext) {
+    auto info = PointerAuthInfo::emit(IGF, schema,
+                                      resumeContextAddr.getAddress(),
+                                      PointerAuthEntity());
+    resumeContext = emitPointerAuthAuth(IGF, resumeContext, info);
+  }
+  return resumeContext;
+}
+
+static Address emitLoadOfContinuationContext(IRGenFunction &IGF,
+                                             llvm::Value *continuation) {
+  auto ptr = emitLoadOfResumeContextFromTask(IGF, continuation);
+  ptr = IGF.Builder.CreateBitCast(ptr, IGF.IGM.ContinuationAsyncContextPtrTy);
+  return Address(ptr, IGF.IGM.getAsyncContextAlignment());
+}
+
+static Address emitAddrOfContinuationNormalResultPointer(IRGenFunction &IGF,
+                                                         Address context) {
+  assert(context.getType() == IGF.IGM.ContinuationAsyncContextPtrTy);
+  auto offset = 5 * IGF.IGM.getPointerSize();
+  return IGF.Builder.CreateStructGEP(context, 3, offset);
+}
+
 void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
                                              StackAddress resultAddr,
-                                             Explosion &out) {
-  // Create the continuation.
-  // void current_sil_function(AsyncContext *currCtxt) {
+                                             Explosion &out,
+                                             bool canThrow) {
+  // A continuation is just a reference to the current async task,
+  // parked with a special context:
   //
-  // A continuation is the current AsyncTask 'currTask' with:
-  //   currTask->ResumeTask = @llvm.coro.async.resume();
-  //   currTask->ResumeContext = &continuation_context;
-  //
-  // Where:
-  //
-  // struct {
-  //   AsyncContext *resumeCtxt;
-  //   void *awaitSynchronization;
+  // struct ContinuationAsyncContext : AsyncContext {
+  //   std::atomic<size_t> awaitSynchronization;
   //   SwiftError *errResult;
   //   Result *result;
-  //   ExecutorRef *resumeExecutor;
-  // } continuation_context; // local variable of current_sil_function
+  //   ExecutorRef resumeExecutor;
+  // };
   //
-  // continuation_context.resumeCtxt = currCtxt;
-  // continuation_context.errResult = nulllptr;
-  // continuation_context.result = ... // local alloca.
-  // continuation_context.resumeExecutor = .. // current executor
-
-  auto currTask = getAsyncTask();
-  auto unsafeContinuation = unsafeContinuationFromTask(*this, currTask);
+  // We need fill out this context essentially as if we were calling
+  // something.
 
   // Create and setup the continuation context.
-  // continuation_context.resumeCtxt = currCtxt;
-  // continuation_context.errResult = nullptr;
-  // continuation_context.result = ... // local alloca T
-  auto pointerAlignment = IGM.getPointerAlignment();
   auto continuationContext =
-      createAlloca(IGM.AsyncContinuationContextTy, pointerAlignment);
+    createAlloca(IGM.ContinuationAsyncContextTy,
+                 IGM.getAsyncContextAlignment());
   AsyncCoroutineCurrentContinuationContext = continuationContext.getAddress();
   // TODO: add lifetime with matching lifetime in await_async_continuation
-  auto contResumeAddr =
-      Builder.CreateStructGEP(continuationContext.getAddress(), 0);
-  llvm::Value *asyncContextValue = getAsyncContext();
+
+  // We're required to initialize three fields in the continuation
+  // context before calling swift_continuation_init:
+
+  // - Parent, the parent context pointer, which we initialize to
+  //   the current context.
+  auto contextBase = Builder.CreateStructGEP(continuationContext, 0, Size(0));
+  auto parentContextAddr = Builder.CreateStructGEP(contextBase, 0, Size(0));
+  llvm::Value *asyncContextValue =
+    Builder.CreateBitCast(getAsyncContext(), IGM.SwiftContextPtrTy);
   if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
-    auto authInfo = PointerAuthInfo::emit(*this, schema, contResumeAddr,
+    auto authInfo = PointerAuthInfo::emit(*this, schema,
+                                          parentContextAddr.getAddress(),
                                           PointerAuthEntity());
     asyncContextValue = emitPointerAuthSign(*this, asyncContextValue, authInfo);
   }
-  Builder.CreateStore(asyncContextValue,
-                      Address(contResumeAddr, pointerAlignment));
-  auto contErrResultAddr =
-      Builder.CreateStructGEP(continuationContext.getAddress(), 2);
-  Builder.CreateStore(
-      llvm::Constant::getNullValue(
-          contErrResultAddr->getType()->getPointerElementType()),
-      Address(contErrResultAddr, pointerAlignment));
-  auto contResultAddr =
-      Builder.CreateStructGEP(continuationContext.getAddress(), 3);
+  Builder.CreateStore(asyncContextValue, parentContextAddr);
+
+  // - NormalResult, the pointer to the normal result, which we initialize
+  //   to the result address that we were given, or else a temporary slot.
+  //   TODO: emit lifetime.start for this temporary, paired with a
+  //   lifetime.end within the await after we take from the slot.
+  auto normalResultAddr =
+    emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
   if (!resultAddr.getAddress().isValid()) {
     auto &resumeTI = getTypeInfo(resumeTy);
-    auto resultAddr =
-        resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
-    Builder.CreateStore(Builder.CreateBitOrPointerCast(
-                            resultAddr.getAddress().getAddress(),
-                            contResultAddr->getType()->getPointerElementType()),
-                        Address(contResultAddr, pointerAlignment));
-  } else {
-    Builder.CreateStore(Builder.CreateBitOrPointerCast(
-                            resultAddr.getAddress().getAddress(),
-                            contResultAddr->getType()->getPointerElementType()),
-                        Address(contResultAddr, pointerAlignment));
+    resultAddr =
+      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
   }
-  auto executorAddr =
-    Builder.CreateStructGEP(continuationContext.getAddress(), 4);
-  auto executor = Builder.CreateCall(IGM.getTaskGetCurrentExecutorFn(), {});
-  executorAddr = Builder.CreateBitCast(executorAddr, executor->getType()->getPointerTo());
-  Builder.CreateStore(executor, executorAddr, pointerAlignment);
+  Builder.CreateStore(Builder.CreateBitOrPointerCast(
+                            resultAddr.getAddress().getAddress(),
+                            IGM.OpaquePtrTy),
+                      normalResultAddr);
 
-  // Fill the current task (i.e the continuation) with the continuation
-  // information.
-  // currTask->ResumeTask = @llvm.coro.async.resume();
-  assert(currTask->getType() == IGM.SwiftTaskPtrTy);
-  auto currTaskResumeTaskAddr = Builder.CreateStructGEP(currTask, 4);
+  // - ResumeParent, the continuation function pointer, which we initialize
+  //   with the result of a new call to @llvm.coro.async.resume; we'll pair
+  //   this with a suspend point when we emit the corresponding
+  //   await_async_continuation.
   auto coroResume =
-      Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
-
-  assert(AsyncCoroutineCurrentResume == nullptr &&
-         "Don't support nested get_async_continuation");
-  AsyncCoroutineCurrentResume = coroResume;
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+  auto resumeFunctionAddr =
+    Builder.CreateStructGEP(contextBase, 1, IGM.getPointerSize());
   llvm::Value *coroResumeValue =
-      Builder.CreateBitOrPointerCast(coroResume, IGM.FunctionPtrTy);
-  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeFunction) {
-    auto authInfo = PointerAuthInfo::emit(*this, schema, currTaskResumeTaskAddr,
+    Builder.CreateBitOrPointerCast(coroResume,
+                                   IGM.TaskContinuationFunctionPtrTy);
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextResume) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema,
+                                          resumeFunctionAddr.getAddress(),
                                           PointerAuthEntity());
     coroResumeValue = emitPointerAuthSign(*this, coroResumeValue, authInfo);
   }
-  Builder.CreateStore(coroResumeValue,
-                      Address(currTaskResumeTaskAddr, pointerAlignment));
-  // currTask->ResumeContext = &continuation_context;
-  auto currTaskResumeCtxtAddr = Builder.CreateStructGEP(currTask, 5);
-  llvm::Value *continuationContextValue = Builder.CreateBitOrPointerCast(
-      continuationContext.getAddress(), IGM.SwiftContextPtrTy);
-  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeContext) {
-    auto authInfo = PointerAuthInfo::emit(*this, schema, currTaskResumeCtxtAddr,
-                                          PointerAuthEntity());
-    continuationContextValue =
-        emitPointerAuthSign(*this, continuationContextValue, authInfo);
-  }
-  Builder.CreateStore(continuationContextValue,
-                      Address(currTaskResumeCtxtAddr, pointerAlignment));
+  Builder.CreateStore(coroResumeValue, resumeFunctionAddr);
 
-  // Publish all the writes.
-  // continuation_context.awaitSynchronization =(atomic release) nullptr;
-  auto contAwaitSyncAddr =
-      Builder.CreateStructGEP(continuationContext.getAddress(), 1);
-  auto null = llvm::ConstantInt::get(
-      contAwaitSyncAddr->getType()->getPointerElementType(), 0);
-  auto atomicStore =
-      Builder.CreateStore(null, Address(contAwaitSyncAddr, pointerAlignment));
-  atomicStore->setAtomic(llvm::AtomicOrdering::Release,
-                         llvm::SyncScope::System);
+  // Save the resume intrinsic call for await_async_continuation.
+  assert(AsyncCoroutineCurrentResume == nullptr &&
+         "Don't support nested get_async_continuation");
+  AsyncCoroutineCurrentResume = coroResume;
+
+  AsyncContinuationFlags flags;
+  if (canThrow) flags.setCanThrow(true);
+
+  // Call the swift_continuation_init runtime function to initialize
+  // the rest of the continuation and return the task pointer back to us.
+  auto task = Builder.CreateCall(IGM.getContinuationInitFn(), {
+    continuationContext.getAddress(),
+    IGM.getSize(Size(flags.getOpaqueValue()))
+  });
+  task->setCallingConv(IGM.SwiftCC);
+
+  // TODO: if we have a better idea of what executor to return to than
+  // the current executor, overwrite the ResumeToExecutor field.
+
+  auto unsafeContinuation = unsafeContinuationFromTask(*this, task);
   out.add(unsafeContinuation);
 }
 
@@ -652,36 +659,52 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   assert(AsyncCoroutineCurrentContinuationContext && "no active continuation");
   auto pointerAlignment = IGM.getPointerAlignment();
 
-  // First check whether the await reached this point first. Meaning we still
-  // have to wait for the continuation result. If the await reaches first we
-  // abort the control flow here (resuming the continuation will execute the
-  // remaining control flow).
+  // Check whether the continuation has already been resumed.
+  // If so, we can just immediately continue with the control flow.
+  // Otherwise, we need to suspend, and resuming the continuation will
+  // trigger the function to resume.
+  //
+  // We do this by atomically trying to change the synchronization field
+  // in the continuation context from 0 (the state it was initialized
+  // with) to 1.  If this fails, the continuation must already have been
+  // resumed, so we can bypass the suspension point and immediately
+  // start interpreting the result stored in the continuation.
+  // Note that we use a strong compare-exchange (the default for the LLVM
+  // cmpxchg instruction), so spurious failures are disallowed; we can
+  // therefore trust that a failure means that the continuation has
+  // already been resumed.
+
   auto contAwaitSyncAddr =
       Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 1);
-  auto null = llvm::ConstantInt::get(
-      contAwaitSyncAddr->getType()->getPointerElementType(), 0);
-  auto one = llvm::ConstantInt::get(
-      contAwaitSyncAddr->getType()->getPointerElementType(), 1);
+
+  auto pendingV = llvm::ConstantInt::get(
+      contAwaitSyncAddr->getType()->getPointerElementType(),
+      unsigned(ContinuationStatus::Pending));
+  auto awaitedV = llvm::ConstantInt::get(
+      contAwaitSyncAddr->getType()->getPointerElementType(),
+      unsigned(ContinuationStatus::Awaited));
   auto results = Builder.CreateAtomicCmpXchg(
-      contAwaitSyncAddr, null, one,
+      contAwaitSyncAddr, pendingV, awaitedV,
       llvm::AtomicOrdering::Release /*success ordering*/,
       llvm::AtomicOrdering::Acquire /* failure ordering */,
       llvm::SyncScope::System);
   auto firstAtAwait = Builder.CreateExtractValue(results, 1);
-  auto contBB = createBasicBlock("await.async.maybe.resume");
+  auto contBB = createBasicBlock("await.async.resume");
   auto abortBB = createBasicBlock("await.async.abort");
   Builder.CreateCondBr(firstAtAwait, abortBB, contBB);
   Builder.emitBlock(abortBB);
   {
-    // We are first to the sync point. Abort. The continuation's result is not
-    // available yet.
+    // We were the first to the sync point. "Abort" (return from the
+    // coroutine partial function, without making a tail call to anything)
+    // because the continuation result is not available yet. When the
+    // continuation is later resumed, the task will get scheduled
+    // starting from the suspension point.
     emitCoroutineOrAsyncExit();
   }
 
-  auto contBB2 = createBasicBlock("await.async.resume");
   Builder.emitBlock(contBB);
   {
-    // Setup the suspend point.
+    // Set up the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
     unsigned swiftAsyncContextIndex = 0;
     arguments.push_back(IGM.getInt32(swiftAsyncContextIndex)); // context index
@@ -701,22 +724,13 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto resultTy =
         llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy}, false /*packed*/);
     emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
-
-    auto results = Builder.CreateAtomicCmpXchg(
-        contAwaitSyncAddr, null, one,
-        llvm::AtomicOrdering::Release /*success ordering*/,
-        llvm::AtomicOrdering::Acquire /* failure ordering */,
-        llvm::SyncScope::System);
-    // Again, are we first at the wait (can only reach that state after
-    // continuation.resume/abort is called)? If so abort to wait for the end of
-    // the await point to be reached.
-    auto firstAtAwait = Builder.CreateExtractValue(results, 1);
-    Builder.CreateCondBr(firstAtAwait, abortBB, contBB2);
   }
 
-  Builder.emitBlock(contBB2);
-  auto contBB3 = createBasicBlock("await.async.normal");
+  // If there's an error destination (i.e. if the continuation is throwing),
+  // load the error value out and check whether it's null.  If so, branch
+  // to the error destination.
   if (optionalErrorBB) {
+    auto normalContBB = createBasicBlock("await.async.normal");
     auto contErrResultAddr = Address(
         Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 2),
         pointerAlignment);
@@ -724,12 +738,13 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto nullError = llvm::Constant::getNullValue(errorRes->getType());
     auto hasError = Builder.CreateICmpNE(errorRes, nullError);
     optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
-    Builder.CreateCondBr(hasError, optionalErrorBB, contBB3);
-  } else {
-    Builder.CreateBr(contBB3);
+    Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
+    Builder.emitBlock(normalContBB);
   }
 
-  Builder.emitBlock(contBB3);
+  // We're now on the normal-result path.  If we didn't have an indirect
+  // result slot, load from the temporary we created during
+  // get_async_continuation.
   if (!isIndirectResult) {
     auto contResultAddrAddr =
         Builder.CreateStructGEP(AsyncCoroutineCurrentContinuationContext, 3);
@@ -744,7 +759,41 @@ void IRGenFunction::emitAwaitAsyncContinuation(
                 resumeTI.getFixedAlignment());
     resumeTI.loadAsTake(*this, resultAddr, outDirectResult);
   }
+
   Builder.CreateBr(normalBB);
   AsyncCoroutineCurrentResume = nullptr;
   AsyncCoroutineCurrentContinuationContext = nullptr;
+}
+
+void IRGenFunction::emitResumeAsyncContinuationReturning(
+                        llvm::Value *continuation, llvm::Value *srcPtr,
+                        SILType valueTy, bool throwing) {
+  continuation = Builder.CreateBitCast(continuation, IGM.SwiftTaskPtrTy);
+  auto &valueTI = getTypeInfo(valueTy);
+  Address srcAddr = valueTI.getAddressForPointer(srcPtr);
+
+  // Extract the destination value pointer and cast it from an opaque
+  // pointer type.
+  Address context = emitLoadOfContinuationContext(*this, continuation);
+  auto destPtrAddr = emitAddrOfContinuationNormalResultPointer(*this, context);
+  auto destPtr = Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr),
+                                     valueTI.getStorageType()->getPointerTo());
+  Address destAddr = valueTI.getAddressForPointer(destPtr);
+
+  valueTI.initializeWithTake(*this, destAddr, srcAddr, valueTy,
+                             /*outlined*/ false);
+
+  auto call = Builder.CreateCall(throwing
+                                   ? IGM.getContinuationThrowingResumeFn()
+                                   : IGM.getContinuationResumeFn(),
+                                 { continuation });
+  call->setCallingConv(IGM.SwiftCC);
+}
+
+void IRGenFunction::emitResumeAsyncContinuationThrowing(
+                        llvm::Value *continuation, llvm::Value *error) {
+  continuation = Builder.CreateBitCast(continuation, IGM.SwiftTaskPtrTy);
+  auto call = Builder.CreateCall(IGM.getContinuationThrowingResumeWithErrorFn(),
+                                 { continuation, error });
+  call->setCallingConv(IGM.SwiftCC);
 }

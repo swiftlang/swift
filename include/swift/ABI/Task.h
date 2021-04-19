@@ -40,14 +40,26 @@ extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job : public HeapObject {
-protected:
+public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
     /// The next waiting task link, an AsyncTask that is waiting on a future.
     NextWaitingTaskIndex = 0,
+
+    // The Dispatch object header is one pointer and two ints, which is
+    // equvialent to three pointers on 32-bit and two pointers 64-bit. Set the
+    // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
+    // expects.
+    DispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
+
+    /// An opaque field used by Dispatch when enqueueing Jobs directly.
+    DispatchLinkageIndex = DispatchHasLongObjectHeader ? 1 : 0,
+
+    /// The dispatch queue being used when enqueueing a Job directly with
+    /// Dispatch.
+    DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
-public:
   // Reserved for the use of the scheduler.
   void *SchedulerPrivate[2];
 
@@ -519,20 +531,40 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_yield
     YieldToParent;
 
-  /// The executor that the parent context needs to be yielded to on.
-  ExecutorRef YieldToParentExecutor;
-
   YieldingAsyncContext(AsyncContextFlags flags,
                        TaskContinuationFunction *resumeParent,
                        TaskContinuationFunction *yieldToParent,
-                       ExecutorRef yieldToParentExecutor,
                        AsyncContext *parent)
     : AsyncContext(flags, resumeParent, parent),
-      YieldToParent(yieldToParent),
-      YieldToParentExecutor(yieldToParentExecutor) {}
+      YieldToParent(yieldToParent) {}
 
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::Yielding;
+  }
+};
+
+/// An async context that can be resumed as a continuation.
+class ContinuationAsyncContext : public AsyncContext {
+public:
+  /// An atomic object used to ensure that a continuation is not
+  /// scheduled immediately during a resume if it hasn't yet been
+  /// awaited by the function which set it up.
+  std::atomic<ContinuationStatus> AwaitSynchronization;
+
+  /// The error result value of the continuation.
+  /// This should be null-initialized when setting up the continuation.
+  /// Throwing resumers must overwrite this with a non-null value.
+  SwiftError *ErrorResult;
+
+  /// A pointer to the normal result value of the continuation.
+  /// Normal resumers must initialize this before resuming.
+  OpaqueValue *NormalResult;
+
+  /// The executor that should be resumed to.
+  ExecutorRef ResumeToExecutor;
+
+  static bool classof(const AsyncContext *context) {
+    return context->Flags.getKind() == AsyncContextKind::Continuation;
   }
 };
 
@@ -540,7 +572,7 @@ public:
 /// task.
 ///
 /// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
+/// is the type used by `detach` and `Task.group.add` to create
 /// futures.
 class FutureAsyncContext : public AsyncContext {
 public:

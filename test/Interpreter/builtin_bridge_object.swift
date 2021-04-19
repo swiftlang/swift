@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-Onone -parse-stdlib) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG
-// RUN: %target-run-simple-swift(-O -parse-stdlib) | %FileCheck --check-prefixes=CHECK,CHECK-OPT %s
+// RUN: %target-run-simple-swift(-Onone -parse-stdlib -Xfrontend -enable-copy-propagation) | %FileCheck %s --check-prefixes=CHECK,CHECK-DBG
+// RUN: %target-run-simple-swift(-O -parse-stdlib -Xfrontend -enable-copy-propagation) | %FileCheck --check-prefixes=CHECK,CHECK-OPT %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

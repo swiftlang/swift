@@ -162,25 +162,21 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_continuation_resume) {
-  swift_continuation_resume(nullptr, nullptr, nullptr);
+  swift_continuation_resume(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_continuation_throwingResume) {
-  swift_continuation_resume(nullptr, nullptr, nullptr);
+  swift_continuation_throwingResume(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_continuation_throwingResumeWithError) {
-  swift_continuation_resume(nullptr, nullptr, nullptr);
+  swift_continuation_throwingResumeWithError(nullptr, nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initialize) {
   swift_taskGroup_initialize(nullptr);
-}
-
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_create) {
-  swift_taskGroup_create();
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_attachChild) {
@@ -209,7 +205,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_cancelAll) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_addPending) {
-  swift_taskGroup_addPending(nullptr);
+  swift_taskGroup_addPending(nullptr, true);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swifttask_localValuePush) {

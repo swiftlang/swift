@@ -412,9 +412,11 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
       auto src = srcWords + vtable->getVTableOffset(description);
       auto dest = dstWords + vtable->getVTableOffset(description);
       for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
-        swift_ptrauth_copy(reinterpret_cast<void **>(&dest[i]),
-                           reinterpret_cast<void *const *>(&src[i]),
-                           descriptors[i].Flags.getExtraDiscriminator());
+        swift_ptrauth_copy_code_or_data(
+            reinterpret_cast<void **>(&dest[i]),
+            reinterpret_cast<void *const *>(&src[i]),
+            descriptors[i].Flags.getExtraDiscriminator(),
+            !descriptors[i].Flags.isAsync());
       }
     }
 
@@ -1027,19 +1029,29 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
+  // We're not supposed to accept NULL, but older runtimes somehow did as a
+  // side effect of UB in dyn_cast, so we'll keep that going.
+  if (!theMetadata)
+    return nullptr;
+
   // Unwrap ObjC class wrappers.
-  if (auto wrapper = dyn_cast_or_null<ObjCClassWrapperMetadata>(theMetadata)) {
+  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
   }
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(!theClass || theClass->isTypeMetadata());
+  assert(theClass->isTypeMetadata());
   return theClass;
 }
 
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadataConditional(const Metadata *theMetadata) {
+  // We're not supposed to accept NULL, but older runtimes somehow did as a
+  // side effect of UB in dyn_cast, so we'll keep that going.
+  if (!theMetadata)
+    return nullptr;
+
   // If it's an ordinary class, return it.
   if (auto theClass = dyn_cast<ClassMetadata>(theMetadata)) {
     return theClass;
@@ -1068,12 +1080,17 @@ public:
 
   struct Key {
     const FunctionTypeFlags Flags;
-
+    const FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
     const Metadata *const *Parameters;
     const uint32_t *ParameterFlags;
     const Metadata *Result;
 
     FunctionTypeFlags getFlags() const { return Flags; }
+
+    FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind;
+    }
+
     const Metadata *getParameter(unsigned index) const {
       assert(index < Flags.getNumParameters());
       return Parameters[index];
@@ -1091,7 +1108,10 @@ public:
     }
 
     friend llvm::hash_code hash_value(const Key &key) {
-      auto hash = llvm::hash_combine(key.Flags.getIntValue(), key.Result);
+      auto hash = llvm::hash_combine(
+          key.Flags.getIntValue(),
+          key.DifferentiabilityKind.getIntValue(),
+          key.Result);
       for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
         hash = llvm::hash_combine(hash, key.getParameter(i));
         hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
@@ -1109,6 +1129,9 @@ public:
   bool matchesKey(const Key &key) const {
     if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
       return false;
+    if (key.getDifferentiabilityKind().Value !=
+        Data.getDifferentiabilityKind().Value)
+      return false;
     if (key.getResult() != Data.ResultType)
       return false;
     for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
@@ -1122,8 +1145,9 @@ public:
   }
 
   friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
-    Key key = {value.Data.Flags, value.Data.getParameters(),
-               value.Data.getParameterFlags(), value.Data.ResultType};
+    Key key = {value.Data.Flags, value.Data.getDifferentiabilityKind(),
+               value.Data.getParameters(), value.Data.getParameterFlags(),
+               value.Data.ResultType};
     return hash_value(key);
   }
 
@@ -1140,6 +1164,9 @@ public:
     auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
     if (flags.hasParameterFlags())
       size += numParams * sizeof(uint32_t);
+    if (flags.isDifferentiable())
+      size = roundUpToAlignment(size, sizeof(void *)) +
+          sizeof(FunctionMetadataDifferentiabilityKind);
     return roundUpToAlignment(size, sizeof(void *));
   }
 };
@@ -1195,7 +1222,26 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
                                      const Metadata *const *parameters,
                                      const uint32_t *parameterFlags,
                                      const Metadata *result) {
-  FunctionCacheEntry::Key key = { flags, parameters, parameterFlags, result };
+  assert(!flags.isDifferentiable()
+         && "Differentiable function type metadata should be obtained using "
+            "'swift_getFunctionTypeMetadataDifferentiable'");
+  FunctionCacheEntry::Key key = {
+    flags, FunctionMetadataDifferentiabilityKind::NonDifferentiable, parameters,
+    parameterFlags, result,
+  };
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadataDifferentiable(
+    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
+    const Metadata *const *parameters, const uint32_t *parameterFlags,
+    const Metadata *result) {
+  assert(flags.isDifferentiable());
+  assert(diffKind.isDifferentiable());
+  FunctionCacheEntry::Key key = {
+    flags, diffKind, parameters, parameterFlags, result
+  };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
 
@@ -1235,6 +1281,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
   Data.setKind(MetadataKind::Function);
   Data.Flags = flags;
   Data.ResultType = key.getResult();
+  if (flags.isDifferentiable())
+    *Data.getDifferentiabilityKindAddress() = key.getDifferentiabilityKind();
 
   for (unsigned i = 0; i < numParameters; ++i) {
     Data.getParameters()[i] = key.getParameter(i);
@@ -2585,9 +2633,11 @@ static void copySuperclassMetadataToSubclass(ClassMetadata *theClass,
 #if SWIFT_PTRAUTH
       auto descriptors = description->getMethodDescriptors();
       for (size_t i = 0, e = vtable->VTableSize; i != e; ++i) {
-        swift_ptrauth_copy(reinterpret_cast<void**>(&dest[i]),
-                           reinterpret_cast<void*const*>(&src[i]),
-                           descriptors[i].Flags.getExtraDiscriminator());
+        swift_ptrauth_copy_code_or_data(
+            reinterpret_cast<void **>(&dest[i]),
+            reinterpret_cast<void *const *>(&src[i]),
+            descriptors[i].Flags.getExtraDiscriminator(),
+            !descriptors[i].Flags.isAsync());
       }
 #else
       memcpy(dest, src, vtable->VTableSize * sizeof(uintptr_t));
@@ -2632,9 +2682,10 @@ static void initClassVTable(ClassMetadata *self) {
     auto descriptors = description->getMethodDescriptors();
     for (unsigned i = 0, e = vtable->VTableSize; i < e; ++i) {
       auto &methodDescription = descriptors[i];
-      swift_ptrauth_init(&classWords[vtableOffset + i],
-                         methodDescription.Impl.get(),
-                         methodDescription.Flags.getExtraDiscriminator());
+      swift_ptrauth_init_code_or_data(
+          &classWords[vtableOffset + i], methodDescription.Impl.get(),
+          methodDescription.Flags.getExtraDiscriminator(),
+          !methodDescription.Flags.isAsync());
     }
   }
 
@@ -2673,9 +2724,10 @@ static void initClassVTable(ClassMetadata *self) {
       auto offset = (baseVTable->getVTableOffset(baseClass) +
                      (baseMethod - baseClassMethods.data()));
 
-      swift_ptrauth_init(&classWords[offset],
-                         descriptor.Impl.get(),
-                         baseMethod->Flags.getExtraDiscriminator());
+      swift_ptrauth_init_code_or_data(&classWords[offset],
+                                      descriptor.Impl.get(),
+                                      baseMethod->Flags.getExtraDiscriminator(),
+                                      !baseMethod->Flags.isAsync());
     }
   }
 }
@@ -3236,11 +3288,17 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
 #if SWIFT_PTRAUTH
   // Re-sign the return value without the address.
   unsigned extra = method->Flags.getExtraDiscriminator();
-  return ptrauth_auth_and_resign(*methodPtr,
-                                 ptrauth_key_function_pointer,
-                                 ptrauth_blend_discriminator(methodPtr, extra),
-                                 ptrauth_key_function_pointer,
-                                 extra);
+  if (method->Flags.isAsync()) {
+    return ptrauth_auth_and_resign(
+        *methodPtr, ptrauth_key_process_independent_data,
+        ptrauth_blend_discriminator(methodPtr, extra),
+        ptrauth_key_process_independent_data, extra);
+  } else {
+    return ptrauth_auth_and_resign(
+        *methodPtr, ptrauth_key_function_pointer,
+        ptrauth_blend_discriminator(methodPtr, extra),
+        ptrauth_key_function_pointer, extra);
+  }
 #else
   return *methodPtr;
 #endif
@@ -4608,7 +4666,9 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+    swift_ptrauth_init_code_or_data(slot, witness,
+                                    reqt.Flags.getExtraDiscriminator(),
+                                    !reqt.Flags.isAsync());
     return;
 
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
@@ -4647,7 +4707,9 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
-    swift_ptrauth_copy(dest, src, reqt.Flags.getExtraDiscriminator());
+    swift_ptrauth_copy_code_or_data(dest, src,
+                                    reqt.Flags.getExtraDiscriminator(),
+                                    !reqt.Flags.isAsync());
     return;
 
   // FIXME: these should both use ptrauth_key_process_independent_data now.

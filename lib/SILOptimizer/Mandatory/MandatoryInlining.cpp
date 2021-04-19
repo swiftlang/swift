@@ -610,6 +610,78 @@ static SILValue getLoadedCalleeValue(LoadInst *li) {
   return si->getSrc();
 }
 
+// PartialApply/ThinToThick -> ConvertFunction patterns are generated
+// by @noescape closures.
+//
+// FIXME: We don't currently handle mismatched return types, however, this
+// would be a good optimization to handle and would be as simple as inserting
+// a cast.
+static SILValue stripFunctionConversions(SILValue CalleeValue) {
+  // Skip any copies that we see.
+  CalleeValue = stripCopiesAndBorrows(CalleeValue);
+
+  // We can also allow a thin @escape to noescape conversion as such:
+  // %1 = function_ref @thin_closure_impl : $@convention(thin) () -> ()
+  // %2 = convert_function %1 :
+  //      $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
+  // %3 = thin_to_thick_function %2 :
+  //  $@convention(thin) @noescape () -> () to
+  //            $@noescape @callee_guaranteed () -> ()
+  // %4 = apply %3() : $@noescape @callee_guaranteed () -> ()
+  if (auto *ConvertFn = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
+    // If the conversion only changes the substitution level of the function,
+    // we can also look through it.
+    if (ConvertFn->onlyConvertsSubstitutions())
+      return stripFunctionConversions(ConvertFn->getOperand());
+
+    auto FromCalleeTy =
+        ConvertFn->getOperand()->getType().castTo<SILFunctionType>();
+    if (FromCalleeTy->getExtInfo().hasContext())
+      return CalleeValue;
+
+    auto ToCalleeTy = ConvertFn->getType().castTo<SILFunctionType>();
+    auto EscapingCalleeTy = ToCalleeTy->getWithExtInfo(
+        ToCalleeTy->getExtInfo().withNoEscape(false));
+    if (FromCalleeTy != EscapingCalleeTy)
+      return CalleeValue;
+
+    return stripCopiesAndBorrows(ConvertFn->getOperand());
+  }
+
+  // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
+  // the dependence of the trivial closure context value on the captured
+  // arguments.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(CalleeValue)) {
+    while (MD) {
+      CalleeValue = MD->getValue();
+      MD = dyn_cast<MarkDependenceInst>(CalleeValue);
+    }
+    return CalleeValue;
+  }
+
+  auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue);
+  if (!CFI)
+    return stripCopiesAndBorrows(CalleeValue);
+
+  // TODO: Handle argument conversion. All the code in this file needs to be
+  // cleaned up and generalized. The argument conversion handling in
+  // optimizeApplyOfConvertFunctionInst should apply to any combine
+  // involving an apply, not just a specific pattern.
+  //
+  // For now, just handle conversion that doesn't affect argument types,
+  // return types, or throws. We could trivially handle any other
+  // representation change, but the only one that doesn't affect the ABI and
+  // matters here is @noescape, so just check for that.
+  auto FromCalleeTy = CFI->getOperand()->getType().castTo<SILFunctionType>();
+  auto ToCalleeTy = CFI->getType().castTo<SILFunctionType>();
+  auto EscapingCalleeTy =
+    ToCalleeTy->getWithExtInfo(ToCalleeTy->getExtInfo().withNoEscape(false));
+  if (FromCalleeTy != EscapingCalleeTy)
+    return stripCopiesAndBorrows(CalleeValue);
+
+  return stripCopiesAndBorrows(CFI->getOperand());
+}
+
 /// Returns the callee SILFunction called at a call site, in the case
 /// that the call is transparent (as in, both that the call is marked
 /// with the transparent flag and that callee function is actually transparently
@@ -646,79 +718,8 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     CalleeValue = stripCopiesAndBorrows(CalleeValue);
   }
 
-  // PartialApply/ThinToThick -> ConvertFunction patterns are generated
-  // by @noescape closures.
-  //
-  // FIXME: We don't currently handle mismatched return types, however, this
-  // would be a good optimization to handle and would be as simple as inserting
-  // a cast.
-  auto skipFuncConvert = [](SILValue CalleeValue) {
-    // Skip any copies that we see.
-    CalleeValue = stripCopiesAndBorrows(CalleeValue);
-
-    // We can also allow a thin @escape to noescape conversion as such:
-    // %1 = function_ref @thin_closure_impl : $@convention(thin) () -> ()
-    // %2 = convert_function %1 :
-    //      $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-    // %3 = thin_to_thick_function %2 :
-    //  $@convention(thin) @noescape () -> () to
-    //            $@noescape @callee_guaranteed () -> ()
-    // %4 = apply %3() : $@noescape @callee_guaranteed () -> ()
-    if (auto *ConvertFn = dyn_cast<ConvertFunctionInst>(CalleeValue)) {
-      // If the conversion only changes the substitution level of the function,
-      // we can also look through it.
-      if (ConvertFn->onlyConvertsSubstitutions()) {
-        return stripCopiesAndBorrows(ConvertFn->getOperand());
-      }
-      
-      auto FromCalleeTy =
-          ConvertFn->getOperand()->getType().castTo<SILFunctionType>();
-      if (FromCalleeTy->getExtInfo().hasContext())
-        return CalleeValue;
-      auto ToCalleeTy = ConvertFn->getType().castTo<SILFunctionType>();
-      auto EscapingCalleeTy = ToCalleeTy->getWithExtInfo(
-          ToCalleeTy->getExtInfo().withNoEscape(false));
-      if (FromCalleeTy != EscapingCalleeTy)
-        return CalleeValue;
-      return stripCopiesAndBorrows(ConvertFn->getOperand());
-    }
-
-    // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
-    // the dependence of the trivial closure context value on the captured
-    // arguments.
-    if (auto *MD = dyn_cast<MarkDependenceInst>(CalleeValue)) {
-      while (MD) {
-        CalleeValue = MD->getValue();
-        MD = dyn_cast<MarkDependenceInst>(CalleeValue);
-      }
-      return CalleeValue;
-    }
-
-    auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue);
-    if (!CFI)
-      return stripCopiesAndBorrows(CalleeValue);
-
-    // TODO: Handle argument conversion. All the code in this file needs to be
-    // cleaned up and generalized. The argument conversion handling in
-    // optimizeApplyOfConvertFunctionInst should apply to any combine
-    // involving an apply, not just a specific pattern.
-    //
-    // For now, just handle conversion that doesn't affect argument types,
-    // return types, or throws. We could trivially handle any other
-    // representation change, but the only one that doesn't affect the ABI and
-    // matters here is @noescape, so just check for that.
-    auto FromCalleeTy = CFI->getOperand()->getType().castTo<SILFunctionType>();
-    auto ToCalleeTy = CFI->getType().castTo<SILFunctionType>();
-    auto EscapingCalleeTy =
-      ToCalleeTy->getWithExtInfo(ToCalleeTy->getExtInfo().withNoEscape(false));
-    if (FromCalleeTy != EscapingCalleeTy)
-      return stripCopiesAndBorrows(CalleeValue);
-
-    return stripCopiesAndBorrows(CFI->getOperand());
-  };
-
   // Look through a escape to @noescape conversion.
-  CalleeValue = skipFuncConvert(CalleeValue);
+  CalleeValue = stripFunctionConversions(CalleeValue);
 
   // We are allowed to see through exactly one "partial apply" instruction or
   // one "thin to thick function" instructions, since those are the patterns
@@ -735,7 +736,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     IsThick = true;
   }
 
-  CalleeValue = skipFuncConvert(CalleeValue);
+  CalleeValue = stripFunctionConversions(CalleeValue);
 
   auto *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
   if (!FRI)
@@ -912,19 +913,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
                    ? PAI->getSubstitutionMap()
                    : InnerAI.getSubstitutionMap());
 
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
-      F->getModule().registerDeleteNotificationHandler(
-          &OpenedArchetypesTracker);
-      // The callee only needs to know about opened archetypes used in
-      // the substitution list.
-      OpenedArchetypesTracker.registerUsedOpenedArchetypes(
-          InnerAI.getInstruction());
-      if (PAI) {
-        OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
-      }
-
       SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
-                         Subs, OpenedArchetypesTracker);
+                         Subs);
       if (!Inliner.canInlineApplySite(InnerAI))
         continue;
 

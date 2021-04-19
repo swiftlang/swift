@@ -351,6 +351,19 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   llvm_unreachable("bad DescriptiveDeclKind");
 }
 
+const Decl *Decl::getInnermostDeclWithAvailability() const {
+  const Decl *enclosingDecl = this;
+  // Find the innermost enclosing declaration with an @available annotation.
+  while (enclosingDecl != nullptr) {
+    if (enclosingDecl->getAttrs().hasAttribute<AvailableAttr>())
+      return enclosingDecl;
+
+    enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();
+  }
+
+  return nullptr;
+}
+
 Optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   for (auto *attr: getAttrs()) {
@@ -2622,7 +2635,8 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       newFlags = newFlags.withInOut(false);
     }
 
-    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags);
+    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags,
+                                    param.getInternalLabel());
     newParams.push_back(newParam);
   }
 
@@ -4237,10 +4251,27 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
 }
 
 bool ClassDecl::isDefaultActor() const {
+  return isDefaultActor(getModuleContext(), ResilienceExpansion::Minimal);
+}
+
+bool ClassDecl::isDefaultActor(ModuleDecl *M,
+                               ResilienceExpansion expansion) const {
   auto mutableThis = const_cast<ClassDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
-                           IsDefaultActorRequest{mutableThis},
+                           IsDefaultActorRequest{mutableThis, M,
+                                                 expansion},
                            false);
+}
+
+const ClassDecl *ClassDecl::getRootActorClass() const {
+  if (!isActor()) return nullptr;
+  auto cur = this;
+  while (true) {
+    auto super = cur->getSuperclassDecl();
+    if (!super || !super->isActor())
+      return cur;
+    cur = super;
+  }
 }
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
@@ -5903,6 +5934,27 @@ bool VarDecl::hasImplicitPropertyWrapper() const {
   return !isImplicit() && getName().hasDollarPrefix() && isClosureParam;
 }
 
+bool VarDecl::hasExternalPropertyWrapper() const {
+  if (!hasAttachedPropertyWrapper() || !isa<ParamDecl>(this))
+    return false;
+
+  // This decision needs to be made before closures are type checked (and
+  // the wrapper types are potentially inferred) so closure parameters with
+  // property wrappers are always "external". This is fine, because the
+  // type checker will always inject a thunk with the wrapped or projected type
+  // around the closure, so the wrapper will never affect the caller's
+  // arguments directly anyway.
+  if (isa<AbstractClosureExpr>(getDeclContext()))
+    return true;
+
+  // Wrappers with attribute arguments are always implementation-detail.
+  if (getAttachedPropertyWrappers().front()->getArg())
+    return false;
+
+  auto wrapperInfo = getAttachedPropertyWrapperTypeInfo(0);
+  return wrapperInfo.projectedValueVar && wrapperInfo.hasProjectedValueInit;
+}
+
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
 /// initializer.
 bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
@@ -6303,7 +6355,7 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 
 AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   if (!type) {
-    if (hasAttachedPropertyWrapper() && !hasImplicitPropertyWrapper()) {
+    if (hasExternalPropertyWrapper()) {
       type = getPropertyWrapperBackingPropertyType();
     } else {
       type = getInterfaceType();
@@ -6314,11 +6366,12 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
     type = ParamDecl::getVarargBaseTy(type);
 
   auto label = getArgumentName();
+  auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
       getValueOwnership(),
       /*isNoDerivative*/ false);
-  return AnyFunctionType::Param(type, label, flags);
+  return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
 Optional<Initializer *> ParamDecl::getCachedDefaultArgumentInitContext() const {
@@ -6843,6 +6896,12 @@ bool AbstractFunctionDecl::hasDynamicSelfResult() const {
   return isa<ConstructorDecl>(this);
 }
 
+AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
+  auto mutableFunc = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           AsyncAlternativeRequest{mutableFunc}, nullptr);
+}
+
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   // Initializers have argument labels.
   if (isa<ConstructorDecl>(this))
@@ -7325,6 +7384,27 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
+bool AbstractFunctionDecl::hasKnownUnsafeSendableFunctionParams() const {
+  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  // DispatchQueue operations.
+  auto nominalName = nominal->getName().str();
+  if (nominalName == "DispatchQueue") {
+    auto name = getBaseName().userFacingName();
+    return llvm::StringSwitch<bool>(name)
+      .Case("sync", true)
+      .Case("async", true)
+      .Case("asyncAndWait", true)
+      .Case("asyncAfter", true)
+      .Case("concurrentPerform", true)
+      .Default(false);
+  }
+
+  return false;
+}
+
 void FuncDecl::setResultInterfaceType(Type type) {
   getASTContext().evaluator.cacheOutput(ResultTypeRequest{this},
                                         std::move(type));
@@ -7592,13 +7672,13 @@ bool FuncDecl::isMainTypeMainMethod() const {
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
-                                 bool Throws,
-                                 SourceLoc ThrowsLoc,
+                                 bool Async, SourceLoc AsyncLoc,
+                                 bool Throws, SourceLoc ThrowsLoc,
                                  ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
-                         /*Async=*/false, SourceLoc(), Throws, ThrowsLoc,
+                         Async, AsyncLoc, Throws, ThrowsLoc,
                          /*HasImplicitSelfDecl=*/true,
                          GenericParams),
     FailabilityLoc(FailabilityLoc),
@@ -7616,13 +7696,17 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
 ConstructorDecl *ConstructorDecl::createImported(
     ASTContext &ctx, ClangNode clangNode, DeclName name,
     SourceLoc constructorLoc, bool failable, SourceLoc failabilityLoc,
+    bool async, SourceLoc asyncLoc,
     bool throws, SourceLoc throwsLoc, ParameterList *bodyParams,
     GenericParamList *genericParams, DeclContext *parent) {
   void *declPtr = allocateMemoryForDecl<ConstructorDecl>(
       ctx, sizeof(ConstructorDecl), true);
   auto ctor = ::new (declPtr)
-      ConstructorDecl(name, constructorLoc, failable, failabilityLoc, throws,
-                      throwsLoc, bodyParams, genericParams, parent);
+      ConstructorDecl(name, constructorLoc,
+                      failable, failabilityLoc, 
+                      async, asyncLoc,
+                      throws, throwsLoc, 
+                      bodyParams, genericParams, parent);
   ctor->setClangNode(clangNode);
   return ctor;
 }
@@ -7993,7 +8077,12 @@ bool ClassDecl::hasExplicitCustomActorMethods() const {
 }
 
 bool ClassDecl::isRootDefaultActor() const {
-  if (!isDefaultActor()) return false;
+  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Minimal);
+}
+
+bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
+                                   ResilienceExpansion expansion) const {
+  if (!isDefaultActor(M, expansion)) return false;
   auto superclass = getSuperclassDecl();
   return (!superclass || superclass->isNSObject());
 }

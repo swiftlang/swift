@@ -1711,7 +1711,8 @@ static Type applyToFunctionType(
 }
 
 Type ClangImporter::Implementation::applyParamAttributes(
-    const clang::ParmVarDecl *param, Type type) {
+    const clang::ParmVarDecl *param, Type type, bool &isUnsafeSendable,
+    bool &isUnsafeMainActor) {
   if (!param->hasAttrs())
     return type;
 
@@ -1731,7 +1732,7 @@ Type ClangImporter::Implementation::applyParamAttributes(
 
     // Map the main-actor attribute.
     if (isMainActorAttr(SwiftContext, swiftAttr)) {
-      if (Type mainActor = getMainActorType()) {
+      if (Type mainActor = SwiftContext.getMainActorType()) {
         type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
           return extInfo.withGlobalActor(mainActor);
         });
@@ -1746,6 +1747,18 @@ Type ClangImporter::Implementation::applyParamAttributes(
         return extInfo.withConcurrent();
       });
 
+      continue;
+    }
+
+    // Map @_unsafeSendable.
+    if (swiftAttr->getAttribute() == "@_unsafeSendable") {
+      isUnsafeSendable = true;
+      continue;
+    }
+
+    // Map @_unsafeMainActor.
+    if (swiftAttr->getAttribute() == "@_unsafeMainActor") {
+      isUnsafeMainActor = true;
       continue;
     }
   }
@@ -1928,7 +1941,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Apply attributes to the type.
-    swiftParamTy = applyParamAttributes(param, swiftParamTy);
+    bool isUnsafeSendable = false;
+    bool isUnsafeMainActor = false;
+    swiftParamTy = applyParamAttributes(
+        param, swiftParamTy, isUnsafeSendable, isUnsafeMainActor);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -1949,6 +1965,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
+    recordUnsafeConcurrencyForDecl(
+        paramInfo, isUnsafeSendable, isUnsafeMainActor);
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -2185,6 +2203,49 @@ static Type decomposeCompletionHandlerType(
   }
 }
 
+ImportedType ClangImporter::Implementation::importEffectfulPropertyType(
+                                        const clang::ObjCMethodDecl *decl,
+                                        DeclContext *dc,
+                                        importer::ImportedName name,
+                                        bool isFromSystemModule) {
+  // here we expect a method that is being imported as an effectful property.
+  // thus, we currently require async info.
+  if (!name.getAsyncInfo())
+    return ImportedType();
+
+  // a variadic method doesn't make sense here
+  if (decl->isVariadic())
+    return ImportedType();
+
+  // Our strategy here is to determine what the return type of the method would
+  // be, had we imported it as a method.
+
+  Optional<ForeignAsyncConvention> asyncConvention;
+  Optional<ForeignErrorConvention> errorConvention;
+
+  const auto kind = SpecialMethodKind::Regular;
+
+  // Import the parameter list and result type.
+  ParameterList *bodyParams = nullptr;
+  ImportedType importedType;
+
+  auto methodReturnType = importMethodParamsAndReturnType(
+      dc, decl, decl->parameters(), false,
+      isFromSystemModule, &bodyParams, name,
+      asyncConvention, errorConvention, kind);
+
+  // getter mustn't have any parameters!
+  if (bodyParams->size() != 0) {
+    return ImportedType();
+  }
+
+  // We expect that the method, after import, will have only an async convention
+  if (!asyncConvention || errorConvention)
+    return ImportedType();
+
+  return methodReturnType;
+}
+
 ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCMethodDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
@@ -2351,6 +2412,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
       swiftParamTy = SwiftContext.getNSCopyingType();
+      if (!swiftParamTy)
+        return {Type(), false};
       if (optionalityOfParam != OTK_None)
         swiftParamTy = OptionalType::get(swiftParamTy);
 
@@ -2424,7 +2487,10 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
 
     // Apply Clang attributes to the parameter type.
-    swiftParamTy = applyParamAttributes(param, swiftParamTy);
+    bool isUnsafeSendable = false;
+    bool isUnsafeMainActor = false;
+    swiftParamTy = applyParamAttributes(
+        param, swiftParamTy, isUnsafeSendable, isUnsafeMainActor);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -2448,6 +2514,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
+    recordUnsafeConcurrencyForDecl(
+        paramInfo, isUnsafeSendable, isUnsafeMainActor);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||

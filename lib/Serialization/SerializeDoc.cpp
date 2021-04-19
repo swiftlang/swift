@@ -247,7 +247,7 @@ public:
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
     for (auto C : data.Raw.Comments) {
-      writer.write<uint32_t>(C.StartColumn);
+      writer.write<uint32_t>(C.ColumnIndent);
       writer.write<uint32_t>(C.RawText.size());
       out << C.RawText;
     }
@@ -526,9 +526,9 @@ namespace {
 struct DeclLocationsTableData {
   uint32_t SourceFileOffset;
   uint32_t DocRangesOffset;
-  LineColumn Loc;
-  LineColumn StartLoc;
-  LineColumn EndLoc;
+  SourcePosition Loc;
+  SourcePosition StartLoc;
+  SourcePosition EndLoc;
 };
 
 class USRTableInfo {
@@ -643,7 +643,7 @@ public:
    original offset.
    */
   uint32_t getDocRangesOffset(const Decl *D,
-      ArrayRef<std::pair<LineColumn, uint32_t>> DocRanges) {
+      ArrayRef<std::pair<SourcePosition, uint32_t>> DocRanges) {
     if (DocRanges.empty()) {
       return 0;
     }

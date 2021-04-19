@@ -789,6 +789,9 @@ public:
     return Attrs;
   }
 
+  /// Returns the innermost enclosing decl with an availability annotation.
+  const Decl *getInnermostDeclWithAvailability() const;
+
   /// Returns the introduced OS version in the given platform kind specified
   /// by @available attribute.
   /// This function won't consider the parent context to get the information.
@@ -3486,7 +3489,7 @@ class StructDecl final : public NominalTypeDecl {
   SourceLoc StructLoc;
 
   // We import C++ class templates as generic structs. Then when in Swift code
-  // we want to substitude generic parameters with actual arguments, we
+  // we want to substitute generic parameters with actual arguments, we
   // convert the arguments to C++ equivalents and ask Clang to instantiate the
   // C++ template. Then we import the C++ class template instantiation
   // as a non-generic structs with a name prefixed with `__CxxTemplateInst`.
@@ -3763,13 +3766,18 @@ public:
 
   /// Whether the class is (known to be) a default actor.
   bool isDefaultActor() const;
+  bool isDefaultActor(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Whether the class is known to be a *root* default actor,
   /// i.e. the first class in its hierarchy that is a default actor.
   bool isRootDefaultActor() const;
+  bool isRootDefaultActor(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Whether the class was explicitly declared with the `actor` keyword.
   bool isExplicitActor() const { return Bits.ClassDecl.IsActor; }
+
+  /// Get the closest-to-root superclass that's an actor class.
+  const ClassDecl *getRootActorClass() const;
 
   /// Does this class explicitly declare any of the methods that
   /// would prevent it from being a default actor?
@@ -5013,6 +5021,10 @@ public:
   /// Whether this var has an implicit property wrapper attribute.
   bool hasImplicitPropertyWrapper() const;
 
+  /// Whether this var is a parameter with an attached property wrapper
+  /// that has an external effect on the function.
+  bool hasExternalPropertyWrapper() const;
+
   /// Whether all of the attached property wrappers have an init(wrappedValue:)
   /// initializer.
   bool allAttachedPropertyWrappersHaveWrappedValueInit() const;
@@ -6097,6 +6109,17 @@ public:
   /// constructor.
   bool hasDynamicSelfResult() const;
 
+
+  AbstractFunctionDecl *getAsyncAlternative() const;
+
+  /// Determine whether this function is implicitly known to have its
+  /// parameters of function type be @_unsafeSendable.
+  ///
+  /// This hard-codes knowledge of a number of functions that will
+  /// eventually have @_unsafeSendable and, eventually, @Sendable,
+  /// on their parameters of function type.
+  bool hasKnownUnsafeSendableFunctionParams() const;
+
   using DeclContext::operator new;
   using Decl::getASTContext;
 };
@@ -6746,6 +6769,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   bool Failable, SourceLoc FailabilityLoc,
+                  bool Async, SourceLoc AsyncLoc,
                   bool Throws, SourceLoc ThrowsLoc,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
@@ -6753,8 +6777,10 @@ public:
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
-                 SourceLoc constructorLoc, bool failable,
-                 SourceLoc failabilityLoc, bool throws, SourceLoc throwsLoc,
+                 SourceLoc constructorLoc, 
+                 bool failable, SourceLoc failabilityLoc, 
+                 bool async, SourceLoc asyncLoc,
+                 bool throws, SourceLoc throwsLoc,
                  ParameterList *bodyParams, GenericParamList *genericParams,
                  DeclContext *parent);
 

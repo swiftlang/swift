@@ -461,9 +461,11 @@ class FunctionTypeRef final : public TypeRef {
   std::vector<Param> Parameters;
   const TypeRef *Result;
   FunctionTypeFlags Flags;
+  FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
 
   static TypeRefID Profile(const std::vector<Param> &Parameters,
-                           const TypeRef *Result, FunctionTypeFlags Flags) {
+                           const TypeRef *Result, FunctionTypeFlags Flags,
+                           FunctionMetadataDifferentiabilityKind DiffKind) {
     TypeRefID ID;
     for (const auto &Param : Parameters) {
       ID.addString(Param.getLabel().str());
@@ -472,20 +474,22 @@ class FunctionTypeRef final : public TypeRef {
     }
     ID.addPointer(Result);
     ID.addInteger(static_cast<uint64_t>(Flags.getIntValue()));
+    ID.addInteger(static_cast<uint64_t>(DiffKind.getIntValue()));
     return ID;
   }
 
 public:
   FunctionTypeRef(std::vector<Param> Params, const TypeRef *Result,
-                  FunctionTypeFlags Flags)
+                  FunctionTypeFlags Flags,
+                  FunctionMetadataDifferentiabilityKind DiffKind)
       : TypeRef(TypeRefKind::Function), Parameters(Params), Result(Result),
-        Flags(Flags) {}
+        Flags(Flags), DifferentiabilityKind(DiffKind) {}
 
   template <typename Allocator>
-  static const FunctionTypeRef *create(Allocator &A, std::vector<Param> Params,
-                                       const TypeRef *Result,
-                                       FunctionTypeFlags Flags) {
-    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Params, Result, Flags);
+  static const FunctionTypeRef *create(
+      Allocator &A, std::vector<Param> Params, const TypeRef *Result,
+      FunctionTypeFlags Flags, FunctionMetadataDifferentiabilityKind DiffKind) {
+    FIND_OR_CREATE_TYPEREF(A, FunctionTypeRef, Params, Result, Flags, DiffKind);
   }
 
   const std::vector<Param> &getParameters() const { return Parameters; };
@@ -496,6 +500,10 @@ public:
 
   FunctionTypeFlags getFlags() const {
     return Flags;
+  }
+
+  FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+    return DifferentiabilityKind;
   }
 
   static bool classof(const TypeRef *TR) {

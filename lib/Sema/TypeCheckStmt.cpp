@@ -1597,6 +1597,9 @@ static Type getResultBuilderType(FuncDecl *FD) {
   return builderType;
 }
 
+/// Attempts to build an implicit call within the provided constructor
+/// to the provided class's zero-argument super initializer.
+/// @returns nullptr if there was an error and a diagnostic was emitted.
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
                                       ClassDecl *ClDecl) {
   ASTContext &Context = ctor->getASTContext();
@@ -1643,7 +1646,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
     return true;
   }
-  
+
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
@@ -1662,7 +1665,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
 
     for (auto decl : lookupResults) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(decl);
-    if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
+      if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;
 
@@ -1673,9 +1676,21 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
 
     // Make sure we can reference the designated initializer correctly.
     auto loc = fromCtor->getLoc();
-    diagnoseDeclAvailability(
+    const bool didDiagnose = diagnoseDeclAvailability(
         ctor, loc, nullptr,
         ExportContext::forFunctionBody(fromCtor, loc));
+    if (didDiagnose) {
+      fromCtor->diagnose(diag::availability_unavailable_implicit_init,
+                         ctor->getDescriptiveKind(), ctor->getName(),
+                         superclassDecl->getName());
+    }
+
+    // Not allowed to implicitly generate a super.init() call if the init
+    // is async; that would hide the 'await' from the programmer.
+    if (ctor->hasAsync()) {
+      fromCtor->diagnose(diag::implicit_async_super_init);
+      return true; // considered an error
+    }
   }
 
 

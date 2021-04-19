@@ -14,6 +14,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "AvailabilityMixin.h"
@@ -21,6 +22,7 @@
 #include "Symbol.h"
 #include "SymbolGraph.h"
 #include "SymbolGraphASTWalker.h"
+#include "DeclarationFragmentPrinter.h"
 
 using namespace swift;
 using namespace symbolgraphgen;
@@ -516,6 +518,33 @@ Symbol::getPathComponents(SmallVectorImpl<PathComponent> &Components) const {
 
   // The list is leaf-to-root, but we want root-to-leaf, so reverse it.
   std::reverse(Components.begin(), Components.end());
+}
+
+void Symbol::
+getFragmentInfo(SmallVectorImpl<FragmentInfo> &FragmentInfos) const {
+  SmallPtrSet<const Decl*, 8> Referenced;
+
+  auto Options = Graph->getDeclarationFragmentsPrintOptions();
+  if (getBaseType()) {
+    Options.setBaseType(getBaseType());
+    Options.PrintAsMember = true;
+  }
+
+  llvm::json::OStream OS(llvm::nulls());
+  OS.object([&]{
+    DeclarationFragmentPrinter Printer(Graph, OS, {"ignored"}, &Referenced);
+    getSymbolDecl()->print(Printer, Options);
+  });
+
+  for (auto *D: Referenced) {
+    if (!Symbol::supportsKind(D->getKind()))
+      continue;
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      FragmentInfos.push_back(FragmentInfo{VD, {}});
+      Symbol RefSym(Graph, VD, nullptr);
+      RefSym.getPathComponents(FragmentInfos.back().ParentContexts);
+    }
+  }
 }
 
 void Symbol::printPath(llvm::raw_ostream &OS) const {

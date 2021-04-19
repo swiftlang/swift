@@ -26,10 +26,11 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Demangling/Demangle.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -750,6 +751,11 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
+                                 llvm::cl::desc("Disable implicit import of _Concurrency module"),
+                                 llvm::cl::init(false));
 
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
@@ -3851,6 +3857,9 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+  }
+  if (options::DisableImplicitConcurrencyImport) {
+    InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
   }
 
   // We disable source location resolutions from .swiftsourceinfo files by

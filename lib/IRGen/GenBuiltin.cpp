@@ -28,6 +28,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenConcurrency.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -221,11 +222,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // getCurrentActor has no arguments.
   if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
-    auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetCurrentExecutorFn(),
-                                        {});
-    call->setDoesNotThrow();
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    out.add(call);
+    emitGetCurrentExecutor(IGF, out);
+
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
+    out.add(emitCreateTaskGroup(IGF));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::DestroyTaskGroup) {
+    emitDestroyTaskGroup(IGF, args.claimNext());
     return;
   }
 
@@ -287,7 +295,29 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
+  if (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationReturning ||
+      Builtin.ID == BuiltinValueKind::ResumeNonThrowingContinuationReturning) {
+    auto continuation = args.claimNext();
+    auto valueTy = argTypes[1];
+    auto valuePtr = args.claimNext();
+    bool throwing =
+      (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationReturning);
+    IGF.emitResumeAsyncContinuationReturning(continuation, valuePtr, valueTy,
+                                             throwing);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationThrowing) {
+    auto continuation = args.claimNext();
+    auto error = args.claimNext();
+    IGF.emitResumeAsyncContinuationThrowing(continuation, error);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildSerialExecutorRef) {
+    auto actor = args.claimNext();
+    emitBuildSerialExecutorRef(IGF, actor, argTypes[0], out);
+    return;
   }
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
@@ -809,6 +839,16 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     auto newValue = args.claimNext();
     auto index = args.claimNext();
     out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::ShuffleVector) {
+    using namespace llvm;
+
+    auto dict0 = args.claimNext();
+    auto dict1 = args.claimNext();
+    auto index = args.claimNext();
+    out.add(IGF.Builder.CreateShuffleVector(dict0, dict1, index));
     return;
   }
 

@@ -25,6 +25,9 @@
 
 namespace swift {
 
+// Uncomment to enable helpful debug spew to stderr
+//#define SWIFT_TASK_PRINTF_DEBUG 1
+
 class AsyncTask;
 class TaskGroup;
 
@@ -70,6 +73,11 @@ void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 /// on the same address.
 void _swift_tsan_acquire(void *addr);
 void _swift_tsan_release(void *addr);
+
+/// Special values used with DispatchQueueIndex to indicate the global and main
+/// executors.
+#define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
+#define DISPATCH_QUEUE_MAIN_EXECUTOR (void *)2
 
 // ==== ------------------------------------------------------------------------
 

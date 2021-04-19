@@ -198,8 +198,8 @@ AsyncContextLayout::AsyncContextLayout(
 #endif
 }
 
-static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
-  return IGM.getPointerAlignment();
+Alignment IRGenModule::getAsyncContextAlignment() const {
+  return Alignment(MaximumAlignment);
 }
 
 void IRGenFunction::setupAsync(unsigned asyncContextIndex) {
@@ -1971,10 +1971,17 @@ void irgen::extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,
     returned = IGF.coerceValue(returned, bodyType, IGF.IGM.DataLayout);
 
   if (auto *structType = dyn_cast<llvm::StructType>(bodyType))
-    for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
-      out.add(IGF.Builder.CreateExtractValue(returned, i));
+    IGF.emitAllExtractValues(returned, structType, out);
   else
     out.add(returned);
+}
+
+void IRGenFunction::emitAllExtractValues(llvm::Value *value,
+                                         llvm::StructType *structType,
+                                         Explosion &out) {
+  assert(value->getType() == structType);
+  for (unsigned i = 0, e = structType->getNumElements(); i != e; ++i)
+    out.add(Builder.CreateExtractValue(value, i));
 }
 
 std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
@@ -1985,24 +1992,41 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
   assert(functionPointer.getKind() != FunctionPointer::Kind::Function);
   bool emitFunction = values.first;
   bool emitSize = values.second;
-  auto *ptr = functionPointer.getRawPointer();
-  if (auto authInfo = functionPointer.getAuthInfo()) {
-    ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
-  }
-  auto *afpPtr =
-      IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
+  // Ensure that the AsyncFunctionPointer is not auth'd if it is not used and
+  // that it is not auth'd more than once if it is needed.
+  //
+  // The AsyncFunctionPointer is not needed in the case where only the function
+  // is being loaded and the FunctionPointer was created from a function_ref
+  // instruction.
+  llvm::Optional<llvm::Value *> afpPtrValue = llvm::None;
+  auto getAFPPtr = [&]() {
+    if (!afpPtrValue) {
+      auto *ptr = functionPointer.getRawPointer();
+      if (auto authInfo = functionPointer.getAuthInfo()) {
+        ptr = emitPointerAuthAuth(IGF, ptr, authInfo);
+      }
+      auto *afpPtr =
+          IGF.Builder.CreateBitCast(ptr, IGF.IGM.AsyncFunctionPointerPtrTy);
+      afpPtrValue = afpPtr;
+    }
+    return *afpPtrValue;
+  };
   llvm::Value *fn = nullptr;
   if (emitFunction) {
     if (functionPointer.useStaticContextSize()) {
       fn = functionPointer.getRawPointer();
+    } else if (auto *function = functionPointer.getRawAsyncFunction()) {
+      fn = function;
     } else {
-      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(afpPtr, 0);
+      llvm::Value *addrPtr = IGF.Builder.CreateStructGEP(getAFPPtr(), 0);
       fn = IGF.emitLoadOfRelativePointer(
           Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
           /*expectedType*/ functionPointer.getFunctionType()->getPointerTo());
     }
     if (auto authInfo = functionPointer.getAuthInfo()) {
-      fn = emitPointerAuthSign(IGF, fn, authInfo);
+      auto newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                         authInfo.getDiscriminator());
+      fn = emitPointerAuthSign(IGF, fn, newAuthInfo);
     }
   }
   llvm::Value *size = nullptr;
@@ -2012,7 +2036,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
                                     initialContextSize.getValue());
     } else {
       assert(!functionPointer.useStaticContextSize());
-      auto *sizePtr = IGF.Builder.CreateStructGEP(afpPtr, 1);
+      auto *sizePtr = IGF.Builder.CreateStructGEP(getAFPPtr(), 1);
       size = IGF.Builder.CreateLoad(sizePtr, IGF.IGM.getPointerAlignment());
     }
   }
@@ -2330,9 +2354,13 @@ public:
   }
 
   FunctionPointer getCalleeFunctionPointer() override {
+    PointerAuthInfo newAuthInfo;
+    if (auto authInfo = CurCallee.getFunctionPointer().getAuthInfo()) {
+      newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                    authInfo.getDiscriminator());
+    }
     return FunctionPointer(
-        FunctionPointer::Kind::Function, calleeFunction,
-        CurCallee.getFunctionPointer().getAuthInfo(),
+        FunctionPointer::Kind::Function, calleeFunction, newAuthInfo,
         Signature::forAsyncAwait(IGF.IGM, getCallee().getOrigFunctionType()));
   }
 
@@ -3815,7 +3843,7 @@ llvm::Value *irgen::emitTaskCreate(
 
 Address irgen::emitAllocAsyncContext(IRGenFunction &IGF,
                                      llvm::Value *sizeValue) {
-  auto alignment = getAsyncContextAlignment(IGF.IGM);
+  auto alignment = IGF.IGM.getAsyncContextAlignment();
   auto address = IGF.emitTaskAlloc(sizeValue, alignment);
   IGF.Builder.CreateLifetimeStart(address, Size(-1) /*dynamic size*/);
   return address;
@@ -4661,8 +4689,9 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
 
 FunctionPointer FunctionPointer::forDirect(IRGenModule &IGM,
                                            llvm::Constant *fnPtr,
+                                           llvm::Constant *secondaryValue,
                                            CanSILFunctionType fnType) {
-  return forDirect(fnType, fnPtr, IGM.getSignature(fnType));
+  return forDirect(fnType, fnPtr, secondaryValue, IGM.getSignature(fnType));
 }
 
 StringRef FunctionPointer::getName(IRGenModule &IGM) const {
@@ -4684,6 +4713,14 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
   case BasicKind::Function:
     return Value;
   case BasicKind::AsyncFunctionPointer: {
+    if (auto *rawFunction = getRawAsyncFunction()) {
+      // If the pointer to the underlying function is available, it means that
+      // this FunctionPointer instance was created via 
+      // FunctionPointer::forDirect and as such has no AuthInfo.
+      assert(!AuthInfo && "have PointerAuthInfo for an async FunctionPointer "
+                          "for which the raw function is known");
+      return rawFunction;
+    }
     auto *fnPtr = Value;
     if (auto authInfo = AuthInfo) {
       fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);
@@ -4695,7 +4732,9 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
         Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
         /*expectedType*/ getFunctionType()->getPointerTo());
     if (auto authInfo = AuthInfo) {
-      result = emitPointerAuthSign(IGF, result, authInfo);
+      auto newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                                         authInfo.getDiscriminator());
+      result = emitPointerAuthSign(IGF, result, newAuthInfo);
     }
     return result;
   }
@@ -4732,7 +4771,19 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
 }
 
 FunctionPointer FunctionPointer::getAsFunction(IRGenFunction &IGF) const {
-  return FunctionPointer(Kind::Function, getPointer(IGF), AuthInfo, Sig);
+  switch (getBasicKind()) {
+  case FunctionPointer::BasicKind::Function:
+    return *this;
+  case FunctionPointer::BasicKind::AsyncFunctionPointer: {
+    auto authInfo = AuthInfo;
+    if (authInfo) {
+      authInfo = PointerAuthInfo(AuthInfo.getCorrespondingCodeKey(),
+                                 AuthInfo.getDiscriminator());
+    }
+    return FunctionPointer(Kind::Function, getPointer(IGF), authInfo, Sig);
+  }
+  }
+  llvm_unreachable("unhandled case");
 }
 
 void irgen::emitAsyncReturn(
@@ -4803,12 +4854,13 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   auto &nativeSchema =
       IGM.getTypeInfo(funcResultTypeInContext).nativeReturnValueSchema(IGM);
   if (result.empty() && !nativeSchema.empty()) {
-    // When we throw, we set the return values to undef.
-    nativeSchema.enumerateComponents([&](clang::CharUnits begin,
-                                         clang::CharUnits end,
-                                         llvm::Type *componentTy) {
-      nativeResultsStorage.push_back(llvm::UndefValue::get(componentTy));
-    });
+    if (!nativeSchema.requiresIndirect())
+      // When we throw, we set the return values to undef.
+      nativeSchema.enumerateComponents([&](clang::CharUnits begin,
+                                           clang::CharUnits end,
+                                           llvm::Type *componentTy) {
+        nativeResultsStorage.push_back(llvm::UndefValue::get(componentTy));
+      });
     if (!error.empty())
       nativeResultsStorage.push_back(error.claimNext());
     nativeResults = nativeResultsStorage;

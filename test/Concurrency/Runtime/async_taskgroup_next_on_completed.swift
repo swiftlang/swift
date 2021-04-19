@@ -4,18 +4,23 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_sum_nextOnCompleted() async {
   let numbers = [1, 2, 3, 4, 5]
   let expected = 15 // FIXME: numbers.reduce(0, +) this hangs?
 
-  let sum = try! await Task.withGroup(resultType: Int.self) {
+  let sum = try! await withTaskGroup(of: Int.self) {
     (group) async -> Int in
     for n in numbers {
-      await group.add {
+      group.spawn {
         () async -> Int in
-        print("  complete group.add { \(n) }")
+        print("  complete group.spawn { \(n) }")
         return n
       }
     }
@@ -42,11 +47,11 @@ func test_sum_nextOnCompleted() async {
   }
 
   // The completions may arrive in any order, we make no strong guarantees about it:
-  // CON: CHECK-DAG: complete group.add { [[N1:[0-9]+]] }
-  // CON: CHECK-DAG: complete group.add { [[N2:[0-9]+]] }
-  // CON: CHECK-DAG: complete group.add { [[N3:[0-9]+]] }
-  // CON: CHECK-DAG: complete group.add { [[N4:[0-9]+]] }
-  // CON: CHECK-DAG: complete group.add { [[N5:[0-9]+]] }
+  // CON: CHECK-DAG: complete group.spawn { [[N1:[0-9]+]] }
+  // CON: CHECK-DAG: complete group.spawn { [[N2:[0-9]+]] }
+  // CON: CHECK-DAG: complete group.spawn { [[N3:[0-9]+]] }
+  // CON: CHECK-DAG: complete group.spawn { [[N4:[0-9]+]] }
+  // CON: CHECK-DAG: complete group.spawn { [[N5:[0-9]+]] }
   // CON: CHECK-DAG: next: [[N1]]
   // CON: CHECK-DAG: next: [[N2]]
   // CON: CHECK-DAG: next: [[N3]]
@@ -61,6 +66,7 @@ func test_sum_nextOnCompleted() async {
   print("result: \(sum)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_sum_nextOnCompleted()

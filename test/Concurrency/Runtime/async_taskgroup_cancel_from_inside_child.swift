@@ -4,20 +4,34 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_cancel_from_inside_child() async {
-  let result: Int = try! await Task.withGroup(resultType: Int.self) { group in
-    let firstAdded = await group.add { [group] in // must explicitly capture, as the task executes concurrently
+  let one = try! await withTaskGroup(of: Int.self, returning: Int.self) { group in
+    await group.next()
+    return 0
+  }
+
+  let two = await withTaskGroup(of: Int.self, returning: Int.self) { group in
+    0
+  }
+
+  let result = await withTaskGroup(of: Int.self, returning: Int.self) { group in
+    let firstAdded = group.spawnUnlessCancelled { [group] in // must explicitly capture, as the task executes concurrently
       group.cancelAll() // allowed
       print("first")
       return 1
     }
     print("firstAdded: \(firstAdded)") // CHECK: firstAdded: true
 
-    let one = try! await group.next()
+    let one = await group.next()
 
-    let secondAdded = await group.add {
+    let secondAdded = group.spawnUnlessCancelled {
       print("second")
       return 2
     }
@@ -31,6 +45,7 @@ func test_taskGroup_cancel_from_inside_child() async {
 
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_from_inside_child()

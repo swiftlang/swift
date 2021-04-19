@@ -574,6 +574,23 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata,
               TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// Metadata *
+// swift_getFunctionTypeMetadataDifferentiable(unsigned long flags,
+//                                             unsigned long diffKind,
+//                                             const Metadata **parameters,
+//                                             const uint32_t *parameterFlags,
+//                                             const Metadata *result);
+FUNCTION(GetFunctionMetadataDifferentiable,
+         swift_getFunctionTypeMetadataDifferentiable,
+         C_CC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy,
+              SizeTy,
+              TypeMetadataPtrTy->getPointerTo(0),
+              Int32Ty->getPointerTo(0),
+              TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // Metadata *swift_getFunctionTypeMetadata0(unsigned long flags,
 //                                          const Metadata *resultMetadata);
 FUNCTION(GetFunctionMetadata0, swift_getFunctionTypeMetadata0,
@@ -1578,14 +1595,48 @@ FUNCTION(TaskSwitchFunc,
          swift_task_switch, SwiftAsyncCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
-         ARGS(SwiftContextPtrTy, Int8PtrTy, SwiftExecutorPtrTy),
+         ARGS(SwiftContextPtrTy, Int8PtrTy, ExecutorFirstTy, ExecutorSecondTy),
+         ATTRS(NoUnwind))
+
+// AsyncTask *swift_continuation_init(AsyncContext *continuationContext,
+//                                    AsyncContinuationFlags);
+FUNCTION(ContinuationInit,
+         swift_continuation_init, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(SwiftTaskPtrTy),
+         ARGS(ContinuationAsyncContextPtrTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// void swift_continuation_resume(AsyncTask *continuation);
+FUNCTION(ContinuationResume,
+         swift_continuation_resume, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_continuation_throwingResume(AsyncTask *continuation);
+FUNCTION(ContinuationThrowingResume,
+         swift_continuation_throwingResume, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
+//                                                 SwiftError *error);
+FUNCTION(ContinuationThrowingResumeWithError,
+         swift_continuation_throwingResumeWithError, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy, ErrorPtrTy),
          ATTRS(NoUnwind))
 
 // ExecutorRef swift_task_getCurrentExecutor();
 FUNCTION(TaskGetCurrentExecutor,
          swift_task_getCurrentExecutor, SwiftCC,
          ConcurrencyAvailability,
-         RETURNS(IntPtrTy),
+         RETURNS(SwiftExecutorTy),
          ARGS(),
          ATTRS(NoUnwind, ArgMemOnly))
 
@@ -1605,21 +1656,37 @@ FUNCTION(DefaultActorDestroy,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-//// void swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group);
-//FUNCTION(TaskGroupInitialize,
-//         swift_taskGroup_initialize, SwiftCC,
-//         ConcurrencyAvailability,
-//         RETURNS(VoidTy),
-//         ARGS(RefCountedPtrTy, RefCountedPtrTy),
-//         ATTRS(NoUnwind))
-//
-//// void swift_taskGroup_destroy(AsyncTask *task, TaskGroup *group);
-//FUNCTION(TaskGroupDestroy,
-//         swift_taskGroup_destroy, SwiftCC,
-//         ConcurrencyAvailability,
-//         RETURNS(VoidTy),
-//         ARGS(RefCountedPtrTy, RefCountedPtrTy),
-//         ATTRS(NoUnwind))
+// void swift_defaultActor_deallocate(DefaultActor *actor);
+FUNCTION(DefaultActorDeallocate,
+         swift_defaultActor_deallocate, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_defaultActor_deallocateResilient(HeapObject *actor);
+FUNCTION(DefaultActorDeallocateResilient,
+         swift_defaultActor_deallocateResilient, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_taskGroup_initialize(TaskGroup *group);
+FUNCTION(TaskGroupInitialize,
+         swift_taskGroup_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_taskGroup_destroy(TaskGroup *group);
+FUNCTION(TaskGroupDestroy,
+         swift_taskGroup_destroy, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
 
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
 FUNCTION(AutoDiffCreateLinearMapContext,

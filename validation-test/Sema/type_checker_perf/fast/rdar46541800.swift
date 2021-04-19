@@ -16,7 +16,7 @@ class SomeView {
     let displayScale: CGFloat = CGFloat()
     let _ = (descriptionTextViewFrame.height 
              + (-descriptionTextView.lastBaselineOffsetFromBottom - textInset.bottom + descriptionLabelProperties.lastBaselineOffsetFromBottom)
-            + (-descriptionTextView.firstBaselineOffsetFromTop - textInset.top + descriptionTextBaselineOffset).ceilingValue(scale: displayScale)
+             + (-descriptionTextView.firstBaselineOffsetFromTop - textInset.top + descriptionTextBaselineOffset).ceilingValue(scale: displayScale)
             )
   }
 

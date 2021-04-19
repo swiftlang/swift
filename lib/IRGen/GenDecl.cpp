@@ -1051,6 +1051,22 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
+// Eagerly emit functions that are externally visible. Functions with code
+// coverage instrumentation must also be eagerly emitted. So must functions
+// that are a dynamic replacement for another.
+static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
+  if (f.isPossiblyUsedExternally())
+    return false;
+
+  if (f.getDynamicallyReplacedFunction())
+    return false;
+
+  if (hasCodeCoverageInstrumentation(f, m))
+    return false;
+
+  return true;
+}
+
 void IRGenerator::emitGlobalTopLevel(
     const std::vector<std::string> &linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
@@ -1082,13 +1098,9 @@ void IRGenerator::emitGlobalTopLevel(
   }
   
   // Emit SIL functions.
-  for (SILFunction &f : PrimaryIGM->getSILModule()) {
-    // Eagerly emit functions that are externally visible. Functions with code
-    // coverage instrumentation must also be eagerly emitted. So must functions
-    // that are a dynamic replacement for another.
-    if (!f.isPossiblyUsedExternally() &&
-        !f.getDynamicallyReplacedFunction() &&
-        !hasCodeCoverageInstrumentation(f, PrimaryIGM->getSILModule()))
+  auto &m = PrimaryIGM->getSILModule();
+  for (SILFunction &f : m) {
+    if (isLazilyEmittedFunction(f, m))
       continue;
 
     CurrentIGMPtr IGM = getGenModule(&f);
@@ -2573,7 +2585,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       IGF.CurFn, FunctionPtrTy);
 
-  auto &schema = getOptions().PointerAuth.SwiftDynamicReplacements;
+  auto &schema = f->isAsync()
+                     ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                     : getOptions().PointerAuth.SwiftDynamicReplacements;
   llvm::Value *ReplFn = nullptr, *hasReplFn = nullptr;
 
   if (UseBasicDynamicReplacement) {
@@ -2613,7 +2627,12 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       FunctionPointer(silFunctionType, realReplFn, authInfo, signature)
           .getAsFunction(IGF),
       forwardedArgs);
-  Res->setTailCall();
+  if (Res->getCallingConv() == llvm::CallingConv::SwiftTail &&
+      Res->getCaller()->getCallingConv() == llvm::CallingConv::SwiftTail) {
+    Res->setTailCallKind(IGF.IGM.AsyncTailCallKind);
+  } else {
+    Res->setTailCall();
+  }
   if (IGF.CurFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
   else
@@ -2930,8 +2949,8 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     }
 
   // Otherwise, if we have a lazy definition for it, be sure to queue that up.
-  } else if (isDefinition && !forDefinition && !f->isPossiblyUsedExternally() &&
-             !hasCodeCoverageInstrumentation(*f, getSILModule())) {
+  } else if (isDefinition && !forDefinition &&
+             isLazilyEmittedFunction(*f, getSILModule())) {
     IRGen.addLazyFunction(f);
   }
 

@@ -815,7 +815,7 @@ extension SIMD where Scalar: FixedWidthInteger {
   /// Returns the sum of the scalars in the vector, computed with wrapping
   /// addition.
   ///
-  /// Equivalent to indices.reduce(into: 0) { $0 &+= self[$1] }.
+  /// Equivalent to `indices.reduce(into: 0) { $0 &+= self[$1] }`.
   @_alwaysEmitIntoClient
   public func wrappedSum() -> Scalar {
     return indices.reduce(into: 0) { $0 &+= self[$1] }

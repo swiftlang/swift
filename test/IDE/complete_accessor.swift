@@ -1,129 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOCAL_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOCAL_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_PROPERTY_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_PROPERTY_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SUBSCRIPT_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SUBSCRIPT_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_PROPERTY_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_PROPERTY_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_SUBSCRIPT_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_SUBSCRIPT_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_PROPERTY_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_PROPERTY_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_SUBSCRIPT_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_SUBSCRIPT_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_EXT_PROPERTY_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_EXT_PROPERTY_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_EXT_SUBSCRIPT_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONCRETE_EXT_SUBSCRIPT_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNKNOWN_EXT_PROPERTY_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNKNOWN_EXT_PROPERTY_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNKNOWN_EXT_SUBSCRIPT_FIRST > %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNKNOWN_EXT_SUBSCRIPT_SECOND > %t.result
-// RUN: %FileCheck %s -check-prefix=NO_GLOBAL < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_SELF < %t.result
-// RUN: %FileCheck %s -check-prefix=WITH_GETSET < %t.result
-// RUN: %FileCheck %s -check-prefix=NO_OBSERVER < %t.result
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 // WITH_GETSET: Keyword/None:                       get; name=get
 // WITH_GETSET: Keyword/None:                       set; name=set
@@ -144,107 +20,107 @@
 var globalValue: String
 
 var something1: String = 1 {
-  #^GLOBAL_FIRST^#
+  #^GLOBAL_FIRST?check=WITH_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   willSet {}
 }
 
 var something2: String {
   get {}
-  #^GLOBAL_SECOND^#
+  #^GLOBAL_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
 }
 
 func testLocal() {
   var something3: String = 1 {
-    #^LOCAL_FIRST^#
+    #^LOCAL_FIRST?check=WITH_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
     willSet {}
   }
 
   var something4: String {
     get {}
-    #^LOCAL_SECOND^#
+    #^LOCAL_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
 }
 
 protocol SomeProto {
   var prop1: Int {
-    #^PROTOCOL_PROPERTY_FIRST^#
+    #^PROTOCOL_PROPERTY_FIRST?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   var prop2: Int {
-    get #^PROTOCOL_PROPERTY_SECOND^#
+    get #^PROTOCOL_PROPERTY_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_1 index:Int) -> Int {
-    #^PROTOCOL_SUBSCRIPT_FIRST^#
+    #^PROTOCOL_SUBSCRIPT_FIRST?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_2 index:Int) -> String {
     get
-    #^PROTOCOL_SUBSCRIPT_SECOND^#
+    #^PROTOCOL_SUBSCRIPT_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
 }
 
 extension SomeProto {
   var prop1: Int {
-    #^PROTOCOL_EXT_PROPERTY_FIRST^#
+    #^PROTOCOL_EXT_PROPERTY_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   var prop2: Int {
-    set {} #^PROTOCOL_EXT_PROPERTY_SECOND^#
+    set {} #^PROTOCOL_EXT_PROPERTY_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_1 index:Int) -> Int {
-    #^PROTOCOL_EXT_SUBSCRIPT_FIRST^#
+    #^PROTOCOL_EXT_SUBSCRIPT_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_2 index:Int) -> String {
     get { }
-    #^PROTOCOL_EXT_SUBSCRIPT_SECOND^#
+    #^PROTOCOL_EXT_SUBSCRIPT_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
 }
 
 struct SomeStruct {
   var prop1: Int {
-    #^CONCRETE_PROPERTY_FIRST^#
+    #^CONCRETE_PROPERTY_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
   var prop2: Int {
     get {}
     @available(*, unavailable)
-    #^CONCRETE_PROPERTY_SECOND^#
+    #^CONCRETE_PROPERTY_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
   subscript<T>(_1 index: T) -> Int {
-    #^CONCRETE_SUBSCRIPT_FIRST^#
+    #^CONCRETE_SUBSCRIPT_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_2 index: Int) -> String {
     get { }
-    #^CONCRETE_SUBSCRIPT_SECOND^#
+    #^CONCRETE_SUBSCRIPT_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
 }
 
 extension SomeStruct {
   var prop3: Int {
-    #^CONCRETE_EXT_PROPERTY_FIRST^#
+    #^CONCRETE_EXT_PROPERTY_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
   var prop4: Int {
     get {}
-    #^CONCRETE_EXT_PROPERTY_SECOND^#
+    #^CONCRETE_EXT_PROPERTY_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
   subscript(_3 index:Int) -> Int {
-    #^CONCRETE_EXT_SUBSCRIPT_FIRST^#
+    #^CONCRETE_EXT_SUBSCRIPT_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript<U>(_4 index: Int) -> U {
     get { }
-    #^CONCRETE_EXT_SUBSCRIPT_SECOND^#
+    #^CONCRETE_EXT_SUBSCRIPT_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
 }
 
 extension UNKNOWN_TYPE {
   var prop1: Int {
-    #^UNKNOWN_EXT_PROPERTY_FIRST^#
+    #^UNKNOWN_EXT_PROPERTY_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
   var prop2: Int {
     get {}
-    #^UNKNOWN_EXT_PROPERTY_SECOND^#
+    #^UNKNOWN_EXT_PROPERTY_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
   subscript<T>(_1 index: T) -> T where T: ANOTHER_UNKNWON_TYPE {
-    #^UNKNOWN_EXT_SUBSCRIPT_FIRST^#
+    #^UNKNOWN_EXT_SUBSCRIPT_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_2 index: Int) -> String {
     get { }
-    #^UNKNOWN_EXT_SUBSCRIPT_SECOND^#
+    #^UNKNOWN_EXT_SUBSCRIPT_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
 }

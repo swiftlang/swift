@@ -319,6 +319,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   auto *ctor =
     new (ctx) ConstructorDecl(name, Loc,
                               /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               paramList, /*GenericParams=*/nullptr, decl);
 
@@ -566,17 +567,15 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
   // If the superclass has its own availability, make sure the synthesized
   // constructor is only as available as its superclass's constructor.
   if (superclassCtor->getAttrs().hasAttribute<AvailableAttr>()) {
-    SmallVector<Decl *, 2> asAvailableAs;
+    SmallVector<const Decl *, 2> asAvailableAs;
 
     // We don't have to look at enclosing contexts of the superclass constructor,
     // because designated initializers must always be defined in the superclass
     // body, and we already enforce that a superclass is at least as available as
     // a subclass.
     asAvailableAs.push_back(superclassCtor);
-    Decl *parentDecl = classDecl;
-    while (parentDecl != nullptr) {
+    if (auto *parentDecl = classDecl->getInnermostDeclWithAvailability()) {
       asAvailableAs.push_back(parentDecl);
-      parentDecl = parentDecl->getDeclContext()->getAsDecl();
     }
     AvailabilityInference::applyInferredAvailableAttrs(
         ctor, asAvailableAs, ctx);
@@ -746,6 +745,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               classDecl->getBraces().Start,
                               superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
                               bodyParams, genericParams, classDecl);

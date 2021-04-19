@@ -704,7 +704,7 @@ ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
 ERROR(sema_no_import_target,Fatal,
       "could not find module '%0' for target '%1'; "
-      "found: %2", (StringRef, StringRef, StringRef))
+      "found: %2, at: %3", (StringRef, StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
 NOTE(sema_no_import_no_sdk,none,
@@ -728,6 +728,10 @@ ERROR(module_interface_build_failed,Fatal,
       "the textual interface may be broken by project issues"
       "%select{, differences between compilers (the producer '%3' and this compiler '%4')|}2 or a compiler bug",
       (bool, StringRef, bool, StringRef, StringRef))
+ERROR(module_interface_build_failed_mismatching_compiler,Fatal,
+      "failed to build module '%0'; this SDK is not supported by the compiler "
+      "(the SDK is built with '%1', while this compiler is '%2'). Please select a toolchain which matches the SDK.",
+      (StringRef, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -1788,8 +1792,9 @@ ERROR(function_type_access,none,
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{parameter|result}5 uses "
-      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
-      (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3"
+      "%select{| API wrapper}6 type",
+      (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
 ERROR(function_type_spi,none,
       "%select{function|method|initializer}0 "
       "cannot be declared '@_spi' "
@@ -1802,18 +1807,19 @@ WARNING(function_type_access_warn,none,
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its %select{parameter|result}5 uses "
-        "%select{a private|a fileprivate|an internal|%error|%error}3 type",
-        (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+        "%select{a private|a fileprivate|an internal|%error|%error}3 "
+        "%select{|API wrapper}6 type",
+        (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
 ERROR(function_type_usable_from_inline,none,
-      "the %select{parameter|result}1 of a "
+      "the %select{parameter|result}1%select{| API wrapper}2 of a "
       "'@usableFromInline' %select{function|method|initializer}0 "
       "must be '@usableFromInline' or public",
-      (unsigned, bool))
+      (unsigned, bool, bool))
 WARNING(function_type_usable_from_inline_warn,none,
-        "the %select{parameter|result}1 of a "
+        "the %select{parameter|result}1%select{| API wrapper}2 of a "
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
-        (unsigned, bool))
+        (unsigned, bool, bool))
 
 ERROR(spi_attribute_on_non_public,none,
       "%select{private|fileprivate|internal|%error|%error}0 %1 "
@@ -2395,11 +2401,10 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
-        "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
+        "redundant conformance constraint %0 : %1", (Type, ProtocolDecl *))
 NOTE(redundant_conformance_here,none,
-     "conformance constraint %1: %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, ProtocolDecl *))
+     "conformance constraint %0 : %1 implied here",
+     (Type, ProtocolDecl *))
 
 ERROR(unsupported_recursive_requirements, none,
       "requirement involves recursion that is not currently supported", ())
@@ -2413,27 +2418,30 @@ NOTE(same_type_redundancy_here,none,
      "same-type constraint %1 == %2 %select{written here|implied here|"
      "inferred from type here}0",
      (unsigned, Type, Type))
-ERROR(requires_superclass_conflict,none,
-      "%select{generic parameter %1 cannot|protocol %1 cannot require 'Self' to|" 
-      "%1 cannot}0 be a subclass of both %2 and %3",
-      (unsigned, Type, Type, Type))
+ERROR(conflicting_superclass_constraints,none,
+      "type %0 cannot be a subclass of both %1 and %2",
+      (Type, Type, Type))
+NOTE(conflicting_superclass_constraint,none,
+     "constraint conflicts with %0 : %1",
+     (Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
 NOTE(superclass_redundancy_here,none,
-     "superclass constraint %1 : %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, Type))
+     "superclass constraint %0 : %1 implied here",
+     (Type, Type))
 
 ERROR(conflicting_layout_constraints,none,
-      "%select{generic parameter |protocol |}0%1 has conflicting "
-      "constraints %2 and %3",
-      (unsigned, Type, LayoutConstraint, LayoutConstraint))
+      "type %0 has conflicting constraints %1 and %2",
+      (Type, LayoutConstraint, LayoutConstraint))
+NOTE(conflicting_layout_constraint, none,
+     "constraint conflicts with %0 : %1",
+     (Type, LayoutConstraint))
 WARNING(redundant_layout_constraint,none,
-        "redundant constraint %0 : %1", (Type, LayoutConstraint))
+        "redundant constraint %0 : %1",
+        (Type, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-     "constraint %1 : %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, LayoutConstraint))
+     "constraint %0 : %1 implied here",
+     (Type, LayoutConstraint))
 
 WARNING(redundant_same_type_constraint,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
@@ -2601,12 +2609,8 @@ ERROR(override_dynamic_self_mismatch,none,
 ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
-ERROR(override_throws,none,
-      "cannot override non-throwing %select{method|initializer}0 with "
-      "throwing %select{method|initializer}0", (bool))
-// TODO: this really could be merged with the above.
 ERROR(override_with_more_effects,none,
-      "cannot override non-'%1' %0 with '%1' %0",
+      "cannot override non-%1 %0 with %1 %0",
       (DescriptiveDeclKind, StringRef))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
@@ -2842,6 +2846,9 @@ WARNING(warn_implementation_only_conflict,none,
         (Identifier))
 NOTE(implementation_only_conflict_here,none,
      "imported as implementation-only here", ())
+WARNING(warn_public_import_of_private_module,none,
+        "private module %0 is imported publicly from the public module %1",
+        (Identifier, Identifier))
 
 ERROR(implementation_only_decl_non_override,none,
       "'@_implementationOnly' can only be used on overrides", ())
@@ -3896,6 +3903,11 @@ ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
+ERROR(implicit_async_super_init,none,
+      "missing call to superclass's initializer; "
+      "'super.init' is 'async' and requires an explicit call",
+      ())
+
 WARNING(if_always_true,none,
         "'if' condition is always true", ())
 WARNING(while_always_true,none,
@@ -4278,7 +4290,7 @@ NOTE(note_add_globalactor_to_function,none,
      (StringRef, DescriptiveDeclKind, DeclName, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
 ERROR(not_objc_function_async,none,
-      "'async' function cannot be represented in Objective-C", ())
+      "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
 ERROR(actor_isolated_objc,none,
@@ -4373,6 +4385,12 @@ ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from %select{this|a non-isolated}3%select{| synchronous}5 context",
       (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
+ERROR(actor_isolated_call,none,
+      "call to %0 function in a synchronous %1 context",
+      (ActorIsolation, ActorIsolation))
+ERROR(actor_isolated_call_decl,none,
+      "call to %0 %1 %2 in a synchronous %3 context",
+      (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
@@ -4387,9 +4405,6 @@ ERROR(actor_isolated_from_concurrent_function,none,
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_async_let,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
-        (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_escaping_closure,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from an '@escaping' closure",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to actor-isolated %0 %1",
@@ -5286,6 +5301,10 @@ ERROR(availability_macro_in_inlinable, none,
 ERROR(availabilty_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly "
       "construct a String from subscripted result", ())
+
+NOTE(availability_unavailable_implicit_init, none,
+     "call to unavailable %0 %1 from superclass %2 occurs implicitly at the "
+     "end of this initializer", (DescriptiveDeclKind, DeclName, DeclName))
 
 // Conformance availability checking diagnostics
 

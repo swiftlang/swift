@@ -6,11 +6,11 @@
 // CHECK: %swift.defaultactor = type { [10 x i8*] }
 
 // CHECK-objc-LABEL: @"$s11actor_class7MyClassCMm" = global
-// CHECK-objc-SAME: %objc_class* @"OBJC_METACLASS_$__TtCs12_SwiftObject"
+// CHECK-objc-SAME: @"OBJC_METACLASS_$__TtCs12_SwiftObject{{(.ptrauth)?}}"
 
 // CHECK: @"$s11actor_class7MyClassCMf" = internal global
 // CHECK-SAME: @"$s11actor_class7MyClassCfD{{(.ptrauth)?}}"
-// CHECK-objc-SAME: %objc_class* @"OBJC_CLASS_$__TtCs12_SwiftObject"
+// CHECK-objc-SAME: @"OBJC_CLASS_$__TtCs12_SwiftObject{{(.ptrauth)?}}"
 // CHECK-nonobjc-SAME: %swift.type* null,
 //   Flags: uses Swift refcounting
 // CHECK-SAME: i32 2,

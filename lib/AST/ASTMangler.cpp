@@ -1047,6 +1047,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       return appendOperator("BI");
     case TypeKind::BuiltinJob:
       return appendOperator("Bj");
+    case TypeKind::BuiltinExecutor:
+      return appendOperator("Be");
     case TypeKind::BuiltinDefaultActorStorage:
       return appendOperator("BD");
     case TypeKind::BuiltinRawPointer:
@@ -2404,18 +2406,6 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Reverse) {
-      if (fn->isNoEscape())
-        return appendOperator("XF");
-      else
-        return appendOperator("XG");
-    }
-    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
-      if (fn->isNoEscape())
-        return appendOperator("XH");
-      else
-        return appendOperator("XI");
-    }
     if (isAutoClosure) {
       if (fn->isNoEscape())
         return appendOperator("XK");
@@ -2458,11 +2448,27 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
-    appendOperator("Y");
+    appendOperator("Ya");
   if (fn->isSendable())
-    appendOperator("J");
+    appendOperator("Yb");
   if (fn->isThrowing())
     appendOperator("K");
+  switch (auto diffKind = fn->getDifferentiabilityKind()) {
+  case DifferentiabilityKind::NonDifferentiable:
+    break;
+  case DifferentiabilityKind::Forward:
+    appendOperator("Yjf");
+    break;
+  case DifferentiabilityKind::Reverse:
+    appendOperator("Yjr");
+    break;
+  case DifferentiabilityKind::Normal:
+    appendOperator("Yjd");
+    break;
+  case DifferentiabilityKind::Linear:
+    appendOperator("Yjl");
+    break;
+  }
 }
 
 void ASTMangler::appendFunctionInputType(
@@ -2535,6 +2541,9 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
   else
     appendType(elementType, forDecl);
 
+  if (flags.isNoDerivative()) {
+    appendOperator("Yk");
+  }
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
     /* nothing */

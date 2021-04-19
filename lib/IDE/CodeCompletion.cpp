@@ -1001,6 +1001,7 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
     PO.SkipAttributes = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    PO.AlwaysTryPrintParameterLabels = true;
     if (ContextTy)
       PO.setBaseType(ContextTy);
 
@@ -1017,6 +1018,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
 
         if (param.hasLabel()) {
           OS << param.getLabel();
+        } else if (param.hasInternalLabel()) {
+          OS << param.getInternalLabel();
         } else {
           OS << "<#";
           if (param.isInOut())
@@ -2337,8 +2340,7 @@ public:
       SmallVector<AnyFunctionType::Param, 8> erasedParams;
       for (const auto &param : genericFuncType->getParams()) {
         auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
-        erasedParams.emplace_back(erasedTy, param.getLabel(),
-                                  param.getParameterFlags());
+        erasedParams.emplace_back(param.withType(erasedTy));
       }
       return GenericFunctionType::get(genericSig,
           erasedParams,
@@ -3255,7 +3257,7 @@ public:
   void addConstructorCallsForType(Type type, Identifier name,
                                   DeclVisibilityKind Reason,
                                   DynamicLookupInfo dynamicLookupInfo) {
-    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr && !IsUnresolvedMember)
+    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr)
       return;
 
     assert(CurrDeclContext);
@@ -3267,10 +3269,6 @@ public:
       auto *init = cast<ConstructorDecl>(entry.getValueDecl());
       if (init->shouldHideFromEditor())
         continue;
-      if (IsUnresolvedMember && init->isFailable() &&
-          !init->isImplicitlyUnwrappedOptional()) {
-        continue;
-      }
       addConstructorCall(cast<ConstructorDecl>(init), Reason,
                          dynamicLookupInfo, type, None,
                          /*IsOnType=*/true, name);
@@ -3341,8 +3339,6 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
-    if (IsUnresolvedMember)
-      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
@@ -3371,8 +3367,6 @@ public:
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo) {
-    if (IsUnresolvedMember)
-      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
@@ -4609,7 +4603,8 @@ public:
     }
   }
 
-  void getGenericRequirementCompletions(DeclContext *DC) {
+  void getGenericRequirementCompletions(DeclContext *DC,
+                                        SourceLoc CodeCompletionLoc) {
     auto genericSig = DC->getGenericSignatureOfContext();
     if (!genericSig)
       return;
@@ -4636,6 +4631,18 @@ public:
                              CurrDeclContext, IncludeInstanceMembers,
                              /*includeDerivedRequirements*/false,
                              /*includeProtocolExtensionMembers*/true);
+    // We not only allow referencing nested types/typealiases directly, but also
+    // qualified by the current type. Thus also suggest current self type so the
+    // user can do a memberwise lookup on it.
+    if (auto SelfType = typeContext->getSelfNominalTypeDecl()) {
+      addNominalTypeRef(SelfType, DeclVisibilityKind::LocalVariable,
+                        DynamicLookupInfo());
+    }
+
+    // Self is also valid in all cases in which it can be used in function
+    // bodies. Suggest it if applicable.
+    getSelfTypeCompletionInDeclContext(CodeCompletionLoc,
+                                       /*isForResultType=*/false);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4757,6 +4764,9 @@ public:
     getAttributeDeclParamCompletions(DAK_Available, 0);
   }
 
+  /// \p Loc is the location of the code completin token.
+  /// \p isForDeclResult determines if were are spelling out the result type
+  /// of a declaration.
   void getSelfTypeCompletionInDeclContext(SourceLoc Loc, bool isForDeclResult) {
     const DeclContext *typeDC = CurrDeclContext->getInnermostTypeContext();
     if (!typeDC)
@@ -6924,9 +6934,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::GenericRequirement:
-    Lookup.getGenericRequirementCompletions(CurDeclContext);
+  case CompletionKind::GenericRequirement: {
+    auto Loc = Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getGenericRequirementCompletions(CurDeclContext, Loc);
     break;
+  }
   case CompletionKind::PrecedenceGroup:
     Lookup.getPrecedenceGroupCompletions(SyntxKind);
     break;

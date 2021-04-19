@@ -314,12 +314,12 @@ protocol HammeredDulcimer {
 }
 
 protocol Santur : HammeredDulcimer {
-  override subscript(_ note : Int) -> Int { get throws } // expected-error{{cannot override non-'throws' subscript with 'throws' subscript}}
+  override subscript(_ note : Int) -> Int { get throws } // expected-error{{cannot override non-throwing subscript with throwing subscript}}
   override var bridges : Int { get throws }
 }
 
 protocol Santoor : Santur {
-  override var bridges : Int { get async throws } // expected-error{{cannot override non-'async' property with 'async' property}}
+  override var bridges : Int { get async throws } // expected-error{{cannot override non-async property with async property}}
 }
 
 protocol Yangqin : HammeredDulcimer {
@@ -328,5 +328,5 @@ protocol Yangqin : HammeredDulcimer {
 
 protocol Hackbrett : HammeredDulcimer {
  override var bridges : Int { get } // no effects are OK
- override subscript(_ note : Int) -> Int { get async throws } // expected-error {{cannot override non-'async' subscript with 'async' subscript}}
+ override subscript(_ note : Int) -> Int { get async throws } // expected-error {{cannot override non-async subscript with async subscript}}
 }

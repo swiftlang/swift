@@ -569,12 +569,15 @@ protected:
 
   NodePointer demangleTypeMangling();
   NodePointer demangleSymbolicReference(unsigned char rawKind);
+  NodePointer demangleTypeAnnotation();
+
   NodePointer demangleAutoDiffFunctionOrSimpleThunk(Node::Kind nodeKind);
   NodePointer demangleAutoDiffFunctionKind();
   NodePointer demangleAutoDiffSubsetParametersThunk();
   NodePointer demangleAutoDiffSelfReorderingReabstractionThunk();
   NodePointer demangleDifferentiabilityWitness();
   NodePointer demangleIndexSubset();
+  NodePointer demangleDifferentiableFunctionType();
 
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);

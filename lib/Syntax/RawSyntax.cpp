@@ -87,9 +87,6 @@ Trivia lexTrivia(StringRef TriviaStr) {
   return SyntaxTrivia;
 }
 
-// FIXME: If we want thread-safety for tree creation, this needs to be atomic.
-unsigned RawSyntax::NextFreeNodeId = 1;
-
 Trivia RawSyntax::getLeadingTriviaPieces() const {
   return lexTrivia(getLeadingTrivia());
 }
@@ -104,8 +101,7 @@ const RawSyntax *RawSyntax::append(const RawSyntax *NewLayoutElement) const {
   NewLayout.reserve(Layout.size() + 1);
   std::copy(Layout.begin(), Layout.end(), std::back_inserter(NewLayout));
   NewLayout.push_back(NewLayoutElement);
-  return RawSyntax::makeAndCalcLength(getKind(), NewLayout,
-                                      SourcePresence::Present, Arena);
+  return RawSyntax::make(getKind(), NewLayout, SourcePresence::Present, Arena);
 }
 
 const RawSyntax *
@@ -123,8 +119,7 @@ RawSyntax::replacingChild(CursorIndex Index,
   std::copy(Layout.begin() + Index + 1, Layout.end(),
             std::back_inserter(NewLayout));
 
-  return RawSyntax::makeAndCalcLength(getKind(), NewLayout, getPresence(),
-                                      Arena);
+  return RawSyntax::make(getKind(), NewLayout, getPresence(), Arena);
 }
 
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {

@@ -55,6 +55,20 @@ namespace swift {
     Complete,
   };
 
+  /// Access or distribution level of a library.
+  enum class LibraryLevel : uint8_t {
+    /// Application Programming Interface that is publicly distributed so
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
+
+    /// System Programming Interface that has restricted distribution
+    /// all decls in the module are considered to be SPI including public ones.
+    SPI,
+
+    /// The library has some other undefined distribution.
+    Other
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -259,11 +273,9 @@ namespace swift {
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
-    /// Enable experimental derivation of `Codable` for enums.
-    bool EnableExperimentalEnumCodableDerivation = false;
-
     /// Disable the implicit import of the _Concurrency module.
-    bool DisableImplicitConcurrencyModuleImport = false;
+    bool DisableImplicitConcurrencyModuleImport =
+        !SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -305,6 +317,9 @@ namespace swift {
     /// Whether to enable Swift 3 @objc inference, e.g., for members of
     /// Objective-C-derived classes and 'dynamic' members.
     bool EnableSwift3ObjCInference = false;
+
+    /// Access or distribution level of the whole module being parsed.
+    LibraryLevel LibraryLevel = LibraryLevel::Other;
 
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.

@@ -411,14 +411,13 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
   ARGUMENT(SILFunctionArgument, SILArgument)
   ARGUMENT_RANGE(SILArgument, SILPhiArgument, SILFunctionArgument)
 
-ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
-  MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
-  MULTIPLE_VALUE_INST_RESULT(BeginCOWMutationResult, MultipleValueInstructionResult)
-  MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
-  MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
-  VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, DestructureTupleResult)
+VALUE(MultipleValueInstructionResult, ValueBase)
 
 VALUE(SILUndef, ValueBase)
+
+/// Used internally in e.g. the SIL parser and deserializer.
+/// A PlaceholderValue must not appear in valid SIL.
+VALUE(PlaceholderValue, ValueBase)
 
 ABSTRACT_NODE(SILInstruction, SILNode)
 
@@ -725,6 +724,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     SINGLE_VALUE_INST(GetAsyncContinuationAddrInst, get_async_continuation_addr,
                       GetAsyncContinuationInstBase, MayHaveSideEffects, MayRelease)
     SINGLE_VALUE_INST_RANGE(GetAsyncContinuationInstBase, GetAsyncContinuationInst, GetAsyncContinuationAddrInst)
+
+  SINGLE_VALUE_INST(ExtractExecutorInst, extract_executor,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path

@@ -2043,28 +2043,23 @@ public:
 /// alternative, optionally providing a name (for cases when the alternative
 /// has a different name).
 class CompletionHandlerAsyncAttr final : public DeclAttribute {
-private:
-  /// DeclName of the async function in the attribute
+public:
+  /// Reference to the async alternative function. Only set for deserialized
+  /// attributes or inferred attributes from ObjectiveC code.
+  AbstractFunctionDecl *AsyncFunctionDecl;
+
+  /// DeclName of the async function in the attribute. Only set from actual
+  /// Swift code, deserialization/ObjectiveC imports will set the decl instead.
   const DeclNameRef AsyncFunctionName;
 
-public:
   /// Source location of the async function name in the attribute
   const SourceLoc AsyncFunctionNameLoc;
-
-  /// Get the name of the async function
-  ///
-  /// The name will come from the AsyncFunctionDecl if available, otherwise will
-  /// fall back on the user-provided name. If that is not defined, this function
-  /// will abort.
-  DeclNameRef getAsyncFunctionName() const;
 
   /// The index of the completion handler
   const size_t CompletionHandlerIndex;
 
   /// Source location of the completion handler index passed to the index
   const SourceLoc CompletionHandlerIndexLoc;
-
-  AbstractFunctionDecl *AsyncFunctionDecl = nullptr;
 
   CompletionHandlerAsyncAttr(DeclNameRef asyncFunctionName,
                              SourceLoc asyncFunctionNameLoc,
@@ -2073,6 +2068,7 @@ public:
                              SourceLoc atLoc, SourceRange range)
       : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
                       /*implicit*/ false),
+        AsyncFunctionDecl(nullptr),
         AsyncFunctionName(asyncFunctionName),
         AsyncFunctionNameLoc(asyncFunctionNameLoc),
         CompletionHandlerIndex(completionHandlerIndex),
@@ -2084,11 +2080,9 @@ public:
                              SourceLoc atLoc, SourceRange range)
       : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
                       /*implicit*/ false),
+        AsyncFunctionDecl(&asyncFunctionDecl) ,
         CompletionHandlerIndex(completionHandlerIndex),
-        CompletionHandlerIndexLoc(completionHandlerIndexLoc),
-        AsyncFunctionDecl(&asyncFunctionDecl) {}
-
-
+        CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_CompletionHandlerAsync;
@@ -2330,8 +2324,6 @@ public:
 
   Optional<Convention> ConventionArguments;
 
-  // Indicates whether the type's '@differentiable' attribute has a 'linear'
-  // argument.
   DifferentiabilityKind differentiabilityKind =
       DifferentiabilityKind::NonDifferentiable;
 

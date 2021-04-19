@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native,CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
+// XFAIL: CPU=arm64e
 
 sil_stage canonical
 
@@ -54,6 +55,72 @@ bb0(%0 : $Int, %1: @guaranteed $@async @callee_owned @substituted <τ_0_0> () ->
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create_future(
   %20 = builtin "createAsyncTaskFuture"<()>(%0 : $Int, %9 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc void @resume_nonthrowing_continuation
+sil hidden [ossa] @resume_nonthrowing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
+  // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
+  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 5
+  // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
+  // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3
+  // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load %swift.opaque*, %swift.opaque** [[RESULT_ADDR_SLOT]], align
+  // CHECK-NEXT: [[RESULT_ADDR:%.*]] = bitcast %swift.opaque* [[RESULT_ADDR_OPAQUE]] to %swift.refcounted**
+  // CHECK-NEXT: [[VALUE:%.*]] = load %swift.refcounted*, %swift.refcounted** %0, align
+  // CHECK-NEXT: store %swift.refcounted* [[VALUE]], %swift.refcounted** [[RESULT_ADDR]], align
+  // CHECK-NEXT: call swiftcc void @swift_continuation_resume(%swift.task* [[CONT]])
+  // CHECK-NEXT: ret void
+  builtin "resumeNonThrowingContinuationReturning"<Builtin.NativeObject>(%1 : $Builtin.RawUnsafeContinuation, %0 : $*Builtin.NativeObject) : $()
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc void @resume_throwing_continuation
+sil hidden [ossa] @resume_throwing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
+  // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
+  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 5
+  // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
+  // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3
+  // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load %swift.opaque*, %swift.opaque** [[RESULT_ADDR_SLOT]], align
+  // CHECK-NEXT: [[RESULT_ADDR:%.*]] = bitcast %swift.opaque* [[RESULT_ADDR_OPAQUE]] to %swift.refcounted**
+  // CHECK-NEXT: [[VALUE:%.*]] = load %swift.refcounted*, %swift.refcounted** %0, align
+  // CHECK-NEXT: store %swift.refcounted* [[VALUE]], %swift.refcounted** [[RESULT_ADDR]], align
+  // CHECK-NEXT: call swiftcc void @swift_continuation_throwingResume(%swift.task* [[CONT]])
+  // CHECK-NEXT: ret void
+  builtin "resumeThrowingContinuationReturning"<Builtin.NativeObject>(%1 : $Builtin.RawUnsafeContinuation, %0 : $*Builtin.NativeObject) : $()
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc void @resume_throwing_continuation_throwing
+sil hidden [ossa] @resume_throwing_continuation_throwing : $(@owned Error, Builtin.RawUnsafeContinuation) -> () {
+bb0(%0 : @owned $Error, %1 : $Builtin.RawUnsafeContinuation):
+  // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
+  // CHECK-NEXT: call swiftcc void @swift_continuation_throwingResumeWithError(%swift.task* [[CONT]], %swift.error* %0)
+  // CHECK-NEXT: ret void
+  builtin "resumeThrowingContinuationThrowing"(%1 : $Builtin.RawUnsafeContinuation, %0 : $Error) : $()
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc  void @task_group_create_destroy
+sil hidden [ossa] @task_group_create_destroy : $@async () -> () {
+bb0:
+  // CHECK:      [[TASKGROUP:%.*]] = alloca [32 x i8*], align 16
+  // CHECK:      [[T0:%.*]] = bitcast [32 x i8*]* [[TASKGROUP]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_initialize(i8* [[T0]])
+  %0 = builtin "createTaskGroup"() : $Builtin.RawPointer
+
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_destroy(i8* [[T0]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[T0]])
+  builtin "destroyTaskGroup"(%0 : $Builtin.RawPointer) : $()
+
   %21 = tuple ()
   return %21 : $()
 }

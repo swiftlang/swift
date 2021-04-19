@@ -40,14 +40,13 @@ using namespace Lowering;
 SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                DeclContext *DC)
     : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
-      StartOfPostmatter(F.end()), B(*this), OpenedArchetypesTracker(&F),
+      StartOfPostmatter(F.end()), B(*this),
       CurrentSILLoc(F.getLocation()), Cleanups(*this),
       StatsTracer(SGM.M.getASTContext().Stats,
                   "SILGen-function", &F) {
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
-  B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 }
 
 /// SILGenFunction destructor - called after the entire function's AST has been
@@ -512,17 +511,29 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
-  for (auto *param : *fd->getParameters()) {
-    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-      visit(auxiliaryVar);
-    });
-  }
 
   if (fd->isAsyncHandler() &&
       // If F.isAsync() we are emitting the asyncHandler body and not the
       // original asyncHandler.
       !F.isAsync()) {
     emitAsyncHandler(fd);
+  } else if (llvm::any_of(*fd->getParameters(),
+                          [](ParamDecl *p){ return p->hasAttachedPropertyWrapper(); })) {
+    // If any parameters have property wrappers, emit the local auxiliary
+    // variables before emitting the function body.
+    LexicalScope BraceScope(*this, CleanupLocation(fd));
+    for (auto *param : *fd->getParameters()) {
+      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+        SILLocation WrapperLoc(auxiliaryVar);
+        WrapperLoc.markAsPrologue();
+        if (auto *patternBinding = auxiliaryVar->getParentPatternBinding())
+          visitPatternBindingDecl(patternBinding);
+
+        visit(auxiliaryVar);
+      });
+    }
+
+    emitStmt(fd->getTypecheckedBody());
   } else {
     emitStmt(fd->getTypecheckedBody());
   }
@@ -986,8 +997,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
     }
   }
 
-  emitProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr, interfaceType, dc,
-             /*throws=*/false, SourceLoc());
+  emitBasicProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr,
+                  interfaceType, dc, /*throws=*/ false,SourceLoc());
   prepareEpilog(true, false, CleanupLocation(loc));
 
   auto pbd = var->getParentPatternBinding();

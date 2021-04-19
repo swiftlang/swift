@@ -132,7 +132,9 @@ func testArchetypeAnnotations<T>(arg: TestArchetypeAnnotations<T>) {
 struct TestGenericParamAnnotations<T> {
   func foo1<U>(u: U) where #^WHERE^#
 }
-// WHERE: Begin completions, 2 items
-// WHERE-NEXT: Decl[GenericTypeParam]/Local:       <name>T</name>; typename=<typeid.user>T</typeid.user>; name=T
-// WHERE-NEXT: Decl[GenericTypeParam]/Local:       <name>U</name>; typename=<typeid.user>U</typeid.user>; name=U
+// WHERE: Begin completions, 4 items
+// WHERE-DAG: Decl[GenericTypeParam]/Local:       <name>T</name>; typename=<typeid.user>T</typeid.user>; name=T
+// WHERE-DAG: Decl[GenericTypeParam]/Local:       <name>U</name>; typename=<typeid.user>U</typeid.user>; name=U
+// WHERE-DAG: Decl[Struct]/Local:                 <name>TestGenericParamAnnotations</name>;
+// WHERE-DAG: Keyword[Self]/CurrNominal:          <keyword>Self</keyword>;
 // WHERE: End completions

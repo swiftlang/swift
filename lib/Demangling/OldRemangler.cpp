@@ -606,10 +606,6 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
 }
 
-void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
-  unreachable("unsupported");
-}
-
 void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
   unreachable("unsupported");
 }
@@ -654,6 +650,10 @@ void Remangler::mangleAsyncAnnotation(Node *node) {
 
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << "z";
+}
+
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  Buffer << "D" << (char)node->getIndex(); // differentiability kind
 }
 
 void Remangler::mangleFieldOffset(Node *node) {
@@ -1230,26 +1230,6 @@ void Remangler::mangleThinFunctionType(Node *node) {
   mangleChildNodes(node); // argument tuple, result type
 }
 
-void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  Buffer << "XF";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
-  Buffer << "XG";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleLinearFunctionType(Node *node) {
-  Buffer << "XH";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleEscapingLinearFunctionType(Node *node) {
-  Buffer << "XI";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
 void Remangler::mangleArgumentTuple(Node *node) {
   mangleSingleChildNode(node);
 }
@@ -1502,6 +1482,11 @@ void Remangler::mangleOwned(Node *node) {
 
 void Remangler::mangleInOut(Node *node) {
   Buffer << 'R';
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleNoDerivative(Node *node) {
+  Buffer << 'k';
   mangleSingleChildNode(node); // type
 }
 

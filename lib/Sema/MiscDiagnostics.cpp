@@ -4655,28 +4655,18 @@ public:
     if (expr->getType().isNull())
       return {false, expr}; // Something failed to typecheck, bail out
 
-    if (ClosureExpr *closure = dyn_cast<ClosureExpr>(expr))
+    if (auto *closure = dyn_cast<ClosureExpr>(expr))
       return {closure->isBodyAsync(), closure};
 
-    if (ApplyExpr *call = dyn_cast<ApplyExpr>(expr)) {
-      if (DeclRefExpr *fnDeclExpr = dyn_cast<DeclRefExpr>(call->getFn())) {
-        ValueDecl *fnDecl = fnDeclExpr->getDecl();
-        CompletionHandlerAsyncAttr *asyncAltAttr =
-            fnDecl->getAttrs().getAttribute<CompletionHandlerAsyncAttr>();
-        if (asyncAltAttr) {
-          // Ensure that the attribute typechecks,
-          // this also resolves the async function decl.
-          if (!evaluateOrDefault(
-                  ctx.evaluator,
-                  TypeCheckCompletionHandlerAsyncAttrRequest{
-                      cast<AbstractFunctionDecl>(fnDecl), asyncAltAttr},
-                  false)) {
+    if (auto *call = dyn_cast<ApplyExpr>(expr)) {
+      if (auto *fn = dyn_cast<DeclRefExpr>(call->getFn())) {
+        if (auto *afd = dyn_cast<AbstractFunctionDecl>(fn->getDecl())) {
+          auto *asyncFunc = afd->getAsyncAlternative();
+          if (!asyncFunc)
             return {false, call};
-          }
           ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
-          ctx.Diags.diagnose(asyncAltAttr->AsyncFunctionDecl->getLoc(),
-                             diag::decl_declared_here,
-                             asyncAltAttr->AsyncFunctionDecl->getName());
+          ctx.Diags.diagnose(asyncFunc->getLoc(), diag::decl_declared_here,
+                             asyncFunc->getName());
         }
       }
     }

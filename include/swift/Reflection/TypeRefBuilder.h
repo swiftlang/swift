@@ -414,17 +414,13 @@ public:
 
   const FunctionTypeRef *createFunctionType(
       llvm::ArrayRef<remote::FunctionParam<const TypeRef *>> params,
-      const TypeRef *result, FunctionTypeFlags flags) {
-    return FunctionTypeRef::create(*this, params, result, flags);
+      const TypeRef *result, FunctionTypeFlags flags,
+      FunctionMetadataDifferentiabilityKind diffKind) {
+    return FunctionTypeRef::create(*this, params, result, flags, diffKind);
   }
-  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
-  using BuiltRequirement = TypeRefRequirement;
 
   const FunctionTypeRef *createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
-      BuiltRequirement *witnessMethodConformanceRequirement,
-      const llvm::SmallVectorImpl<BuiltType> &genericParameters,
-      const llvm::SmallVectorImpl<BuiltRequirement> &requirements,
       llvm::ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
       llvm::ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
       llvm::Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
@@ -454,9 +450,29 @@ public:
 
     funcFlags = funcFlags.withConcurrent(flags.isSendable());
     funcFlags = funcFlags.withAsync(flags.isAsync());
+    funcFlags = funcFlags.withDifferentiable(flags.isDifferentiable());
+
+    FunctionMetadataDifferentiabilityKind diffKind;
+    switch (flags.getDifferentiabilityKind()) {
+    case ImplFunctionDifferentiabilityKind::NonDifferentiable:
+      diffKind = FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+      break;
+    case ImplFunctionDifferentiabilityKind::Forward:
+      diffKind = FunctionMetadataDifferentiabilityKind::Forward;
+      break;
+    case ImplFunctionDifferentiabilityKind::Reverse:
+      diffKind = FunctionMetadataDifferentiabilityKind::Reverse;
+      break;
+    case ImplFunctionDifferentiabilityKind::Normal:
+      diffKind = FunctionMetadataDifferentiabilityKind::Normal;
+      break;
+    case ImplFunctionDifferentiabilityKind::Linear:
+      diffKind = FunctionMetadataDifferentiabilityKind::Linear;
+      break;
+    }
 
     auto result = createTupleType({}, "");
-    return FunctionTypeRef::create(*this, {}, result, funcFlags);
+    return FunctionTypeRef::create(*this, {}, result, funcFlags, diffKind);
   }
 
   const ProtocolCompositionTypeRef *
@@ -524,6 +540,8 @@ public:
   }
 
   using BuiltSILBoxField = typename SILBoxTypeWithLayoutTypeRef::Field;
+  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
+  using BuiltRequirement = TypeRefRequirement;
   using BuiltLayoutConstraint = TypeRefLayoutConstraint;
   BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
     // FIXME: Implement this.

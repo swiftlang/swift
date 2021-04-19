@@ -101,6 +101,36 @@ namespace irgen {
       assert(isSigned());
       return Key;
     }
+    bool hasCodeKey() const {
+      assert(isSigned());
+      return (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASIA) ||
+             (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASIB);
+    }
+    bool hasDataKey() const {
+      assert(isSigned());
+      return (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASDA) ||
+             (getKey() == (unsigned)PointerAuthSchema::ARM8_3Key::ASDB);
+    }
+    bool getCorrespondingCodeKey() const {
+      assert(hasDataKey());
+      switch (getKey()) {
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASDA:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASIA;
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASDB:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASIB;
+      }
+      llvm_unreachable("unhandled case");
+    }
+    bool getCorrespondingDataKey() const {
+      assert(hasCodeKey());
+      switch (getKey()) {
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASIA:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASDA;
+      case (unsigned)PointerAuthSchema::ARM8_3Key::ASIB:
+        return (unsigned)PointerAuthSchema::ARM8_3Key::ASDB;
+      }
+      llvm_unreachable("unhandled case");
+    }
     llvm::Value *getDiscriminator() const {
       assert(isSigned());
       return Discriminator;
@@ -204,6 +234,12 @@ namespace irgen {
     /// The actual pointer, either to the function or to its descriptor.
     llvm::Value *Value;
 
+    /// An additional value whose meaning varies by the FunctionPointer's Kind:
+    /// - Kind::AsyncFunctionPointer -> pointer to the corresponding function
+    ///                                 if the FunctionPointer was created via
+    ///                                 forDirect; nullptr otherwise. 
+    llvm::Value *SecondaryValue;
+
     PointerAuthInfo AuthInfo;
 
     Signature Sig;
@@ -213,26 +249,42 @@ namespace irgen {
     /// We may add more arguments to this; try to use the other
     /// constructors/factories if possible.
     explicit FunctionPointer(Kind kind, llvm::Value *value,
+                             llvm::Value *secondaryValue,
                              PointerAuthInfo authInfo,
                              const Signature &signature)
-        : kind(kind), Value(value), AuthInfo(authInfo), Sig(signature) {
+        : kind(kind), Value(value), SecondaryValue(secondaryValue),
+          AuthInfo(authInfo), Sig(signature) {
       // The function pointer should have function type.
       assert(value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
+      if (authInfo) {
+        if (kind == Kind::Function) {
+          assert(authInfo.hasCodeKey());
+        } else {
+          assert(authInfo.hasDataKey());
+        }
+      }
     }
+
+    explicit FunctionPointer(Kind kind, llvm::Value *value,
+                             PointerAuthInfo authInfo,
+                             const Signature &signature)
+        : FunctionPointer(kind, value, nullptr, authInfo, signature){};
 
     // Temporary only!
     explicit FunctionPointer(Kind kind, llvm::Value *value,
                              const Signature &signature)
       : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
 
-    static FunctionPointer forDirect(IRGenModule &IGM,
-                                     llvm::Constant *value,
+    static FunctionPointer forDirect(IRGenModule &IGM, llvm::Constant *value,
+                                     llvm::Constant *secondaryValue,
                                      CanSILFunctionType fnType);
 
     static FunctionPointer forDirect(Kind kind, llvm::Constant *value,
+                                     llvm::Constant *secondaryValue,
                                      const Signature &signature) {
-      return FunctionPointer(kind, value, PointerAuthInfo(), signature);
+      return FunctionPointer(kind, value, secondaryValue, PointerAuthInfo(),
+                             signature);
     }
 
     static FunctionPointer forExplosionValue(IRGenFunction &IGF,
@@ -257,6 +309,13 @@ namespace irgen {
 
     /// Return the actual function pointer.
     llvm::Value *getRawPointer() const { return Value; }
+
+    /// Assuming that the receiver is of kind AsyncFunctionPointer, returns the
+    /// pointer to the corresponding function if available.
+    llvm::Value *getRawAsyncFunction() const {
+      assert(kind.isAsyncFunctionPointer());
+      return SecondaryValue;
+    }
 
     /// Given that this value is known to have been constructed from
     /// a direct function, return the function pointer.
@@ -295,7 +354,7 @@ namespace irgen {
     llvm::Value *getExplosionValue(IRGenFunction &IGF,
                                    CanSILFunctionType fnType) const;
 
-    /// Form a FunctionPointer whose KindTy is ::Function.
+    /// Form a FunctionPointer whose Kind is ::Function.
     FunctionPointer getAsFunction(IRGenFunction &IGF) const;
 
     bool useStaticContextSize() const {

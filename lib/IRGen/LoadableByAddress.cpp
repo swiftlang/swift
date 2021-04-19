@@ -26,6 +26,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/MapVector.h"
@@ -2540,7 +2541,8 @@ void LoadableByAddress::recreateSingleApply(
     applyBuilder.createTryApply(
         castedApply->getLoc(), callee,
         applySite.getSubstitutionMap(), callArgs,
-        castedApply->getNormalBB(), castedApply->getErrorBB());
+        castedApply->getNormalBB(), castedApply->getErrorBB(),
+        castedApply->getApplyOptions());
     break;
   }
   case SILInstructionKind::BeginApplyInst: {

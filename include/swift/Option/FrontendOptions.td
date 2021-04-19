@@ -237,10 +237,6 @@ def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;
 
-def enable_experimental_enum_codable_derivation :
-  Flag<["-"], "enable-experimental-enum-codable-derivation">,
-  HelpText<"Enable experimental derivation of Codable for enums">;
-
 def enable_resilience : Flag<["-"], "enable-resilience">,
      HelpText<"Deprecated, use -enable-library-evolution instead">;
 }
@@ -432,6 +428,11 @@ def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+
+def library_level : Separate<["-"], "library-level">,
+  MetaVarName<"<level>">,
+  Flags<[FrontendOption]>,
+  HelpText<"Library distribution level 'api', 'spi' or 'other' (the default)">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,

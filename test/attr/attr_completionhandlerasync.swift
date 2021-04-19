@@ -1,7 +1,10 @@
 // REQUIRES: concurrency
+// REQUIRES: objc_interop
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -parse-as-library
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-concurrency -I %S/Inputs/custom-modules
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-concurrency -parse-as-library -I %S/Inputs/custom-modules
+
+import ObjcAsync
 
 // ===================
 // Parsing
@@ -147,7 +150,7 @@ func typecheckFunc9(handler: @escaping () -> Void) {}
 
 // Suggest using async alternative function in async context
 
-func asyncContext() async {
+func asyncContext(t: HandlerTest) async {
   // expected-warning@+1:3{{consider using asynchronous alternative function}}
   goodFunc1(value: "Hello") { _ in }
 
@@ -167,10 +170,44 @@ func asyncContext() async {
   // This doesn't get the warning because the completionHandlerAsync failed to
   // resolve the decl name
   badFunc(value: "Hello") { _ in }
+
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  t.simple { _ in }
+  _ = await t.simple()
+
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  t.simpleArg(1) { _ in }
+  _ = await t.simpleArg(1)
+
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  t.alias { _ in }
+  _ = await t.alias()
+
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  t.error { _, _ in }
+  _ = try! await t.error()
+
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  try! t.removedError { _, _ in }
+  _ = try! await t.removedError()
+
+  // expected-warning@+1{{consider using asynchronous alternative function}}
+  t.asyncImportSame(1, completionHandler: { _ in })
+  _ = await t.asyncImportSame(1)
+
+  // Marked with swift_async(none), so shouldn't have a warning about using it
+  t.asyncImportSame(1, replyTo: { _ in })
 }
 
-func syncContext() {
+func syncContext(t: HandlerTest) {
   goodFunc1(value: "Hello") { _ in }
+  t.simple { _ in }
+  t.simpleArg(1) { _ in }
+  t.alias { _ in }
+  t.error { _, _ in }
+  try! t.removedError { _, _ in }
+  t.asyncImportSame(1, completionHandler: { _ in })
+  t.asyncImportSame(1, replyTo: { _ in })
 }
 
 let asyncGlobalClosure = { () async -> () in

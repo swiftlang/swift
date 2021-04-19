@@ -4,19 +4,25 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
 /// Tests that only the specific group we cancelAll on is cancelled,
 /// and not accidentally all tasks in all groups within the given parent task.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_cancelAll_onlySpecificGroup() async {
-  async let g1: Int = Task.withGroup(resultType: Int.self) { group in
+  async let g1: Int = withTaskGroup(of: Int.self) { group in
 
     for i in 1...5 {
-      await group.add {
+      group.spawn {
         await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("add: \(i) (cancelled: \(c))")
@@ -39,9 +45,9 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
   }
 
   // The cancellation os g2 should have no impact on g1
-  let g2: Int = try! await Task.withGroup(resultType: Int.self) { group in
+  let g2: Int = try! await withTaskGroup(of: Int.self) { group in
     for i in 1...3 {
-      await group.add {
+      group.spawn {
         await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("g1 task \(i) (cancelled: \(c))")
@@ -73,6 +79,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
 
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancelAll_onlySpecificGroup()

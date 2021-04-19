@@ -262,29 +262,23 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
 
 /// A high-level overview of how forward references work in serializer and
 /// deserializer:
-/// In serializer, we pre-assign a value ID in order, to each basic block
+/// In the serializer, we pre-assign a value ID in order, to each basic block
 /// argument and each SILInstruction that has a value.
-/// In deserializer, we use LocalValues to store the definitions and
-/// ForwardLocalValues for forward-referenced values (values that are
-/// used but not yet defined). LocalValues are updated in setLocalValue where
-/// the ID passed in assumes the same ordering as in serializer: in-order
-/// for each basic block argument and each SILInstruction that has a value.
-/// We update ForwardLocalValues in getLocalValue and when a value is defined
-/// in setLocalValue, the corresponding entry in ForwardLocalValues will be
-/// erased.
+/// In the deserializer, we create a PlaceholderValue for a forward-referenced
+/// value (a value that is used but not yet defined). LocalValues are updated in
+/// setLocalValue where the ID passed in assumes the same ordering as in
+/// serializer: in-order for each basic block argument and each SILInstruction
+/// that has a value.
+/// When a forward-referenced value is defined, it replaces the PlaceholderValue
+/// in LocalValues.
 void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
   ValueBase *&Entry = LocalValues[Id];
-  assert(!Entry && "We should not redefine the same value.");
 
-  auto It = ForwardLocalValues.find(Id);
-  if (It != ForwardLocalValues.end()) {
-    // Take the information about the forward ref out of the map.
-    ValueBase *Placeholder = It->second;
-
-    // Remove the entries from the map.
-    ForwardLocalValues.erase(It);
-
-    Placeholder->replaceAllUsesWith(Value);
+  if (auto *placeholder = dyn_cast_or_null<PlaceholderValue>(Entry)) {
+    placeholder->replaceAllUsesWith(Value);
+    ::delete placeholder;
+  } else {
+    assert(!Entry && "We should not redefine the same value.");
   }
 
   // Store it in our map.
@@ -301,19 +295,15 @@ SILValue SILDeserializer::getLocalValue(ValueID Id,
                     "changes that without updating this code if needed");
 
   // Check to see if this is already defined.
-  ValueBase *Entry = LocalValues.lookup(Id);
-  if (Entry) {
-    // If this value was already defined, check it to make sure types match.
-    assert(Entry->getType() == Type && "Value Type mismatch?");
-    return Entry;
+  ValueBase *&Entry = LocalValues[Id];
+  if (!Entry) {
+    // Otherwise, this is a forward reference.  Create a dummy node to represent
+    // it until we see a real definition.
+    Entry = ::new PlaceholderValue(Type);
   }
-
-  // Otherwise, this is a forward reference.  Create a dummy node to represent
-  // it until we see a real definition.
-  ValueBase *&Placeholder = ForwardLocalValues[Id];
-  if (!Placeholder)
-    Placeholder = new (SILMod) GlobalAddrInst(SILDebugLocation(), Type);
-  return Placeholder;
+  // If this value was already defined, check it to make sure types match.
+  assert(Entry->getType() == Type && "Value Type mismatch?");
+  return Entry;
 }
 
 /// Return the SILBasicBlock of a given ID.
@@ -807,27 +797,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // The first two IDs are reserved for SILUndef.
   LastValueID = 1;
   LocalValues.clear();
-  ForwardLocalValues.clear();
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(fn);
   SILBuilder Builder(*fn);
-  // Track the archetypes just like SILGen. This
-  // is required for adding typedef operands to instructions.
-  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-
-  // Define a callback to be invoked on the deserialized types.
-  auto OldDeserializedTypeCallback = MF->DeserializedTypeCallback;
-  SWIFT_DEFER {
-    MF->DeserializedTypeCallback = OldDeserializedTypeCallback;
-  };
-
-  MF->DeserializedTypeCallback = [&OpenedArchetypesTracker] (Type ty) {
-    // We can't call getCanonicalType() immediately on everything we
-    // deserialize, but fortunately we only need to register opened
-    // existentials.
-    if (ty->isOpenedExistential())
-      OpenedArchetypesTracker.registerUsedOpenedArchetypes(CanType(ty));
-  };
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
@@ -877,7 +848,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // Check that there are no unresolved forward definitions of opened
   // archetypes.
-  if (OpenedArchetypesTracker.hasUnresolvedOpenedArchetypeDefinitions())
+  if (SILMod.hasUnresolvedOpenedArchetypeDefinitions())
     llvm_unreachable(
         "All forward definitions of opened archetypes should be resolved");
 
@@ -1551,7 +1522,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
     ResultInst = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
-                                        Substitutions, Args, normalBB, errorBB);
+                                        Substitutions, Args, normalBB, errorBB,
+                                        ApplyOpts);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -1877,6 +1849,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   UNARY_INSTRUCTION(AbortApply)
   UNARY_INSTRUCTION(EndApply)
   UNARY_INSTRUCTION(HopToExecutor)
+  UNARY_INSTRUCTION(ExtractExecutor)
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -3032,11 +3005,9 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   SILBuilder Builder(v);
   
   llvm::DenseMap<uint32_t, ValueBase*> SavedLocalValues;
-  llvm::DenseMap<uint32_t, ValueBase*> SavedForwardLocalValues;
   serialization::ValueID SavedLastValueID = 1;
   
   SavedLocalValues.swap(LocalValues);
-  SavedForwardLocalValues.swap(ForwardLocalValues);
   std::swap(SavedLastValueID, LastValueID);
 
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
@@ -3064,7 +3035,6 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   }
 
   SavedLocalValues.swap(LocalValues);
-  SavedForwardLocalValues.swap(ForwardLocalValues);
   std::swap(SavedLastValueID, LastValueID);
 
   return v;

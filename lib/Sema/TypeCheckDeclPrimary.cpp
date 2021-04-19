@@ -1610,6 +1610,25 @@ public:
     // Force the lookup of decls referenced by a scoped import in case it emits
     // diagnostics.
     (void)ID->getDecls();
+
+    // Report the public import of a private module.
+    if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
+      auto target = ID->getModule();
+      auto importer = ID->getModuleContext();
+      if (target &&
+          !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+          target->getLibraryLevel() == LibraryLevel::SPI) {
+
+        auto &diags = ID->getASTContext().Diags;
+        InFlightDiagnostic inFlight =
+            diags.diagnose(ID, diag::warn_public_import_of_private_module,
+                           target->getName(), importer->getName());
+        if (ID->getAttrs().isEmpty()) {
+           inFlight.fixItInsert(ID->getStartLoc(),
+                              "@_implementationOnly ");
+        }
+      }
+    }
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -3002,6 +3021,9 @@ void TypeChecker::checkParameterList(ParameterList *params,
         }
       }
     }
+
+    if (param->hasAttachedPropertyWrapper())
+      (void) param->getPropertyWrapperInitializerInfo();
 
     auto *SF = param->getDeclContext()->getParentSourceFile();
     param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {

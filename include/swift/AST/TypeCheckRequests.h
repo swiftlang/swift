@@ -938,7 +938,7 @@ public:
 /// Determine whether the given class is a default actor.
 class IsDefaultActorRequest :
     public SimpleRequest<IsDefaultActorRequest,
-                         bool(ClassDecl *),
+                         bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -946,7 +946,8 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl,
+                ModuleDecl *M, ResilienceExpansion expansion) const;
 
 public:
   // Caching
@@ -2753,6 +2754,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Get the library level of a module.
+class ModuleLibraryLevelRequest
+    : public SimpleRequest<ModuleLibraryLevelRequest,
+                           LibraryLevel(const ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  LibraryLevel evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
                            Type(const TypeResolution *, TypeRepr *,
@@ -2936,10 +2955,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class TypeCheckCompletionHandlerAsyncAttrRequest
-    : public SimpleRequest<TypeCheckCompletionHandlerAsyncAttrRequest,
-                           bool(AbstractFunctionDecl *,
-                                CompletionHandlerAsyncAttr *),
+class AsyncAlternativeRequest
+    : public SimpleRequest<AsyncAlternativeRequest,
+                           AbstractFunctionDecl *(AbstractFunctionDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2947,12 +2965,10 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator,
-                AbstractFunctionDecl *attachedFucntionDecl,
-                CompletionHandlerAsyncAttr *attr) const;
+  AbstractFunctionDecl *evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *attachedFunctionDecl) const;
 
 public:
-  // Caching
   bool isCached() const { return true; }
 };
 

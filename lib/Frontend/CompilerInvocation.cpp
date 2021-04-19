@@ -101,6 +101,25 @@ getVersionedPrebuiltModulePath(Optional<llvm::VersionTuple> sdkVer,
   } while(true);
 }
 
+std::string CompilerInvocation::computePrebuiltCachePath(
+    StringRef RuntimeResourcePath, llvm::Triple target,
+    Optional<llvm::VersionTuple> sdkVer) {
+  SmallString<64> defaultPrebuiltPath{RuntimeResourcePath};
+  StringRef platform;
+  if (tripleIsMacCatalystEnvironment(target)) {
+    // The prebuilt cache for macCatalyst is the same as the one for macOS, not
+    // iOS or a separate location of its own.
+    platform = "macosx";
+  } else {
+    platform = getPlatformNameForTriple(target);
+  }
+  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+
+  // If the SDK version is given, we should check if SDK-versioned prebuilt
+  // module cache is available and use it if so.
+  return getVersionedPrebuiltModulePath(sdkVer, defaultPrebuiltPath);
+}
+
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
   if (!FrontendOpts.PrebuiltModuleCachePath.empty())
@@ -108,21 +127,8 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
   if (SearchPathOpts.RuntimeResourcePath.empty())
     return;
 
-  SmallString<64> defaultPrebuiltPath{SearchPathOpts.RuntimeResourcePath};
-  StringRef platform;
-  if (tripleIsMacCatalystEnvironment(LangOpts.Target)) {
-    // The prebuilt cache for macCatalyst is the same as the one for macOS, not iOS
-    // or a separate location of its own.
-    platform = "macosx";
-  } else {
-    platform = getPlatformNameForTriple(LangOpts.Target);
-  }
-  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-
-  // If the SDK version is given, we should check if SDK-versioned prebuilt
-  // module cache is available and use it if so.
-  FrontendOpts.PrebuiltModuleCachePath =
-    getVersionedPrebuiltModulePath(LangOpts.SDKVersion, defaultPrebuiltPath);
+  FrontendOpts.PrebuiltModuleCachePath = computePrebuiltCachePath(
+      SearchPathOpts.RuntimeResourcePath, LangOpts.Target, LangOpts.SDKVersion);
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -179,8 +185,10 @@ setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
   // Set the OutputKind for the given Action.
   IRGenOpts.OutputKind = [](FrontendOptions::ActionType Action) {
     switch (Action) {
+    case FrontendOptions::ActionType::EmitIRGen:
+      return IRGenOutputKind::LLVMAssemblyBeforeOptimization;
     case FrontendOptions::ActionType::EmitIR:
-      return IRGenOutputKind::LLVMAssembly;
+      return IRGenOutputKind::LLVMAssemblyAfterOptimization;
     case FrontendOptions::ActionType::EmitBC:
       return IRGenOutputKind::LLVMBitcode;
     case FrontendOptions::ActionType::EmitAssembly:
@@ -394,9 +402,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
     Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
-  Opts.EnableExperimentalEnumCodableDerivation |=
-      Args.hasArg(OPT_enable_experimental_enum_codable_derivation);
-
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
@@ -537,6 +542,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableSwift3ObjCInference =
     Args.hasFlag(OPT_enable_swift3_objc_inference,
                  OPT_disable_swift3_objc_inference, false);
+
+  if (const Arg *A = Args.getLastArg(OPT_library_level)) {
+    StringRef contents = A->getValue();
+    if (contents == "api") {
+      Opts.LibraryLevel = LibraryLevel::API;
+    } else if (contents == "spi") {
+      Opts.LibraryLevel = LibraryLevel::SPI;
+    } else {
+      Opts.LibraryLevel = LibraryLevel::Other;
+      if (contents != "other") {
+        // Error on unknown library levels.
+        auto inFlight = Diags.diagnose(SourceLoc(),
+                                       diag::error_unknown_library_level,
+                                       contents);
+
+        // Only warn for "ipi" as we may use it in the future.
+        if (contents == "ipi")
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+      }
+    }
+  }
 
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(

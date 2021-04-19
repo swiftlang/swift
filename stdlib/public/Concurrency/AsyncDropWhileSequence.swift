@@ -12,6 +12,7 @@
 
 import Swift
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   public __consuming func drop(
@@ -21,6 +22,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct AsyncDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -38,6 +40,7 @@ public struct AsyncDropWhileSequence<Base: AsyncSequence> {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncDropWhileSequence: AsyncSequence {
   public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator

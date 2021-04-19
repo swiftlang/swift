@@ -79,7 +79,7 @@ struct GlobalCat {
     set {}
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test015accessSweaterOfC03catAA0C0VAA3CatC_tYF : $@convention(thin) @async (@guaranteed Cat) -> @owned Sweater {
+// CHECK-LABEL: sil hidden [ossa] @$s4test015accessSweaterOfC03catAA0C0VAA3CatC_tYaF : $@convention(thin) @async (@guaranteed Cat) -> @owned Sweater {
 // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat):
 // CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT]] : $Cat
@@ -104,13 +104,13 @@ struct GlobalCat {
 
 // CHECK:    destroy_value [[CAT2_REF]] : $Cat
 // CHECK:    return [[SWEATER2_OWNER]] : $Sweater
-// CHECK: } // end sil function '$s4test015accessSweaterOfC03catAA0C0VAA3CatC_tYF'
+// CHECK: } // end sil function '$s4test015accessSweaterOfC03catAA0C0VAA3CatC_tYaF'
 func accessSweaterOfSweater(cat : Cat) async -> Sweater {
     // note that Sweater is not an actor!
     return await cat.computedSweater.owner.computedSweater
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYF : $@convention(thin) @async (@guaranteed Cat) -> @owned String {
+// CHECK-LABEL: sil hidden [ossa] @$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYaF : $@convention(thin) @async (@guaranteed Cat) -> @owned String {
 // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat):
 // CHECK:    [[GLOBAL_CAT_SHARED:%[0-9]+]] = function_ref @$s4test9GlobalCatV6sharedAA0C0Cvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:    [[GLOBAL_CAT_RAWPTR:%[0-9]+]] = apply [[GLOBAL_CAT_SHARED]]() : $@convention(thin) () -> Builtin.RawPointer
@@ -126,7 +126,7 @@ func accessSweaterOfSweater(cat : Cat) async -> Sweater {
 // CHECK:    hop_to_executor [[PREV_EXEC]]
 // CHECK:    destroy_value [[GLOBAL_CAT_REF]] : $Cat
 // CHECK:    return [[THE_STRING]] : $String
-// CHECK: } // end sil function '$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYF'
+// CHECK: } // end sil function '$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYaF'
 func accessGlobalIsolatedMember(cat : Cat) async -> String {
     return await cat.leader
 }
@@ -134,7 +134,7 @@ func accessGlobalIsolatedMember(cat : Cat) async -> String {
 
 actor Dog {
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC15accessGlobalVarSbyYF : $@convention(method) @async (@guaranteed Dog) -> Bool {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC15accessGlobalVarSbyYaF : $@convention(method) @async (@guaranteed Dog) -> Bool {
     // CHECK:   [[GLOBAL_BOOL_ADDR:%[0-9]+]] = global_addr @$s4test10globalBoolSbvp : $*Bool
     // CHECK:   hop_to_executor [[SELF:%[0-9]+]] : $Dog
     // CHECK:   [[SHARED_REF_FN:%[0-9]+]] = function_ref @$s4test9GlobalCatV6sharedAA0C0Cvau : $@convention(thin) () -> Builtin.RawPointer
@@ -152,13 +152,13 @@ actor Dog {
     // CHECK:   hop_to_executor [[SELF]] : $Dog
     // CHECK:   destroy_value [[CAT]] : $Cat
     // CHECK:   return [[THE_BOOL]] : $Bool
-    // CHECK: } // end sil function '$s4test3DogC15accessGlobalVarSbyYF'
+    // CHECK: } // end sil function '$s4test3DogC15accessGlobalVarSbyYaF'
     func accessGlobalVar() async -> Bool {
         return await globalBool
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC24accessGlobalComputedPropSiyYF : $@convention(method) @async (@guaranteed Dog) -> Int {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC24accessGlobalComputedPropSiyYaF : $@convention(method) @async (@guaranteed Dog) -> Int {
     // CHECK:  bb0([[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    [[SHARED_REF_FN:%[0-9]+]] = function_ref @$s4test9GlobalCatV6sharedAA0C0Cvau : $@convention(thin) () -> Builtin.RawPointer
@@ -185,13 +185,13 @@ actor Dog {
     // CHECK:    destroy_value [[BIRB]] : $Birb
     // CHECK:    destroy_value [[CAT]] : $Cat
     // CHECK:    return [[THE_INT]] : $Int
-    // CHECK: } // end sil function '$s4test3DogC24accessGlobalComputedPropSiyYF'
+    // CHECK: } // end sil function '$s4test3DogC24accessGlobalComputedPropSiyYaF'
     func accessGlobalComputedProp() async -> Int {
         return await someBirb.feathers
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC21accessWrappedProperty3catSiAA3CatC_tYF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> Int {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC21accessWrappedProperty3catSiAA3CatC_tYaF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> Int {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    hop_to_executor [[CAT]] : $Cat
@@ -208,13 +208,13 @@ actor Dog {
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    destroy_value [[BIRB_REF]] : $Birb
     // CHECK:    return [[THE_INT]] : $Int
-    // CHECK: } // end sil function '$s4test3DogC21accessWrappedProperty3catSiAA3CatC_tYF'
+    // CHECK: } // end sil function '$s4test3DogC21accessWrappedProperty3catSiAA3CatC_tYaF'
     func accessWrappedProperty(cat : Cat) async -> Int {
         return await cat.bestFriend.feathers
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC16accessFromRValueSbyYF : $@convention(method) @async (@guaranteed Dog) -> Bool {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC16accessFromRValueSbyYaF : $@convention(method) @async (@guaranteed Dog) -> Bool {
     // CHECK:   hop_to_executor [[SELF:%[0-9]+]] : $Dog
     // CHECK:   [[INIT:%[0-9]+]] = function_ref @$s4test3CatCACycfC : $@convention(method) (@thick Cat.Type) -> @owned Cat
     // CHECK:   [[CAT_REF:%[0-9]+]] = apply [[INIT]]({{%[0-9]+}}) : $@convention(method) (@thick Cat.Type) -> @owned Cat
@@ -230,13 +230,13 @@ actor Dog {
     // CHECK:   hop_to_executor [[SELF]] : $Dog
     // CHECK:   destroy_value [[CAT_REF]] : $Cat
     // CHECK:   return [[THE_BOOL]] : $Bool
-    // CHECK: } // end sil function '$s4test3DogC16accessFromRValueSbyYF'
+    // CHECK: } // end sil function '$s4test3DogC16accessFromRValueSbyYaF'
     func accessFromRValue() async -> Bool {
         return await Cat().storedBool
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC23accessFromRValueChainedSbyYF : $@convention(method) @async (@guaranteed Dog) -> Bool {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC23accessFromRValueChainedSbyYaF : $@convention(method) @async (@guaranteed Dog) -> Bool {
     // CHECK:   hop_to_executor [[SELF:%[0-9]+]] : $Dog
     // CHECK:   [[INIT:%[0-9]+]] = function_ref @$s4test3CatCACycfC : $@convention(method) (@thick Cat.Type) -> @owned Cat
     // CHECK:   [[CAT_REF:%[0-9]+]] = apply [[INIT]]({{%[0-9]+}}) : $@convention(method) (@thick Cat.Type) -> @owned Cat
@@ -263,13 +263,13 @@ actor Dog {
     // CHECK:   hop_to_executor [[SELF]] : $Dog
     // CHECK:   destroy_value [[FRIEND_REF]] : $Cat
     // CHECK:   return [[THE_BOOL]] : $Bool
-    // CHECK: } // end sil function '$s4test3DogC23accessFromRValueChainedSbyYF'
+    // CHECK: } // end sil function '$s4test3DogC23accessFromRValueChainedSbyYaF'
     func accessFromRValueChained() async -> Bool {
         return await Cat().friend.storedBool
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC15accessSubscript3catAA3CatCAG_tYF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Cat {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC15accessSubscript3catAA3CatCAG_tYaF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Cat {
     // CHECK: bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[DOG:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:   hop_to_executor [[DOG]] : $Dog
     // CHECK:   [[INTEGER1:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
@@ -280,12 +280,12 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[DOG]] : $Dog
     // CHECK:   return [[OTHER_CAT]] : $Cat
-    // CHECK: } // end sil function '$s4test3DogC15accessSubscript3catAA3CatCAG_tYF'
+    // CHECK: } // end sil function '$s4test3DogC15accessSubscript3catAA3CatCAG_tYaF'
     func accessSubscript(cat : Cat) async -> Cat {
         return await cat[1]
     }
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC27accessRValueNestedSubscriptAA3CatCyYF : $@convention(method) @async (@guaranteed Dog) -> @owned Cat {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC27accessRValueNestedSubscriptAA3CatCyYaF : $@convention(method) @async (@guaranteed Dog) -> @owned Cat {
     // CHECK:   hop_to_executor [[SELF:%[0-9]+]] : $Dog
     // CHECK:   [[RVALUE_CAT_REF:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@thick Cat.Type) -> @owned Cat
     // CHECK:   [[LIT_ONE:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 1
@@ -315,13 +315,13 @@ actor Dog {
     // CHECK:   hop_to_executor [[SELF]] : $Dog
     // CHECK:   destroy_value [[FIRST_CAT_REF]] : $Cat
     // CHECK:   return [[SECOND_CAT_REF]] : $Cat
-    // CHECK: } // end sil function '$s4test3DogC27accessRValueNestedSubscriptAA3CatCyYF'
+    // CHECK: } // end sil function '$s4test3DogC27accessRValueNestedSubscriptAA3CatCyYaF'
     func accessRValueNestedSubscript() async -> Cat {
         return await Cat()[1][2]
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC33accessStoredPropFromRefProjection3boxSbAA6CatBoxC_tYF : $@convention(method) @async (@guaranteed CatBox, @guaranteed Dog) -> Bool {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC33accessStoredPropFromRefProjection3boxSbAA6CatBoxC_tYaF : $@convention(method) @async (@guaranteed CatBox, @guaranteed Dog) -> Bool {
     // CHECK:   bb0([[BOX:%[0-9]+]] : @guaranteed $CatBox, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:     hop_to_executor [[SELF]] : $Dog
     // CHECK:     [[BOX_GETTER:%[0-9]+]] = class_method [[BOX]] : $CatBox, #CatBox.cat!getter : (CatBox) -> () -> Cat, $@convention(method) (@guaranteed CatBox) -> @owned Cat
@@ -338,12 +338,12 @@ actor Dog {
     // CHECK:     hop_to_executor [[SELF]] : $Dog
     // CHECK:     destroy_value [[CAT_REF]] : $Cat
     // CHECK:    return [[THE_BOOL]] : $Bool
-    // CHECK: } // end sil function '$s4test3DogC33accessStoredPropFromRefProjection3boxSbAA6CatBoxC_tYF'
+    // CHECK: } // end sil function '$s4test3DogC33accessStoredPropFromRefProjection3boxSbAA6CatBoxC_tYaF'
     func accessStoredPropFromRefProjection(box : CatBox) async -> Bool {
         return await box.cat.storedBool
     }
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC015accessSweaterOfD03catAA0D0VAA3CatC_tYF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Sweater {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC015accessSweaterOfD03catAA0D0VAA3CatC_tYaF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Sweater {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
 
@@ -369,14 +369,14 @@ actor Dog {
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    destroy_value [[CAT2_REF]] : $Cat
     // CHECK:    return [[SWEATER2_OWNER]] : $Sweater
-    // CHECK: } // end sil function '$s4test3DogC015accessSweaterOfD03catAA0D0VAA3CatC_tYF'
+    // CHECK: } // end sil function '$s4test3DogC015accessSweaterOfD03catAA0D0VAA3CatC_tYaF'
     func accessSweaterOfSweater(cat : Cat) async -> Sweater {
         // note that Sweater is not an actor!
         return await cat.computedSweater.owner.computedSweater
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC13accessCatList3catAA0D0CAG_tYF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Cat {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC13accessCatList3catAA0D0CAG_tYaF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Cat {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    hop_to_executor [[CAT]] : $Cat
@@ -393,13 +393,13 @@ actor Dog {
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    destroy_value [[FRIEND1_REF]] : $Cat
     // CHECK:    return [[FRIEND2_REF]] : $Cat
-    // CHECK: } // end sil function '$s4test3DogC13accessCatList3catAA0D0CAG_tYF'
+    // CHECK: } // end sil function '$s4test3DogC13accessCatList3catAA0D0CAG_tYaF'
     func accessCatList(cat : Cat) async -> Cat {
         return await cat.friend.friend
     }
 
 
-    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC21accessOptionalCatList3catAA0E0CSgAG_tYF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Optional<Cat> {
+    // CHECK-LABEL: sil hidden [ossa] @$s4test3DogC21accessOptionalCatList3catAA0E0CSgAG_tYaF : $@convention(method) @async (@guaranteed Cat, @guaranteed Dog) -> @owned Optional<Cat> {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    [[FRIEND1_STACK:%[0-9]+]] = alloc_stack $Optional<Cat>
@@ -431,7 +431,7 @@ actor Dog {
     // CHECK:    br bb2([[FRIEND2_OPTIONAL]] : $Optional<Cat>)
 
     // CHECK-NOT:  hop_to_executor
-    // CHECK: } // end sil function '$s4test3DogC21accessOptionalCatList3catAA0E0CSgAG_tYF'
+    // CHECK: } // end sil function '$s4test3DogC21accessOptionalCatList3catAA0E0CSgAG_tYaF'
     func accessOptionalCatList(cat : Cat) async -> Cat? {
         return await cat.maybeFriend?.friend
     }

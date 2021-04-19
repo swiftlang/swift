@@ -2682,8 +2682,8 @@ bb0(%0 : @guaranteed $MyClass):
 sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned : $@convention(thin) (@owned MyClass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("3CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = unchecked_ref_cast %2 : $@opened("3CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -2699,8 +2699,8 @@ bb0(%0 : @owned $MyClass):
   br bb1
 
 bb1:
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = unchecked_ref_cast %2 : $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -2716,11 +2716,11 @@ bb0(%0 : @owned $MyClass):
   br bb1
 
 bb1:
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("5CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
   br bb2
 
 bb2:
-  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  %3 = unchecked_ref_cast %2 : $@opened("5CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -2735,8 +2735,8 @@ bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
   %f = function_ref @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
   apply %f(%1) : $@convention(thin) (@guaranteed AnyObject) -> ()
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("6CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = unchecked_ref_cast %2 : $@opened("6CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -2749,11 +2749,11 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned_fail_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
   %f = function_ref @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
-  apply %f<@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject>(%2) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  apply %f<@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject>(%2) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
 
-  %3 = unchecked_ref_cast %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
+  %3 = unchecked_ref_cast %2 : $@opened("7CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -2766,8 +2766,8 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @collapse_existential_pack_unpack_ref_to_raw_pointer : $@convention(thin) (@guaranteed MyClass) -> () {
 bb0(%0 : @guaranteed $MyClass):
   %1 = init_existential_ref %0 : $MyClass : $MyClass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("8CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  %3 = ref_to_raw_pointer %2 : $@opened("8CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
   %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = integer_literal $Builtin.Word, 5
   store %5 to [trivial] %4 : $*Builtin.Word
@@ -5020,3 +5020,66 @@ bb0:
   return %3 : $Builtin.Word
 }
 
+struct Function {
+  var impl: (MyInt) -> Double
+}
+
+sil @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+
+// CHECK-LABEL: sil [ossa] @test_borrow_struct_extract : $@convention(thin) (@guaranteed Function) -> Double {
+// CHECK-NOT: struct_extract
+// CHECK-NOT: struct $Function
+// CHECK: } // end sil function 'test_borrow_struct_extract'
+sil [ossa] @test_borrow_struct_extract : $@convention(thin) (@guaranteed Function) -> Double {
+bb0(%0 : @guaranteed $Function):
+  %3 = function_ref @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %4 = copy_value %0 : $Function
+  %5 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %6 = struct $Function (%5 : $@callee_guaranteed (MyInt) -> Double)
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = struct $MyInt (%7 : $Builtin.Int32)
+  %9 = begin_borrow %6 : $Function
+  %12 = struct_extract %9 : $Function, #Function.impl
+  %13 = apply %12(%8) : $@callee_guaranteed (MyInt) -> Double
+  end_borrow %9 : $Function
+  destroy_value %6 : $Function
+  return %13 : $Double
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_tuple_extract : $@convention(thin) (@guaranteed Function) -> Double {
+// CHECK-NOT: tuple_extract
+// CHECK: } // end sil function 'test_borrow_tuple_extract'
+sil [ossa] @test_borrow_tuple_extract : $@convention(thin) (@guaranteed Function) -> Double {
+bb0(%0 : @guaranteed $Function):
+  %3 = function_ref @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %4 = copy_value %0 : $Function
+  %5 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = struct $MyInt (%7 : $Builtin.Int32)
+  %6 = tuple (%5 : $@callee_guaranteed (MyInt) -> Double, %7 : $Builtin.Int32)
+  %9 = begin_borrow %6 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32)
+  %12 = tuple_extract %9 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32), 0
+  %13 = apply %12(%8) : $@callee_guaranteed (MyInt) -> Double
+  end_borrow %9 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32)
+  destroy_value %6 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32)
+  return %13 : $Double
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_unchecked_enum_data : $@convention(thin) (@guaranteed Function) -> Double {
+// CHECK-NOT: unchecked_enum_data
+// CHECK: } // end sil function 'test_borrow_unchecked_enum_data'
+sil [ossa] @test_borrow_unchecked_enum_data : $@convention(thin) (@guaranteed Function) -> Double {
+bb0(%0 : @guaranteed $Function):
+  %3 = function_ref @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %4 = copy_value %0 : $Function
+  %5 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = struct $MyInt (%7 : $Builtin.Int32)
+  %6 = enum $Optional<@callee_guaranteed (MyInt) -> Double>, #Optional.some!enumelt, %5 : $@callee_guaranteed (MyInt) -> Double
+  %9 = begin_borrow %6 : $Optional<@callee_guaranteed (MyInt) -> Double>
+  %12 = unchecked_enum_data %9 : $Optional<@callee_guaranteed (MyInt) -> Double>, #Optional.some!enumelt
+  %13 = apply %12(%8) : $@callee_guaranteed (MyInt) -> Double
+  end_borrow %9 : $Optional<@callee_guaranteed (MyInt) -> Double>
+  destroy_value %6 : $Optional<@callee_guaranteed (MyInt) -> Double>
+  return %13 : $Double
+}

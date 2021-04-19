@@ -62,3 +62,4 @@ import AutolinkElfCPragma
 import AutolinkModuleMapLink
 #endif
 
+// UNSUPPORTED: OS=macosx && CPU=arm64

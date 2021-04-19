@@ -1,159 +1,10 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -disable-implicit-concurrency-module-import -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 // RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
 // RUN: %target-swift-frontend -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %t_no_errors.swift
 
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_PA -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_1 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_PA_EXT_2 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_PB -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_PB < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PB < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_PA_PB -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_PA_PB < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PB < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BA -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT1 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BA_PA_EXT2 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BA_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BA_PB -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BA_PB < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PB < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BB -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BB < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BB < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BE -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT1 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_BE_PA_PE_EXT2 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_BE_PA_PE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_BE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=CLASS_PEI_PE -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_PEI_PE < %t.txt
-// RUN: %FileCheck %s -check-prefix=WITH_PEI < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOCOL_PA -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=PROTOCOL_PA < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOCOL_PA_EXT -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=PROTOCOL_PA_EXT < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=NESTED_CLOSURE_1
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE_2 -code-completion-keywords=false | %FileCheck %s -check-prefix=NESTED_CLOSURE_2
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD1 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=OMIT_KEYWORD1< %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD2 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=OMIT_KEYWORD2< %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD3 -code-completion-keywords=false > %t.txt
-// RUN: %FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD4 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD4_LET -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD5 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD1
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD6 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD2
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD7 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD3
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD8 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD8_LET -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9 -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD9_LET -code-completion-keywords=false | %FileCheck %s -check-prefix=OMIT_KEYWORD4
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD10 -code-completion-keywords=false | %FileCheck %s -check-prefix=WITH_PA_NO_PROTOFUNCA
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=SR2560_WHERE_CLAUSE -code-completion-keywords=false | %FileCheck %s -check-prefix=SR2560_WHERE_CLAUSE
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | %FileCheck %s -check-prefix=HAS_THROWING
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=ASSOC_TYPE1 -code-completion-keywords=false | %FileCheck %s -check-prefix=ASSOC_TYPE1
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=DEPRECATED_1
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=ESCAPING_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=ESCAPING_1
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER1 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER1
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER2 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER2
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER3 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER2
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER4 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER4
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER5 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER5
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER6 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER6
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER7 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER7
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER8 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER8
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER9 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER9
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER10 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER6
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER11 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER9
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER12 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER12
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER13 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER13
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER14 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER12
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER15 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER15
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER16 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER15
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER17 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER17
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER18 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER17
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER19 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER13
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER20 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER13
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER21 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER21
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER22 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER22
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER23 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER23
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER24 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER24
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER25 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER23
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER26 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER24
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOINIT_NORM -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_NORM
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOINIT_FINAL -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_FINAL
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOINIT_STRUCT -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_STRUCT
-
-// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MISSING_ASSOC_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=MISSING_ASSOC_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_1 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_2 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_3 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERRIDE_SYNTHESIZED_4 -code-completion-keywords=false | %FileCheck %s -check-prefix=OVERRIDE_SYNTHESIZED_4
+// NORESULT: Token
+// NORESULT-NOT: Begin completions
 
 @objc
 class TagPA {}
@@ -322,92 +173,90 @@ class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
 class TestClass_PA : ProtocolA {
   func ERROR() {}
 
-  #^CLASS_PA^#
+  #^CLASS_PA?check=CLASS_PA;check=WITH_PA;keywords=false^#
 }
 // CLASS_PA: Begin completions, 6 items
 
 class TestClass_PA_Ext {
   func ERROR1() {}
-  #^CLASS_PA_EXT_1^#
+  #^CLASS_PA_EXT_1?check=CLASS_PA;check=WITH_PA;keywords=false^#
 }
 extension TestClass_PA_Ext : ProtocolA {
   func ERROR2() {}
-  #^CLASS_PA_EXT_2^#
+  #^CLASS_PA_EXT_2?check=CLASS_PA;check=WITH_PA;keywords=false^#
 }
 
 class TestClass_PB : ProtocolB {
-  #^CLASS_PB^#
+  #^CLASS_PB?check=CLASS_PB;check=WITH_PB;keywords=false^#
 }
 // CLASS_PB: Begin completions, 11 items
 
 class TestClass_PA_PB : ProtocolA, ProtocolB {
-  #^CLASS_PA_PB^#
+  #^CLASS_PA_PB?check=CLASS_PA_PB;check=WITH_PA;check=WITH_PB;keywords=false^#
 }
 // CLASS_PA_PB: Begin completions, 11 items
 
 class TestClass_BA : BaseA {
-  #^CLASS_BA^#
+  #^CLASS_BA?check=CLASS_BA;check=WITH_BA;keywords=false^#
 }
 // CLASS_BA: Begin completions, 6 items
 
 class TestClass_BA_PA : BaseA, ProtocolA {
-  #^CLASS_BA_PA^#
+  #^CLASS_BA_PA?check=CLASS_BA_PA;check=WITH_BA;check=WITH_PA;keywords=false^#
 }
 // CLASS_BA_PA: Begin completions, 12 items
 
 class TestClass_BA_PA_Ext : BaseA {
-  #^CLASS_BA_PA_EXT1^#
+  #^CLASS_BA_PA_EXT1?check=CLASS_BA_PA;check=WITH_BA;check=WITH_PA;keywords=false^#
 }
 
 extension TestClass_BA_PA_Ext : ProtocolA {
-  #^CLASS_BA_PA_EXT2^#
+  #^CLASS_BA_PA_EXT2?check=CLASS_BA_PA;check=WITH_BA;check=WITH_PA;keywords=false^#
 }
 
 class TestClass_BA_PB : BaseA, ProtocolB {
-  #^CLASS_BA_PB^#
+  #^CLASS_BA_PB?check=CLASS_BA_PB;check=WITH_BA;check=WITH_PB;keywords=false^#
 }
 // CLASS_BA_PB: Begin completions, 17 items
 
 class TestClass_BB : BaseB {
-  #^CLASS_BB^#
+  #^CLASS_BB?check=CLASS_BB;check=WITH_BB;keywords=false^#
 }
 // CLASS_BB: Begin completions, 8 items
 
 class TestClass_BE : BaseE {
-  #^CLASS_BE^#
+  #^CLASS_BE?check=CLASS_BE;check=WITH_BE;keywords=false^#
 }
 // CLASS_BE: Begin completions, 9 items
 
 class TestClass_BE_PA : BaseE, ProtocolA {
-  #^CLASS_BE_PA^#
+  #^CLASS_BE_PA?check=CLASS_BE_PA;check=WITH_BE;check=WITH_PA;keywords=false^#
 }
 // CLASS_BE_PA: Begin completions, 15 items
 
 class TestClass_BE_PA_PE : BaseE, ProtocolA, ProtocolE {
-  #^CLASS_BE_PA_PE^#
+  #^CLASS_BE_PA_PE?check=CLASS_BE_PA_PE;check=WITH_BE;check=WITH_PA;keywords=false^#
 }
 // CLASS_BE_PA_PE: Begin completions, 15 items
 
 class TestClass_BE_PA_PE_Ext : BaseE {
-  #^CLASS_BE_PA_PE_EXT1^#
+  #^CLASS_BE_PA_PE_EXT1?check=CLASS_BE_PA_PE;check=WITH_BE;check=WITH_PA;keywords=false^#
 }
 extension TestClass_BE_PA_PE_Ext : ProtocolA, ProtocolE {
-  #^CLASS_BE_PA_PE_EXT2^#
+  #^CLASS_BE_PA_PE_EXT2?check=CLASS_BE_PA_PE;check=WITH_BE;check=WITH_PA;keywords=false^#
 }
 
 class TestClass_PEI_PE : ProtocolEImpl, ProtocolE {
-  #^CLASS_PEI_PE^#
+  #^CLASS_PEI_PE?check=CLASS_PEI_PE;check=WITH_PEI;keywords=false^#
 }
 // CLASS_PEI_PE: Begin completions, 5 items
 
 protocol TestProtocol_PA : ProtocolA {
-  #^PROTOCOL_PA^#
+  #^PROTOCOL_PA?keywords=false;check=NORESULT^#
 }
-// PROTOCOL_PA: found code completion token
-// PROTOCOL_PA-NOT: Begin completions
 
 extension TestProtocol_PA {
-  #^PROTOCOL_PA_EXT^#
+  #^PROTOCOL_PA_EXT?keywords=false^#
 }
 
 // PROTOCOL_PA_EXT: Begin completions
@@ -421,26 +270,24 @@ extension TestProtocol_PA {
 
 class OuterNominal : ProtocolA {
   class Inner {
-    #^NESTED_NOMINAL^#
+    #^NESTED_NOMINAL?check=NORESULT;keywords=false^#
   }
 }
-// NESTED_NOMINAL: found code completion token
-// NESTED_NOMINAL-NOT: Begin completions
 
 class OuterNominal2: ProtocolA {
-  var f = { #^NESTED_CLOSURE_1^# }()
+  var f = { #^NESTED_CLOSURE_1?keywords=false^# }()
 }
 // NESTED_CLOSURE_1-NOT: Decl{{.*}}/Super
 // NESTED_CLOSURE_1-NOT: {|}
 
 class OuterNominal3: ProtocolA {
-  var f = { static #^NESTED_CLOSURE_2^# }()
+  var f = { static #^NESTED_CLOSURE_2?keywords=false^# }()
 }
 // NESTED_CLOSURE_2-NOT: Decl{{.*}}/Super
 // NESTED_CLOSURE_2-NOT: {|}
 
 class OmitKW1 : ProtocolA {
-  override#^OMIT_KEYWORD1^#
+  override#^OMIT_KEYWORD1?keywords=false^#
 }
 
 // OMIT_KEYWORD1:        Begin completions
@@ -453,7 +300,7 @@ class OmitKW1 : ProtocolA {
 // OMIT_KEYWORD1: End completions
 
 class OmitKW2 : ProtocolA {
-  override func#^OMIT_KEYWORD2^#
+  override func#^OMIT_KEYWORD2?keywords=false^#
 }
 
 // OMIT_KEYWORD2:        Begin completions
@@ -468,7 +315,7 @@ class OmitKW2 : ProtocolA {
 // OMIT_KEYWORD2: End completions
 
 class OmitKW3 : ProtocolA {
-  func#^OMIT_KEYWORD3^#
+  func#^OMIT_KEYWORD3?keywords=false^#
 }
 
 // OMIT_KEYWORD3:        Begin completions
@@ -484,10 +331,10 @@ class OmitKW3 : ProtocolA {
 // OMIT_KEYWORD3: End completions
 
 class OmitKW4: ProtocolA {
-  var #^OMIT_KEYWORD4^#
+  var #^OMIT_KEYWORD4?keywords=false^#
 }
 class OmitKW4_let: ProtocolA {
-  let #^OMIT_KEYWORD4_LET^#
+  let #^OMIT_KEYWORD4_LET?check=OMIT_KEYWORD4;keywords=false^#
 }
 
 // OMIT_KEYWORD4-NOT:    Decl[Constructor]
@@ -499,44 +346,44 @@ class OmitKW4_let: ProtocolA {
 
 class OmitKW5: ProtocolA {
   override
-  #^OMIT_KEYWORD5^#
+  #^OMIT_KEYWORD5?check=OMIT_KEYWORD1;keywords=false^#
 // Same as OMIT_KEYWORD1
 }
 class OmitKW6: ProtocolA {
   override
   func
-  #^OMIT_KEYWORD6^#
+  #^OMIT_KEYWORD6?check=OMIT_KEYWORD2;keywords=false^#
 // Same as OMIT_KEYWORD2
 }
 class OmitKW7: ProtocolA {
   func
-  #^OMIT_KEYWORD7^#
+  #^OMIT_KEYWORD7?check=OMIT_KEYWORD3;keywords=false^#
 // Same as OMIT_KEYWORD3
 }
 
 class OmitKW8: ProtocolA {
   var
-  #^OMIT_KEYWORD8^#
+  #^OMIT_KEYWORD8?check=OMIT_KEYWORD4;keywords=false^#
 // Same as OMIT_KEYWORD4
 }
 class OmitKW8_let: ProtocolA {
   let
-  #^OMIT_KEYWORD8_LET^#
+  #^OMIT_KEYWORD8_LET?check=OMIT_KEYWORD4;keywords=false^#
 }
 class OmitKW9: ProtocolA {
   override
   var
-  #^OMIT_KEYWORD9^#
+  #^OMIT_KEYWORD9?check=OMIT_KEYWORD4;keywords=false^#
 // Same as OMIT_KEYWORD4
 }
 class OmitKW9_let: ProtocolA {
   override
   let
-  #^OMIT_KEYWORD9_LET^#
+  #^OMIT_KEYWORD9_LET?check=OMIT_KEYWORD4;keywords=false^#
 // Same as OMIT_KEYWORD4
 }
 class OmitKW10: ProtocolA {
-  override func protoAFunc() {}; #^OMIT_KEYWORD10^#
+  override func protoAFunc() {}; #^OMIT_KEYWORD10?check=WITH_PA_NO_PROTOFUNCA;keywords=false^#
 // WITH_PA
 }
 
@@ -544,7 +391,7 @@ protocol SR2560Proto {
   func foo<S : Sequence>(x: S) where S.Iterator.Element == Int
 }
 class SR2560Class: SR2560Proto {
-  #^SR2560_WHERE_CLAUSE^#
+  #^SR2560_WHERE_CLAUSE?keywords=false^#
 }
 
 // SR2560_WHERE_CLAUSE: Begin completions
@@ -561,7 +408,7 @@ class HasThrowing {
   init() throws {}
 }
 class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
-  #^HAS_THROWING^#
+  #^HAS_THROWING?keywords=false^#
 }
 // HAS_THROWING: Begin completions
 // HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo() throws
@@ -577,7 +424,7 @@ protocol P1 {
   associatedtype T3
 }
 class C1 : P1 {
-  #^ASSOC_TYPE1^#
+  #^ASSOC_TYPE1?keywords=false^#
 }
 
 // ASSOC_TYPE1: Begin completions, 2 items
@@ -590,7 +437,7 @@ class Deprecated1 {
 }
 
 class Deprecated2 : Deprecated1 {
-  override func #^DEPRECATED_1^#
+  override func #^DEPRECATED_1?keywords=false^#
 }
 // DEPRECATED_1: Decl[InstanceMethod]/Super/NotRecommended: deprecated() {|};
 
@@ -599,7 +446,7 @@ class EscapingBase {
   func autoclosure(arg: @autoclosure () -> Bool) {}
 }
 class Escaping : EscapingBase {
-  override func #^ESCAPING_1^#
+  override func #^ESCAPING_1?keywords=false^#
 }
 // ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
 // ESCAPING_1: Decl[InstanceMethod]/Super:         autoclosure(arg: @autoclosure () -> Bool) {|};
@@ -632,99 +479,99 @@ protocol OverrideP {
 }
 
 class Override1 : OverrideBase, OverrideP {
-  #^MODIFIER1^#
+  #^MODIFIER1?keywords=false^#
 }
 class Override2 : OverrideBase, OverrideP {
-  final #^MODIFIER2^#
+  final #^MODIFIER2?keywords=false^#
 }
 class Override3 : OverrideBase, OverrideP {
-  open #^MODIFIER3^#
+  open #^MODIFIER3?check=MODIFIER2;keywords=false^#
   // Same as MODIFIER2.
 }
 class Override4 : OverrideBase, OverrideP {
-  required #^MODIFIER4^#
+  required #^MODIFIER4?keywords=false^#
 }
 class Override5 : OverrideBase, OverrideP {
-  convenience #^MODIFIER5^#
+  convenience #^MODIFIER5?keywords=false^#
 }
 class Override6 : OverrideBase, OverrideP {
-  typealias #^MODIFIER6^#
+  typealias #^MODIFIER6?keywords=false^#
 }
 class Override7 : OverrideBase, OverrideP {
-  override #^MODIFIER7^#
+  override #^MODIFIER7?keywords=false^#
 }
 class Override8 : OverrideBase, OverrideP {
   // Note: This *does* emit functions. It will result invalid decl, but fix-it
   // will do the job.
-  convenience func #^MODIFIER8^#
+  convenience func #^MODIFIER8?keywords=false^#
 }
 class Override9 : OverrideBase, OverrideP {
   // Ditto.
-  required var #^MODIFIER9^#
+  required var #^MODIFIER9?keywords=false^#
 }
 class Override10 : OverrideBase, OverrideP {
   // Ditto.
-  final typealias #^MODIFIER10^#
+  final typealias #^MODIFIER10?check=MODIFIER6;keywords=false^#
   // Same as MODIFIER6.
 }
 class Override11 : OverrideBase, OverrideP {
-  var #^MODIFIER11^#
+  var #^MODIFIER11?check=MODIFIER9;keywords=false^#
   // Same as MODIFIER9.
 }
 class Override12 : OverrideBase, OverrideP {
-  override var #^MODIFIER12^#
+  override var #^MODIFIER12?keywords=false^#
 }
 class Override13 : OverrideBase, OverrideP {
   // No completions.
-  let #^MODIFIER13^#
+  let #^MODIFIER13?keywords=false^#
 }
 class Override14 : OverrideBase, OverrideP {
   // Note: This *does* emit variables. It will result invalid decl, but a
   // diagnostic will tell the user what to do.
-  override let #^MODIFIER14^#
+  override let #^MODIFIER14?check=MODIFIER12;keywords=false^#
   // Same as MODIFIER12.
 }
 class Override15 : OverrideBase, OverrideP {
-  required static var #^MODIFIER15^#
+  required static var #^MODIFIER15?keywords=false^#
 }
 class Override16 : OverrideBase, OverrideP {
-  class var #^MODIFIER16^#
+  class var #^MODIFIER16?check=MODIFIER15;keywords=false^#
   // Same as MODIFIER15
 }
 class Override17 : OverrideBase, OverrideP {
-  override class var #^MODIFIER17^#
+  override class var #^MODIFIER17?keywords=false^#
 }
 class Override18 : OverrideBase, OverrideP {
   // Note: This *does* emit variables. See MODIFIER14
-  override static let #^MODIFIER18^#
+  override static let #^MODIFIER18?check=MODIFIER17;keywords=false^#
   // Same as MODIFIER17
 }
 class Override19 : OverrideBase, OverrideP {
   // No completions.
-  class let #^MODIFIER19^#
+  class let #^MODIFIER19?check=MODIFIER13;keywords=false^#
 }
 class Override20 : OverrideBase, OverrideP {
   // No completions.
-  static let #^MODIFIER20^#
+  static let #^MODIFIER20?check=MODIFIER13;keywords=false^#
 }
 class Override21 : OverrideBase, OverrideP {
-  override class func #^MODIFIER21^#
+  override class func #^MODIFIER21?keywords=false^#
 }
 class Override22 : OverrideBase, OverrideP {
-  class func #^MODIFIER22^#
+  class func #^MODIFIER22?keywords=false^#
 }
 class Override23 : OverrideBase, OverrideP {
-  static #^MODIFIER23^#
+  static #^MODIFIER23?keywords=false^#
 }
 class Override24 : OverrideBase, OverrideP {
-  override static #^MODIFIER24^#
+  override static #^MODIFIER24?keywords=false^#
 }
 class Override25 : OverrideBase, OverrideP {
-  class #^MODIFIER25^#
+  class #^MODIFIER25?check=MODIFIER23;keywords=false^#
   // Same as MODIFIER23
 }
 class Override26 : OverrideBase, OverrideP {
-  class override #^MODIFIER26^#
+  class override #^MODIFIER26?check=MODIFIER24;keywords=false^#
   // Same as MODIFIER24
 }
 
@@ -826,13 +673,13 @@ protocol RequiredP {
   init(p: Int)
 }
 class RequiredClass : RequiredP {
-  #^PROTOINIT_NORM^#
+  #^PROTOINIT_NORM?keywords=false^#
 }
 final class RequiredFinal : RequiredP {
-  #^PROTOINIT_FINAL^#
+  #^PROTOINIT_FINAL?keywords=false^#
 }
 struct RequiredS : RequiredP {
-  #^PROTOINIT_STRUCT^#
+  #^PROTOINIT_STRUCT?keywords=false^#
 }
 
 // PROTOINIT_NORM: Begin completions, 1 items
@@ -858,7 +705,7 @@ protocol AssocAndMethod {
 }
 
 struct MissingAssoc: AssocAndMethod {
-  func #^MISSING_ASSOC_1^#
+  func #^MISSING_ASSOC_1?keywords=false^#
 }
 // MISSING_ASSOC_1: Begin completions
 // MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f1(_: T) {|};
@@ -870,7 +717,7 @@ struct MissingAssoc: AssocAndMethod {
 
 struct SynthesizedConformance1: Codable {
   let foo: Int
-  #^OVERRIDE_SYNTHESIZED_1^#
+  #^OVERRIDE_SYNTHESIZED_1?keywords=false^#
 // OVERRIDE_SYNTHESIZED_1: Begin completions,  2 items
 // OVERRIDE_SYNTHESIZED_1-DAG: Decl[Constructor]/Super/IsSystem:       init(from decoder: Decoder) throws {|};
 // OVERRIDE_SYNTHESIZED_1-DAG: Decl[InstanceMethod]/Super/IsSystem:    func encode(to encoder: Encoder) throws {|};
@@ -879,14 +726,14 @@ struct SynthesizedConformance1: Codable {
 open class SynthesizedConformance2: Codable {
   let foo: Int
   func encode(to encoder: Encoder) throws {}
-  #^OVERRIDE_SYNTHESIZED_2^#
+  #^OVERRIDE_SYNTHESIZED_2?keywords=false^#
 // OVERRIDE_SYNTHESIZED_2: Begin completions, 1 items
 // OVERRIDE_SYNTHESIZED_2: Decl[Constructor]/Super/IsSystem:           public required init(from decoder: Decoder) throws {|};
 }
 
 struct SynthesizedConformance3: Hashable {
   let foo: Int
-  #^OVERRIDE_SYNTHESIZED_3^#
+  #^OVERRIDE_SYNTHESIZED_3?keywords=false^#
 // FIXME: Where did Equatable.(==) go?
 // OVERRIDE_SYNTHESIZED_3: Begin completions, 2 items
 // OVERRIDE_SYNTHESIZED_3-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int; name=hashValue: Int
@@ -895,7 +742,7 @@ struct SynthesizedConformance3: Hashable {
 
 enum SynthesizedConformance4: CaseIterable {
   case a, b, c, d
-  #^OVERRIDE_SYNTHESIZED_4^#
+  #^OVERRIDE_SYNTHESIZED_4?keywords=false^#
 // OVERRIDE_SYNTHESIZED_4: Begin completions, 3 items
 // OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceVar]/Super/IsSystem:       var hashValue: Int
 // OVERRIDE_SYNTHESIZED_4-DAG: Decl[InstanceMethod]/Super/IsSystem:    func hash(into hasher: inout Hasher) {|};
@@ -903,8 +750,10 @@ enum SynthesizedConformance4: CaseIterable {
 }
 
 class SynthesizedConformance5: SynthesizedConformance2 {
-  #^OVERRIDE_SYNTHESIZED_5^#
-// OVERRIDE_SYNTHESIZED_5: Begin completions, 2 items
-// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super/IsSystem:    override func encode(to encoder: Encoder) throws {|};
+  #^OVERRIDE_SYNTHESIZED_5?keywords=false^#
+// OVERRIDE_SYNTHESIZED_5: Begin completions, 3 items
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[InstanceMethod]/Super:             override func encode(to encoder: Encoder) throws {|};
 // OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super/IsSystem:       required init(from decoder: Decoder) throws {|};
+// OVERRIDE_SYNTHESIZED_5-DAG: Decl[Constructor]/Super:                required init(from decoder: Decoder) throws {|};
+// FIXME: 'required init(from decoder: Decoder)' is suggested twice
 }

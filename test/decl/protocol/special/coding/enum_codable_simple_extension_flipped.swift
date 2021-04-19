@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -swift-version 4 -enable-experimental-enum-codable-derivation
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -swift-version 4
 
 // Simple enums where Codable conformance is added in extensions should derive
 // conformance, no matter which order the extension and type occur in.

@@ -72,6 +72,7 @@ public:
   void setValueOwnership(ValueOwnership ownership) {
     Flags = Flags.withValueOwnership(ownership);
   }
+  void setNoDerivative() { Flags = Flags.withNoDerivative(true); }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -315,6 +316,11 @@ public:
   bool isSendable() const { return Concurrent; }
 
   bool isPseudogeneric() const { return Pseudogeneric; }
+
+  bool isDifferentiable() const {
+    return getDifferentiabilityKind() !=
+        ImplFunctionDifferentiabilityKind::NonDifferentiable;
+  }
 
   ImplFunctionDifferentiabilityKind getDifferentiabilityKind() const {
     return ImplFunctionDifferentiabilityKind(DifferentiabilityKind);
@@ -708,10 +714,6 @@ public:
     case NodeKind::NoEscapeFunctionType:
     case NodeKind::AutoClosureType:
     case NodeKind::EscapingAutoClosureType:
-    case NodeKind::DifferentiableFunctionType:
-    case NodeKind::EscapingDifferentiableFunctionType:
-    case NodeKind::LinearFunctionType:
-    case NodeKind::EscapingLinearFunctionType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -727,21 +729,37 @@ public:
           flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
       } else if (Node->getKind() == NodeKind::ThinFunctionType) {
         flags = flags.withConvention(FunctionMetadataConvention::Thin);
-      } else if (Node->getKind() == NodeKind::DifferentiableFunctionType ||
-               Node->getKind() ==
-                   NodeKind::EscapingDifferentiableFunctionType) {
-        flags = flags.withDifferentiabilityKind(
-            FunctionMetadataDifferentiabilityKind::Reverse);
-      } else if (Node->getKind() == NodeKind::LinearFunctionType ||
-                 Node->getKind() == NodeKind::EscapingLinearFunctionType) {
-        flags = flags.withDifferentiabilityKind(
-            FunctionMetadataDifferentiabilityKind::Linear);
       }
 
       unsigned firstChildIdx = 0;
       if (Node->getChild(firstChildIdx)->getKind() == NodeKind::ClangType) {
         // [TODO: synthesize-Clang-type-from-mangled-name] Use the first child
         // to create a ClangTypeInfo.
+        ++firstChildIdx;
+      }
+
+      FunctionMetadataDifferentiabilityKind diffKind;
+      if (Node->getChild(firstChildIdx)->getKind() ==
+            NodeKind::DifferentiableFunctionType) {
+        auto mangledDiffKind = (MangledDifferentiabilityKind)
+            Node->getChild(firstChildIdx)->getIndex();
+        switch (mangledDiffKind) {
+        case MangledDifferentiabilityKind::NonDifferentiable:
+          assert(false && "Unexpected case NonDifferentiable");
+          break;
+        case MangledDifferentiabilityKind::Forward:
+          diffKind = FunctionMetadataDifferentiabilityKind::Forward;
+          break;
+        case MangledDifferentiabilityKind::Reverse:
+          diffKind = FunctionMetadataDifferentiabilityKind::Reverse;
+          break;
+        case MangledDifferentiabilityKind::Normal:
+          diffKind = FunctionMetadataDifferentiabilityKind::Normal;
+          break;
+        case MangledDifferentiabilityKind::Linear:
+          diffKind = FunctionMetadataDifferentiabilityKind::Linear;
+          break;
+        }
         ++firstChildIdx;
       }
 
@@ -767,7 +785,8 @@ public:
       }
 
       flags = flags.withConcurrent(isSendable)
-          .withAsync(isAsync).withThrows(isThrow);
+          .withAsync(isAsync).withThrows(isThrow)
+          .withDifferentiable(diffKind.isDifferentiable());
 
       if (Node->getNumChildren() < firstChildIdx + 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -786,25 +805,19 @@ public:
               .withEscaping(
                           Node->getKind() == NodeKind::FunctionType ||
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock ||
-                          Node->getKind() ==
-                              NodeKind::EscapingDifferentiableFunctionType ||
-                          Node->getKind() ==
-                              NodeKind::EscapingLinearFunctionType);
+                          Node->getKind() == NodeKind::EscapingObjCBlock);
 
       auto result = decodeMangledType(Node->getChild(firstChildIdx+1));
       if (result.isError())
         return result;
-      return Builder.createFunctionType(parameters, result.getType(), flags);
+      return Builder.createFunctionType(
+          parameters, result.getType(), flags, diffKind);
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;
-      BuiltRequirement *witnessMethodConformanceRequirement = nullptr;
       llvm::SmallVector<ImplFunctionParam<BuiltType>, 8> parameters;
       llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> results;
       llvm::SmallVector<ImplFunctionResult<BuiltType>, 8> errorResults;
-      llvm::SmallVector<BuiltType, 4> genericParameters;
-      llvm::SmallVector<BuiltRequirement, 4> requirements;
       ImplFunctionTypeFlags flags;
 
       for (unsigned i = 0; i < Node->getNumChildren(); i++) {
@@ -837,9 +850,6 @@ public:
           } else if (text == "block") {
             flags =
               flags.withRepresentation(ImplFunctionRepresentation::Block);
-          } else if (text == "witness_method") {
-            flags = flags.withRepresentation(
-                ImplFunctionRepresentation::WitnessMethod);
           }
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
@@ -877,27 +887,6 @@ public:
           if (decodeImplFunctionPart(child, errorResults))
             return MAKE_NODE_TYPE_ERROR0(child,
                                          "failed to decode function part");
-        } else if (child->getKind() == NodeKind::DependentGenericSignature) {
-          llvm::SmallVector<unsigned, 4> genericParamsAtDepth;
-
-          if (auto error = decodeDependentGenericSignatureNode(
-                  child, requirements, genericParamsAtDepth))
-            return *error;
-          if (flags.getRepresentation() ==
-              ImplFunctionRepresentation::WitnessMethod) {
-            // By convention, the first requirement of a witness method is the
-            // conformance of Self to the protocol.
-            witnessMethodConformanceRequirement = &requirements[0];
-          }
-
-          for (unsigned long depth = 0, depths = genericParamsAtDepth.size();
-               depth < depths; ++depth) {
-            for (unsigned index = 0; index < genericParamsAtDepth[depth];
-                 ++index) {
-              genericParameters.emplace_back(
-                  Builder.createGenericTypeParameterType(depth, index));
-            }
-          }
         } else {
           return MAKE_NODE_TYPE_ERROR0(child, "unexpected kind");
         }
@@ -918,11 +907,11 @@ public:
       // TODO: Some cases not handled above, but *probably* they cannot
       // appear as the types of values in SIL (yet?):
       // - functions with yield returns
+      // - functions with generic signatures
       // - foreign error conventions
-      return Builder.createImplFunctionType(
-          calleeConvention, witnessMethodConformanceRequirement,
-          genericParameters, requirements, parameters, results, errorResult,
-          flags);
+      return Builder.createImplFunctionType(calleeConvention,
+                                            parameters, results,
+                                            errorResult, flags);
     }
 
     case NodeKind::ArgumentTuple:
@@ -1093,12 +1082,35 @@ public:
           return MAKE_NODE_TYPE_ERROR0(substNode, "expected type list");
 
         auto *dependentGenericSignatureNode = Node->getChild(1);
+        if (dependentGenericSignatureNode->getKind() !=
+            NodeKind::DependentGenericSignature)
+          return MAKE_NODE_TYPE_ERROR0(dependentGenericSignatureNode,
+                                       "expected dependent generic signature");
+        if (dependentGenericSignatureNode->getNumChildren() < 1)
+          return MAKE_NODE_TYPE_ERROR(
+              dependentGenericSignatureNode,
+              "fewer children (%zu) than required (1)",
+              dependentGenericSignatureNode->getNumChildren());
+        decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
+                          BuilderType>(
+            dependentGenericSignatureNode, requirements, Builder/*,
+            [&](NodePointer Node) -> BuiltType {
+              return decodeMangledType(Node).getType();
+            },
+            [&](LayoutConstraintKind Kind) -> BuiltLayoutConstraint {
+              return {}; // Not implemented!
+            },
+            [&](LayoutConstraintKind Kind, unsigned SizeInBits,
+                unsigned Alignment) -> BuiltLayoutConstraint {
+              return {}; // Not Implemented!
+              }*/);
+        // The number of generic parameters at each depth are in a mini
+        // state machine and come first.
         llvm::SmallVector<unsigned, 4> genericParamsAtDepth;
-        if (auto error = decodeDependentGenericSignatureNode(
-                dependentGenericSignatureNode, requirements,
-                genericParamsAtDepth))
-          return *error;
-
+        for (auto *reqNode : *dependentGenericSignatureNode)
+          if (reqNode->getKind() == NodeKind::DependentGenericParamCount)
+            if (reqNode->hasIndex())
+              genericParamsAtDepth.push_back(reqNode->getIndex());
         unsigned depth = 0;
         unsigned index = 0;
         for (auto *subst : *substNode) {
@@ -1359,33 +1371,44 @@ private:
             FunctionParam<BuiltType> &param) -> bool {
       Demangle::NodePointer node = typeNode;
 
-      auto setOwnership = [&](ValueOwnership ownership) {
-        param.setValueOwnership(ownership);
-        node = node->getFirstChild();
-        hasParamFlags = true;
-      };
-      switch (node->getKind()) {
-      case NodeKind::InOut:
-        setOwnership(ValueOwnership::InOut);
-        break;
+      bool recurse = true;
+      while (recurse) {
+        switch (node->getKind()) {
+        case NodeKind::InOut:
+          param.setValueOwnership(ValueOwnership::InOut);
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      case NodeKind::Shared:
-        setOwnership(ValueOwnership::Shared);
-        break;
+        case NodeKind::Shared:
+          param.setValueOwnership(ValueOwnership::Shared);
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      case NodeKind::Owned:
-        setOwnership(ValueOwnership::Owned);
-        break;
+        case NodeKind::Owned:
+          param.setValueOwnership(ValueOwnership::Owned);
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      case NodeKind::AutoClosureType:
-      case NodeKind::EscapingAutoClosureType: {
-        param.setAutoClosure();
-        hasParamFlags = true;
-        break;
-      }
+        case NodeKind::NoDerivative:
+          param.setNoDerivative();
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
 
-      default:
-        break;
+        case NodeKind::AutoClosureType:
+        case NodeKind::EscapingAutoClosureType:
+          param.setAutoClosure();
+          hasParamFlags = true;
+          recurse = false;
+          break;
+
+        default:
+          recurse = false;
+          break;
+        }
       }
 
       auto paramType = decodeMangledType(node);
@@ -1447,43 +1470,6 @@ private:
 
     params.push_back(std::move(param));
     return true;
-  }
-
-  llvm::Optional<TypeLookupError> decodeDependentGenericSignatureNode(
-      NodePointer dependentGenericSignatureNode,
-      llvm::SmallVectorImpl<BuiltRequirement> &requirements,
-      llvm::SmallVectorImpl<unsigned> &genericParamsAtDepth) {
-    using NodeKind = Demangle::Node::Kind;
-    if (dependentGenericSignatureNode->getKind() !=
-        NodeKind::DependentGenericSignature)
-      return llvm::Optional<TypeLookupError>(
-          MAKE_NODE_TYPE_ERROR0(dependentGenericSignatureNode,
-                                "expected dependent generic signature"));
-    if (dependentGenericSignatureNode->getNumChildren() < 1)
-      return llvm::Optional<TypeLookupError>(MAKE_NODE_TYPE_ERROR(
-          dependentGenericSignatureNode,
-          "fewer children (%zu) than required (1)",
-          dependentGenericSignatureNode->getNumChildren()));
-    decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
-                      BuilderType>(dependentGenericSignatureNode, requirements,
-                                   Builder /*,
-[&](NodePointer Node) -> BuiltType {
-return decodeMangledType(Node).getType();
-},
-[&](LayoutConstraintKind Kind) -> BuiltLayoutConstraint {
-return {}; // Not implemented!
-},
-[&](LayoutConstraintKind Kind, unsigned SizeInBits,
-unsigned Alignment) -> BuiltLayoutConstraint {
-return {}; // Not Implemented!
-}*/);
-    // The number of generic parameters at each depth are in a mini
-    // state machine and come first.
-    for (auto *reqNode : *dependentGenericSignatureNode)
-      if (reqNode->getKind() == NodeKind::DependentGenericParamCount)
-        if (reqNode->hasIndex())
-          genericParamsAtDepth.push_back(reqNode->getIndex());
-    return llvm::None;
   }
 };
 

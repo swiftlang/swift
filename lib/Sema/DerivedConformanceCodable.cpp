@@ -1164,7 +1164,8 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
                           /*implicit*/ true, AccessSemantics::Ordinary);
 
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
@@ -1801,7 +1802,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
     auto switchStmt =
         SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), firstExpr,
-                           SourceLoc(), cases, SourceLoc(), C);
+                           SourceLoc(), cases, SourceLoc(), SourceLoc(), C);
 
     statements.push_back(switchStmt);
   }
@@ -1847,6 +1848,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
                               /*Failable=*/false,SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/true, SourceLoc(), paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
@@ -2014,9 +2016,7 @@ static bool canDeriveCodable(NominalTypeDecl *NTD,
   // Structs, classes and enums can explicitly derive Encodable and Decodable
   // conformance (explicitly meaning we can synthesize an implementation if
   // a type conforms manually).
-  if (!isa<StructDecl>(NTD) && !isa<ClassDecl>(NTD) &&
-      !(NTD->getASTContext().LangOpts.EnableExperimentalEnumCodableDerivation
-        && isa<EnumDecl>(NTD))) {
+  if (!isa<StructDecl>(NTD) && !isa<ClassDecl>(NTD) && !isa<EnumDecl>(NTD)) {
     return false;
   }
 
@@ -2039,8 +2039,7 @@ bool DerivedConformance::canDeriveEncodable(NominalTypeDecl *NTD) {
 ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   // We can only synthesize Encodable for structs and classes.
   if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal) &&
-      !(Context.LangOpts.EnableExperimentalEnumCodableDerivation
-        && isa<EnumDecl>(Nominal)))
+      !isa<EnumDecl>(Nominal))
     return nullptr;
 
   if (requirement->getBaseName() != Context.Id_encode) {
@@ -2070,8 +2069,7 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
 ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   // We can only synthesize Encodable for structs and classes.
   if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal) &&
-      !(Context.LangOpts.EnableExperimentalEnumCodableDerivation
-        && isa<EnumDecl>(Nominal)))
+      !isa<EnumDecl>(Nominal))
     return nullptr;
 
   if (requirement->getBaseName() != DeclBaseName::createConstructor()) {

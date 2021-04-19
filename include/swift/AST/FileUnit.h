@@ -14,6 +14,8 @@
 #define SWIFT_AST_FILEUNIT_H
 
 #include "swift/AST/Module.h"
+#include "swift/AST/RawComment.h"
+#include "swift/Basic/BasicSourceInfo.h"
 
 namespace swift {
 static inline unsigned alignOfFileUnit();
@@ -166,7 +168,7 @@ public:
     return None;
   }
 
-  virtual void collectAllGroups(std::vector<StringRef> &Names) const {}
+  virtual void collectAllGroups(SmallVectorImpl<StringRef> &Names) const {}
 
   /// Returns an implementation-defined "discriminator" for \p D, which
   /// distinguishes \p D from other declarations in the same module with the
