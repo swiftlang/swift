@@ -47,7 +47,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
   }
   // Stored as a singular structured assignment for initialization
   var state: State
-  
+
   private init(_doNotCallMe: ()) {
     fatalError("Storage must be initialized by create")
   }
@@ -63,7 +63,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
     _unlock(ptr)
   }
-  
+
   var onCancel: (@Sendable () -> Void)? {
     get {
       lock()
@@ -79,7 +79,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       }
     }
   }
-  
+
   private func enqueue(_ value: __owned Element?) {
     if let value = value {
       if state.terminal == nil {
@@ -92,7 +92,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       terminate()
     }
   }
-  
+
   private func terminate(error: __owned Failure? = nil) {
     state.onCancel = nil
     if let failure = error {
@@ -139,7 +139,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       unlock()
     }
   }
-  
+
   func yield(_ value: __owned Element?) where Failure == Never {
     lock()
     enqueue(value)
@@ -177,7 +177,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       unlock()
     }
   }
-  
+
   func yield(throwing error: __owned Failure) {
     lock()
     if let raw = state.continuation {
@@ -196,7 +196,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       }
     }
   }
-  
+
   func next(_ continuation: UnsafeContinuation<Element?, Never>) {
     let raw =
       unsafeBitCast(continuation, to: Builtin.RawUnsafeContinuation.self)
@@ -228,7 +228,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       fatalError("attempt to await next() on more than one task")
     }
   }
-  
+
   func next(_ continuation: UnsafeContinuation<Element?, Error>) {
     let raw =
       unsafeBitCast(continuation, to: Builtin.RawUnsafeContinuation.self)
@@ -260,7 +260,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
       fatalError("attempt to await next() on more than one task")
     }
   }
-  
+
   static func create(limit: Int) -> _SeriesBufferedStorage<Element, Failure> {
     let minimumCapacity = _lockWordCount()
     let storage = Builtin.allocWithTailElems_1(
@@ -268,7 +268,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
         minimumCapacity._builtinWordValue,
         UnsafeRawPointer.self
     )
-    
+
     let state =
       UnsafeMutablePointer<State>(Builtin.addressof(&storage.state))
     state.initialize(to: State(limit: limit))
@@ -284,22 +284,22 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
 /// Series is an interface type to adapt from code producing values to an
 /// asynchronous context iterating them. This is itended to be used to allow
 /// callback or delegation based APIs to participate with async/await.
-/// 
-/// When values are produced from a non async/await source there is a 
+///
+/// When values are produced from a non async/await source there is a
 /// consideration that must be made on behavioral characteristics of how that
-/// production of values interacts with the iteration. Series offers a 
-/// initialization strategy that provides a method of yielding values into 
-/// iteration. 
+/// production of values interacts with the iteration. Series offers a
+/// initialization strategy that provides a method of yielding values into
+/// iteration.
 ///
 /// Series can be initialized with the option to buffer to a given limit.
-/// The default value for this limit is Int.max. The buffering is only for 
+/// The default value for this limit is Int.max. The buffering is only for
 /// values that have yet to be consumed by iteration. Values can be yielded in
 /// case to the continuation passed into the build closure. That continuation
-/// is Sendable, in that it is intended to be used from concurrent contexts 
+/// is Sendable, in that it is intended to be used from concurrent contexts
 /// external to the iteration of the Series.
-/// 
+///
 /// A trivial use case producing values from a detached task would work as such:
-/// 
+///
 ///     let digits = Series(buffering: Int.self) { continuation in
 ///       detach {
 ///         for digit in 0..<10 {
@@ -310,7 +310,7 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
 ///     }
 ///
 ///     for await digit in digits {
-///       print(digit)  
+///       print(digit)
 ///     }
 ///
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -318,29 +318,38 @@ public struct Series<Element> {
   public struct Continuation: Sendable {
     fileprivate let storage: _SeriesBufferedStorage<Element, Never>
 
-    /// Resume the task awaiting the next iteration point by having it return 
-    /// nomally from its suspension point or buffer the value if no awaiting 
+    /// Resume the task awaiting the next iteration point by having it return
+    /// nomally from its suspension point or buffer the value if no awaiting
     /// next iteration is active.
     ///
     /// - Parameter value: The value to yield from the continuation.
     ///
-    /// This can be called more than once and returns to the caller immediately 
+    /// This can be called more than once and returns to the caller immediately
     /// without blocking for any awaiting consuption from the iteration.
     public func resume(yielding value: __owned Element) {
       storage.yield(value)
     }
 
-    /// Resume the task awaiting the next iteration point by having it return 
+    /// Resume the task awaiting the next iteration point by having it return
     /// nil which signifies the end of the iteration.
     ///
     /// Calling this function more than once is idempotent; i.e. finishing more
-    /// than once does not alter the state beyond the requirements of 
-    /// AsyncSequence; which claims that all values past a terminal state are 
+    /// than once does not alter the state beyond the requirements of
+    /// AsyncSequence; which claims that all values past a terminal state are
     /// nil.
     public func finish() {
       storage.yield(nil)
     }
 
+    /// A callback to invoke when iteration of a Series is cancelled.
+    ///
+    /// If an `onCancel` callback is set, when iteration of a Series is
+    /// cancelled via task cancellation that callback is invoked. The callback
+    /// is disposed of after any terminal state is reached.
+    ///
+    /// Cancelling an active iteration will first invoke the onCancel callback
+    /// and then resume yeilding nil. This means that any cleanup state can be
+    /// emitted accordingly in the cancellation handler
     public var onCancel: (@Sendable () -> Void)? {
       get {
         return storage.onCancel
@@ -354,20 +363,20 @@ public struct Series<Element> {
   let produce: (UnsafeContinuation<Element?, Never>) -> Void
   let cancel: @Sendable () -> Void
 
-  /// Construct a Series buffering given an Element type. 
+  /// Construct a Series buffering given an Element type.
   ///
   /// - Parameter buffering: The type the Series will produce.
-  /// - Parameter maxBufferedPendingElements: The maximum number of elements to 
+  /// - Parameter maxBufferedPendingElements: The maximum number of elements to
   ///   hold in the buffer past any checks for continuations being resumed.
   /// - Parameter build: The work associated with yielding values to the Series.
-  /// 
-  /// The maximum number of pending elements limited by dropping the oldest 
-  /// value when a new value comes in if the buffer would excede the limit 
+  ///
+  /// The maximum number of pending elements limited by dropping the oldest
+  /// value when a new value comes in if the buffer would excede the limit
   /// placed upon it. By default this limit is unlimited.
-  /// 
+  ///
   /// The build closure passes in a Continuation which can be used in
-  /// concurrent contexts. It is thread safe to send and finish; all calls are 
-  /// to the continuation are serialized, however calling this from multiple 
+  /// concurrent contexts. It is thread safe to send and finish; all calls are
+  /// to the continuation are serialized, however calling this from multiple
   /// concurrent contexts could result in out of order delivery.
   public init(
     buffering: Element.Type = Element.self,
@@ -388,7 +397,7 @@ public struct Series<Element> {
 extension Series: AsyncSequence {
   /// The asynchronous iterator for iterating a Series.
   ///
-  /// This type is specificially not Sendable. It is not intended to be used 
+  /// This type is specificially not Sendable. It is not intended to be used
   /// from multiple concurrent contexts. Any such case that next is invoked
   /// concurrently and contends with another call to next is a programmer error
   /// and will fatalError.
@@ -398,11 +407,11 @@ extension Series: AsyncSequence {
 
     /// The next value from the Series.
     ///
-    /// When next returns nil this signifies the end of the Series. Any such 
-    /// case that next is invoked concurrently and contends with another call to 
+    /// When next returns nil this signifies the end of the Series. Any such
+    /// case that next is invoked concurrently and contends with another call to
     /// next is a programmer error and will fatalError.
     ///
-    /// If the task this iterator is running in is canceled while next is 
+    /// If the task this iterator is running in is canceled while next is
     /// awaiting a value, this will terminate the Series and next may return nil
     /// immediately (or will return nil on subseuqent calls)
     public mutating func next() async -> Element? {
@@ -425,6 +434,14 @@ extension Series: AsyncSequence {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Series.Continuation {
+  /// Resume the task awaiting the next iteration point by having it return
+  /// nomally from its suspension point or buffer the value if no awaiting
+  /// next iteration is active.
+  ///
+  /// - Parameter result: A result to yield from the continuation.
+  ///
+  /// This can be called more than once and returns to the caller immediately
+  /// without blocking for any awaiting consuption from the iteration.
   public func yield(
     with result: Result<Element, Never>
   ) {
@@ -433,7 +450,13 @@ extension Series.Continuation {
         self.resume(yielding: val)
     }
   }
-  
+
+  /// Resume the task awaiting the next iteration point by having it return
+  /// nomally from its suspension point or buffer the value if no awaiting
+  /// next iteration is active where the `Element` is `Void`.
+  ///
+  /// This can be called more than once and returns to the caller immediately
+  /// without blocking for any awaiting consuption from the iteration.
   public func resume() where Element == Void {
     self.resume(yielding: ())
   }
@@ -444,18 +467,44 @@ public struct ThrowingSeries<Element> {
   public struct Continuation: Sendable {
     fileprivate let storage: _SeriesBufferedStorage<Element, Error>
 
+    /// Resume the task awaiting the next iteration point by having it return
+    /// nomally from its suspension point or buffer the value if no awaiting
+    /// next iteration is active.
+    ///
+    /// - Parameter value: The value to yield from the continuation.
+    ///
+    /// This can be called more than once and returns to the caller immediately
+    /// without blocking for any awaiting consuption from the iteration.
     public func resume(yielding value: __owned Element) {
       storage.yield(value)
     }
 
+    /// Resume the task awaiting the next iteration point by having it return
+    /// nil or throw which signifies the end of the iteration.
+    ///
+    /// - Parameter error: The error to throw or nil to signify termination.
+    ///
+    /// Calling this function more than once is idempotent; i.e. finishing more
+    /// than once does not alter the state beyond the requirements of
+    /// AsyncSequence; which claims that all values past a terminal state are
+    /// nil.
     public func finish(throwing error: __owned Error? = nil) {
       if let failure = error {
-        storage.yield(throwing: failure)  
+        storage.yield(throwing: failure)
       } else {
         storage.yield(nil)
       }
     }
 
+    /// A callback to invoke when iteration of a ThrowingSeries is cancelled.
+    ///
+    /// If an `onCancel` callback is set, when iteration of a Series is
+    /// cancelled via task cancellation that callback is invoked. The callback
+    /// is disposed of after any terminal state is reached.
+    ///
+    /// Cancelling an active iteration will first invoke the onCancel callback
+    /// and then resume yeilding nil. This means that any cleanup state can be
+    /// emitted accordingly in the cancellation handler
     public var onCancel: (@Sendable () -> Void)? {
       get {
         return storage.onCancel
@@ -469,6 +518,21 @@ public struct ThrowingSeries<Element> {
   let produce: (UnsafeContinuation<Element?, Error>) -> Void
   let cancel: @Sendable () -> Void
 
+  /// Construct a ThrowingSeries buffering given an Element type.
+  ///
+  /// - Parameter buffering: The type the Series will produce.
+  /// - Parameter maxBufferedPendingElements: The maximum number of elements to
+  ///   hold in the buffer past any checks for continuations being resumed.
+  /// - Parameter build: The work associated with yielding values to the Series.
+  ///
+  /// The maximum number of pending elements limited by dropping the oldest
+  /// value when a new value comes in if the buffer would excede the limit
+  /// placed upon it. By default this limit is unlimited.
+  ///
+  /// The build closure passes in a Continuation which can be used in
+  /// concurrent contexts. It is thread safe to send and finish; all calls are
+  /// to the continuation are serialized, however calling this from multiple
+  /// concurrent contexts could result in out of order delivery.
   public init(
     buffering: Element.Type,
     maxBufferedPendingElements limit: Int = .max,
@@ -486,6 +550,12 @@ public struct ThrowingSeries<Element> {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension ThrowingSeries: AsyncSequence {
+  /// The asynchronous iterator for iterating a ThrowingSeries.
+  ///
+  /// This type is specificially not Sendable. It is not intended to be used
+  /// from multiple concurrent contexts. Any such case that next is invoked
+  /// concurrently and contends with another call to next is a programmer error
+  /// and will fatalError.
   public struct Iterator: AsyncIteratorProtocol {
     let produce: (UnsafeContinuation<Element?, Error>) -> Void
     let cancel: @Sendable () -> Void
@@ -502,6 +572,7 @@ extension ThrowingSeries: AsyncSequence {
     }
   }
 
+  /// Construct an iterator.
   public func makeAsyncIterator() -> Iterator {
     return Iterator(produce: produce, cancel: cancel)
   }
@@ -509,6 +580,14 @@ extension ThrowingSeries: AsyncSequence {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension ThrowingSeries.Continuation {
+  /// Resume the task awaiting the next iteration point by having it return
+  /// nomally from its suspension point or buffer the value if no awaiting
+  /// next iteration is active.
+  ///
+  /// - Parameter result: A result to yield from the continuation.
+  ///
+  /// This can be called more than once and returns to the caller immediately
+  /// without blocking for any awaiting consuption from the iteration.
   public func resume<Failure: Error>(
     with result: Result<Element, Failure>
   ) {
@@ -519,7 +598,13 @@ extension ThrowingSeries.Continuation {
         self.finish(throwing: err)
     }
   }
-  
+
+  /// Resume the task awaiting the next iteration point by having it return
+  /// nomally from its suspension point or buffer the value if no awaiting
+  /// next iteration is active where the `Element` is `Void`.
+  ///
+  /// This can be called more than once and returns to the caller immediately
+  /// without blocking for any awaiting consuption from the iteration.
   public func resume() where Element == Void {
     self.resume(yielding: ())
   }
