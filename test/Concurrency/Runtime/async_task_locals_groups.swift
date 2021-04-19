@@ -8,45 +8,34 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-class StringLike: CustomStringConvertible {
-  let value: String
-  init(_ value: String) {
-    self.value = value
-  }
-
-  var description: String { value }
-}
-
-
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension TaskLocalValues {
-  struct NumberKey: TaskLocalKey {
-    static var defaultValue: Int { 0 }
-  }
-  var number: NumberKey { .init() }
+enum TL {
+  @TaskLocal
+  static var number: Int  = 0
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-func printTaskLocal<Key>(
-  _ key: KeyPath<TaskLocalValues, Key>,
-  _ expected: Key.Value? = nil,
-  file: String = #file, line: UInt = #line
-) where Key: TaskLocalKey {
-  let value = Task.local(key)
-  print("\(Key.self): \(value) at \(file):\(line)")
+@discardableResult
+func printTaskLocal<V, Key>(
+    _ key: Key,
+    _ expected: V? = nil,
+    file: String = #file, line: UInt = #line
+) -> V? where Key: TaskLocal<V> {
+  let value = key
+  print("\(value) at \(file):\(line)")
   if let expected = expected {
     assert("\(expected)" == "\(value)",
-      "Expected [\(expected)] but found: \(value), at \(file):\(line)")
+        "Expected [\(expected)] but found: \(value), at \(file):\(line)")
   }
+  return expected
 }
 
 // ==== ------------------------------------------------------------------------
 
-
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func groups() async {
   // no value
-  try! await withTaskGroup(of: Int.self) { group in
+  await withTaskGroup(of: Int.self) { group in
     printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
   }
 
@@ -59,7 +48,7 @@ func groups() async {
         printTaskLocal(\.number) // CHECK: NumberKey: 1 {{.*}}
       }
       printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
-      return Task.local(\.number) // 0
+      return TaskLocal(\.number) // 0
     }
 
     return try! await group.next()!
@@ -78,7 +67,7 @@ func groups() async {
         async let childInsideGroupChild: () = printTaskLocal(\.number)
         await childInsideGroupChild // CHECK: NumberKey: 2 {{.*}}
 
-        return Task.local(\.number)
+        return TaskLocal(\.number)
       }
       printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 

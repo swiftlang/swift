@@ -19,17 +19,13 @@ class StringLike: CustomStringConvertible {
 
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension TaskLocalValues {
+enum TaskLocalValues {
 
-  struct StringKey: TaskLocalKey {
-    static var defaultValue: String { .init("<undefined>") }
-  }
-  var string: StringKey { .init() }
+  @TaskLocal
+  static var string: String = "<undefined>"
 
-  struct NumberKey: TaskLocalKey {
-    static var defaultValue: Int { 0 }
-  }
-  var number: NumberKey { .init() }
+  @TaskLocal
+  static var number: Int = 0
 
   struct NeverKey: TaskLocalKey {
     static var defaultValue: StringLike { .init("<never>") }
