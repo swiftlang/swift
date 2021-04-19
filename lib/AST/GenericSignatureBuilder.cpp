@@ -6465,6 +6465,12 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
         if (resolvedConcreteType) {
           if (typeImpliesLayoutConstraint(resolvedConcreteType, layout)) {
             impliedByConcrete.push_back(constraint);
+
+            if (!source->isDerivedRequirement()) {
+              Impl->ExplicitConformancesImpliedByConcrete.insert(
+                  ExplicitRequirement::fromExplicitConstraint(
+                      RequirementKind::Layout, constraint));
+            }
           }
         }
 
