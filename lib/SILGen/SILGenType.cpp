@@ -1060,10 +1060,9 @@ public:
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
                                ConformanceLookupKind::NonInherited)) {
-      if (conformance->isComplete()) {
-        if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-          SGM.getWitnessTable(normal);
-      }
+      assert(conformance->isComplete());
+      if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
+        SGM.getWitnessTable(normal);
     }
   }
 
@@ -1183,10 +1182,9 @@ public:
       // extension.
       for (auto *conformance : e->getLocalConformances(
                                  ConformanceLookupKind::All)) {
-        if (conformance->isComplete()) {
-          if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
-            SGM.getWitnessTable(normal);
-        }
+        assert(conformance->isComplete());
+        if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
+          SGM.getWitnessTable(normal);
       }
     }
   }
