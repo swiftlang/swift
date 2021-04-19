@@ -78,9 +78,10 @@ extension ${Self}: LosslessStringConvertible {
   ///       let e = ${Self}("2837.5e-2")
   ///       // e == 28.375
   ///
-  ///   A decimal string is converted into a correctly-rounded ${Self}
-  ///   instance using IEEE 754 round-to-nearest
-  ///   conventions. Very small values are rounded to positive or
+  ///   A decimal string is converted to a ${Self}
+  ///   instance using the IEEE 754 roundTiesToEven (default) rounding
+  ///   attribute.
+  ///   Very small values are rounded to positive or
   ///   negative zero, very large values are rounded
   ///   to plus or minus infinity.
   ///
