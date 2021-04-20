@@ -482,7 +482,10 @@ public:
   
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of Swift.NAME. */ \
-  DECL_CLASS *get##NAME##Decl() const;
+  DECL_CLASS *get##NAME##Decl() const; \
+\
+  /** Retrieve the type of Swift.NAME. */ \
+  Type get##NAME##Type() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
@@ -491,14 +494,17 @@ public:
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
 
+  /// Retrieve the declaration of Swift.Void.
+  TypeAliasDecl *getVoidDecl() const;
+
+  /// Retrieve the type of Swift.Void.
+  Type getVoidType() const;
+
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
   /// Retrieve the type Swift.AnyObject.
   CanType getAnyObjectType() const;
-
-  /// Retrieve the type Swift.Never.
-  CanType getNeverType() const;
 
 #define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of MODULE.NAME. */ \

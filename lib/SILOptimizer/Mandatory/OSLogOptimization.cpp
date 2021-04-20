@@ -243,18 +243,6 @@ static bool isIntegerOrBoolType(SILType silType, ASTContext &astContext) {
   return nominalDecl && isStdlibIntegerOrBoolDecl(nominalDecl, astContext);
 }
 
-/// Return true if and only if the given SIL type represents a String type.
-static bool isStringType(SILType silType, ASTContext &astContext) {
-  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
-  return nominalDecl && nominalDecl == astContext.getStringDecl();
-}
-
-/// Return true if and only if the given SIL type represents an Array type.
-static bool isArrayType(SILType silType, ASTContext &astContext) {
-  NominalTypeDecl *nominalDecl = silType.getNominalOrBoundGenericNominal();
-  return nominalDecl && nominalDecl == astContext.getArrayDecl();
-}
-
 /// Decide if the given instruction (which could possibly be a call) should
 /// be constant evaluated.
 ///
@@ -297,7 +285,7 @@ static bool isFoldableIntOrBool(SILValue value, ASTContext &astContext) {
 /// Return true iff the given value is a string and is not an initialization
 /// of an string from a string literal.
 static bool isFoldableString(SILValue value, ASTContext &astContext) {
-  return isStringType(value->getType(), astContext) &&
+  return value->getType().getASTType()->isString() &&
          (!isa<ApplyInst>(value) ||
           !getStringMakeUTF8Init(cast<ApplyInst>(value)));
 }
@@ -305,7 +293,7 @@ static bool isFoldableString(SILValue value, ASTContext &astContext) {
 /// Return true iff the given value is an array and is not an initialization
 /// of an array from an array literal.
 static bool isFoldableArray(SILValue value, ASTContext &astContext) {
-  if (!isArrayType(value->getType(), astContext))
+  if (!value->getType().getASTType()->isArray())
     return false;
   // If value is an initialization of an array from a literal or an empty array
   // initializer, it need not be folded. Arrays constructed from literals use a
@@ -523,8 +511,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
                                          CanType arrayType, SILBuilder &builder,
                                          SILLocation loc) {
   ASTContext &astContext = builder.getASTContext();
-  assert(astContext.getArrayDecl() ==
-         arrayType->getNominalOrBoundGenericNominal());
+  assert(arrayType->isArray());
   SILModule &module = builder.getModule();
 
   // Create a SILValue for the number of elements.
@@ -672,8 +659,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
 
   switch (symVal.getKind()) {
   case SymbolicValue::String: {
-    assert(astContext.getStringDecl() ==
-           expectedType->getNominalOrBoundGenericNominal());
+    assert(expectedType->isString());
 
     StringRef stringVal = symVal.getStringValue();
     StringLiteralInst *stringLitInst = builder.createStringLiteral(

@@ -1145,8 +1145,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           "unknown structurally uninhabited type");
       }
     } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
-      if (BST->getDecl() == Context.getArrayDecl())
-          shouldRequireType = BST->getGenericArgs()[0]->isEqual(Context.TheEmptyTupleType);
+      if (BST->isArray())
+        shouldRequireType = BST->getGenericArgs()[0]->isVoid();
     }
     
     if (shouldRequireType &&
@@ -1255,7 +1255,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
-    if (type->getAnyNominal() == Context.getBoolDecl()) {
+    if (type->isBool()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);
@@ -1318,7 +1318,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       auto extraOpts =
           llvm::drop_begin(inputTypeOptionals, castTypeOptionals.size());
       for (auto extraOptTy : llvm::reverse(extraOpts)) {
-        auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
+        auto some = Context.getOptionalSomeDecl();
         auto *base = TypeExpr::createImplicit(extraOptTy, Context);
         sub = new (Context) EnumElementPattern(
             base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),

@@ -3107,13 +3107,11 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   // reads and writes its base; an application of a ReferenceWritableKeyPath
   // only reads its base; the other KeyPath types cannot be written at all.
   if (auto *KPA = dyn_cast<KeyPathApplicationExpr>(E)) {
-    auto &C = KPA->getType()->getASTContext();
     KPA->getKeyPath()->walk(*this);
 
     bool isMutating =
       (Flags & RK_Written) &&
-      KPA->getKeyPath()->getType()->getAnyNominal()
-        == C.getWritableKeyPathDecl();
+      KPA->getKeyPath()->getType()->isWritableKeyPath();
     markBaseOfStorageUse(KPA->getBase(), isMutating);
     return;
   }
@@ -4364,9 +4362,8 @@ static void diagnoseDeprecatedWritableKeyPath(const Expr *E,
         return;
 
       if (auto *keyPathExpr = dyn_cast<KeyPathExpr>(E->getKeyPath())) {
-        auto *decl = keyPathExpr->getType()->getNominalOrBoundGenericNominal();
-        if (decl != Ctx.getWritableKeyPathDecl() &&
-            decl != Ctx.getReferenceWritableKeyPathDecl())
+        if (!keyPathExpr->getType()->isWritableKeyPath() &&
+            !keyPathExpr->getType()->isReferenceWritableKeyPath())
           return;
 
         assert(keyPathExpr->getComponents().size() > 0);
@@ -4822,9 +4819,6 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     return "";
 
   ASTContext &ctx = type->getASTContext();
-  Type boolType;
-  if (auto boolDecl = ctx.getBoolDecl())
-    boolType = boolDecl->getDeclaredInterfaceType();
   auto objcBoolType = ctx.getObjCBoolType();
 
   /// Determine the options associated with the given type.
@@ -4833,7 +4827,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     OmissionTypeOptions options;
 
     // Look for Boolean types.
-    if (boolType && type->isEqual(boolType)) {
+    if (type->isBool()) {
       // Swift.Bool
       options |= OmissionTypeFlags::Boolean;
     } else if (objcBoolType && type->isEqual(objcBoolType)) {
@@ -4881,11 +4875,8 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   if (auto nominal = type->getAnyNominal()) {
     // If we have a collection, get the element type.
     if (auto bound = type->getAs<BoundGenericType>()) {
-      ASTContext &ctx = nominal->getASTContext();
       auto args = bound->getGenericArgs();
-      if (!args.empty() &&
-          (bound->getDecl() == ctx.getArrayDecl() ||
-           bound->getDecl() == ctx.getSetDecl())) {
+      if (!args.empty() && (bound->isArray() || bound->isSet())) {
         return OmissionTypeName(nominal->getName().str(),
                                 getOptions(bound),
                                 getTypeNameForOmission(args[0]).Name);

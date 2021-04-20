@@ -1364,7 +1364,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
 static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
                                               Identifier Id) {
   // String -> Builtin.RawPointer
-  auto stringType = NominalType::get(Context.getStringDecl(), Type(), Context);
+  auto stringType = Context.getStringType();
   return getBuiltinFunction(Id, {stringType}, Context.TheRawPointerType);
 }
 
@@ -1427,8 +1427,7 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(
-      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
+  builder.addParameter(makeConcrete(ctx.getIntType()));
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -1439,8 +1438,7 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
 static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(
-      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
+  builder.addParameter(makeConcrete(ctx.getIntType())); // flags
   builder.addParameter(
       makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();

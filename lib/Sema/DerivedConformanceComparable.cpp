@@ -245,7 +245,7 @@ deriveComparable_lt(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
+  auto boolTy = C.getBoolType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {

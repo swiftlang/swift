@@ -4902,12 +4902,11 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   if (auto *const bgt = type->getAs<BoundGenericType>()) {
     auto info = SelfReferenceInfo();
 
-    const auto &ctx = bgt->getDecl()->getASTContext();
-    if (ctx.getArrayDecl() == bgt->getDecl()) {
+    if (bgt->isArray()) {
       // Swift.Array preserves variance in its Value type.
       info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
                                          position);
-    } else if (bgt->getDecl() == ctx.getDictionaryDecl()) {
+    } else if (bgt->isDictionary()) {
       // Swift.Dictionary preserves variance in its Element type.
       info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
                                          SelfReferencePosition::Invariant);
