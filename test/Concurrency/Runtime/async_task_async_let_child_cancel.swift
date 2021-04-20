@@ -3,6 +3,8 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// UNSUPPORTED: OS=windows-msvc
+
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printWaitPrint(_ int: Int) async -> Int {
   print("start, cancelled:\(Task.isCancelled), id:\(int)")
