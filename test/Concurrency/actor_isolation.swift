@@ -336,6 +336,7 @@ struct GenericGlobalActor<T> {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @MainActor func beets() { onions() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'onions()' in a synchronous main actor-isolated context}}
+// expected-note@-1{{calls to global function 'beets()' from outside of its actor context are implicitly asynchronous}}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Crystal {
@@ -686,7 +687,7 @@ class SomeClassWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
 
-  static var shared = SomeClassWithInits() // expected-note{{static property declared here}}
+  static var shared = SomeClassWithInits() // expected-note 2{{static property declared here}}
 
   init() { // expected-note{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
     self.mutableState = 42
@@ -696,7 +697,9 @@ class SomeClassWithInits {
   }
 
   deinit {
-    print(SomeClassWithInits.shared) // okay, we're actor-isolated
+    print(mutableState) // Okay, we're actor-isolated
+    print(SomeClassWithInits.shared) // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    beets() //expected-error{{call to main actor-isolated global function 'beets()' in a synchronous nonisolated context}}
   }
 
   func isolated() { }
