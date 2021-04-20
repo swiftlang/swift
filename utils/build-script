@@ -1378,6 +1378,12 @@ def main_normal():
     # Create build directory.
     shell.makedirs(invocation.workspace.build_root)
 
+    # Create .build_script_log
+    if not args.dry_run:
+        build_script_log = os.path.join(invocation.workspace.build_root,
+                                        ".build_script_log")
+        open(build_script_log, 'w').close()
+
     # Build ninja if required, which will update the toolchain.
     if args.build_ninja:
         invocation.build_ninja()
