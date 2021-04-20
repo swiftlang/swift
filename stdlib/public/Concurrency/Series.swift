@@ -52,6 +52,10 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
     fatalError("Storage must be initialized by create")
   }
 
+  deinit {
+    state.onCancel?()
+  }
+
   private func lock() {
     let ptr =
       UnsafeRawPointer(Builtin.projectTailElems(self, UnsafeRawPointer.self))
@@ -78,6 +82,18 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
         unlock()
       }
     }
+  }
+
+  func cancel() {
+    lock()
+    // swap out the handler before we invoke it to prevent double cancel
+    let handler = state.onCancel
+    state.onCancel = nil
+    unlock()
+    
+    handler?() // handler must be invoked before yielding nil for termination
+
+    yield(nil)
   }
 
   private func enqueue(_ value: __owned Element?) {
@@ -386,8 +402,7 @@ public struct Series<Element> {
     let storage: _SeriesBufferedStorage<Element, Never> = .create(limit: limit)
     produce = storage.next
     cancel = {
-      storage.onCancel?()
-      storage.yield(nil)
+      storage.cancel()
     }
     build(Continuation(storage: storage))
   }
@@ -541,8 +556,7 @@ public struct ThrowingSeries<Element> {
     let storage: _SeriesBufferedStorage<Element, Error> = .create(limit: limit)
     produce = storage.next
     cancel = {
-      storage.onCancel?()
-      storage.yield(nil)
+      storage.cancel()
     }
     build(Continuation(storage: storage))
   }
