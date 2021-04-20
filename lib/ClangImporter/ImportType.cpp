@@ -490,9 +490,11 @@ namespace {
           pointerKind = PTK_UnsafeMutablePointer;
         }
       }
-
-      return {pointeeType->wrapInPointer(pointerKind),
-              ImportHint::OtherPointer};
+      if (auto wrapped = pointeeType->wrapInPointer(pointerKind)) {
+        return {wrapped, ImportHint::OtherPointer};
+      } else {
+        return Type();
+      }
     }
 
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
@@ -1929,6 +1931,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       auto genericType =
           findGenericTypeInGenericDecls(templateParamType, genericParams);
       swiftParamTy = genericType->wrapInPointer(pointerKind);
+      if (!swiftParamTy)
+        return nullptr;
     } else if (auto *templateParamType =
                    dyn_cast<clang::TemplateTypeParmType>(paramTy)) {
       swiftParamTy =
