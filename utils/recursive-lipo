@@ -11,7 +11,8 @@ import shutil
 from swift_build_support.swift_build_support import shell
 
 
-def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
+def merge_file_lists(src_root_dirs, explicit_src_files, skip_files,
+                     skip_subpaths):
     """Merges the file lists recursively from all src_root_dirs supplied,
     returning the union of all file paths found.
     Files matching skip_files are ignored and skipped.
@@ -29,6 +30,12 @@ def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
             dirs[:] = filter(
                 lambda dir: os.path.join(rel_dir, dir)
                 not in skip_subpaths, dirs)
+
+    for file in explicit_src_files:
+        # If this is an absolute installation path, e.g. /Applications/Xcode/...,
+        # treat it as being relative to a built toolchain
+        relative_path = file[1:] if file.startswith("/") else file
+        file_list.append(relative_path) if relative_path not in file_list else file_list
     return file_list
 
 
@@ -129,6 +136,15 @@ binaries.
                         default=".DS_Store",
                         help="Files to ignore and skip merge/copy, default " +
                              "is \".DS_Store\"")
+    # A list of files which this script will ensure are merged using lipo.
+    # The intent is to allow for exceptions to binaries located under
+    # `copy-subdirs` that are not built fat. However, if more such exceptions
+    # are added, it would be better to re-think our approach to a more-general
+    # solution.
+    parser.add_argument("--explicit-src-files", metavar="<explicit-source-files>",
+                        default="",
+                        help="Optional list of files which should be merged to " +
+                             "be installed")
     parser.add_argument("--copy-subdirs", metavar="<subdirs-to-copy-verbatim>",
                         default="",
                         help="Optional list of subdirectory paths that " +
@@ -145,11 +161,12 @@ binaries.
     args = parser.parse_args()
 
     skip_files = args.skip_files.split()
+    explicit_sources = args.explicit_src_files.split()
     copy_verbatim_subpaths = [
         subdir.strip('/') for subdir in args.copy_subdirs.split()]
 
-    file_list = merge_file_lists(args.src_root_dirs, skip_files,
-                                 copy_verbatim_subpaths)
+    file_list = merge_file_lists(args.src_root_dirs, explicit_sources,
+                                 skip_files, copy_verbatim_subpaths)
 
     if args.verbose:
         print("Discovered files and dirs: %s" % file_list)
