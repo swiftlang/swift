@@ -103,6 +103,18 @@
 
 namespace swift {
 
+/// Convert this struct_extract into a copy+destructure. Return the destructured
+/// result or invalid SILValue. The caller must delete the extract and its
+/// now-dead copy use.
+///
+// If a copied-def is a struct-extract, attempt a destructure conversion
+//   %extract = struct_extract %... : $TypeWithSingleOwnershipValue
+//   %copy = copy_value %extract : $OwnershipValue
+// To:
+//   %copy = copy_value %extract : $TypeWithSingleOwnershipValue
+//   (%extracted,...) = destructure %copy : $TypeWithSingleOwnershipValue
+SILValue convertExtractToDestructure(StructExtractInst *extract);
+
 /// Information about consumes on the extended-lifetime boundary. Consuming uses
 /// within the lifetime are not included--they will consume a copy after
 /// rewriting. For borrowed def values, the consumes do not include the end of

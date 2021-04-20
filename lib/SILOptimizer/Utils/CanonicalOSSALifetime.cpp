@@ -114,6 +114,32 @@ static void copyLiveUse(Operand *use) {
   LLVM_DEBUG(llvm::dbgs() << "  Copying at last use " << *copy);
 }
 
+// TODO: generalize this to handle multiple nondebug uses of the struct_extract.
+SILValue swift::convertExtractToDestructure(StructExtractInst *extract) {
+  if (!hasOneNonDebugUse(extract))
+    return nullptr;
+
+  if (!extract->isFieldOnlyNonTrivialField())
+    return nullptr;
+
+  auto *extractCopy =
+      dyn_cast<CopyValueInst>(getNonDebugUses(extract).begin()->getUser());
+  if (!extractCopy)
+    return nullptr;
+
+  SILBuilderWithScope builder(extract);
+  auto loc = extract->getLoc();
+  auto *copy = builder.createCopyValue(loc, extract->getOperand());
+  auto *destructure = builder.createDestructureStruct(loc, copy);
+
+  SILValue nonTrivialResult = destructure->getResult(extract->getFieldIndex());
+  assert(!nonTrivialResult->getType().isTrivial(*destructure->getFunction())
+         && "field idx mismatch");
+
+  extractCopy->replaceAllUsesWith(nonTrivialResult);
+  return nonTrivialResult;
+}
+
 //===----------------------------------------------------------------------===//
 //                        MARK: Rewrite borrow scopes
 //===----------------------------------------------------------------------===//
