@@ -1467,12 +1467,9 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
           // For now, just return the unbound generic type.
           return unboundTy;
         },
-        /*placeholderHandler*/
-        [&](auto placeholderRepr) {
-          // FIXME: Don't let placeholder types escape type resolution.
-          // For now, just return the placeholder type.
-          return PlaceholderType::get(getASTContext(), placeholderRepr);
-        });
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        PlaceholderType::get);
     const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
@@ -2004,12 +2001,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
           // For now, just return the unbound generic type.
           return unboundTy;
         },
-        /*placeholderHandler*/
-        [&](auto placeholderRepr) {
-          // FIXME: Don't let placeholder types escape type resolution.
-          // For now, just return the placeholder type.
-          return PlaceholderType::get(getASTContext(), placeholderRepr);
-        });
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        PlaceholderType::get);
     const auto result = resolution.resolveType(typeExpr->getTypeRepr());
     if (result->hasError())
       return nullptr;
