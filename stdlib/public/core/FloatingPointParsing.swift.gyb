@@ -153,7 +153,7 @@ extension ${Self}: LosslessStringConvertible {
   ///       let s = ${Self}("-7.89e7206")
   ///       // s == ${Self}.-infinity
   ///
-  /// Note:  Prior to Swift 5.4, a decimal or
+  /// - Note:  Prior to Swift 5.4, a decimal or
   /// hexadecimal input string whose value was too large to represent
   /// as a finite `${Self}` instance returned `nil` instead of
   /// `${Self}.infinity`.
