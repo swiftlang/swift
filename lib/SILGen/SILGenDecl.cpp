@@ -1142,8 +1142,6 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
-  // TODO: need to allocate the variable, stackalloc it? pass the address to the start()
-
   // If this is an async let, create a child task to compute the initializer
   // value.
   if (PBD->isAsyncLet()) {
@@ -1159,50 +1157,23 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
            "Could not find async let autoclosure");
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
-    // TODO: there's a builtin to make an address into a raw pointer
-    //       --- note dont need that; just have the builtin take it inout?
-    //       --- the builtin can take the address (for start())
-
-    // TODO: make a builtin start async let
-    // Builtin.startAsyncLet -- and in the builtin create the async let record
-
-    // TODO: make a builtin for end async let
-
-    // TODO: IRGen would make a local allocation for the builtins
-
-    // TODO: remember if we did an await already?
-
-    // TODO: force in typesystem that we always await; then end aysnc let does not have to be async
-    // the local let variable is actually owning the result
-    // - but since throwing we can't know; maybe we didnt await on a thing yet
-    // so we do need the tracking if we waited on a thing
-
-    // TODO: awaiting an async let should be able to take ownership
-    // that means we will not await on this async let again, maybe?
-    // it means that the async let destroy should not destroy the result anymore
-
     // Emit the closure for the child task.
-    SILValue childTask;
+    // Prepare the opaque `AsyncLet` representation.
+    SILValue alet;
     {
-      FullExpr Scope(Cleanups, CleanupLocation(init));
       SILLocation loc(PBD);
-      // TODO: opaque object in the async context that represents the async let
-      //
-      childTask = emitRunChildTask(
+      alet = emitAsyncLetStart(
           loc,
           init->getType(),
           emitRValue(init).getScalarValue()
         ).forward(*this);
     }
 
-    // Destroy the task at the end of the scope.
-    enterDestroyCleanup(childTask);
-
-    // Push a cleanup that will cancel the child task at the end of the scope.
-    enterCancelAsyncTaskCleanup(childTask); // TODO: this is "went out scope" rather than just a cancel
+    // Push a cleanup to destroy the AsyncLet along with the task and child record.
+    enterAsyncLetCleanup(alet);
 
     // Save the child task so we can await it as needed.
-    AsyncLetChildTasks[{PBD, idx}] = { childTask, isThrowing };
+    AsyncLetChildTasks[{PBD, idx}] = { alet, isThrowing };
 
     // Mark as uninitialized; actual initialization will occur when the
     // variables are referenced.
@@ -1525,6 +1496,33 @@ namespace {
 CleanupHandle SILGenFunction::enterCancelAsyncTaskCleanup(SILValue task) {
   Cleanups.pushCleanupInState<CancelAsyncTaskCleanup>(
       CleanupState::Active, task);
+  return Cleanups.getTopCleanup();
+}
+
+namespace {
+/// A cleanup that destroys the AsyncLet along with the child task and record.
+class AsyncLetCleanup: public Cleanup {
+  SILValue alet;
+public:
+  AsyncLetCleanup(SILValue alet) : alet(alet) { }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.emitEndAsyncLet(l, alet);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "AsyncLetCleanup\n"
+                 << "AsyncLet:" << alet << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet) {
+  Cleanups.pushCleanupInState<AsyncLetCleanup>(
+      CleanupState::Active, alet);
   return Cleanups.getTopCleanup();
 }
 
