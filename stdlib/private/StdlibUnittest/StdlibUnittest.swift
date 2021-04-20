@@ -886,7 +886,9 @@ func _childProcess() {
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 @inline(never)
 func _childProcessAsync() async {
+#if !os(WASI)
   _installTrapInterceptor()
+#endif
 
 #if _runtime(_ObjC)
   objc_setUncaughtExceptionHandler {
