@@ -2255,18 +2255,18 @@ namespace {
 
         LLVM_FALLTHROUGH;
 
-      case ActorIsolationRestriction::GlobalActor:
-        // If we are within an initializer and are referencing a stored
-        // property on "self", we are not crossing actors.
-        if (isa<ConstructorDecl>(getDeclContext()) &&
-            isa<VarDecl>(member) && cast<VarDecl>(member)->hasStorage() &&
-            getReferencedSelf(base))
+      case ActorIsolationRestriction::GlobalActor: {
+        const bool isInitDeInit = isa<ConstructorDecl>(getDeclContext()) ||
+                                  isa<DestructorDecl>(getDeclContext());
+        // If we are within an initializer or deinitilizer and are referencing a
+        // stored property on "self", we are not crossing actors.
+        if (isInitDeInit && isa<VarDecl>(member) &&
+            cast<VarDecl>(member)->hasStorage() && getReferencedSelf(base))
           return false;
-
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
             isolation.isCrossActor, context);
-
+      }
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
         // cases. The error is emitted by diagnoseInOutArg.
@@ -2745,13 +2745,13 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::OpaqueType:
   case DeclKind::Param:
   case DeclKind::Module:
+  case DeclKind::Destructor:
     return None;
 
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
   case DeclKind::Constructor:
-  case DeclKind::Destructor:
     return MemberIsolationPropagation::GlobalActor;
 
   case DeclKind::Func:
