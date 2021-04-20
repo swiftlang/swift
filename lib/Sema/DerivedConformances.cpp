@@ -665,9 +665,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                      /*implicit*/true,
                                      AccessSemantics::Ordinary,
                                      enumVarDecl->getType());
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(),
-                                       SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), enumRef, cases, C);
 
   stmts.push_back(indexBind);
   stmts.push_back(switchStmt);
