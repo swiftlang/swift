@@ -157,6 +157,12 @@ extension ${Self}: LosslessStringConvertible {
   ///       ${Self}("0x1.25e4")  // Incorrect exponent format
   ///
   /// - Parameter text: An input string to convert to a `${Self}?` instance.
+  ///
+  /// Backwards compatibility note:  Prior to Swift 5.4, a decimal or
+  /// hexadecimal input string whose value was too large to represent
+  /// as a finite `${Self}` instance would return `nil` instead of
+  /// `${Self}.infinity`.
+  ///
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
   %if bits == 16:
