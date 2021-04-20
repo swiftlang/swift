@@ -54,12 +54,12 @@ extension ${Self}: LosslessStringConvertible {
   ///
   /// The string passed as `text` can represent a real number in decimal or
   /// hexadecimal format or can be in a special format representing infinity
-  /// or NaN ("not a number"). If the `text` is not in a recognized format,
+  /// or NaN ("not a number"). If `text` is not in a recognized format,
   /// the optional initializer will fail and return `nil`.
   ///
   /// The `text` string consists of an optional
   /// plus or minus sign character (`+` or `-`)
-  /// followed by one of the following formats:
+  /// followed by one of the following:
   ///
   /// - A *decimal string* contains a significand consisting of one
   ///   or more decimal digits that may include a decimal point:
@@ -79,27 +79,6 @@ extension ${Self}: LosslessStringConvertible {
   ///       let e = ${Self}("2837.5e-2")
   ///       // e == 28.375
   ///
-  ///   A decimal string is converted to a ${Self}
-  ///   instance using the IEEE 754 roundTiesToEven (default) rounding
-  ///   attribute.
-  ///   Very small values are rounded to positive or
-  ///   negative zero, very large values are rounded
-  ///   to plus or minus infinity.
-  ///
-  ///       let y = ${Self}("1.23e-9999")
-  ///       // y == 0.0
-  ///       // y?.sign == .plus
-  ///
-  ///       let z = ${Self}("-7.89e-7206")
-  ///       // z == -0.0
-  ///       // z?.sign == .minus
-  ///
-  ///       let r = ${Self}("1.23e17802")
-  ///       // r == ${Self}.infinity
-  ///
-  ///       let s = ${Self}("-7.89e7206")
-  ///       // s == ${Self}.-infinity
-  ///
   /// - A *hexadecimal string* contains a significand consisting of
   ///   `0X` or `0x` followed by one or more hexadecimal digits that may
   ///   include a decimal point.
@@ -115,11 +94,6 @@ extension ${Self}: LosslessStringConvertible {
   ///
   ///       let g = ${Self}("0x1.c6p4")
   ///       // g == 28.375
-  ///
-  ///   As with decimal strings, hexadecimal strings are rounded
-  ///   to the closest ${Self} instance to the real number.  Very small
-  ///   or very large values are rounded to plus or minus zero or plus
-  ///   or minus infinity.
   ///
   /// - The input strings `"inf"` or `"infinity"` (case insensitive)
   ///   are converted to an infinite result:
@@ -148,20 +122,43 @@ extension ${Self}: LosslessStringConvertible {
   ///       // p?.isNaN == true
   ///       // String(p!) == "nan(0x10)"
   ///
-  /// - A string in any other format or containing additional characters
-  ///   results in a `nil` value. For example, the following conversions
-  ///   result in `nil`:
+  /// A string in any other format than those described above
+  /// or containing additional characters
+  /// results in a `nil` value. For example, the following conversions
+  /// result in `nil`:
   ///
   ///       ${Self}(" 5.0")      // Includes whitespace
   ///       ${Self}("±2.0")      // Invalid character
   ///       ${Self}("0x1.25e4")  // Incorrect exponent format
   ///
-  /// - Parameter text: An input string to convert to a `${Self}?` instance.
+  /// A decimal or hexadecimal string is converted to a `${Self}`
+  /// instance using the IEEE 754 roundTiesToEven (default) rounding
+  /// attribute.
+  /// Values with absolute value smaller than `${Self}.leastNonzeroMagnitude`
+  /// are rounded to plus or minus zero.
+  /// Values with absolute value larger than `${Self}.greatestFiniteMagnitude`
+  /// are rounded to plus or minus infinity.
   ///
-  /// Backwards compatibility note:  Prior to Swift 5.4, a decimal or
+  ///       let y = ${Self}("1.23e-9999")
+  ///       // y == 0.0
+  ///       // y?.sign == .plus
+  ///
+  ///       let z = ${Self}("-7.89e-7206")
+  ///       // z == -0.0
+  ///       // z?.sign == .minus
+  ///
+  ///       let r = ${Self}("1.23e17802")
+  ///       // r == ${Self}.infinity
+  ///
+  ///       let s = ${Self}("-7.89e7206")
+  ///       // s == ${Self}.-infinity
+  ///
+  /// Note:  Prior to Swift 5.4, a decimal or
   /// hexadecimal input string whose value was too large to represent
-  /// as a finite `${Self}` instance would return `nil` instead of
+  /// as a finite `${Self}` instance returned `nil` instead of
   /// `${Self}.infinity`.
+  ///
+  /// - Parameter text: An input string to convert to a `${Self}?` instance.
   ///
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
