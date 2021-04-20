@@ -39,6 +39,9 @@ struct SymbolGraphOptions {
   /// Whether to print informational messages when rendering
   /// a symbol graph.
   bool PrintMessages;
+  
+  /// Whether to skip docs for symbols with compound, "SYNTHESIZED" USRs.
+  bool SkipInheritedDocs;
 };
 
 } // end namespace symbolgraphgen
