@@ -44,11 +44,8 @@ static bool isNSObjectOrAnyHashable(ASTContext &ctx, Type type) {
              == ctx.getSwiftId(KnownFoundationEntity::NSObject) &&
            classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
   }
-  if (auto nomDecl = type->getAnyNominal()) {
-    return nomDecl == ctx.getAnyHashableDecl();
-  }
 
-  return false;
+  return type->isAnyHashable();
 }
 
 static bool isAnyObjectOrAny(Type type) {
@@ -1075,7 +1072,7 @@ private:
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
-    if (!genericTy || genericTy->getDecl() != getASTContext().getArrayDecl())
+    if (!genericTy || !genericTy->isArray())
       return false;
 
     assert(genericTy->getGenericArgs().size() == 1);
@@ -1182,14 +1179,14 @@ private:
 
       auto nominal = copyTy->getNominalOrBoundGenericNominal();
       if (nominal && isa<StructDecl>(nominal)) {
-        if (nominal == ctx.getArrayDecl() ||
-            nominal == ctx.getDictionaryDecl() ||
-            nominal == ctx.getSetDecl() ||
-            nominal == ctx.getStringDecl() ||
+        if (copyTy->isArray() ||
+            copyTy->isDictionary() ||
+            copyTy->isSet() ||
+            copyTy->isString() ||
             (!getKnownTypeInfo(nominal) && getObjCBridgedClass(nominal))) {
           // We fast-path the most common cases in the condition above.
           os << ", copy";
-        } else if (nominal == ctx.getUnmanagedDecl()) {
+        } else if (copyTy->isUnmanaged()) {
           os << ", unsafe_unretained";
           // Don't print unsafe_unretained twice.
           if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
@@ -1721,10 +1718,7 @@ private:
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
     if (ty->isAny()) {
       ty = ctx.getAnyObjectType();
-    } else if (SD != ctx.getArrayDecl() &&
-        SD != ctx.getDictionaryDecl() &&
-        SD != ctx.getSetDecl() &&
-        !isSwiftNewtype(SD)) {
+    } else if (!ty->isKnownStdlibCollectionType() && !isSwiftNewtype(SD)) {
       ty = ctx.getBridgedToObjC(&owningPrinter.M, ty);
     }
 
@@ -1737,13 +1731,9 @@ private:
   /// it out.
   bool printIfKnownGenericStruct(const BoundGenericStructType *BGT,
                                  Optional<OptionalTypeKind> optionalKind) {
-    StructDecl *SD = BGT->getDecl();
-    if (!SD->getModuleContext()->isStdlibModule())
-      return false;
+    auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
 
-    ASTContext &ctx = getASTContext();
-
-    if (SD == ctx.getUnmanagedDecl()) {
+    if (bgsTy->isUnmanaged()) {
       auto args = BGT->getGenericArgs();
       assert(args.size() == 1);
       visitPart(args.front(), optionalKind);
@@ -1753,10 +1743,10 @@ private:
 
     // Everything from here on is some kind of pointer type.
     bool isConst;
-    if (SD == ctx.getUnsafePointerDecl()) {
+    if (bgsTy->isUnsafePointer()) {
       isConst = true;
-    } else if (SD == ctx.getAutoreleasingUnsafeMutablePointerDecl() ||
-               SD == ctx.getUnsafeMutablePointerDecl()) {
+    } else if (bgsTy->isAutoreleasingUnsafeMutablePointer() ||
+               bgsTy->isUnsafeMutablePointer()) {
       isConst = false;
     } else {
       // Not a pointer.

@@ -1389,13 +1389,12 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = E->getType()->getCanonicalType();
 
   // Get the intrinsic function.
-  auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
+  if (fromCollection->isArray()) {
     fn = SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->isDictionary()) {
     fn = SGF.SGM.getDictionaryUpCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
+  } else if (fromCollection->isSet()) {
     fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
@@ -1868,8 +1867,7 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
   // Ensure that the intrinsic function exists.
   auto convertFn = SGM.getConvertToAnyHashable(loc);
   if (!convertFn)
-    return emitUndefRValue(
-        loc, getASTContext().getAnyHashableDecl()->getDeclaredInterfaceType());
+    return emitUndefRValue(loc, getASTContext().getAnyHashableType());
 
   // Construct the substitution for T: Hashable.
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
@@ -2745,8 +2743,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     params.push_back({loweredBaseTy, paramConvention});
     auto &C = SGM.getASTContext();
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
-                                                   ->getCanonicalType(),
+      params.push_back({C.getUnsafeRawPointerType()->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
     SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
@@ -2896,8 +2893,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         : paramConvention});
     // indexes
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
-                                                   ->getCanonicalType(),
+      params.push_back({C.getUnsafeRawPointerType()->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
     return SILFunctionType::get(genericSig,
@@ -3043,10 +3039,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   }
 
   auto &C = SGM.getASTContext();
-  auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
-                                                       ->getCanonicalType();
-  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType()->getCanonicalType();
-  auto intTy = C.getIntDecl()->getDeclaredInterfaceType()->getCanonicalType();
+  auto unsafeRawPointerTy = C.getUnsafeRawPointerType()->getCanonicalType();
+  auto boolTy = C.getBoolType()->getCanonicalType();
+  auto intTy = C.getIntType()->getCanonicalType();
 
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
 
@@ -3858,7 +3853,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   } else {
     arrayType = E->getType()->getCanonicalType();
     auto genericType = cast<BoundGenericStructType>(arrayType);
-    assert(genericType->getDecl() == SGF.getASTContext().getArrayDecl());
+    assert(genericType->isArray());
     elementType = genericType.getGenericArgs()[0];
   }
 

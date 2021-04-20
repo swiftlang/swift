@@ -520,7 +520,7 @@ namespace {
                                   /*implicit*/ true);
             cs.setType(
                 stringExpr,
-                cs.getASTContext().getStringDecl()->getDeclaredInterfaceType());
+                cs.getASTContext().getStringType());
             keyPath->setObjCStringLiteralExpr(stringExpr);
         }
       }
@@ -1978,7 +1978,7 @@ namespace {
         
         if (auto nom = keyPathTy->getAs<NominalType>()) {
           // AnyKeyPath is <T> rvalue T -> rvalue Any?
-          if (nom->getDecl() == cs.getASTContext().getAnyKeyPathDecl()) {
+          if (nom->isAnyKeyPath()) {
             valueTy = ProtocolCompositionType::get(cs.getASTContext(), {},
                                                   /*explicit anyobject*/ false);
             valueTy = OptionalType::get(valueTy);
@@ -2008,8 +2008,7 @@ namespace {
           if (!baseTy->isEqual(cs.getType(base)->getRValueType()))
             base = coerceToType(base, baseTy, locator);
 
-          if (keyPathBGT->getDecl()
-                == cs.getASTContext().getPartialKeyPathDecl()) {
+          if (keyPathBGT->isPartialKeyPath()) {
             // PartialKeyPath<T> is rvalue T -> rvalue Any
             valueTy = ProtocolCompositionType::get(cs.getASTContext(), {},
                                                  /*explicit anyobject*/ false);
@@ -2021,14 +2020,12 @@ namespace {
             valueTy = keyPathBGT->getGenericArgs()[1];
         
             // The result may be an lvalue based on the base and key path kind.
-            if (keyPathBGT->getDecl() == cs.getASTContext().getKeyPathDecl()) {
+            if (keyPathBGT->isKeyPath()) {
               resultIsLValue = false;
               base = cs.coerceToRValue(base);
-            } else if (keyPathBGT->getDecl() ==
-                         cs.getASTContext().getWritableKeyPathDecl()) {
+            } else if (keyPathBGT->isWritableKeyPath()) {
               resultIsLValue = cs.getType(base)->hasLValueType();
-            } else if (keyPathBGT->getDecl() ==
-                       cs.getASTContext().getReferenceWritableKeyPathDecl()) {
+            } else if (keyPathBGT->isReferenceWritableKeyPath()) {
               resultIsLValue = true;
               base = cs.coerceToRValue(base);
             } else {
@@ -2848,7 +2845,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, ctx.getIntDecl()->getDeclaredInterfaceType());
+        cs.setType(expr, ctx.getIntType());
         return handleIntegerLiteralExpr(expr);
       };
 
@@ -3851,10 +3848,7 @@ namespace {
           ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
         }
 
-        cs.setType(isSomeExpr,
-                   boolDecl
-                   ? boolDecl->getDeclaredInterfaceType()
-                   : Type());
+        cs.setType(isSomeExpr, boolDecl ? ctx.getBoolType() : Type());
         return isSomeExpr;
       }
 
@@ -7142,8 +7136,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   case TypeKind::BoundGenericStruct: {
     auto toStruct = cast<BoundGenericStructType>(desugaredToType);
-    if (toStruct->getDecl() != ctx.getArrayDecl() &&
-        toStruct->getDecl() != ctx.getDictionaryDecl())
+    if (!toStruct->isArray() && !toStruct->isDictionary())
       break;
 
     if (toStruct->getDecl() == cs.getType(expr)->getAnyNominal())
@@ -8633,7 +8626,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         return None;
 
       // FIXME: Feels like we could leverage existing code more.
-      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
+      Type boolType = cs.getASTContext().getBoolType();
       guardExpr = solution.coerceToType(
           guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
       if (!guardExpr)

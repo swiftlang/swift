@@ -604,10 +604,9 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   auto *BGT = Ty->getAs<BoundGenericType>();
   if (!BGT)
     return false;
-  if (BGT->getDecl() != Ctx.getUnsafePointerDecl() &&
-      BGT->getDecl() != Ctx.getUnsafeMutablePointerDecl())
+  if (!BGT->isUnsafePointer() && !BGT->isUnsafeMutablePointer())
     return false;
-  IsMutable = BGT->getDecl() == Ctx.getUnsafeMutablePointerDecl();
+  IsMutable = BGT->isUnsafeMutablePointer();
   assert(BGT->getGenericArgs().size() == 1);
   return BGT->getGenericArgs().front()->isVoid();
 }

@@ -416,7 +416,7 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
   // Method should return `String?`
   auto &C = calleeFn->getASTContext();
   auto objTy = AI->getType().getOptionalObjectType();
-  if (!objTy || objTy.getStructOrBoundGenericStruct() != C.getStringDecl())
+  if (!objTy || !objTy.getASTType()->isString())
     return false;
   
   auto objcString = kp->getPattern()->getObjCString();

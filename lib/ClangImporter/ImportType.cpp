@@ -838,8 +838,7 @@ namespace {
       case ImportHint::NSUInteger:
         // NSUInteger might be imported as Int rather than UInt depending
         // on where the import lives.
-        if (underlyingResult.AbstractType->getAnyNominal() ==
-            Impl.SwiftContext.getIntDecl())
+        if (underlyingResult.AbstractType->isInt())
           break;
         LLVM_FALLTHROUGH;
       default:
@@ -1079,7 +1078,7 @@ namespace {
         if (auto objcClassDef = objcClass->getDefinition())
           bridgedType = mapSwiftBridgeAttr(objcClassDef);
         else if (objcClass->getName() == "NSString")
-          bridgedType = Impl.SwiftContext.getStringDecl()->getDeclaredInterfaceType();
+          bridgedType = Impl.SwiftContext.getStringType();
 
         if (bridgedType) {
           // Gather the type arguments.
@@ -1121,31 +1120,25 @@ namespace {
             // The first type argument for Dictionary or Set needs
             // to be Hashable. If something isn't Hashable, fall back
             // to AnyHashable as a key type.
-            if (unboundDecl == Impl.SwiftContext.getDictionaryDecl() ||
-                unboundDecl == Impl.SwiftContext.getSetDecl()) {
+            if (unboundType->isDictionary() || unboundType->isSet()) {
               auto &keyType = importedTypeArgs[0];
-              auto keyStructDecl = keyType->getStructOrBoundGenericStruct();
               if (!Impl.matchesHashableBound(keyType) ||
                   // Dictionary and Array conditionally conform to Hashable,
                   // but the conformance doesn't necessarily apply with the
                   // imported versions of their type arguments.
                   // FIXME: Import their non-Hashable type parameters as
                   // AnyHashable in this context.
-                  keyStructDecl == Impl.SwiftContext.getDictionaryDecl() ||
-                  keyStructDecl == Impl.SwiftContext.getArrayDecl()) {
-                if (auto anyHashable = Impl.SwiftContext.getAnyHashableDecl())
-                  keyType = anyHashable->getDeclaredInterfaceType();
-                else
-                  keyType = Type();
+                  keyType->isDictionary() || keyType->isArray()) {
+                keyType = Impl.SwiftContext.getAnyHashableType();
               }
             }
 
             // Form the specialized type.
-            if (unboundDecl == Impl.SwiftContext.getArrayDecl()) {
+            if (unboundType->isArray()) {
               // Type sugar for arrays.
               assert(importedTypeArgs.size() == 1);
               bridgedType = ArraySliceType::get(importedTypeArgs[0]);
-            } else if (unboundDecl == Impl.SwiftContext.getDictionaryDecl()) {
+            } else if (unboundType->isDictionary()) {
               // Type sugar for dictionaries.
               assert(importedTypeArgs.size() == 2);
               bridgedType = DictionaryType::get(importedTypeArgs[0],
@@ -1340,8 +1333,7 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
   if (!boundGenericTy)
     return Type();
 
-  auto boundGenericBase = boundGenericTy->getDecl();
-  if (boundGenericBase != impl.SwiftContext.getUnmanagedDecl())
+  if (!boundGenericTy->isUnmanaged())
     return Type();
 
   assert(boundGenericTy->getGenericArgs().size() == 1 &&
@@ -1467,14 +1459,14 @@ static ImportedType adjustTypeForConcreteImport(
     // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
     // losslessly.
     if (bridging == Bridgeability::Full && canBridgeTypes(importKind))
-      importedType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      importedType = impl.SwiftContext.getBoolType();
     break;
 
   case ImportHint::NSUInteger:
     // When NSUInteger is used as an enum's underlying type or if it does not
     // come from a system module, make sure it stays unsigned.
     if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt)
-      importedType = impl.SwiftContext.getUIntDecl()->getDeclaredInterfaceType();
+      importedType = impl.SwiftContext.getUIntType();
     break;
 
   case ImportHint::CFPointer:
@@ -1780,7 +1772,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     switch (getClangASTContext().BuiltinInfo.getTypeString(builtinID)[0]) {
     case 'z': // size_t
     case 'Y': // ptrdiff_t
-      return {SwiftContext.getIntDecl()->getDeclaredInterfaceType(), false};
+      return {SwiftContext.getIntType(), false};
     default:
       break;
     }
@@ -2200,7 +2192,7 @@ static Type decomposeCompletionHandlerType(
 
   switch (resultTypeElts.size()) {
   case 0:
-    return paramTy->getASTContext().getVoidDecl()->getDeclaredInterfaceType();
+    return paramTy->getASTContext().getVoidType();
 
   case 1:
     return resultTypeElts.front().getType();
@@ -2575,7 +2567,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   *bodyParams = ParameterList::create(SwiftContext, swiftParams);
 
   if (clangDecl->hasAttr<clang::NoReturnAttr>()) {
-    origSwiftResultTy = SwiftContext.getNeverType();
+    origSwiftResultTy = SwiftContext.getNeverType()->getCanonicalType();
     swiftResultTy = SwiftContext.getNeverType();
   }
 
@@ -2649,7 +2641,7 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
     paramInfo->setInterfaceType(propertyTy);
 
     *params = ParameterList::create(SwiftContext, paramInfo);
-    resultTy = SwiftContext.getVoidDecl()->getDeclaredInterfaceType();
+    resultTy = SwiftContext.getVoidType();
     isIUO = false;
   }
 

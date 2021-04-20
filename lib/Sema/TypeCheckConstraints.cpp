@@ -1800,8 +1800,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  if (ConstraintSystem::isAnyHashableType(toType) ||
-      ConstraintSystem::isAnyHashableType(fromType)) {
+  if (toType->isAnyHashable() || fromType->isAnyHashable()) {
     return CheckedCastKind::ValueCast;
   }
 

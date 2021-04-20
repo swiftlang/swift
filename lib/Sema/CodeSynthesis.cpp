@@ -184,7 +184,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   bool isNilInitialized =
     var->getAttrs().hasAttribute<LazyAttr>() ||
     (!isExplicitlyInitialized && isDefaultInitializable &&
-     var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
+     var->getValueInterfaceType()->isOptional() &&
      (var->getAttachedPropertyWrappers().empty() ||
       var->isPropertyMemberwiseInitializedWithWrappedType()));
   if (isNilInitialized) {
