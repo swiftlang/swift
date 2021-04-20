@@ -244,6 +244,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::EndAsyncLet) {
     emitEndAsyncLet(IGF, args.claimNext());
+    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
+    // only used for dependency tracking.
+    (void)args.claimAll();
     return;
   }
 
