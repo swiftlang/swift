@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-library-evolution -emit-module -emit-module-path %t/resilient_struct.swiftmodule
 // RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-library-evolution -emit-module -emit-module-path %t/resilient_enum.swiftmodule
-// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -disable-copy-propagation -I %t -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -enable-experimental-concurrency -emit-sil -disable-copy-propagation -I %t -o - | %FileCheck %s
 
 // Using -disable-copy-propagation to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
@@ -61,6 +61,20 @@ public func testSimple(c: C) {
 
 public func testGeneric(c: C) {
   use_closureGeneric { return c.returnInt() }
+}
+
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup12testAsyncLetyS2SYaF : $@convention(thin) @async (@guaranteed String) -> @owned String {
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:   [[MD:%.*]] = mark_dependence [[PA]]
+// CHECK:   [[CONV:%.*]] = convert_function [[MD]]
+// CHECK:   [[BAL:%.*]] = builtin "startAsyncLet"<String>([[CONV]]
+// CHECK:   builtin "endAsyncLet"([[BAL]] : $Builtin.RawPointer, [[MD]]
+// CHECK: } // end sil function '$s22closure_lifetime_fixup12testAsyncLetyS2SYaF'
+
+public func testAsyncLet(_ n: String) async -> String {
+  async let first = n
+  let result = await first
+  return result
 }
 
 public protocol P {
