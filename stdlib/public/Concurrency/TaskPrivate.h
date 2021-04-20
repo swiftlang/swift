@@ -55,6 +55,11 @@ void runJobInEstablishedExecutorContext(Job *job);
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
 
+AsyncTaskAndContext swift_task_create_future_no_escaping(JobFlags flags,
+                     const Metadata *futureResultType,
+                     void *closureEntry,
+                     void *closureContext);
+
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
 #else

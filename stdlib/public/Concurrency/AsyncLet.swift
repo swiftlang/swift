@@ -20,7 +20,7 @@ import Swift
 @_silgen_name("swift_asyncLet_start")
 public func _asyncLetStart<T>(
   asyncLet: Builtin.RawPointer,
-  operation: __owned @Sendable @escaping () async throws -> T
+  operation: @Sendable () async throws -> T
 )
 
 /// Similar to _taskFutureGet but for AsyncLet

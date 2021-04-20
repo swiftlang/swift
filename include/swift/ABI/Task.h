@@ -581,13 +581,13 @@ public:
 /// This matches the ABI of a closure `() async throws -> ()`
 using AsyncVoidClosureEntryPoint =
   SWIFT_CC(swiftasync)
-  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
 /// This matches the ABI of a closure `<T>() async throws -> T`
 using AsyncGenericClosureEntryPoint =
     SWIFT_CC(swiftasync)
     void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
 /// This matches the ABI of the resume function of a closure
 ///  `() async throws -> ()`.
@@ -601,7 +601,7 @@ public:
   // passing the closure context instead of via the async context)
   AsyncVoidClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
-   HeapObject *closureContext;
+  void *closureContext;
   SwiftError *errorResult;
 };
 
@@ -614,7 +614,7 @@ public:
   // passing the closure context instead of via the async context)
   AsyncGenericClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
-  HeapObject *closureContext;
+  void *closureContext;
   SwiftError *errorResult;
 };
 

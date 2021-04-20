@@ -300,7 +300,7 @@ static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context,
   auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
       reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
 
-  swift_release(asyncContextPrefix->closureContext);
+  swift_release((HeapObject *)asyncContextPrefix->closureContext);
   
   // Clean up the rest of the task.
   return completeTask(context, error);
@@ -335,7 +335,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     JobFlags flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
-    HeapObject * /* +1 */ closureContext,
+    void *closureContext, bool owningClosureContext,
     size_t initialContextSize) {
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
@@ -471,7 +471,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
   initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-      closureContext ? &completeTaskWithClosure : &completeTask);
+      (closureContext && owningClosureContext) ? &completeTaskWithClosure :
+                                                 &completeTask);
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
@@ -492,7 +493,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 static AsyncTaskAndContext swift_task_create_group_future_common(
     JobFlags flags, TaskGroup *group, const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
-    HeapObject * /* +1 */ closureContext, size_t initialContextSize);
+    void *closureContext, bool owningClosureContext,
+    size_t initialContextSize);
 
 AsyncTaskAndContext
 swift::swift_task_create_f(JobFlags flags,
@@ -521,6 +523,7 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   return swift_task_create_group_future_common(flags, group,
                                                futureResultType,
                                                function, nullptr,
+                                               /*owningClosureContext*/ false,
                                                initialContextSize);
 }
 
@@ -556,6 +559,26 @@ AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
   return swift_task_create_group_future_common(
       flags, nullptr, futureResultType,
       taskEntry, closureContext,
+      /*owningClosureContext*/ true,
+      initialContextSize);
+}
+
+AsyncTaskAndContext swift::swift_task_create_future_no_escaping(JobFlags flags,
+                     const Metadata *futureResultType,
+                     void *closureEntry,
+                     void *closureContext) {
+  FutureAsyncSignature::FunctionType *taskEntry;
+  size_t initialContextSize;
+  std::tie(taskEntry, initialContextSize)
+    = getAsyncClosureEntryPointAndContextSize<
+      FutureAsyncSignature,
+      SpecialPointerAuthDiscriminators::AsyncFutureFunction
+    >(closureEntry, (HeapObject *)closureContext);
+
+  return swift_task_create_group_future_common(
+      flags, nullptr, futureResultType,
+      taskEntry, closureContext,
+      /*owningClosureContext*/ false,
       initialContextSize);
 }
 
@@ -575,6 +598,7 @@ swift::swift_task_create_group_future(
   return swift_task_create_group_future_common(
       flags, group, futureResultType,
       taskEntry, closureContext,
+      /*owningClosureContext*/ true,
       initialContextSize);
 }
 

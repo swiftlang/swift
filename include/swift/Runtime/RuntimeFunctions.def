@@ -1682,7 +1682,7 @@ FUNCTION(DefaultActorDeallocateResilient,
 ///     AsyncLet *alet,
 ///     const Metadata *futureResultType,
 ///     void *closureEntryPoint,
-///     HeapObject *closureContext
+///     OpaqueValue *closureContext
 /// );
 FUNCTION(AsyncLetStart,
          swift_asyncLet_start, SwiftCC,
@@ -1691,7 +1691,7 @@ FUNCTION(AsyncLetStart,
          ARGS(SwiftAsyncLetPtrTy, // AsyncLet*, alias for Int8PtrTy
               TypeMetadataPtrTy,  // futureResultType
               Int8PtrTy,          // closureEntry
-              RefCountedPtrTy,    // closureContext
+              OpaquePtrTy,        // closureContext
          ),
          ATTRS(NoUnwind, ArgMemOnly))
 

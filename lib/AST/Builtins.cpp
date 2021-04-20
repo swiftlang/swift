@@ -1498,7 +1498,7 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
 
   // operation async function pointer: () async throws -> T
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().withNoEscape().build();
   builder.addParameter(
       makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
 

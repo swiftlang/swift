@@ -281,7 +281,7 @@ bool swift_taskGroup_isEmpty(TaskGroup *group);
 /// \code
 /// func swift_asyncLet_start<T>(
 ///     _ alet: Builtin.RawPointer,
-///     operation: __owned @Sendable @escaping () async throws -> T
+///     operation: __owned @Sendable () async throws -> T
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -289,7 +289,7 @@ void swift_asyncLet_start(
     AsyncLet *alet,
     const Metadata *futureResultType,
     void *closureEntryPoint,
-    HeapObject * /* +1 */ closureContext);
+    void *closureContext);
 
 /// This matches the ABI of a closure `<T>(Builtin.RawPointer) async -> T`
 using AsyncLetWaitSignature =
