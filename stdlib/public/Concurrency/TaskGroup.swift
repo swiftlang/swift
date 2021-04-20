@@ -254,7 +254,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       flags.bits, _group, operation)
     
     // Attach it to the group's task record in the current task.
-    _ = _taskGroupAttachChild(group: _group, child: childTask)
+    _taskGroupAttachChild(group: _group, child: childTask)
     
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
@@ -299,7 +299,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       flags.bits, _group, operation)
 
     // Attach it to the group's task record in the current task.
-    _ = _taskGroupAttachChild(group: _group, child: childTask)
+    _taskGroupAttachChild(group: _group, child: childTask)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
@@ -507,7 +507,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       flags.bits, _group, operation)
 
     // Attach it to the group's task record in the current task.
-    _ = _taskGroupAttachChild(group: _group, child: childTask)
+    _taskGroupAttachChild(group: _group, child: childTask)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
@@ -552,7 +552,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
       flags.bits, _group, operation)
 
     // Attach it to the group's task record in the current task.
-    _ = _taskGroupAttachChild(group: _group, child: childTask)
+    _taskGroupAttachChild(group: _group, child: childTask)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
@@ -790,7 +790,7 @@ extension ThrowingTaskGroup: AsyncSequence {
 func _taskGroupAttachChild(
   group: Builtin.RawPointer,
   child: Builtin.NativeObject
-) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
+)
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_destroy")

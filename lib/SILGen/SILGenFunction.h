@@ -376,9 +376,9 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
 
-  /// Mapping from each async let clause to the child task that will produce
-  /// the initializer value for that clause and a Boolean value indicating
-  /// whether the task can throw.
+  /// Mapping from each async let clause to the AsyncLet repr that contains the
+  /// AsyncTask that will produce the initializer value for that clause and a
+  /// Boolean value indicating whether the task can throw.
   llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
                       std::pair<SILValue, bool /*isThrowing*/> >
       AsyncLetChildTasks;
@@ -1369,8 +1369,12 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
-  ManagedValue emitRunChildTask(
+  ManagedValue emitAsyncLetStart(
       SILLocation loc, Type functionType, ManagedValue taskFunction);
+
+  ManagedValue emitAsyncLetGet(SILLocation loc, SILValue asyncLet);
+
+  ManagedValue emitEndAsyncLet(SILLocation loc, SILValue asyncLet);
 
   ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
 
@@ -2095,6 +2099,9 @@ public:
 
   /// Enter a cleanup to cancel the given task.
   CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
+
+  // Enter a cleanup to cancel and destroy an AsyncLet as it leaves the scope.
+  CleanupHandle enterAsyncLetCleanup(SILValue alet);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,
