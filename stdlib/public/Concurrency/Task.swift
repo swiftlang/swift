@@ -680,10 +680,6 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
-@available(*, deprecated)
-@_silgen_name("swift_task_runAndBlockThread")
-public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
-
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_asyncMainDrainQueue")
 public func _asyncMainDrainQueue() -> Never

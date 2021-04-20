@@ -1584,7 +1584,7 @@ public:
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext, 
-                   Optional<ValueDecl *> implicitlyAsyncApply);
+                   Optional<ActorIsolation> implicitAsyncIsolation);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,

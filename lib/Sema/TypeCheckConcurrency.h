@@ -169,7 +169,11 @@ public:
   }
 
   /// Determine the isolation rules for a given declaration.
-  static ActorIsolationRestriction forDeclaration(ConcreteDeclRef declRef);
+  ///
+  /// \param fromExpression Indicates that the reference is coming from an
+  /// expression.
+  static ActorIsolationRestriction forDeclaration(
+      ConcreteDeclRef declRef, bool fromExpression = true);
 
   operator Kind() const { return kind; };
 };

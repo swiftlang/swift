@@ -129,7 +129,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
@@ -386,7 +387,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     switchArg = CallExpr;
   }
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), switchArg,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());

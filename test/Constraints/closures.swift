@@ -1097,3 +1097,11 @@ struct R_76250381<Result, Failure: Error> {
     return false
   }
 }
+
+// SR-13483
+(0..<10).map { x, y in } 
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 2 were used in closure body}}
+(0..<10).map { x, y, z in } 
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 3 were used in closure body}}
+(0..<10).map { x, y, z, w in } 
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 4 were used in closure body}}

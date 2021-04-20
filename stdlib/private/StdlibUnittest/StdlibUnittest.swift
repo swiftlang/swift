@@ -883,6 +883,62 @@ func _childProcess() {
   }
 }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+@inline(never)
+func _childProcessAsync() async {
+  _installTrapInterceptor()
+
+#if _runtime(_ObjC)
+  objc_setUncaughtExceptionHandler {
+    let exception = ($0 as Optional)! as AnyObject
+    var stderr = _Stderr()
+    let maybeNSException =
+        unsafeBitCast(exception, to: _StdlibUnittestNSException.self)
+    if let name = maybeNSException.name {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception " +
+        "\(name): \(exception)",
+        to: &stderr)
+    } else {
+      print("*** [StdlibUnittest] Terminating due to uncaught exception: " +
+        "\(exception)",
+        to: &stderr)
+    }
+  }
+#endif
+
+  while let line = _stdlib_getline() {
+    let parts = line._split(separator: ";")
+
+    if parts[0] == _stdlibUnittestStreamPrefix {
+      precondition(parts[1] == "shutdown")
+      return
+    }
+
+    let testSuiteName = parts[0]
+    let testName = parts[1]
+    var testParameter: Int?
+    if parts.count > 2 {
+      testParameter = Int(parts[2])!
+    } else {
+      testParameter = nil
+    }
+
+    let testSuite = _allTestSuites[_testSuiteNameToIndex[testSuiteName]!]
+    _anyExpectFailed.store(false)
+    await testSuite._runTestAsync(name: testName, parameter: testParameter)
+
+    print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed.load())")
+
+    var stderr = _Stderr()
+    print("\(_stdlibUnittestStreamPrefix);end", to: &stderr)
+
+    if testSuite._shouldShutDownChildProcess(forTestNamed: testName) {
+      return
+    }
+  }
+}
+#endif
+
 class _ParentProcess {
 #if os(Windows)
   internal var _process: HANDLE = INVALID_HANDLE_VALUE
@@ -1321,6 +1377,100 @@ class _ParentProcess {
     }
   }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  internal func runOneTestAsync(
+    fullTestName: String,
+    testSuite: TestSuite,
+    test t: TestSuite._Test,
+    testParameter: Int?
+  ) async -> _TestStatus {
+    let activeSkips = t.getActiveSkipPredicates()
+    if !activeSkips.isEmpty {
+      return .skip(activeSkips)
+    }
+
+    let activeXFails = t.getActiveXFailPredicates()
+    let expectXFail = !activeXFails.isEmpty
+    let activeXFailsText = expectXFail ? " (XFAIL: \(activeXFails))" : ""
+    print("[ RUN      ] \(fullTestName)\(activeXFailsText)")
+
+    var expectCrash = false
+    var childTerminationStatus: ProcessTerminationStatus?
+    var crashStdout: [Substring] = []
+    var crashStderr: [Substring] = []
+    if _runTestsInProcess {
+      if t.stdinText != nil {
+        print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
+        _anyExpectFailed.store(true)
+      } else if t.requiresOwnProcess {
+        print("The test \(fullTestName) requires running in a child process and can't be run in-process, marking as failed.")
+        _anyExpectFailed.store(true)
+      } else {
+        _anyExpectFailed.store(false)
+        await testSuite._runTestAsync(name: t.name, parameter: testParameter)
+      }
+    } else {
+      var anyExpectFailed = false
+      (anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
+       crashStderr) =
+        _runTestInChild(testSuite, t.name, parameter: testParameter)
+      _anyExpectFailed.store(anyExpectFailed)
+    }
+
+    // Determine if the test passed, not taking XFAILs into account.
+    var testPassed = false
+    switch (childTerminationStatus, expectCrash) {
+    case (.none, false):
+      testPassed = !_anyExpectFailed.load()
+
+    case (.none, true):
+      testPassed = false
+      print("expecting a crash, but the test did not crash")
+
+    case (.some, false):
+      testPassed = false
+      print("the test crashed unexpectedly")
+
+    case (.some, true):
+      testPassed = !_anyExpectFailed.load()
+    }
+    if testPassed && t.crashOutputMatches.count > 0 {
+      // If we still think that the test passed, check if the crash
+      // output matches our expectations.
+      let crashOutput = crashStdout + crashStderr
+      for expectedSubstring in t.crashOutputMatches {
+        var found = false
+        for s in crashOutput {
+          if findSubstring(s, expectedSubstring) != nil {
+            found = true
+            break
+          }
+        }
+        if !found {
+          print("did not find expected string after crash: \(expectedSubstring.debugDescription)")
+          testPassed = false
+        }
+      }
+    }
+
+    // Apply XFAILs.
+    switch (testPassed, expectXFail) {
+    case (true, false):
+      return .pass
+
+    case (true, true):
+      return .uxPass
+
+    case (false, false):
+      return .fail
+
+    case (false, true):
+      return .xFail
+    }
+  }
+#endif
+
+
   func run() {
     if let filter = _filter {
       print("StdlibUnittest: using filter: \(filter)")
@@ -1392,6 +1542,81 @@ class _ParentProcess {
       _testSuiteFailedCallback()
     }
   }
+
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  func runAsync() async {
+    if let filter = _filter {
+      print("StdlibUnittest: using filter: \(filter)")
+    }
+    for testSuite in _allTestSuites {
+      var uxpassedTests: [String] = []
+      var failedTests: [String] = []
+      var skippedTests: [String] = []
+      for t in testSuite._tests {
+        for testParameter in t.parameterValues {
+          var testName = t.name
+          if let testParameter = testParameter {
+            testName += "/"
+            testName += String(testParameter)
+          }
+          let fullTestName = "\(testSuite.name).\(testName)"
+          if let filter = _filter,
+             findSubstring(fullTestName, filter) == nil {
+
+            continue
+          }
+
+          switch runOneTest(
+            fullTestName: fullTestName,
+            testSuite: testSuite,
+            test: t,
+            testParameter: testParameter
+          ) {
+          case .skip(let activeSkips):
+            skippedTests.append(testName)
+            print("[ SKIP     ] \(fullTestName) (skip: \(activeSkips))")
+
+          case .pass:
+            print("[       OK ] \(fullTestName)")
+
+          case .uxPass:
+            uxpassedTests.append(testName)
+            print("[   UXPASS ] \(fullTestName)")
+
+          case .fail:
+            failedTests.append(testName)
+            print("[     FAIL ] \(fullTestName)")
+
+          case .xFail:
+            print("[    XFAIL ] \(fullTestName)")
+          }
+        }
+      }
+
+      if !uxpassedTests.isEmpty || !failedTests.isEmpty {
+        print("\(testSuite.name): Some tests failed, aborting")
+        print("UXPASS: \(uxpassedTests)")
+        print("FAIL: \(failedTests)")
+        print("SKIP: \(skippedTests)")
+        if !uxpassedTests.isEmpty {
+          _printDebuggingAdvice(uxpassedTests[0])
+        }
+        if !failedTests.isEmpty {
+          _printDebuggingAdvice(failedTests[0])
+        }
+        _testSuiteFailedCallback()
+      } else {
+        print("\(testSuite.name): All tests passed")
+      }
+    }
+    let (failed: failedOnShutdown, ()) = _shutdownChild()
+    if failedOnShutdown {
+      print("The child process failed during shutdown, aborting.")
+      _testSuiteFailedCallback()
+    }
+  }
+#endif
+
 }
 
 // Track repeated calls to runAllTests() and/or runNoTests().
@@ -1507,6 +1732,76 @@ public func runAllTests() {
   }
 }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+public func runAllTestsAsync() async {
+  if PersistentState.runNoTestsWasCalled {
+    print("runAllTests() called after runNoTests(). Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  if PersistentState.runAllTestsWasCalled {
+    print("runAllTests() called twice. Aborting.")
+    _testSuiteFailedCallback()
+    return
+  }
+  PersistentState.runAllTestsWasCalled = true
+  PersistentState.ranSomething = true
+
+#if _runtime(_ObjC)
+  autoreleasepool {
+    _stdlib_initializeReturnAutoreleased()
+  }
+#endif
+
+  let _isChildProcess: Bool =
+    CommandLine.arguments.contains("--stdlib-unittest-run-child")
+
+  if _isChildProcess {
+    await _childProcessAsync()
+  } else {
+    var runTestsInProcess: Bool = false
+    var filter: String?
+    var args = [String]()
+    var i = 0
+    i += 1 // Skip the name of the executable.
+    while i < CommandLine.arguments.count {
+      let arg = CommandLine.arguments[i]
+      if arg == "--stdlib-unittest-in-process" {
+        runTestsInProcess = true
+        i += 1
+        continue
+      }
+      if arg == "--stdlib-unittest-filter" {
+        filter = CommandLine.arguments[i + 1]
+        i += 2
+        continue
+      }
+      if arg == "--help" {
+        let message =
+"optional arguments:\n" +
+"--stdlib-unittest-in-process\n" +
+"                        run tests in-process without intercepting crashes.\n" +
+"                        Useful for running under a debugger.\n" +
+"--stdlib-unittest-filter FILTER-STRING\n" +
+"                        only run tests whose names contain FILTER-STRING as\n" +
+"                        a substring."
+        print(message)
+        return
+      }
+
+      // Pass through unparsed arguments to the child process.
+      args.append(CommandLine.arguments[i])
+
+      i += 1
+    }
+
+    let parent = _ParentProcess(
+      runTestsInProcess: runTestsInProcess, args: args, filter: filter)
+    await parent.runAsync()
+  }
+}
+#endif
+
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 @_silgen_name("_swift_leaks_startTrackingObjects")
@@ -1541,6 +1836,23 @@ public final class TestSuite {
     _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
     .code(testFunction)
   }
+
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  // This method is prohibited from inlining because inlining the test harness
+  // into the test is not interesting from the runtime performance perspective.
+  // And it does not really make the test cases more effectively at testing the
+  // optimizer from a correctness prospective. On the contrary, it sometimes
+  // severely affects the compile time of the test code.
+  @inline(never)
+  public func test(
+    _ name: String,
+    file: String = #file, line: UInt = #line,
+    _ testFunction: @escaping () async -> Void
+  ) {
+    _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
+    .code(testFunction)
+  }
+#endif
 
   // This method is prohibited from inlining because inlining the test harness
   // into the test is not interesting from the runtime performance perspective.
@@ -1587,6 +1899,12 @@ public final class TestSuite {
       code()
     case .parameterized(code: let code, _):
       code(parameter!)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+    case .singleAsync(_):
+      fatalError("Cannot call async code, use `runAllTestsAsync`")
+    case .parameterizedAsync(code: _, _):
+      fatalError("Cannot call async code, use `runAllTestsAsync`")
+#endif
     }
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -1600,6 +1918,54 @@ public final class TestSuite {
       0, LifetimeTracked.instances, "Found leaked LifetimeTracked instances.",
       file: test.testLoc.file, line: test.testLoc.line)
   }
+
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  func _runTestAsync(name testName: String, parameter: Int?) async {
+    PersistentState.ranSomething = true
+    for r in _allResettables {
+      r.reset()
+    }
+    LifetimeTracked.instances = 0
+    if let f = _testSetUpCode {
+      f()
+    }
+    let test = _testByName(testName)
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    startTrackingObjects(name)
+#endif
+
+    switch test.code {
+    case .single(let code):
+      precondition(
+        parameter == nil,
+        "can't pass parameters to non-parameterized tests")
+      code()
+    case .parameterized(code: let code, _):
+      code(parameter!)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+    case .singleAsync(let code):
+      precondition(
+        parameter == nil,
+        "can't pass parameters to non-parameterized tests")
+      await code()
+    case .parameterizedAsync(code: let code, _):
+      await code(parameter!)
+#endif
+    }
+
+#if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
+    _ = stopTrackingObjects(name)
+#endif
+
+    if let f = _testTearDownCode {
+      f()
+    }
+    expectEqual(
+      0, LifetimeTracked.instances, "Found leaked LifetimeTracked instances.",
+      file: test.testLoc.file, line: test.testLoc.line)
+  }
+#endif
 
   func _testByName(_ testName: String) -> _Test {
     return _tests[_testNameToIndex[testName]!]
@@ -1619,6 +1985,10 @@ public final class TestSuite {
   internal enum _TestCode {
     case single(code: () -> Void)
     case parameterized(code: (Int) -> Void, count: Int)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+    case singleAsync(code: () async -> Void)
+    case parameterizedAsync(code: (Int) async -> Void, count: Int)
+#endif
   }
 
   internal struct _Test {
@@ -1652,6 +2022,12 @@ public final class TestSuite {
         return [nil]
       case .parameterized(code: _, count: let count):
         return Array(0..<count)
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+      case .singleAsync:
+        return [nil]
+      case .parameterizedAsync(code: _, count: let count):
+        return Array(0..<count)
+#endif
       }
     }
   }
@@ -1720,6 +2096,12 @@ public final class TestSuite {
       _build(.single(code: testFunction))
     }
 
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+    public func code(_ testFunction: @escaping () async -> Void) {
+      _build(.singleAsync(code: testFunction))
+    }
+#endif
+
     public func forEach<Data>(
       in parameterSets: [Data],
       testFunction: @escaping (Data) -> Void
@@ -1728,6 +2110,18 @@ public final class TestSuite {
         code: { (i: Int) in testFunction(parameterSets[i]) },
         count: parameterSets.count))
     }
+
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+    public func forEach<Data>(
+      in parameterSets: [Data],
+      testFunction: @escaping (Data) async -> Void
+    ) {
+      _build(.parameterizedAsync(
+        code: { (i: Int) in await testFunction(parameterSets[i]) },
+        count: parameterSets.count))
+    }
+#endif
+
   }
 
   var name: String
