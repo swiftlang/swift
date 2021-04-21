@@ -11,20 +11,6 @@ import _Concurrency
 import StdlibUnittest
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension TestSuite {
-  @inline(never)
-  public func test(
-    _ name: String,
-    file: String = #file, line: UInt = #line,
-    _ testFunction: @escaping () async -> Void
-  ) {
-    test(name, file: file, line: line) {
-      runAsyncAndBlock(testFunction)
-    }
-  }
-}
-
 struct SomeError: Error, Equatable {
   var value = Int.random(in: 0..<100)
 }
