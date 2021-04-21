@@ -177,6 +177,7 @@ static void destroyJob(SWIFT_CONTEXT HeapObject *obj) {
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
+
   // For a future, destroy the result.
   if (task->isFuture()) {
     task->futureFragment()->destroy();
@@ -282,10 +283,8 @@ static void completeTask(SWIFT_ASYNC_CONTEXT AsyncContext *context,
   }
 
   // TODO: set something in the status?
-  if (task->hasChildFragment()) {
-    // TODO: notify the parent somehow?
-    // TODO: remove this task from the child-task chain?
-  }
+  // TODO: notify the parent somehow?
+  // TODO: remove this task from the child-task chain?
 
   // Release the task, balancing the retain that a running task has on itself.
   // If it was a group child task, it will remain until the group returns it.
@@ -355,12 +354,15 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
+
   if (parent) {
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
+
   if (flags.task_isGroupChildTask()) {
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
+
   if (futureResultType) {
     headerSize += FutureFragment::fragmentSize(futureResultType);
     // Add the future async context prefix.
@@ -378,9 +380,6 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 
   assert(amountToAllocate % MaximumAlignment == 0);
 
-  // TODO: allow optionally passing in an allocation+sizeOfIt to reuse for the task
-  //       if the necessary space is enough, we can initialize into it rather than malloc.
-  //       this would allow us to stack-allocate async-let related tasks.
   void *allocation = malloc(amountToAllocate);
 
   AsyncContext *initialContext =
@@ -593,6 +592,7 @@ static void swift_task_future_waitImpl(OpaqueValue *result,
   context->asyncResumeEntryPoint = nullptr;
   context->successResultPointer = result;
   context->errorResult = nullptr;
+
 
   // Wait on the future.
   assert(task->isFuture());

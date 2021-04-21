@@ -2822,6 +2822,7 @@ SILGenFunction::maybeEmitValueOfLocalVarDecl(
       completeAsyncLetChildTask(patternBinding, index);
     }
 
+
     // If this has an address, return it.  By-value let's have no address.
     SILValue ptr = It->second.value;
     if (ptr->getType().isAddress())

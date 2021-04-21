@@ -137,7 +137,7 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   }
 
   // Add storage for data used by runtime entry points.
-  // See TaskFutureWaitAsyncContext and TaskGroupNextAsyncContext.
+  // See TaskFutureWaitAsyncContext.
   if (kind.isSpecial()) {
     switch (kind.getSpecialKind()) {
     case FunctionPointer::SpecialKind::TaskFutureWait:
@@ -155,25 +155,7 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
       // void (*, *) async  *asyncResumeEntryPoint;
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
-      break;
-    }
-    case FunctionPointer::SpecialKind::AsyncLetWait:
-    case FunctionPointer::SpecialKind::AsyncLetWaitThrowing: {
-      // This needs to match the layout of TaskFutureWaitAsyncContext.
-      // Add storage for the waiting future's result pointer (OpaqueValue *).
-      auto ty = SILType();
-      auto &ti = IGM.getSwiftContextPtrTypeInfo();
-      // SwiftError *
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      // OpaqueValue *successResultPointer
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      // void (*, *) async  *asyncResumeEntryPoint;
-      valTypes.push_back(ty);
-      typeInfos.push_back(&ti);
-      break;
-    }
+    } break;
     case FunctionPointer::SpecialKind::TaskGroupWaitNext: {
       // This needs to match the layout of TaskGroupNextAsyncContext.
       // Add storage for the waiting future's result pointer (OpaqueValue *).
@@ -191,11 +173,10 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
       // TaskGroup *group;
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
-      // Metadata *successType;
+      // Metata *successType;
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
-      break;
-    }
+    } break;
     }
   }
   return AsyncContextLayout(IGM, LayoutStrategy::Optimal, valTypes, typeInfos,
