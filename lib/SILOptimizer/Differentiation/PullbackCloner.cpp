@@ -2345,6 +2345,9 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
   // Propagate pullback struct argument.
   TangentBuilder pullbackTrampolineBBBuilder(
       pullbackTrampolineBB, getContext());
+  pullbackTrampolineBBBuilder.setCurrentDebugScope(
+      remapScope(origPredBB->getTerminator()->getDebugScope()));
+
   auto *pullbackTrampolineBBArg = pullbackTrampolineBB->getArguments().front();
   if (vjpCloner.getLoopInfo()->getLoopFor(origPredBB)) {
     assert(pullbackTrampolineBBArg->getType() ==
