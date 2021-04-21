@@ -207,6 +207,12 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({operatorDecl});
+
+  // For the effective memberwise initializer before we force the body,
+  // so that it becomes part of the emitted ABI members even if we don't
+  // emit the body.
+  (void) nominal->getEffectiveMemberwiseInitializer();
+
   return operatorDecl;
 }
 
@@ -311,6 +317,12 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   getterDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_zero, nullptr);
 
   derived.addMembersToConformanceContext({propDecl, pbDecl});
+
+  // For the effective memberwise initializer before we force the body,
+  // so that it becomes part of the emitted ABI members even if we don't
+  // emit the body.
+  (void) nominal->getEffectiveMemberwiseInitializer();
+
   return propDecl;
 }
 

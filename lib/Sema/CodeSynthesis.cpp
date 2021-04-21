@@ -1312,10 +1312,6 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
         continue;
       storedProperties.push_back(vd);
     }
-    // Return false if initializer does not have interface type set. It is not
-    // possible to determine whether it is a memberwise initializer.
-    if (!initDecl->hasInterfaceType())
-      return false;
     auto initDeclType =
         initDecl->getMethodInterfaceType()->getAs<AnyFunctionType>();
     // Return false if initializer does not have a valid interface type.
