@@ -3833,6 +3833,30 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
   }
 }
 
+// If the given witness matches a generic RawRepresentable function conforming
+// with a given protocol e.g. `func == <T : RawRepresentable>(lhs: T, rhs: T) ->
+// Bool where T.RawValue : Equatable`
+static bool isRawRepresentableGenericFunction(
+    ASTContext &ctx, const ValueDecl *witness,
+    const NormalProtocolConformance *conformance) {
+  auto *fnDecl = dyn_cast<AbstractFunctionDecl>(witness);
+  if (!fnDecl || !fnDecl->isStdlibDecl())
+    return false;
+
+  return fnDecl->isGeneric() && fnDecl->getGenericParams()->size() == 1 &&
+         fnDecl->getGenericRequirements().size() == 2 &&
+         llvm::all_of(
+             fnDecl->getGenericRequirements(), [&](Requirement genericReq) {
+               if (genericReq.getKind() != RequirementKind::Conformance)
+                 return false;
+               return genericReq.getProtocolDecl() ==
+                          ctx.getProtocol(
+                              KnownProtocolKind::RawRepresentable) ||
+                      genericReq.getProtocolDecl() ==
+                          conformance->getProtocol();
+             });
+}
+
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
@@ -3881,6 +3905,16 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   bool considerRenames =
       !canDerive && !requirement->getAttrs().hasAttribute<OptionalAttr>() &&
       !requirement->getAttrs().isUnavailable(getASTContext());
+
+  auto &ctx = getASTContext();
+  bool isEquatableConformance = Conformance->getProtocol() ==
+                                ctx.getProtocol(KnownProtocolKind::Equatable);
+
+  auto decl = Conformance->getDeclContext()->getSelfNominalTypeDecl();
+  auto *enumDecl = dyn_cast_or_null<EnumDecl>(decl);
+  bool isSwiftRawRepresentableEnum =
+      enumDecl && enumDecl->hasRawType() && !enumDecl->isObjC();
+
   if (findBestWitness(requirement,
                       considerRenames ? &ignoringNames : nullptr,
                       Conformance,
@@ -3888,6 +3922,17 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                       matches, numViable, bestIdx, doNotDiagnoseMatches)) {
     const auto &best = matches[bestIdx];
     auto witness = best.Witness;
+
+    if (canDerive && isSwiftRawRepresentableEnum && isEquatableConformance) {
+      // For swift enum types that can derive equatable conformance,
+      // if the best witness is default generic conditional conforming
+      // `func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool where
+      // T.RawValue : Equatable` let's return as missing and derive
+      // the conformance since it is possible.
+      if (isRawRepresentableGenericFunction(ctx, witness, Conformance)) {
+        return ResolveWitnessResult::Missing;
+      }
+    }
 
     // If the name didn't actually line up, complain.
     if (ignoringNames &&
