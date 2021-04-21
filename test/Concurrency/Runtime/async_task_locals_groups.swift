@@ -35,43 +35,43 @@ func printTaskLocal<V, Key>(
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func groups() async {
   // no value
-  await withTaskGroup(of: Int.self) { group in
-    printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
+  _ = await withTaskGroup(of: Int.self) { group in
+    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
   }
 
   // no value in parent, value in child
-  let x1: Int = try! await withTaskGroup(of: Int.self) { group in
+  let x1: Int = await withTaskGroup(of: Int.self) { group in
     group.spawn {
-      printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
       // inside the child task, set a value
-      await Task.withLocal(\.number, boundTo: 1) {
-        printTaskLocal(\.number) // CHECK: NumberKey: 1 {{.*}}
+      _ = await TL.$number.withValue(1) {
+        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(1)
       }
-      printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
-      return TaskLocal(\.number) // 0
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
+      return TL.number // 0
     }
 
-    return try! await group.next()!
+    return await group.next()!
   }
   assert(x1 == 0)
 
   // value in parent and in groups
-  await Task.withLocal(\.number, boundTo: 2) {
-    printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+  await TL.$number.withValue(2) {
+    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
 
-    let x2: Int = try! await withTaskGroup(of: Int.self) { group in
-      printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+    let x2: Int = await withTaskGroup(of: Int.self) { group in
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
       group.spawn {
-        printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
 
-        async let childInsideGroupChild: () = printTaskLocal(\.number)
-        await childInsideGroupChild // CHECK: NumberKey: 2 {{.*}}
+        async let childInsideGroupChild = printTaskLocal(TL.$number)
+        _ = await childInsideGroupChild // CHECK: TaskLocal<Int>(2)
 
-        return TaskLocal(\.number)
+        return TL.number
       }
-      printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
 
-      return try! await group.next()!
+      return await group.next()!
     }
 
     assert(x2 == 2)

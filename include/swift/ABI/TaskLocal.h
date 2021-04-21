@@ -136,7 +136,6 @@ public:
 
     /// Retrieve a pointer to the storage of the value.
     OpaqueValue *getStoragePtr() {
-      fprintf(stderr, "[%s:%d] (%s) GET STORAGE\n", __FILE__, __LINE__, __FUNCTION__);
       return reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(this) + storageOffset(valueType));
     }

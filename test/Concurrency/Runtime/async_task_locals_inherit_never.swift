@@ -33,7 +33,7 @@ func printTaskLocal<Key>(
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-enum TaskLocalValues {
+enum TL {
 
   struct StringKey: TaskLocalKey {
     static var defaultValue: String { .init("<undefined>") }
