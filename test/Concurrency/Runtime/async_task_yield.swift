@@ -5,6 +5,8 @@
 
 // https://bugs.swift.org/browse/SR-14333
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 protocol Go: Actor {
