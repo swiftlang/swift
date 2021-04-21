@@ -490,6 +490,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     member->setImplicit();
 
   derived.addMembersToConformanceContext({structDecl});
+
+  TypeChecker::checkConformancesInContext(structDecl);
+
   return structDecl;
 }
 
