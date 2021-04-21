@@ -19,17 +19,10 @@ import Swift
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public final class TaskLocal<Value>: CustomStringConvertible {
   var defaultValue: Value
-  var inherit: TaskLocalInheritance
 
   // Note: could overload with additional parameters to support other features
   public init(wrappedValue: Value) {
     self.defaultValue = wrappedValue
-    self.inherit = .default
-  }
-
-  public init(wrappedValue: Value, inherit: TaskLocalInheritance) {
-    self.defaultValue = wrappedValue
-    self.inherit = inherit
   }
 
   public var wrappedValue: Value {
@@ -40,7 +33,7 @@ public final class TaskLocal<Value>: CustomStringConvertible {
         }
 
         let value = _taskLocalValueGet(
-            task._task, key: unsafeBitCast(self, to: Builtin.RawPointer.self), inheritance: inherit.rawValue)
+            task._task, key: unsafeBitCast(self, to: Builtin.RawPointer.self))
 
         guard let rawValue = value else {
           return self.defaultValue
@@ -63,6 +56,7 @@ public final class TaskLocal<Value>: CustomStringConvertible {
     self
   }
 
+  /// Execute the `body` closure
   @discardableResult
   public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R,
                            file: String = #file, line: UInt = #line) async rethrows -> R {
@@ -87,55 +81,6 @@ public final class TaskLocal<Value>: CustomStringConvertible {
 
 }
 
-/// A `TaskLocalKey` is used to identify, bind and get a task local value from
-/// a `Task` in which a function is currently executing.
-///
-/// - SeeAlso: `Task.withLocal(_:boundTo:operation:)`
-/// - SeeAlso: `TaskLocal(_:)`
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public protocol TaskLocalKey {
-  /// The type of `Value` uniquely identified by this key.
-  associatedtype Value
-
-  /// If a task local value is not present in a given context, its `defaultValue`
-  /// will be returned instead.
-  ///
-  /// A common pattern is to use an `Optional<T>` type and use `nil` as default value,
-  /// if the type itself does not have a good "undefined" or "zero" value that could
-  /// be used here.
-  static var defaultValue: Value { get }
-
-  /// Allows configuring specialized inheritance strategies for task local values.
-  ///
-  /// By default, task local values are accessible by the current or any of its
-  /// child tasks (with this rule applying recursively).
-  ///
-  /// Some, rare yet important, use-cases may require specialized inheritance
-  /// strategies, and this property allows them to configure these for their keys.
-  static var inherit: TaskLocalInheritance { get }
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension TaskLocalKey {
-  public static var inherit: TaskLocalInheritance { .default }
-}
-
-/// Determines task local value behavior in child tasks.
-// TODO: should likely remain extensible
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public enum TaskLocalInheritance: UInt8, Equatable {
-  /// The default inheritance strategy.
-  ///
-  /// Task local values whose keys are `default` inherited are available to the
-  /// task which declared them, as well as recursively by any child tasks
-  case `default` = 0
-
-  /// Causes task local values to never be inherited.
-  /// If the parent task has a value bound using this key, and a child task
-  /// attempts to look up a value of that key, it will return `defaultValue`.
-  case never = 1
-}
-
 // ==== ------------------------------------------------------------------------
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -156,8 +101,7 @@ public func _taskLocalValuePop(
 @_silgen_name("swift_task_localValueGet")
 public func _taskLocalValueGet(
   _ task: Builtin.NativeObject,
-  key: Builtin.RawPointer/*Key*/,
-  inheritance: UInt8/*TaskLocalInheritance*/
+  key: Builtin.RawPointer/*Key*/
 ) -> UnsafeMutableRawPointer? // where Key: TaskLocal
 
 // ==== Checks -----------------------------------------------------------------
