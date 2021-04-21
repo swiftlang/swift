@@ -961,6 +961,7 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   unsafeSendable.resize(params.size());
   unsafeMainActor.resize(params.size());
+  implicitSelfCapture.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -1020,6 +1021,10 @@ ParameterListInfo::ParameterListInfo(
     if (param->getAttrs().hasAttribute<UnsafeMainActorAttr>()) {
       unsafeMainActor.set(i);
     }
+
+    if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
+      implicitSelfCapture.set(i);
+    }
   }
 }
 
@@ -1048,6 +1053,17 @@ bool ParameterListInfo::isUnsafeMainActor(unsigned paramIdx) const {
   return paramIdx < unsafeMainActor.size()
       ? unsafeMainActor[paramIdx]
       : false;
+}
+
+bool ParameterListInfo::isImplicitSelfCapture(unsigned paramIdx) const {
+  return paramIdx < implicitSelfCapture.size()
+      ? implicitSelfCapture[paramIdx]
+      : false;
+}
+
+bool ParameterListInfo::anyContextualInfo() const {
+  return unsafeSendable.any() || unsafeMainActor.any() ||
+      implicitSelfCapture.any();
 }
 
 /// Turn a param list into a symbolic and printable representation that does not

@@ -1546,7 +1546,7 @@ namespace  {
     UNINTERESTING_ATTR(Nonisolated)
     UNINTERESTING_ATTR(UnsafeSendable)
     UNINTERESTING_ATTR(UnsafeMainActor)
-
+    UNINTERESTING_ATTR(ImplicitSelfCapture)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
