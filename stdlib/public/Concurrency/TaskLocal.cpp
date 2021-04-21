@@ -63,8 +63,6 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
 
 TaskLocal::Item*
 TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
-  fprintf(stderr, "[%s:%d] (%s) CREATE PARENT LINK\n", __FILE__, __LINE__, __FUNCTION__);
-
   size_t amountToAllocate = Item::itemSize(/*valueType*/nullptr);
   // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
   void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
@@ -112,7 +110,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
   char *message;
   swift_asprintf(
       &message,
-      "error: task-local value: detected illegal task-local value binding at %.*s:%d.\n"
+      "error: task-local: detected illegal task-local value binding at %.*s:%d.\n"
       "Task-local values must only be set in a structured-context, such as: "
       "around any (synchronous or asynchronous function invocation), "
       "around an 'async let' declaration, or around a 'with(Throwing)TaskGroup(...){ ... }' "
@@ -130,7 +128,7 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       "\n"
       "    // bind task-local for all tasks spawned within the group\n"
       "    await <task-local>.withValue(1234) {\n"
-      "        await withTaskGroup(...) { group in \n"
+      "        await withTaskGroup(...) { group in\n"
       "            group.spawn { ... }\n"
       "        }\n"
       "    }\n"
@@ -138,9 +136,9 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
       "or, inside the specific task-group child task:\n"
       "\n"
       "    // bind-task-local for only specific child-task\n"
-      "    await withTaskGroup(...) { group in \n"
+      "    await withTaskGroup(...) { group in\n"
       "        group.spawn {\n"
-      "            await <task-local>.withValue(1234) {    // OK!\n"
+      "            await <task-local>.withValue(1234) {\n"
       "                ... \n"
       "            }\n"
       "        }\n"
@@ -239,7 +237,6 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
   assert(value && "Task local value must not be nil");
 
   auto item = Item::createLink(task, key, valueType);
-  fprintf(stderr, "[%s:%d] (%s) here\n", __FILE__, __LINE__, __FUNCTION__);
   valueType->vw_initializeWithTake(item->getStoragePtr(), value);
   head = item;
 }

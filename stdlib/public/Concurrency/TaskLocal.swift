@@ -63,9 +63,11 @@ public final class TaskLocal<Value>: CustomStringConvertible {
     self
   }
 
-  public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R) async rethrows -> R {
+  @discardableResult
+  public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R,
+                           file: String = #file, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
-    _checkIllegalTaskLocalBindingWithinWithTaskGroup()
+    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
     // we need to escape the `_task` since the withUnsafeCurrentTask closure is not `async`.
     // this is safe, since we know the task will remain alive because we are running inside of it.
@@ -162,8 +164,7 @@ public func _taskLocalValueGet(
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @usableFromInline
-func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String = #file,
-                                                      line: UInt = #line) {
+func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
     file.withCString { _fileStart in
       _reportIllegalTaskLocalBindingWithinWithTaskGroup(

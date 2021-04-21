@@ -17,9 +17,8 @@ class StringLike: CustomStringConvertible {
   var description: String { value }
 }
 
-
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-enum TaskLocalValues {
+enum TL {
 
   @TaskLocal
   static var string: String = "<undefined>"
@@ -27,16 +26,11 @@ enum TaskLocalValues {
   @TaskLocal
   static var number: Int = 0
 
-  struct NeverKey: TaskLocalKey {
-    static var defaultValue: StringLike { .init("<never>") }
-  }
-  var never: NeverKey { .init() }
+  @TaskLocal
+  static var never: StringLike = "<never>"
 
-  struct ClazzKey: TaskLocalKey {
-    static var defaultValue: ClassTaskLocal? { nil }
-  }
-  var clazz: ClazzKey { .init() }
-
+  @TaskLocal
+  static var clazz: ClassTaskLocal = nil
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -68,9 +62,9 @@ func printTaskLocal<Key>(
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple() async {
-  printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
-  await Task.withLocal(\.number, boundTo: 1) {
-    printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 1 {{.*}}
+  printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+  await TL.$number.withValue(1) {
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(1)
   }
 }
 
@@ -103,16 +97,16 @@ func simple_throw() async {
 func nested() async {
   printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "hello") {
-    printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 0 {{.*}}
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(2)
     printTaskLocal(\.string)// CHECK-NEXT: StringKey: hello {{.*}}
-    await Task.withLocal(\.number, boundTo: 2) {
-      printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 2 {{.*}}
+    await TL.$number.withValue(2) {
+      printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(2)
       printTaskLocal(\.string, "hello") // CHECK: StringKey: hello {{.*}}
     }
-    printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 0 {{.*}}
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(2)
     printTaskLocal(\.string) // CHECK-NEXT: StringKey: hello {{.*}}
   }
-  printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 0 {{.*}}
+  printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(2)
   printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
 }
 
@@ -138,9 +132,9 @@ func nested_3_onlyTopContributes() async {
   printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "one") {
     printTaskLocal(\.string)// CHECK-NEXT: StringKey: one {{.*}}
-    await Task.withLocal(\.number, boundTo: 2) {
+    await TL.$number.withValue(2) {
       printTaskLocal(\.string) // CHECK-NEXT: StringKey: one {{.*}}
-      await Task.withLocal(\.number, boundTo: 3) {
+      await TL.$number.withValue(3) {
         printTaskLocal(\.string) // CHECK-NEXT: StringKey: one {{.*}}
       }
       printTaskLocal(\.string) // CHECK-NEXT: StringKey: one {{.*}}
