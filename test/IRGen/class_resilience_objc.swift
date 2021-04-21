@@ -7,6 +7,7 @@
 //   The test is cloned as class_resilience_objc_armv7k.swift for them.
 // XFAIL: CPU=armv7k
 // XFAIL: CPU=arm64_32
+// XFAIL: CPU=arm64e
 // REQUIRES: objc_interop
 
 import Foundation
