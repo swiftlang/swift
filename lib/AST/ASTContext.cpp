@@ -3075,11 +3075,13 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                               Type result) {
+                               Type result, Type globalActor) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
   properties |= result->getRecursiveProperties();
+  if (globalActor)
+    properties |= globalActor->getRecursiveProperties();
   properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
@@ -3274,7 +3276,11 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, Optional<ExtInfo> info) {
-  auto properties = getFunctionRecursiveProperties(params, result);
+  Type globalActor;
+  if (info.hasValue())
+    globalActor = info->getGlobalActor();
+
+  auto properties = getFunctionRecursiveProperties(params, result, globalActor);
   auto arena = getArena(properties);
 
   llvm::FoldingSetNodeID id;
@@ -3295,10 +3301,6 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 
   bool hasClangInfo =
       info.hasValue() && !info.getValue().getClangTypeInfo().empty();
-
-  Type globalActor;
-  if (info.hasValue())
-    globalActor = info->getGlobalActor();
 
   size_t allocSize = totalSizeToAlloc<
       AnyFunctionType::Param, ClangTypeInfo, Type
@@ -3393,7 +3395,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (info.hasValue())
     globalActor = info->getGlobalActor();
 
-  if (globalActor && !globalActor->isCanonical())
+  if (globalActor && !sig->isCanonicalTypeInContext(globalActor))
     isCanonical = false;
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type>(

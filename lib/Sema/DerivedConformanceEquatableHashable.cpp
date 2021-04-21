@@ -80,7 +80,8 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
                                   /*implicit*/ true,
                                   TupleType::get(abTupleElts, C));
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -277,7 +278,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -751,7 +753,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   auto enumRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());

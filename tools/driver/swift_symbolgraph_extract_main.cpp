@@ -167,6 +167,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       AccessLevel::Public,
       !ParsedArgs.hasArg(OPT_skip_synthesized_members),
       ParsedArgs.hasArg(OPT_v),
+      ParsedArgs.hasArg(OPT_skip_inherited_docs),
   };
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {

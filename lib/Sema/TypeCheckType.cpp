@@ -2020,15 +2020,16 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   }
 
   case TypeReprKind::Placeholder: {
+    auto &ctx = getASTContext();
     // Fill in the placeholder if there's an appropriate handler.
     if (const auto handlerFn = resolution.getPlaceholderHandler())
-      if (const auto ty = handlerFn(cast<PlaceholderTypeRepr>(repr)))
+      if (const auto ty = handlerFn(ctx, cast<PlaceholderTypeRepr>(repr)))
         return ty;
 
     // Complain if we're allowed to and bail out with an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors))
-      getASTContext().Diags.diagnose(repr->getLoc(),
-                                     diag::placeholder_type_not_allowed);
+      ctx.Diags.diagnose(repr->getLoc(),
+                         diag::placeholder_type_not_allowed);
 
     return ErrorType::get(resolution.getASTContext());
   }

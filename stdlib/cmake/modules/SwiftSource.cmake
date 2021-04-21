@@ -264,6 +264,10 @@ function(_add_target_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
+  if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY")
+  endif()
+
   if(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS)
     list(APPEND result "-D" "SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS")
   endif()

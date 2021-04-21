@@ -23,7 +23,8 @@ TEST_F(SemaTest, TestTrailingClosureMatchRecordingForIdenticalFunctions) {
   auto intType = getStdlibType("Int");
   auto floatType = getStdlibType("Float");
 
-  auto func = FunctionType::get({FunctionType::Param(intType)}, floatType);
+  auto func = FunctionType::get(
+      {FunctionType::Param(intType), FunctionType::Param(intType)}, floatType);
 
   cs.addConstraint(
       ConstraintKind::ApplicableFunction, func, func,
@@ -37,7 +38,9 @@ TEST_F(SemaTest, TestTrailingClosureMatchRecordingForIdenticalFunctions) {
   const auto &solution = solutions.front();
 
   auto *locator = cs.getConstraintLocator({}, ConstraintLocator::ApplyArgument);
-  auto choice = solution.trailingClosureMatchingChoices.find(locator);
-  ASSERT_TRUE(choice != solution.trailingClosureMatchingChoices.end());
-  ASSERT_EQ(choice->second, TrailingClosureMatching::Forward);
+  auto choice = solution.argumentMatchingChoices.find(locator);
+  ASSERT_TRUE(choice != solution.argumentMatchingChoices.end());
+  MatchCallArgumentResult expected{
+      TrailingClosureMatching::Forward, {{0}, {1}}, None};
+  ASSERT_EQ(choice->second, expected);
 }

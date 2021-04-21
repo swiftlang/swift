@@ -689,7 +689,8 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
     switch (kind) {
     case PTK_UnsafeMutableRawPointer:
     case PTK_UnsafeRawPointer:
-      llvm_unreachable("these pointer types don't take arguments");
+      // these pointer types don't take arguments.
+      return (NominalTypeDecl*)nullptr;
     case PTK_UnsafePointer:
       return ctx.getUnsafePointerDecl();
     case PTK_UnsafeMutablePointer:
@@ -701,6 +702,10 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
   }());
 
   assert(pointerDecl);
+  // Don't fail hard on null pointerDecl.
+  if (!pointerDecl) {
+    return Type();
+  }
   return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
 }
 
@@ -3181,15 +3186,12 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // archetype in question. This will map the inner generic signature of the
   // opaque type to its outer signature.
   auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
-  // Then apply the substitutions from the root opaque archetype, to specialize
-  // for its type arguments.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
   auto isContextWholeModule = this->isContextWholeModule;
-  if (substTy.findIf(
+  if (partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
                                        isContextWholeModule))
@@ -3197,6 +3199,12 @@ operator()(SubstitutableType *maybeOpaqueType) const {
             return false;
           }))
     return maybeOpaqueType;
+
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments. We perform this substitution after checking for
+  // visibility, since we do not want the result of the visibility check to
+  // depend on the substitutions previously applied.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
   // If the type changed, but still contains opaque types, recur.
   if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
@@ -3264,18 +3272,12 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // archetype in question. This will map the inner generic signature of the
   // opaque type to its outer signature.
   auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
-  auto partialSubstRef =
-      abstractRef.subst(archetype->getInterfaceType(), *subs);
-
-  // Then apply the substitutions from the root opaque archetype, to specialize
-  // for its type arguments.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
   auto isContextWholeModule = this->isContextWholeModule;
-  if (substTy.findIf(
+  if (partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
                                        isContextWholeModule))
@@ -3284,6 +3286,14 @@ operator()(CanType maybeOpaqueType, Type replacementType,
           }))
     return abstractRef;
 
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments. We perform this substitution after checking for
+  // visibility, since we do not want the result of the visibility check to
+  // depend on the substitutions previously applied.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+
+  auto partialSubstRef =
+      abstractRef.subst(archetype->getInterfaceType(), *subs);
   auto substRef =
       partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
 
@@ -4879,6 +4889,17 @@ case TypeKind::Id:
     if (resultTy.getPointer() != function->getResult().getPointer())
       isUnchanged = false;
 
+    // Transform the global actor.
+    Type globalActorType;
+    if (Type origGlobalActorType = function->getGlobalActor()) {
+      globalActorType = origGlobalActorType.transformRec(fn);
+      if (!globalActorType)
+        return Type();
+
+      if (globalActorType.getPointer() != origGlobalActorType.getPointer())
+        isUnchanged = false;
+    }
+
     if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
 #ifndef NDEBUG
       // Check that generic parameters won't be trasnformed.
@@ -4895,7 +4916,8 @@ case TypeKind::Id:
       if (!function->hasExtInfo())
         return GenericFunctionType::get(genericSig, substParams, resultTy);
       return GenericFunctionType::get(genericSig, substParams, resultTy,
-                                      function->getExtInfo());
+                                      function->getExtInfo()
+                                          .withGlobalActor(globalActorType));
     }
 
     if (isUnchanged) return *this;
@@ -4903,7 +4925,8 @@ case TypeKind::Id:
     if (!function->hasExtInfo())
       return FunctionType::get(substParams, resultTy);
     return FunctionType::get(substParams, resultTy,
-                             function->getExtInfo());
+                             function->getExtInfo()
+                                 .withGlobalActor(globalActorType));
   }
 
   case TypeKind::ArraySlice: {

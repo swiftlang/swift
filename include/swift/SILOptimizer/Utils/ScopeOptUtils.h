@@ -61,7 +61,6 @@ protected:
   /// on Optional has value.
   void invalidateCleanup(unsigned cleanupIndex) {
     assert(!didPop && "Should not invalidate once popped?!");
-    assert(cleanupIndex < cleanups.size());
     assert(cleanups[cleanupIndex].hasValue());
     cleanups[cleanupIndex] = None;
   }

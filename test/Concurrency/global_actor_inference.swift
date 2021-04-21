@@ -49,21 +49,21 @@ protocol P2 {
 }
 
 class C1: P1 {
-  func method() { } // expected-note 2 {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  func method() { } // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
   @OtherGlobalActor func testMethod() {
-    method() // expected-error {{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
-    _ = method  // expected-error {{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+    method() // expected-error {{call to global actor 'SomeGlobalActor'-isolated instance method 'method()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
+    _ = method
   }
 }
 
 class C2: P2 {
-  func method1() { }  // expected-note 2{{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
+  func method1() { }  // expected-note {{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
   func method2() { }
 
   @OtherGlobalActor func testMethod() {
-    method1() // expected-error{{instance method 'method1()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
-    _ = method1 // expected-error{{instance method 'method1()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+    method1() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method1()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
+    _ = method1
     method2() // okay
   }
 }
@@ -74,8 +74,8 @@ struct AllInP1: P1 {
 }
 
 func testAllInP1(ap1: AllInP1) { // expected-note 2 {{add '@SomeGlobalActor' to make global function 'testAllInP1(ap1:)' part of global actor 'SomeGlobalActor'}}
-  ap1.method() // expected-error{{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
-  ap1.other() // expected-error{{instance method 'other()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  ap1.method() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method()' in a synchronous nonisolated context}}
+  ap1.other() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'other()' in a synchronous nonisolated context}}
 }
 
 struct NotAllInP1 {
@@ -87,7 +87,7 @@ extension NotAllInP1: P1 {
 }
 
 func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor' to make global function 'testNotAllInP1(nap1:)' part of global actor 'SomeGlobalActor'}}
-  nap1.method() // expected-error{{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  nap1.method() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method()' in a synchronous nonisolated context}}
   nap1.other() // okay
 }
 
@@ -96,19 +96,19 @@ func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor'
 // Global actor inference for classes and extensions
 // ----------------------------------------------------------------------
 @SomeGlobalActor class C3 {
-  func method1() { }  // expected-note 2{{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
+  func method1() { }  // expected-note {{calls to instance method 'method1()' from outside of its actor context are implicitly asynchronous}}
 }
 
 extension C3 {
-  func method2() { }  // expected-note 2{{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
+  func method2() { }  // expected-note {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
 }
 
 class C4: C3 {
-  func method3() { }  // expected-note 2{{calls to instance method 'method3()' from outside of its actor context are implicitly asynchronous}}
+  func method3() { }  // expected-note {{calls to instance method 'method3()' from outside of its actor context are implicitly asynchronous}}
 }
 
 extension C4 {
-  func method4() { }  // expected-note 2{{calls to instance method 'method4()' from outside of its actor context are implicitly asynchronous}}
+  func method4() { }  // expected-note {{calls to instance method 'method4()' from outside of its actor context are implicitly asynchronous}}
 }
 
 class C5 {
@@ -116,30 +116,30 @@ class C5 {
 }
 
 @SomeGlobalActor extension C5 {
-  func method2() { }  // expected-note 2{{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
+  func method2() { }  // expected-note {{calls to instance method 'method2()' from outside of its actor context are implicitly asynchronous}}
 }
 
 @OtherGlobalActor func testGlobalActorInference(c3: C3, c4: C4, c5: C5) {
   // Propagation via class annotation
-  c3.method1() // expected-error{{instance method 'method1()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
-  c3.method2() // expected-error{{instance method 'method2()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+  c3.method1() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method1()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
+  c3.method2() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method2()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
   
-  _ = c3.method1  // expected-error{{instance method 'method1()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
-  _ = c3.method2  // expected-error{{instance method 'method2()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+  _ = c3.method1
+  _ = c3.method2
 
   // Propagation via subclassing
-  c4.method3() // expected-error{{instance method 'method3()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
-  c4.method4() // expected-error{{instance method 'method4()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+  c4.method3() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method3()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
+  c4.method4() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method4()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
 
-  _ = c4.method3  // expected-error{{instance method 'method3()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
-  _ = c4.method4  // expected-error{{instance method 'method4()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+  _ = c4.method3
+  _ = c4.method4
 
   // Propagation in an extension.
   c5.method1() // OK: no propagation
-  c5.method2() // expected-error{{instance method 'method2()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+  c5.method2() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'method2()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
 
   _ = c5.method1  // OK
-  _ = c5.method2 // expected-error{{instance method 'method2()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'OtherGlobalActor'}}
+  _ = c5.method2
 }
 
 protocol P3 {
@@ -174,14 +174,14 @@ actor GenericSuper<T> {
 }
 
 actor GenericSub<T> : GenericSuper<[T]> {
-  override func method() { }  // expected-note 2{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  override func method() { }  // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
-  nonisolated override func method3() { } // expected-error{{actor-independent instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
+  nonisolated override func method3() { } // expected-error{{nonisolated instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
   @OtherGlobalActor func testMethod() {
-    method() // expected-error{{instance method 'method()' isolated to global actor 'GenericGlobalActor<[T]>' can not be referenced from different global actor 'OtherGlobalActor'}}
-    _ = method  // expected-error{{instance method 'method()' isolated to global actor 'GenericGlobalActor<[T]>' can not be referenced from different global actor 'OtherGlobalActor'}}
+    method() // expected-error{{call to global actor 'GenericGlobalActor<[T]>'-isolated instance method 'method()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
+    _ = method
   }
 }
 
@@ -200,11 +200,11 @@ struct OtherContainer<U> {
 
   // Ensure that substitutions work properly when inheriting.
   class Subclass3<V> : Container<(U, V)>.Superclass2 {
-    func method() { } // expected-note{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+    func method() { }
 
     @OtherGlobalActor func testMethod() async {
       await method()
-      let _ = method  // expected-error{{instance method 'method()' isolated to global actor 'GenericGlobalActor<[(U, V)]>' can not be referenced from different global actor 'OtherGlobalActor'}}
+      let _ = method
     }
   }
 }
@@ -255,7 +255,7 @@ func bar() async {
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func barSync() {
-  foo() // expected-error {{global function 'foo()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  foo() // expected-error {{call to global actor 'SomeGlobalActor'-isolated global function 'foo()' in a synchronous nonisolated context}}
 }
 
 // ----------------------------------------------------------------------
@@ -404,7 +404,7 @@ struct InferredFromPropertyWrapper {
 }
 
 func testInferredFromWrapper(x: InferredFromPropertyWrapper) { // expected-note{{add '@SomeGlobalActor' to make global function 'testInferredFromWrapper(x:)' part of global actor 'SomeGlobalActor'}}
-  _ = x.test() // expected-error{{instance method 'test()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  _ = x.test() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'test()' in a synchronous nonisolated context}}
 }
 
 
@@ -433,7 +433,7 @@ struct StructUGA3: UGA {
 
 @GenericGlobalActor<String>
 func testUGA<T: UGA>(_ value: T) {
-  value.req() // expected-error{{instance method 'req()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
+  value.req() // expected-error{{call to global actor 'SomeGlobalActor'-isolated instance method 'req()' in a synchronous global actor 'GenericGlobalActor<String>'-isolated context}}
 }
 
 class UGAClass {
@@ -498,7 +498,7 @@ func acceptClosure<T>(_: () -> T) { }
 
 @SomeGlobalActor func someGlobalActorFunc() async {
   acceptClosure { getGlobal7() } // okay
-  acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{global function 'getGlobal7()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
+  acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'getGlobal7()' in a synchronous nonisolated context}}
 }
 
 // ----------------------------------------------------------------------

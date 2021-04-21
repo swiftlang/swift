@@ -1310,9 +1310,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     }
 
     selectedTrailingMatching = callArgumentMatch->trailingClosureMatching;
-    // Record the direction of matching used for this call.
-    cs.recordTrailingClosureMatch(cs.getConstraintLocator(locator),
-                                  selectedTrailingMatching);
+    // Record the matching direction and parameter bindings used for this call.
+    cs.recordMatchCallArgumentResult(cs.getConstraintLocator(locator),
+                                     *callArgumentMatch);
 
     // If there was a disjunction because both forward and backward were
     // possible, increase the score for forward matches to bias toward the
@@ -4340,8 +4340,33 @@ bool ConstraintSystem::repairFailures(
     // as a narrow exception to SE-0110, see `matchFunctionTypes`.
     //
     // But if `T.Element` didn't get resolved to `Void` we'd like
-    // to diagnose this as a missing argument which can't be ignored.
+    // to diagnose this as a missing argument which can't be ignored or
+    // a tuple is trying to be inferred as a tuple for destructuring but
+    // contextual argument does not match(in this case we remove the extra
+    // closure arguments).
     if (arg != getTypeVariables().end()) {
+      if (auto argToParamElt =
+              path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
+        auto loc = getConstraintLocator(anchor, path);
+        auto closureAnchor =
+            getAsExpr<ClosureExpr>(simplifyLocatorToAnchor(loc));
+        if (rhs->is<TupleType>() && closureAnchor &&
+            closureAnchor->getParameters()->size() > 1) {
+          auto callee = getCalleeLocator(loc);
+          if (auto overload = findSelectedOverloadFor(callee)) {
+            auto fnType =
+                simplifyType(overload->openedType)->castTo<FunctionType>();
+            auto paramIdx = argToParamElt->getParamIdx();
+            auto paramType = fnType->getParams()[paramIdx].getParameterType();
+            if (auto paramFnType = paramType->getAs<FunctionType>()) {
+              conversionsOrFixes.push_back(RemoveExtraneousArguments::create(
+                  *this, paramFnType, {}, loc));
+              break;
+            }
+          }
+        }
+      }
+
       conversionsOrFixes.push_back(AddMissingArguments::create(
           *this, {SynthesizedArg{0, AnyFunctionType::Param(*arg)}},
           getConstraintLocator(anchor, path)));
@@ -9914,10 +9939,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // have an explicit inout argument.
   if (type1.getPointer() == desugar2) {
     if (!isOperator || !hasInOut()) {
-      recordTrailingClosureMatch(
+      recordMatchCallArgumentResult(
           getConstraintLocator(
               outerLocator.withPathElement(ConstraintLocator::ApplyArgument)),
-          TrailingClosureMatching::Forward);
+          MatchCallArgumentResult::forArity(func1->getNumParams()));
       return SolutionKind::Solved;
     }
   }
@@ -11062,6 +11087,12 @@ void ConstraintSystem::recordPotentialHole(Type type) {
   });
 }
 
+void ConstraintSystem::recordMatchCallArgumentResult(
+    ConstraintLocator *locator, MatchCallArgumentResult result) {
+  assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
+  argumentMatchingChoices.push_back({locator, result});
+}
+
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
@@ -11228,7 +11259,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
   case FixKind::AllowAlwaysSucceedCheckedCast:
-  case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype: {
+  case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
+  case FixKind::RemoveExtraneousArguments: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -11377,7 +11409,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
-  case FixKind::RemoveExtraneousArguments:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:

@@ -62,7 +62,7 @@ func testClosures() async {
   }
 
   acceptOnSomeGlobalActor { () -> Int in
-    let i = onOtherGlobalActorUnsafe() // expected-error{{global function 'onOtherGlobalActorUnsafe()' isolated to global actor 'OtherGlobalActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
+    let i = onOtherGlobalActorUnsafe() // expected-error{{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     return i
   }
 }
@@ -79,7 +79,7 @@ func testClosuresOld() {
   }
 
   acceptOnSomeGlobalActor { () -> Int in
-    let i = onOtherGlobalActor() // expected-error{{global function 'onOtherGlobalActor()' isolated to global actor 'OtherGlobalActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
+    let i = onOtherGlobalActor() // expected-error{{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActor()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     return i
   }
 
@@ -89,7 +89,7 @@ func testClosuresOld() {
   }
 
   acceptOnSomeGlobalActor { @SomeGlobalActor () -> Int in
-    let i = onOtherGlobalActorUnsafe() // expected-error{{global function 'onOtherGlobalActorUnsafe()' isolated to global actor 'OtherGlobalActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
+    let i = onOtherGlobalActorUnsafe() // expected-error{{call to global actor 'OtherGlobalActor'-isolated global function 'onOtherGlobalActorUnsafe()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     return i
   }
 }
@@ -108,4 +108,30 @@ func f2(_ x: X<@SomeGlobalActor () -> Void>) {
 }
 func g2(_ x: X<() -> Void>) {
   f2(x) // expected-error{{cannot convert value of type 'X<() -> Void>' to expected argument type 'X<@SomeGlobalActor () -> Void>'}}
+}
+
+
+func testTypesNonConcurrencyContext() { // expected-note{{add '@SomeGlobalActor' to make global function 'testTypesNonConcurrencyContext()' part of global actor 'SomeGlobalActor'}}
+  let f1 = onSomeGlobalActor // expected-note{{calls to let 'f1' from outside of its actor context are implicitly asynchronous}}
+  let f2 = onSomeGlobalActorUnsafe
+
+  let _: () -> Int = f1 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f2
+
+  _ = f1() // expected-error{{call to global actor 'SomeGlobalActor'-isolated let 'f1' in a synchronous nonisolated context}}
+  _ = f2()
+}
+
+func testTypesConcurrencyContext() async {
+  let f1 = onSomeGlobalActor
+  let f2 = onSomeGlobalActorUnsafe
+
+  let _: () -> Int = f1 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+  let _: () -> Int = f2 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
+
+  _ = f1() // expected-error{{call is 'async' but is not marked with 'await'}}
+  _ = f2() // expected-error{{call is 'async' but is not marked with 'await'}}
+
+  _ = await f1()
+  _ = await f2()
 }

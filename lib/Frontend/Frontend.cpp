@@ -168,6 +168,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     llvm::sys::fs::make_absolute(OutputDir);
     serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
   }
+  serializationOpts.SkipSymbolGraphInheritedDocs = opts.SkipInheritedDocs;
   
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
@@ -761,6 +762,8 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
   if (target.isOSWindows())
     return true;
   if (target.isOSLinux())
+    return true;
+  if (target.isOSWASI())
     return true;
   return false;
 }

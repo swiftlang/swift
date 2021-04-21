@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -I %S/Inputs/imports-submodule-order/ | %FileCheck %s
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -I %S/Inputs/imports-submodule-order/ -D XY | %FileCheck %s
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -typecheck -emit-module-interface-path - %s -I %S/Inputs/imports-submodule-order/ | %FileCheck %s
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -typecheck -emit-module-interface-path - %s -I %S/Inputs/imports-submodule-order/ -D XY | %FileCheck %s
 
 #if XY
 @_exported import X.Submodule
@@ -20,5 +20,4 @@
 // CHECK-NEXT: {{^}}import Swift{{$}}
 // CHECK-NEXT: import X{{$}}
 // CHECK-NEXT: import Y{{$}}
-// CHECK-NEXT: {{^}}import _Concurrency{{$}}
 // CHECK-NOT: import
