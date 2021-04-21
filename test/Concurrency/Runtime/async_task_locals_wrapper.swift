@@ -13,10 +13,6 @@ enum TL {
   @TaskLocal
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   static var number: Int  = 0
-
-  @TaskLocal(inherit: .never)
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  static var string: String = "<unknown>"
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

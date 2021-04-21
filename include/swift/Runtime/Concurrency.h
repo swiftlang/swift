@@ -359,15 +359,12 @@ void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
 /// \code
 /// func _taskLocalValueGet<Key>(
 ///   _ task: Builtin.NativeObject,
-///   keyType: Any.Type /*Key.Type*/,
-///   inheritance: UInt8/*TaskLocalInheritance*/
+///   keyType: Any.Type /*Key.Type*/
 /// ) -> UnsafeMutableRawPointer? where Key: TaskLocalKey
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
-swift_task_localValueGet(AsyncTask* task,
-                         const HeapObject *key,
-                         TaskLocal::TaskLocalInheritance inheritance);
+swift_task_localValueGet(AsyncTask* task, const HeapObject *key);
 
 /// Add a task local value to the passed in task.
 ///

@@ -41,9 +41,8 @@ static void swift_task_localValuePushImpl(AsyncTask *task,
 
 SWIFT_CC(swift)
 static OpaqueValue* swift_task_localValueGetImpl(AsyncTask *task,
-                                                 const HeapObject *key,
-                                                 TaskLocal::TaskLocalInheritance inheritance) {
-  return task->localValueGet(key, inheritance);
+                                                 const HeapObject *key) {
+  return task->localValueGet(key);
 }
 
 SWIFT_CC(swift)
@@ -249,8 +248,7 @@ void TaskLocal::Storage::popValue(AsyncTask *task) {
 }
 
 OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
-                                          const HeapObject *key,
-                                          const TaskLocalInheritance inherit) {
+                                          const HeapObject *key) {
   assert(key && "TaskLocal key must not be null.");
 
   auto item = head;
@@ -258,12 +256,6 @@ OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
     if (item->key == key) {
       return item->getStoragePtr();
     }
-
-    // if the key is an `inherit = .never` type, we stop our search the first
-    // time we would be jumping to a parent task to continue the search.
-    if (item->getNextLinkType() == NextLinkType::IsParent &&
-        inherit == TaskLocalInheritance::Never)
-      return nullptr;
 
     item = item->getNext();
   }

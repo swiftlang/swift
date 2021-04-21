@@ -46,28 +46,6 @@ public:
     IsParent = 0b01,
   };
 
-  /// Values must match `TaskLocalInheritance` declared in `TaskLocal.swift`.
-  enum class TaskLocalInheritance : uint8_t {
-    /// Default task local value behavior
-    ///
-    /// Values declared with a default-inherited key are accessible from:
-    /// - the current task that has bound the value,
-    /// - any child task of the current task (e.g. created by async let or groups)
-    ///
-    /// Such values are *not* carried through detached tasks.
-    Default = 0,
-
-    /// Special semantics which confine a task's local value to *only* the current
-    /// task. In other words, they ave never inherited by any child task created
-    /// by the current task.
-    ///
-    /// Values declared with a never-inherited key only accessible:
-    /// - specifically from the current task itself
-    ///
-    /// Such values are *not* accessible from child tasks or detached tasks.
-    Never = 1
-  };
-
   class Item {
   private:
     /// Mask used for the low status bits in a task local chain item.
@@ -204,9 +182,7 @@ public:
                    const HeapObject *key,
                    /* +1 */ OpaqueValue *value, const Metadata *valueType);
 
-    OpaqueValue* getValue(AsyncTask *task,
-                          const HeapObject *key,
-                          TaskLocalInheritance inheritance);
+    OpaqueValue* getValue(AsyncTask *task, const HeapObject *key);
 
     void popValue(AsyncTask *task);
 

@@ -213,8 +213,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swifttask_localValuePush) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValueGet) {
-  swift_task_localValueGet(nullptr, nullptr,
-                           swift::TaskLocal::TaskLocalInheritance());
+  swift_task_localValueGet(nullptr, nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValuePop) {

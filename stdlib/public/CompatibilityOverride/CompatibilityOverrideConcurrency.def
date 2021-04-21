@@ -200,9 +200,8 @@ OVERRIDE_TASK_LOCAL(task_localValuePush, void,
 OVERRIDE_TASK_LOCAL(task_localValueGet, OpaqueValue *,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
-                    (AsyncTask *task, const HeapObject *key,
-                     TaskLocal::TaskLocalInheritance inheritance),
-                    (task, key, inheritance))
+                    (AsyncTask *task, const HeapObject *key),
+                    (task, key))
 
 OVERRIDE_TASK_LOCAL(task_localValuePop, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

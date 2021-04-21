@@ -222,9 +222,8 @@ public:
     Local.pushValue(this, key, value, valueType);
   }
 
-  OpaqueValue* localValueGet(const HeapObject *key,
-                             TaskLocal::TaskLocalInheritance inherit) {
-    return Local.getValue(this, key, inherit);
+  OpaqueValue* localValueGet(const HeapObject *key) {
+    return Local.getValue(this, key);
   }
 
   void localValuePop() {
