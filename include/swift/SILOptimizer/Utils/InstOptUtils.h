@@ -361,6 +361,9 @@ class InstModCallbacks {
   /// A function sets the value in \p use to be \p newValue.
   ///
   /// Default implementation just calls use->set(newValue).
+  ///
+  /// NOTE: It is assumed that this operation will never invalidate instruction
+  /// iterators.
   std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
 
   /// A boolean that tracks if any of our callbacks were ever called.

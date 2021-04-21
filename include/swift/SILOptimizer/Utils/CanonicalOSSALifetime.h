@@ -97,6 +97,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/PrunedLiveness.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
@@ -107,13 +108,19 @@ namespace swift {
 /// result or invalid SILValue. The caller must delete the extract and its
 /// now-dead copy use.
 ///
-// If a copied-def is a struct-extract, attempt a destructure conversion
-//   %extract = struct_extract %... : $TypeWithSingleOwnershipValue
-//   %copy = copy_value %extract : $OwnershipValue
-// To:
-//   %copy = copy_value %extract : $TypeWithSingleOwnershipValue
-//   (%extracted,...) = destructure %copy : $TypeWithSingleOwnershipValue
-SILValue convertExtractToDestructure(StructExtractInst *extract);
+/// If a copied-def is a struct-extract, attempt a destructure conversion
+///   %extract = struct_extract %... : $TypeWithSingleOwnershipValue
+///   %copy = copy_value %extract : $OwnershipValue
+/// To:
+///   %copy = copy_value %extract : $TypeWithSingleOwnershipValue
+///   (%extracted,...) = destructure %copy : $TypeWithSingleOwnershipValue
+///
+/// \p instModCallbacks If non-null, this routine uses
+/// InstModCallbacks::{setUseValue,RAUW}() internally to modify code. Otherwise,
+/// just performs standard operations.
+SILValue
+convertExtractToDestructure(StructExtractInst *extract,
+                            InstModCallbacks *instModCallbacks = nullptr);
 
 /// Information about consumes on the extended-lifetime boundary. Consuming uses
 /// within the lifetime are not included--they will consume a copy after
@@ -333,16 +340,21 @@ private:
   /// lifetime.
   CanonicalOSSAConsumeInfo consumes;
 
+  /// The callbacks to use when deleting/rauwing instructions.
+  InstModCallbacks instModCallbacks;
+
 public:
-  CanonicalizeOSSALifetime(bool pruneDebugMode, bool canonicalizeBorrowMode,
-                           bool poisonRefsMode,
-                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                           DominanceAnalysis *dominanceAnalysis)
-    : pruneDebugMode(pruneDebugMode),
-      canonicalizeBorrowMode(canonicalizeBorrowMode),
-      poisonRefsMode(poisonRefsMode),
-      accessBlockAnalysis(accessBlockAnalysis),
-      dominanceAnalysis(dominanceAnalysis) {}
+  CanonicalizeOSSALifetime(
+      bool pruneDebugMode, bool canonicalizeBorrowMode, bool poisonRefsMode,
+      NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+      DominanceAnalysis *dominanceAnalysis,
+      InstModCallbacks instModCallbacks = InstModCallbacks())
+      : pruneDebugMode(pruneDebugMode),
+        canonicalizeBorrowMode(canonicalizeBorrowMode),
+        poisonRefsMode(poisonRefsMode),
+        accessBlockAnalysis(accessBlockAnalysis),
+        dominanceAnalysis(dominanceAnalysis),
+        instModCallbacks(instModCallbacks) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 
