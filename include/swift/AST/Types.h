@@ -3382,6 +3382,7 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector unsafeSendable;
   SmallBitVector unsafeMainActor;
+  SmallBitVector implicitSelfCapture;
 
 public:
   ParameterListInfo() { }
@@ -3409,6 +3410,13 @@ public:
   /// we will treat it as being part of the main actor but that it is not
   /// part of the type system.
   bool isUnsafeMainActor(unsigned paramIdx) const;
+
+  /// Whether the given parameter is a closure that should allow capture of
+  /// 'self' to be implicit, without requiring "self.".
+  bool isImplicitSelfCapture(unsigned paramIdx) const;
+
+  /// Whether there is any contextual information set on this parameter list.
+  bool anyContextualInfo() const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
