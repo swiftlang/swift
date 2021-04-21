@@ -348,6 +348,12 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(
     CancellationNotificationStatusRecord *record);
 
+/// Report error about attempting to bind a task-local value from an illegal context.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
+    const unsigned char *file, uintptr_t fileLength,
+    bool fileIsASCII, uintptr_t line);
+
 /// Get a task local value from the passed in task. Its Swift signature is
 ///
 /// \code

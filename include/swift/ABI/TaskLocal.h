@@ -28,8 +28,6 @@ struct SwiftError;
 class TaskStatusRecord;
 class TaskGroup;
 
-extern FullMetadata<HeapMetadata> taskLocalHeapItemHeapMetadata;
-
 // ==== Task Locals Values ---------------------------------------------------
 
 class TaskLocal {
@@ -46,9 +44,6 @@ public:
     /// lookups by skipping empty parent tasks during get(), and explained
     /// in depth in `createParentLink`.
     IsParent = 0b01,
-
-    /// The next item is "unstructured" and must be ref-counted.
-    ThisItemIsHeapItem = 0b10
   };
 
   /// Values must match `TaskLocalInheritance` declared in `TaskLocal.swift`.
@@ -133,10 +128,6 @@ public:
       return static_cast<NextLinkType>(next & statusMask);
     }
 
-    bool isHeapItem() const {
-      return getNextLinkType() == NextLinkType::ThisItemIsHeapItem;
-    }
-
     /// Item does not contain any actual value, and is only used to point at
     /// a specific parent item.
     bool isEmpty() const {
@@ -147,13 +138,12 @@ public:
     OpaqueValue *getStoragePtr() {
       fprintf(stderr, "[%s:%d] (%s) GET STORAGE\n", __FILE__, __LINE__, __FUNCTION__);
       return reinterpret_cast<OpaqueValue *>(
-        reinterpret_cast<char *>(this) + storageOffset(isHeapItem(), valueType));
+        reinterpret_cast<char *>(this) + storageOffset(valueType));
     }
 
     /// Compute the offset of the storage from the base of the item.
-    static size_t storageOffset(bool isHeapItem, const Metadata *valueType) {
+    static size_t storageOffset(const Metadata *valueType) {
       size_t offset = sizeof(Item);
-
 
       if (valueType) {
         size_t alignment = valueType->vw_alignment();
@@ -164,50 +154,11 @@ public:
     }
 
     /// Determine the size of the item given a particular value type.
-    static size_t itemSize(bool isHeapItem, const Metadata *valueType) {
-      size_t offset = storageOffset(isHeapItem, valueType);
-      size_t headerSize = isHeapItem ? sizeof(HeapObject) : 0;
-      offset += headerSize;
+    static size_t itemSize(const Metadata *valueType) {
+      size_t offset = storageOffset(valueType);
       if (valueType) {
         offset += valueType->vw_size();
       }
-      return offset;
-    }
-  };
-
-  /// Heap allocated version of TaskLocal::Item.
-  /// It is used in limited un-structured concurrency cases, where the task
-  /// local must be stored on the heap for the time being.
-  ///
-  /// MUST HAVE THE SAME LAYOUT AS TaskLocal::Item.
-  /// FIXME: how to actually make this work...
-  ///        get the address of "after heap object" and cast that to Item?
-  class HeapItem : public HeapObject, public Item {
-  public:
-
-    explicit HeapItem(const HeapMetadata *metadata = &taskLocalHeapItemHeapMetadata)
-        : HeapObject(metadata),
-          Item() {}
-
-    explicit HeapItem(const HeapObject *key, const Metadata *valueType)
-        : HeapItem(&taskLocalHeapItemHeapMetadata, key, valueType) {}
-
-    explicit HeapItem(const HeapMetadata *metadata,
-                      const HeapObject *key, const Metadata *valueType)
-        : HeapObject(metadata),
-          Item(key, valueType) {}
-
-
-    /// Retrieve a pointer to the `Item` that is part of this object.
-    TaskLocal::Item *getItem() {
-      fprintf(stderr, "[%s:%d] (%s) GET ITEM PTR, heapItem:%p\n", __FILE__, __LINE__, __FUNCTION__, this);
-      return reinterpret_cast<TaskLocal::Item *>(
-          reinterpret_cast<char *>(this) + itemOffset());
-    }
-
-    /// Compute the offset of `Item` part of this object.
-    static size_t itemOffset() {
-      size_t offset = sizeof(HeapObject);
       return offset;
     }
   };

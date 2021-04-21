@@ -818,6 +818,10 @@ func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_silgen_name("swift_task_hasTaskGroupStatusRecord")
+func _taskHasTaskGroupStatusRecord() -> Bool
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum PollStatus: Int {
   case empty   = 0
   case waiting = 1

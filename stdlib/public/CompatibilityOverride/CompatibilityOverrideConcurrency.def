@@ -183,6 +183,13 @@ OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     swift::, (TaskGroup *group, bool unconditionally),
                     (group, unconditionally))
 
+
+OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+                    (const unsigned char *file, uintptr_t fileLength,
+                        bool fileIsASCII, uintptr_t line),
+                    (file, fileLength, fileIsASCII, line))
+
 OVERRIDE_TASK_LOCAL(task_localValuePush, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
