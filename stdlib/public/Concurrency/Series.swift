@@ -524,7 +524,7 @@ public struct ThrowingSeries<Element> {
       get {
         return storage.onCancel
       }
-      set {
+      nonmutating set {
         storage.onCancel = newValue
       }
     }
