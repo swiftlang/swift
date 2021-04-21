@@ -763,6 +763,8 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
     return true;
   if (target.isOSLinux())
     return true;
+  if (target.isOSWASI())
+    return true;
   return false;
 }
 
