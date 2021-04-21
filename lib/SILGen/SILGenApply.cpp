@@ -5762,35 +5762,30 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   return endApplyHandle;
 }
 
-ManagedValue SILGenFunction::emitAsyncLetStart(
+ManagedValue SILGenFunction::emitRunChildTask(
     SILLocation loc, Type functionType, ManagedValue taskFunction) {
-  ASTContext &ctx = getASTContext();
+  auto runChildTaskFn = SGM.getRunChildTask();
+
   Type resultType = functionType->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
-  auto startBuiltin = cast<FuncDecl>(
-      getBuiltinValueDecl(ctx, ctx.getIdentifier("startAsyncLet")));
-  auto subs = SubstitutionMap::get(startBuiltin->getGenericSignature(),
+  auto subs = SubstitutionMap::get(runChildTaskFn->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
 
-  CanType origParamType = startBuiltin->getParameters()->get(1)
+  CanType origParamType = runChildTaskFn->getParameters()->get(0)
       ->getInterfaceType()->getCanonicalType();
   CanType substParamType = origParamType.subst(subs)->getCanonicalType();
 
   // Ensure that the closure has the appropriate type.
   AbstractionPattern origParam(
-      startBuiltin->getGenericSignature().getCanonicalSignature(),
+      runChildTaskFn->getGenericSignature().getCanonicalSignature(),
       origParamType);
   taskFunction = emitSubstToOrigValue(
       loc, taskFunction, origParam, substParamType);
 
-  auto apply = B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StartAsyncLet)),
-      getLoweredType(ctx.TheRawPointerType), subs,
-      { taskFunction.forward(*this) });
-
-  return ManagedValue::forUnmanaged(apply);
+  return emitApplyOfLibraryIntrinsic(
+      loc, runChildTaskFn, subs, {taskFunction}, SGFContext()
+    ).getScalarValue();
 }
 
 ManagedValue SILGenFunction::emitCancelAsyncTask(
@@ -5806,24 +5801,24 @@ ManagedValue SILGenFunction::emitCancelAsyncTask(
 
 void SILGenFunction::completeAsyncLetChildTask(
     PatternBindingDecl *patternBinding, unsigned index) {
-  SILValue asyncLet;
+  SILValue childTask;
   bool isThrowing;
-  std::tie(asyncLet, isThrowing)= AsyncLetChildTasks[{patternBinding, index}];
+  std::tie(childTask, isThrowing)= AsyncLetChildTasks[{patternBinding, index}];
 
   Type childResultType = patternBinding->getPattern(index)->getType();
 
-  auto asyncLetGet = isThrowing
-      ? SGM.getAsyncLetGetThrowing()
-      : SGM.getAsyncLetGet();
+  auto taskFutureGetFn = isThrowing
+      ? SGM.getTaskFutureGetThrowing()
+      : SGM.getTaskFutureGet();
 
-  // Get the result from the async-let future.
+  // Get the result from the future.
   Type replacementTypes[] = {childResultType};
-  auto subs = SubstitutionMap::get(asyncLetGet->getGenericSignature(),
+  auto subs = SubstitutionMap::get(taskFutureGetFn->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
   RValue childResult = emitApplyOfLibraryIntrinsic(
-      SILLocation(patternBinding), asyncLetGet, subs,
-      { ManagedValue::forTrivialObjectRValue(asyncLet) },
+      SILLocation(patternBinding), taskFutureGetFn, subs,
+      { ManagedValue::forBorrowedObjectRValue(childTask) },
       SGFContext());
 
   // Write the child result into the pattern variables.
@@ -5832,16 +5827,6 @@ void SILGenFunction::completeAsyncLetChildTask(
       std::move(childResult));
 }
 
-ManagedValue SILGenFunction::emitEndAsyncLet(
-    SILLocation loc, SILValue asyncLet) {
-  ASTContext &ctx = getASTContext();
-  auto apply = B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::EndAsyncLet)),
-      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { asyncLet });
-  return ManagedValue::forUnmanaged(apply);
-}
 
 // Create a partial application of a dynamic method, applying bridging thunks
 // if necessary.

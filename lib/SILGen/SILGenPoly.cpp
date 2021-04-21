@@ -624,7 +624,6 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // Should have handled the conversion in one of the cases above.
-  v.dump();
   llvm_unreachable("Unhandled transform?");
 }
 

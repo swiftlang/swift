@@ -144,7 +144,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:
-    case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::DestroyTaskGroup:
       return false;
@@ -172,7 +171,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnsafeGuaranteed:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
-    case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTaskFuture:
     case BuiltinValueKind::CreateAsyncTaskGroupFuture:
     case BuiltinValueKind::ConvertTaskToJob:
