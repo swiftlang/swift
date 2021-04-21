@@ -608,8 +608,9 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_emit_private_module_interface_path,
         options::OPT_emit_module_source_info_path,
         options::OPT_emit_tbd_path,
-        options::OPT_emit_ldadd_cfile_path,
-        options::OPT_emit_symbol_graph_dir)) {
+        options::OPT_emit_ldadd_cfile_path)) {
+    // FIXME(vmitchell): add -emit-symbol-graph-dir to the supplementary file map in the new driver
+    // (rdar://76902664)
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");
