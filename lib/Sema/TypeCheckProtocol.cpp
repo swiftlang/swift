@@ -3840,15 +3840,20 @@ static bool isRawRepresentableGenericFunction(
     ASTContext &ctx, const ValueDecl *witness,
     const NormalProtocolConformance *conformance) {
   auto *fnDecl = dyn_cast<AbstractFunctionDecl>(witness);
-  return fnDecl && fnDecl->isGeneric() &&
+  if (!fnDecl || !fnDecl->isStdlibDecl())
+    return false;
+
+  return fnDecl->isGeneric() && fnDecl->getGenericParams()->size() == 1 &&
+         fnDecl->getGenericRequirements().size() == 2 &&
          llvm::all_of(
              fnDecl->getGenericRequirements(), [&](Requirement genericReq) {
-               return genericReq.getKind() == RequirementKind::Conformance &&
-                      (genericReq.getProtocolDecl() ==
-                           ctx.getProtocol(
-                               KnownProtocolKind::RawRepresentable) ||
-                       genericReq.getProtocolDecl() ==
-                           conformance->getProtocol());
+               if (genericReq.getKind() != RequirementKind::Conformance)
+                 return false;
+               return genericReq.getProtocolDecl() ==
+                          ctx.getProtocol(
+                              KnownProtocolKind::RawRepresentable) ||
+                      genericReq.getProtocolDecl() ==
+                          conformance->getProtocol();
              });
 }
 
