@@ -723,6 +723,13 @@ public func expectCrash(withMessage message: String = "", executing: () -> Void)
   fatalError()
 }
 
+public func expectCrashAsync(withMessage message: String = "", executing: () async -> Void) async -> Never {
+  expectCrashLater(withMessage: message)
+  await executing()
+  expectUnreachable()
+  fatalError()
+}
+
 func _defaultTestSuiteFailedCallback() {
   abort()
 }
