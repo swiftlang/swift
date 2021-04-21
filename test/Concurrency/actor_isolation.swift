@@ -70,7 +70,7 @@ actor MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 19{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String {
     super.superState += 4
     return synchronous()
@@ -753,4 +753,31 @@ func testCrossActorProtocol<T: P>(t: T) async {
   await t.g()
   t.f() // expected-error{{call is 'async' but is not marked with 'await'}}
   t.g() // expected-error{{call is 'async' but is not marked with 'await'}}
+}
+
+// ----------------------------------------------------------------------
+// @_
+// ----------------------------------------------------------------------
+func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
+func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension MyActor {
+  func testSendableAndInheriting() {
+    acceptAsyncSendableClosure {
+      synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
+    }
+
+    acceptAsyncSendableClosure {
+      await synchronous() // ok
+    }
+
+    acceptAsyncSendableClosureInheriting {
+      synchronous() // okay
+    }
+
+    acceptAsyncSendableClosureInheriting {
+      await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
+    }
+  }
 }
