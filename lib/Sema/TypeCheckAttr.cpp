@@ -137,6 +137,7 @@ public:
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(UnsafeSendable)
   IGNORED_ATTR(UnsafeMainActor)
+  IGNORED_ATTR(ImplicitSelfCapture)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
