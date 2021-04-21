@@ -65,6 +65,9 @@ public:
   /// It is turned off by default.
   bool EnableSpeculativeDevirtualization = false;
 
+  /// Controls whether to emit actor data-race checks.
+  bool EnableActorDataRaceChecks = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
