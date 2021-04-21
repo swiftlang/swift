@@ -169,7 +169,8 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   }
 
   // Enable address top-byte ignored in the ARM64 backend.
-  if (Triple.getArch() == llvm::Triple::aarch64) {
+  if (Triple.getArch() == llvm::Triple::aarch64 ||
+      Triple.getArch() == llvm::Triple::aarch64_32) {
     arguments.push_back("-Xllvm");
     arguments.push_back("-aarch64-use-tbi");
   }
@@ -965,7 +966,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(getTriple().str()));
 
   // Enable address top-byte ignored in the ARM64 backend.
-  if (getTriple().getArch() == llvm::Triple::aarch64) {
+  if (getTriple().getArch() == llvm::Triple::aarch64 ||
+      getTriple().getArch() == llvm::Triple::aarch64_32) {
     Arguments.push_back("-Xllvm");
     Arguments.push_back("-aarch64-use-tbi");
   }
