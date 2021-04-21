@@ -61,7 +61,7 @@ func customHashable() {
 enum InvalidCustomHashable {
   case A, B
 
-  var hashValue: String { return "" } // expected-error {{invalid redeclaration of synthesized implementation for protocol requirement 'hashValue'}}
+  var hashValue: String { return "" }
 }
 func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
