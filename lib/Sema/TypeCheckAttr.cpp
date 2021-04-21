@@ -138,6 +138,7 @@ public:
   IGNORED_ATTR(UnsafeSendable)
   IGNORED_ATTR(UnsafeMainActor)
   IGNORED_ATTR(ImplicitSelfCapture)
+  IGNORED_ATTR(InheritActorContext)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

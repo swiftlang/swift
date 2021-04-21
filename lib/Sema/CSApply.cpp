@@ -5712,17 +5712,19 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(
-      Expr *expr, bool sendable, bool forMainActor, bool implicitSelfCapture) {
+      Expr *expr, bool sendable, bool forMainActor, bool implicitSelfCapture,
+      bool inheritActorContext) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setUnsafeConcurrent(sendable, forMainActor);
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
+    closure->setInheritsActorContext(inheritActorContext);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(
         captureList->getClosureBody(), sendable, forMainActor,
-        implicitSelfCapture);
+        implicitSelfCapture, inheritActorContext);
   }
 }
 
@@ -5983,9 +5985,10 @@ Expr *ExprRewriter::coerceCallArguments(
     bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
         (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
+    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     applyContextualClosureFlags(
         arg, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
-        isMainActor, isImplicitSelfCapture);
+        isMainActor, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
@@ -7002,8 +7005,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    // If we have a ClosureExpr, then we can safely propagate the 'concurrent'
-    // bit to the closure without invalidating prior analysis.
+    // If we have a ClosureExpr, then we can safely propagate @Sendable
+    // to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
     if (toEI.isSendable() && !fromEI.isSendable()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
