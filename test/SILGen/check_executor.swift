@@ -15,6 +15,8 @@ import _Concurrency
 
 func takeClosure(_ fn: @escaping () -> Int) { }
 
+func takeUnsafeMainActorClosure(@_unsafeMainActor _ fn: @escaping () -> Int) { }
+
 public actor MyActor {
   var counter = 0
 
@@ -35,5 +37,16 @@ public actor MyActor {
   // CHECK-RAW: return [[VALUE:%.*]] : $Int
   deinit {
     takeClosure { self.counter }
+  }
+
+  // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiycfU_
+  // CHECK-RAW-NOT: _checkExpectedExecutor
+  // CHECK-RAW: onMainActor
+  // CHECK-RAW: return
+  public func testUnsafeMain() {
+    takeUnsafeMainActorClosure {
+      onMainActor()
+      return 5
+    }
   }
 }
