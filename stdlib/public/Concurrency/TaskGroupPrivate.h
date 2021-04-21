@@ -22,13 +22,6 @@
 
 namespace swift {
 
-//void _swift_taskgroup_offer(AsyncTask *completed,
-//                            AsyncContext *context,
-//                            ExecutorRef executor);
-//
-//void _swift_taskgroup_cancelAll(AsyncTask *completed,
-//                                TaskGroup *group);
-
 } // end namespace swift
 
 #endif

@@ -93,10 +93,6 @@ METADATAKIND(Task,
 METADATAKIND(Job,
              3 | MetadataKindIsNonType | MetadataKindIsRuntimePrivate)
 
-/// A heap-allocated task-local value `TaskLocal::Item`.
-METADATAKIND(TaskLocalHeapItem,
-             4 | MetadataKindIsNonType | MetadataKindIsRuntimePrivate)
-
 // getEnumeratedMetadataKind assumes that all the enumerated values here
 // will be <= LastEnumeratedMetadataKind.
 

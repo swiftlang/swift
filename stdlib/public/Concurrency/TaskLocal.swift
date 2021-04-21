@@ -64,6 +64,9 @@ public final class TaskLocal<Value>: CustomStringConvertible {
   }
 
   public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R) async rethrows -> R {
+    // check if we're not trying to bind a value from an illegal context; this may crash
+    _checkIllegalTaskLocalBindingWithinWithTaskGroup()
+
     // we need to escape the `_task` since the withUnsafeCurrentTask closure is not `async`.
     // this is safe, since we know the task will remain alive because we are running inside of it.
     let _task = withUnsafeCurrentTask { task in
@@ -154,3 +157,26 @@ public func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/,
   inheritance: UInt8/*TaskLocalInheritance*/
 ) -> UnsafeMutableRawPointer? // where Key: TaskLocal
+
+// ==== Checks -----------------------------------------------------------------
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@usableFromInline
+func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String = #file,
+                                                      line: UInt = #line) {
+  if _taskHasTaskGroupStatusRecord() {
+    file.withCString { _fileStart in
+      _reportIllegalTaskLocalBindingWithinWithTaskGroup(
+          _fileStart, file.count, true, line)
+    }
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@usableFromInline
+@_silgen_name("swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup")
+func _reportIllegalTaskLocalBindingWithinWithTaskGroup(
+  _ _filenameStart: UnsafePointer<Int8>,
+  _ _filenameLength: Int,
+  _ _filenameIsASCII: Bool,
+  _ _line: UInt)

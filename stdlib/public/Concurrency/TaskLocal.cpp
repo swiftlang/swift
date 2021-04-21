@@ -12,10 +12,19 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/TaskLocal.h"
-#include "swift/Runtime/Concurrency.h"
+#include "swift/ABI/Actor.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/Runtime/Once.h"
+#include "swift/Runtime/Mutex.h"
+#include "swift/Runtime/Concurrency.h"
 #include "TaskPrivate.h"
+
+#if defined(__APPLE__)
+#include <asl.h>
+#elif defined(__ANDROID__)
+#include <android/log.h>
+#endif
 
 using namespace swift;
 
@@ -42,31 +51,6 @@ static void swift_task_localValuePopImpl(AsyncTask *task) {
   task->localValuePop();
 }
 
-SWIFT_CC(swift)
-static void destroyTaskLocalHeapItem(SWIFT_CONTEXT HeapObject *obj) {
-  fprintf(stderr, "[%s:%d] (%s) DESTROY heapItem:%p\n", __FILE__, __LINE__, __FUNCTION__, obj);
-//  assert(false && "TODO: we got released and should destroy it now");
-//  TaskLocal::HeapItem *heapItem = static_cast<TaskLocal::HeapItem*>(obj);
-}
-
-// =============================================================================
-// ==== TaskLocal::HeapItem Metadata -------------------------------------------
-
-/// Heap metadata for an asynchronous task.
-FullMetadata<HeapMetadata> swift::taskLocalHeapItemHeapMetadata = {
-    {
-        {
-            &destroyTaskLocalHeapItem
-        },
-        {
-            /*value witness table*/ nullptr
-        }
-    },
-    {
-        MetadataKind::TaskLocalHeapItem
-    }
-};
-
 // =============================================================================
 // ==== Initialization ---------------------------------------------------------
 
@@ -81,7 +65,7 @@ TaskLocal::Item*
 TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
   fprintf(stderr, "[%s:%d] (%s) CREATE PARENT LINK\n", __FILE__, __LINE__, __FUNCTION__);
 
-  size_t amountToAllocate = Item::itemSize(/*isHeapItem*/false, /*valueType*/nullptr);
+  size_t amountToAllocate = Item::itemSize(/*valueType*/nullptr);
   // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
   void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
   Item *item = new(allocation) Item();
@@ -108,8 +92,6 @@ TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
             item->next = reinterpret_cast<uintptr_t>(parentHead->getNext());
           }
           break;
-        case NextLinkType::ThisItemIsHeapItem:
-          assert(false && "ThisItemIsHeapItem?"); // FIXME: what?
       }
     } else {
       item->next = reinterpret_cast<uintptr_t>(parentHead) |
@@ -122,91 +104,101 @@ TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
   return item;
 }
 
+SWIFT_CC(swift)
+static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
+    const unsigned char *file, uintptr_t fileLength,
+    bool fileIsASCII, uintptr_t line) {
+
+  char *message;
+  swift_asprintf(
+      &message,
+      "error: task-local value: detected illegal task-local value binding at %.*s:%d.\n"
+      "Task-local values must only be set in a structured-context, such as: "
+      "around any (synchronous or asynchronous function invocation), "
+      "around an 'async let' declaration, or around a 'with(Throwing)TaskGroup(...){ ... }' "
+      "invocation. Notably, binding a task-local value is illegal *within the body* "
+      "of a withTaskGroup invocation.\n"
+      "\n"
+      "The following example is illegal:\n\n"
+      "    await withTaskGroup(...) { group in \n"
+      "        await <task-local>.withValue(1234) {\n"
+      "            group.spawn { ... }\n"
+      "        }\n"
+      "    }\n"
+      "\n"
+      "And should be replaced by, either: setting the value for the entire group:\n"
+      "\n"
+      "    // bind task-local for all tasks spawned within the group\n"
+      "    await <task-local>.withValue(1234) {\n"
+      "        await withTaskGroup(...) { group in \n"
+      "            group.spawn { ... }\n"
+      "        }\n"
+      "    }\n"
+      "\n"
+      "or, inside the specific task-group child task:\n"
+      "\n"
+      "    // bind-task-local for only specific child-task\n"
+      "    await withTaskGroup(...) { group in \n"
+      "        group.spawn {\n"
+      "            await <task-local>.withValue(1234) {    // OK!\n"
+      "                ... \n"
+      "            }\n"
+      "        }\n"
+      "\n"
+      "        group.spawn { ... }\n"
+      "    }\n",
+      (int)fileLength, file,
+      (int)line);
+
+  if (_swift_shouldReportFatalErrorsToDebugger()) {
+    RuntimeErrorDetails details = {
+        .version = RuntimeErrorDetails::currentVersion,
+        .errorType = "task-local-violation",
+        .currentStackDescription = "Task-local bound in illegal context",
+        .framesToSkip = 1,
+    };
+    _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
+  }
+
+#if defined(_WIN32)
+  #define STDERR_FILENO 2
+  _write(STDERR_FILENO, message, strlen(message));
+#else
+  write(STDERR_FILENO, message, strlen(message));
+#endif
+#if defined(__APPLE__)
+  asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
+#elif defined(__ANDROID__)
+  __android_log_print(ANDROID_LOG_FATAL, "SwiftRuntime", "%s", message);
+#endif
+
+  free(message);
+  abort();
+}
+
 TaskLocal::Item*
 TaskLocal::Item::createLink(AsyncTask *task,
                         const HeapObject *key,
                         const Metadata *valueType) {
   assert(task);
-  fprintf(stderr, "[%s:%d] (%s) CREATE LINK, key:%p\n", __FILE__, __LINE__, __FUNCTION__, key);
 
-  // If we're executing this inside of a withTaskGroup { ... } we risk the
-  // following situation:
-  //
-  //    withTaskGroup(...) { group in // (Parent Task):[,...]
-  //      // the TaskGroupRecord is present throughout the execution of this closure
-  //      Lib.$key.withValue("xoxo") { // (Parent Task)[key="xoxo",...]
-  //        group.spawn {
-  //          <sleep>
-  //          print(Lib.someTaskLocal)
-  //        } //
-  //      }
-  //      return group.next()!
-  //    }
-  bool isStructured = !swift_task_hasTaskGroupStatusRecord();
-  bool isHeapItem = !isStructured;
-
-  size_t amountToAllocate = Item::itemSize(isHeapItem, valueType);
+  size_t amountToAllocate = Item::itemSize(valueType);
   // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
 
-  void *allocation;
-  Item *item = nullptr;
-  HeapItem *heapItem = nullptr;
-
-  if (isStructured) {
-    allocation = _swift_task_alloc_specific(task, amountToAllocate);
-    fprintf(stderr, "[%s:%d] (%s) fast-path, TASK_ALLOC, key:%p, ptr:%p\n",
-            __FILE__, __LINE__, __FUNCTION__, key, allocation);
-    item = new(allocation) Item(key, valueType);
-  } else {
-    allocation = malloc(amountToAllocate);
-    fprintf(stderr, "[%s:%d] (%s) slow-path, unstructured, MALLOC, key:%p, ptr:%p\n", __FILE__, __LINE__, __FUNCTION__, key, allocation);
-    heapItem = new(allocation) HeapItem(key, valueType);
-    fprintf(stderr, "[%s:%d] (%s) slow-path, unstructured; heapItem:%p\n", __FILE__, __LINE__, __FUNCTION__, heapItem);
-    item = heapItem->getItem();
-    fprintf(stderr, "[%s:%d] (%s) slow-path, unstructured; item:%p\n", __FILE__, __LINE__, __FUNCTION__, item);
-
-    fprintf(stderr, "[%s:%d] (%s) BEFORE heapItem:%p, ref-count:%d\n", __FILE__, __LINE__, __FUNCTION__, heapItem, swift_retainCount(heapItem));
-    swift_retain(heapItem);
-    fprintf(stderr, "[%s:%d] (%s) AFTER heapItem:%p, ref-count:%d\n", __FILE__, __LINE__, __FUNCTION__, heapItem, swift_retainCount(heapItem));
-  }
-
+  void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
+  Item *item = new(allocation) Item(key, valueType);
 
   auto next = task->Local.head;
-  auto nextLinkType = isStructured ? NextLinkType::IsNext // FIXME: don't really need the isNext, only is parent and heap item need markers
-                                   : NextLinkType::ThisItemIsHeapItem;
   item->next = reinterpret_cast<uintptr_t>(next) |
-               static_cast<uintptr_t>(nextLinkType);
+      static_cast<uintptr_t>(NextLinkType::IsNext);
 
   return item;
-
-
-//
-//  Item *item = new(allocation) Item(key, valueType);
-//
-//  auto next = task->Local.head;
-////  auto nextLinkType = next ? NextLinkType::IsNext
-////                           : NextLinkType::IsTerminal;
-//  auto nextLinkType = isStructured ? NextLinkType::IsNext
-//                                   : NextLinkType::ThisItemIsHeapItem;
-//  item->next = reinterpret_cast<uintptr_t>(next) |
-//               static_cast<uintptr_t>(nextLinkType);
-//
-//  return item;
 }
 
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
 
 void TaskLocal::Item::destroy(AsyncTask *task) {
-  auto linkType = getNextLinkType();
-
-  // if it was unstructured, we cannot delete it until all references are gone
-  if (linkType == TaskLocal::NextLinkType::ThisItemIsHeapItem) {
-    fprintf(stderr, "[%s:%d] (%s) destroy item:%p\n", __FILE__, __LINE__, __FUNCTION__, this);
-    assert(false && "implement releasing the heap item");
-    return;
-  }
-
   // otherwise it was task-local allocated, so we can safely destroy it right away
   if (valueType) {
     valueType->vw_destroy(getStoragePtr());
@@ -222,10 +214,6 @@ void TaskLocal::Storage::destroy(AsyncTask *task) {
   while (item) {
     auto linkType = item->getNextLinkType();
     switch (linkType) {
-    case TaskLocal::NextLinkType::ThisItemIsHeapItem: {
-      fprintf(stderr, "[%s:%d] (%s) destroy UNSTRUCTURED\n", __FILE__, __LINE__, __FUNCTION__);
-      LLVM_FALLTHROUGH;
-    }
     case TaskLocal::NextLinkType::IsNext:
         next = item->getNext();
         item->destroy(task);

@@ -333,6 +333,19 @@ void swift_asyncLet_wait_throwing(OpaqueValue *,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_asyncLet_end(AsyncLet *alet);
 
+/// Returns true if the currently executing AsyncTask has a
+/// 'TaskGroupTaskStatusRecord' present.
+///
+/// This can be called from any thread.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_hasTaskGroupRecord()
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_taskGroup_hasTaskGroupRecord();
+
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
 ///
@@ -405,6 +418,12 @@ swift_task_addCancellationHandler(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(
     CancellationNotificationStatusRecord *record);
+
+/// Report error about attempting to bind a task-local value from an illegal context.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
+    const unsigned char *file, uintptr_t fileLength,
+    bool fileIsASCII, uintptr_t line);
 
 /// Get a task local value from the passed in task. Its Swift signature is
 ///
