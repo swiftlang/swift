@@ -1568,8 +1568,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.UseTypeLayoutValueHandling = false;
   }
 
-  Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
-
   // This is set to true by default.
   Opts.UseIncrementalLLVMCodeGen &=
     !Args.hasArg(OPT_disable_incremental_llvm_codegeneration);
