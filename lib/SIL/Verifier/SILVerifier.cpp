@@ -278,6 +278,7 @@ void verifyKeyPathComponent(SILModule &M,
                 SILFunctionTypeRepresentation::Thin,
               "getter should be a thin function");
       
+      auto &C = M.getASTContext();
       require(substGetterType->getNumParameters() == 1 + (hasIndices || C.LangOpts.Target.isOSBinFormatWasm()),
               "getter should have one parameter");
       auto baseParam = substGetterType->getParameters()[0];
@@ -330,6 +331,7 @@ void verifyKeyPathComponent(SILModule &M,
                 SILFunctionTypeRepresentation::Thin,
               "setter should be a thin function");
       
+      auto &C = M.getASTContext();
       require(substSetterType->getNumParameters() == 2 + (hasIndices || C.LangOpts.Target.isOSBinFormatWasm()),
               "setter should have two parameters");
 
