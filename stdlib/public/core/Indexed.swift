@@ -14,7 +14,7 @@
 /// collection together.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct Indexed<Base: Collection> {
+public struct IndexedCollection<Base: Collection> {
   @usableFromInline
   internal let _base: Base
   
@@ -26,10 +26,11 @@ public struct Indexed<Base: Collection> {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Indexed: Collection {
+extension IndexedCollection: Collection {
   public typealias Element = (index: Base.Index, element: Base.Element)
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
-  public typealias SubSequence = Indexed<Base.SubSequence>
+  public typealias SubSequence = IndexedCollection<Base.SubSequence>
 
   @inlinable
   public var startIndex: Index {
@@ -83,6 +84,7 @@ extension Indexed: Collection {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Indexed: BidirectionalCollection where Base: BidirectionalCollection {
+extension IndexedCollection: BidirectionalCollection where Base: BidirectionalCollection {
   @inlinable
   public func index(before i: Index) -> Index {
     _base.index(before: i)
@@ -91,12 +93,15 @@ extension Indexed: BidirectionalCollection where Base: BidirectionalCollection {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Indexed: RandomAccessCollection where Base: RandomAccessCollection {}
+extension IndexedCollection: RandomAccessCollection where Base: RandomAccessCollection {}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Indexed: LazySequenceProtocol where Base: LazySequenceProtocol {}
+extension IndexedCollection: LazySequenceProtocol where Base: LazySequenceProtocol {}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Indexed: LazyCollectionProtocol where Base: LazyCollectionProtocol {}
+extension IndexedCollection: LazyCollectionProtocol where Base: LazyCollectionProtocol {}
 
 extension Collection {
   /// Returns a collection of pairs *(i, x)*, where *i* represents an index of
@@ -118,7 +123,7 @@ extension Collection {
   /// - Complexity: O(1)
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @inlinable
-  public func indexed() -> Indexed<Self> {
-    Indexed(_base: self)
+  public func indexed() -> IndexedCollection<Self> {
+    IndexedCollection(_base: self)
   }
 }

@@ -359,7 +359,7 @@ SequenceTypeTests.test("indexed/Collection") {
     let s = MinimalCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.indexed()
-    expectType(Indexed<MinimalCollection<OpaqueValue<Int>>>.self, &result)
+    expectType(IndexedCollection<MinimalCollection<OpaqueValue<Int>>>.self, &result)
     
     checkCollection(
       test.expected,
@@ -376,7 +376,7 @@ SequenceTypeTests.test("indexed/BidirectionalCollection") {
     let s = MinimalBidirectionalCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.indexed()
-    expectType(Indexed<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self, &result)
+    expectType(IndexedCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self, &result)
     
     checkBidirectionalCollection(
       test.expected,
@@ -393,7 +393,7 @@ SequenceTypeTests.test("indexed/RandomAccessCollection") {
     let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.indexed()
-    expectType(Indexed<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self, &result)
+    expectType(IndexedCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self, &result)
     
     checkRandomAccessCollection(
       test.expected,
