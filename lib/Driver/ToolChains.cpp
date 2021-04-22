@@ -217,6 +217,9 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_actor_data_race_checks,
+                       options::OPT_disable_actor_data_race_checks);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);

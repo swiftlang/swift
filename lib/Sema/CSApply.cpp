@@ -5711,16 +5711,18 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyUnsafeConcurrent(
-      Expr *expr, bool sendable, bool forMainActor) {
+static void applyContextualClosureFlags(
+      Expr *expr, bool sendable, bool forMainActor, bool implicitSelfCapture) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setUnsafeConcurrent(sendable, forMainActor);
+    closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyUnsafeConcurrent(
-        captureList->getClosureBody(), sendable, forMainActor);
+    applyContextualClosureFlags(
+        captureList->getClosureBody(), sendable, forMainActor,
+        implicitSelfCapture);
   }
 }
 
@@ -5808,7 +5810,8 @@ Expr *ExprRewriter::coerceCallArguments(
 
   // Quickly test if any further fix-ups for the argument types are necessary.
   if (AnyFunctionType::equalParams(args, params) &&
-      !shouldInjectWrappedValuePlaceholder)
+      !shouldInjectWrappedValuePlaceholder &&
+      !paramInfo.anyContextualInfo())
     return arg;
 
   // Apply labels to arguments.
@@ -5979,9 +5982,10 @@ Expr *ExprRewriter::coerceCallArguments(
     bool isUnsafeSendable = paramInfo.isUnsafeSendable(paramIdx);
     bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
         (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
-    applyUnsafeConcurrent(
+    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
+    applyContextualClosureFlags(
         arg, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
-        isMainActor);
+        isMainActor, isImplicitSelfCapture);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();

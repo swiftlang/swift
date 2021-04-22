@@ -1570,6 +1570,13 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           return false;
       }
 
+      // If the closure was used in a context where it's explicitly stated
+      // that it does not need "self." qualification, don't require it.
+      if (auto closure = dyn_cast<ClosureExpr>(CE)) {
+        if (closure->allowsImplicitSelfCapture())
+          return false;
+      }
+
       return true;
     }
 
