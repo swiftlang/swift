@@ -33,36 +33,11 @@ import Swift
 /// unless implementing a scheduler.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct Task {
-  internal let _task: Builtin.NativeObject
-
-  // May only be created by the standard library.
-  internal init(_ task: Builtin.NativeObject) {
-    self._task = task
-  }
-}
-
-// ==== Current Task -----------------------------------------------------------
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Task {
-
-  /// Returns 'current' `Task` instance, representing the task from within which
-  /// this function was called.
-  ///
-  /// All functions available on the Task
-  public static var current: Task? {
-    guard let _task = _getCurrentAsyncTask() else {
-      return nil
-    }
-
-    // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
-    //        with "destroying a task that never completed" in the task's destroy.
-    //        How do we solve this properly?
-    Builtin.retain(_task)
-
-    return Task(_task)
-  }
-
+  // Task instances should not be used as they could be stored away,
+  // and sine some tasks may be task-local allocated such stored away
+  // references could point at already destroyed task memory (!).
+  //
+  // If necessary to obtain a task instance, please use withUnsafeCurrentTask.
 }
 
 // ==== Task Priority ----------------------------------------------------------
@@ -78,18 +53,12 @@ extension Task {
   /// - SeeAlso: `Task.priority`
   public static var currentPriority: Priority {
     withUnsafeCurrentTask { task in
-      task?.priority ?? Priority.default
-    }
-  }
+      guard let task = task else {
+        return Priority.default
+      }
 
-  /// Returns the `current` task's priority.
-  ///
-  /// If no current `Task` is available, returns `Priority.default`.
-  ///
-  /// - SeeAlso: `Task.Priority`
-  /// - SeeAlso: `Task.currentPriority`
-  public var priority: Priority {
-    getJobFlags(_task).priority
+      return getJobFlags(task._task).priority
+    }
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -150,16 +119,20 @@ extension Task {
   /// i.e. the task will run regardless of the handle still being present or not.
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
+  ///
+  // Implementation notes:
+  // A task handle can ONLY be obtained for a detached task, and as such shares
+  // no lifetime concerns with regards to holding and storing the `_task` with
+  // the `Task` type, which would have also be obtainable for any task, including
+  // a potentially task-local allocated one. I.e. it is always safe to store away
+  // a Task.Handle, yet the same is not true for the "current task" which may be
+  // a async-let created task, at risk of getting destroyed while the reference
+  // lingers around.
   public struct Handle<Success, Failure: Error>: Sendable {
     internal let _task: Builtin.NativeObject
 
     internal init(_ task: Builtin.NativeObject) {
       self._task = task
-    }
-
-    /// Returns the `Task` that this handle refers to.
-    public var task: Task {
-      Task(_task)
     }
 
     /// Wait for the task to complete, returning (or throwing) its result.
@@ -247,23 +220,6 @@ extension Task.Handle: Hashable {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task.Handle: Equatable {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
-      UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
-  }
-}
-
-// ==== Conformances -----------------------------------------------------------
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Task: Hashable {
-  public func hash(into hasher: inout Hasher) {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
-  }
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Task: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
       UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
@@ -603,7 +559,7 @@ extension Task {
 extension Task {
 
   @available(*, deprecated, message: "`Task.unsafeCurrent` was replaced by `withUnsafeCurrentTask { task in ... }`, and will be removed soon.")
-  public static var unsafeCurrent: UnsafeCurrentTask? {
+  public static var unsafeCurrent: UnsafeCurrentTask? { // TODO: remove as soon as possible
     guard let _task = _getCurrentAsyncTask() else {
       return nil
     }
@@ -665,14 +621,6 @@ public struct UnsafeCurrentTask {
   // May only be created by the standard library.
   internal init(_ task: Builtin.NativeObject) {
     self._task = task
-  }
-
-  /// Returns `Task` representing the same asynchronous context as this 'UnsafeCurrentTask'.
-  ///
-  /// Operations on `Task` (unlike `UnsafeCurrentTask`) are safe to be called
-  /// from any other task (or thread).
-  public var task: Task {
-    Task(_task)
   }
 
   /// Returns `true` if the task is cancelled, and should stop executing.
