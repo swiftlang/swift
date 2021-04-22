@@ -136,6 +136,9 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
+WARNING(warn_implicit_concurrency_import_failed,none,
+        "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
+
 ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
