@@ -879,6 +879,13 @@ public:
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
+
+  /// Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  bool canImportModuleImpl(ImportPath::Element ModulePath) const;
 public:
   namelookup::ImportCache &getImportCache() const;
 
@@ -908,6 +915,7 @@ public:
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
   bool canImportModule(ImportPath::Element ModulePath);
+  bool canImportModule(ImportPath::Element ModulePath) const;
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
