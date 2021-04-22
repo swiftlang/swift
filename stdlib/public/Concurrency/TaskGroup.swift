@@ -740,7 +740,7 @@ extension TaskGroup: AsyncSequence {
     /// this iterater is guaranteed to never produce more values.
     ///
     /// For more information about the iteration order and semantics,
-    /// see `TaskGroup.next()` 
+    /// see `TaskGroup.next()`.
     public mutating func next() async -> Element? {
       guard !finished else { return nil }
       guard let element = await group.next() else {
