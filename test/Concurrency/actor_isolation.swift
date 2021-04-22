@@ -756,7 +756,7 @@ func testCrossActorProtocol<T: P>(t: T) async {
 }
 
 // ----------------------------------------------------------------------
-// @_
+// @_inheritActorContext
 // ----------------------------------------------------------------------
 func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
 func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
