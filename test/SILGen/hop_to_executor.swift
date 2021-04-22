@@ -245,3 +245,20 @@ func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
 func testGlobalActorFuncValue(_ fn: @RedActor () -> Void) async {
   await fn()
 }
+
+func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
+
+extension MyActor {
+  func synchronous() { }
+
+  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A10InheritingyyFyyYaYbXEfU_
+  // CHECK: debug_value [[SELF:%[0-9]+]] : $MyActor
+  // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[SELF]] : $MyActor
+  // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $MyActor
+  // CHECK-NEXT: hop_to_executor [[BORROW]] : $MyActor
+  func testInheriting() {
+    acceptAsyncSendableClosureInheriting {
+      synchronous()
+    }
+  }
+}

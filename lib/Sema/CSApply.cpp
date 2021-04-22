@@ -5724,6 +5724,12 @@ static void applyContextualClosureFlags(
         captureList->getClosureBody(), sendable, forMainActor,
         implicitSelfCapture, inheritActorContext);
   }
+
+  if (auto identity = dyn_cast<IdentityExpr>(expr)) {
+    applyContextualClosureFlags(
+        identity->getSubExpr(), sendable, forMainActor,
+        implicitSelfCapture, inheritActorContext);
+  }
 }
 
 /// Whether this is a reference to a method on the main dispatch queue.
@@ -6114,6 +6120,20 @@ Expr *ExprRewriter::coerceCallArguments(
 static bool isClosureLiteralExpr(Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
   return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
+}
+
+/// Whether we should propagate async down to a closure.
+static bool shouldPropagateAsyncToClosure(Expr *expr) {
+  if (auto IE = dyn_cast<IdentityExpr>(expr))
+    return shouldPropagateAsyncToClosure(IE->getSubExpr());
+
+  if (auto CLE = dyn_cast<CaptureListExpr>(expr))
+    return shouldPropagateAsyncToClosure(CLE->getClosureBody());
+
+  if (auto CE = dyn_cast<ClosureExpr>(expr))
+    return CE->inheritsActorContext();
+
+  return false;
 }
 
 /// If the expression is an explicit closure expression (potentially wrapped in
@@ -6984,6 +7004,22 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto fromEI = fromFunc->getExtInfo();
     if (toEI.isSendable() && !fromEI.isSendable()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating the 'concurrent' bit might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate the 'async'
+    // bit to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (toEI.isAsync() && !fromEI.isAsync() &&
+        shouldPropagateAsyncToClosure(expr)) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withAsync());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
