@@ -146,7 +146,7 @@ func _opaqueGetInt64(x: Int) -> Int
 
 @inline(never)
 public func getInt(x: Int) -> Int {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
   return _opaqueGetInt32(x)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || \
 arch(powerpc64le) || arch(s390x)

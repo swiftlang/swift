@@ -82,12 +82,17 @@ public func use_global() -> Int {
 // aarch64:         bl swift_endAccess
 // aarch64:         ldr x0, [sp]
 
+// The following checks are temporarily disabled. See rdar://problem/42909618
 // arm64e-LABEL: _$s4main10use_globalSiyF:
 // arm64e:         bl _swift_beginAccess
-// arm64e:         adrp [[REG3:x[0-9]+]], _$s4main6globalSivp@PAGE
-// arm64e:         add  [[REG4:x[0-9]+]], [[REG3]], _$s4main6globalSivp@PAGEOFF
-// arm64e:         ldr {{x[0-9]+}}, {{\[}}[[REG4]]{{\]}}
+// arm64e:         ldr [[REG2:x[0-9]+]], [{{x[0-9]+}}, _$s4main6globalSivp@PAGEOFF]
 // arm64e:         bl _swift_endAccess
+
+// arm64_32-LABEL: _$s4main10use_globalSiyF:
+// arm64_32:         adrp [[REG1:x[0-9]+]], _$s4main6globalSivp@PAGE
+// arm64_32:         add [[REG1]], [[REG1]], _$s4main6globalSivp@PAGEOFF
+// arm64_32:         bl _swift_beginAccess
+// arm64_32:         ldr {{w[0-9]+}}, {{\[}}[[REG1]]{{\]}}
 
 // powerpc64le-LABEL: {{_?}}$s4main10use_globalSiyF:
 // powerpc64le:        bl swift_beginAccess

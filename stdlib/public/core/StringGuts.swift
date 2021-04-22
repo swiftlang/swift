@@ -180,7 +180,7 @@ extension _StringGuts {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if arch(i386) || arch(arm) || arch(wasm32)
+    #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it

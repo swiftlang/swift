@@ -260,10 +260,8 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 
   // AnyHashable is a special case that we do not handle since we only handle
   // objc targets in this function. Bailout early.
-  if (auto dt = target.getNominalOrBoundGenericNominal()) {
-    if (dt == mod.getASTContext().getAnyHashableDecl()) {
-      return nullptr;
-    }
+  if (target->isAnyHashable()) {
+    return nullptr;
   }
 
   SILValue src = dynamicCast.getSource();

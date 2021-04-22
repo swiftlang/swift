@@ -647,6 +647,16 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeMainActor, UnsafeMainActor,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   114)
 
+SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
+  OnParam | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  115)
+
+SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
+  OnParam | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  116)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

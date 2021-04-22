@@ -614,6 +614,16 @@ def warn_swift3_objc_inference_minimal :
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
 
+def enable_actor_data_race_checks :
+  Flag<["-"], "enable-actor-data-race-checks">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit runtime checks for actor data races">;
+
+def disable_actor_data_race_checks :
+  Flag<["-"], "disable-actor-data-race-checks">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable runtime checks for actor data races">;
+
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,

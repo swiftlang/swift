@@ -55,6 +55,11 @@ public func invalidFuncBody() -> ValidStructInvalidMember {
 }
 
 public func invalidFunc() -> undefined {} // expected-error {{cannot find type 'undefined'}}
+
+extension undefined: undefined {} // expected-error {{cannot find type 'undefined'}}
+
+class GenericClass<T> {}
+class InvalidSuperclass: GenericClass<undefined> {} // expected-error {{cannot find type 'undefined'}}
 #endif
 
 // RUN: %target-swift-frontend -emit-module -o %t/validUses.swiftmodule -experimental-allow-module-with-compiler-errors -I%t -D VALID_USES %s 2>&1 | %FileCheck -check-prefix=CHECK-VALID %s

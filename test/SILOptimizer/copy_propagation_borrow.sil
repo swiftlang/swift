@@ -9,7 +9,6 @@
 sil_stage canonical
 
 import Builtin
-import Swift
 
 class B { }
 
@@ -26,6 +25,53 @@ sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
+}
+
+class Klass {}
+
+struct HasObjectAndInt {
+  var object: Klass
+  var value: Builtin.Int64
+}
+
+
+struct Wrapper {
+  var hasObject: HasObjectAndInt
+}
+
+struct UInt64 {
+  @_hasStorage public var _value: Builtin.Int64 { get set }
+  init(_value: Builtin.Int64)
+}
+
+struct Int64 {
+  @_hasStorage public var _value: Builtin.Int64 { get set }
+  init(_value: Builtin.Int64)
+}
+
+internal struct _StringObject {
+  @usableFromInline
+  @_hasStorage internal var _countAndFlagsBits: UInt64 { get set }
+  @usableFromInline
+  @_hasStorage internal var _object: Builtin.BridgeObject { get set }
+  init(_countAndFlagsBits: UInt64, _object: Builtin.BridgeObject)
+}
+
+struct _StringGuts {
+  @_hasStorage internal var _object: _StringObject { get set }
+  init(_object: _StringObject)
+}
+
+public struct String {
+  @_hasStorage var _guts: _StringGuts { get set }
+  init(_guts: _StringGuts)
+}
+
+extension String {
+  public struct UTF16View {
+    @_hasStorage internal var _guts: _StringGuts { get set }
+    init(_guts: _StringGuts)
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -84,27 +130,29 @@ bb0(%0 : @guaranteed $NativeObjectPair):
 // Test consolidateBorrowScope
 // =============================================================================
 
-// Don't consolidate a multi-block borrow scope, but do optimize dead copies.
+// Remove nested borrow scopes for multiple levels of struct_extracts.
 //
 // CHECK-LABEL: sil [ossa] @testMultiBlockBorrow : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: bb0(%0 : @guaranteed $C):
-// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
-// CHECK:   [[CP0:%.*]] = copy_value [[BORROW]] : $C
+// CHECK-NOT: borrow
 // CHECK-NOT: copy
 // CHECK: cond_br undef, bb1, bb2
 // CHECK: bb1:
-// CHECK:   [[CP1:%.*]] = copy_value [[BORROW]] : $C
-// CHECK:   end_borrow [[BORROW]] : $C
+// CHECK-NOT: borrow
 // CHECK-NOT: copy
+// CHECK:   [[CP1:%.*]] = copy_value %0 : $C
 // CHECK:   apply %{{.*}}([[CP1]]) : $@convention(thin) (@owned C) -> ()
-// CHECK: br bb3
+// CHECK-NOT: destroy
+// CHECK:   br bb3
 // CHECK: bb2:
+// CHECK-NOT: borrow
 // CHECK-NOT: copy
 // CHECK-NOT: destroy
-// CHECK:   br bb3                                          // id: %10
+// CHECK:   br bb3
 // CHECK: bb3:
 // CHECK-NOT: destroy
-// CHECK:   apply %1([[CP0]]) : $@convention(thin) (@owned C) -> ()
+// CHECK:   [[CP3:%.*]] = copy_value %0 : $C
+// CHECK:   apply %1([[CP3]]) : $@convention(thin) (@owned C) -> ()
 // CHECK-NOT: destroy
 // CHECK-LABEL: } // end sil function 'testMultiBlockBorrow'
 sil [ossa] @testMultiBlockBorrow : $@convention(thin) (@guaranteed C) -> () {
@@ -137,7 +185,8 @@ bb3:
 // CHECK-LABEL: sil [ossa] @testLocalBorrowPostDomDestroy : $@convention(thin) (@owned C) -> () {
 // CHECK:        [[OUTERCOPY:%.*]] = copy_value %0 : $C
 // CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $C
-// CHECK-NEXT:   end_borrow [[BORROW]] : $C
+// CHECK-NOT:    copy_value
+// CHECK:        end_borrow [[BORROW]] : $C
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
 // CHECK-NEXT:   [[COPY:%.*]] = copy_value [[OUTERCOPY]] : $C
@@ -156,6 +205,9 @@ bb0(%0 : @owned $C):
   %f = function_ref @takeOwnedC : $@convention(thin) (@owned C) -> ()
   %borrow = begin_borrow %0 : $C
   %copy3 = copy_value %borrow : $C
+  // Force the borrow not to be eliminated early.
+  %fguaranteed = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %call0 = apply %fguaranteed(%borrow) : $@convention(thin) (@guaranteed C) -> ()
   end_borrow %borrow : $C
   cond_br undef, bb1, bb2
 bb1:
@@ -176,7 +228,8 @@ bb3:
 // CHECK-LABEL: sil [ossa] @testLocalBorrowNoPostDomDestroy : $@convention(thin) (@owned C) -> () {
 // CHECK:        [[OUTERCOPY:%.*]] = copy_value %0 : $C
 // CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow %0 : $C
-// CHECK-NEXT:   end_borrow [[BORROW]] : $C
+// CHECK-NOT:    copy_value
+// CHECK:        end_borrow [[BORROW]] : $C
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
 // CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
@@ -197,6 +250,8 @@ bb0(%0 : @owned $C):
   %fguaranteed = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
   %borrow = begin_borrow %0 : $C
   %copy3 = copy_value %borrow : $C
+  // Force the borrow not to be eliminated early.
+  %call0 = apply %fguaranteed(%borrow) : $@convention(thin) (@guaranteed C) -> ()
   end_borrow %borrow : $C
   cond_br undef, bb1, bb2
 bb1:
@@ -216,7 +271,8 @@ bb3:
 // CHECK-LABEL: sil [ossa] @testLocalBorrowDoubleConsume : $@convention(thin) (@owned C) -> () {
 // CHECK:   [[OUTERCOPY:%.*]] = copy_value %0 : $C
 // CHECK-NEXT:  begin_borrow %0 : $C
-// CHECK-NEXT:  end_borrow
+// CHECK-NOT:   copy
+// CHECK:       end_borrow
 // CHECK-NEXT:  cond_br undef, bb1, bb2
 // CHECK:     bb1:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
@@ -227,8 +283,8 @@ bb3:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
 //
 // This copy would be eliminated if the outer lifetime were also canonicalized (no unchecked_ownership_conversion)
-// CHECK-NEXT:  %13 = copy_value [[OUTERCOPY]] : $C
-// CHECK-NEXT:  destroy_value %13 : $C
+// CHECK-NEXT:  [[COPY2:%.*]] = copy_value [[OUTERCOPY]] : $C
+// CHECK-NEXT:  destroy_value [[COPY2]] : $C
 // CHECK-NEXT:  destroy_value %4 : $C
 // CHECK-NEXT:  br bb3
 // CHECK: bb3:
@@ -243,6 +299,8 @@ bb0(%0 : @owned $C):
   %borrow = begin_borrow %0 : $C
   %copy3 = copy_value %borrow : $C
   %copy4 = copy_value %borrow : $C
+  // Force the borrow not to be eliminated early.
+  %call0 = apply %fguaranteed(%borrow) : $@convention(thin) (@guaranteed C) -> ()
   end_borrow %borrow : $C
   cond_br undef, bb1, bb2
 bb1:
@@ -304,8 +362,10 @@ bb3:
 // CHECK-LABEL: sil [ossa] @testInterleavedBorrow : $@convention(thin) () -> @owned C {
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
 // CHECK-NEXT:   [[B1:%.*]] = begin_borrow [[ALLOC]]
-// CHECK-NEXT:   [[B2:%.*]] = begin_borrow [[ALLOC]]
-// CHECK-NEXT:   end_borrow [[B1]] : $C
+// CHECK-NOT:    copy
+// CHECK:        [[B2:%.*]] = begin_borrow [[ALLOC]]
+// CHECK-NOT:    copy
+// CHECK:        end_borrow [[B1]] : $C
 // CHECK-NEXT:   apply %0([[B2]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   end_borrow [[B2]] : $C
 // CHECK-NEXT:   return [[ALLOC]] : $C
@@ -316,7 +376,11 @@ bb0:
   %0 = alloc_ref $C
   %1 = begin_borrow %0 : $C
   %2 = copy_value %1 : $C
+  // Force the borrow not to be eliminated early.
+  %fguaranteed = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  %call0 = apply %fguaranteed(%1) : $@convention(thin) (@guaranteed C) -> ()
   %3 = begin_borrow %2 : $C
+  %call1 = apply %fguaranteed(%3) : $@convention(thin) (@guaranteed C) -> ()
   end_borrow %1 : $C
   apply %f(%3) : $@convention(thin) (@guaranteed C) -> ()
   end_borrow %3 : $C
@@ -330,7 +394,8 @@ bb0:
 //
 // CHECK-LABEL: sil [ossa] @testInterleavedBorrowCrossBlock : $@convention(thin) () -> @owned C {
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
-// CHECK-NEXT:   [[B1:%.*]] = begin_borrow [[ALLOC]]
+// CHECK:        [[B1:%.*]] = begin_borrow [[ALLOC]]
+// CHECK:        apply %{{.*}}([[B1]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT:   [[B2:%.*]] = begin_borrow [[ALLOC]]
 // CHECK-NEXT:   end_borrow [[B1]] : $C
 // CHECK-NEXT:   cond_br undef, bb1, bb2
@@ -347,13 +412,14 @@ bb0:
 sil [ossa] @testInterleavedBorrowCrossBlock : $@convention(thin) () -> @owned C {
 bb0:
   %0 = alloc_ref $C
+  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
   %1 = begin_borrow %0 : $C
   %2 = copy_value %1 : $C
+  apply %f(%1) : $@convention(thin) (@guaranteed C) -> ()
   %3 = begin_borrow %2 : $C
   end_borrow %1 : $C
   cond_br undef, bb1, bb2
 bb1:
-  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
   apply %f(%3) : $@convention(thin) (@guaranteed C) -> ()
   end_borrow %3 : $C
   br bb3
@@ -514,10 +580,11 @@ bb3(%borrowphi : @guaranteed $C):
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
 // CHECK:      bb3([[BORROWPHI:%.*]] : @guaranteed $C):
 // CHECK-NEXT:   [[COPY:%.*]] = copy_value [[BORROWPHI]] : $C
-// CHECK-NEXT:   begin_borrow [[BORROWPHI]] : $C
-// CHECK-NEXT:   end_borrow
-// CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value [[COPY]] : $C
+// CHECK-NEXT:   begin_borrow [[BORROWPHI]] : $C
+// CHECK-NOT:    copy
+// CHECK:        end_borrow
+// CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value [[ALLOC]] : $C
 // CHECK-LABEL: } // end sil function 'testNestedReborrowOutsideUse'
 sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
@@ -533,6 +600,8 @@ bb2:
 bb3(%borrowphi : @guaranteed $C):
   %nestedborrow = begin_borrow %borrowphi : $C
   %innercopy = copy_value %nestedborrow : $C
+  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %f(%nestedborrow) : $@convention(thin) (@guaranteed C) -> ()
   end_borrow %nestedborrow : $C
   %middlecopy = copy_value %innercopy : $C
   end_borrow %borrowphi : $C
@@ -583,3 +652,127 @@ bb3(%borrow3 : @guaranteed $C, %copy3 : @owned $C):
   %result = tuple ()
   return %result : $()
 }
+
+// Test conversion from struct_extract to destructure.
+//
+// CHECK-LABEL: sil [ossa] @testDestructureConversion : $@convention(thin) (@owned Wrapper) -> () {
+// CHECK: bb0(%0 : @owned $Wrapper):
+// CHECK-NOT: copy
+// CHECK:   [[SPLIT:%.*]] = destructure_struct %0 : $Wrapper
+// CHECK:   [[BORROWINNER:%.*]] = begin_borrow [[SPLIT]] : $HasObjectAndInt
+// CHECK:   debug_value [[BORROWINNER]] : $HasObjectAndInt, let, name "self", argno 1
+// CHECK:   struct_extract [[BORROWINNER]] : $HasObjectAndInt, #HasObjectAndInt.value
+// CHECK:   end_borrow [[BORROWINNER]] : $HasObjectAndInt
+// CHECK:   destroy_value [[SPLIT]] : $HasObjectAndInt
+// CHECK-LABEL: } // end sil function 'testDestructureConversion'
+sil [ossa] @testDestructureConversion : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : @owned $Wrapper):
+  %1 = begin_borrow %0 : $Wrapper
+  %2 = struct_extract %1 : $Wrapper, #Wrapper.hasObject
+  // This copy is only used by a nested borrow scope.
+  %3 = copy_value %2 : $HasObjectAndInt
+  // This borrow scope is only used by debug_value and extracting a trivial member
+  %4 = begin_borrow %3 : $HasObjectAndInt
+  debug_value %4 : $HasObjectAndInt, let, name "self", argno 1
+  %6 = struct_extract %4 : $HasObjectAndInt, #HasObjectAndInt.value
+  %7 = builtin "and_Int64"(%6 : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
+  end_borrow %4 : $HasObjectAndInt
+  end_borrow %1 : $Wrapper
+  destroy_value %3 : $HasObjectAndInt
+  destroy_value %0 : $Wrapper
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// FIXME: This borrow scope should also be removed:
+//   %11 = begin_borrow %10 : $_StringObject           // users: %17, %16, %13, %11
+//
+// It only has one trivial struct_extract. But copy propagation
+// currently only removes completely dead borrows.
+// Removing this borrow scope will unblock removal of the final remaining copy_value:
+//    %_ = copy_value %_ : $String.UTF16View
+//
+// CHECK-LABEL: sil [ossa] @testUselessBorrow : $@convention(thin) (@owned String) -> () {
+// CHECK: bb0(%0 : @owned $String):
+// CHECK-NEXT:   [[DESTRUCTURE:%.*]] = destructure_struct %0 : $String
+// CHECK-NEXT:   [[UTF16:%.*]] = struct $String.UTF16View ([[DESTRUCTURE]] : $_StringGuts)
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   [[COPY:%.*]] = copy_value [[UTF16]] : $String.UTF16View
+// CHECK-NEXT:   [[GUTS:%.*]] = destructure_struct [[COPY]] : $String.UTF16View
+// CHECK-NEXT:   [[OBJ:%.*]] = destructure_struct [[GUTS]] : $_StringGuts
+// CHECK-NEXT:   [[BORROW:%.*]] = begin_borrow [[OBJ]] : $_StringObject
+// CHECK-NEXT:   cond_br undef, bb2, bb3
+// CHECK:      bb2:
+// CHECK:        br bb4
+// CHECK:      bb3:
+// CHECK:        br bb4
+// CHECK:      bb4:
+// CHECK-NEXT:   debug_value [[BORROW]] : $_StringObject, let, name "self", argno 1
+// CHECK-NEXT:   cond_br undef, bb5, bb6
+// CHECK:      bb5:
+// CHECK-NEXT:   end_borrow [[BORROW]] : $_StringObject
+// CHECK-NEXT:   destroy_value [[OBJ]] : $_StringObject
+// CHECK-NEXT:   br bb1
+// CHECK:      bb6:
+// CHECK-NEXT:   struct_extract [[BORROW]] : $_StringObject, #_StringObject._countAndFlagsBits
+// CHECK-NEXT:   end_borrow [[BORROW]] : $_StringObject
+// CHECK-NEXT:   destroy_value [[OBJ]] : $_StringObject
+// CHECK-NEXT:   struct_extract %{{.*}} : $UInt64, #UInt64._value
+// CHECK-NEXT:   builtin "and_Int64"(%{{.*}} : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
+// CHECK-NEXT:   cond_br undef, bb7, bb8
+// CHECK:      bb7:
+// CHECK:        br bb1
+// CHECK:      bb8:
+// CHECK-NEXT:   destroy_value [[UTF16]] : $String.UTF16View
+// CHECK-LABEL: } // end sil function 'testUselessBorrow'
+sil [ossa] @testUselessBorrow : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_borrow %0 : $String
+  %2 = struct_extract %1 : $String, #String._guts
+  %3 = copy_value %2 : $_StringGuts
+  %4 = struct $String.UTF16View (%3 : $_StringGuts)
+  end_borrow %1 : $String
+  br bb1
+
+bb1:
+  %7 = begin_borrow %4 : $String.UTF16View
+  %8 = struct_extract %7 : $String.UTF16View, #String.UTF16View._guts
+  %9 = struct_extract %8 : $_StringGuts, #_StringGuts._object
+  %10 = copy_value %9 : $_StringObject
+  %11 = begin_borrow %10 : $_StringObject
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  end_borrow %7 : $String.UTF16View
+  debug_value %11 : $_StringObject, let, name "self", argno 1
+  cond_br undef, bb5, bb6
+
+bb5:
+  end_borrow %11 : $_StringObject
+  destroy_value %10 : $_StringObject
+  br bb1
+
+bb6:
+  %21 = struct_extract %11 : $_StringObject, #_StringObject._countAndFlagsBits
+  end_borrow %11 : $_StringObject
+  destroy_value %10 : $_StringObject
+  %24 = struct_extract %21 : $UInt64, #UInt64._value
+  %25 = builtin "and_Int64"(%24 : $Builtin.Int64, undef : $Builtin.Int64) : $Builtin.Int64
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb1
+
+bb8:
+  destroy_value %4 : $String.UTF16View
+  destroy_value %0 : $String
+  %30 = tuple ()
+  return %30 : $()
+} // end sil function 'testUselessBorrow'

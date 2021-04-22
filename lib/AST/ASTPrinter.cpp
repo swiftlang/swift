@@ -4517,15 +4517,13 @@ public:
 
   void visitBoundGenericType(BoundGenericType *T) {
     if (Options.SynthesizeSugarOnTypes) {
-      auto *NT = T->getDecl();
-      auto &Ctx = T->getASTContext();
-      if (NT == Ctx.getArrayDecl()) {
+      if (T->isArray()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
         Printer << "]";
         return;
       }
-      if (NT == Ctx.getDictionaryDecl()) {
+      if (T->isDictionary()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
         Printer << " : ";
@@ -4533,7 +4531,7 @@ public:
         Printer << "]";
         return;
       }
-      if (NT == Ctx.getOptionalDecl()) {
+      if (T->isOptional()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
         Printer << "?";
         return;

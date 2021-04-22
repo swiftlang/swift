@@ -1911,9 +1911,9 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto &C = importer.SwiftContext;
   auto swiftValueDecl = dyn_cast_or_null<ValueDecl>(
       importer.importDecl(errorDomainDecl, importer.CurrentVersion));
-  auto stringTy = C.getStringDecl()->getDeclaredInterfaceType();
+  auto stringTy = C.getStringType();
   assert(stringTy && "no string type available");
-  if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isEqual(stringTy)) {
+  if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isString()) {
     // Couldn't actually import it as an error enum, fall back to enum
     return false;
   }
@@ -6179,7 +6179,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // we will store the underlying type and leave it up to the use site
   // to determine whether to use this new_type, or an Unmanaged<CF...> type.
   if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
-    if (genericType->getDecl() == Impl.SwiftContext.getUnmanagedDecl()) {
+    if (genericType->isUnmanaged()) {
       assert(genericType->getGenericArgs().size() == 1 && "other args?");
       storedUnderlyingType = genericType->getGenericArgs()[0];
     }

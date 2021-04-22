@@ -1725,11 +1725,11 @@ static Type
 defaultTypeLiteralKind(CodeCompletionLiteralKind kind, ASTContext &Ctx) {
   switch (kind) {
   case CodeCompletionLiteralKind::BooleanLiteral:
-    return Ctx.getBoolDecl()->getDeclaredInterfaceType();
+    return Ctx.getBoolType();
   case CodeCompletionLiteralKind::IntegerLiteral:
-    return Ctx.getIntDecl()->getDeclaredInterfaceType();
+    return Ctx.getIntType();
   case CodeCompletionLiteralKind::StringLiteral:
-    return Ctx.getStringDecl()->getDeclaredInterfaceType();
+    return Ctx.getStringType();
   case CodeCompletionLiteralKind::ArrayLiteral:
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
@@ -4344,7 +4344,7 @@ public:
       builder.addRightBracket();
     });
 
-    auto floatType = context.getFloatDecl()->getDeclaredInterfaceType();
+    auto floatType = context.getFloatType();
     addFromProto(LK::ColorLiteral, [&](Builder &builder) {
       builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
@@ -4358,7 +4358,7 @@ public:
       builder.addRightParen();
     });
 
-    auto stringType = context.getStringDecl()->getDeclaredInterfaceType();
+    auto stringType = context.getStringType();
     addFromProto(LK::ImageLiteral, [&](Builder &builder) {
       builder.addBaseName("#imageLiteral");
       builder.addLeftParen();
@@ -4408,7 +4408,7 @@ public:
         }
       }
 
-      if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
+      if (!addedKeyPath && T->isString()) {
         addPoundKeyPath(needPound);
         if (addedSelector)
           break;

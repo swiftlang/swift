@@ -70,7 +70,7 @@ actor MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 19{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String {
     super.superState += 4
     return synchronous()
@@ -336,6 +336,7 @@ struct GenericGlobalActor<T> {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @MainActor func beets() { onions() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'onions()' in a synchronous main actor-isolated context}}
+// expected-note@-1{{calls to global function 'beets()' from outside of its actor context are implicitly asynchronous}}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor Crystal {
@@ -686,7 +687,7 @@ class SomeClassWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
 
-  static var shared = SomeClassWithInits() // expected-note{{static property declared here}}
+  static var shared = SomeClassWithInits() // expected-note 2{{static property declared here}}
 
   init() { // expected-note{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
     self.mutableState = 42
@@ -696,7 +697,9 @@ class SomeClassWithInits {
   }
 
   deinit {
-    print(SomeClassWithInits.shared) // okay, we're actor-isolated
+    print(mutableState) // Okay, we're actor-isolated
+    print(SomeClassWithInits.shared) // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    beets() //expected-error{{call to main actor-isolated global function 'beets()' in a synchronous nonisolated context}}
   }
 
   func isolated() { }
@@ -750,4 +753,31 @@ func testCrossActorProtocol<T: P>(t: T) async {
   await t.g()
   t.f() // expected-error{{call is 'async' but is not marked with 'await'}}
   t.g() // expected-error{{call is 'async' but is not marked with 'await'}}
+}
+
+// ----------------------------------------------------------------------
+// @_inheritActorContext
+// ----------------------------------------------------------------------
+func acceptAsyncSendableClosure<T>(_: @Sendable () async -> T) { }
+func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension MyActor {
+  func testSendableAndInheriting() {
+    acceptAsyncSendableClosure {
+      synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
+    }
+
+    acceptAsyncSendableClosure {
+      await synchronous() // ok
+    }
+
+    acceptAsyncSendableClosureInheriting {
+      synchronous() // okay
+    }
+
+    acceptAsyncSendableClosureInheriting {
+      await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
+    }
+  }
 }

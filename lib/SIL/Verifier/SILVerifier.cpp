@@ -139,7 +139,6 @@ void verifyKeyPathComponent(SILModule &M,
                             SubstitutionMap patternSubs,
                             bool forPropertyDescriptor,
                             bool hasIndices) {
-  auto &C = M.getASTContext();
   auto expansion = typeExpansionContext.getResilienceExpansion();
   auto opaque = AbstractionPattern::getOpaque();
   auto loweredBaseTy =
@@ -170,8 +169,7 @@ void verifyKeyPathComponent(SILModule &M,
           require(param.getConvention()
                     == ParameterConvention::Direct_Unowned,
                   "indices pointer should be trivial");
-          require(param.getInterfaceType()->getAnyNominal()
-                    == C.getUnsafeRawPointerDecl(),
+          require(param.getInterfaceType()->isUnsafeRawPointer(),
                   "indices pointer should be an UnsafeRawPointer");
         }
         
@@ -181,9 +179,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substEqualsType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substEqualsType->getResults()[0].getInterfaceType()
-                               ->getAnyNominal()
-                  == C.getBoolDecl(),
+        require(substEqualsType->getResults()[0].getInterfaceType()->isBool(),
                 "result should be Bool");
       }
       {
@@ -202,8 +198,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(param.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(param.getInterfaceType()->getAnyNominal()
-                  == C.getUnsafeRawPointerDecl(),
+        require(param.getInterfaceType()->isUnsafeRawPointer(),
                 "indices pointer should be an UnsafeRawPointer");
         
         require(substHashType->getResults().size() == 1,
@@ -212,9 +207,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substHashType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substHashType->getResults()[0].getInterfaceType()
-                             ->getAnyNominal()
-                  == C.getIntDecl(),
+        require(substHashType->getResults()[0].getInterfaceType()->isInt(),
                 "result should be Int");
       }
     } else {
@@ -285,6 +278,7 @@ void verifyKeyPathComponent(SILModule &M,
                 SILFunctionTypeRepresentation::Thin,
               "getter should be a thin function");
       
+      auto &C = M.getASTContext();
       require(substGetterType->getNumParameters() == 1 + (hasIndices || C.LangOpts.Target.isOSBinFormatWasm()),
               "getter should have one parameter");
       auto baseParam = substGetterType->getParameters()[0];
@@ -303,7 +297,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(
             indicesParam
                     .getArgumentType(M, substGetterType, typeExpansionContext)
-                    ->getAnyNominal() == C.getUnsafeRawPointerDecl(),
+                    ->isUnsafeRawPointer(),
             "indices pointer should be an UnsafeRawPointer");
       }
 
@@ -337,6 +331,7 @@ void verifyKeyPathComponent(SILModule &M,
                 SILFunctionTypeRepresentation::Thin,
               "setter should be a thin function");
       
+      auto &C = M.getASTContext();
       require(substSetterType->getNumParameters() == 2 + (hasIndices || C.LangOpts.Target.isOSBinFormatWasm()),
               "setter should have two parameters");
 
@@ -361,7 +356,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(
             indicesParam
                     .getArgumentType(M, substSetterType, typeExpansionContext)
-                    ->getAnyNominal() == C.getUnsafeRawPointerDecl(),
+                    ->isUnsafeRawPointer(),
             "indices pointer should be an UnsafeRawPointer");
       }
 
@@ -4844,10 +4839,9 @@ public:
     
     auto kpBGT = kpTy.getAs<BoundGenericType>();
     require(kpBGT, "keypath result must be a generic type");
-    auto &C = F.getASTContext();
-    require(kpBGT->getDecl() == C.getKeyPathDecl()
-            || kpBGT->getDecl() == C.getWritableKeyPathDecl()
-            || kpBGT->getDecl() == C.getReferenceWritableKeyPathDecl(),
+    require(kpBGT->isKeyPath() ||
+            kpBGT->isWritableKeyPath() ||
+            kpBGT->isReferenceWritableKeyPath(),
             "keypath result must be a key path type");
     
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
