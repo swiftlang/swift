@@ -305,6 +305,7 @@ class ToolchainTestCase(unittest.TestCase):
         args = self.default_args()
         args.build_watchos_simulator = True
         args.test_watchos_simulator = True
+        args.test_watchos_32bit_simulator = False
         args.host_target = host_target
         args.stdlib_deployment_targets = [host_target]
         args.build_stdlib_deployment_targets = 'all'
