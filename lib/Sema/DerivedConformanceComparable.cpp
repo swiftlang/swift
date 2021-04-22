@@ -210,9 +210,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
   auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(),
-                                       SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());

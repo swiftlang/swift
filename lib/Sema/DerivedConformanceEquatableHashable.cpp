@@ -79,9 +79,8 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true,
                                   TupleType::get(abTupleElts, C));
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(),
-                                       SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -277,9 +276,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(),
-                                       SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -752,9 +750,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   // generate: switch enumVar { }
   auto enumRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(),
-                                       SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), enumRef, cases, C);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());
