@@ -457,7 +457,7 @@ extension Series.Continuation {
   ///
   /// This can be called more than once and returns to the caller immediately
   /// without blocking for any awaiting consuption from the iteration.
-  public func yield(
+  public func resume(
     with result: Result<Element, Never>
   ) {
     switch result {
