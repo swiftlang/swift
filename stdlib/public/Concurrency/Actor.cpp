@@ -264,7 +264,11 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
   if (isExecutingOnMainThread())
     return JobPriority::UserInitiated;
 
+#if defined(__APPLE__)
   return static_cast<JobPriority>(qos_class_self());
+#else
+  return JobPriority::Unspecified;
+#endif
 }
 
 SWIFT_CC(swift)
