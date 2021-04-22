@@ -27,6 +27,7 @@
 #include "swift/ABI/Actor.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
+#include <dispatch/dispatch.h>
 
 #if defined(__APPLE__)
 #include <asl.h>
@@ -257,6 +258,13 @@ static bool isExecutingOnMainThread() {
 #else
   return pthread_main_np() == 1;
 #endif
+}
+
+JobPriority swift::swift_task_getCurrentThreadPriority() {
+  if (isExecutingOnMainThread())
+    return JobPriority::UserInitiated;
+
+  return static_cast<JobPriority>(qos_class_self());
 }
 
 SWIFT_CC(swift)

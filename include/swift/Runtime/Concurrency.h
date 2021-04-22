@@ -584,6 +584,10 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
     uintptr_t line, ExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobPriority swift_task_getCurrentThreadPriority(void);
+
 }
 
 #pragma clang diagnostic pop
