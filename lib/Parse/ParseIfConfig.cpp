@@ -282,6 +282,13 @@ public:
                    diag::unsupported_platform_runtime_condition_argument);
         return nullptr;
       }
+      
+      // Open-source toolchains do not support arm64_32, but we also don't
+      // want to warn on it, to allow projects to detect it when building
+      // with Apple toolchains and not have spurious warnings when building
+      // with public tooling.
+      if (Kind == PlatformConditionKind::Arch && *ArgStr == "arm64_32")
+        return E;
 
       // Just a warning for other unsupported arguments.
       StringRef DiagName;

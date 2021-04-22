@@ -84,6 +84,11 @@ struct S {
 #if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note{{did you mean 'arm'?}} {{10-13=arm}}
 #endif
 
+// We should not warn for arm64_32 to support projects that need
+// to build with both Apple and public toolchains.
+#if arch(arm64_32)
+#endif
+
 #if _endian(mid) // expected-warning {{unknown endianness for build configuration '_endian'}} expected-note{{did you mean 'big'?}} {{13-16=big}}
 #endif
 
