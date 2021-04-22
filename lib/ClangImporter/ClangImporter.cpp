@@ -678,6 +678,7 @@ importer::getNormalInvocationArguments(
         invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM_"});
         break;
       case llvm::Triple::aarch64:
+      case llvm::Triple::aarch64_32:
         invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM64_"});
         break;
       case llvm::Triple::x86:
@@ -808,6 +809,7 @@ importer::addCommonInvocationArguments(
              (triple.isiOS() || triple.isWatchOS()))
       invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.getArch() == llvm::Triple::aarch64 ||
+             triple.getArch() == llvm::Triple::aarch64_32 ||
              triple.getArch() == llvm::Triple::aarch64_be) {
       invocationArgStrs.push_back("-mcpu=apple-a7");
     }
@@ -2775,36 +2777,41 @@ void ClangImporter::lookupTypeDecl(
   clang::DeclarationName clangName(
       &Impl.Instance->getASTContext().Idents.get(rawName));
 
-  clang::Sema::LookupNameKind lookupKind;
+  SmallVector<clang::Sema::LookupNameKind, 1> lookupKinds;
   switch (kind) {
   case ClangTypeKind::Typedef:
-    lookupKind = clang::Sema::LookupOrdinaryName;
+    lookupKinds.push_back(clang::Sema::LookupOrdinaryName);
     break;
   case ClangTypeKind::Tag:
-    lookupKind = clang::Sema::LookupTagName;
+    lookupKinds.push_back(clang::Sema::LookupTagName);
+    lookupKinds.push_back(clang::Sema::LookupNamespaceName);
     break;
   case ClangTypeKind::ObjCProtocol:
-    lookupKind = clang::Sema::LookupObjCProtocolName;
+    lookupKinds.push_back(clang::Sema::LookupObjCProtocolName);
     break;
   }
 
   // Perform name lookup into the global scope.
   auto &sema = Impl.Instance->getSema();
-  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
-                                   lookupKind);
   bool foundViaClang = false;
-  if (!Impl.DisableSourceImport &&
-      sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
-    for (auto clangDecl : lookupResult) {
-      if (!isa<clang::TypeDecl>(clangDecl) &&
-          !isa<clang::ObjCContainerDecl>(clangDecl) &&
-          !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
-        continue;
-      }
-      auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
-      if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
-        foundViaClang = true;
-        receiver(importedType);
+
+  for (auto lookupKind : lookupKinds) {
+    clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                     lookupKind);
+    if (!Impl.DisableSourceImport &&
+        sema.LookupName(lookupResult, /*Scope=*/ sema.TUScope)) {
+      for (auto clangDecl : lookupResult) {
+        if (!isa<clang::TypeDecl>(clangDecl) &&
+            !isa<clang::NamespaceDecl>(clangDecl) &&
+            !isa<clang::ObjCContainerDecl>(clangDecl) &&
+            !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+          continue;
+        }
+        auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+        if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
+          foundViaClang = true;
+          receiver(importedType);
+        }
       }
     }
   }

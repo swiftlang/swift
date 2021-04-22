@@ -137,6 +137,8 @@ public:
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(UnsafeSendable)
   IGNORED_ATTR(UnsafeMainActor)
+  IGNORED_ATTR(ImplicitSelfCapture)
+  IGNORED_ATTR(InheritActorContext)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -568,13 +570,13 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
     return diag::iboutlet_nonobjc_class;
   }
 
-  if (nominal == ctx.getStringDecl()) {
+  if (type->isString()) {
     // String is okay because it is bridged to NSString.
     // FIXME: BridgesTypes.def is almost sufficient for this.
     return None;
   }
 
-  if (nominal == ctx.getArrayDecl()) {
+  if (type->isArray()) {
     // Arrays of arrays are not allowed.
     if (isArray)
       return diag::iboutlet_nonobject_type;
@@ -1365,13 +1367,10 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
                                  ignoreLabel))
     return false;
 
-  const auto *param = decl->getIndices()->get(0);
-  if (auto NTD = param->getInterfaceType()->getAnyNominal()) {
-    return NTD == ctx.getKeyPathDecl() ||
-           NTD == ctx.getWritableKeyPathDecl() ||
-           NTD == ctx.getReferenceWritableKeyPathDecl();
-  }
-  return false;
+  auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
+  return paramTy->isKeyPath() ||
+         paramTy->isWritableKeyPath() ||
+         paramTy->isReferenceWritableKeyPath();
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at

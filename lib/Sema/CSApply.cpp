@@ -520,7 +520,7 @@ namespace {
                                   /*implicit*/ true);
             cs.setType(
                 stringExpr,
-                cs.getASTContext().getStringDecl()->getDeclaredInterfaceType());
+                cs.getASTContext().getStringType());
             keyPath->setObjCStringLiteralExpr(stringExpr);
         }
       }
@@ -1978,7 +1978,7 @@ namespace {
         
         if (auto nom = keyPathTy->getAs<NominalType>()) {
           // AnyKeyPath is <T> rvalue T -> rvalue Any?
-          if (nom->getDecl() == cs.getASTContext().getAnyKeyPathDecl()) {
+          if (nom->isAnyKeyPath()) {
             valueTy = ProtocolCompositionType::get(cs.getASTContext(), {},
                                                   /*explicit anyobject*/ false);
             valueTy = OptionalType::get(valueTy);
@@ -2008,8 +2008,7 @@ namespace {
           if (!baseTy->isEqual(cs.getType(base)->getRValueType()))
             base = coerceToType(base, baseTy, locator);
 
-          if (keyPathBGT->getDecl()
-                == cs.getASTContext().getPartialKeyPathDecl()) {
+          if (keyPathBGT->isPartialKeyPath()) {
             // PartialKeyPath<T> is rvalue T -> rvalue Any
             valueTy = ProtocolCompositionType::get(cs.getASTContext(), {},
                                                  /*explicit anyobject*/ false);
@@ -2021,14 +2020,12 @@ namespace {
             valueTy = keyPathBGT->getGenericArgs()[1];
         
             // The result may be an lvalue based on the base and key path kind.
-            if (keyPathBGT->getDecl() == cs.getASTContext().getKeyPathDecl()) {
+            if (keyPathBGT->isKeyPath()) {
               resultIsLValue = false;
               base = cs.coerceToRValue(base);
-            } else if (keyPathBGT->getDecl() ==
-                         cs.getASTContext().getWritableKeyPathDecl()) {
+            } else if (keyPathBGT->isWritableKeyPath()) {
               resultIsLValue = cs.getType(base)->hasLValueType();
-            } else if (keyPathBGT->getDecl() ==
-                       cs.getASTContext().getReferenceWritableKeyPathDecl()) {
+            } else if (keyPathBGT->isReferenceWritableKeyPath()) {
               resultIsLValue = true;
               base = cs.coerceToRValue(base);
             } else {
@@ -2848,7 +2845,7 @@ namespace {
       // Make the integer literals for the parameters.
       auto buildExprFromUnsigned = [&](unsigned value) {
         LiteralExpr *expr = IntegerLiteralExpr::createFromUnsigned(ctx, value);
-        cs.setType(expr, ctx.getIntDecl()->getDeclaredInterfaceType());
+        cs.setType(expr, ctx.getIntType());
         return handleIntegerLiteralExpr(expr);
       };
 
@@ -3851,10 +3848,7 @@ namespace {
           ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
         }
 
-        cs.setType(isSomeExpr,
-                   boolDecl
-                   ? boolDecl->getDeclaredInterfaceType()
-                   : Type());
+        cs.setType(isSomeExpr, boolDecl ? ctx.getBoolType() : Type());
         return isSomeExpr;
       }
 
@@ -5715,16 +5709,26 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyUnsafeConcurrent(
-      Expr *expr, bool sendable, bool forMainActor) {
+static void applyContextualClosureFlags(
+      Expr *expr, bool sendable, bool forMainActor, bool implicitSelfCapture,
+      bool inheritActorContext) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setUnsafeConcurrent(sendable, forMainActor);
+    closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
+    closure->setInheritsActorContext(inheritActorContext);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyUnsafeConcurrent(
-        captureList->getClosureBody(), sendable, forMainActor);
+    applyContextualClosureFlags(
+        captureList->getClosureBody(), sendable, forMainActor,
+        implicitSelfCapture, inheritActorContext);
+  }
+
+  if (auto identity = dyn_cast<IdentityExpr>(expr)) {
+    applyContextualClosureFlags(
+        identity->getSubExpr(), sendable, forMainActor,
+        implicitSelfCapture, inheritActorContext);
   }
 }
 
@@ -5809,7 +5813,8 @@ Expr *ExprRewriter::coerceCallArguments(
 
   // Quickly test if any further fix-ups for the argument types are necessary.
   if (AnyFunctionType::equalParams(args, params) &&
-      !shouldInjectWrappedValuePlaceholder)
+      !shouldInjectWrappedValuePlaceholder &&
+      !paramInfo.anyContextualInfo())
     return arg;
 
   // Apply labels to arguments.
@@ -5960,9 +5965,11 @@ Expr *ExprRewriter::coerceCallArguments(
     bool isUnsafeSendable = paramInfo.isUnsafeSendable(paramIdx);
     bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
         (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
-    applyUnsafeConcurrent(
+    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
+    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
+    applyContextualClosureFlags(
         arg, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
-        isMainActor);
+        isMainActor, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
@@ -6113,6 +6120,20 @@ Expr *ExprRewriter::coerceCallArguments(
 static bool isClosureLiteralExpr(Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
   return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
+}
+
+/// Whether we should propagate async down to a closure.
+static bool shouldPropagateAsyncToClosure(Expr *expr) {
+  if (auto IE = dyn_cast<IdentityExpr>(expr))
+    return shouldPropagateAsyncToClosure(IE->getSubExpr());
+
+  if (auto CLE = dyn_cast<CaptureListExpr>(expr))
+    return shouldPropagateAsyncToClosure(CLE->getClosureBody());
+
+  if (auto CE = dyn_cast<ClosureExpr>(expr))
+    return CE->inheritsActorContext();
+
+  return false;
 }
 
 /// If the expression is an explicit closure expression (potentially wrapped in
@@ -6978,11 +6999,27 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    // If we have a ClosureExpr, then we can safely propagate the 'concurrent'
-    // bit to the closure without invalidating prior analysis.
+    // If we have a ClosureExpr, then we can safely propagate @Sendable
+    // to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
     if (toEI.isSendable() && !fromEI.isSendable()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating the 'concurrent' bit might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate the 'async'
+    // bit to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (toEI.isAsync() && !fromEI.isAsync() &&
+        shouldPropagateAsyncToClosure(expr)) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withAsync());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
@@ -7142,8 +7179,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
   case TypeKind::BoundGenericStruct: {
     auto toStruct = cast<BoundGenericStructType>(desugaredToType);
-    if (toStruct->getDecl() != ctx.getArrayDecl() &&
-        toStruct->getDecl() != ctx.getDictionaryDecl())
+    if (!toStruct->isArray() && !toStruct->isDictionary())
       break;
 
     if (toStruct->getDecl() == cs.getType(expr)->getAnyNominal())
@@ -8633,7 +8669,7 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
         return None;
 
       // FIXME: Feels like we could leverage existing code more.
-      Type boolType = cs.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
+      Type boolType = cs.getASTContext().getBoolType();
       guardExpr = solution.coerceToType(
           guardExpr, boolType, cs.getConstraintLocator(info.guardExpr));
       if (!guardExpr)

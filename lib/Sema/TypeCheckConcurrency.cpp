@@ -773,17 +773,24 @@ static bool isAsyncCall(const ApplyExpr *call) {
 /// features.
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc);
 
-/// Determine whether this closure is escaping.
-static bool isSendableClosure(const AbstractClosureExpr *closure) {
+/// Determine whether this closure should be treated as Sendable.
+///
+/// \param forActorIsolation Whether this check is for the purposes of
+/// determining whether the closure must be non-isolated.
+static bool isSendableClosure(
+    const AbstractClosureExpr *closure, bool forActorIsolation) {
+  if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+    if (forActorIsolation && explicitClosure->inheritsActorContext())
+      return false;
+
+    if (explicitClosure->isUnsafeSendable())
+      return true;
+  }
+
   if (auto type = closure->getType()) {
     if (auto fnType = type->getAs<AnyFunctionType>())
       if (fnType->isSendable())
         return true;
-  }
-
-  if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-    if (explicitClosure->isUnsafeSendable())
-      return true;
   }
 
   return false;
@@ -2113,7 +2120,7 @@ namespace {
       }
 
       if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-        if (isSendableClosure(closure)) {
+        if (isSendableClosure(closure, /*forActorIsolation=*/true)) {
           return diag::actor_isolated_from_concurrent_closure;
         }
 
@@ -2255,18 +2262,18 @@ namespace {
 
         LLVM_FALLTHROUGH;
 
-      case ActorIsolationRestriction::GlobalActor:
-        // If we are within an initializer and are referencing a stored
-        // property on "self", we are not crossing actors.
-        if (isa<ConstructorDecl>(getDeclContext()) &&
-            isa<VarDecl>(member) && cast<VarDecl>(member)->hasStorage() &&
-            getReferencedSelf(base))
+      case ActorIsolationRestriction::GlobalActor: {
+        const bool isInitDeInit = isa<ConstructorDecl>(getDeclContext()) ||
+                                  isa<DestructorDecl>(getDeclContext());
+        // If we are within an initializer or deinitilizer and are referencing a
+        // stored property on "self", we are not crossing actors.
+        if (isInitDeInit && isa<VarDecl>(member) &&
+            cast<VarDecl>(member)->hasStorage() && getReferencedSelf(base))
           return false;
-
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
             isolation.isCrossActor, context);
-
+      }
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
         // cases. The error is emitted by diagnoseInOutArg.
@@ -2310,8 +2317,9 @@ namespace {
         }
       }
 
-      // Sendable closures are always actor-independent.
-      if (isSendableClosure(closure))
+      // Sendable closures are actor-independent unless the closure has
+      // specifically opted into inheriting actor isolation.
+      if (isSendableClosure(closure, /*forActorIsolation=*/true))
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.
@@ -2362,7 +2370,7 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
   while (useContext != defContext) {
     // If we find a concurrent closure... it can be run concurrently.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isSendableClosure(closure))
+      if (isSendableClosure(closure, /*forActorIsolation=*/false))
         return true;
     }
 
@@ -2745,13 +2753,13 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::OpaqueType:
   case DeclKind::Param:
   case DeclKind::Module:
+  case DeclKind::Destructor:
     return None;
 
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
   case DeclKind::Constructor:
-  case DeclKind::Destructor:
     return MemberIsolationPropagation::GlobalActor;
 
   case DeclKind::Func:

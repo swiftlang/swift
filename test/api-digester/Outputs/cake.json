@@ -545,6 +545,37 @@
           "moduleName": "cake"
         },
         {
+          "kind": "Function",
+          "name": "__derived_enum_equals",
+          "printedName": "__derived_enum_equals(_:_:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Bool",
+              "printedName": "Swift.Bool",
+              "usr": "s:Sb"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Number",
+              "printedName": "cake.Number",
+              "usr": "s:4cake6NumberO"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Number",
+              "printedName": "cake.Number",
+              "usr": "s:4cake6NumberO"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "s:4cake6NumberO21__derived_enum_equalsySbAC_ACtFZ",
+          "moduleName": "cake",
+          "static": true,
+          "implicit": true,
+          "funcSelfKind": "NonMutating"
+        },
+        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(rawValue:)",

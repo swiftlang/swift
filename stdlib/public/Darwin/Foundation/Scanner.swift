@@ -86,7 +86,7 @@ extension Scanner {
         if let value = scanInt64(representation: representation) { 
             return Int(value)
         }
-#elseif arch(i386) || arch(arm)
+#elseif arch(i386) || arch(arm) || arch(arm64_32)
         if let value = scanInt32(representation: representation) { 
             return Int(value)
         }

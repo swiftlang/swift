@@ -604,10 +604,9 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
   auto *BGT = Ty->getAs<BoundGenericType>();
   if (!BGT)
     return false;
-  if (BGT->getDecl() != Ctx.getUnsafePointerDecl() &&
-      BGT->getDecl() != Ctx.getUnsafeMutablePointerDecl())
+  if (!BGT->isUnsafePointer() && !BGT->isUnsafeMutablePointer())
     return false;
-  IsMutable = BGT->getDecl() == Ctx.getUnsafeMutablePointerDecl();
+  IsMutable = BGT->isUnsafeMutablePointer();
   assert(BGT->getGenericArgs().size() == 1);
   return BGT->getGenericArgs().front()->isVoid();
 }
@@ -1131,21 +1130,26 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       NominalTypeDecl *nominal = nullptr;
       if ((nominalDC = dc->getInnermostTypeContext()) &&
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
-        // Attempt to refer to 'Self' within a non-protocol nominal
-        // type. Fix this by replacing 'Self' with the nominal type name.
-        assert(isa<ClassDecl>(nominal) && "Must be a class");
+        if (isa<ClassDecl>(nominal)) {
+          // Attempt to refer to 'Self' within a non-protocol nominal
+          // type. Fix this by replacing 'Self' with the nominal type name.
 
-        // Produce a Fix-It replacing 'Self' with the nominal type name.
-        auto name = getDeclNameFromContext(dc, nominal);
-        diags.diagnose(comp->getNameLoc(), diag::dynamic_self_invalid, name)
-          .fixItReplace(comp->getNameLoc().getSourceRange(), name);
+          // Produce a Fix-It replacing 'Self' with the nominal type name.
+          auto name = getDeclNameFromContext(dc, nominal);
+          diags.diagnose(comp->getNameLoc(), diag::dynamic_self_invalid, name)
+            .fixItReplace(comp->getNameLoc().getSourceRange(), name);
 
-        auto type = resolution.mapTypeIntoContext(
-          dc->getInnermostTypeContext()->getSelfInterfaceType());
+          auto type = resolution.mapTypeIntoContext(
+            dc->getInnermostTypeContext()->getSelfInterfaceType());
 
-        comp->overwriteNameRef(DeclNameRef(nominal->getName()));
-        comp->setValue(nominal, nominalDC->getParent());
-        return type;
+          comp->overwriteNameRef(DeclNameRef(nominal->getName()));
+          comp->setValue(nominal, nominalDC->getParent());
+          return type;
+        } else {
+          diags.diagnose(comp->getNameLoc(), diag::cannot_find_type_in_scope,
+                         comp->getNameRef());
+          return ErrorType::get(ctx);
+        }
       }
       // Attempt to refer to 'Self' from a free function.
       diags.diagnose(comp->getNameLoc(), diag::dynamic_self_non_method,

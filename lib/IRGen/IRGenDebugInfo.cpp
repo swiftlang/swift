@@ -988,7 +988,7 @@ private:
       } else {
         // Discriminated union case without argument. Fallback to Int
         // as the element type; there is no storage here.
-        Type IntTy = IGM.Context.getIntDecl()->getDeclaredInterfaceType();
+        Type IntTy = IGM.Context.getIntType();
         ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.getStorageType(), Size(0),
                                   Alignment(1), true, false);
       }

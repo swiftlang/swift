@@ -153,7 +153,8 @@ static_assert(alignof(HeapObject) == alignof(void*),
 #define _swift_BridgeObject_TaggedPointerBits                                  \
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
 
-#elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
+#elif (defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)) &&     \
+      (__POINTER_WIDTH__ == 64)
 
 #ifdef __APPLE__
 #define _swift_abi_LeastValidPointerValue                                      \
@@ -221,7 +222,8 @@ extern unsigned char __global_base;
 #if defined(__i386__)
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_I386_SWIFT_SPARE_BITS_MASK
-#elif defined(__arm__) || defined(_M_ARM)
+#elif defined(__arm__) || defined(_M_ARM) ||                                   \
+      (defined(__arm64__) && (__POINTER_WIDTH__ == 32))
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK
 #else

@@ -2236,6 +2236,8 @@ static bool contextDependsOn(const NominalTypeDecl *decl,
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
                                         const DeclContext *excluding) {
+  if (!ty)
+    return;
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
@@ -3064,6 +3066,9 @@ public:
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
+      if (extension->getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
+          !inherited.getType())
+        continue;
       assert(!inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
     }

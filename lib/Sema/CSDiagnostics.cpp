@@ -1978,15 +1978,11 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
 
         auto indexType = resolveType(argType->getElementType(0));
 
-        if (auto bgt = indexType->getAs<BoundGenericType>()) {
-          // In Swift versions lower than 5, this check will fail as read only
-          // key paths can masquerade as writable for compatibilty reasons.
-          // This is fine as in this case we just fall back on old diagnostics.
-          auto &ctx = getASTContext();
-          if (bgt->getDecl() == ctx.getKeyPathDecl() ||
-              bgt->getDecl() == ctx.getPartialKeyPathDecl()) {
-            return {expr, member};
-          }
+        // In Swift versions lower than 5, this check will fail as read only
+        // key paths can masquerade as writable for compatibilty reasons.
+        // This is fine as in this case we just fall back on old diagnostics.
+        if (indexType->isKeyPath() || indexType->isPartialKeyPath()) {
+          return {expr, member};
         }
       }
     }
@@ -2837,13 +2833,10 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (!getASTContext().getStdlibModule())
     return false;
 
-  auto String = getASTContext().getStringDecl()->getDeclaredInterfaceType();
-  auto Substring = getASTContext().getSubstringDecl()->getDeclaredInterfaceType();
-
   // Substring -> String conversion
   // Wrap in String.init
-  if (getFromType()->isEqual(Substring)) {
-    if (getToType()->isEqual(String)) {
+  if (getFromType()->isSubstring()) {
+    if (getToType()->isString()) {
       auto *anchor = castToExpr(getAnchor())->getSemanticsProvidingExpr();
       if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
         anchor = CE->getSubExpr();
@@ -6891,13 +6884,11 @@ bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
 
 bool UnableToInferKeyPathRootFailure::diagnoseAsError() {
   assert(isExpr<KeyPathExpr>(getAnchor()) && "Expected key path expression");
-  auto &ctx = getASTContext();
   auto contextualType = getContextualType(getAnchor());
   auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
 
   auto emitKeyPathDiagnostic = [&]() {
-    if (contextualType &&
-        contextualType->getAnyNominal() == ctx.getAnyKeyPathDecl()) {
+    if (contextualType && contextualType->isAnyKeyPath()) {
       return emitDiagnostic(
           diag::cannot_infer_keypath_root_anykeypath_context);
     }

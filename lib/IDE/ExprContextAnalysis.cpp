@@ -1016,12 +1016,12 @@ class ExprContextAnalyzer {
         if (auto boundGenericT = arrayT->getAs<BoundGenericType>()) {
           // let _: [Element] = [#HERE#]
           // In this case, 'Element' is the expected type.
-          if (boundGenericT->getDecl() == Context.getArrayDecl())
+          if (boundGenericT->isArray())
             recordPossibleType(boundGenericT->getGenericArgs()[0]);
 
           // let _: [Key : Value] = [#HERE#]
           // In this case, 'Key' is the expected type.
-          if (boundGenericT->getDecl() == Context.getDictionaryDecl())
+          if (boundGenericT->isDictionary())
             recordPossibleType(boundGenericT->getGenericArgs()[0]);
         }
       }
@@ -1033,7 +1033,7 @@ class ExprContextAnalyzer {
 
       for (auto dictT : dictCtxtInfo.getPossibleTypes()) {
         if (auto boundGenericT = dictT->getAs<BoundGenericType>()) {
-          if (boundGenericT->getDecl() == Context.getDictionaryDecl()) {
+          if (boundGenericT->isDictionary()) {
             if (ParsedExpr->isImplicit() && isa<TupleExpr>(ParsedExpr)) {
               // let _: [Key : Value] = [#HERE#:]
               // let _: [Key : Value] = [#HERE#:val]
@@ -1048,7 +1048,7 @@ class ExprContextAnalyzer {
             } else {
               // let _: [Key : Value] = [key: val, #HERE#]
               // In this case, assume 'Key' is the expected type.
-              if (boundGenericT->getDecl() == Context.getDictionaryDecl())
+              if (boundGenericT->isDictionary())
                 recordPossibleType(boundGenericT->getGenericArgs()[0]);
             }
           }
@@ -1061,7 +1061,7 @@ class ExprContextAnalyzer {
       if (IE->isFolded() &&
           SM.rangeContains(IE->getCondExpr()->getSourceRange(),
                            ParsedExpr->getSourceRange())) {
-        recordPossibleType(Context.getBoolDecl()->getDeclaredInterfaceType());
+        recordPossibleType(Context.getBoolType());
         break;
       }
       ExprContextInfo ternaryCtxtInfo(DC, Parent);
@@ -1141,8 +1141,7 @@ class ExprContextAnalyzer {
     case StmtKind::ForEach:
       if (auto SEQ = cast<ForEachStmt>(Parent)->getSequence()) {
         if (containsTarget(SEQ)) {
-          recordPossibleType(
-              Context.getSequenceDecl()->getDeclaredInterfaceType());
+          recordPossibleType(Context.getSequenceType());
         }
       }
       break;
@@ -1151,7 +1150,7 @@ class ExprContextAnalyzer {
     case StmtKind::While:
     case StmtKind::Guard:
       if (isBoolConditionOf(Parent)) {
-        recordPossibleType(Context.getBoolDecl()->getDeclaredInterfaceType());
+        recordPossibleType(Context.getBoolType());
       }
       break;
     default:

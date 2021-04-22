@@ -40,18 +40,18 @@ extension Struct: Equatable where T: Equatable {}
 // CHECK-RESILIENT-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Struct<T>, @in_guaranteed Struct<T>, @thin Struct<T>.Type) -> Bool {
 
 extension Struct: Hashable where T: Hashable {}
-// CHECK-LABEL: // Struct<A>.hashValue.getter
-// CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Struct<T>) -> Int {
-
 // CHECK-LABEL: // Struct<A>.hash(into:)
 // CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Struct<T>) -> () {
 
-extension Struct: Codable where T: Codable {}
-// CHECK-LABEL: // Struct<A>.init(from:)
-// CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASeRzSERzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable, T : Encodable> (@in Decoder, @thin Struct<T>.Type) -> (@out Struct<T>, @error Error)
+// CHECK-LABEL: // Struct<A>.hashValue.getter
+// CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Struct<T>) -> Int {
 
+extension Struct: Codable where T: Codable {}
 // CHECK-LABEL: // Struct<A>.encode(to:)
 // CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASeRzSERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Decodable, T : Encodable> (@in_guaranteed Encoder, @in_guaranteed Struct<T>) -> @error Error {
+
+// CHECK-LABEL: // Struct<A>.init(from:)
+// CHECK-NEXT: sil hidden [ossa] @$s30synthesized_conformance_struct6StructVAASeRzSERzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable, T : Encodable> (@in Decoder, @thin Struct<T>.Type) -> (@out Struct<T>, @error Error)
 
 
 // Witness tables
