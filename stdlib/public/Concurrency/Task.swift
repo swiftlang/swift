@@ -56,54 +56,11 @@ import Swift
 /// and additional reasons can accrue during the cancellation process.
 @available(SwiftStdlib 5.5, *)
 public struct Task {
-  internal let _task: Builtin.NativeObject
-
-  // May only be created by the standard library.
-  internal init(_ task: Builtin.NativeObject) {
-    self._task = task
-  }
-}
-
-// ==== Current Task -----------------------------------------------------------
-
-@available(SwiftStdlib 5.5, *)
-extension Task {
-
-  /// Returns the task that this code runs on,
-  /// or `nil` when you access this property outside of any task.
-  ///
-  /// If you read this property from the context of an asynchronous function or closure,
-  /// the current task is non-nil.
-  /// In a synchronous context,
-  /// this property's value depends on whether the synchronous operation was
-  /// called from an asynchronous context.
-  /// For example:
-  ///
-  ///     func hello() {
-  ///         if Task.current == nil { print("Nil") }
-  ///         else { print("Not nil") }
-  ///     }
-  ///
-  ///     func asynchronous() async { hello() }
-  ///
-  /// In the code above,
-  /// because `hello()` is called by an asynchronous function,
-  /// it prints "Not nil".
-  ///
-  @available(*, deprecated, message: "`Task.current` has been deprecated and will be removed, use static functions on Task instead.")
-  public static var current: Task? {
-    guard let _task = _getCurrentAsyncTask() else {
-      return nil
-    }
-
-    // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
-    //        with "destroying a task that never completed" in the task's destroy.
-    //        How do we solve this properly?
-    Builtin.retain(_task)
-
-    return Task(_task)
-  }
-
+  // Task instances should not be used as they could be stored away,
+  // and sine some tasks may be task-local allocated such stored away
+  // references could point at already destroyed task memory (!).
+  //
+  // If necessary to obtain a task instance, please use withUnsafeCurrentTask.
 }
 
 // ==== Task Priority ----------------------------------------------------------
@@ -130,14 +87,6 @@ extension Task {
       // Otherwise, query the system.
       return Task.Priority(rawValue: _getCurrentThreadPriority()) ?? .default
     }
-  }
-
-  /// The task's priority.
-  ///
-  /// - SeeAlso: `Task.currentPriority`
-  @available(*, deprecated, message: "Storing `Task` instances has been deprecated, and as such instance functions on Task are deprecated and will be removed soon. Use the static 'Task.currentPriority' instead.")
-  public var priority: Priority {
-    getJobFlags(_task).priority ?? .default
   }
 
   /// The priority of a task.
@@ -208,21 +157,24 @@ extension Task {
   ///
   /// You can use a task's handle to wait for its result or cancel the task.
   ///
-  /// It isn't a programming error to discard a task's handle without awaiting or canceling the task.
-  /// A task runs regardless of whether you still have its handle stored somewhere.
-  /// However, if you discard a task's handle, you give up the ability
-  /// to wait for that task's result or cancel the task.
+  /// It is not a programming error to drop a handle without awaiting or cancelling it,
+  /// i.e. the task will run regardless of the handle still being present or not.
+  /// Dropping a handle however means losing the ability to await on the task's result
+  /// and losing the ability to cancel it.
+  ///
+  // Implementation notes:
+  // A task handle can ONLY be obtained for a detached task, and as such shares
+  // no lifetime concerns with regards to holding and storing the `_task` with
+  // the `Task` type, which would have also be obtainable for any task, including
+  // a potentially task-local allocated one. I.e. it is always safe to store away
+  // a Task.Handle, yet the same is not true for the "current task" which may be
+  // a async-let created task, at risk of getting destroyed while the reference
+  // lingers around.
   public struct Handle<Success, Failure: Error>: Sendable {
     internal let _task: Builtin.NativeObject
 
     internal init(_ task: Builtin.NativeObject) {
       self._task = task
-    }
-
-    /// The task that this handle refers to.
-    @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
-    public var task: Task {
-      Task(_task)
     }
 
     /// Wait for the task to complete, returning its result or throw an error.
@@ -305,23 +257,6 @@ extension Task.Handle: Hashable {
 
 @available(SwiftStdlib 5.5, *)
 extension Task.Handle: Equatable {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
-      UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
-  }
-}
-
-// ==== Conformances -----------------------------------------------------------
-
-@available(SwiftStdlib 5.5, *)
-extension Task: Hashable {
-  public func hash(into hasher: inout Hasher) {
-    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
-  }
-}
-
-@available(SwiftStdlib 5.5, *)
-extension Task: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
       UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
@@ -775,7 +710,7 @@ extension Task {
 extension Task {
 
   @available(*, deprecated, message: "`Task.unsafeCurrent` was replaced by `withUnsafeCurrentTask { task in ... }`, and will be removed soon.")
-  public static var unsafeCurrent: UnsafeCurrentTask? {
+  public static var unsafeCurrent: UnsafeCurrentTask? { // TODO: remove as soon as possible
     guard let _task = _getCurrentAsyncTask() else {
       return nil
     }
@@ -854,20 +789,7 @@ public struct UnsafeCurrentTask {
     self._task = task
   }
 
-  /// The current task,
-  /// represented in a way that's safe to store for later use.
-  ///
-  /// Operations on an instance of `Task` are safe to call from any other task,
-  /// unlike `UnsafeCurrentTask`.
-  @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
-  public var task: Task {
-    Task(_task)
-  }
-
-  /// A Boolean value that indicates whether the current task was canceled.
-  ///
-  /// After the value of this property is `true`, it remains `true` indefinitely.
-  /// There is no way to uncancel the operation.
+  /// Returns `true` if the task is cancelled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
