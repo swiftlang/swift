@@ -10,19 +10,18 @@
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum TL {
-  @TaskLocal
-  static var number: Int  = 0
+  @TaskLocal(default: 0) static var number
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
-func printTaskLocal<V, Key>(
-    _ key: Key,
+func printTaskLocal<V>(
+    _ key: TaskLocal<V>.Access,
     _ expected: V? = nil,
     file: String = #file, line: UInt = #line
-) -> V? where Key: TaskLocal<V> {
-  let value = key
-  print("\(value) at \(file):\(line)")
+) -> V? {
+  let value = key.get()
+  print("\(key) (\(value)) at \(file):\(line)")
   if let expected = expected {
     assert("\(expected)" == "\(value)",
         "Expected [\(expected)] but found: \(value), at \(file):\(line)")
@@ -36,19 +35,19 @@ func printTaskLocal<V, Key>(
 func groups() async {
   // no value
   _ = await withTaskGroup(of: Int.self) { group in
-    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
+    printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (0)
   }
 
   // no value in parent, value in child
   let x1: Int = await withTaskGroup(of: Int.self) { group in
     group.spawn {
-      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
+      printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (0)
       // inside the child task, set a value
-      _ = await TL.$number.withValue(1) {
-        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(1)
+      _ = await TL.number.withValue(1) {
+        printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (1)
       }
-      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
-      return TL.number // 0
+      printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (0)
+      return TL.number.get() // 0
     }
 
     return await group.next()!
@@ -56,20 +55,20 @@ func groups() async {
   assert(x1 == 0)
 
   // value in parent and in groups
-  await TL.$number.withValue(2) {
-    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+  await TL.number.withValue(2) {
+    printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
 
     let x2: Int = await withTaskGroup(of: Int.self) { group in
-      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+      printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
       group.spawn {
-        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+        printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
 
-        async let childInsideGroupChild = printTaskLocal(TL.$number)
-        _ = await childInsideGroupChild // CHECK: TaskLocal<Int>(2)
+        async let childInsideGroupChild = printTaskLocal(TL.number)
+        _ = await childInsideGroupChild // CHECK: TaskLocal<Int>.Access (2)
 
-        return TL.number
+        return TL.number.get()
       }
-      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+      printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
 
       return await group.next()!
     }
