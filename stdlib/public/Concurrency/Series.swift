@@ -111,10 +111,12 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
 
   private func terminate(error: __owned Failure? = nil) {
     state.onCancel = nil
-    if let failure = error {
-      state.terminal = .failed(failure)
-    } else {
-      state.terminal = .finished
+    if state.terminal == nil {
+      if let failure = error {
+        state.terminal = .failed(failure)
+      } else {
+        state.terminal = .finished
+      }
     }
   }
 
@@ -198,13 +200,22 @@ fileprivate final class _SeriesBufferedStorage<Element, Failure: Error>: UnsafeS
     lock()
     if let raw = state.continuation {
       state.continuation = nil
+      let terminal = state.terminal
       let continuation =
         unsafeBitCast(raw, to: UnsafeContinuation<Element?, Error>.self)
       withExtendedLifetime((state.onCancel, state.terminal)) {
         terminate()
         unlock()
       }
-      continuation.resume(throwing: error)
+      switch terminal {
+      case .finished:
+        continuation.resume(returning: nil)
+      case .failed(let error):
+        continuation.resume(throwing: error)
+      case .none:
+        continuation.resume(throwing: error)
+      }
+      
     } else {
       withExtendedLifetime((state.onCancel, state.terminal)) {
         terminate(error: error)
