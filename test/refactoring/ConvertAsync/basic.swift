@@ -150,9 +150,15 @@ struct MyStruct {
 func retStruct() -> MyStruct { return MyStruct() }
 
 protocol MyProtocol {
-  // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=PROTO-MEMBER %s
+  // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=PROTO-MEMBER %s
+  // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=PROTO-MEMBER-TO-ASYNC %s
   func protoMember(completion: (String) -> Void)
   // PROTO-MEMBER: func protoMember() async -> String{{$}}
+
+  // FIXME: The current async refactoring only refactors the client side and thus only adds the 'async' keyword.
+  // We should be refactoring the entire method signature here and removing the completion parameter.
+  // This test currently checks that we are not crashing.
+  // PROTO-MEMBER-TO-ASYNC: func protoMember(completion: (String) -> Void) async
 }
 
 // RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
