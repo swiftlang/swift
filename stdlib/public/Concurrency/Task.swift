@@ -484,7 +484,7 @@ public func detach<T>(
 /// Run given `operation` as asynchronously in its own top-level task.
 ///
 /// The `async` function should be used when creating asynchronous work
-/// that operations on behalf of the synchronous function that calls it.
+/// that operates on behalf of the synchronous function that calls it.
 /// Like `detach`, the async function creates a separate, top-level task.
 /// Unlike `detach`, the task creating by `async` inherits the priority and
 /// actor context of the caller, so the `operation` is treated more like an
