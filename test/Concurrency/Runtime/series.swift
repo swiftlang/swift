@@ -369,9 +369,9 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       }
       ready.signal()
       var iterator = series.makeAsyncIterator()
-      let first = await iterator.next()
-      expectEqual(first, "Hit cancel")
       do {
+        let first = try await iterator.next()
+        expectEqual(first, "Hit cancel")
         let second = try await iterator.next()
         expectEqual(second, nil)
       } catch {
