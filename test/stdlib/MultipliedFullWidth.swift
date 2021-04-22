@@ -12,6 +12,7 @@
 
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 

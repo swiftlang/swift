@@ -1669,7 +1669,7 @@ extension StringProtocol where Index == String.Index {
   // forward trivially to rangeOfString.
 
   /// Returns `true` if `other` is non-empty and contained within `self` by
-  /// case-sensitive, non-literal search. Otherwise, returns `false`.
+  /// case-sensitive, non-literal search; otherwise, returns `false`.
   ///
   /// Equivalent to `self.range(of: other) != nil`
   public func contains<T : StringProtocol>(_ other: T) -> Bool {

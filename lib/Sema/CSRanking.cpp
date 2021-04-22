@@ -627,8 +627,8 @@ bool CompareDeclSpecializationRequest::evaluate(
     // If they both have trailing closures, compare those separately.
     bool compareTrailingClosureParamsSeparately = false;
     if (numParams1 > 0 && numParams2 > 0 &&
-        params1.back().getOldType()->is<AnyFunctionType>() &&
-        params2.back().getOldType()->is<AnyFunctionType>()) {
+        params1.back().getParameterType()->is<AnyFunctionType>() &&
+        params2.back().getParameterType()->is<AnyFunctionType>()) {
       compareTrailingClosureParamsSeparately = true;
     }
 
@@ -1132,8 +1132,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto params = fnTy->getParams();
         assert(params.size() == 2);
 
-        auto param1 = params[0].getOldType();
-        auto param2 = params[1].getOldType()->castTo<AnyFunctionType>();
+        auto param1 = params[0].getParameterType();
+        auto param2 = params[1].getParameterType()->castTo<AnyFunctionType>();
 
         assert(param1->getOptionalObjectType());
         assert(params[1].isAutoClosure());

@@ -340,7 +340,7 @@ void swift::simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner)
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
-  auto LC = SM.getPresumedLineAndColumnForLoc(owner.Loc);
+  auto LC = SM.getLineAndColumnInBuffer(owner.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
 
@@ -351,7 +351,7 @@ void swift::ide::simple_display(llvm::raw_ostream &out,
   out << "Resolved cursor info at ";
   auto &SM = info.SF->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*info.SF->getBufferID());
-  auto LC = SM.getPresumedLineAndColumnForLoc(info.Loc);
+  auto LC = SM.getLineAndColumnInBuffer(info.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
 
@@ -815,12 +815,33 @@ public:
     analyzeDecl(D);
     auto &DCInfo = getCurrentDC();
 
-    auto NodeRange = Node.getSourceRange();
-
     // Widen the node's source range to include all attributes to get a range
     // match if a function with its attributes has been selected.
-    if (auto D = Node.dyn_cast<Decl *>())
-      NodeRange = D->getSourceRangeIncludingAttrs();
+    auto getSourceRangeIncludingAttrs = [](ASTNode N) -> SourceRange {
+      if (auto D = N.dyn_cast<Decl *>()) {
+        return D->getSourceRangeIncludingAttrs();
+      } else {
+        return N.getSourceRange();
+      }
+    };
+
+    auto NodeRange = getSourceRangeIncludingAttrs(Node);
+
+    // SemaAnnotator walks the AST in source order, but considers source order
+    // for declarations to be defined by their range *excluding* attributes.
+    // In RangeResolver, we attributes as belonging to their decl (see comment
+    // on getSourceRAngeIncludingAttrs above).
+    // Thus, for the purpose RangeResolver, we need to assume that SemaAnnotator
+    // hands us the nodes in arbitrary order.
+    //
+    // Remove any nodes that are contained by the newly added one.
+    auto removeIterator = std::remove_if(
+        ContainedASTNodes.begin(), ContainedASTNodes.end(),
+        [&](ASTNode ContainedNode) {
+          return SM.rangeContains(NodeRange,
+                                  getSourceRangeIncludingAttrs(ContainedNode));
+        });
+    ContainedASTNodes.erase(removeIterator, ContainedASTNodes.end());
 
     switch (getRangeMatchKind(NodeRange)) {
       case RangeMatchKind::NoneMatch: {
@@ -848,11 +869,16 @@ public:
 
     // If no parent is considered as a contained node; this node should be
     // a top-level contained node.
+    // If a node that contains this one is later discovered, this node will be
+    // removed from ContainedASTNodes again.
     if (std::none_of(ContainedASTNodes.begin(), ContainedASTNodes.end(),
-      [&](ASTNode N) { return SM.rangeContains(N.getSourceRange(),
-                                               Node.getSourceRange()); })) {
-        ContainedASTNodes.push_back(Node);
-      }
+                     [&](ASTNode ContainedNode) {
+                       return SM.rangeContains(
+                           getSourceRangeIncludingAttrs(ContainedNode),
+                           NodeRange);
+                     })) {
+      ContainedASTNodes.push_back(Node);
+    }
 
     if (DCInfo.isMultiStatement()) {
       postAnalysis(DCInfo.EndMatches.back());
@@ -1072,8 +1098,8 @@ void swift::simple_display(llvm::raw_ostream &out,
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
   out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
-  auto SLC = SM.getPresumedLineAndColumnForLoc(owner.StartLoc);
-  auto ELC = SM.getPresumedLineAndColumnForLoc(owner.EndLoc);
+  auto SLC = SM.getLineAndColumnInBuffer(owner.StartLoc);
+  auto ELC = SM.getLineAndColumnInBuffer(owner.EndLoc);
   out << ": (" << SLC.first << ":" << SLC.second << ", "
     << ELC.first << ":" << ELC.second << ")";
 }

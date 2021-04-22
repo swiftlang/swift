@@ -12,6 +12,7 @@
 
 import Swift
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @rethrows
 public protocol AsyncSequence {
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
@@ -19,6 +20,7 @@ public protocol AsyncSequence {
   __consuming func makeAsyncIterator() -> AsyncIterator
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   public func reduce<Result>(
@@ -49,6 +51,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @inlinable
 @inline(__always)
 func _contains<Source: AsyncSequence>(
@@ -63,6 +66,7 @@ func _contains<Source: AsyncSequence>(
   return false
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   public func contains(
@@ -79,6 +83,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence where Element: Equatable {
   @inlinable
   public func contains(_ search: Element) async rethrows -> Bool {
@@ -91,6 +96,7 @@ extension AsyncSequence where Element: Equatable {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @inlinable
 @inline(__always)
 func _first<Source: AsyncSequence>(
@@ -105,6 +111,7 @@ func _first<Source: AsyncSequence>(
   return nil
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   public func first(
@@ -114,6 +121,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   @warn_unqualified_access
@@ -150,6 +158,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence where Element: Comparable {
   @inlinable
   @warn_unqualified_access

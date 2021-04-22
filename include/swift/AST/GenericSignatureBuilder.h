@@ -427,6 +427,15 @@ public:
                         Type superclass,
                         FloatingRequirementSource source);
 
+  /// Update the layout constraint for the equivalence class of \c T.
+  ///
+  /// This assumes that the constraint has already been recorded.
+  ///
+  /// \returns true if anything in the equivalence class changed, false
+  /// otherwise.
+  bool updateLayout(ResolvedType type,
+                    LayoutConstraint layout);
+
 private:
   /// Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
@@ -528,8 +537,7 @@ public:
   LookUpConformanceInBuilder getLookupConformanceFn();
 
   /// Lookup a protocol conformance in a module-agnostic manner.
-  ProtocolConformanceRef lookupConformance(CanType dependentType,
-                                           Type conformingReplacementType,
+  ProtocolConformanceRef lookupConformance(Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol);
 
   /// Enumerate the requirements that describe the signature of this
@@ -646,12 +654,14 @@ public:
 
   class ExplicitRequirement;
 
-  bool isRedundantExplicitRequirement(ExplicitRequirement req) const;
+  bool isRedundantExplicitRequirement(const ExplicitRequirement &req) const;
 
 private:
   void computeRedundantRequirements();
 
   void diagnoseRedundantRequirements() const;
+
+  void diagnoseConflictingConcreteTypeRequirements() const;
 
   bool hasExplicitConformancesImpliedByConcrete() const;
 
@@ -695,34 +705,6 @@ private:
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
                            Diag<unsigned, Type, T> otherNoteDiag);
-
-  /// Check a list of constraints, removing self-derived constraints
-  /// and diagnosing redundant constraints.
-  ///
-  /// \param isSuitableRepresentative Determines whether the given constraint
-  /// is a suitable representative.
-  ///
-  /// \param checkConstraint Checks the given constraint against the
-  /// canonical constraint to determine which diagnostics (if any) should be
-  /// emitted.
-  ///
-  /// \returns the representative constraint.
-  template<typename T, typename DiagT>
-  Constraint<T> checkConstraintList(
-                           TypeArrayView<GenericTypeParamType> genericParams,
-                           std::vector<Constraint<T>> &constraints,
-                           RequirementKind kind,
-                           llvm::function_ref<bool(const Constraint<T> &)>
-                             isSuitableRepresentative,
-                           llvm::function_ref<
-                             ConstraintRelation(const Constraint<T>&)>
-                               checkConstraint,
-                           Optional<Diag<unsigned, Type, DiagT, DiagT>>
-                             conflictingDiag,
-                           Diag<Type, DiagT> redundancyDiag,
-                           Diag<unsigned, Type, DiagT> otherNoteDiag,
-                           llvm::function_ref<DiagT(const T&)> diagValue,
-                           bool removeSelfDerived);
 
   /// Check the concrete type constraints within the equivalence
   /// class of the given potential archetype.

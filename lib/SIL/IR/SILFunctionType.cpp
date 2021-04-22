@@ -1445,8 +1445,7 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
       return isClangTypeMoreIndirectThanSubstType(TC,
                     clangTy->getPointeeType().getTypePtr(), CanType(eltTy));
 
-    if (substTy->getAnyNominal() ==
-          TC.Context.getOpaquePointerDecl())
+    if (substTy->isOpaquePointer())
       // TODO: We could conceivably have an indirect opaque ** imported
       // as COpaquePointer. That shouldn't ever happen today, though,
       // since we only ever indirect the 'self' parameter of functions
@@ -2671,8 +2670,7 @@ public:
         return ResultConvention::UnownedInnerPointer;
 
       auto type = tl.getLoweredType();
-      if (type.unwrapOptionalType().getStructOrBoundGenericStruct()
-          == type.getASTContext().getUnmanagedDecl())
+      if (type.unwrapOptionalType().getASTType()->isUnmanaged())
         return ResultConvention::UnownedInnerPointer;
       return ResultConvention::Unowned;
     }

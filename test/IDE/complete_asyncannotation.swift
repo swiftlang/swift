@@ -65,9 +65,9 @@ func testMemberAsyncRethrows(_ x: HasAsyncMembers) async {
 func testAsyncIntiializers() async {
   HasAsyncMembers(#^CHECK_initializers^#
 // CHECK_initializers: Begin completions
-// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#HasAsyncMembers#]; name=
-// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal: ['(']{#withAsync: Int#}[')'][#HasAsyncMembers#]; name=withAsync: Int
-// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal: ['(']{#withAsyncThrows: Int#}[')'][' throws'][#HasAsyncMembers#]; name=withAsyncThrows: Int throws
-// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal: ['(']{#withAsyncRethrows: () async throws -> Void##() async throws -> Void#}[')'][' rethrows'][#HasAsyncMembers#]; name=withAsyncRethrows: () async throws -> Void rethrows
+// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal:      ['('][')'][' async'][#HasAsyncMembers#]; name= async
+// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal:      ['(']{#withAsync: Int#}[')'][' async'][#HasAsyncMembers#]; name=withAsync: Int async
+// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal:      ['(']{#withAsyncThrows: Int#}[')'][' async'][' throws'][#HasAsyncMembers#]; name=withAsyncThrows: Int async throws
+// CHECK_initializers-DAG: Decl[Constructor]/CurrNominal:      ['(']{#withAsyncRethrows: () async throws -> Void##() async throws -> Void#}[')'][' async'][' rethrows'][#HasAsyncMembers#]; name=withAsyncRethrows: () async throws -> Void async rethrows
 // CHECK_initializers: End completions
 }

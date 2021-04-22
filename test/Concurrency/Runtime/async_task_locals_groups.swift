@@ -6,6 +6,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 class StringLike: CustomStringConvertible {
   let value: String
@@ -17,6 +18,7 @@ class StringLike: CustomStringConvertible {
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension TaskLocalValues {
   struct NumberKey: TaskLocalKey {
     static var defaultValue: Int { 0 }
@@ -24,6 +26,7 @@ extension TaskLocalValues {
   var number: NumberKey { .init() }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
   _ expected: Key.Value? = nil,
@@ -40,15 +43,16 @@ func printTaskLocal<Key>(
 // ==== ------------------------------------------------------------------------
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func groups() async {
   // no value
-  try! await Task.withGroup(resultType: Int.self) { group in
+  try! await withTaskGroup(of: Int.self) { group in
     printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
   }
 
   // no value in parent, value in child
-  let x1: Int = try! await Task.withGroup(resultType: Int.self) { group in
-    await group.add {
+  let x1: Int = try! await withTaskGroup(of: Int.self) { group in
+    group.spawn {
       printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
       // inside the child task, set a value
       await Task.withLocal(\.number, boundTo: 1) {
@@ -66,9 +70,9 @@ func groups() async {
   await Task.withLocal(\.number, boundTo: 2) {
     printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 
-    let x2: Int = try! await Task.withGroup(resultType: Int.self) { group in
+    let x2: Int = try! await withTaskGroup(of: Int.self) { group in
       printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
-      await group.add {
+      group.spawn {
         printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 
         async let childInsideGroupChild: () = printTaskLocal(\.number)
@@ -85,6 +89,7 @@ func groups() async {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await groups()

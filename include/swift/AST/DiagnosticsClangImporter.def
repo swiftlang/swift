@@ -83,5 +83,9 @@ WARNING(implicit_bridging_header_imported_from_module,none,
         "is deprecated and will be removed in a later version of Swift",
         (StringRef, Identifier))
 
+WARNING(import_multiple_mainactor_attr,none,
+      "this attribute for global actor '%0' is invalid; the declaration already has attribute for global actor '%1'",
+      (StringRef, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

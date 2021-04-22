@@ -181,6 +181,8 @@ EXPECTED_DEFAULTS = {
     'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
+    'llvm_ninja_targets': [],
+    'llvm_ninja_targets_for_cross_compile_hosts': [],
     'llvm_max_parallel_lto_link_jobs':
         defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
     'llvm_targets_to_build': 'X86;ARM;AArch64;PowerPC;SystemZ;Mips',
@@ -212,6 +214,7 @@ EXPECTED_DEFAULTS = {
         defaults.SWIFT_MAX_PARALLEL_LTO_LINK_JOBS,
     'swift_user_visible_version': defaults.SWIFT_USER_VISIBLE_VERSION,
     'symbols_package': None,
+    'clean_llbuild': True,
     'clean_swiftpm': True,
     'clean_swift_driver': True,
     'test': None,
@@ -579,6 +582,7 @@ EXPECTED_OPTIONS = [
                   dest='build_watchos_device'),
     DisableOption('--skip-build-watchos-simulator',
                   dest='build_watchos_simulator'),
+    DisableOption('--skip-clean-llbuild', dest='clean_llbuild'),
     DisableOption('--skip-clean-swiftpm', dest='clean_swiftpm'),
     DisableOption('--skip-clean-swift-driver', dest='clean_swift_driver'),
     DisableOption('--skip-test-android', dest='test_android'),
@@ -682,6 +686,8 @@ EXPECTED_OPTIONS = [
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
     AppendOption('--test-paths'),
+    AppendOption('--llvm-ninja-targets'),
+    AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
 
     UnsupportedOption('--build-jobs'),
     UnsupportedOption('--common-cmake-options'),

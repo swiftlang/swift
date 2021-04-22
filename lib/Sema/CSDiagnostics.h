@@ -603,6 +603,8 @@ public:
       : FailureDiagnostic(solution, locator), CTP(purpose), RawFromType(lhs),
         RawToType(rhs) {}
 
+  SourceLoc getLoc() const override;
+
   Type getFromType() const { return resolve(RawFromType); }
 
   Type getToType() const { return resolve(RawToType); }

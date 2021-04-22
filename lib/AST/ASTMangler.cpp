@@ -2303,9 +2303,9 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
                isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
       appendOperator("a");
     } else if (isa<clang::NamespaceDecl>(namedDecl)) {
-      // Note: Namespaces are not really structs, but since namespaces are
+      // Note: Namespaces are not really enums, but since namespaces are
       // imported as enums, be consistent.
-      appendOperator("V");
+      appendOperator("O");
     } else {
       llvm_unreachable("unknown imported Clang type");
     }
@@ -2448,25 +2448,25 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
-    appendOperator("Y");
+    appendOperator("Ya");
   if (fn->isSendable())
-    appendOperator("J");
+    appendOperator("Yb");
   if (fn->isThrowing())
     appendOperator("K");
   switch (auto diffKind = fn->getDifferentiabilityKind()) {
   case DifferentiabilityKind::NonDifferentiable:
     break;
   case DifferentiabilityKind::Forward:
-    appendOperator("jf");
+    appendOperator("Yjf");
     break;
   case DifferentiabilityKind::Reverse:
-    appendOperator("jr");
+    appendOperator("Yjr");
     break;
   case DifferentiabilityKind::Normal:
-    appendOperator("jd");
+    appendOperator("Yjd");
     break;
   case DifferentiabilityKind::Linear:
-    appendOperator("jl");
+    appendOperator("Yjl");
     break;
   }
 }
@@ -2541,6 +2541,9 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
   else
     appendType(elementType, forDecl);
 
+  if (flags.isNoDerivative()) {
+    appendOperator("Yk");
+  }
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
     /* nothing */

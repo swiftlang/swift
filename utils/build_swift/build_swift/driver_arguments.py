@@ -1041,6 +1041,8 @@ def create_argument_parser():
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
 
+    option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
+           help='skip cleaning up llbuild')
     option('--skip-clean-swiftpm', toggle_false('clean_swiftpm'),
            help='skip cleaning up swiftpm')
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
@@ -1077,6 +1079,21 @@ def create_argument_parser():
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
            help='LLVM target generators to build')
+
+    option('--llvm-ninja-targets', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of ninja targets to build for LLVM '
+                'instead of the default ones. Only supported when using '
+                'ninja to build. Can be called multiple times '
+                'to add multiple such options.')
+
+    option('--llvm-ninja-targets-for-cross-compile-hosts', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of ninja targets to build for LLVM '
+                'in cross compile hosts instead of the ones specified in '
+                'llvm-ninja-targets (or the default ones). '
+                'Can be called multiple times '
+                'to add multiple such options.')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')

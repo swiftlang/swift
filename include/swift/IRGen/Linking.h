@@ -456,6 +456,11 @@ class LinkEntity {
     /// An async function pointer to a partial apply forwarder.
     /// The pointer is the llvm::Function* for a partial apply forwarder.
     PartialApplyForwarderAsyncFunctionPointer,
+
+    /// An async function pointer to a function which is known to exist whose
+    /// name is known.
+    /// The pointer is a const char* of the name.
+    KnownAsyncFunctionPointer,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1194,6 +1199,15 @@ public:
   static LinkEntity forAsyncFunctionPointer(AbstractFunctionDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::AsyncFunctionPointerAST, decl);
+    return entity;
+  }
+
+  static LinkEntity forKnownAsyncFunctionPointer(const char *name) {
+    LinkEntity entity;
+    entity.Pointer = const_cast<char *>(name);
+    entity.SecondaryPointer = nullptr;
+    entity.Data =
+        LINKENTITY_SET_FIELD(Kind, unsigned(Kind::KnownAsyncFunctionPointer));
     return entity;
   }
 

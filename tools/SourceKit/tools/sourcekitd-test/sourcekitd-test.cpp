@@ -1051,7 +1051,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                              SemaName.c_str());
   }
 
-  if (!Opts.CompilerArgs.empty()) {
+  if (!Opts.CompilerArgs.empty() ||
+      !Opts.ModuleCachePath.empty() ||
+      Opts.DisableImplicitConcurrencyModuleImport) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
     if (!Opts.ModuleCachePath.empty()) {
       if (compilerArgsAreClang) {
@@ -1069,6 +1071,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
         sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Opts.ModuleCachePath.c_str());
       }
     }
+    if (Opts.DisableImplicitConcurrencyModuleImport && !compilerArgsAreClang) {
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+                                          "-Xfrontend");
+      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
+          "-disable-implicit-concurrency-module-import");
+    }
+
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);
@@ -1574,6 +1583,16 @@ struct ResponseSymbolInfo {
     const char *Kind;
     const char *USR;
   };
+  struct ReferencedSymbol {
+    const char *USR;
+    const char *AccessLevel;
+    const char *Filename;
+    const char *ModuleName;
+    const char *DeclLang;
+    bool IsSystem;
+    bool IsSPI;
+    std::vector<ParentInfo> ParentContexts;
+  };
 
   const char *Kind = nullptr;
   const char *Lang = nullptr;
@@ -1597,6 +1616,8 @@ struct ResponseSymbolInfo {
   std::vector<const char *> AnnotatedRelatedDeclarations;
   std::vector<const char *> ModuleGroups;
   std::vector<ParentInfo> ParentContexts;
+  std::vector<ReferencedSymbol> ReferencedSymbols;
+
   std::vector<const char *> ReceiverUSRs;
   bool IsSystem = false;
   bool IsDynamic = false;
@@ -1665,6 +1686,26 @@ struct ResponseSymbolInfo {
               sourcekitd_variant_dictionary_get_string(Entry, KeyName),
               sourcekitd_variant_dictionary_get_string(Entry, KeyKind),
               sourcekitd_variant_dictionary_get_string(Entry, KeyUSR)};
+        });
+    Symbol.ReferencedSymbols = readArray<ReferencedSymbol>(
+        Info, KeyReferencedSymbols, [&](sourcekitd_variant_t Entry){
+          return ReferencedSymbol{
+            sourcekitd_variant_dictionary_get_string(Entry, KeyUSR),
+            sourcekitd_variant_dictionary_get_string(Entry, KeyAccessLevel),
+            sourcekitd_variant_dictionary_get_string(Entry, KeyFilePath),
+            sourcekitd_variant_dictionary_get_string(Entry, KeyModuleName),
+            sourcekitd_uid_get_string_ptr(
+              sourcekitd_variant_dictionary_get_uid(Entry, KeyDeclarationLang)),
+            sourcekitd_variant_dictionary_get_bool(Entry, KeyIsSystem),
+            sourcekitd_variant_dictionary_get_bool(Entry, KeyIsSPI),
+            readArray<ParentInfo>(Entry, KeyParentContexts,
+                                  [&](sourcekitd_variant_t Entry){
+              return ParentInfo{
+                  sourcekitd_variant_dictionary_get_string(Entry, KeyName),
+                  sourcekitd_variant_dictionary_get_string(Entry, KeyKind),
+                  sourcekitd_variant_dictionary_get_string(Entry, KeyUSR)};
+            })
+          };
         });
 
     Symbol.ReceiverUSRs = readStringArray(Info, KeyReceivers, KeyUSR);
@@ -1750,6 +1791,20 @@ struct ResponseSymbolInfo {
     for (auto Parent : ParentContexts)
       OS << Parent.Title << " " << Parent.Kind << " " << Parent.USR << '\n';
     OS << "PARENT CONTEXTS END\n";
+
+    OS << "REFERENCED DECLS BEGIN\n";
+    for (auto Ref : ReferencedSymbols) {
+      OS << Ref.USR << " | " << Ref.AccessLevel << " | "
+         << (strlen(Ref.Filename) ? Ref.Filename : "<empty>") << " | "
+         << (strlen(Ref.ModuleName) ? Ref.ModuleName : "<empty>") << " | "
+         << (Ref.IsSystem ? "System" : "User") << " | "
+         << (Ref.IsSPI ? "SPI" : "NonSPI") << " | "
+         << Ref.DeclLang << "\n";
+      for (auto Parent: Ref.ParentContexts)
+        OS << "  " << Parent.Title << " " << Parent.Kind << " " << Parent.USR
+           << '\n';
+    }
+    OS << "REFERENCED DECLS END\n";
 
     OS << "OVERRIDES BEGIN\n";
     for (auto OverUSR : OverrideUSRs)

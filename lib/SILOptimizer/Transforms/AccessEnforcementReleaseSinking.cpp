@@ -120,6 +120,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:
+    case BuiltinValueKind::ShuffleVector:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
     case BuiltinValueKind::StringObjectOr:
@@ -143,6 +144,9 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:
+    case BuiltinValueKind::EndAsyncLet:
+    case BuiltinValueKind::CreateTaskGroup:
+    case BuiltinValueKind::DestroyTaskGroup:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime
@@ -168,6 +172,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnsafeGuaranteed:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
+    case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTaskFuture:
     case BuiltinValueKind::CreateAsyncTaskGroupFuture:
     case BuiltinValueKind::ConvertTaskToJob:

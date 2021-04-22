@@ -37,8 +37,11 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
   Actor.swift
+  AsyncLet.cpp
+  AsyncLet.swift
   CheckedContinuation.swift
   GlobalExecutor.cpp
+  Errors.swift
   Executor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -68,6 +71,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.swift
   ThreadSanitizer.cpp
   Mutex.cpp
+  YieldingContinuation.swift
   ${swift_concurrency_objc_sources}
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc

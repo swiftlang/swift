@@ -606,10 +606,6 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
 }
 
-void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
-  unreachable("unsupported");
-}
-
 void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
   unreachable("unsupported");
 }
@@ -1486,6 +1482,11 @@ void Remangler::mangleOwned(Node *node) {
 
 void Remangler::mangleInOut(Node *node) {
   Buffer << 'R';
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleNoDerivative(Node *node) {
+  Buffer << 'k';
   mangleSingleChildNode(node); // type
 }
 

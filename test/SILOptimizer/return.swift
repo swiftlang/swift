@@ -2,12 +2,12 @@
 
 func singleBlock() -> Int {
   _ = 0
-} // expected-error {{missing return in a function expected to return 'Int'}}
+} // expected-error {{missing return in global function expected to return 'Int'}}
 
 func singleBlock2() -> Int {
   var y = 0 
   y += 1
-} // expected-error {{missing return in a function expected to return 'Int'}}
+} // expected-error {{missing return in global function expected to return 'Int'}}
 
 enum NoCasesButNotNever {}
 
@@ -36,7 +36,7 @@ func diagnoseNeverWithBody(i : Int) -> Never {
 } // expected-error {{function with uninhabited return type 'Never' is missing call to another never-returning function on all paths}}
 
 class MyClassWithClosure {
-  var f : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in a closure expected to return 'String'}}
+  var f : (_ s: String) -> String = { (_ s: String) -> String in } // expected-error {{missing return in closure expected to return 'String'}}
 }
 
 func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
@@ -46,7 +46,7 @@ func multipleBlocksSingleMissing(b: Bool) -> (String, Int) {
   } else if (y == 0) {
     y += 1
   }
-} // expected-error {{missing return in a function expected to return '(String, Int)'}}
+} // expected-error {{missing return in global function expected to return '(String, Int)'}}
 
 func multipleBlocksAllMissing(x: Int) -> Int {
   var y : Int = x + 1 
@@ -56,7 +56,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
   }
   var x = 0
   x += 1
-} // expected-error {{missing return in a function expected to return 'Int'}}
+} // expected-error {{missing return in global function expected to return 'Int'}}
 
 @_silgen_name("exit") func exit () -> Never
 
@@ -64,7 +64,7 @@ func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
   if (i) {
     exit() 
   } 
-} // expected-error {{missing return in a function expected to return 'Int'}}
+} // expected-error {{missing return in global function expected to return 'Int'}}
 
 func diagnose_missing_return_no_error_after_noreturn(i: Bool) -> Int {
   if (i) {
@@ -92,7 +92,7 @@ func whileLoop(flag: Bool) -> Int {
     }
     b += 1
   }
-} //expected-error {{missing return in a function expected to return 'Int'}}
+} //expected-error {{missing return in global function expected to return 'Int'}}
 
 struct S {}
 extension S:ExpressibleByStringLiteral {
@@ -166,10 +166,11 @@ func testSR13753() {
       get { 0 }
       set { }
     }
-    x // expected-error {{missing return in a closure expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
-    // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
-    // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
-    // expected-warning@-3 {{variable is unused}}
+    x // expected-error {{missing return in closure expected to return 'Int'}}
+    // expected-note@-1 {{did you mean to return the last expression?}}{{5-5=return }}
+    // expected-warning@-2 {{setter argument 'newValue' was never used, but the property was accessed}}
+    // expected-note@-3 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
+    // expected-warning@-4 {{variable is unused}}
   }
 
   func f() -> Int {
@@ -177,10 +178,11 @@ func testSR13753() {
         get { 0 }
         set { }
     }
-    x // expected-error {{missing return in a function expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
-    // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
-    // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
-    // expected-warning@-3 {{variable is unused}}
+    x // expected-error {{missing return in local function expected to return 'Int'}}
+    // expected-note@-1 {{did you mean to return the last expression?}}{{5-5=return }}
+    // expected-warning@-2 {{setter argument 'newValue' was never used, but the property was accessed}}
+    // expected-note@-3 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
+    // expected-warning@-4 {{variable is unused}}
   } 
 
   let _ : () -> Int = {
@@ -192,7 +194,7 @@ func testSR13753() {
     // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
     // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
     // expected-warning@-3 {{variable is unused}}
-  } // expected-error {{missing return in a closure expected to return 'Int'}}
+  } // expected-error {{missing return in closure expected to return 'Int'}}
 
   func f1() -> Int {
     var x : UInt {
@@ -203,13 +205,50 @@ func testSR13753() {
     // expected-warning@-1 {{setter argument 'newValue' was never used, but the property was accessed}}
     // expected-note@-2 {{did you mean to use 'newValue' instead of accessing the property's current value?}}
     // expected-warning@-3 {{variable is unused}}
-  } // expected-error {{missing return in a function expected to return 'Int'}}
+  } // expected-error {{missing return in local function expected to return 'Int'}}
 
   let _ : () -> Int = {
     var x : Int = 0 // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
     var _ : Int = 0
     
-    x // expected-error{{missing return in a closure expected to return 'Int'; did you mean to return the last expression?}} {{5-5=return }}
-    //expected-warning@-1{{variable is unused}}
+    x // expected-error{{missing return in closure expected to return 'Int'}}
+    // expected-note@-1 {{did you mean to return the last expression?}}{{5-5=return }}
+    //expected-warning@-2{{variable is unused}}
   }
+}
+
+// SR-14505
+struct SR14505 {
+    let b = true
+    var x: Int {
+        if b {
+            return 0
+        }
+    } // expected-error {{missing return in getter expected to return 'Int'}}
+
+    var y: Int {
+        get {
+            if b {
+                return 0
+            }
+        } // expected-error {{missing return in getter expected to return 'Int'}}
+        set {}
+    } 
+}
+
+class SR14505_C {
+  static let a = false
+  let b = true
+
+  func method() -> Int {
+    if b {
+      return 0
+    }
+  } // expected-error {{missing return in instance method expected to return 'Int'}}
+
+  class func method1() -> Int {
+    if a {
+      return 0
+    }
+  } // expected-error {{missing return in class method expected to return 'Int'}}
 }

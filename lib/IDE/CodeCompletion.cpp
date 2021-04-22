@@ -59,6 +59,7 @@ using namespace swift;
 using namespace ide;
 
 using CommandWordsPairs = std::vector<std::pair<StringRef, StringRef>>;
+using NotRecommendedReason = CodeCompletionResult::NotRecommendedReason;
 
 enum CodeCompletionCommandKind {
   none,
@@ -819,7 +820,7 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   }
 
   if (D->getAttrs().getDeprecated(D->getASTContext()))
-    setNotRecommended(CodeCompletionResult::Deprecated);
+    setNotRecommended(NotRecommendedReason::Deprecated);
 }
 
 namespace {
@@ -1001,6 +1002,7 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
     PO.SkipAttributes = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    PO.AlwaysTryPrintParameterLabels = true;
     if (ContextTy)
       PO.setBaseType(ContextTy);
 
@@ -1017,6 +1019,8 @@ void CodeCompletionResultBuilder::addCallParameter(Identifier Name,
 
         if (param.hasLabel()) {
           OS << param.getLabel();
+        } else if (param.hasInternalLabel()) {
+          OS << param.getInternalLabel();
         } else {
           OS << "<#";
           if (param.isInOut())
@@ -1291,8 +1295,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
-        /*NotRecommended=*/IsNotRecommended, NotRecReason,
-        copyString(*Sink.Allocator, BriefComment),
+        NotRecReason, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
   }
@@ -1722,11 +1725,11 @@ static Type
 defaultTypeLiteralKind(CodeCompletionLiteralKind kind, ASTContext &Ctx) {
   switch (kind) {
   case CodeCompletionLiteralKind::BooleanLiteral:
-    return Ctx.getBoolDecl()->getDeclaredInterfaceType();
+    return Ctx.getBoolType();
   case CodeCompletionLiteralKind::IntegerLiteral:
-    return Ctx.getIntDecl()->getDeclaredInterfaceType();
+    return Ctx.getIntType();
   case CodeCompletionLiteralKind::StringLiteral:
-    return Ctx.getStringDecl()->getDeclaredInterfaceType();
+    return Ctx.getStringType();
   case CodeCompletionLiteralKind::ArrayLiteral:
     return Ctx.getArrayDecl()->getDeclaredType();
   case CodeCompletionLiteralKind::DictionaryLiteral:
@@ -2087,8 +2090,7 @@ public:
       Builder.addBaseName(MD->getNameStr());
       Builder.addTypeAnnotation("Module");
       if (Pair.second)
-        Builder.setNotRecommended(CodeCompletionResult::NotRecommendedReason::
-                                    Redundant);
+        Builder.setNotRecommended(NotRecommendedReason::RedundantImport);
     }
   }
 
@@ -2112,9 +2114,7 @@ public:
     }
   }
 
-  void addModuleName(
-      ModuleDecl *MD,
-      Optional<CodeCompletionResult::NotRecommendedReason> R = None) {
+  void addModuleName(ModuleDecl *MD, Optional<NotRecommendedReason> R = None) {
 
     // Don't add underscored cross-import overlay modules.
     if (MD->getDeclaringModuleIfCrossImportOverlay())
@@ -2148,11 +2148,11 @@ public:
         continue;
 
       auto MD = ModuleDecl::create(ModuleName, Ctx);
-      Optional<CodeCompletionResult::NotRecommendedReason> Reason = None;
+      Optional<NotRecommendedReason> Reason = None;
 
       // Imported modules are not recommended.
       if (ImportedModules.count(MD->getNameStr()) != 0)
-        Reason = CodeCompletionResult::NotRecommendedReason::Redundant;
+        Reason = NotRecommendedReason::RedundantImport;
 
       addModuleName(MD, Reason);
     }
@@ -2337,8 +2337,7 @@ public:
       SmallVector<AnyFunctionType::Param, 8> erasedParams;
       for (const auto &param : genericFuncType->getParams()) {
         auto erasedTy = eraseArchetypes(param.getPlainType(), genericSig);
-        erasedParams.emplace_back(erasedTy, param.getLabel(),
-                                  param.getParameterFlags());
+        erasedParams.emplace_back(param.withType(erasedTy));
       }
       return GenericFunctionType::get(genericSig,
           erasedParams,
@@ -2516,9 +2515,8 @@ public:
     return Type();
   }
 
-  void analyzeActorIsolation(
-      const ValueDecl *VD, Type T, bool &implicitlyAsync,
-      Optional<CodeCompletionResult::NotRecommendedReason> &NotRecommended) {
+  void analyzeActorIsolation(const ValueDecl *VD, Type T, bool &implicitlyAsync,
+                             Optional<NotRecommendedReason> &NotRecommended) {
     auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
 
     switch (isolation.getKind()) {
@@ -2542,19 +2540,19 @@ public:
     if (implicitlyAsync && T) {
       if (isa<VarDecl>(VD)) {
         if (!isSendableType(CurrDeclContext, T)) {
-          NotRecommended = CodeCompletionResult::CrossActorReference;
+          NotRecommended = NotRecommendedReason::CrossActorReference;
         }
       } else {
         assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
         // Check if the result and the param types are all 'Sendable'.
         auto *AFT = T->castTo<AnyFunctionType>();
         if (!isSendableType(CurrDeclContext, AFT->getResult())) {
-          NotRecommended = CodeCompletionResult::CrossActorReference;
+          NotRecommended = NotRecommendedReason::CrossActorReference;
         } else {
           for (auto &param : AFT->getParams()) {
             Type paramType = param.getPlainType();
             if (!isSendableType(CurrDeclContext, paramType)) {
-              NotRecommended = CodeCompletionResult::CrossActorReference;
+              NotRecommended = NotRecommendedReason::CrossActorReference;
               break;
             }
           }
@@ -2575,18 +2573,18 @@ public:
     if (VD->hasInterfaceType())
       VarType = getTypeOfMember(VD, dynamicLookupInfo);
 
-    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
+    Optional<NotRecommendedReason> NotRecommended;
     // "not recommended" in its own getter.
     if (Kind == LookupKind::ValueInDeclContext) {
       if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
         if (accessor->getStorage() == VD && accessor->isGetter())
-          NotRecommended = CodeCompletionResult::NoReason;
+          NotRecommended = NotRecommendedReason::VariableUsedInOwnDefinition;
       }
     }
     bool implicitlyAsync = false;
     analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
     if (!NotRecommended && implicitlyAsync && !CanCurrDeclContextHandleAsync) {
-      NotRecommended = CodeCompletionResult::InvalidContext;
+      NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
     CommandWordsPairs Pairs;
@@ -2927,8 +2925,7 @@ public:
         addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
       if (AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
-        Builder.setNotRecommended(
-            CodeCompletionResult::NotRecommendedReason::InvalidContext);
+        Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
       }
     };
 
@@ -3037,14 +3034,14 @@ public:
     if (AFT && !IsImplicitlyCurriedInstanceMethod)
       trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
-    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
+    Optional<NotRecommendedReason> NotRecommended;
     bool implictlyAsync = false;
     analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
     if (!NotRecommended && !IsImplicitlyCurriedInstanceMethod &&
         ((AFT && AFT->isAsync()) || implictlyAsync) &&
         !CanCurrDeclContextHandleAsync) {
-      NotRecommended = CodeCompletionResult::InvalidContext;
+      NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
     // Add the method, possibly including any default arguments.
@@ -3242,8 +3239,7 @@ public:
       }
 
       if (ConstructorType->isAsync() && !CanCurrDeclContextHandleAsync) {
-        Builder.setNotRecommended(
-            CodeCompletionResult::NotRecommendedReason::InvalidContext);
+        Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
       }
     };
 
@@ -3289,12 +3285,12 @@ public:
     if (!subscriptType)
       return;
 
-    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
+    Optional<NotRecommendedReason> NotRecommended;
     bool implictlyAsync = false;
     analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
     if (!NotRecommended && implictlyAsync && !CanCurrDeclContextHandleAsync) {
-      NotRecommended = CodeCompletionResult::InvalidContext;
+      NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
     CommandWordsPairs Pairs;
@@ -4348,7 +4344,7 @@ public:
       builder.addRightBracket();
     });
 
-    auto floatType = context.getFloatDecl()->getDeclaredInterfaceType();
+    auto floatType = context.getFloatType();
     addFromProto(LK::ColorLiteral, [&](Builder &builder) {
       builder.addBaseName("#colorLiteral");
       builder.addLeftParen();
@@ -4362,7 +4358,7 @@ public:
       builder.addRightParen();
     });
 
-    auto stringType = context.getStringDecl()->getDeclaredInterfaceType();
+    auto stringType = context.getStringType();
     addFromProto(LK::ImageLiteral, [&](Builder &builder) {
       builder.addBaseName("#imageLiteral");
       builder.addLeftParen();
@@ -4412,7 +4408,7 @@ public:
         }
       }
 
-      if (!addedKeyPath && T->getAnyNominal() == Ctx.getStringDecl()) {
+      if (!addedKeyPath && T->isString()) {
         addPoundKeyPath(needPound);
         if (addedSelector)
           break;

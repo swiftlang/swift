@@ -18,6 +18,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 
 namespace llvm {
@@ -86,7 +87,7 @@ struct APIRecord {
 
   APIRecord(llvm::StringRef name, APILoc loc, APILinkage linkage,
             APIFlags flags, APIAccess access, APIAvailability availability)
-      : name(name.str()), loc(loc), linkage(linkage), flags(flags),
+      : name(name.data(), name.size()), loc(loc), linkage(linkage), flags(flags),
         access(access), availability(availability) {}
 
   bool isWeakDefined() const {
@@ -135,7 +136,7 @@ struct ObjCMethodRecord : APIRecord {
 };
 
 struct ObjCContainerRecord : APIRecord {
-  std::vector<ObjCMethodRecord> methods;
+  std::vector<ObjCMethodRecord*> methods;
 
   ObjCContainerRecord(llvm::StringRef name, APILinkage linkage, APILoc loc,
                       APIAccess access, const APIAvailability &availability)
@@ -148,12 +149,13 @@ struct ObjCInterfaceRecord : ObjCContainerRecord {
                       APIAccess access, APIAvailability availability,
                       llvm::StringRef superClassName)
       : ObjCContainerRecord(name, linkage, loc, access, availability),
-        superClassName(superClassName.str()) {}
+        superClassName(superClassName.data(), superClassName.size()) {}
 };
 
 class API {
 public:
   API(const llvm::Triple &triple) : target(triple) {}
+
   const llvm::Triple &getTarget() const { return target; }
 
   void addSymbol(llvm::StringRef symbol, APILoc loc, APILinkage linkage,
@@ -174,8 +176,9 @@ public:
 private:
   const llvm::Triple target;
 
-  std::vector<GlobalRecord> globals;
-  std::vector<ObjCInterfaceRecord> interfaces;
+  llvm::BumpPtrAllocator allocator;
+  std::vector<GlobalRecord*> globals;
+  std::vector<ObjCInterfaceRecord*> interfaces;
 };
 
 } // end namespace apigen

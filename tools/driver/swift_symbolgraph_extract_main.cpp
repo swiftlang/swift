@@ -166,6 +166,8 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       ParsedArgs.hasArg(OPT_pretty_print),
       AccessLevel::Public,
       !ParsedArgs.hasArg(OPT_skip_synthesized_members),
+      ParsedArgs.hasArg(OPT_v),
+      ParsedArgs.hasArg(OPT_skip_inherited_docs),
   };
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
@@ -218,7 +220,9 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   }
 
   const auto &MainFile = M->getMainFile(FileUnitKind::SerializedAST);
-  llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';
+  
+  if (Options.PrintMessages)
+    llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';
   
   int Success = symbolgraphgen::emitSymbolGraphForModule(M, Options);
   
@@ -236,8 +240,10 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());
     if (CIM) {
       const auto &CIMainFile = CIM->getMainFile(FileUnitKind::SerializedAST);
-      llvm::errs() << "Emitting symbol graph for cross-import overlay module file: "
-        << CIMainFile.getModuleDefiningPath() << '\n';
+      
+      if (Options.PrintMessages)
+        llvm::errs() << "Emitting symbol graph for cross-import overlay module file: "
+          << CIMainFile.getModuleDefiningPath() << '\n';
       
       Success |= symbolgraphgen::emitSymbolGraphForModule(CIM, Options);
     }

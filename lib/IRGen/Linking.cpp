@@ -454,6 +454,11 @@ std::string LinkEntity::mangleAsString() const {
     Result.append("Tu");
     return Result;
   }
+  case Kind::KnownAsyncFunctionPointer: {
+    std::string Result(static_cast<char *>(Pointer));
+    Result.append("Tu");
+    return Result;
+  }
 
   case Kind::AsyncFunctionPointerAST: {
     std::string Result;
@@ -748,6 +753,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .getLinkage(ForDefinition);
+  case Kind::KnownAsyncFunctionPointer:
+    return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
     return SILLinkage::Private;
   }
@@ -833,6 +840,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
   case Kind::PartialApplyForwarder:
+  case Kind::KnownAsyncFunctionPointer:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -949,6 +957,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
+  case Kind::KnownAsyncFunctionPointer:
     return IGM.AsyncFunctionPointerTy;
   case Kind::PartialApplyForwarder:
     return IGM.FunctionPtrTy;
@@ -984,6 +993,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
+  case Kind::KnownAsyncFunctionPointer:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
   case Kind::TypeMetadataLazyCacheVariable:
@@ -1134,6 +1144,12 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .isWeakImported(module);
+  case Kind::KnownAsyncFunctionPointer:
+    auto &context = module->getASTContext();
+    auto deploymentAvailability =
+        AvailabilityContext::forDeploymentTarget(context);
+    return !deploymentAvailability.isContainedIn(
+        context.getConcurrencyAvailability());
   }
 
   llvm_unreachable("Bad link entity kind");
@@ -1241,6 +1257,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::ValueWitnessTable:
   case Kind::DifferentiabilityWitness:
   case Kind::PartialApplyForwarder:
+  case Kind::KnownAsyncFunctionPointer:
     return nullptr;
 
   case Kind::AsyncFunctionPointer:

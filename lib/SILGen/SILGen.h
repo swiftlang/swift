@@ -119,7 +119,11 @@ public:
 
   Optional<ProtocolConformance *> NSErrorConformanceToError;
 
-  Optional<FuncDecl*> RunChildTask;
+  Optional<FuncDecl*> AsyncLetStart;
+  Optional<FuncDecl*> AsyncLetGet;
+  Optional<FuncDecl*> AsyncLetGetThrowing;
+  Optional<FuncDecl*> EndAsyncLet;
+
   Optional<FuncDecl*> TaskFutureGet;
   Optional<FuncDecl*> TaskFutureGetThrowing;
 
@@ -128,6 +132,7 @@ public:
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
   Optional<FuncDecl*> RunAsyncHandler;
+  Optional<FuncDecl*> CheckExpectedExecutor;
 
 public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
@@ -481,8 +486,14 @@ public:
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
 
-  /// Retrieve the _Concurrency._runChildTask intrinsic.
-  FuncDecl *getRunChildTask();
+  /// Retrieve the _Concurrency._asyncLetStart intrinsic.
+  FuncDecl *getAsyncLetStart();
+  /// Retrieve the _Concurrency._asyncLetGet intrinsic.
+  FuncDecl *getAsyncLetGet();
+  /// Retrieve the _Concurrency._asyncLetGetThrowing intrinsic.
+  FuncDecl *getAsyncLetGetThrowing();
+  /// Retrieve the _Concurrency._asyncLetEnd intrinsic.
+  FuncDecl *getEndAsyncLet();
 
   /// Retrieve the _Concurrency._taskFutureGet intrinsic.
   FuncDecl *getTaskFutureGet();
@@ -500,6 +511,8 @@ public:
   FuncDecl *getRunAsyncHandler();
   /// Retrieve the _Concurrency._runTaskForBridgedAsyncMethod intrinsic.
   FuncDecl *getRunTaskForBridgedAsyncMethod();
+  /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.
+  FuncDecl *getCheckExpectedExecutor();
 
   SILFunction *getKeyPathProjectionCoroutine(bool isReadAccess,
                                              KeyPathTypeKind typeKind);

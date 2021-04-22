@@ -621,7 +621,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   llvm::Value *coroResumeValue =
     Builder.CreateBitOrPointerCast(coroResume,
                                    IGM.TaskContinuationFunctionPtrTy);
-  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeFunction) {
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextResume) {
     auto authInfo = PointerAuthInfo::emit(*this, schema,
                                           resumeFunctionAddr.getAddress(),
                                           PointerAuthEntity());

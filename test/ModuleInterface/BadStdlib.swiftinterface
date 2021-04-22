@@ -1,0 +1,19 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target x86_64-apple-macos10.9 -module-name BadStdlib
+
+// no-error@-3
+
+// Tests whether -compile-module-from-interface correctly stops early when the
+// standard library module interface is broken, rather than trying to limp along
+// without a standard library, which tends to cause ClangImporter crashes (among
+// other things.)
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend(mock-sdk: -sdk %/S/Inputs/BadStdlib.sdk -module-cache-path %/t/module-cache -resource-dir %/S/Inputs/BadStdlib.sdk) -compile-module-from-interface -o %/t/BadStdlib.swiftmodule %s -verify -verify-additional-file %/S/Inputs/BadStdlib.sdk/usr/lib/swift/Swift.swiftmodule/x86_64-apple-macos.swiftinterface
+
+import ClangMod
+
+public func useHasPointer(_: HasPointer)
+
+// FIXME: SR-14489
+// UNSUPPORTED: windows

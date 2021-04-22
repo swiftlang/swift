@@ -6,25 +6,28 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_detach() async {
   let a1 = Task.currentPriority
-  print("a1: \(a1)") // CHECK: a1: default
+  print("a1: \(a1)") // CHECK: a1: unspecified
 
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
   // task.
-  await Task.runDetached(priority: .userInitiated) {
+  await detach(priority: .userInitiated) {
     let a2 = Task.currentPriority
     print("a2: \(a2)") // CHECK: a2: userInitiated
   }.get()
 
   let a3 = Task.currentPriority
-  print("a3: \(a3)") // CHECK: a3: default
+  print("a3: \(a3)") // CHECK: a3: unspecified
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_multiple_lo_indirectly_escalated() async {
   @Sendable
   func loopUntil(priority: Task.Priority) async {
@@ -33,16 +36,16 @@ func test_multiple_lo_indirectly_escalated() async {
     }
   }
 
-  let z = Task.runDetached(priority: .background) {
+  let z = detach(priority: .background) {
     await loopUntil(priority: .userInitiated)
   }
-  let x = Task.runDetached(priority: .background) {
+  let x = detach(priority: .background) {
     _ = await z // waiting on `z`, but it won't complete since we're also background
     await loopUntil(priority: .userInitiated)
   }
 
   // detach, don't wait
-  Task.runDetached(priority: .userInitiated) {
+  detach(priority: .userInitiated) {
     await x // escalates x, which waits on z, so z also escalates
   }
 
@@ -56,6 +59,7 @@ func test_multiple_lo_indirectly_escalated() async {
   print("default done") // CHECK: default done
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_detach()

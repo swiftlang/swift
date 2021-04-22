@@ -16,6 +16,7 @@
 #include "ModuleFileSharedCore.h"
 #include "DocFormat.h"
 #include "SourceInfoFormat.h"
+#include "swift/AST/RawComment.h"
 #include "llvm/Support/DJB.h"
 
 namespace swift {

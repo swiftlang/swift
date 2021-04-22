@@ -550,11 +550,11 @@ void BindingSet::addBinding(PotentialBinding binding) {
 
     if (type->isCGFloatType() &&
         llvm::any_of(Bindings, [](const PotentialBinding &binding) {
-          return binding.BindingType->isDoubleType();
+          return binding.BindingType->isDouble();
         }))
       return;
 
-    if (type->isDoubleType()) {
+    if (type->isDouble()) {
       auto inferredCGFloat =
           llvm::find_if(Bindings, [](const PotentialBinding &binding) {
             return binding.BindingType->isCGFloatType();
@@ -1114,7 +1114,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     if (locator->isKeyPathType()) {
       auto *BGT =
           type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
-      if (!BGT || !isKnownKeyPathDecl(CS.getASTContext(), BGT->getDecl()))
+      if (!BGT || !isKnownKeyPathType(BGT))
         return None;
     }
 
@@ -1310,6 +1310,12 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
     // Constraints from which we can't do anything.
+    break;
+
+  // For now let's avoid inferring protocol requirements from
+  // this constraint, but in the future we could do that to
+  // to filter bindings.
+  case ConstraintKind::TransitivelyConformsTo:
     break;
 
   case ConstraintKind::DynamicTypeOf: {

@@ -42,6 +42,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/SourceManager.h"
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 
@@ -714,6 +715,28 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
+static StringRef
+getModuleName(const ValueDecl *VD, llvm::BumpPtrAllocator &Allocator,
+              ModuleDecl *IgnoreModule = nullptr) {
+  ASTContext &Ctx = VD->getASTContext();
+  ClangImporter *Importer =
+      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  auto ClangNode = VD->getClangNode();
+  if (ClangNode) {
+    auto ClangMod = Importer->getClangOwningModule(ClangNode);
+    if (ClangMod)
+      return copyString(Allocator, ClangMod->getFullModuleName());
+  } else if (VD->getModuleContext() != IgnoreModule) {
+    ModuleDecl *MD = VD->getModuleContext();
+    // If the decl is from a cross-import overlay module, report the
+    // overlay's declaring module as the owning module.
+    if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
+      MD = Declaring;
+    return MD->getNameStr();
+  }
+  return "";
+}
+
 struct DeclInfo {
   const ValueDecl *VD;
   Type ContainerType;
@@ -779,6 +802,85 @@ static ArrayRef<T> copyAndClearArray(llvm::BumpPtrAllocator &Allocator,
   return Ref;
 }
 
+static void getLocationInfoForClangNode(
+    ClangNode ClangNode, ClangImporter *Importer,
+    llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
+    StringRef &Filename) {
+  clang::ASTContext &ClangCtx = Importer->getClangASTContext();
+  clang::SourceManager &ClangSM = ClangCtx.getSourceManager();
+
+  clang::SourceRange SR = ClangNode.getLocation();
+  if (auto MD =
+          dyn_cast_or_null<clang::ObjCMethodDecl>(ClangNode.getAsDecl())) {
+    SR = clang::SourceRange(MD->getSelectorStartLoc(),
+                            MD->getDeclaratorEndLoc());
+  }
+
+  clang::CharSourceRange CharRange =
+      clang::Lexer::makeFileCharRange(clang::CharSourceRange::getTokenRange(SR),
+                                      ClangSM, ClangCtx.getLangOpts());
+  if (CharRange.isInvalid())
+    return;
+
+  std::pair<clang::FileID, unsigned> Decomp =
+      ClangSM.getDecomposedLoc(CharRange.getBegin());
+  if (!Decomp.first.isInvalid()) {
+    if (auto FE = ClangSM.getFileEntryForID(Decomp.first)) {
+      Filename = FE->getName();
+
+      std::pair<clang::FileID, unsigned> EndDecomp =
+          ClangSM.getDecomposedLoc(CharRange.getEnd());
+
+      DeclarationLoc = {Decomp.second, EndDecomp.second - Decomp.second};
+    }
+  }
+}
+
+static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
+  SourceLoc CharEndLoc = Lexer::getLocForEndOfToken(SM, TokenRange.End);
+  return SM.getByteDistance(TokenRange.Start, CharEndLoc);
+}
+
+static void
+getLocationInfo(const ValueDecl *VD,
+                llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
+                StringRef &Filename) {
+  ASTContext &Ctx = VD->getASTContext();
+  SourceManager &SM = Ctx.SourceMgr;
+
+  auto ClangNode = VD->getClangNode();
+
+  if (VD->getLoc().isValid()) {
+    auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
+      if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+        SourceRange R = FD->getSignatureSourceRange();
+        if (R.isValid())
+          return getCharLength(SM, R);
+      }
+      return None;
+    };
+    unsigned NameLen;
+    if (auto SigLen = getSignatureRange(VD)) {
+      NameLen = SigLen.getValue();
+    } else if (VD->hasName()) {
+      NameLen = VD->getBaseName().userFacingName().size();
+    } else {
+      NameLen = getCharLength(SM, VD->getLoc());
+    }
+
+    unsigned DeclBufID = SM.findBufferContainingLoc(VD->getLoc());
+    DeclarationLoc = {SM.getLocOffsetInBuffer(VD->getLoc(), DeclBufID),
+                      NameLen};
+    Filename = SM.getIdentifierForBuffer(DeclBufID);
+
+  } else if (ClangNode) {
+    ClangImporter *Importer =
+        static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+    return getLocationInfoForClangNode(ClangNode, Importer, DeclarationLoc,
+                                       Filename);
+  }
+}
+
 static llvm::Error
 fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                ModuleDecl *MainModule, SourceLoc CursorLoc, bool AddSymbolGraph,
@@ -839,17 +941,21 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
 
   if (AddSymbolGraph) {
     SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
+    SmallVector<symbolgraphgen::FragmentInfo, 8> FragmentInfos;
     symbolgraphgen::SymbolGraphOptions Options{
         "",
         Invoc.getLangOptions().Target,
         /*PrettyPrint=*/false,
         AccessLevel::Private,
         /*EmitSynthesizedMembers*/ false,
+        /*PrintMessages*/ false,
+        /*SkipInheritedDocs*/ false,
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
                                             DInfo.InSynthesizedExtension,
-                                            Options, OS, PathComponents);
+                                            Options, OS, PathComponents,
+                                            FragmentInfos);
     Symbol.SymbolGraph = copyAndClearString(Allocator, Buffer);
 
     SmallVector<ParentInfo, 4> Parents;
@@ -860,29 +966,47 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
                            copyAndClearString(Allocator, Buffer));
     };
     Symbol.ParentContexts = copyArray(Allocator, llvm::makeArrayRef(Parents));
-  }
 
-  {
-    ASTContext &Ctx = DInfo.VD->getASTContext();
-    ClangImporter *Importer =
-        static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-    auto ClangNode = DInfo.VD->getClangNode();
-    if (ClangNode) {
-      auto ClangMod = Importer->getClangOwningModule(ClangNode);
-      if (ClangMod) {
-        Symbol.ModuleName =
-            copyString(Allocator, ClangMod->getFullModuleName());
+    SmallVector<ReferencedDeclInfo, 8> ReferencedDecls;
+    for (auto &FI: FragmentInfos) {
+      SmallVector<ParentInfo, 4> FIParents;
+      for (auto &Component: FI.ParentContexts) {
+        SwiftLangSupport::printUSR(Component.VD, OS);
+        FIParents.emplace_back(copyString(Allocator, Component.Title),
+                               Component.Kind,
+                               copyAndClearString(Allocator, Buffer));
       }
-    } else if (DInfo.VD->getModuleContext() != MainModule) {
-      ModuleDecl *MD = DInfo.VD->getModuleContext();
-      // If the decl is from a cross-import overlay module, report the
-      // overlay's declaring module as the owning module.
-      if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
-        MD = Declaring;
-      Symbol.ModuleName = MD->getNameStr();
+
+      ASTContext &Ctx = FI.VD->getASTContext();
+      StringRef Filename = "";
+      if (auto Loc = FI.VD->getLoc(/*SerializedOK=*/true)) {
+        Filename = Ctx.SourceMgr.getDisplayNameForLoc(Loc);
+      } else if (auto ClangNode = FI.VD->getClangNode()) {
+        auto Loc = ClangNode.getLocation();
+        if (Loc.isValid()) {
+          Filename = Ctx.getClangModuleLoader()->getClangASTContext()
+              .getSourceManager()
+              .getFilename(Loc);
+        }
+      }
+
+      SwiftLangSupport::printUSR(FI.VD, OS);
+      ReferencedDecls.emplace_back(
+          copyAndClearString(Allocator, Buffer),
+          SwiftLangSupport::getUIDForDeclLanguage(FI.VD),
+          swift::getAccessLevelSpelling(FI.VD->getFormalAccess()), Filename,
+          getModuleName(FI.VD, Allocator),
+          FI.VD->getModuleContext()->isSystemModule(),
+          FI.VD->isSPI(),
+          copyArray(Allocator, llvm::makeArrayRef(FIParents)));
     }
+    Symbol.ReferencedSymbols = copyArray(Allocator,
+                                         llvm::makeArrayRef(ReferencedDecls));
   }
 
+  Symbol.ModuleName = copyString(Allocator,
+                                 getModuleName(DInfo.VD, Allocator,
+                                               /*ModuleToIgnore=*/MainModule));
   if (auto IFaceGenRef =
           Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
@@ -1312,7 +1436,7 @@ static void resolveCursor(
         SmallVector<RefactoringKind, 8> Kinds;
         RangeConfig Range;
         Range.BufferId = BufferID;
-        auto Pair = SM.getPresumedLineAndColumnForLoc(Loc);
+        auto Pair = SM.getLineAndColumnInBuffer(Loc);
         Range.Line = Pair.first;
         Range.Column = Pair.second;
         Range.Length = Length;

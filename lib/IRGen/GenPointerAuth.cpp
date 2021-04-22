@@ -198,6 +198,10 @@ static const PointerAuthSchema &getFunctionPointerSchema(IRGenModule &IGM,
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::Closure:
+    if (fnType->isAsync()) {
+      return options.AsyncSwiftFunctionPointers;
+    }
+
     return options.SwiftFunctionPointers;
 
   case SILFunctionTypeRepresentation::ObjCMethod:

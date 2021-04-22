@@ -129,7 +129,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
 
   auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
@@ -291,8 +292,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   assert(rawTy);
   rawTy = initDecl->mapTypeIntoContext(rawTy);
 
-  bool isStringEnum =
-    (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl());
+  bool isStringEnum = rawTy->isString();
   llvm::SmallVector<Expr *, 16> stringExprs;
 
   Type enumType = parentDC->getDeclaredTypeInContext();
@@ -386,7 +386,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     switchArg = CallExpr;
   }
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), switchArg,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
@@ -425,6 +426,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
                             /*Failable=*/ true, /*FailabilityLoc=*/SourceLoc(),
+                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);

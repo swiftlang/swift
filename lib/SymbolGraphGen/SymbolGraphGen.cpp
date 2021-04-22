@@ -70,16 +70,18 @@ symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
   SmallVector<Decl *, 64> ModuleDecls;
   M->getDisplayDecls(ModuleDecls);
 
-  llvm::errs() << ModuleDecls.size()
-      << " top-level declarations in this module.\n";
+  if (Options.PrintMessages)
+    llvm::errs() << ModuleDecls.size()
+        << " top-level declarations in this module.\n";
 
   for (auto *Decl : ModuleDecls) {
     Walker.walk(Decl);
   }
 
-  llvm::errs()
-    << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
-    << Walker.MainGraph.Edges.size() << " relationships.\n";
+  if (Options.PrintMessages)
+    llvm::errs()
+      << "Found " << Walker.MainGraph.Nodes.size() << " symbols and "
+      << Walker.MainGraph.Edges.size() << " relationships.\n";
 
   int Success = EXIT_SUCCESS;
 
@@ -100,7 +102,8 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
                         bool InSynthesizedExtension,
                         const SymbolGraphOptions &Options,
                         llvm::raw_ostream &OS,
-                        SmallVectorImpl<PathComponent> &ParentContexts) {
+                        SmallVectorImpl<PathComponent> &ParentContexts,
+                        SmallVectorImpl<FragmentInfo> &FragmentInfo) {
   if (!Symbol::supportsKind(D->getKind()))
     return EXIT_FAILURE;
 
@@ -116,6 +119,7 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
 
   Symbol MySym(&Graph, D, NTD, BaseTy);
   MySym.getPathComponents(ParentContexts);
+  MySym.getFragmentInfo(FragmentInfo);
   Graph.recordNode(MySym);
   Graph.serialize(JOS);
   return EXIT_SUCCESS;

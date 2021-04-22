@@ -218,6 +218,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
+  /// The declaration of Swift.Void.
+  TypeAliasDecl *VoidDecl = nullptr;
+
   /// The declaration of Swift.UnsafeMutableRawPointer.memory.
   VarDecl *UnsafeMutableRawPointerMemoryDecl = nullptr;
 
@@ -285,7 +288,7 @@ struct ASTContext::Implementation {
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
 
   /// Map from Swift declarations to raw comments.
-  llvm::DenseMap<const Decl *, RawComment> RawComments;
+  llvm::DenseMap<const Decl *, std::pair<RawComment, bool>> RawComments;
 
   /// Map from Swift declarations to brief comments.
   llvm::DenseMap<const Decl *, StringRef> BriefComments;
@@ -712,7 +715,8 @@ FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
         continue;
       for (auto Req: FD->getGenericRequirements()) {
         if (Req.getKind() == RequirementKind::Conformance &&
-              Req.getProtocolDecl() == getRangeReplaceableCollectionDecl()) {
+              Req.getProtocolDecl() ==
+              getProtocol(KnownProtocolKind::RangeReplaceableCollection)) {
           getImpl().PlusFunctionOnRangeReplaceableCollection = FD;
         }
       }
@@ -733,17 +737,13 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
       if (!FD->getOperatorDecl())
         continue;
       auto ResultType = FD->getResultInterfaceType();
-      if (ResultType->getNominalOrBoundGenericNominal() != getStringDecl())
+      if (!ResultType->isString())
         continue;
       auto ParamList = FD->getParameters();
       if (ParamList->size() != 2)
         continue;
-      auto CheckIfStringParam = [this](ParamDecl* Param) {
-        auto Type = Param->getInterfaceType()->getNominalOrBoundGenericNominal();
-        return Type == getStringDecl();
-      };
-      if (CheckIfStringParam(ParamList->get(0)) &&
-          CheckIfStringParam(ParamList->get(1))) {
+      if (ParamList->get(0)->getInterfaceType()->isString() &&
+          ParamList->get(1)->getInterfaceType()->isString()) {
         getImpl().PlusFunctionOnString = FD;
         break;
       }
@@ -803,22 +803,28 @@ FuncDecl *ASTContext::getAsyncSequenceMakeAsyncIterator() const {
 }
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
-  DECL_CLASS *ASTContext::get##NAME##Decl() const { \
-    if (getImpl().NAME##Decl) \
-      return getImpl().NAME##Decl; \
-    SmallVector<ValueDecl *, 1> results; \
-    lookupInSwiftModule(#NAME, results); \
-    for (auto result : results) { \
-      if (auto type = dyn_cast<DECL_CLASS>(result)) { \
-        auto params = type->getGenericParams(); \
-        if (NUM_GENERIC_PARAMS == (params == nullptr ? 0 : params->size())) { \
-          getImpl().NAME##Decl = type; \
-          return type; \
-        } \
+DECL_CLASS *ASTContext::get##NAME##Decl() const { \
+  if (getImpl().NAME##Decl) \
+    return getImpl().NAME##Decl; \
+  SmallVector<ValueDecl *, 1> results; \
+  lookupInSwiftModule(#NAME, results); \
+  for (auto result : results) { \
+    if (auto type = dyn_cast<DECL_CLASS>(result)) { \
+      auto params = type->getGenericParams(); \
+      if (NUM_GENERIC_PARAMS == (params == nullptr ? 0 : params->size())) { \
+        getImpl().NAME##Decl = type; \
+        return type; \
       } \
     } \
-    return nullptr; \
-  }
+  } \
+  return nullptr; \
+} \
+\
+Type ASTContext::get##NAME##Type() const { \
+  if (!get##NAME##Decl()) \
+    return Type(); \
+  return get##NAME##Decl()->getDeclaredInterfaceType(); \
+}
 #include "swift/AST/KnownStdlibTypes.def"
 
 CanType ASTContext::getExceptionType() const {
@@ -844,6 +850,30 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   if (!getImpl().OptionalNoneDecl)
     getImpl().OptionalNoneDecl =getOptionalDecl()->getUniqueElement(/*hasVal*/false);
   return getImpl().OptionalNoneDecl;
+}
+
+TypeAliasDecl *ASTContext::getVoidDecl() const {
+  if (getImpl().VoidDecl) {
+    return getImpl().VoidDecl;
+  }
+
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("Void", results);
+  for (auto result : results) {
+    if (auto typealias = dyn_cast<TypeAliasDecl>(result)) {
+      getImpl().VoidDecl = typealias;
+      return typealias;
+    }
+  }
+
+  return nullptr;
+}
+
+Type ASTContext::getVoidType() const {
+  auto decl = getVoidDecl();
+  if (!decl)
+    return Type();
+  return decl->getDeclaredInterfaceType();
 }
 
 static VarDecl *getPointeeProperty(VarDecl *&cache,
@@ -909,13 +939,6 @@ CanType ASTContext::getAnyObjectType() const {
     ProtocolCompositionType::get(
       *this, {}, /*HasExplicitAnyObject=*/true));
   return getImpl().AnyObjectType;
-}
-
-CanType ASTContext::getNeverType() const {
-  auto neverDecl = getNeverDecl();
-  if (!neverDecl)
-    return CanType();
-  return neverDecl->getDeclaredInterfaceType()->getCanonicalType();
 }
 
 #define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECLTYPE, GENERIC_ARGS) \
@@ -1159,19 +1182,18 @@ FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op, 
   if (!C.getIntDecl() || !C.getBoolDecl())
     return nullptr;
 
-  auto intType = C.getIntDecl()->getDeclaredInterfaceType();
   auto isIntParam = [&](AnyFunctionType::Param param) {
     return (!param.isVariadic() && !param.isInOut() &&
-            param.getPlainType()->isEqual(intType));
+            param.getPlainType()->isInt());
   };
-  auto boolType = C.getBoolDecl()->getDeclaredInterfaceType();
-  auto decl = lookupOperatorFunc(C, op, intType, 
-      [=](FunctionType *type) {
+
+  auto decl = lookupOperatorFunc(C, op, C.getIntType(),
+                                 [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
     if (type->getParams().size() != 2) return false;
     if (!isIntParam(type->getParams()[0]) ||
         !isIntParam(type->getParams()[1])) return false;
-    return type->getResult()->isEqual(boolType);
+    return type->getResult()->isBool();
   });
   cached = decl;
   return decl;
@@ -1226,11 +1248,8 @@ FuncDecl *ASTContext::getArrayAppendElementDecl() const {
         return nullptr;
 
       auto SelfInOutTy = SelfDecl->getInterfaceType();
-      BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getAs<BoundGenericStructType>();
-      if (!SelfGenericStructTy)
-        return nullptr;
-      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+
+      if (!SelfInOutTy->isArray())
         return nullptr;
 
       auto ParamList = FnDecl->getParameters();
@@ -1273,11 +1292,8 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
         return nullptr;
 
       auto SelfInOutTy = SelfDecl->getInterfaceType();
-      BoundGenericStructType *SelfGenericStructTy =
-        SelfInOutTy->getAs<BoundGenericStructType>();
-      if (!SelfGenericStructTy)
-        return nullptr;
-      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+
+      if (!SelfInOutTy->isArray())
         return nullptr;
 
       auto ParamList = FnDecl->getParameters();
@@ -2020,7 +2036,7 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   return TheStdlibModule;
 }
 
-Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
+Optional<std::pair<RawComment, bool>> ASTContext::getRawComment(const Decl *D) {
   auto Known = getImpl().RawComments.find(D);
   if (Known == getImpl().RawComments.end())
     return None;
@@ -2028,8 +2044,8 @@ Optional<RawComment> ASTContext::getRawComment(const Decl *D) {
   return Known->second;
 }
 
-void ASTContext::setRawComment(const Decl *D, RawComment RC) {
-  getImpl().RawComments[D] = RC;
+void ASTContext::setRawComment(const Decl *D, RawComment RC, bool FromSerialized) {
+  getImpl().RawComments[D] = std::make_pair(RC, FromSerialized);
 }
 
 Optional<StringRef> ASTContext::getBriefComment(const Decl *D) {
@@ -3075,21 +3091,27 @@ DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
 
 static RecursiveTypeProperties
 getFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
-                               Type result) {
+                               Type result, Type globalActor) {
   RecursiveTypeProperties properties;
   for (auto param : params)
     properties |= param.getPlainType()->getRecursiveProperties();
   properties |= result->getRecursiveProperties();
+  if (globalActor)
+    properties |= globalActor->getRecursiveProperties();
   properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
 
 static bool
-isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
+isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
                         Type result) {
   for (auto param : params) {
     if (!param.getPlainType()->isCanonical())
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return result->isCanonical();
@@ -3128,6 +3150,10 @@ isGenericFunctionTypeCanonical(GenericSignature sig,
   for (auto param : params) {
     if (!sig->isCanonicalTypeInContext(param.getPlainType()))
       return false;
+    if (!param.getInternalLabel().empty()) {
+      // Canonical types don't have internal labels
+      return false;
+    }
   }
 
   return sig->isCanonicalTypeInContext(result);
@@ -3231,17 +3257,21 @@ void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
   assert(params.size() == labels.size());
   for (auto i : indices(params)) {
     auto &param = params[i];
-    param = AnyFunctionType::Param(param.getPlainType(),
-                                   labels[i],
-                                   param.getParameterFlags());
+    param = AnyFunctionType::Param(param.getPlainType(), labels[i],
+                                   param.getParameterFlags(),
+                                   param.getInternalLabel());
   }
 }
 
+/// Profile \p params into \p ID. In contrast to \c == on \c Param, the profile
+/// *does* take the internal label into account and *does not* canonicalize
+/// the param's type.
 static void profileParams(llvm::FoldingSetNodeID &ID,
                           ArrayRef<AnyFunctionType::Param> params) {
   ID.AddInteger(params.size());
   for (auto param : params) {
     ID.AddPointer(param.getLabel().get());
+    ID.AddPointer(param.getInternalLabel().get());
     ID.AddPointer(param.getPlainType().getPointer());
     ID.AddInteger(param.getParameterFlags().toRaw());
   }
@@ -3262,7 +3292,11 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                                 Type result, Optional<ExtInfo> info) {
-  auto properties = getFunctionRecursiveProperties(params, result);
+  Type globalActor;
+  if (info.hasValue())
+    globalActor = info->getGlobalActor();
+
+  auto properties = getFunctionRecursiveProperties(params, result, globalActor);
   auto arena = getArena(properties);
 
   llvm::FoldingSetNodeID id;
@@ -3284,16 +3318,12 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.hasValue() && !info.getValue().getClangTypeInfo().empty();
 
-  Type globalActor;
-  if (info.hasValue())
-    globalActor = info->getGlobalActor();
-
   size_t allocSize = totalSizeToAlloc<
       AnyFunctionType::Param, ClangTypeInfo, Type
     >(params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
-  bool isCanonical = isFunctionTypeCanonical(params, result);
+  bool isCanonical = isAnyFunctionTypeCanonical(params, result);
   if (!clangTypeInfo.empty()) {
     if (ctx.LangOpts.UseClangFunctionTypes)
       isCanonical &= clangTypeInfo.getType()->isCanonicalUnqualified();
@@ -3381,7 +3411,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   if (info.hasValue())
     globalActor = info->getGlobalActor();
 
-  if (globalActor && !globalActor->isCanonical())
+  if (globalActor && !sig->isCanonicalTypeInContext(globalActor))
     isCanonical = false;
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type>(
@@ -4617,7 +4647,7 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       [&](KnownProtocolKind known) -> ProtocolConformanceRef {
     // Don't ascribe any behavior to Optional other than what we explicitly
     // give it. We don't want things like AnyObject?? to work.
-    if (type->getAnyNominal() == getOptionalDecl())
+    if (type->isOptional())
       return ProtocolConformanceRef::forInvalid();
 
     // Find the protocol.

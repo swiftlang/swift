@@ -17,6 +17,7 @@
 #include "swift/AST/Type.h"
 #include "SymbolGraphOptions.h"
 #include "PathComponent.h"
+#include "FragmentInfo.h"
 
 namespace swift {
 class ValueDecl;
@@ -36,7 +37,8 @@ int printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
                             bool InSynthesizedExtension,
                             const SymbolGraphOptions &Options,
                             llvm::raw_ostream &OS,
-                            SmallVectorImpl<PathComponent> &ParentContexts);
+                            SmallVectorImpl<PathComponent> &ParentContexts,
+                            SmallVectorImpl<FragmentInfo> &FragmentInfo);
 
 } // end namespace symbolgraphgen
 } // end namespace swift

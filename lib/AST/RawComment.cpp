@@ -61,71 +61,57 @@ SingleRawComment::SingleRawComment(CharSourceRange Range,
                                    const SourceManager &SourceMgr)
     : Range(Range), RawText(SourceMgr.extractText(Range)),
       Kind(static_cast<unsigned>(getCommentKind(RawText))) {
-  auto StartLineAndColumn =
-      SourceMgr.getPresumedLineAndColumnForLoc(Range.getStart());
-  StartLine = StartLineAndColumn.first;
-  StartColumn = StartLineAndColumn.second;
-  EndLine = SourceMgr.getLineAndColumnInBuffer(Range.getEnd()).first;
+  ColumnIndent = SourceMgr.getLineAndColumnInBuffer(Range.getStart()).second;
 }
 
-SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
+SingleRawComment::SingleRawComment(StringRef RawText, unsigned ColumnIndent)
     : RawText(RawText), Kind(static_cast<unsigned>(getCommentKind(RawText))),
-      StartColumn(StartColumn), StartLine(0), EndLine(0) {}
-
-static void addCommentToList(SmallVectorImpl<SingleRawComment> &Comments,
-                             const SingleRawComment &SRC) {
-  // TODO: consider producing warnings when we decide not to merge comments.
-
-  if (SRC.isOrdinary()) {
-    // Skip gyb comments that are line number markers.
-    if (SRC.RawText.startswith("// ###"))
-      return;
-
-    Comments.clear();
-    return;
-  }
-
-  // If this is the first documentation comment, save it (because there isn't
-  // anything to merge it with).
-  if (Comments.empty()) {
-    Comments.push_back(SRC);
-    return;
-  }
-
-  auto &Last = Comments.back();
-
-  // Merge comments if they are on same or consecutive lines.
-  if (Last.EndLine + 1 < SRC.StartLine) {
-    Comments.clear();
-    return;
-  }
-
-  Comments.push_back(SRC);
-}
+      ColumnIndent(ColumnIndent) {}
 
 static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   if (Range.isInvalid())
     return RawComment();
 
-  auto &SourceMgr = Context.SourceMgr;
-  unsigned BufferID = SourceMgr.findBufferContainingLoc(Range.getStart());
-  unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(), BufferID);
-  unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(Range.getEnd(), BufferID);
+  auto &SM = Context.SourceMgr;
+  unsigned BufferID = SM.findBufferContainingLoc(Range.getStart());
+  unsigned Offset = SM.getLocOffsetInBuffer(Range.getStart(), BufferID);
+  unsigned EndOffset = SM.getLocOffsetInBuffer(Range.getEnd(), BufferID);
   LangOptions FakeLangOpts;
-  Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, LexerMode::Swift,
-          HashbangMode::Disallowed,
-          CommentRetentionMode::ReturnAsTokens,
-          TriviaRetentionMode::WithoutTrivia,
-          Offset, EndOffset);
+  Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
+          TriviaRetentionMode::WithoutTrivia, Offset, EndOffset);
+
   SmallVector<SingleRawComment, 16> Comments;
   Token Tok;
+  unsigned LastEnd = 0;
   while (true) {
     L.lex(Tok);
     if (Tok.is(tok::eof))
       break;
     assert(Tok.is(tok::comment));
-    addCommentToList(Comments, SingleRawComment(Tok.getRange(), SourceMgr));
+
+    auto SRC = SingleRawComment(Tok.getRange(), SM);
+    if (SRC.isOrdinary()) {
+      // Skip gyb comments that are line number markers.
+      if (!SRC.RawText.startswith("// ###")) {
+        Comments.clear();
+        LastEnd = 0;
+      }
+      continue;
+    }
+
+    // Merge comments if they are on same or consecutive lines.
+    unsigned Start =
+        SM.getLineAndColumnInBuffer(Tok.getRange().getStart()).first;
+    if (LastEnd > 0 && LastEnd + 1 < Start) {
+      Comments.clear();
+      LastEnd = 0;
+    } else {
+      Comments.push_back(SRC);
+      LastEnd = SM.getLineAndColumnInBuffer(Tok.getRange().getEnd()).first;
+    }
   }
+
   RawComment Result;
   Result.Comments = Context.AllocateCopy(Comments);
   return Result;
@@ -137,13 +123,16 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
 
   // Check the cache in ASTContext.
   auto &Context = getASTContext();
-  if (Optional<RawComment> RC = Context.getRawComment(this))
-    return RC.getValue();
+  if (Optional<std::pair<RawComment, bool>> RC = Context.getRawComment(this)) {
+    auto P = RC.getValue();
+    if (!SerializedOK || P.second)
+      return P.first;
+  }
 
   // Check the declaration itself.
   if (auto *Attr = getAttrs().getAttribute<RawDocCommentAttr>()) {
     RawComment Result = toRawComment(Context, Attr->getCommentRange());
-    Context.setRawComment(this, Result);
+    Context.setRawComment(this, Result, true);
     return Result;
   }
 
@@ -156,31 +145,30 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
   switch (Unit->getKind()) {
   case FileUnitKind::SerializedAST: {
     if (SerializedOK) {
-      if (const auto *CachedLocs = getSerializedLocs()) {
-        if (!CachedLocs->DocRanges.empty()) {
-          SmallVector<SingleRawComment, 4> SRCs;
-          for (const auto &Range : CachedLocs->DocRanges) {
-            if (Range.isValid()) {
-              SRCs.push_back({ Range, Context.SourceMgr });
-            } else {
-              // if we've run into an invalid range, don't bother trying to load
-              // any of the other comments
-              SRCs.clear();
-              break;
-            }
+      auto *CachedLocs = getSerializedLocs();
+      if (!CachedLocs->DocRanges.empty()) {
+        SmallVector<SingleRawComment, 4> SRCs;
+        for (const auto &Range : CachedLocs->DocRanges) {
+          if (Range.isValid()) {
+            SRCs.push_back({Range, Context.SourceMgr});
+          } else {
+            // if we've run into an invalid range, don't bother trying to load
+            // any of the other comments
+            SRCs.clear();
+            break;
           }
-          auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
+        }
 
-          if (!RC.isEmpty()) {
-            Context.setRawComment(this, RC);
-            return RC;
-          }
+        if (!SRCs.empty()) {
+          auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
+          Context.setRawComment(this, RC, true);
+          return RC;
         }
       }
     }
 
     if (Optional<CommentInfo> C = Unit->getCommentForDecl(this)) {
-      Context.setRawComment(this, C->Raw);
+      Context.setRawComment(this, C->Raw, false);
       return C->Raw;
     }
 
@@ -258,44 +246,4 @@ CharSourceRange RawComment::getCharSourceRange() {
   auto Length = static_cast<const char *>(End.getOpaquePointerValue()) -
                 static_cast<const char *>(Start.getOpaquePointerValue());
   return CharSourceRange(Start, Length);
-}
-
-BasicSourceFileInfo::BasicSourceFileInfo(const SourceFile *SF)
-    : SFAndIsFromSF(SF, true) {
-  FilePath = SF->getFilename();
-}
-
-bool BasicSourceFileInfo::isFromSourceFile() const {
-  return SFAndIsFromSF.getInt();
-}
-
-void BasicSourceFileInfo::populateWithSourceFileIfNeeded() {
-  const auto *SF = SFAndIsFromSF.getPointer();
-  if (!SF)
-    return;
-  SWIFT_DEFER {
-    SFAndIsFromSF.setPointer(nullptr);
-  };
-
-  SourceManager &SM = SF->getASTContext().SourceMgr;
-
-  if (FilePath.empty())
-    return;
-  auto stat = SM.getFileSystem()->status(FilePath);
-  if (!stat)
-    return;
-
-  LastModified = stat->getLastModificationTime();
-  FileSize = stat->getSize();
-
-  if (SF->hasInterfaceHash()) {
-    InterfaceHashIncludingTypeMembers = SF->getInterfaceHashIncludingTypeMembers();
-    InterfaceHashExcludingTypeMembers = SF->getInterfaceHash();
-  } else {
-    // FIXME: Parse the file with EnableInterfaceHash option.
-    InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
-    InterfaceHashExcludingTypeMembers = Fingerprint::ZERO();
-  }
-
-  return;
 }

@@ -1158,25 +1158,22 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
     // Emit the closure for the child task.
-    SILValue childTask;
+    // Prepare the opaque `AsyncLet` representation.
+    SILValue alet;
     {
-      FullExpr Scope(Cleanups, CleanupLocation(init));
       SILLocation loc(PBD);
-      childTask = emitRunChildTask(
+      alet = emitAsyncLetStart(
           loc,
           init->getType(),
           emitRValue(init).getScalarValue()
         ).forward(*this);
     }
 
-    // Destroy the task at the end of the scope.
-    enterDestroyCleanup(childTask);
-
-    // Push a cleanup that will cancel the child task at the end of the scope.
-    enterCancelAsyncTaskCleanup(childTask);
+    // Push a cleanup to destroy the AsyncLet along with the task and child record.
+    enterAsyncLetCleanup(alet);
 
     // Save the child task so we can await it as needed.
-    AsyncLetChildTasks[{PBD, idx}] = { childTask, isThrowing };
+    AsyncLetChildTasks[{PBD, idx}] = { alet, isThrowing };
 
     // Mark as uninitialized; actual initialization will occur when the
     // variables are referenced.
@@ -1333,9 +1330,13 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
-      assert(!OSVersion.isEmpty());
-
-      if (OSVersion.isAll()) {
+      
+      // The OS version might be left empty if availability checking was
+      // disabled. Treat it as always-true in that case.
+      assert(!OSVersion.isEmpty()
+             || getASTContext().LangOpts.DisableAvailabilityChecking);
+        
+      if (OSVersion.isEmpty() || OSVersion.isAll()) {
         // If there's no check for the current platform, this condition is
         // trivially true.
         SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
@@ -1495,6 +1496,33 @@ namespace {
 CleanupHandle SILGenFunction::enterCancelAsyncTaskCleanup(SILValue task) {
   Cleanups.pushCleanupInState<CancelAsyncTaskCleanup>(
       CleanupState::Active, task);
+  return Cleanups.getTopCleanup();
+}
+
+namespace {
+/// A cleanup that destroys the AsyncLet along with the child task and record.
+class AsyncLetCleanup: public Cleanup {
+  SILValue alet;
+public:
+  AsyncLetCleanup(SILValue alet) : alet(alet) { }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.emitEndAsyncLet(l, alet);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "AsyncLetCleanup\n"
+                 << "AsyncLet:" << alet << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet) {
+  Cleanups.pushCleanupInState<AsyncLetCleanup>(
+      CleanupState::Active, alet);
   return Cleanups.getTopCleanup();
 }
 

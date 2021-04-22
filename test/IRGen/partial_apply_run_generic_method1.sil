@@ -1,0 +1,212 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LL-LABEL: define hidden swiftcc void @call_generic_function
+//       CHECK-LL:   call swiftcc void{{(.*)}} @"$sTA
+sil hidden [ossa] @call_generic_function : $@convention(thin) <On, T where On : C> (@guaranteed On, @in_guaranteed T) -> @out T {
+bb0(%out : $*T, %on_guaranteed : @guaranteed $On, %in : $*T):
+  %on = copy_value %on_guaranteed : $On
+  %c = upcast %on : $On to $C
+  %method = class_method %c : $C, #C.generic_function : <T> (C) -> (T) -> T, $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @guaranteed C) -> @out τ_0_0
+  %closure = partial_apply [callee_guaranteed] %method<T>(%c) : $@convention(method) <τ_1_0> (@in_guaranteed τ_1_0, @guaranteed C) -> @out τ_1_0
+  %result = apply %closure(%out, %in) : $@callee_guaranteed (@in_guaranteed T) -> @out T
+  destroy_value %closure : $@callee_guaranteed (@in_guaranteed T) -> @out T
+  return %result : $()
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+class C {
+  @_silgen_name("generic_function")
+  func generic_function<T>(_ t: T) -> T
+  deinit
+  init()
+}
+
+@_silgen_name("call_generic_function")
+func call_generic_function<On, T>(on: On, with t: T) -> T where On : C
+
+@main struct Main {
+  static func main()
+  init()
+}
+
+
+sil hidden [ossa] @generic_function : $@convention(method) <T> (@in_guaranteed T, @guaranteed C) -> @out T {
+
+
+
+bb0(%0 : $*T, %1 : $*T, %2 : @guaranteed $C):
+  debug_value_addr %1 : $*T, let, name "t", argno 1 
+  debug_value %2 : $C, let, name "self", argno 2  
+  copy_addr %1 to [initialization] %0 : $*T       
+  %6 = tuple ()                                   
+  return %6 : $()                                 
+} 
+
+
+sil hidden [ossa] @$s4main1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject {
+
+bb0(%0 : @guaranteed $C):
+  debug_value %0 : $C, let, name "self", argno 1  
+  %2 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject 
+  %3 = unchecked_ownership_conversion %2 : $Builtin.NativeObject, @guaranteed to @owned 
+  return %3 : $Builtin.NativeObject               
+} 
+
+
+sil hidden [ossa] @$s4main1CCfD : $@convention(method) (@owned C) -> () {
+
+bb0(%0 : @owned $C):
+  debug_value %0 : $C, let, name "self", argno 1  
+  
+  %2 = function_ref @$s4main1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject 
+  %3 = begin_borrow %0 : $C                       
+  %4 = apply %2(%3) : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject 
+  end_borrow %3 : $C                              
+  end_lifetime %0 : $C                            
+  %7 = unchecked_ref_cast %4 : $Builtin.NativeObject to $C 
+  dealloc_ref %7 : $C                             
+  %9 = tuple ()                                   
+  return %9 : $()                                 
+} 
+
+
+sil hidden [exact_self_class] [ossa] @$s4main1CCACycfC : $@convention(method) (@thick C.Type) -> @owned C {
+
+bb0(%0 : $@thick C.Type):
+  %1 = alloc_ref $C                               
+  
+  %2 = function_ref @$s4main1CCACycfc : $@convention(method) (@owned C) -> @owned C 
+  %3 = apply %2(%1) : $@convention(method) (@owned C) -> @owned C 
+  return %3 : $C                                  
+} 
+
+
+sil hidden [ossa] @$s4main1CCACycfc : $@convention(method) (@owned C) -> @owned C {
+
+bb0(%0 : @owned $C):
+  debug_value %0 : $C, let, name "self", argno 1  
+  %2 = mark_uninitialized [rootself] %0 : $C      
+  %3 = copy_value %2 : $C                         
+  destroy_value %2 : $C                           
+  return %3 : $C                                  
+} 
+
+
+sil hidden [ossa] @$s4main4MainVAAyyFZ : $@convention(method) (@thin Main.Type) -> () {
+
+bb0(%0 : $@thin Main.Type):
+  debug_value %0 : $@thin Main.Type, let, name "self", argno 1 
+  %2 = metatype $@thick C.Type                    
+  
+  %3 = function_ref @$s4main1CCACycfC : $@convention(method) (@thick C.Type) -> @owned C 
+  %4 = apply %3(%2) : $@convention(method) (@thick C.Type) -> @owned C 
+  debug_value %4 : $C, let, name "s"              
+  %6 = integer_literal $Builtin.IntLiteral, 42    
+  %7 = metatype $@thin Int.Type                   
+  
+  %8 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int 
+  %9 = apply %8(%6, %7) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int 
+  debug_value %9 : $Int, let, name "t"            
+  %11 = alloc_stack $Int                          
+  %12 = begin_borrow %4 : $C                      
+  %13 = alloc_stack $Int                          
+  store %9 to [trivial] %13 : $*Int               
+  
+  %15 = function_ref @call_generic_function : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : C> (@guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_1 
+  %16 = apply %15<C, Int>(%11, %12, %13) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : C> (@guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_1
+  dealloc_stack %13 : $*Int                       
+  end_borrow %12 : $C                             
+  %19 = load [trivial] %11 : $*Int                
+  debug_value %19 : $Int, let, name "out"         
+  dealloc_stack %11 : $*Int                       
+  %22 = alloc_stack $Int                          
+  store %19 to [trivial] %22 : $*Int              
+  
+  %24 = function_ref @printGeneric : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () 
+  // CHECK: 42
+  %25 = apply %24<Int>(%22) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %22 : $*Int                       
+  destroy_value %4 : $C                           
+  %28 = tuple ()                                  
+  return %28 : $()                                
+} 
+
+
+sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+
+sil hidden [ossa] @$s4main4MainVACycfC : $@convention(method) (@thin Main.Type) -> Main {
+
+bb0(%0 : $@thin Main.Type):
+  %1 = alloc_box ${ var Main }, var, name "self"  
+  %2 = mark_uninitialized [rootself] %1 : ${ var Main } 
+  %3 = project_box %2 : ${ var Main }, 0          
+  %4 = load [trivial] %3 : $*Main                 
+  destroy_value %2 : ${ var Main }                
+  return %4 : $Main                               
+} 
+
+
+sil hidden [ossa] @$s4main4MainV5$mainyyFZ : $@convention(method) (@thin Main.Type) -> () {
+
+bb0(%0 : $@thin Main.Type):
+  debug_value %0 : $@thin Main.Type, let, name "self", argno 1 
+  %2 = metatype $@thin Main.Type                  
+  
+  %3 = function_ref @$s4main4MainVAAyyFZ : $@convention(method) (@thin Main.Type) -> () 
+  %4 = apply %3(%2) : $@convention(method) (@thin Main.Type) -> ()
+  %5 = tuple ()                                   
+  return %5 : $()                                 
+} 
+
+
+
+sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = metatype $@thin Main.Type                  
+  
+  %3 = function_ref @$s4main4MainV5$mainyyFZ : $@convention(method) (@thin Main.Type) -> () 
+  %4 = apply %3(%2) : $@convention(method) (@thin Main.Type) -> ()
+  %5 = integer_literal $Builtin.Int32, 0          
+  br bb1(%5 : $Builtin.Int32)                     
+
+
+bb1(%7 : $Builtin.Int32):                         
+  %8 = struct $Int32 (%7 : $Builtin.Int32)        
+  return %8 : $Int32                              
+} 
+
+sil_vtable C {
+  #C.generic_function: <T> (C) -> (T) -> T : @generic_function	
+  #C.init!allocator: (C.Type) -> () -> C : @$s4main1CCACycfC	
+  #C.deinit!deallocator: @$s4main1CCfD	
+}

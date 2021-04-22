@@ -168,6 +168,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     llvm::sys::fs::make_absolute(OutputDir);
     serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
   }
+  serializationOpts.SkipSymbolGraphInheritedDocs = opts.SkipInheritedDocs;
   
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
@@ -309,6 +310,7 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
         Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                              filename, result.getError().message());
         hadError |= true;
+        continue;
       }
 
       auto bufferID = SourceMgr.addNewSourceBuffer(std::move(result.get()));
@@ -753,9 +755,20 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+/// Enable Swift concurrency on a per-target basis
+static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
+  if (target.isOSDarwin())
+    return true;
+  if (target.isOSWindows())
+    return true;
+  if (target.isOSLinux())
+    return true;
+  return false;
+}
+
 bool CompilerInvocation::shouldImportSwiftConcurrency() const {
-  return getLangOptions().EnableExperimentalConcurrency
-      && !getLangOptions().DisableImplicitConcurrencyModuleImport &&
+  return shouldImportConcurrencyByDefault(getLangOptions().Target) &&
+      !getLangOptions().DisableImplicitConcurrencyModuleImport &&
       getFrontendOptions().InputMode !=
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }

@@ -22,7 +22,6 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVisitor.h"
 
 namespace swift {
@@ -48,7 +47,6 @@ protected:
   SILBuilder Builder;
   DominanceInfo *DomTree = nullptr;
   TypeSubstitutionMap OpenedExistentialSubs;
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
 
   // The old-to-new value map.
   llvm::DenseMap<SILValue, SILValue> ValueMap;
@@ -74,21 +72,10 @@ private:
 public:
   using SILInstructionVisitor<ImplClass>::asImpl;
 
-  explicit SILCloner(SILFunction &F,
-                     SILOpenedArchetypesTracker &OpenedArchetypesTracker,
-                     DominanceInfo *DT = nullptr)
-      : Builder(F), DomTree(DT),
-        OpenedArchetypesTracker(OpenedArchetypesTracker) {
-    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
-
   explicit SILCloner(SILFunction &F, DominanceInfo *DT = nullptr)
-      : Builder(F), DomTree(DT), OpenedArchetypesTracker(&F) {
-    Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
+      : Builder(F), DomTree(DT) {}
 
-  explicit SILCloner(SILGlobalVariable *GlobVar)
-      : Builder(GlobVar), OpenedArchetypesTracker(nullptr) {}
+  explicit SILCloner(SILGlobalVariable *GlobVar) : Builder(GlobVar) {}
 
   void clearClonerState() {
     ValueMap.clear();
@@ -385,15 +372,6 @@ protected:
 private:
   /// MARK: SILCloner implementation details hidden from CRTP extensions.
 
-  /// SILVisitor CRTP callback. Preprocess any instruction before cloning.
-  void beforeVisit(SILInstruction *Orig) {
-    // Update the set of available opened archetypes with the opened
-    // archetypes used by the current instruction.
-    auto TypeDependentOperands = Orig->getTypeDependentOperands();
-    Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        TypeDependentOperands);
-  }
-
   void clonePhiArgs(SILBasicBlock *oldBB);
 
   void visitBlocksDepthFirst(SILBasicBlock *StartBB);
@@ -418,7 +396,6 @@ public:
     {
       setInsertionPoint(SC.getBuilder().getInsertionBB(),
                         SC.getBuilder().getInsertionPoint());
-      setOpenedArchetypesTracker(SC.getBuilder().getOpenedArchetypesTracker());
     }
 
   ~SILBuilderWithPostProcess() {
@@ -437,10 +414,9 @@ class SILClonerWithScopes : public SILCloner<ImplClass> {
   friend class SILCloner<ImplClass>;
 public:
   SILClonerWithScopes(SILFunction &To,
-                      SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                       DominanceInfo *DT = nullptr,
                       bool Disable = false)
-      : SILCloner<ImplClass>(To, OpenedArchetypesTracker, DT) {
+      : SILCloner<ImplClass>(To, DT) {
 
     // We only want to do this when we generate cloned functions, not
     // when we inline.
@@ -454,24 +430,6 @@ public:
 
     scopeCloner.reset(new ScopeCloner(To));
   }
-
-  SILClonerWithScopes(SILFunction &To,
-                      bool Disable = false)
-      : SILCloner<ImplClass>(To) {
-
-    // We only want to do this when we generate cloned functions, not
-    // when we inline.
-
-    // FIXME: This is due to having TypeSubstCloner inherit from
-    //        SILClonerWithScopes, and having TypeSubstCloner be used
-    //        both by passes that clone whole functions and ones that
-    //        inline functions.
-    if (Disable)
-      return;
-
-    scopeCloner.reset(new ScopeCloner(To));
-  }
-
 
 private:
   std::unique_ptr<ScopeCloner> scopeCloner;
@@ -684,9 +642,7 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
     if (BB != startBB)
       clonePhiArgs(BB);
 
-    // Non-terminating instructions are cloned in the first preorder walk so
-    // that all opened existentials are registered with OpenedArchetypesTracker
-    // before phi argument type substitution in successors.
+    // Non-terminating instructions are cloned in the first preorder walk.
     getBuilder().setInsertionPoint(BBMap[BB]);
     asImpl().visitInstructionsInBlock(BB);
 
@@ -3056,6 +3012,15 @@ void SILCloner<ImplClass>
                             getOpValue(Inst->getTargetExecutor())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>
+::visitExtractExecutorInst(ExtractExecutorInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createExtractExecutor(
+                            getOpLocation(Inst->getLoc()),
+                            getOpValue(Inst->getExpectedExecutor())));
+}
 
 } // end namespace swift
 

@@ -1,124 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | %FileCheck %s -check-prefix=EXPECT_OINT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | %FileCheck %s -check-prefix=ARG-NAME1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG3 | %FileCheck %s -check-prefix=ARG-NAME2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG4 | %FileCheck %s -check-prefix=EXPECT_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG5 | %FileCheck %s -check-prefix=EXPECT_OSTRING
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG6 | %FileCheck %s -check-prefix=ARG-NAME3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | %FileCheck %s -check-prefix=ARG-NAME4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | %FileCheck %s -check-prefix=EXPECT_STRING
-
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | %FileCheck %s -check-prefix=OVERLOAD1
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | %FileCheck %s -check-prefix=OVERLOAD2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD5 | %FileCheck %s -check-prefix=OVERLOAD5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD6 | %FileCheck %s -check-prefix=OVERLOAD6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD7 | %FileCheck %s -check-prefix=OVERLOAD6
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR1 | %FileCheck %s -check-prefix=HASERROR1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR2 | %FileCheck %s -check-prefix=HASERROR2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR3 | %FileCheck %s -check-prefix=HASERROR3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HASERROR4 | %FileCheck %s -check-prefix=HASERROR4
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER3 | %FileCheck %s -check-prefix=MEMBER3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | %FileCheck %s -check-prefix=MEMBER4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER5 | %FileCheck %s -check-prefix=MEMBER2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER6 | %FileCheck %s -check-prefix=MEMBER4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | %FileCheck %s -check-prefix=MEMBER7
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | %FileCheck %s -check-prefix=MEMBER8
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | %FileCheck %s -check-prefix=MEMBER1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG1 | %FileCheck %s -check-prefix=EXPECT_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG2 | %FileCheck %s -check-prefix=EXPECT_STRING
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG3 | %FileCheck %s -check-prefix=MEMBER2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG4 | %FileCheck %s -check-prefix=MEMBER4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG5 | %FileCheck %s -check-prefix=MEMBER2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG6 | %FileCheck %s -check-prefix=FARG6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG7 | %FileCheck %s -check-prefix=EXPECT_OINT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_1 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_2 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 -code-complete-call-pattern-heuristics | %FileCheck %s -check-prefix=FIRST_ARG_NAME_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_4
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_1 | %FileCheck %s -check-prefix=BOUND_GENERIC_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_GENERIC_1_2 | %FileCheck %s -check-prefix=BOUND_GENERIC_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_1 | %FileCheck %s -check-prefix=EMPTY_OVERLOAD
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_OVERLOAD_2 | %FileCheck %s -check-prefix=EMPTY_OVERLOAD
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CALLARG_IUO | %FileCheck %s -check-prefix=CALLARG_IUO
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=BOUND_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FORCED_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TO_GENERIC | %FileCheck %s -check-prefix=GENERIC_TO_GENERIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE | %FileCheck %s -check-prefix=NESTED_CLOSURE
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_1 | %FileCheck %s -check-prefix=SHUFFLE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_2 | %FileCheck %s -check-prefix=SHUFFLE_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SHUFFLE_3 | %FileCheck %s -check-prefix=SHUFFLE_3
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1 | %FileCheck %s -check-prefix=SUBSCRIPT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_1_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2 | %FileCheck %s -check-prefix=SUBSCRIPT_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_2_DOT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3 | %FileCheck %s -check-prefix=SUBSCRIPT_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_3_DOT | %FileCheck %s -check-prefix=SUBSCRIPT_3_DOT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ERRORCONTEXT_NESTED_1 | %FileCheck %s -check-prefix=ERRORCONTEXT_NESTED_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ERRORCONTEXT_NESTED_2 | %FileCheck %s -check-prefix=ERRORCONTEXT_NESTED_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_SELF_1 | %FileCheck %s -check-prefix=CURRIED_SELF_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_SELF_2 | %FileCheck %s -check-prefix=CURRIED_SELF_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CURRIED_SELF_3 | %FileCheck %s -check-prefix=CURRIED_SELF_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_AFTERPAREN_1 | %FileCheck %s -check-prefix=STATIC_METHOD_AFTERPAREN_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_AFTERPAREN_2 | %FileCheck %s -check-prefix=STATIC_METHOD_AFTERPAREN_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SECOND | %FileCheck %s -check-prefix=STATIC_METHOD_SECOND
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_SKIPPED | %FileCheck %s -check-prefix=STATIC_METHOD_SKIPPED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_METHOD_OVERLOADED | %FileCheck %s -check-prefix=STATIC_METHOD_OVERLOADED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_3 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_OVERLOADED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_OVERLOADED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_OVERLOADED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_OVERLOADED
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPECHECKED_OVERLOADED | %FileCheck %s -check-prefix=TYPECHECKED_OVERLOADED
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPECHECKED_TYPEEXPR | %FileCheck %s -check-prefix=TYPECHECKED_TYPEEXPR
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_INOUT | %FileCheck %s -check-prefix=ARG_PARAMFLAG_INOUT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_AUTOCLOSURE| %FileCheck %s -check-prefix=ARG_PARAMFLAG_AUTOCLOSURE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_IUO | %FileCheck %s -check-prefix=ARG_PARAMFLAG_IUO
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG_PARAMFLAG_VARIADIC | %FileCheck %s -check-prefix=ARG_PARAMFLAG_VARIADIC
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_1 | %FileCheck %s -check-prefix=TUPLEELEM_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TUPLEELEM_2 | %FileCheck %s -check-prefix=TUPLEELEM_2
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYPATH_THUNK_BASE | %FileCheck %s -check-prefix=KEYPATH_THUNK_BASE
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_1 | %FileCheck %s -check-prefix=VARIADIC_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_2 | %FileCheck %s -check-prefix=VARIADIC_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_3 | %FileCheck %s -check-prefix=VARIADIC_2
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_IN_SELF_DOT_INIT | %FileCheck %s -check-prefix=LABEL_IN_SELF_DOT_INIT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MISSING_REQUIRED_PARAM | %FileCheck %s -check-prefix=MISSING_REQUIRED_PARAM
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NAMED_PARAMETER_WITH_LEADING_VARIADIC | %FileCheck %s -check-prefix=NAMED_PARAMETER_WITH_LEADING_VARIADIC
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 var i1 = 1
 var i2 = 2
@@ -169,28 +50,28 @@ enum SimpleEnum {
 
 class C1 {
   func f1() {
-    foo(3, b: #^ARG1^#)
+    foo(3, b: #^ARG1?check=EXPECT_OINT^#)
   }
   func f2() {
-    foo(3, #^ARG2^#)
+    foo(3, #^ARG2?check=ARG-NAME1^#)
   }
   func f3() {
-    foo1(2, #^ARG3^#
+    foo1(2, #^ARG3?check=ARG-NAME2^#
   }
   func f4() {
-    foo1(2, b : #^ARG4^#
+    foo1(2, b : #^ARG4?check=EXPECT_INT^#
   }
 
   func f5() {
-    foo(#^FARG1^#, b1 : 2)
+    foo(#^FARG1?check=EXPECT_INT^#, b1 : 2)
   }
 
   func f6() {
-    bar(#^FARG2^#
+    bar(#^FARG2?check=EXPECT_STRING^#
   }
 
   func f7() {
-    foo3(#^FARG7^#)
+    foo3(#^FARG7?check=EXPECT_OINT^#)
   }
 }
 
@@ -235,16 +116,16 @@ class C1 {
 
 class C2 {
   func f1() {
-    bar("", b: #^ARG5^#)
+    bar("", b: #^ARG5?check=EXPECT_OSTRING^#)
   }
   func f2() {
-    bar("", #^ARG6^#)
+    bar("", #^ARG6?check=ARG-NAME3^#)
   }
   func f3() {
-    bar1("", #^ARG7^#
+    bar1("", #^ARG7?check=ARG-NAME4^#
   }
   func f4() {
-    bar1("", b : #^ARG8^#
+    bar1("", b : #^ARG8?check=EXPECT_STRING^#
   }
 }
 
@@ -279,10 +160,10 @@ class C3 {
   var C1I = C1()
   var C2I = C2()
   func f1() {
-    foo2(C1I, #^OVERLOAD1^#)
+    foo2(C1I, #^OVERLOAD1?xfail=FIXME^#)
   }
   func f2() {
-    foo2(C2I, #^OVERLOAD2^#)
+    foo2(C2I, #^OVERLOAD2?xfail=FIXME^#)
   }
   func f3() {
     foo2(C1I, b1: #^OVERLOAD3^#)
@@ -301,7 +182,7 @@ class C3 {
   func f6(obj: C3) {
     overloaded(#^OVERLOAD6^#
     func sync() {}
-    obj.overloaded(#^OVERLOAD7^#
+    obj.overloaded(#^OVERLOAD7?check=OVERLOAD6^#
   }
 }
 
@@ -394,11 +275,11 @@ class C4 {
   }
 
   func f5(_ G1 : Gen, G2 : Gen) {
-    G1.IntTaker(1, i1 : G2.#^MEMBER5^#
+    G1.IntTaker(1, i1 : G2.#^MEMBER5?check=MEMBER2^#
   }
 
   func f6(_ G1 : Gen, G2 : Gen) {
-    G1.StringTaker("", s2: G2.#^MEMBER6^#
+    G1.StringTaker("", s2: G2.#^MEMBER6?check=MEMBER4^#
   }
 
   func f7(_ GA : [Gen]) {
@@ -410,19 +291,19 @@ class C4 {
   }
 
   func f9() {
-    foo(1, b1 : GenGenerator(1).#^MEMBER9^#
+    foo(1, b1 : GenGenerator(1).#^MEMBER9?check=MEMBER1^#
   }
 
   func f10(_ G: Gen) {
-    foo(G.#^FARG3^#
+    foo(G.#^FARG3?check=MEMBER2^#
   }
 
   func f11(_ G: Gen) {
-    bar(G.#^FARG4^#
+    bar(G.#^FARG4?check=MEMBER4^#
   }
 
   func f12(_ G1 : Gen, G2 : Gen) {
-    G1.IntTaker(G2.#^FARG5^#
+    G1.IntTaker(G2.#^FARG5?check=MEMBER2^#
   }
 
   func f13(_ G : Gen) {
@@ -486,28 +367,26 @@ class C4 {
 
 func firstArg(arg1 arg1: Int, arg2: Int) {}
 func testArg1Name1() {
-  firstArg(#^FIRST_ARG_NAME_1^#
+  firstArg(#^FIRST_ARG_NAME_1?check=FIRST_ARG_NAME_PATTERN^#
 }
-// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}[')']
+// FIRST_ARG_NAME_PATTERN: Decl[FreeFunction]/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 func testArg2Name1() {
-  firstArg(#^FIRST_ARG_NAME_2^#)
+  firstArg(#^FIRST_ARG_NAME_2?check=FIRST_ARG_NAME_PATTERN^#)
 }
 
 func testArg2Name3() {
-  firstArg(#^FIRST_ARG_NAME_3^#,
+  firstArg(#^FIRST_ARG_NAME_3?check=FIRST_ARG_NAME_PATTERN^#,
 }
-// FIRST_ARG_NAME_3: Pattern/ExprSpecific: {#arg1: Int#}[#Int#];
-// FIRST_ARG_NAME_4: Decl[FreeFunction]/CurrModule: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 
 func takeArray<T>(_ x: [T]) {}
 struct TestBoundGeneric1 {
   let x: [Int]
   let y: [Int]
   func test1() {
-    takeArray(self.#^BOUND_GENERIC_1_1^#)
+    takeArray(self.#^BOUND_GENERIC_1_1?check=BOUND_GENERIC_1^#)
   }
   func test2() {
-    takeArray(#^BOUND_GENERIC_1_2^#)
+    takeArray(#^BOUND_GENERIC_1_2?check=BOUND_GENERIC_1^#)
   }
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: x[#[Int]#];
 // BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: y[#[Int]#];
@@ -523,12 +402,12 @@ func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
 
 func emptyOverload() {}
 func emptyOverload(foo foo: Int) {}
-emptyOverload(foo: #^EMPTY_OVERLOAD_1^#)
+emptyOverload(foo: #^EMPTY_OVERLOAD_1?check=EMPTY_OVERLOAD^#)
 struct EmptyOverload {
   init() {}
   init(foo: Int) {}
 }
-_ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
+_ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2?check=EMPTY_OVERLOAD^#)
 // EMPTY_OVERLOAD: Begin completions
 // EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i2[#Int#];
 // EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i1[#Int#];
@@ -547,8 +426,8 @@ class Bar {
   var collectionView: Foo!
 
   func foo() {
-    self.collectionView? .#^BOUND_IUO^#x
-    self.collectionView! .#^FORCED_IUO^#x
+    self.collectionView? .#^BOUND_IUO?check=MEMBEROF_IUO^#x
+    self.collectionView! .#^FORCED_IUO?check=MEMBEROF_IUO^#x
   }
   // MEMBEROF_IUO: Begin completions, 2 items
   // MEMBEROF_IUO: Keyword[self]/CurrNominal: self[#Foo#]; name=self
@@ -570,8 +449,8 @@ func trailingClosureLocal(x: Int, fn: (Int) -> Void) {
     if #^TRAILING_CLOSURE_LOCAL^#
   }
   // TRAILING_CLOSURE_LOCAL: Begin completions
-  // TRAILING_CLOSURE_LOCAL: Decl[LocalVar]/Local: localArg[#Int#]; name=localArg
-  // TRAILING_CLOSURE_LOCAL: Decl[LocalVar]/Local: localVar[#Int#]; name=localVar
+  // TRAILING_CLOSURE_LOCAL-DAG: Decl[LocalVar]/Local: localArg[#Int#]; name=localArg
+  // TRAILING_CLOSURE_LOCAL-DAG: Decl[LocalVar]/Local: localVar[#Int#]; name=localVar
 }
 
 func shuffled(_ x: Int ..., y: String = "", z: SimpleEnum = .foo) {}
@@ -650,7 +529,7 @@ func testNestedContext() {
 // ERRORCONTEXT_NESTED_1-DAG: Decl[GlobalVar]/CurrModule: i2[#Int#]; name=i2
 // ERRORCONTEXT_NESTED_1-NOT: TypeRelation[Identical]
 
-  for _ in [bar(#^ERRORCONTEXT_NESTED_2^#)] {}
+  for _ in [bar(#^ERRORCONTEXT_NESTED_2?check=ERRORCONTEXT_NESTED_1^#)] {}
 // Same as ERRORCONTEXT_NESTED_1.
 }
 
@@ -661,9 +540,9 @@ class TestImplicitlyCurriedSelf {
   static func test() {
     foo(#^CURRIED_SELF_1^#
     func sync();
-    self.foo(#^CURRIED_SELF_2^#
+    self.foo(#^CURRIED_SELF_2?check=CURRIED_SELF_1^#
     func sync();
-    TestImplicitlyCurriedSelf.foo(#^CURRIED_SELF_3^#
+    TestImplicitlyCurriedSelf.foo(#^CURRIED_SELF_3?check=CURRIED_SELF_1^#
 
 // CURRIED_SELF_1: Begin completions, 2 items
 // CURRIED_SELF_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(self): TestImplicitlyCurriedSelf#}[')'][#(Int) -> ()#]{{; name=.+$}}
@@ -759,39 +638,39 @@ func testImplicitMemberInArrayLiteral() {
 
   Receiver([
     .create1(x: 1),
-    .create1(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1^#),
+    .create1(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1?check=IMPLICIT_MEMBER_AFTERPAREN_1^#),
     // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
   ])
   Receiver([
     .create1(x: 1),
-    .create2(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2^#),
+    .create2(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2?check=IMPLICIT_MEMBER_AFTERPAREN_2^#),
     // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
   ])
   Receiver([
     .create1(x: 1),
-    .create2(1, #^IMPLICIT_MEMBER_ARRAY_1_SECOND^#
+    .create2(1, #^IMPLICIT_MEMBER_ARRAY_1_SECOND?check=IMPLICIT_MEMBER_SECOND^#
     // Same as IMPLICIT_MEMBER_SECOND.
   ])
   Receiver(arg1: 12, arg2: [
-    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_1_SKIPPED^#
+    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_1_SKIPPED?check=IMPLICIT_MEMBER_SKIPPED^#
     // Same as IMPLICIT_MEMBER_SKIPPED.
     .create1(x: 12)
   ])
   Receiver(arg1: 12, arg2: [
     .create1(x: 12),
-    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_1_OVERLOADED^#)
+    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_1_OVERLOADED?check=IMPLICIT_MEMBER_OVERLOADED^#)
     // Same as IMPLICIT_MEMBER_OVERLOADED.
   ])
   let _: [TestStaticMemberCall] = [
-    .create1(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1^#),
+    .create1(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1?check=IMPLICIT_MEMBER_AFTERPAREN_1^#),
     // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
-    .create2(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2^#),
+    .create2(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2?check=IMPLICIT_MEMBER_AFTERPAREN_2^#),
     // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
-    .create2(1, #^IMPLICIT_MEMBER_ARRAY_2_SECOND^#),
+    .create2(1, #^IMPLICIT_MEMBER_ARRAY_2_SECOND?check=IMPLICIT_MEMBER_SECOND^#),
     // Same as IMPLICIT_MEMBER_SECOND.
-    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_2_SKIPPED^#),
+    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_2_SKIPPED?check=IMPLICIT_MEMBER_SKIPPED^#),
     // Same as IMPLICIT_MEMBER_SKIPPED.
-    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_2_OVERLOADED^#),
+    .createOverloaded(#^IMPLICIT_MEMBER_ARRAY_2_OVERLOADED?check=IMPLICIT_MEMBER_OVERLOADED^#),
     // Same as IMPLICIT_MEMBER_OVERLOADED
   ]
 }
@@ -908,7 +787,7 @@ func testVariadic(_ arg: Any..., option1: Int = 0, option2: String = 1) {
 // VARIADIC_2-DAG: Pattern/ExprSpecific:          {#option2: String#}[#String#];
 // VARIADIC_2-DAG: Decl[GlobalVar]/CurrModule:    i1[#Int#];
 // VARIADIC_2: End completions
-    testVariadic(1, 2, #^VARIADIC_3^#)
+    testVariadic(1, 2, #^VARIADIC_3?check=VARIADIC_2^#)
 // Same as VARIADIC_2.
 }
 
@@ -946,4 +825,77 @@ func testAfterVariadic() {
 // NAMED_PARAMETER_WITH_LEADING_VARIADIC-DAG: Pattern/ExprSpecific:               {#z: Int#}[#Int#]
 // NAMED_PARAMETER_WITH_LEADING_VARIADIC: End completions
   }
+}
+
+func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSiganture() {
+  func sort(callback: (_ left: Int, _ right: Int) -> Bool) {}
+  sort(#^CLOSURE_PARAM_WITH_INTERNAL_NAME^#)
+// CLOSURE_PARAM_WITH_INTERNAL_NAME: Begin completions, 1 item
+// CLOSURE_PARAM_WITH_INTERNAL_NAME-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: (Int, Int) -> Bool##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// CLOSURE_PARAM_WITH_INTERNAL_NAME: End completions
+
+  func sortWithParensAroundClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)) {}
+  sortWithParensAroundClosureType(#^CLOSURE_PARAM_WITH_PARENS^#)
+// CLOSURE_PARAM_WITH_PARENS: Begin completions, 1 item
+// CLOSURE_PARAM_WITH_PARENS-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: ((Int, Int) -> Bool)##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// CLOSURE_PARAM_WITH_PARENS: End completions
+
+  func sortWithOptionalClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)?) {}
+  sortWithOptionalClosureType(#^OPTIONAL_CLOSURE_PARAM^#)
+// OPTIONAL_CLOSURE_PARAM: Begin completions, 1 item
+// OPTIONAL_CLOSURE_PARAM-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: ((Int, Int) -> Bool)?##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// OPTIONAL_CLOSURE_PARAM: End completions
+
+  func sortWithEscapingClosureType(callback: @escaping (_ left: Int, _ right: Int) -> Bool) {}
+  sortWithEscapingClosureType(#^ESCAPING_OPTIONAL_CLOSURE_PARAM^#)
+// ESCAPING_OPTIONAL_CLOSURE_PARAM: Begin completions, 1 item
+// ESCAPING_OPTIONAL_CLOSURE_PARAM-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: (Int, Int) -> Bool##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// ESCAPING_OPTIONAL_CLOSURE_PARAM: End completions
+}
+
+func testClosurePlaceholderPrintsTypesOnlyIfNoInternalParameterNamesExist() {
+  func sort(callback: (Int, Int) -> Bool) {}
+  sort(#^COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES^#)
+// COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES: Begin completions, 1 item
+// COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: (Int, Int) -> Bool##(Int, Int) -> Bool#}[')'][#Void#];
+// COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES: End completions
+}
+
+func testCompleteLabelAfterVararg() {
+  enum Foo {
+    case bar
+  }
+
+  struct Rdar76355192 {
+    func test(_: String, xArg: Foo..., yArg: Foo..., zArg: Foo...) {}
+  }
+
+  private func test(value: Rdar76355192) {
+    value.test("test", xArg: #^COMPLETE_AFTER_VARARG^#)
+    // COMPLETE_AFTER_VARARG: Begin completions
+    // COMPLETE_AFTER_VARARG-NOT: Pattern/ExprSpecific:               {#yArg: Foo...#}[#Foo#];
+    // COMPLETE_AFTER_VARARG-NOT: Pattern/ExprSpecific:               {#zArg: Foo...#}[#Foo#];
+    // COMPLETE_AFTER_VARARG: End completions
+    value.test("test", xArg: .bar, #^COMPLETE_AFTER_VARARG_WITH_PREV_PARAM^#)
+    // COMPLETE_AFTER_VARARG_WITH_PREV_PARAM: Begin completions
+    // COMPLETE_AFTER_VARARG_WITH_PREV_PARAM-DAG: Pattern/ExprSpecific:               {#yArg: Foo...#}[#Foo#];
+    // COMPLETE_AFTER_VARARG_WITH_PREV_PARAM-DAG: Pattern/ExprSpecific:               {#zArg: Foo...#}[#Foo#];
+    // COMPLETE_AFTER_VARARG_WITH_PREV_PARAM: End completions
+    value.test("test", xArg: .bar, .#^COMPLETE_MEMBER_IN_VARARG^#)
+    // COMPLETE_MEMBER_IN_VARARG: Begin completions, 2 items
+    // COMPLETE_MEMBER_IN_VARARG-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#Foo#];
+    // COMPLETE_MEMBER_IN_VARARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Foo#})[#(into: inout Hasher) -> Void#];
+    // COMPLETE_MEMBER_IN_VARARG: End completions
+  }
+}
+
+func testGenericConstructor() {
+  public struct TextField<Label> {
+    init(label: String, text: String) {}
+  }
+
+  _ = TextField(label: "Encoded", #^GENERIC_INITIALIZER^#)
+// GENERIC_INITIALIZER: Begin completions, 1 item
+// GENERIC_INITIALIZER-DAG: Pattern/ExprSpecific:               {#text: String#}[#String#]
+// GENERIC_INITIALIZER: End completions
 }

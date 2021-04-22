@@ -1,0 +1,47 @@
+# REQUIRES: standalone_build
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --build-llvm=0 --cmake %cmake  2>&1 | %FileCheck --check-prefix=BUILD-LLVM-0-CHECK %s
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --build-llvm=0 --llvm-ninja-targets="lib/all clangDependencyScanning" --cmake %cmake  2>&1 | %FileCheck --check-prefix=BUILD-LLVM-0-CHECK %s
+
+# BUILD-LLVM-0-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} clean
+
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --cmake %cmake  2>&1 | %FileCheck --check-prefix=SKIP-BUILD-CHECK %s
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build --llvm-ninja-targets="lib/all bin/clang" --cmake %cmake  2>&1 | %FileCheck --check-prefix=SKIP-BUILD-CHECK %s
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build-llvm --cmake %cmake  2>&1 | %FileCheck --check-prefix=SKIP-BUILD-CHECK %s
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build-llvm --llvm-ninja-targets="bin/clang clangDependencyScanning" --cmake %cmake  2>&1 | %FileCheck --check-prefix=SKIP-BUILD-CHECK %s
+
+# SKIP-BUILD-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets
+# SKIP-BUILD-CHECK-SAME: FileCheck not llvm-nm
+
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --skip-build-llvm --build-toolchain-only=1 --cmake %cmake  2>&1 | %FileCheck --check-prefix=SKIP-BUILD-LLVM-BUILD-TOOLCHAIN-ONLY-CHECK %s
+
+# SKIP-BUILD-LLVM-BUILD-TOOLCHAIN-ONLY-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets
+# SKIP-BUILD-LLVM-BUILD-TOOLCHAIN-ONLY-CHECK-NOT: FileCheck not llvm-nm
+
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --llvm-ninja-targets="lib/all clangDependencyScanning" --cmake %cmake  2>&1 | %FileCheck --check-prefix=LLVM-NINJA-TARGETS-CHECK %s
+
+# LLVM-NINJA-TARGETS-CHECK: cmake --build {{.*}}/llvm-{{[^/]*}} lib/all clangDependencyScanning
+

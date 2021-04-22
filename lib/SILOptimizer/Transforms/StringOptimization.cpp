@@ -300,7 +300,7 @@ bool StringOptimization::optimizeTypeName(ApplyInst *typeNameCall) {
 
   auto metatype = metatypeInst->getType().getAs<MetatypeType>();
   Type ty = metatype->getInstanceType();
-  if (ty->hasArchetype())
+  if (ty->hasArchetype() || ty->hasDynamicSelfType())
     return false;
   
   // Usually the "qualified" parameter of _typeName() is a constant boolean.

@@ -152,7 +152,7 @@ classifyDynamicCastToProtocol(ModuleDecl *M, CanType source, CanType target,
 
   // AnyHashable is a special case: although it's a struct, there maybe another
   // type conforming to it and to the TargetProtocol at the same time.
-  if (SourceNominalTy == SourceNominalTy->getASTContext().getAnyHashableDecl())
+  if (source->isAnyHashable())
     return DynamicCastFeasibility::MaySucceed;
 
   // If we are in a whole-module compilation and
@@ -417,7 +417,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
   // Casts from AnyHashable.
   if (auto sourceStruct = dyn_cast<StructType>(source)) {
-    if (sourceStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
+    if (sourceStruct->isAnyHashable()) {
       if (auto hashable = getHashableExistentialType(M)) {
         // Succeeds if Hashable can be cast to the target type.
         return classifyDynamicCastFromProtocol(M, hashable, target,
@@ -428,7 +428,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
   // Casts to AnyHashable.
   if (auto targetStruct = dyn_cast<StructType>(target)) {
-    if (targetStruct->getDecl() == M->getASTContext().getAnyHashableDecl()) {
+    if (targetStruct->isAnyHashable()) {
       // Succeeds if the source type can be dynamically cast to Hashable.
       // Hashable is not actually a legal existential type right now, but
       // the check doesn't care about that.
@@ -733,8 +733,7 @@ swift::classifyDynamicCast(ModuleDecl *M,
   if (auto sourceStruct = dyn_cast<BoundGenericStructType>(source)) {
     if (auto targetStruct = dyn_cast<BoundGenericStructType>(target)) {
       // Both types have to be the same kind of collection.
-      auto typeDecl = sourceStruct->getDecl();
-      if (typeDecl == targetStruct->getDecl()) {
+      if (sourceStruct->getDecl() == targetStruct->getDecl()) {
         auto sourceArgs = sourceStruct.getGenericArgs();
         auto targetArgs = targetStruct.getGenericArgs();
 
@@ -742,15 +741,14 @@ swift::classifyDynamicCast(ModuleDecl *M,
         // a cast can always succeed on an empty collection.
 
         // Arrays and sets.
-        if (typeDecl == M->getASTContext().getArrayDecl() ||
-            typeDecl == M->getASTContext().getSetDecl()) {
+        if (sourceStruct->isArray() || sourceStruct->isSet()) {
           auto valueFeasibility =
             classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
           return atWorst(valueFeasibility,
                          DynamicCastFeasibility::MaySucceed);
 
         // Dictionaries.
-        } else if (typeDecl == M->getASTContext().getDictionaryDecl()) {
+        } else if (sourceStruct->isDictionary()) {
           auto keyFeasibility =
             classifyDynamicCast(M, sourceArgs[0], targetArgs[0]);
           auto valueFeasibility =

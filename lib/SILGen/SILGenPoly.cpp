@@ -511,12 +511,11 @@ ManagedValue Transform::transform(ManagedValue v,
     // Attempt collection upcast only if input and output declarations match.
     if (inputStruct == outputStruct) {
       FuncDecl *fn = nullptr;
-      auto &ctx = SGF.getASTContext();
-      if (inputStruct == ctx.getArrayDecl()) {
+      if (inputSubstType->isArray()) {
         fn = SGF.SGM.getArrayForceCast(Loc);
-      } else if (inputStruct == ctx.getDictionaryDecl()) {
+      } else if (inputSubstType->isDictionary()) {
         fn = SGF.SGM.getDictionaryUpCast(Loc);
-      } else if (inputStruct == ctx.getSetDecl()) {
+      } else if (inputSubstType->isSet()) {
         fn = SGF.SGM.getSetUpCast(Loc);
       } else {
         llvm_unreachable("unsupported collection upcast kind");
@@ -608,9 +607,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // - T : Hashable to AnyHashable
-  if (isa<StructType>(outputSubstType) &&
-      outputSubstType->getAnyNominal() ==
-        SGF.getASTContext().getAnyHashableDecl()) {
+  if (outputSubstType->isAnyHashable()) {
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
     auto conformance = SGF.SGM.M.getSwiftModule()->lookupConformance(
@@ -624,6 +621,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // Should have handled the conversion in one of the cases above.
+  v.dump();
   llvm_unreachable("Unhandled transform?");
 }
 

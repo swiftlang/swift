@@ -6,7 +6,9 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 class StringLike: CustomStringConvertible {
   let value: String
   init(_ value: String) {
@@ -16,6 +18,7 @@ class StringLike: CustomStringConvertible {
   var description: String { value }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
   _ expected: Key.Value? = nil,
@@ -29,6 +32,7 @@ func printTaskLocal<Key>(
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension TaskLocalValues {
 
   struct StringKey: TaskLocalKey {
@@ -41,6 +45,7 @@ extension TaskLocalValues {
 
 // ==== ------------------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_async_let() async {
   print(#function) // CHECK: test_async_let
 
@@ -55,6 +60,7 @@ func test_async_let() async {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_async_group() async {
   // CHECK: test_async_group
   print(#function)
@@ -63,18 +69,20 @@ func test_async_group() async {
   await Task.withLocal(\.string, boundTo: "top") {
     printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
-    try! await Task.withGroup(resultType: Void.self) { group -> Void? in
+    await withTaskGroup(of: Int.self, returning: Void.self) { group in
       printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
-      await group.add {
+      group.spawn {
         printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
+        return 0
       }
 
-      return try! await group.next()
+      _ = await group.next()
     }
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_async_let()

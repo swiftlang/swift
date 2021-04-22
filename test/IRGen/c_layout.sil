@@ -265,6 +265,22 @@ bb0:
 // CHECK-arm64e-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
 // CHECK-arm64e-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
 
+// CHECK-arm64_32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-arm64_32:         call signext i8 @chareth(i8 signext
+// CHECK-arm64_32:         call signext i8 @signedChareth(i8 signext
+// CHECK-arm64_32:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-arm64_32:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-arm64_32:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-arm64_32:         call i32 @ints(i32 %5)
+// CHECK-arm64_32:         call i32 @unsigneds(i32 %6)
+// CHECK-arm64_32-LABEL: declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-arm64_32-LABEL: declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-arm64_32-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-arm64_32-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-arm64_32-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-arm64_32-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-arm64_32-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+
 // CHECK-aarch64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
 // CHECK-aarch64:         call i8 @chareth(i8 %0)
 // CHECK-aarch64:         call i8 @signedChareth(i8 %1)

@@ -500,7 +500,7 @@ public:
       return StoredPointer();
 
     auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
-    return classMeta->Superclass;
+    return stripSignedPointer(classMeta->Superclass);
   }
 
   /// Given a remote pointer to class metadata, attempt to discover its class
@@ -534,9 +534,9 @@ public:
     size_t start = isaAndRetainCountSize;
 
     auto classMeta = cast<TargetClassMetadata<Runtime>>(meta);
-    while (classMeta->Superclass) {
+    while (stripSignedPointer(classMeta->Superclass)) {
       classMeta = cast<TargetClassMetadata<Runtime>>(
-          readMetadata(classMeta->Superclass));
+          readMetadata(stripSignedPointer(classMeta->Superclass)));
 
       // Subtract the size contribution of the isa and retain counts from 
       // the super class.
@@ -1751,7 +1751,8 @@ protected:
         if (descriptorAddress || !skipArtificialSubclasses)
           return static_cast<StoredPointer>(descriptorAddress);
 
-        auto superclassMetadataAddress = classMeta->Superclass;
+        auto superclassMetadataAddress =
+            stripSignedPointer(classMeta->Superclass);
         if (!superclassMetadataAddress)
           return 0;
 
@@ -2661,11 +2662,11 @@ private:
     BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
     if (!BuiltObjCClass) {
       // Try the superclass.
-      if (!classMeta->Superclass)
+      if (!stripSignedPointer(classMeta->Superclass))
         return BuiltType();
 
-      BuiltObjCClass = readTypeFromMetadata(classMeta->Superclass,
-                                            skipArtificialSubclasses);
+      BuiltObjCClass = readTypeFromMetadata(
+          stripSignedPointer(classMeta->Superclass), skipArtificialSubclasses);
     }
 
     TypeCache[origMetadataPtr] = BuiltObjCClass;

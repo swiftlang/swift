@@ -149,7 +149,7 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
   assert(isLoadableOrOpaque(Ty));
   if (Ty.isTrivial(getFunction()))
     return insert(UncheckedTrivialBitCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction()));
 
   if (SILType::canRefCast(Op->getType(), Ty, getModule()))
     return createUncheckedRefCast(Loc, Op, Ty);
@@ -157,7 +157,7 @@ SILBuilder::createUncheckedReinterpretCast(SILLocation Loc, SILValue Op,
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
   return insert(UncheckedBitwiseCastInst::create(
-      getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+      getSILDebugLocation(Loc), Op, Ty, getFunction()));
 }
 
 // Create the appropriate cast instruction based on result type.
@@ -170,7 +170,7 @@ SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
   assert(isLoadableOrOpaque(Ty));
   if (Ty.isTrivial(getFunction()))
     return insert(UncheckedTrivialBitCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction()));
 
   if (SILType::canRefCast(Op->getType(), Ty, getModule()))
     return createUncheckedRefCast(Loc, Op, Ty);
@@ -486,57 +486,6 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
   return createObjCToThickMetatype(Loc, Op, Ty);
 }
 
-/// Add opened archetypes defined or used by the current instruction.
-/// If there are no such opened archetypes in the current instruction
-/// and it is an instruction with just one operand, try to perform
-/// the same action for the instruction defining an operand, because
-/// it may have some opened archetypes used or defined.
-void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
-  // The list of archetypes from the previous instruction needs
-  // to be replaced, because it may reference a removed instruction.
-  C.OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
-  if (I && I->getNumTypeDependentOperands() > 0)
-    return;
-
-  // Keep track of already visited instructions to avoid infinite loops.
-  SmallPtrSet<SILInstruction *, 8> Visited;
-
-  while (I && I->getNumOperands() == 1 &&
-         I->getNumTypeDependentOperands() == 0) {
-    // All the open instructions are single-value instructions.  Operands may
-    // be null when code is being transformed.
-    auto SVI = dyn_cast_or_null<SingleValueInstruction>(I->getOperand(0));
-    // Within SimplifyCFG this function may be called for an instruction
-    // within unreachable code. And within an unreachable block it can happen
-    // that defs do not dominate uses (because there is no dominance defined).
-    // To avoid the infinite loop when following the chain of instructions via
-    // their operands, bail if the operand is not an instruction or this
-    // instruction was seen already.
-    if (!SVI || !Visited.insert(SVI).second)
-      return;
-    // If it is a definition of an opened archetype,
-    // register it and exit.
-    auto Archetype = getOpenedArchetypeOf(SVI);
-    if (!Archetype) {
-      I = SVI;
-      continue;
-    }
-    auto Def = C.OpenedArchetypes.getOpenedArchetypeDef(Archetype);
-    // Return if it is a known open archetype.
-    if (Def)
-      return;
-    // Otherwise register it and return.
-    if (C.OpenedArchetypesTracker)
-      C.OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, SVI);
-    return;
-  }
-
-  if (I && I->getNumTypeDependentOperands() > 0) {
-    C.OpenedArchetypes.addOpenedArchetypeOperands(
-        I->getTypeDependentOperands());
-  }
-}
-
 ValueMetatypeInst *SILBuilder::createValueMetatype(SILLocation Loc,
                                                    SILType MetatypeTy,
                                                    SILValue Base) {
@@ -673,7 +622,7 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
          "failureBB's argument doesn't match incoming argument type");
   return insertTerminator(CheckedCastBranchInst::create(
       getSILDebugLocation(Loc), isExact, op, destLoweredTy, destFormalTy,
-      successBB, failureBB, getFunction(), C.OpenedArchetypes, target1Count,
+      successBB, failureBB, getFunction(), target1Count,
       target2Count, forwardingOwnershipKind));
 }
 

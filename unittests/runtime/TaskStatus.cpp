@@ -48,7 +48,7 @@ static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context,
   // Return to finish off the task.
   // In a normal situation we'd need to free the context, but here
   // we know we're at the top level.
-  valueContext->ResumeParent(valueContext);
+  return valueContext->ResumeParent(valueContext);
 }
 
 template <class T>

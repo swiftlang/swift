@@ -14,6 +14,7 @@ import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 /// A partial task is a unit of scheduleable work.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
 public struct PartialAsyncTask {
   private var context: Builtin.Job
@@ -21,6 +22,7 @@ public struct PartialAsyncTask {
   public func run() { }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
 public struct UnsafeContinuation<T, E: Error> {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
@@ -44,7 +46,11 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) where E == Never {
+    #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeNonThrowingContinuationReturning(context, value)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it return normally
@@ -61,7 +67,11 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) {
+    #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationReturning(context, value)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it throw an error
@@ -78,10 +88,15 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(throwing error: __owned E) {
+#if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationThrowing(context, error)
+#else
+    fatalError("Swift compiler is incompatible with this SDK version")
+#endif
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeContinuation {
   /// Resume the task awaiting the continuation by having it either
   /// return normally or throw an error based on the state of the given
@@ -150,6 +165,7 @@ extension UnsafeContinuation {
 #if _runtime(_ObjC)
 
 // Intrinsics used by SILGen to resume or fail continuations.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
@@ -158,6 +174,7 @@ internal func _resumeUnsafeContinuation<T>(
   continuation.resume(returning: value)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
@@ -166,6 +183,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
   continuation.resume(returning: value)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
@@ -179,6 +197,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// The operation functions must resume the continuation *exactly once*.
 ///
 /// The continuation will not begin executing until the operation function returns.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -191,6 +210,7 @@ public func withUnsafeContinuation<T>(
 /// The operation functions must resume the continuation *exactly once*.
 ///
 /// The continuation will not begin executing until the operation function returns.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
@@ -200,5 +220,6 @@ public func withUnsafeThrowingContinuation<T>(
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @available(*, deprecated, message: "please use UnsafeContination<..., Error>")
 public typealias UnsafeThrowingContinuation<T> = UnsafeContinuation<T, Error>

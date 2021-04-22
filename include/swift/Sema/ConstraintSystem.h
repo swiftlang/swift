@@ -1111,6 +1111,43 @@ public:
   }
 };
 
+/// Describes the arguments to which a parameter binds.
+/// FIXME: This is an awful data structure. We want the equivalent of a
+/// TinyPtrVector for unsigned values.
+using ParamBinding = SmallVector<unsigned, 1>;
+
+/// The result of calling matchCallArguments().
+struct MatchCallArgumentResult {
+  /// The direction of trailing closure matching that was performed.
+  TrailingClosureMatching trailingClosureMatching;
+
+  /// The parameter bindings determined by the match.
+  SmallVector<ParamBinding, 4> parameterBindings;
+
+  /// When present, the forward and backward scans each produced a result,
+  /// and the parameter bindings are different. The primary result will be
+  /// forwarding, and this represents the backward binding.
+  Optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
+
+  friend bool operator==(const MatchCallArgumentResult &lhs,
+                         const MatchCallArgumentResult &rhs) {
+    if (lhs.trailingClosureMatching != rhs.trailingClosureMatching)
+      return false;
+    if (lhs.parameterBindings != rhs.parameterBindings)
+      return false;
+    return lhs.backwardParameterBindings == rhs.backwardParameterBindings;
+  }
+
+  /// Generate a result that maps the provided number of arguments to the same
+  /// number of parameters via forward match.
+  static MatchCallArgumentResult forArity(unsigned argCount) {
+    SmallVector<ParamBinding, 4> Bindings;
+    for (unsigned i : range(argCount))
+      Bindings.push_back({i});
+    return {TrailingClosureMatching::Forward, Bindings, None};
+  }
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1159,9 +1196,9 @@ public:
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// For locators associated with call expressions, the trailing closure
-  /// matching rule that was applied.
-  llvm::SmallMapVector<ConstraintLocator*, TrailingClosureMatching, 4>
-    trailingClosureMatchingChoices;
+  /// matching rule and parameter bindings that were applied.
+  llvm::SmallMapVector<ConstraintLocator *, MatchCallArgumentResult, 4>
+      argumentMatchingChoices;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -1202,6 +1239,10 @@ public:
 
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::MapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
+
+  /// Record a new argument matching choice for given locator that maps a
+  /// single argument to a single parameter.
+  void recordSingleArgMatchingChoice(ConstraintLocator *locator);
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -2210,9 +2251,9 @@ private:
       AppliedDisjunctions;
 
   /// For locators associated with call expressions, the trailing closure
-  /// matching rule that was applied.
-  std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
-      trailingClosureMatchingChoices;
+  /// matching rule and parameter bindings that were applied.
+  std::vector<std::pair<ConstraintLocator *, MatchCallArgumentResult>>
+      argumentMatchingChoices;
 
   /// The set of implicit value conversions performed by the solver on
   /// a current path to reach a solution.
@@ -2709,8 +2750,8 @@ public:
     /// The length of \c AppliedDisjunctions.
     unsigned numAppliedDisjunctions;
 
-    /// The length of \c trailingClosureMatchingChoices;
-    unsigned numTrailingClosureMatchingChoices;
+    /// The length of \c argumentMatchingChoices.
+    unsigned numArgumentMatchingChoices;
 
     /// The length of \c OpenedTypes.
     unsigned numOpenedTypes;
@@ -3226,11 +3267,8 @@ public:
 
   void recordPotentialHole(Type type);
 
-  void recordTrailingClosureMatch(
-      ConstraintLocator *locator,
-      TrailingClosureMatching trailingClosureMatch) {
-    trailingClosureMatchingChoices.push_back({locator, trailingClosureMatch});
-  }
+  void recordMatchCallArgumentResult(ConstraintLocator *locator,
+                                     MatchCallArgumentResult result);
 
   /// Walk a closure AST to determine its effects.
   ///
@@ -3754,9 +3792,6 @@ public:
   /// Determine if the type in question is a Set<T> and, if so, provide the
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
-
-  /// Determine if the type in question is AnyHashable.
-  static bool isAnyHashableType(Type t);
 
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
@@ -4513,6 +4548,12 @@ private:
                                             ConstraintLocatorBuilder locator,
                                             TypeMatchOptions flags);
 
+  /// Similar to \c simplifyConformsToConstraint but also checks for
+  /// optional and pointer derived a given type.
+  SolutionKind simplifyTransitivelyConformsTo(Type type, Type protocol,
+                                              ConstraintLocatorBuilder locator,
+                                              TypeMatchOptions flags);
+
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
                                              TypeMatchOptions flags,
@@ -4977,27 +5018,6 @@ public:
     return getExpressionTooComplex(solutionMemory);
   }
 
-  typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
-  typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
-      ConstraintMatchLoop;
-  typedef std::function<void(SmallVectorImpl<unsigned> &options)>
-      PartitionAppendCallback;
-
-  // Partition the choices in the disjunction into groups that we will
-  // iterate over in an order appropriate to attempt to stop before we
-  // have to visit all of the options.
-  void partitionDisjunction(ArrayRef<Constraint *> Choices,
-                            SmallVectorImpl<unsigned> &Ordering,
-                            SmallVectorImpl<unsigned> &PartitionBeginning);
-
-  /// Partition the choices in the range \c first to \c last into groups and
-  /// order the groups in the best order to attempt based on the argument
-  /// function type that the operator is applied to.
-  void partitionGenericOperators(ArrayRef<Constraint *> Choices,
-                                 SmallVectorImpl<unsigned>::iterator first,
-                                 SmallVectorImpl<unsigned>::iterator last,
-                                 ConstraintLocator *locator);
-
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
   const FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
@@ -5052,7 +5072,7 @@ public:
     this->locator = cs.getConstraintLocator(locator);
   }
 
-  Type operator()(PlaceholderTypeRepr *placeholderRepr) const {
+  Type operator()(ASTContext &ctx, PlaceholderTypeRepr *placeholderRepr) const {
     return cs.createTypeVariable(
         cs.getConstraintLocator(
             locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
@@ -5085,11 +5105,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
   return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
                              sources);
 }
-
-/// Describes the arguments to which a parameter binds.
-/// FIXME: This is an awful data structure. We want the equivalent of a
-/// TinyPtrVector for unsigned values.
-using ParamBinding = SmallVector<unsigned, 1>;
 
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
@@ -5156,20 +5171,6 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
-};
-
-/// The result of calling matchCallArguments().
-struct MatchCallArgumentResult {
-  /// The direction of trailing closure matching that was performed.
-  TrailingClosureMatching trailingClosureMatching;
-
-  /// The parameter bindings determined by the match.
-  SmallVector<ParamBinding, 4> parameterBindings;
-
-  /// When present, the forward and backward scans each produced a result,
-  /// and the parameter bindings are different. The primary result will be
-  /// forwarding, and this represents the backward binding.
-  Optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
 };
 
 /// Match the call arguments (as described by the given argument type) to
@@ -5322,6 +5323,8 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type,
 Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
                                    ConstraintLocator *memberLocator);
 
+ValueDecl *getOverloadChoiceDecl(Constraint *choice);
+
 class DisjunctionChoice {
   ConstraintSystem &CS;
   unsigned Index;
@@ -5347,7 +5350,7 @@ public:
   }
 
   bool isUnavailable() const {
-    if (auto *decl = getDecl(Choice))
+    if (auto *decl = getOverloadChoiceDecl(Choice))
       return CS.isDeclUnavailable(decl, Choice->getLocator());
     return false;
   }
@@ -5375,22 +5378,11 @@ private:
   void propagateConversionInfo(ConstraintSystem &cs) const;
 
   static ValueDecl *getOperatorDecl(Constraint *choice) {
-    auto *decl = getDecl(choice);
+    auto *decl = getOverloadChoiceDecl(choice);
     if (!decl)
       return nullptr;
 
     return decl->isOperator() ? decl : nullptr;
-  }
-
-  static ValueDecl *getDecl(Constraint *constraint) {
-    if (constraint->getKind() != ConstraintKind::BindOverload)
-      return nullptr;
-
-    auto choice = constraint->getOverloadChoice();
-    if (choice.getKind() != OverloadChoiceKind::Decl)
-      return nullptr;
-
-    return choice.getDecl();
   }
 };
 
@@ -5554,7 +5546,7 @@ public:
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
     // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
+    partitionDisjunction(Ordering, PartitionBeginning);
   }
 
   void setNeedsGenericOperatorOrdering(bool flag) {
@@ -5580,16 +5572,27 @@ public:
     if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
       unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
                                      PartitionBeginning[PartitionIndex] : Ordering.size());
-      CS.partitionGenericOperators(Choices,
-                                   Ordering.begin() + currIndex,
-                                   Ordering.begin() + nextPartitionIndex,
-                                   Disjunction->getLocator());
+      partitionGenericOperators(Ordering.begin() + currIndex,
+                                Ordering.begin() + nextPartitionIndex);
       needsGenericOperatorOrdering = false;
     }
 
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
   }
+
+private:
+  // Partition the choices in the disjunction into groups that we will
+  // iterate over in an order appropriate to attempt to stop before we
+  // have to visit all of the options.
+  void partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
+                            SmallVectorImpl<unsigned> &PartitionBeginning);
+
+  /// Partition the choices in the range \c first to \c last into groups and
+  /// order the groups in the best order to attempt based on the argument
+  /// function type that the operator is applied to.
+  void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
+                                 SmallVectorImpl<unsigned>::iterator last);
 };
 
 /// Determine whether given type is a known one
@@ -5613,6 +5616,10 @@ void performSyntacticDiagnosticsForTarget(
 /// protocol is contextually bound to some concrete type via same-type
 /// generic requirement and if so return that type or null type otherwise.
 Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
+
+/// Determine whether given disjunction constraint represents a set
+/// of operator overload choices.
+bool isOperatorDisjunction(Constraint *disjunction);
 
 } // end namespace constraints
 

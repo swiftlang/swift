@@ -6,6 +6,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 func fib(_ n: Int) -> Int {
   var first = 0
@@ -18,6 +19,7 @@ func fib(_ n: Int) -> Int {
   return first
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncFib(_ n: Int) async -> Int {
   if n == 0 || n == 1 {
     return n
@@ -37,6 +39,7 @@ func asyncFib(_ n: Int) async -> Int {
   return result
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func runFibonacci(_ n: Int) async {
   let result = await asyncFib(n)
 
@@ -45,6 +48,7 @@ func runFibonacci(_ n: Int) async {
   assert(result == fib(n))
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await runFibonacci(10)

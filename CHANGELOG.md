@@ -29,6 +29,24 @@ CHANGELOG
 Swift 5.5
 ---------
 
+* The determination of whether a call to a `rethrows` function can throw now considers default arguments of `Optional` type.
+
+  In Swift 5.4, such default arguments were ignored entirely by `rethrows` checking. This meant that the following example was accepted:
+
+  ```swift
+  func foo(_: (() throws -> ())? = nil) rethrows {}
+  foo()  // no 'try' needed
+  ```
+
+  However, it also meant that the following was accepted, even though the call to `foo()` can throw and the call site is not marked with `try`:
+
+  ```swift
+  func foo(_: (() throws -> ())? = { throw myError }) rethrows {}
+  foo()  // 'try' *should* be required here
+  ```
+
+  The new behavior is that the first example is accepted because the default argument is syntactically written as `nil`, which is known not to throw. The second example is correctly rejected, on account of missing a `try` since the default argument *can* throw.
+
 * [SE-0293][]:
 
   Property wrappers can now be applied to function and closure parameters:
@@ -8411,6 +8429,7 @@ Swift 1.0
 [SE-0284]: <https://github.com/apple/swift-evolution/blob/main/proposals/0284-multiple-variadic-parameters.md>
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
+[SE-0293]: <https://github.com/apple/swift-evolution/blob/main/proposals/0293-extend-property-wrappers-to-function-and-closure-parameters.md>
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>

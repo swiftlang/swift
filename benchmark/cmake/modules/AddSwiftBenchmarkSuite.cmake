@@ -108,7 +108,7 @@ macro(configure_sdks_darwin)
   set(macosx_arch "x86_64" "arm64")
   set(iphoneos_arch "arm64" "arm64e" "armv7")
   set(appletvos_arch "arm64")
-  set(watchos_arch "armv7k")
+  set(watchos_arch "armv7k" "arm64_32")
 
   set(macosx_ver "10.9")
   set(iphoneos_ver "8.0")

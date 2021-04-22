@@ -6,19 +6,21 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_skipCallingNext() async {
   let numbers = [1, 1]
 
-  let result = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
+  let result = try! await withTaskGroup(of: Int.self) { (group) async -> Int in
     for n in numbers {
-      print("group.add { \(n) }")
-      await group.add { () async -> Int in
+      print("group.spawn { \(n) }")
+      group.spawn { () async -> Int in
         await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
-        print("  inside group.add { \(n) } (canceled: \(c))")
+        print("  inside group.spawn { \(n) } (canceled: \(c))")
         return n
       }
     }
@@ -29,18 +31,19 @@ func test_skipCallingNext() async {
     return 0
   }
 
-  // CHECK: group.add { 1 }
-  // CHECK: group.add { 1 }
+  // CHECK: group.spawn { 1 }
+  // CHECK: group.spawn { 1 }
   // CHECK: return immediately 0 (canceled: false)
 
-  // CHECK: inside group.add { 1 } (canceled: false)
-  // CHECK: inside group.add { 1 } (canceled: false)
+  // CHECK: inside group.spawn { 1 } (canceled: false)
+  // CHECK: inside group.spawn { 1 } (canceled: false)
 
   // CHECK: result: 0
   print("result: \(result)")
   assert(result == 0)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_skipCallingNext()

@@ -6,7 +6,7 @@
 
 public protocol AsyncProto {
   func protoAsyncFunc() async
-  // CHECK: key.usr: "s:5async10AsyncProtoP05protoB4FuncyyYF"
+  // CHECK: key.usr: "s:5async10AsyncProtoP05protoB4FuncyyYaF"
   // CHECK-NOT: }
   // CHECK: key.is_async: 1
   // CHECK: }
@@ -18,7 +18,7 @@ public protocol AsyncProto {
 
 public struct AsyncStruct: AsyncProto {
   public func structAsyncFunc() async { }
-  // CHECK: key.usr: "s:5async11AsyncStructV06structB4FuncyyYF"
+  // CHECK: key.usr: "s:5async11AsyncStructV06structB4FuncyyYaF"
   // CHECK-NOT: }
   // CHECK: key.is_async: 1
   // CHECK: }
@@ -28,11 +28,11 @@ public struct AsyncStruct: AsyncProto {
   // CHECK: }
 
   public func protoAsyncFunc() async { }
-  // CHECK: key.usr: "s:5async11AsyncStructV05protoB4FuncyyYF"
+  // CHECK: key.usr: "s:5async11AsyncStructV05protoB4FuncyyYaF"
   // CHECK-NOT: }
   // CHECK: key.conforms
   // CHECK: {
-  // CHECK: key.usr: "s:5async10AsyncProtoP05protoB4FuncyyYF"
+  // CHECK: key.usr: "s:5async10AsyncProtoP05protoB4FuncyyYaF"
   // CHECK-NOT: }
   // CHECK: key.is_async: 1
   // CHECK: }
@@ -45,7 +45,7 @@ public struct AsyncStruct: AsyncProto {
 }
 
 public func topLevelAsyncFunc() async { }
-// CHECK: key.usr: "s:5async17topLevelAsyncFuncyyYF"
+// CHECK: key.usr: "s:5async17topLevelAsyncFuncyyYaF"
 // CHECK-NOT: }
 // CHECK: key.is_async: 1
 // CHECK: }

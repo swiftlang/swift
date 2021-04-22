@@ -1510,7 +1510,12 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacroMap Map;
 
   SourceManager &SM = Context.SourceMgr;
-  const LangOptions &LangOpts = Context.LangOpts;
+  LangOptions LangOpts = Context.LangOpts;
+  // The sub-parser is not actually parsing the source file but the LangOpts
+  // AvailabilityMacros. No point creating a libSyntax tree for it. In fact, the
+  // creation of a libSyntax tree would always fail because the
+  // AvailibilityMacro is not valid Swift source code.
+  LangOpts.BuildSyntaxTree = false;
 
   for (StringRef macro: LangOpts.AvailabilityMacros) {
 
@@ -2145,7 +2150,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     bool SuppressLaterDiags = false;
     if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
                   diag::originally_defined_in_missing_rparen,
-                  SyntaxKind::Unknown, [&]() -> ParserStatus {
+                  SyntaxKind::AvailabilitySpecList, [&]() -> ParserStatus {
       SWIFT_DEFER {
         if (NK != NextSegmentKind::PlatformVersion) {
           NK = (NextSegmentKind)((uint8_t)NK + (uint8_t)1);
@@ -2154,6 +2159,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       switch (NK) {
       // Parse 'module: "original_module_name"'.
       case NextSegmentKind::ModuleName: {
+        SyntaxParsingContext argumentContext(SyntaxContext,
+                                             SyntaxKind::AvailabilityLabeledArgument);
         // Parse 'module' ':'.
         if (!Tok.is(tok::identifier) || Tok.getText() != "module" ||
             !peekToken().is(tok::colon)) {
@@ -2182,6 +2189,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       }
       // Parse 'OSX 13.13'.
       case NextSegmentKind::PlatformVersion: {
+        SyntaxParsingContext argumentContext(SyntaxContext,
+                                             SyntaxKind::AvailabilityVersionRestriction);
         if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
             (peekToken().isAny(tok::integer_literal, tok::floating_literal) ||
              peekAvailabilityMacroName())) {
@@ -4421,6 +4430,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
     if (shouldParseExperimentalConcurrency() &&
         Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
+      Tok.setKind(tok::contextual_keyword);
       DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
       DeclResult = parseDeclClass(Flags, Attributes);
       break;
@@ -5007,6 +5017,9 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
       .fixItInsert(endOfPrevious, ";");
   }
 
+  SyntaxParsingContext DeclContext(SyntaxContext,
+                                   SyntaxKind::MemberDeclListItem);
+  
   if (Tok.isAny(tok::pound_sourceLocation, tok::pound_line)) {
     auto LineDirectiveStatus = parseLineDirective(Tok.is(tok::pound_line));
     if (LineDirectiveStatus.isErrorOrHasCompletion())
@@ -5015,8 +5028,6 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   }
 
   ParserResult<Decl> Result;
-  SyntaxParsingContext DeclContext(SyntaxContext,
-                                   SyntaxKind::MemberDeclListItem);
   if (loadCurrentSyntaxNodeFromCache()) {
     return ParserStatus();
   }
@@ -7540,7 +7551,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   // part of
   SourceLoc ClassLoc;
   if (isExplicitActorDecl) {
-    assert(Tok.is(tok::identifier) && Tok.isContextualKeyword("actor"));
     ClassLoc = consumeToken();
   } else {
     ClassLoc = consumeToken(tok::kw_class);
@@ -7995,19 +8005,12 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
 
-  // Initializers cannot be 'async'.
-  // FIXME: We should be able to lift this restriction.
-  if (asyncLoc.isValid()) {
-    diagnose(asyncLoc, diag::async_init)
-      .fixItRemove(asyncLoc);
-    asyncLoc = SourceLoc();
-  }
-
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failable, FailabilityLoc,
+                                           asyncLoc.isValid(), asyncLoc,
                                            throwsLoc.isValid(), throwsLoc,
                                            Params.get(), GenericParams,
                                            CurDeclContext);

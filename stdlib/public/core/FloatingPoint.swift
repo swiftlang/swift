@@ -416,7 +416,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///     let x = -33.375
   ///     // x.sign == .minus
   ///
-  /// Do not use this property to check whether a floating point value is
+  /// Don't use this property to check whether a floating point value is
   /// negative. For a value `x`, the comparison `x.sign == .minus` is not
   /// necessarily the same as `x < 0`. In particular, `x.sign == .minus` if
   /// `x` is -0, and while `x < 0` is always `false` if `x` is NaN, `x.sign`
@@ -1130,7 +1130,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// A Boolean value indicating whether this instance is finite.
   ///
   /// All values other than NaN and infinity are considered finite, whether
-  /// normal or subnormal.
+  /// normal or subnormal.  For NaN, both `isFinite` and `isInfinite` are false.
   var isFinite: Bool { get }
 
   /// A Boolean value indicating whether the instance is equal to zero.
@@ -1147,7 +1147,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// A Boolean value indicating whether the instance is subnormal.
   ///
   /// A *subnormal* value is a nonzero number that has a lesser magnitude than
-  /// the smallest normal number. Subnormal values do not use the full
+  /// the smallest normal number. Subnormal values don't use the full
   /// precision available to values of a type.
   ///
   /// Zero is neither a normal nor a subnormal number. Subnormal numbers are
@@ -1157,8 +1157,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
 
   /// A Boolean value indicating whether the instance is infinite.
   ///
-  /// Note that `isFinite` and `isInfinite` do not form a dichotomy, because
-  /// they are not total: If `x` is `NaN`, then both properties are `false`.
+  /// For NaN, both `isFinite` and `isInfinite` are false.
   var isInfinite: Bool { get }
 
   /// A Boolean value indicating whether the instance is NaN ("not a number").

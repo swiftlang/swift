@@ -184,7 +184,8 @@ def help_hidden : Flag<["-", "--"], "help-hidden">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Display available options, including hidden options">;
 
-def v : Flag<["-"], "v">, Flags<[DoesNotAffectIncrementalBuild]>,
+def v : Flag<["-"], "v">,
+  Flags<[DoesNotAffectIncrementalBuild, SwiftSymbolGraphExtractOption]>,
   HelpText<"Show commands to run and use verbose output">;
 def version : Flag<["-", "--"], "version">, Flags<[FrontendOption]>,
   HelpText<"Print version information and exit">;
@@ -605,6 +606,16 @@ def warn_swift3_objc_inference_minimal :
   Flag<["-"], "warn-swift3-objc-inference-minimal">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def enable_actor_data_race_checks :
+  Flag<["-"], "enable-actor-data-race-checks">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit runtime checks for actor data races">;
+
+def disable_actor_data_race_checks :
+  Flag<["-"], "disable-actor-data-race-checks">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable runtime checks for actor data races">;
 
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
@@ -1212,5 +1223,11 @@ def minimum_access_level : Separate<["-"], "minimum-access-level">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Include symbols with this access level or more">,
   MetaVarName<"<level>">;
+
+def skip_inherited_docs : Flag<["-"], "skip-inherited-docs">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
 
 include "FrontendOptions.td"

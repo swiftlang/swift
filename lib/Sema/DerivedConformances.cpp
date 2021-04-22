@@ -43,12 +43,8 @@ DeclContext *DerivedConformance::getConformanceContext() const {
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
-  auto *SF = ConformanceDecl->getDeclContext()->getParentSourceFile();
-  for (auto child : children) {
+  for (auto child : children)
     IDC->addMember(child);
-    if (SF)
-      SF->SynthesizedDecls.push_back(child);
-  }
 }
 
 Type DerivedConformance::getProtocolType() const {
@@ -126,11 +122,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
       case KnownDerivableProtocolKind::CodingKey: {
         Type rawType = enumDecl->getRawType();
         if (rawType) {
-          auto parentDC = enumDecl->getDeclContext();
-          ASTContext &C = parentDC->getASTContext();
-
-          auto nominal = rawType->getAnyNominal();
-          return nominal == C.getStringDecl() || nominal == C.getIntDecl();
+          return rawType->isString() || rawType->isInt();
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
@@ -590,7 +582,7 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
 
 /// Build a type-checked integer literal.
 static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
-  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
+  Type intType = C.getIntType();
 
   auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
   literal->setType(intType);
@@ -615,7 +607,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                        const char *indexName) {
   ASTContext &C = enumDecl->getASTContext();
   Type enumType = enumVarDecl->getType();
-  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
+  Type intType = C.getIntType();
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                   SourceLoc(), C.getIdentifier(indexName),
@@ -666,7 +658,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                      AccessSemantics::Ordinary,
                                      enumVarDecl->getType());
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+                                       SourceLoc(), cases, SourceLoc(),
+                                       SourceLoc(), C);
 
   stmts.push_back(indexBind);
   stmts.push_back(switchStmt);

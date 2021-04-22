@@ -383,7 +383,7 @@ namespace {
       return true;
 
     // Don't favor narrowing conversions.
-    if (argTy->isDoubleType() && paramTy->isCGFloatType())
+    if (argTy->isDouble() && paramTy->isCGFloatType())
       return false;
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
@@ -420,7 +420,7 @@ namespace {
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.
         if (paramTy->isEqual(defaultType) ||
-            (defaultType->isDoubleType() && paramTy->isCGFloatType()))
+            (defaultType->isDouble() && paramTy->isCGFloatType()))
           return true;
       }
     }
@@ -570,7 +570,7 @@ namespace {
       // in order to preserve current behavior, let's not favor overloads
       // which would result in conversion from CGFloat to Double; otherwise
       // it would lead to ambiguities.
-      if (argTy->isCGFloatType() && paramTy->isDoubleType())
+      if (argTy->isCGFloatType() && paramTy->isDouble())
         return false;
 
       return isFavoredParamAndArg(CS, paramTy, argTy) &&
@@ -733,10 +733,10 @@ namespace {
       // Avoid favoring overloads that would require narrowing conversion
       // to match the arguments.
       {
-        if (firstArgTy->isDoubleType() && firstParamTy->isCGFloatType())
+        if (firstArgTy->isDouble() && firstParamTy->isCGFloatType())
           return false;
 
-        if (secondArgTy->isDoubleType() && secondParamTy->isCGFloatType())
+        if (secondArgTy->isDouble() && secondParamTy->isCGFloatType())
           return false;
       }
 
@@ -1148,8 +1148,7 @@ namespace {
         if (TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc()))
           return nullptr;
 
-        auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
-        return unsafeRawPointer->getDeclaredInterfaceType();
+        return ctx.getUnsafeRawPointerType();
       }
 
       default:
@@ -1251,29 +1250,6 @@ namespace {
           if (!knownType->hasPlaceholder()) {
             // Set the favored type for this expression to the known type.
             CS.setFavoredType(E, knownType.getPointer());
-          }
-        }
-
-        // This can only happen when failure diagnostics is trying
-        // to type-check expressions inside of a single-statement
-        // closure which refer to anonymous parameters, in this case
-        // let's either use type as written or allocate a fresh type
-        // variable, just like we do for closure type.
-        // FIXME: We should eliminate this case.
-        if (auto *PD = dyn_cast<ParamDecl>(VD)) {
-          if (!CS.hasType(PD)) {
-            if (knownType &&
-                (knownType->hasUnboundGenericType() ||
-                 knownType->hasPlaceholder())) {
-              knownType = CS.replaceInferableTypesWithTypeVars(knownType,
-                                                               locator);
-            }
-
-            CS.setType(
-                PD, knownType ? knownType
-                         : CS.createTypeVariable(locator,
-                                                 TVO_CanBindToLValue |
-                                                 TVO_CanBindToNoEscape));
           }
         }
       }
@@ -1477,6 +1453,14 @@ namespace {
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+      // UnresolvedDot applies the base to remove a single curry level from a
+      // member reference without using an applicable function constraint so
+      // we record the call argument matching here so it can be found later when
+      // a solution is applied to the AST.
+      CS.recordMatchCallArgumentResult(
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
+          MatchCallArgumentResult::forArity(1));
+
       // If this is Builtin.type_join*, just return any type and move
       // on since we're going to discard this, and creating any type
       // variables for the reference will cause problems.
@@ -2381,7 +2365,7 @@ namespace {
       }
 
       case PatternKind::Bool:
-        return setType(CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType());
+        return setType(CS.getASTContext().getBoolType());
 
       case PatternKind::EnumElement: {
         auto enumPattern = cast<EnumElementPattern>(pattern);
@@ -2468,7 +2452,7 @@ namespace {
           // Remove parameter labels; they aren't used when matching cases,
           // but outright conflicts will be checked during coercion.
           for (auto &param : params) {
-            param = param.getWithoutLabel();
+            param = param.getWithoutLabels();
           }
 
           Type outputType = CS.createTypeVariable(
@@ -3060,7 +3044,7 @@ namespace {
     }
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-      return CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
+      return CS.getASTContext().getBoolType();
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {

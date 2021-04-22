@@ -76,7 +76,7 @@ internal struct _SmallString {
 extension _SmallString {
   @inlinable @inline(__always)
   internal static var capacity: Int {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     return 10
 #else
     return 15
@@ -131,6 +131,13 @@ extension _SmallString {
   internal func _invariantCheck() {
     _internalInvariant(count <= _SmallString.capacity)
     _internalInvariant(isASCII == computeIsASCII())
+
+    // No bits should be set between the last code unit and the discriminator
+    var copy = self
+    withUnsafeBytes(of: &copy._storage) {
+      _internalInvariant(
+        $0[count..<_SmallString.capacity].allSatisfy { $0 == 0 })
+    }
   }
   #endif // INTERNAL_CHECKS_ENABLED
 
@@ -213,14 +220,19 @@ extension _SmallString {
   }
 
   // Overwrite stored code units, including uninitialized. `f` should return the
-  // new count.
+  // new count. This will re-establish the invariant after `f` that all bits
+  // between the last code unit and the discriminator are unset.
   @inline(__always)
-  internal mutating func withMutableCapacity(
+  fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
     let len = try withUnsafeMutableBytes(of: &self._storage) {
       (rawBufPtr: UnsafeMutableRawBufferPointer) -> Int in
-      return try f(rawBufPtr)
+      let len = try f(rawBufPtr)
+      UnsafeMutableRawBufferPointer(
+        rebasing: rawBufPtr[len...]
+      ).initializeMemory(as: UInt8.self, repeating: 0)
+      return len
     }
     if len == 0 {
       self = _SmallString()
@@ -312,7 +324,7 @@ extension _SmallString {
   }
 }
 
-#if _runtime(_ObjC) && !(arch(i386) || arch(arm))
+#if _runtime(_ObjC) && !(arch(i386) || arch(arm) || arch(arm64_32))
 // Cocoa interop
 extension _SmallString {
   // Resiliently create from a tagged cocoa string

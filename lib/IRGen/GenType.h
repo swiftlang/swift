@@ -27,6 +27,12 @@
 #include "IRGenFunction.h"
 #include "LegacyLayoutFormat.h"
 
+namespace llvm {
+  namespace vfs {
+    class FileSystem;
+  }
+}
+
 namespace swift {
   class GenericSignatureBuilder;
   class ArchetypeType;
