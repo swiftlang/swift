@@ -28,7 +28,7 @@ public final class TaskLocal<Value: Sendable>: CustomStringConvertible {
 
 
   public struct Access: CustomStringConvertible {
-     let key: Builtin.RawPointer
+    let key: Builtin.RawPointer
     let defaultValue: Value
 
     init(key: TaskLocal<Value>, defaultValue: Value) {
@@ -100,6 +100,29 @@ public final class TaskLocal<Value: Sendable>: CustomStringConvertible {
 extension TaskLocal {
   public convenience init<V>() where Value == Optional<V> {
     self.init(default: nil)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeCurrentTask {
+
+  /// Allows for executing a synchronous `body` while binding a task-local value
+  /// in the current task.
+  ///
+  /// This function MUST NOT be invoked by any other task than the current task
+  /// represented by this object.
+  @discardableResult
+  public func withTaskLocal<Value: Sendable, R>(
+      _ access: TaskLocal<Value>.Access, boundTo valueDuringBody: Value,
+      do body: () throws -> R,
+      file: String = #file, line: UInt = #line) rethrows -> R {
+    // check if we're not trying to bind a value from an illegal context; this may crash
+    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
+
+    _taskLocalValuePush(self._task, key: access.key, value: valueDuringBody)
+    defer { _taskLocalValuePop(_task) }
+
+    return try body()
   }
 }
 
