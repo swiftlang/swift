@@ -122,7 +122,7 @@ func test_taskGroup_contains() async {
     }
 
     let three = await group.contains(3)
-    print("three = \(three)")
+    print("three = \(three)") // CHECK: three = true
 
     for n in 5...7 {
       group.spawn {
@@ -131,16 +131,11 @@ func test_taskGroup_contains() async {
     }
 
     let six = await group.contains(6)
-    print("six = \(six)")
-
-    for n in 8...10 {
-      group.spawn {
-        return n
-      }
-    }
-
-    let nine = await group.contains(9)
-    print("nine = \(nine)")
+    print("six = \(six)") // CHECK: six = true
+                                                                    
+                                                                    
+    let sixAgain = await group.contains(6)
+    print("six again = \(sixAgain)") // CHECK: six again = false
 
     return 0
   }
