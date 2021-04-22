@@ -2045,7 +2045,6 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_RawSIL:
       case file_types::TY_Nothing:
       case file_types::TY_IndexUnitOutputPath:
-      case file_types::TY_SymbolGraphOutputPath:
       case file_types::TY_INVALID:
         llvm_unreachable("these types should never be inferred");
       }
@@ -2945,9 +2944,6 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                          options::OPT_emit_objc_header_path))
     chooseObjectiveCHeaderOutputPath(C, OutputMap, workingDirectory,
                                      Output.get());
-  
-  if (C.getArgs().hasArg(options::OPT_emit_symbol_graph))
-    chooseSymbolGraphOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   // 4. Construct a Job which produces the right CommandOutput.
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, C, std::move(InputJobs),
@@ -3416,31 +3412,6 @@ void Driver::chooseOptimizationRecordPath(Compilation &C,
   } else
     // FIXME: We should use the OutputMap in this case.
     Diags.diagnose({}, diag::warn_opt_remark_disabled);
-}
-
-void Driver::chooseSymbolGraphOutputPath(Compilation &C,
-                                         const TypeToPathMap *OutputMap,
-                                         StringRef workingDirectory,
-                                         CommandOutput *Output) const {
-  StringRef optionOutput = C.getArgs().getLastArgValue(options::OPT_emit_symbol_graph_dir);
-  if (hasExistingAdditionalOutput(*Output, file_types::TY_SymbolGraphOutputPath, optionOutput)) {
-    return;
-  }
-  
-  StringRef SymbolGraphDir;
-  if (OutputMap) {
-    auto iter = OutputMap->find(file_types::TY_SymbolGraphOutputPath);
-    if (iter != OutputMap->end())
-      SymbolGraphDir = iter->second;
-  }
-  
-  if (SymbolGraphDir.empty() && !optionOutput.empty()) {
-    SymbolGraphDir = optionOutput;
-  }
-  
-  if (!SymbolGraphDir.empty()) {
-    Output->setAdditionalOutputForType(file_types::TY_SymbolGraphOutputPath, SymbolGraphDir);
-  }
 }
 
 void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
