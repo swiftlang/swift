@@ -10,23 +10,22 @@
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum TL {
-  @TaskLocal
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  static var number: Int  = 0
+  @TaskLocal(default: 0)
+  static var number
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
-func printTaskLocal<V, Key>(
-  _ key: Key,
-  _ expected: V? = nil,
-  file: String = #file, line: UInt = #line
-) -> V? where Key: TaskLocal<V> {
-  let value = key
-  print("\(value) at \(file):\(line)")
+func printTaskLocal<V>(
+    _ key: TaskLocal<V>.Access,
+    _ expected: V? = nil,
+    file: String = #file, line: UInt = #line
+) -> V? {
+  let value = key.get()
+  print("\(key) (\(value)) at \(file):\(line)")
   if let expected = expected {
     assert("\(expected)" == "\(value)",
-      "Expected [\(expected)] but found: \(value), at \(file):\(line)")
+        "Expected [\(expected)] but found: \(value), at \(file):\(line)")
   }
   return expected
 }
@@ -37,14 +36,14 @@ func printTaskLocal<V, Key>(
 func async_let_nested() async {
   print("TL: \(TL.number)")
   
-  _ = printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
-  async let x1: () = TL.$number.withValue(2) {
-    async let x2 = printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+  _ = printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (0)
+  async let x1: () = TL.number.withValue(2) {
+    async let x2 = printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
 
     @Sendable
     func test() async {
-      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
-      async let x31 = printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+      printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
+      async let x31 = printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
       _ = await x31
     }
     async let x3: () = test()
@@ -54,18 +53,18 @@ func async_let_nested() async {
   }
 
   _ = await x1
-  printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(0)
+  printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (0)
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func async_let_nested_skip_optimization() async {
-  async let x1: Int? = TL.$number.withValue(2) {
+  async let x1: Int? = TL.number.withValue(2) {
     async let x2: Int? = { () async -> Int? in
       async let x3: Int? = { () async -> Int? in
         async let x4: Int? = { () async -> Int? in
           async let x5: Int? = { () async -> Int? in
             // assert(TL.number == 2)
-            async let xx = printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(2)
+            async let xx = printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2)
             return await xx
           }()
           return await x5

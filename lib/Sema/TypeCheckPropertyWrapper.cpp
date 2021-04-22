@@ -508,7 +508,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         continue;
       }
     }
-    
+
     result.push_back(mutableAttr);
   }
 
