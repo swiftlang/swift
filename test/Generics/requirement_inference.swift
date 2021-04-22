@@ -354,20 +354,22 @@ protocol P26 {
   associatedtype C: X3
 }
 
-struct X26<T: X3> : P26 { // expected-note {{requirement specified as 'T' : 'X3' [with T = Self.B]}}
+struct X26<T: X3> : P26 {
   typealias C = T
 }
 
 // CHECK-LABEL: .P27a@
-// CHECK-NEXT: Requirement signature: <Self where Self.A == X26<Self.B>>
-// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X26<τ_0_0.B>>
+// CHECK-NEXT: Requirement signature: <Self where Self.A == X26<Self.B>, Self.B : X3>
+// CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0.A == X26<τ_0_0.B>, τ_0_0.B : X3>
 protocol P27a {
   associatedtype A: P26 // expected-warning{{redundant conformance constraint 'Self.A' : 'P26'}}
   // expected-note@-1 {{superclass constraint 'Self.B' : 'X3' implied here}}
 
   associatedtype B: X3 where A == X26<B> // expected-note{{conformance constraint 'Self.A' : 'P26' implied here}}
   // expected-warning@-1 {{redundant superclass constraint 'Self.B' : 'X3'}}
-  // expected-error@-2 {{'X26' requires that 'Self.B' inherit from 'X3'}}
+
+  // FIXME: The above warning should not be emitted -- while the requirement
+  // really is redundant, it is made redundant by an inferred requirement.
 }
 
 // CHECK-LABEL: .P27b@

@@ -8293,7 +8293,31 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   for (auto param : getGenericParams())
     newBuilder.addGenericParameter(param);
 
-  auto newSource = FloatingRequirementSource::forAbstract();
+  const RequirementSource *requirementSignatureSource = nullptr;
+  if (auto *proto = const_cast<ProtocolDecl *>(requirementSignatureSelfProto)) {
+    auto selfType = proto->getSelfInterfaceType();
+    requirementSignatureSource =
+        RequirementSource::forRequirementSignature(newBuilder, selfType, proto);
+
+    // Add the conformance requirement 'Self : Proto' directly without going
+    // through addConformanceRequirement(), since the latter calls
+    // expandConformanceRequirement(), which we want to skip since we're
+    // re-adding the requirements directly below.
+    auto resolvedType = ResolvedType(newBuilder.Impl->PotentialArchetypes[0]);
+    auto equivClass = resolvedType.getEquivalenceClass(newBuilder);
+
+    (void) equivClass->recordConformanceConstraint(newBuilder, resolvedType, proto,
+                                                   requirementSignatureSource);
+  }
+
+  auto newSource = [&]() {
+    if (auto *proto = const_cast<ProtocolDecl *>(requirementSignatureSelfProto)) {
+      return FloatingRequirementSource::viaProtocolRequirement(
+          requirementSignatureSource, proto, /*inferred=*/false);
+    }
+
+    return FloatingRequirementSource::forAbstract();
+  }();
 
   for (const auto &req : Impl->ExplicitRequirements) {
     assert(req.getKind() != RequirementKind::SameType &&
@@ -8382,9 +8406,6 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
            requirementSignatureSelfProto);
 
   if (rebuildingWithoutRedundantConformances) {
-    assert(requirementSignatureSelfProto == nullptr &&
-           "Rebuilding a requirement signature?");
-
     assert(!Impl->HadAnyError &&
            "Rebuilt signature had errors");
 
@@ -8406,7 +8427,6 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   //
   // Also, don't do this when building a requirement signature.
   if (!rebuildingWithoutRedundantConformances &&
-      requirementSignatureSelfProto == nullptr &&
       !Impl->HadAnyError &&
       !Impl->ExplicitConformancesImpliedByConcrete.empty()) {
     return std::move(*this).rebuildSignatureWithoutRedundantRequirements(
