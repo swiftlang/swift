@@ -322,10 +322,11 @@ enum class FixKind : uint8_t {
   /// even though result type of the reference doesn't conform
   /// to an expected protocol.
   AllowInvalidStaticMemberRefOnProtocolMetatype,
-    
-  /// Allow the wrappedValue type of the outermost property
-  /// wrapper of a composed property wrapper to mismatch
-  /// the type of its innermost property wrapper.
+
+  /// Allow the wrappedValue type of any property wrapper that is a
+  /// part of a composed property wrapper to mismatch the type of
+  /// another property wrapper that is a part of the same composed
+  /// property wrapper.
   AllowWrappedValueMismatch,
 };
 

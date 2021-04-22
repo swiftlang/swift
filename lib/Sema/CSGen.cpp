@@ -3613,7 +3613,7 @@ static bool generateWrappedPropertyTypeConstraints(
     } else {
       // The former wrappedValue type must be equal to the current wrapper type
       auto *locator = cs.getConstraintLocator(
-          typeExpr, LocatorPathElt::WrappedValue(wrapperType.getPointer()));
+          typeExpr, LocatorPathElt::WrappedValue(wrapperType));
       wrapperType =
           cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
       cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType, locator);

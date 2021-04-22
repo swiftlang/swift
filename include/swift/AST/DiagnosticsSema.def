@@ -5678,8 +5678,8 @@ ERROR(wrapped_value_mismatch, none,
       "property type %0 does not match 'wrappedValue' type %1",
       (Type, Type))
 ERROR(composed_property_wrapper_mismatch, none,
-      "composed wrapper type %0 does not match the type of %1.wrappedValue, which is %2",
-      (Type, Type, Type))
+      "composed wrapper type %0 does not match type of '%1.wrappedValue', which is %2",
+      (Type, StringRef, Type))
 
 ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "

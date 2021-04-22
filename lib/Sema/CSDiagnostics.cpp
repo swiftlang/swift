@@ -350,9 +350,10 @@ bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
 
 bool WrappedValueMismatch::diagnoseAsError() {
   auto *locator = getLocator();
-  auto elt = locator->getLastElementAs<LocatorPathElt::WrappedValue>();
+  auto elt = locator->castLastElementTo<LocatorPathElt::WrappedValue>();
 
-  emitDiagnostic(diag::composed_property_wrapper_mismatch, resolveType(getFromType()), elt->getType(), getToType());
+  emitDiagnostic(diag::composed_property_wrapper_mismatch, getFromType(),
+                 resolveType(elt.getType())->getString(), getToType());
 
   return true;
 }

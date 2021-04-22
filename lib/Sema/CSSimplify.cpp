@@ -11260,6 +11260,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
   case FixKind::AllowAlwaysSucceedCheckedCast:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
+  case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -11396,11 +11397,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     }
 
     return SolutionKind::Solved;
-  }
-          
-  case FixKind::AllowWrappedValueMismatch: {
-    if (recordFix(fix)) return SolutionKind::Error;
-      return SolutionKind::Solved;
   }
 
   case FixKind::UseSubscriptOperator:

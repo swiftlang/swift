@@ -374,7 +374,7 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
   WrappedValueMismatch failure(solution, getFromType(), getToType(), getLocator());
-  return(failure.diagnoseAsError());
+  return failure.diagnoseAsError();
 }
 
 AllowWrappedValueMismatch *AllowWrappedValueMismatch::create(ConstraintSystem &cs,

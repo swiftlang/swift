@@ -223,9 +223,10 @@ GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
       castLastElementTo<LocatorPathElt::GenericParameter>().getType() : nullptr;
 }
 
-TypeBase *ConstraintLocator::getWrappedValue() const {
-  return isForWrappedValue() ?
-      castLastElementTo<LocatorPathElt::WrappedValue>().getType() : nullptr;
+Type ConstraintLocator::getWrappedValue() const {
+  return isForWrappedValue()
+             ? castLastElementTo<LocatorPathElt::WrappedValue>().getType()
+             : Type();
 }
 
 void ConstraintLocator::dump(SourceManager *sm) const {
@@ -283,7 +284,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     case WrappedValue: {
       auto wrappedValueElt = elt.castTo<LocatorPathElt::WrappedValue>();
       out << "composed property wrapper type '"
-      << wrappedValueElt.getType()->getString(PO) << "'";
+          << wrappedValueElt.getType()->getString(PO) << "'";
       break;
     }
     case ApplyArgument:

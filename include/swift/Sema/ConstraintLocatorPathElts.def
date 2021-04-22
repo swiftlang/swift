@@ -96,7 +96,7 @@ SIMPLE_LOCATOR_PATH_ELT(InstanceType)
 /// Also contains the generic parameter type itself.
 CUSTOM_LOCATOR_PATH_ELT(GenericParameter)
 
-/// The former wrappedValue type for a property wrapper.
+/// The wrappedValue type for a property wrapper.
 ///
 /// Must equal the property declaration's property wrapper type.
 CUSTOM_LOCATOR_PATH_ELT(WrappedValue)
