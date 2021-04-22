@@ -56,7 +56,10 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
   asyncTests.test("GlobalDispatchQueue") {
     DispatchQueue.global(qos: .utility).async {
       async {
+#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+        // Non-Darwin platforms currently lack qos_class_self().
         assert(Task.currentPriority == .utility)
+#endif
       }
     }
     sleep(1)
