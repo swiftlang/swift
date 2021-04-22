@@ -929,7 +929,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
   auto requirement =
     Requirement(RequirementKind::Conformance, selfType,
-              proto->getDeclaredInterfaceType());
+                proto->getDeclaredInterfaceType());
 
   builder.addRequirement(
           requirement,
@@ -939,7 +939,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
   auto reqSignature = std::move(builder).computeGenericSignature(
                         /*allowConcreteGenericParams=*/false,
-                        /*buildingRequirementSignature=*/true);
+                        /*requirementSignatureSelfProto=*/proto);
   return reqSignature->getRequirements();
 }
 

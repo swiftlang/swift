@@ -624,7 +624,7 @@ public:
 
   GenericSignature rebuildSignatureWithoutRedundantRequirements(
                       bool allowConcreteGenericParams,
-                      bool buildingRequirementSignature) &&;
+                      const ProtocolDecl *requirementSignatureSelfProto) &&;
 
   /// Finalize the set of requirements and compute the generic
   /// signature.
@@ -633,7 +633,7 @@ public:
   /// generic signature builder no longer has valid state.
   GenericSignature computeGenericSignature(
                       bool allowConcreteGenericParams = false,
-                      bool buildingRequirementSignature = false,
+                      const ProtocolDecl *requirementSignatureSelfProto = nullptr,
                       bool rebuildingWithoutRedundantConformances = false) &&;
 
   /// Compute the requirement signature for the given protocol.
@@ -646,7 +646,8 @@ private:
   /// \param allowConcreteGenericParams If true, allow generic parameters to
   /// be made concrete.
   void finalize(TypeArrayView<GenericTypeParamType> genericParams,
-                bool allowConcreteGenericParams=false);
+                bool allowConcreteGenericParams,
+                const ProtocolDecl *requirementSignatureSelfProto);
 
 public:
   /// Process any delayed requirements that can be handled now.
@@ -657,7 +658,7 @@ public:
   bool isRedundantExplicitRequirement(const ExplicitRequirement &req) const;
 
 private:
-  void computeRedundantRequirements();
+  void computeRedundantRequirements(const ProtocolDecl *requirementSignatureSelfProto);
 
   void diagnoseRedundantRequirements() const;
 

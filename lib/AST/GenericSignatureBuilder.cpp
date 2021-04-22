@@ -1005,7 +1005,7 @@ static Type replaceSelfWithType(Type selfType, Type depTy) {
 /// occurs within the requirement signature of its own protocol.
 static bool isSelfDerivedProtocolRequirementInProtocol(
                                              const RequirementSource *source,
-                                             ProtocolDecl *selfProto,
+                                             const ProtocolDecl *selfProto,
                                              GenericSignatureBuilder &builder) {
   assert(source->isProtocolRequirement());
 
@@ -1069,7 +1069,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
   };
 
   bool sawProtocolRequirement = false;
-  ProtocolDecl *requirementSignatureSelfProto = nullptr;
+  const ProtocolDecl *requirementSignatureSelfProto = nullptr;
 
   Type rootType = nullptr;
   Optional<std::pair<const RequirementSource *, const RequirementSource *>>
@@ -6279,7 +6279,8 @@ static bool isConcreteConformance(const EquivalenceClass &equivClass,
   return false;
 }
 
-void GenericSignatureBuilder::computeRedundantRequirements() {
+void GenericSignatureBuilder::computeRedundantRequirements(
+    const ProtocolDecl *requirementSignatureSelfProto) {
   assert(!Impl->computedRedundantRequirements &&
          "Already computed redundant requirements");
 #ifndef NDEBUG
@@ -6534,11 +6535,12 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
 
 void
 GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericParams,
-                                  bool allowConcreteGenericParams) {
+                                  bool allowConcreteGenericParams,
+                                  const ProtocolDecl *requirementSignatureSelfProto) {
   // Process any delayed requirements that we can handle now.
   processDelayedRequirements();
 
-  computeRedundantRequirements();
+  computeRedundantRequirements(requirementSignatureSelfProto);
   diagnoseRedundantRequirements();
   diagnoseConflictingConcreteTypeRequirements();
 
@@ -8547,7 +8549,7 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
 
 GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequirements(
                                           bool allowConcreteGenericParams,
-                                          bool buildingRequirementSignature) && {
+                                          const ProtocolDecl *requirementSignatureSelfProto) && {
   NumSignaturesRebuiltWithoutRedundantRequirements++;
 
   GenericSignatureBuilder newBuilder(Context);
@@ -8630,19 +8632,20 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   // Build a new signature using the new builder.
   return std::move(newBuilder).computeGenericSignature(
       allowConcreteGenericParams,
-      buildingRequirementSignature,
+      requirementSignatureSelfProto,
       /*rebuildingWithoutRedundantConformances=*/true);
 }
 
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
-                                          bool buildingRequirementSignature,
+                                          const ProtocolDecl *requirementSignatureSelfProto,
                                           bool rebuildingWithoutRedundantConformances) && {
   // Finalize the builder, producing any necessary diagnostics.
-  finalize(getGenericParams(), allowConcreteGenericParams);
+  finalize(getGenericParams(), allowConcreteGenericParams,
+           requirementSignatureSelfProto);
 
   if (rebuildingWithoutRedundantConformances) {
-    assert(!buildingRequirementSignature &&
+    assert(requirementSignatureSelfProto == nullptr &&
            "Rebuilding a requirement signature?");
 
     assert(!Impl->HadAnyError &&
@@ -8666,12 +8669,12 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   //
   // Also, don't do this when building a requirement signature.
   if (!rebuildingWithoutRedundantConformances &&
-      !buildingRequirementSignature &&
+      requirementSignatureSelfProto == nullptr &&
       !Impl->HadAnyError &&
       !Impl->ExplicitConformancesImpliedByConcrete.empty()) {
     return std::move(*this).rebuildSignatureWithoutRedundantRequirements(
         allowConcreteGenericParams,
-        buildingRequirementSignature);
+        requirementSignatureSelfProto);
   }
 
   // Collect the requirements placed on the generic parameter types.
@@ -8694,7 +8697,8 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // We cannot do this when there were errors.
   //
   // Also, we cannot do this when building a requirement signature.
-  if (!buildingRequirementSignature && !Impl->HadAnyError) {
+  if (requirementSignatureSelfProto == nullptr &&
+      !Impl->HadAnyError) {
     // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));
