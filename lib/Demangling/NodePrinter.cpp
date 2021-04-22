@@ -2812,16 +2812,20 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "async function pointer to ";
     return nullptr;
   case Node::Kind::AsyncAwaitResumePartialFunction:
-    Printer << "(";
-    print(Node->getChild(0));
-    Printer << ")";
-    Printer << " await resume partial function for ";
+    if (Options.ShowAsyncResumePartial) {
+      Printer << "(";
+      print(Node->getChild(0));
+      Printer << ")";
+      Printer << " await resume partial function for ";
+    }
     return nullptr;
   case Node::Kind::AsyncSuspendResumePartialFunction:
-    Printer << "(";
-    print(Node->getChild(0));
-    Printer << ")";
-    Printer << " suspend resume partial function for ";
+    if (Options.ShowAsyncResumePartial) {
+      Printer << "(";
+      print(Node->getChild(0));
+      Printer << ")";
+      Printer << " suspend resume partial function for ";
+    }
     return nullptr;
   }
 
