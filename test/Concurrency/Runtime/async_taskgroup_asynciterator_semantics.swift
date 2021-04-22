@@ -113,10 +113,48 @@ func test_taskGroup_asyncIterator() async {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+func test_taskGroup_contains() async {
+  let sum = await withTaskGroup(of: Int.self, returning: Int.self) { group in
+    for n in 1...4 {
+      group.spawn {
+        return n
+      }
+    }
+
+    let three = await group.contains(3)
+    print("three = \(three)")
+
+    for n in 5...7 {
+      group.spawn {
+        return n
+      }
+    }
+
+    let six = await group.contains(6)
+    print("six = \(six)")
+
+    for n in 8...10 {
+      group.spawn {
+        return n
+      }
+    }
+
+    let nine = await group.contains(9)
+    print("nine = \(nine)")
+
+    return 0
+  }
+
+  // CHECK: result with async iterator: 0
+  print("result with async iterator: \(sum)")
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_next()
     await test_taskGroup_for_in()
     await test_taskGroup_asyncIterator()
+    await test_taskGroup_contains()
   }
 }
