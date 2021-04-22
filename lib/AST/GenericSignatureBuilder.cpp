@@ -580,6 +580,10 @@ public:
     return sourceAndKind.getInt();
   }
 
+  Type getSubjectType() const {
+    return getSource()->getStoredType();
+  }
+
   const RequirementSource *getSource() const {
     return sourceAndKind.getPointer();
   }
@@ -7179,7 +7183,7 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
                      }))
       continue;
 
-    auto subjectType = getSugaredDependentType(source->getStoredType(),
+    auto subjectType = getSugaredDependentType(req.getSubjectType(),
                                                getGenericParams());
 
     switch (req.getKind()) {
@@ -7321,7 +7325,7 @@ void GenericSignatureBuilder::diagnoseConflictingConcreteTypeRequirements() cons
     if (loc.isInvalid() && otherLoc.isInvalid())
       continue;
 
-    auto subjectType = pair.concreteTypeRequirement.getSource()->getStoredType();
+    auto subjectType = pair.concreteTypeRequirement.getSubjectType();
     SourceLoc subjectLoc = (loc.isInvalid() ? otherLoc : loc);
 
     Impl->HadAnyError = true;
@@ -8292,7 +8296,7 @@ void GenericSignatureBuilder::enumerateRequirements(
       continue;
 
     auto depTy = getCanonicalTypeInContext(
-        req.getSource()->getStoredType(), { });
+        req.getSubjectType(), { });
 
     // FIXME: This should be an assert once we ensure that concrete
     // same-type requirements always mark other requirements on the
@@ -8561,7 +8565,7 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
         Impl->ExplicitConformancesImpliedByConcrete.count(req))
       continue;
 
-    auto subjectType = req.getSource()->getStoredType();
+    auto subjectType = req.getSubjectType();
     subjectType = stripBoundDependentMemberTypes(subjectType);
     auto resolvedSubjectType =
         resolveDependentMemberTypes(*this, subjectType,
