@@ -4914,7 +4914,7 @@ private:
         RightStartLoc = Lexer::getLocForEndOfToken(SM, FD->getThrowsLoc());
       }
       SourceLoc RightEndLoc =
-          FD->getBody() ? FD->getBody()->getLBraceLoc() : FD->getEndLoc();
+          FD->getBody() ? FD->getBody()->getLBraceLoc() : RightStartLoc;
       addRange(RightStartLoc, RightEndLoc);
       return;
     }
