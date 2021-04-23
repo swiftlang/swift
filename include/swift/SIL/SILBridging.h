@@ -166,6 +166,13 @@ BridgedMultiValueResult
 BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi);
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst);
 
+BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
+          BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedStringRef name,
+          BridgedType operandType, BridgedType resultType, BridgedValueArray arguments);
+BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
