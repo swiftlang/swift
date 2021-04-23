@@ -1,4 +1,4 @@
-//===--- PassRegistration.swift - Register optimzation passes -------------===//
+//===--- Location.swift - Source location ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-import LibSwiftSIL
+import SILBridging
 
-@_cdecl("initializeLibSwift")
-public func initializeLibSwift() {
-  registerSILClasses()
+public struct Location {
+  let bridgedLocation: BridgedLocation
 }

@@ -1,0 +1,5 @@
+module SILBridging {
+  header "SIL/SILBridging.h"
+  export *
+}
+
