@@ -7,5 +7,6 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 libswift_sources(Optimizer
+  PassUtils.swift
   PassRegistration.swift)
 
