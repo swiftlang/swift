@@ -9,6 +9,7 @@
 add_libswift_module(SIL
   Argument.swift
   BasicBlock.swift
+  Builder.swift
   Function.swift
   GlobalVariable.swift
   Instruction.swift
