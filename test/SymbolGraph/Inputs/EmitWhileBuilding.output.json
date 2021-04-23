@@ -4,7 +4,7 @@
     },
     "EmitWhileBuilding.swift": {
         "object": "./EmitWhileBuilding.o",
-        "swiftmodule": "./EmitWhileBuilding.swiftmodule",
+        "swiftmodule": "./EmitWhileBuilding_partial.swiftmodule",
         "dependencies": "./EmitWhileBuilding.d",
         "swift-dependencies": "./EmitWhileBuilding.swiftdeps"
     }
