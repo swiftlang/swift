@@ -5712,17 +5712,25 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 
 /// Apply the contextually Sendable flag to the given expression,
 static void applyContextualClosureFlags(
-      Expr *expr, bool sendable, bool forMainActor, bool implicitSelfCapture) {
+      Expr *expr, bool sendable, bool forMainActor, bool implicitSelfCapture,
+      bool inheritActorContext) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
     closure->setUnsafeConcurrent(sendable, forMainActor);
     closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
+    closure->setInheritsActorContext(inheritActorContext);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
     applyContextualClosureFlags(
         captureList->getClosureBody(), sendable, forMainActor,
-        implicitSelfCapture);
+        implicitSelfCapture, inheritActorContext);
+  }
+
+  if (auto identity = dyn_cast<IdentityExpr>(expr)) {
+    applyContextualClosureFlags(
+        identity->getSubExpr(), sendable, forMainActor,
+        implicitSelfCapture, inheritActorContext);
   }
 }
 
@@ -5983,9 +5991,10 @@ Expr *ExprRewriter::coerceCallArguments(
     bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
         (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
     bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
+    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
     applyContextualClosureFlags(
         arg, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
-        isMainActor, isImplicitSelfCapture);
+        isMainActor, isImplicitSelfCapture, inheritsActorContext);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();
@@ -6136,6 +6145,20 @@ Expr *ExprRewriter::coerceCallArguments(
 static bool isClosureLiteralExpr(Expr *expr) {
   expr = expr->getSemanticsProvidingExpr();
   return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
+}
+
+/// Whether we should propagate async down to a closure.
+static bool shouldPropagateAsyncToClosure(Expr *expr) {
+  if (auto IE = dyn_cast<IdentityExpr>(expr))
+    return shouldPropagateAsyncToClosure(IE->getSubExpr());
+
+  if (auto CLE = dyn_cast<CaptureListExpr>(expr))
+    return shouldPropagateAsyncToClosure(CLE->getClosureBody());
+
+  if (auto CE = dyn_cast<ClosureExpr>(expr))
+    return CE->inheritsActorContext();
+
+  return false;
 }
 
 /// If the expression is an explicit closure expression (potentially wrapped in
@@ -7002,11 +7025,27 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    // If we have a ClosureExpr, then we can safely propagate the 'concurrent'
-    // bit to the closure without invalidating prior analysis.
+    // If we have a ClosureExpr, then we can safely propagate @Sendable
+    // to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
     if (toEI.isSendable() && !fromEI.isSendable()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating the 'concurrent' bit might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate the 'async'
+    // bit to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (toEI.isAsync() && !fromEI.isAsync() &&
+        shouldPropagateAsyncToClosure(expr)) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withAsync());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 

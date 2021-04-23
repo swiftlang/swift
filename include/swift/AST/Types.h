@@ -3383,6 +3383,7 @@ struct ParameterListInfo {
   SmallBitVector unsafeSendable;
   SmallBitVector unsafeMainActor;
   SmallBitVector implicitSelfCapture;
+  SmallBitVector inheritActorContext;
 
 public:
   ParameterListInfo() { }
@@ -3414,6 +3415,10 @@ public:
   /// Whether the given parameter is a closure that should allow capture of
   /// 'self' to be implicit, without requiring "self.".
   bool isImplicitSelfCapture(unsigned paramIdx) const;
+
+  /// Whether the given parameter is a closure that should inherit the
+  /// actor context from the context in which it was created.
+  bool inheritsActorContext(unsigned paramIdx) const;
 
   /// Whether there is any contextual information set on this parameter list.
   bool anyContextualInfo() const;

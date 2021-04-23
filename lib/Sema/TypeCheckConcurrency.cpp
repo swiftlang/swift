@@ -773,17 +773,24 @@ static bool isAsyncCall(const ApplyExpr *call) {
 /// features.
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc);
 
-/// Determine whether this closure is escaping.
-static bool isSendableClosure(const AbstractClosureExpr *closure) {
+/// Determine whether this closure should be treated as Sendable.
+///
+/// \param forActorIsolation Whether this check is for the purposes of
+/// determining whether the closure must be non-isolated.
+static bool isSendableClosure(
+    const AbstractClosureExpr *closure, bool forActorIsolation) {
+  if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+    if (forActorIsolation && explicitClosure->inheritsActorContext())
+      return false;
+
+    if (explicitClosure->isUnsafeSendable())
+      return true;
+  }
+
   if (auto type = closure->getType()) {
     if (auto fnType = type->getAs<AnyFunctionType>())
       if (fnType->isSendable())
         return true;
-  }
-
-  if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-    if (explicitClosure->isUnsafeSendable())
-      return true;
   }
 
   return false;
@@ -2113,7 +2120,7 @@ namespace {
       }
 
       if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-        if (isSendableClosure(closure)) {
+        if (isSendableClosure(closure, /*forActorIsolation=*/true)) {
           return diag::actor_isolated_from_concurrent_closure;
         }
 
@@ -2310,8 +2317,9 @@ namespace {
         }
       }
 
-      // Sendable closures are always actor-independent.
-      if (isSendableClosure(closure))
+      // Sendable closures are actor-independent unless the closure has
+      // specifically opted into inheriting actor isolation.
+      if (isSendableClosure(closure, /*forActorIsolation=*/true))
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.
@@ -2362,7 +2370,7 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
   while (useContext != defContext) {
     // If we find a concurrent closure... it can be run concurrently.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isSendableClosure(closure))
+      if (isSendableClosure(closure, /*forActorIsolation=*/false))
         return true;
     }
 
