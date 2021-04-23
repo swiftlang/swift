@@ -1101,14 +1101,6 @@ FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
   return prev;
 }
 
-void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
-  if (silCombiner) {
-    // TODO
-  } else {
-    inst->eraseFromParent();
-  }
-}
-
 void LibswiftPassInvocation::finishedPassRun() {
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
 }

@@ -27,6 +27,14 @@ private func registerPass(
   }
 }
 
+private func registerPass<InstType: Instruction>(
+      _ pass: InstructionPass<InstType>,
+      _ runFn: @escaping (@convention(c) (BridgedInstructionPassCtxt) -> ())) {
+  pass.name.withBridgedStringRef { nameStr in
+    SILCombine_registerInstructionPass(nameStr, runFn)
+  }
+}
+
 private func registerSwiftPasses() {
   registerPass(silPrinterPass, { silPrinterPass.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
