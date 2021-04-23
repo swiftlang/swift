@@ -1,0 +1,16 @@
+// RUN: %target-swift-frontend -emit-ir -parse-sil %s -parse-stdlib | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil @entry : $@async @convention(thin) () -> () {
+bb0:
+  %0 = function_ref @swift_task_getCurrent : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+  // CHECK: call swiftcc {{.*}} @swift_task_getCurrent
+  %1 = apply %0() : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+  // CHECK-NEXT: call swiftcc {{.*}} @swift_task_getCurrent
+  %3 = builtin "getCurrentAsyncTask"() : $Builtin.NativeObject
+  return undef : $()
+}
+
+sil hidden_external @swift_task_getCurrent : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
