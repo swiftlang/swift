@@ -7,5 +7,15 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 add_libswift_module(SIL
+  Argument.swift
+  BasicBlock.swift
+  Function.swift
+  GlobalVariable.swift
+  Instruction.swift
+  Location.swift
+  Operand.swift
+  Registration.swift
+  Type.swift
+  Utils.swift
   Value.swift)
 

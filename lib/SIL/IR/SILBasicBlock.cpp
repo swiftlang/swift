@@ -19,6 +19,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
@@ -26,11 +27,20 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/Strings.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
 // SILBasicBlock Implementation
 //===----------------------------------------------------------------------===//
+
+SwiftMetatype SILBasicBlock::registeredMetatype;    
+
+SILBasicBlock::SILBasicBlock() :
+  SwiftObjectHeader(registeredMetatype), Parent(nullptr) {}
+
+SILBasicBlock::SILBasicBlock(SILFunction *parent) :
+  SwiftObjectHeader(registeredMetatype), Parent(parent) {}
 
 SILBasicBlock::~SILBasicBlock() {
   if (!getParent()) {
