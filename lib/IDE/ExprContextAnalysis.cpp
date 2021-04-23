@@ -795,6 +795,12 @@ static bool getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
     if (!SM.isBeforeInBuffer(tuple->getElement(PosInArgs)->getEndLoc(),
                              CCExpr->getStartLoc())) {
       // The arg is after the code completion position. Stop.
+      if (LastParamWasVariadic && tuple->getElementName(PosInArgs).empty()) {
+        // If the last parameter was variadic and this argument stands by itself
+        // without a label, assume that it belongs to the previous vararg
+        // list.
+        PosInParams--;
+      }
       break;
     }
 
