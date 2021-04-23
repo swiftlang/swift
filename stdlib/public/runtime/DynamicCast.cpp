@@ -20,6 +20,7 @@
 #include "SwiftHashableSupport.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -110,12 +111,6 @@ extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 /// Nominal type descriptor for Swift.String.
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SS);
 
-// If this returns `true`, then we will call `fatalError` when we encounter a
-// null reference in a storage locaation whose type does not allow null.
-static bool unexpectedNullIsFatal() {
-  return true;  // Placeholder for an upcoming check.
-}
-
 /// This issues a fatal error or warning if the srcValue contains a null object
 /// reference.  It is used when the srcType is a non-nullable reference type, in
 /// which case it is dangerous to continue with a null reference.  The null
@@ -134,7 +129,7 @@ static HeapObject * getNonNullSrcObject(OpaqueValue *srcValue,
   const char *msg = "Found unexpected null pointer value"
                     " while trying to cast value of type '%s' (%p)"
                     " to '%s' (%p)%s\n";
-  if (unexpectedNullIsFatal()) {
+  if (runtime::bincompat::unexpectedObjCNullWhileCastingIsFatal()) {
     // By default, Swift 5.4 and later issue a fatal error.
     swift::fatalError(/* flags = */ 0, msg,
                       srcTypeName.c_str(), srcType,
@@ -1044,7 +1039,7 @@ initializeToNilAtDepth(OpaqueValue *destLocation, const Metadata *destType, int 
 }
 
 static void
-copyNil(OpaqueValue *destLocation, const Metadata *destType, const Metadata *srcType)
+copyNilPreservingDepth(OpaqueValue *destLocation, const Metadata *destType, const Metadata *srcType)
 {
   assert(srcType->getKind() == MetadataKind::Optional);
   assert(destType->getKind() == MetadataKind::Optional);
@@ -1087,7 +1082,13 @@ tryCastUnwrappingOptionalBoth(
     srcValue, /*emptyCases=*/1);
   auto sourceIsNil = (sourceEnumCase != 0);
   if (sourceIsNil) {
-    copyNil(destLocation, destType, srcType);
+    if (runtime::bincompat::useLegacyOptionalNilInjection()) {
+      auto destInnerType = cast<EnumMetadata>(destType)->getGenericArgs()[0];
+      // Set .none at the outer level
+      destInnerType->vw_storeEnumTagSinglePayload(destLocation, 1, 1);
+    } else {
+      copyNilPreservingDepth(destLocation, destType, srcType);
+    }
     return DynamicCastResult::SuccessViaCopy; // nil was essentially copied to dest
   } else {
     auto destEnumType = cast<EnumMetadata>(destType);
