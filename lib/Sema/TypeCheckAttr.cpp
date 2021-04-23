@@ -997,6 +997,17 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     return;
   }
 
+  auto correctNameUsingNewAttr = [&](ObjCAttr *newAttr) {
+    if (attr->isInvalid()) newAttr->setInvalid();
+    newAttr->setImplicit(attr->isImplicit());
+    newAttr->setNameImplicit(attr->isNameImplicit());
+    newAttr->setAddedByAccessNote(attr->getAddedByAccessNote());
+
+    D->getAttrs().add(newAttr);
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+  };
+
   // If there is a name, check whether the kind of name is
   // appropriate.
   if (auto objcName = attr->getName()) {
@@ -1021,9 +1032,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                    D->getDescriptiveKind())
             .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc())
             .limitBehavior(behavior));
-        const_cast<ObjCAttr *>(attr)->setName(
-          ObjCSelector(Ctx, 0, objcName->getSelectorPieces()[0]),
-          /*implicit=*/false);
+
+        correctNameUsingNewAttr(
+            ObjCAttr::createNullary(Ctx, attr->AtLoc, attr->getLocation(),
+                                    attr->getLParenLoc(), firstNameLoc,
+                                    objcName->getSelectorPieces()[0],
+                                    attr->getRParenLoc()));
       }
     } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
       SourceLoc diagLoc = attr->getLParenLoc();
@@ -1035,7 +1049,9 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                    ? diag::objc_name_subscript
                    : diag::objc_name_deinit)
             .limitBehavior(behavior));
-      const_cast<ObjCAttr *>(attr)->clearName();
+
+      correctNameUsingNewAttr(
+          ObjCAttr::createUnnamed(Ctx, attr->AtLoc, attr->getLocation()));
     } else {
       auto func = cast<AbstractFunctionDecl>(D);
 
@@ -1075,9 +1091,9 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
                    numParameters != 1,
                    func->hasThrows())
               .limitBehavior(behavior));
-        D->getAttrs().add(
-          ObjCAttr::createUnnamed(Ctx, attr->AtLoc,  attr->Range.Start));
-        D->getAttrs().removeAttribute(attr);
+        
+        correctNameUsingNewAttr(
+            ObjCAttr::createUnnamed(Ctx, attr->AtLoc, attr->Range.Start));
       }
     }
   } else if (isa<EnumElementDecl>(D)) {

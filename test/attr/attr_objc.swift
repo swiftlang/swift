@@ -2003,18 +2003,18 @@ extension PlainClass {
   func badlyNamed(_: Int, y: Int) {}
 }
 
-@objc(Class:) // access-note-move{{BadClass1}} expected-error{{'@objc' class must have a simple name}}{{12-13=}}
+@objc(Class:) // bad-access-note-move{{BadClass1}} expected-error{{'@objc' class must have a simple name}}{{12-13=}}
 class BadClass1 { }
 
-@objc(Protocol:) // access-note-move{{BadProto1}} expected-error{{'@objc' protocol must have a simple name}}{{15-16=}}
+@objc(Protocol:) // bad-access-note-move{{BadProto1}} expected-error{{'@objc' protocol must have a simple name}}{{15-16=}}
 protocol BadProto1 { }
 
-@objc(Enum:) // access-note-move{{BadEnum1}} expected-error{{'@objc' enum must have a simple name}}{{11-12=}}
+@objc(Enum:) // bad-access-note-move{{BadEnum1}} expected-error{{'@objc' enum must have a simple name}}{{11-12=}}
 enum BadEnum1: Int { case X }
 
 @objc // access-note-move{{BadEnum2}}
 enum BadEnum2: Int {
-  @objc(X:) // access-note-move{{BadEnum2.X}} expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
+  @objc(X:) // bad-access-note-move{{BadEnum2.X}} expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
   case X
 }
 
@@ -2022,32 +2022,32 @@ class BadClass2 {
   @objc(realDealloc) // expected-error{{'@objc' deinitializer cannot have a name}}
   deinit { }
 
-  @objc(badprop:foo:wibble:) // access-note-move{{BadClass2.badprop}} expected-error{{'@objc' property must have a simple name}}{{16-28=}}
+  @objc(badprop:foo:wibble:) // bad-access-note-move{{BadClass2.badprop}} expected-error{{'@objc' property must have a simple name}}{{16-28=}}
   var badprop: Int = 5
 
-  @objc(foo) // access-note-move{{BadClass2.subscript(_:)}} expected-error{{'@objc' subscript cannot have a name; did you mean to put the name on the getter or setter?}}
+  @objc(foo) // bad-access-note-move{{BadClass2.subscript(_:)}} expected-error{{'@objc' subscript cannot have a name; did you mean to put the name on the getter or setter?}}
   subscript (i: Int) -> Int {
     get {
       return i
     }
   }
 
-  @objc(foo) // access-note-move{{BadClass2.noArgNamesOneParam(x:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
+  @objc(foo) // bad-access-note-move{{BadClass2.noArgNamesOneParam(x:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
   func noArgNamesOneParam(x: Int) { }
   
-  @objc(foo) // access-note-move{{BadClass2.noArgNamesOneParam2(_:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
+  @objc(foo) // bad-access-note-move{{BadClass2.noArgNamesOneParam2(_:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
   func noArgNamesOneParam2(_: Int) { }
 
-  @objc(foo) // access-note-move{{BadClass2.noArgNamesTwoParams(_:y:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters}}
+  @objc(foo) // bad-access-note-move{{BadClass2.noArgNamesTwoParams(_:y:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters}}
   func noArgNamesTwoParams(_: Int, y: Int) { }
 
-  @objc(foo:) // access-note-move{{BadClass2.oneArgNameTwoParams(_:y:)}} expected-error{{'@objc' method name provides one argument name, but method has 2 parameters}}
+  @objc(foo:) // bad-access-note-move{{BadClass2.oneArgNameTwoParams(_:y:)}} expected-error{{'@objc' method name provides one argument name, but method has 2 parameters}}
   func oneArgNameTwoParams(_: Int, y: Int) { }
 
-  @objc(foo:) // access-note-move{{BadClass2.oneArgNameNoParams()}} expected-error{{'@objc' method name provides one argument name, but method has 0 parameters}}
+  @objc(foo:) // bad-access-note-move{{BadClass2.oneArgNameNoParams()}} expected-error{{'@objc' method name provides one argument name, but method has 0 parameters}}
   func oneArgNameNoParams() { }
 
-  @objc(foo:) // access-note-move{{BadClass2.init()}} expected-error{{'@objc' initializer name provides one argument name, but initializer has 0 parameters}}
+  @objc(foo:) // bad-access-note-move{{BadClass2.init()}} expected-error{{'@objc' initializer name provides one argument name, but initializer has 0 parameters}}
   init() { }
 
   var _prop = 5
@@ -2098,14 +2098,14 @@ class Super {
 }
 
 class Sub1 : Super {
-  @objc(foo) // access-note-move{{Sub1.foo}} expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{9-12=renamedFoo}}
+  @objc(foo) // bad-access-note-move{{Sub1.foo}} expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{9-12=renamedFoo}}
   override var foo: Int { get { return 5 } }
 
   override func process(i: Int?) -> Int { } // expected-error{{method cannot be an @objc override because the type of the parameter cannot be represented in Objective-C}}
 }
 
 class Sub2 : Super {
-  @objc // access-note-move{{Sub2.foo}}
+  @objc // bad-access-note-move{{Sub2.foo}} -- @objc is already implied by overriding an @objc attribute, so access notes shouldn't emit a remark
   override var foo: Int { get { return 5 } }
 }
 
@@ -2119,7 +2119,7 @@ class Sub4 : Super {
 }
 
 class Sub5 : Super {
-  @objc(wrongFoo) // access-note-move{{Sub5.foo}} expected-error{{Objective-C property has a different name from the property it overrides ('wrongFoo' vs. 'renamedFoo')}} {{9-17=renamedFoo}}
+  @objc(wrongFoo) // bad-access-note-move{{Sub5.foo}} expected-error{{Objective-C property has a different name from the property it overrides ('wrongFoo' vs. 'renamedFoo')}} {{9-17=renamedFoo}}
   override var foo: Int { get { return 5 } }
 }
 
@@ -2402,10 +2402,10 @@ class ThrowsObjCName {
   @objc(method5AndReturnError:x:closure:) // access-note-move{{ThrowsObjCName.method5(x:closure:)}}
   func method5(x: Int, closure: @escaping (Int) -> Int) throws { }
 
-  @objc(method6) // access-note-move{{ThrowsObjCName.method6()}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
+  @objc(method6) // bad-access-note-move{{ThrowsObjCName.method6()}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
   func method6() throws { }
 
-  @objc(method7) // access-note-move{{ThrowsObjCName.method7(x:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
+  @objc(method7) // bad-access-note-move{{ThrowsObjCName.method7(x:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
   func method7(x: Int) throws { }
 
   // CHECK-DUMP: func_decl{{.*}}"method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
@@ -2432,7 +2432,7 @@ protocol ProtocolThrowsObjCName {
 }
 
 class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {
-  @objc // access-note-move{{ConformsToProtocolThrowsObjCName1.doThing(_:)}}
+  @objc // bad-access-note-move{{ConformsToProtocolThrowsObjCName1.doThing(_:)}} -- @objc inherited, so no remarks
   func doThing(_ x: String) throws -> String { return x } // okay
 }
 

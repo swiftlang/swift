@@ -1696,13 +1696,14 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
   /// Set the @objc name.
   auto setObjCName = [&](ObjCSelector selector) {
-    // If there already is an @objc attribute, update its name.
+    // If there already is an @objc attribute, invalidate and remove it. (This
+    // helps with access notes.)
     if (attr) {
-      const_cast<ObjCAttr *>(attr)->setName(selector, /*implicit=*/true);
-      return;
+      attr->setInvalid();
+      decl->getAttrs().removeAttribute(attr);
     }
 
-    // Otherwise, create an @objc attribute with the implicit name.
+    // Create an @objc attribute with the implicit name.
     attr = ObjCAttr::create(ctx, selector, /*implicitName=*/true);
     decl->getAttrs().add(attr);
   };
@@ -2178,7 +2179,7 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *de
   // about implicit ones because they don't have useful source location
   // information.
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
-  if (attr && attr->isImplicit())
+  if (attr && (attr->isImplicit() || attr->getLocation().isInvalid()))
     attr = nullptr;
 
   // If there is an @objc attribute with an explicit, incorrect witness
