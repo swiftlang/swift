@@ -173,7 +173,7 @@ actor GenericSuper<T> {
   @GenericGlobalActor<T> func method5() { }
 }
 
-actor GenericSub<T> : GenericSuper<[T]> {
+actor GenericSub<T> : GenericSuper<[T]> { // expected-error{{actor types do not support inheritance}}
   override func method() { }  // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
