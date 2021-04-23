@@ -205,36 +205,7 @@ public:
       return false;
 
     auto Slide = ImageStart.getAddressData() - Command->vmaddr;
-    std::string Prefix = "__swift5";
-    uint64_t RangeStart = UINT64_MAX;
-    uint64_t RangeEnd = UINT64_MAX;
     auto SectionsBuf = reinterpret_cast<const char *>(Sections.get());
-    for (unsigned I = 0; I < NumSect; ++I) {
-      auto S = reinterpret_cast<typename T::Section *>(
-          SectionsBuf + (I * sizeof(typename T::Section)));
-      if (strncmp(S->sectname, Prefix.c_str(), strlen(Prefix.c_str())) != 0)
-        continue;
-      if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX) {
-        RangeStart = S->addr + Slide;
-        RangeEnd = S->addr + S->size + Slide;
-        continue;
-      }
-      RangeStart = std::min(RangeStart, (uint64_t)S->addr + Slide);
-      RangeEnd = std::max(RangeEnd, (uint64_t)(S->addr + S->size + Slide));
-      // Keep the range rounded to 8 byte alignment on both ends so we don't
-      // introduce misaligned pointers mapping between local and remote
-      // address space.
-      RangeStart = RangeStart & ~7;
-      RangeEnd = RangeEnd + 7 & ~7;      
-    }
- 
-    if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX)
-      return false;
-
-    auto SectBuf = this->getReader().readBytes(RemoteAddress(RangeStart),
-                                               RangeEnd - RangeStart);
-    if (!SectBuf)
-      return false;
 
     auto findMachOSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
@@ -244,11 +215,13 @@ public:
         if (strncmp(S->sectname, Name.data(), strlen(Name.data())) != 0)
           continue;
         auto RemoteSecStart = S->addr + Slide;
-        auto SectBufData = reinterpret_cast<const char *>(SectBuf.get());
-        auto LocalSectStart =
-            reinterpret_cast<const char *>(SectBufData + RemoteSecStart - RangeStart);
-        
-        auto StartRef = RemoteRef<void>(RemoteSecStart, LocalSectStart);
+        auto LocalSectBuf =
+            this->getReader().readBytes(RemoteAddress(RemoteSecStart), S->size);
+        if (!LocalSectBuf)
+          return {nullptr, 0};
+
+        auto StartRef = RemoteRef<void>(RemoteSecStart, LocalSectBuf.get());
+        savedBuffers.push_back(std::move(LocalSectBuf));
         return {StartRef, S->size};
       }
       return {nullptr, 0};
@@ -307,7 +280,6 @@ public:
     }
 
     savedBuffers.push_back(std::move(Buf));
-    savedBuffers.push_back(std::move(SectBuf));
     savedBuffers.push_back(std::move(Sections));
     return true;
   }
