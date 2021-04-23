@@ -13,7 +13,8 @@ add_swift_host_library(LibSwiftSIL
   Registration.swift
   Type.swift
   Utils.swift
-  Value.swift)
+  Value.swift
+  StackList.swift)
 
 target_link_libraries(LibSwiftSIL
   PRIVATE

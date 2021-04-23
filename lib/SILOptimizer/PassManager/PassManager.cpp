@@ -1081,6 +1081,26 @@ void SILPassManager::viewCallGraph() {
 //                           LibswiftPassInvocation
 //===----------------------------------------------------------------------===//
 
+static_assert(BridgedSlabCapacity == FixedSizeSlab::capacity,
+              "wrong bridged slab capacity");
+
+FixedSizeSlab *LibswiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
+  FixedSizeSlab *slab = passManager->getModule()->allocSlab();
+  if (afterSlab) {
+    allocatedSlabs.insert(std::next(afterSlab->getIterator()), *slab);
+  } else {
+    allocatedSlabs.push_back(*slab);
+  }
+  return slab;
+}
+
+FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
+  FixedSizeSlab *prev = std::prev(&*slab->getIterator());
+  allocatedSlabs.remove(*slab);
+  passManager->getModule()->freeSlab(slab);
+  return prev;
+}
+
 void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
   if (silCombiner) {
     // TODO
@@ -1099,6 +1119,8 @@ void LibswiftPassInvocation::finishedPassRun() {
     SILInstruction::destroy(inst);
   }
   toDelete.clear();
+  
+  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1108,6 +1130,38 @@ void LibswiftPassInvocation::finishedPassRun() {
 inline LibswiftPassInvocation *castToPassInvocation(BridgedPassContext ctxt) {
   return const_cast<LibswiftPassInvocation *>(
     static_cast<const LibswiftPassInvocation *>(ctxt.opaqueCtxt));
+}
+
+inline FixedSizeSlab *castToSlab(BridgedSlab slab) {
+  if (slab.data)
+    return static_cast<FixedSizeSlab *>((FixedSizeSlabPayload *)slab.data);
+  return nullptr;
+}
+
+inline BridgedSlab toBridgedSlab(FixedSizeSlab *slab) {
+  if (slab) {
+    FixedSizeSlabPayload *payload = slab;
+    assert((void *)payload == slab->dataFor<void>());
+    return {payload};
+  }
+  return {nullptr};
+}
+
+
+BridgedSlab PassContext_getNextSlab(BridgedSlab slab) {
+  return toBridgedSlab(&*std::next(castToSlab(slab)->getIterator()));
+}
+
+BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
+                                  BridgedSlab afterSlab) {
+  auto *inv = castToPassInvocation(passContext);
+  return toBridgedSlab(inv->allocSlab(castToSlab(afterSlab)));
+}
+
+BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
+                                 BridgedSlab slab) {
+  auto *inv = castToPassInvocation(passContext);
+  return toBridgedSlab(inv->freeSlab(castToSlab(slab)));
 }
 
 void PassContext_notifyChanges(BridgedPassContext passContext,

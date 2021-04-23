@@ -60,9 +60,16 @@ class LibswiftPassInvocation {
   /// Non-null if this is an instruction pass, invoked from SILCombine.
   SILCombiner *silCombiner;
 
+  /// All slabs, allocated by the pass.
+  SILModule::SlabList allocatedSlabs;
+
 public:
   LibswiftPassInvocation(SILPassManager *passManager, SILCombiner *silCombiner) :
     passManager(passManager), silCombiner(silCombiner) {}
+
+  FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
+
+  FixedSizeSlab *freeSlab(FixedSizeSlab *slab);
 
   /// The top-level API to erase an instruction, called from the Swift pass.
   void eraseInstruction(SILInstruction *inst);

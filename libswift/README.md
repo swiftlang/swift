@@ -104,4 +104,6 @@ Some performance considerations:
 
 * Memory is managed on the C++ side. On the Swift side, SIL objects are treated as "immortal" objects, which avoids (most of) ARC overhead. ARC runtime functions are still being called, but no atomic reference counting operations are done. In future we could add a compiler feature to mark classes as immortal to avoid the runtime calls at all.
 
+* Minimizing memory allocations: _libswift_ provides data structures which are malloc-free. For example `StackList` can be used in optimizations to implement work lists without any memory allocations. (Not yet done: `BasicBlockSet`, `BasicBlockData`)
+
 But most importantly, if there are performance issues with the current compiler, the design of _libswift_ should make it possible to fix performance deficiencies with future compiler improvements.
