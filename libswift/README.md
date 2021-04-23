@@ -18,4 +18,62 @@ Currently the `swift-frontend` and `sil-opt` tools use _libswift_. Tools, which 
 
 This also means that currently it is not possible to implement mandatory passes in _libswift_, because this would break tools which compile Swift code but don't use _libswift_. When we want to implement mandatory passes in _libswift_ in the future, we'll need to link _libswift_ to all those tools.
 
+## SIL
 
+The design of SIL in _libswift_ matches very closely the design on the C++ side. For example, there are functions, basic blocks, instructions, SIL values, etc.
+
+Though, there are some small deviations from the C++ SIL design. Either due to the nature of the Swift language (e.g. the SIL `Value` is a protocol, not a class), or improvements, which could be done in C++ as well.
+
+Bridging SIL between C++ and Swift is toll-free, i.e. does not involve any "conversion" between C++ and Swift SIL.
+
+### The bridging layer
+
+The bridging layer is a small interface layer which enables calling into the SIL C++ API from the Swift side. Currently the bridging layer is implemented in C using C interop. In future it can be replaced by a C++ implementation by using C++ interop, which will further simplify the bridging layer or make it completely obsolete. But this is an implementation detail and does not affect the API of SIL in _libswift_.
+
+The bridging layer consists of the C header file `SILBridging.h` and its implementation file `SILBridging.cpp`. The header file contains all the bridging functions and some C data structures like `BridgedStringRef` (once we use C++ interop, those C data structures are not required anymore and can be removed).
+
+### SIL C++ objects in Swift
+
+The core SIL C++ classes have corresponding classes in _libswift_, for example `Function`, `BasicBlock` or all the instruction classes.
+
+This makes _libswift_ easy to use and it allows to program in a "Swifty" style. For example one can write
+
+```
+  for inst in block.instructions {
+    if let cfi = inst as? CondFailInst {
+      // ...
+    }
+  }
+```
+
+Bridging SIL classes is implemented by including a two word Swift object header (`SwiftObjectHeader`) in the C++ definition of a class, like in `SILFunction`, `SILBasicBlock` or `SILNode`. This enables to use SIL objects on both, the C++ and the Swift, side.
+
+The Swift class metatypes are "registered" by `registerClass()`, called from `initializeLibSwift()`. On the C++ side, they are stored in static global variables (see `registerBridgedClass()`) and then used to initialize the object headers in the class constructors.
+
+The reference counts in the object header are initialized to "immortal", which let's all ARC operations on SIL objects be no-ops.
+
+The Swift classes don't define any stored properties, because those would overlap data fields in the C++ classes. Instead, data fields are accessed via computed properties, which call bridging functions to retrieve the actual data values.
+
+### Lazy implementation
+
+In the current state the SIL functionality and API is not completely implemented, yet. For example, not all instruction classes have a corresponding class in _libswift_. Whenever a new _libswift_ optimization needs a specific SIL feature, like an instruction, a Builder-function or an accessor to a data field, it's easy to add the missing parts.
+
+For example, to add a new instruction class:
+
+*  replace the macro which defines the instruction in `SILNodes.def` with a `BRIDGED-*` macro
+*  add the instruction class in `Instruction.swift`
+*  register the class in `registerSILClasses()`
+*  if needed, add bridging functions to access the instruction's data fields.
+
+
+No yet implemented instruction classes are mapped to a "placeholder" instruction, e.g `UnimplementedInstruction`. This ensures that optimizations can process any kind of SIL, even if some instructions don't have a representation in _libswift_ yet.
+
+
+## Performance
+
+The performance of _libswift_ is very important, because compile time is critical.
+Some performance considerations:
+
+* Memory is managed on the C++ side. On the Swift side, SIL objects are treated as "immortal" objects, which avoids (most of) ARC overhead. ARC runtime functions are still being called, but no atomic reference counting operations are done. In future we could add a compiler feature to mark classes as immortal to avoid the runtime calls at all.
+
+But most importantly, if there are performance issues with the current compiler, the design of _libswift_ should make it possible to fix performance deficiencies with future compiler improvements.
