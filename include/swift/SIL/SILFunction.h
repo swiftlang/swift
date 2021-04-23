@@ -1020,19 +1020,12 @@ public:
 
   /// Transfer all blocks of \p F into this function, at the begin of the block
   /// list.
-  void moveAllBlocksFromOtherFunction(SILFunction *F) {
-    BlockList.splice(begin(), F->BlockList);
-  }
+  void moveAllBlocksFromOtherFunction(SILFunction *F);
   
   /// Transfer \p blockInOtherFunction of another function into this function,
   /// before \p insertPointInThisFunction.
   void moveBlockFromOtherFunction(SILBasicBlock *blockInOtherFunction,
-                                  iterator insertPointInThisFunction) {
-    SILFunction *otherFunc = blockInOtherFunction->getParent();
-    assert(otherFunc != this);
-    BlockList.splice(insertPointInThisFunction, otherFunc->BlockList,
-                     blockInOtherFunction);
-  }
+                                  iterator insertPointInThisFunction);
 
   /// Move block \p BB to immediately before the iterator \p IP.
   ///
