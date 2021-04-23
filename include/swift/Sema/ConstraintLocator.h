@@ -212,6 +212,12 @@ public:
   /// Determine whether this locator points to the generic parameter.
   bool isForGenericParameter() const;
 
+  /// Determine whether this locator points to any of the
+  /// property wrappers' types for a given composed property
+  /// wrapper, with the exception of the innermost property wrapper's
+  /// type.
+  bool isForWrappedValue() const;
+
   /// Determine whether this locator points to the element type of a
   /// sequence in a for ... in ... loop.
   bool isForSequenceElementType() const;
@@ -355,6 +361,11 @@ public:
 
   /// If this locator points to generic parameter return its type.
   GenericTypeParamType *getGenericParameter() const;
+
+  /// If this locator points to any of the property wrappers' types
+  /// for a given composed property wrapper, with the exception
+  /// of the innermost property wrapper's type.
+  Type getWrappedValue() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, ASTNode anchor,
@@ -689,6 +700,20 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == PathElementKind::GenericParameter;
+  }
+};
+
+class LocatorPathElt::WrappedValue final : public StoredPointerElement<TypeBase> {
+public:
+  WrappedValue(Type type)
+      : StoredPointerElement(PathElementKind::WrappedValue, type.getPointer()) {
+    assert(type.getPointer() != nullptr);
+  }
+
+  Type getType() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == PathElementKind::WrappedValue;
   }
 };
 

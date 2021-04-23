@@ -4312,6 +4312,12 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::WrappedValue: {
+    conversionsOrFixes.push_back(AllowWrappedValueMismatch::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
@@ -11254,6 +11260,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
   case FixKind::AllowAlwaysSucceedCheckedCast:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
+  case FixKind::AllowWrappedValueMismatch:
   case FixKind::RemoveExtraneousArguments: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

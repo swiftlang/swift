@@ -11,5 +11,5 @@ struct B {
 }
 
 struct C {
-  @A @B var foo: Int // expected-error{{composed wrapper type 'B' does not match former 'wrappedValue' type 'Int'}}
+  @A @B var foo: Int // expected-error{{composed wrapper type 'B' does not match type of 'A.wrappedValue', which is 'Int'}}
 }
