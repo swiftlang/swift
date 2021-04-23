@@ -12,9 +12,10 @@
 // RUN: rm %t/SPIHelper.swiftmodule
 // RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
 
-/// Reading from .swiftinterface should still produce the same failures
+/// Reading from the public .swiftinterface should raise errors on missing
+/// declarations.
 // RUN: rm %t/SPIHelper.private.swiftinterface
-// RUN: not %target-swift-frontend -typecheck -I %t
+// RUN: not %target-swift-frontend -typecheck -I %t %s
 
 import SPIHelper
 
