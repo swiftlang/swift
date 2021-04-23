@@ -43,6 +43,27 @@
 #define IRGEN_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
 #endif
 
+/// SWIFT_FUNCTION_PASS(Id, Tag, Description)
+///   This macro follows the same conventions as PASS(Id, Tag, Description),
+///   but is used for function passes which are implemented in libswift.
+///
+///   No further code is need on the C++ side. In libswift a function pass with
+///   the same name must be registered with 'registerPass()'.
+///
+#ifndef SWIFT_FUNCTION_PASS
+#define SWIFT_FUNCTION_PASS(Id, Tag, Description) PASS(Id, Tag, Description)
+#endif
+
+/// SWIFT_FUNCTION_PASS_WITH_LEGACY(Id, Tag, Description)
+///   Like SWIFT_FUNCTION_PASS, but the a C++ legacy pass is used if the not
+///   built with libswift.
+///   The C++ legacy creation function must be named 'createLegacy<Id>'
+///
+#ifndef SWIFT_FUNCTION_PASS_WITH_LEGACY
+#define SWIFT_FUNCTION_PASS_WITH_LEGACY(Id, Tag, Description) \
+        SWIFT_FUNCTION_PASS(Id, Tag, Description)
+#endif
+
 /// PASS_RANGE(RANGE_ID, START, END)
 ///   Pass IDs between PassKind::START and PassKind::END, inclusive,
 ///   fall within the set known as
@@ -374,5 +395,7 @@ PASS(PruneVTables, "prune-vtables",
 PASS_RANGE(AllPasses, AADumper, PruneVTables)
 
 #undef IRGEN_PASS
+#undef SWIFT_FUNCTION_PASS
+#undef SWIFT_FUNCTION_PASS_WITH_LEGACY
 #undef PASS
 #undef PASS_RANGE

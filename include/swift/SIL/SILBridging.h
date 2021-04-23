@@ -41,6 +41,10 @@ enum ChangeNotificationKind {
 };
 
 typedef struct {
+  const void * _Nonnull opaqueCtxt;
+} BridgedPassContext;
+
+typedef struct {
   void * _Null_unspecified word0;
   void * _Null_unspecified word1;
   void * _Null_unspecified word2;
@@ -112,6 +116,11 @@ typedef long SwiftInt;
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
 
 void freeBridgedStringRef(BridgedStringRef str);
+
+void PassContext_notifyChanges(BridgedPassContext passContext,
+                               enum ChangeNotificationKind changeKind);
+void PassContext_eraseInstruction(BridgedPassContext passContext,
+                                  BridgedInstruction inst);
 
 BridgedStringRef SILFunction_getName(BridgedFunction function);
 BridgedStringRef SILFunction_debugDescription(BridgedFunction function);
