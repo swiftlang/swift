@@ -24,9 +24,19 @@ typedef struct {
   BridgedPassContext passContext;
 } BridgedFunctionPassCtxt;
 
+typedef struct {
+  BridgedInstruction instruction;
+  BridgedPassContext passContext;
+} BridgedInstructionPassCtxt;
+
 typedef void (*BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
+typedef void (*BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
+
 void SILPassManager_registerFunctionPass(BridgedStringRef name,
                                          BridgedFunctionPassRunFn runFn);
+
+void SILCombine_registerInstructionPass(BridgedStringRef name,
+                                        BridgedInstructionPassRunFn runFn);
 
 #ifdef __cplusplus
 } // extern "C"
