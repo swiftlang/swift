@@ -1155,25 +1155,9 @@ public:
     // Nothing to do here.  The error result pointer is already in the
     // appropriate position.
   }
-  FunctionPointer getFunctionPointerForDispatchCall(const FunctionPointer &fn) {
-    auto &IGM = subIGF.IGM;
-    // Strip off the return type. The original function pointer signature
-    // captured both the entry point type and the resume function type.
-    auto *fnTy = llvm::FunctionType::get(
-        IGM.VoidTy, fn.getSignature().getType()->params(), false /*vaargs*/);
-    auto signature =
-        Signature(fnTy, fn.getSignature().getAttributes(), IGM.SwiftAsyncCC);
-    auto fnPtr =
-        FunctionPointer(FunctionPointer::Kind::Function, fn.getRawPointer(),
-                        fn.getAuthInfo(), signature);
-    return fnPtr;
-  }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
-    PointerAuthInfo newAuthInfo;
-    if (auto authInfo = fnPtr.getAuthInfo()) {
-      newAuthInfo = PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
-                                    authInfo.getDiscriminator());
-    }
+    PointerAuthInfo newAuthInfo =
+        fnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF), newAuthInfo,
         Signature::forAsyncAwait(subIGF.IGM, origType));
@@ -1196,7 +1180,7 @@ public:
     arguments.push_back(
         Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
     auto dispatchFn = subIGF.createAsyncDispatchFn(
-        getFunctionPointerForDispatchCall(newFnPtr), argValues);
+        getFunctionPointerForDispatchCall(IGM, newFnPtr), argValues);
     arguments.push_back(
         Builder.CreateBitOrPointerCast(dispatchFn, IGM.Int8PtrTy));
     arguments.push_back(
@@ -1212,35 +1196,7 @@ public:
   }
   void createReturn(llvm::CallInst *call) override {
     emitDeallocAsyncContext(subIGF, calleeContextBuffer);
-    auto numAsyncContextParams =
-        Signature::forAsyncReturn(IGM, outType).getAsyncContextIndex() + 1;
-    llvm::Value *result = call;
-    auto *suspendResultTy = cast<llvm::StructType>(result->getType());
-    Explosion resultExplosion;
-    Explosion errorExplosion;
-    SILFunctionConventions conv(outType, subIGF.getSILModule());
-    auto hasError = outType->hasErrorResult();
-
-    Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
-    SmallVector<llvm::Value *, 16> nativeResultsStorage;
-
-    if (suspendResultTy->getNumElements() == numAsyncContextParams) {
-      // no result to forward.
-      assert(!hasError);
-    } else {
-      auto &Builder = subIGF.Builder;
-      auto resultTys =
-          makeArrayRef(suspendResultTy->element_begin() + numAsyncContextParams,
-                       suspendResultTy->element_end());
-
-      for (unsigned i = 0, e = resultTys.size(); i != e; ++i) {
-        llvm::Value *elt =
-            Builder.CreateExtractValue(result, numAsyncContextParams + i);
-        nativeResultsStorage.push_back(elt);
-      }
-      nativeResults = nativeResultsStorage;
-    }
-    emitAsyncReturn(subIGF, layout, origType, nativeResults);
+    forwardAsyncCallResult(subIGF, origType, layout, call);
   }
   void end() override {
     assert(context.isValid());
@@ -2331,43 +2287,54 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }
 
-llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
-  auto name = "__swift_async_resume_project_context";
+llvm::Value *
+IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+  auto addr = Builder.CreateBitOrPointerCast(calleeContext, IGM.Int8PtrPtrTy);
+  Address callerContextAddr(addr, IGM.getPointerAlignment());
+  llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
+    auto authInfo =
+        PointerAuthInfo::emit(*this, schema, addr, PointerAuthEntity());
+    callerContext = emitPointerAuthAuth(*this, callerContext, authInfo);
+  }
+  // TODO: remove this once all platforms support lowering the intrinsic.
+  // At the time of this writing only arm64 supports it.
+  if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {
+    llvm::Value *storedCallerContext = callerContext;
+    auto contextLocationInExtendedFrame =
+        Address(Builder.CreateIntrinsicCall(
+                    llvm::Intrinsic::swift_async_context_addr, {}),
+                IGM.getPointerAlignment());
+    // On arm64e we need to sign this pointer address discriminated
+    // with 0xc31a and process dependent key.
+    if (auto schema =
+            IGM.getOptions().PointerAuth.AsyncContextExtendedFrameEntry) {
+      auto authInfo = PointerAuthInfo::emit(
+          *this, schema, contextLocationInExtendedFrame.getAddress(),
+          PointerAuthEntity());
+      storedCallerContext =
+          emitPointerAuthSign(*this, storedCallerContext, authInfo);
+    }
+    Builder.CreateStore(storedCallerContext, contextLocationInExtendedFrame);
+  }
+  return callerContext;
+}
+
+llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
+  // The prologue version lacks artificial debug info as this would cause
+  // verification errors when it gets inlined.
+  auto name = forPrologue ? "__swift_async_resume_project_context_prologue"
+                          : "__swift_async_resume_project_context";
   auto Fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
       [&](IRGenFunction &IGF) {
         auto it = IGF.CurFn->arg_begin();
         auto &Builder = IGF.Builder;
-        auto addr = Builder.CreateBitOrPointerCast(&(*it), IGF.IGM.Int8PtrPtrTy);
-        Address callerContextAddr(addr, IGF.IGM.getPointerAlignment());
-        llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
-        if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
-          auto authInfo =
-              PointerAuthInfo::emit(IGF, schema, addr, PointerAuthEntity());
-          callerContext = emitPointerAuthAuth(IGF, callerContext, authInfo);
-        }
-        // TODO: remove this once all platforms support lowering the intrinsic.
-        // At the time of this writing only arm64 supports it.
-        if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {
-          llvm::Value *storedCallerContext = callerContext;
-          auto contextLocationInExtendedFrame =
-              Address(Builder.CreateIntrinsicCall(
-                          llvm::Intrinsic::swift_async_context_addr, {}),
-                      IGM.getPointerAlignment());
-          // On arm64e we need to sign this pointer address discriminated
-          // with 0xc31a and process dependent key.
-          if (auto schema = IGF.IGM.getOptions()
-                                .PointerAuth.AsyncContextExtendedFrameEntry) {
-            auto authInfo = PointerAuthInfo::emit(
-                IGF, schema, contextLocationInExtendedFrame.getAddress(),
-                PointerAuthEntity());
-            storedCallerContext = emitPointerAuthSign(IGF, storedCallerContext, authInfo);
-          }
-          Builder.CreateStore(storedCallerContext, contextLocationInExtendedFrame);
-        }
+        auto addr = &(*it);
+        auto callerContext = IGF.emitAsyncResumeProjectContext(addr);
         Builder.CreateRet(callerContext);
       },
-      false /*isNoInline*/));
+      false /*isNoInline*/, forPrologue));
   Fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return Fn;
 }
@@ -2406,7 +2373,8 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   dispatch->setCallingConv(IGM.SwiftAsyncCC);
   dispatch->setDoesNotThrow();
   IRGenFunction dispatchIGF(IGM, dispatch);
-  if (IGM.DebugInfo)
+  // Don't emit debug info if we are generating a function for the prologue.
+  if (IGM.DebugInfo && Builder.getCurrentDebugLocation())
     IGM.DebugInfo->emitArtificialFunction(dispatchIGF, dispatch);
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
