@@ -1135,7 +1135,16 @@ public:
                             SourceLoc RBraceLoc,
                             SourceLoc EndLoc,
                             ASTContext &C);
-  
+
+  static SwitchStmt *createImplicit(LabeledStmtInfo LabelInfo,
+                                    Expr *SubjectExpr, ArrayRef<ASTNode> Cases,
+                                    ASTContext &C) {
+    return SwitchStmt::create(LabelInfo, /*SwitchLoc=*/SourceLoc(), SubjectExpr,
+                              /*LBraceLoc=*/SourceLoc(), Cases,
+                              /*RBraceLoc=*/SourceLoc(), /*EndLoc=*/SourceLoc(),
+                              C);
+  }
+
   /// Get the source location of the 'switch' keyword.
   SourceLoc getSwitchLoc() const { return SwitchLoc; }
   /// Get the source location of the opening brace.
