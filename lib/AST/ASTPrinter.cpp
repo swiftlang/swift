@@ -2745,6 +2745,35 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinExecutor(Decl *decl) {
+  auto typeHasBuiltinExecutor = [](Type type) {
+    return type.findIf([&](Type type) {
+      if (auto builtinTy = type->getAs<BuiltinType>())
+        return builtinTy->getBuiltinTypeKind()
+            == BuiltinTypeKind::BuiltinExecutor;
+
+      return false;
+    });
+  };
+
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      if (typeHasBuiltinExecutor(type))
+        return true;
+    }
+  }
+
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+    for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
+      if (Type type = patternBinding->getPattern(idx)->getType())
+        if (typeHasBuiltinExecutor(type))
+          return true;
+    }
+  }
+
+  return false;
+}
+
 static bool usesFeatureBuiltinContinuation(Decl *decl) {
   return false;
 }
