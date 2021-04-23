@@ -18,5 +18,6 @@ add_libswift_module(SIL
   Registration.swift
   Type.swift
   Utils.swift
+  StackList.swift
   Value.swift)
 

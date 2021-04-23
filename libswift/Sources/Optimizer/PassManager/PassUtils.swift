@@ -49,6 +49,12 @@ struct FunctionPass {
   }
 }
 
+extension StackList {
+  init(_ context: FunctionPassContext) {
+    self.init(context: context.passContext)
+  }
+}
+
 extension Builder {
   init(at insPnt: Instruction, location: Location,
        _ context: FunctionPassContext) {

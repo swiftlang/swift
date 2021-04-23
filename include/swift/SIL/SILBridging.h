@@ -30,6 +30,14 @@ enum {
   BridgedOperandSize = 4 * sizeof(uintptr_t)
 };
 
+typedef struct {
+  void * _Nullable data;
+} BridgedSlab;
+
+enum {
+  BridgedSlabCapacity = 64 * sizeof(uintptr_t)
+};
+
 enum ChangeNotificationKind {
   instructionsChanged,
   callsChanged,
@@ -117,6 +125,11 @@ void PassContext_notifyChanges(BridgedPassContext passContext,
                                enum ChangeNotificationKind changeKind);
 void PassContext_eraseInstruction(BridgedPassContext passContext,
                                   BridgedInstruction inst);
+BridgedSlab PassContext_getNextSlab(BridgedSlab slab);
+BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
+                                  BridgedSlab afterSlab);
+BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
+                                 BridgedSlab slab);
 
 BridgedStringRef SILFunction_getName(BridgedFunction function);
 BridgedStringRef SILFunction_debugDescription(BridgedFunction function);
