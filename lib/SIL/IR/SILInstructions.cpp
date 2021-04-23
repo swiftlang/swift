@@ -76,7 +76,7 @@ static void buildTypeDependentOperands(
     SmallVectorImpl<SILValue> &TypeDependentOperands, SILFunction &F) {
 
   for (auto archetype : OpenedArchetypes) {
-    SILValue def = F.getModule().getOpenedArchetypeDef(archetype);
+    SILValue def = F.getModule().getOpenedArchetypeDef(archetype, &F);
     assert(def->getFunction() == &F &&
            "def of opened archetype is in wrong function");
     TypeDependentOperands.push_back(def);
