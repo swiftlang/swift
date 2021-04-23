@@ -135,6 +135,13 @@ namespace irgen {
       assert(isSigned());
       return Discriminator;
     }
+    PointerAuthInfo getCorrespondingCodeAuthInfo() const {
+      if (auto authInfo = *this) {
+        return PointerAuthInfo(authInfo.getCorrespondingCodeKey(),
+                               authInfo.getDiscriminator());
+      }
+      return *this;
+    }
 
     /// Are the auth infos obviously the same?
     friend bool operator==(const PointerAuthInfo &lhs,
