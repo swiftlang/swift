@@ -4,6 +4,7 @@ add_swift_host_library(LibSwiftSIL
   PURE_SWIFT
   Argument.swift
   BasicBlock.swift
+  Builder.swift
   Function.swift
   GlobalVariable.swift
   Instruction.swift

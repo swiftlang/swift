@@ -13,6 +13,7 @@
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILNode.h"
+#include "swift/SIL/SILBuilder.h"
 
 using namespace swift;
 
@@ -361,4 +362,27 @@ BridgedStringRef CondFailInst_getMessage(BridgedInstruction cfi) {
 
 BridgedGlobalVar GlobalAccessInst_getGlobal(BridgedInstruction globalInst) {
   return {castToInst<GlobalAccessInst>(globalInst)->getReferencedGlobal()};
+}
+
+//===----------------------------------------------------------------------===//
+//                                SILBuilder
+//===----------------------------------------------------------------------===//
+
+BridgedInstruction SILBuilder_createBuiltinBinaryFunction(
+          BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedStringRef name,
+          BridgedType operandType, BridgedType resultType,
+          BridgedValueArray arguments) {
+    SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+    SmallVector<SILValue, 16> argValues;
+    return {builder.createBuiltinBinaryFunction(getRegularLocation(loc),
+      getStringRef(name), getSILType(operandType), getSILType(resultType),
+      getSILValues(arguments, argValues))};
+}
+
+BridgedInstruction SILBuilder_createCondFail(BridgedInstruction insertionPoint,
+          BridgedLocation loc, BridgedValue condition, BridgedStringRef messge) {
+  SILBuilder builder(castToInst(insertionPoint), getSILDebugScope(loc));
+  return {builder.createCondFail(getRegularLocation(loc),
+    castToSILValue(condition), getStringRef(messge))};
 }

@@ -49,3 +49,15 @@ struct FunctionPass {
   }
 }
 
+extension Builder {
+  init(at insPnt: Instruction, location: Location,
+       _ context: FunctionPassContext) {
+    self.init(insertionPoint: insPnt, location: location,
+              passContext: context.passContext)
+  }
+
+  init(at insPnt: Instruction, _ context: FunctionPassContext) {
+    self.init(insertionPoint: insPnt, location: insPnt.location,
+              passContext: context.passContext)
+  }
+}
