@@ -64,6 +64,31 @@
         SWIFT_FUNCTION_PASS(Id, Tag, Description)
 #endif
 
+/// SWIFT_INSTRUCTION_PASS(Inst, Tag)
+///   Similar to SWIFT_FUNCTION_PASS, but defines an instruction pass which is
+///   implemented in libswift and is run by the SILCombiner.
+///   The \p Inst argument specifies the instruction class, and \p Tag a name
+///   for the pass.
+///
+///   No further code is need on the C++ side. In libswift an instruction pass
+///   with the same name must be registered with 'registerPass()'.
+///
+#ifndef SWIFT_INSTRUCTION_PASS
+#define SWIFT_INSTRUCTION_PASS(Inst, Tag)
+#endif
+
+/// SWIFT_INSTRUCTION_PASS_WITH_LEGACY(Inst, Tag)
+///   Like SWIFT_INSTRUCTION_PASS, but the a C++ legacy SILCombine visit
+///   function is used if the not
+///   built with libswift.
+///   The C++ legacy visit function must be named
+///   'SILCombiner::legacyVisit<Inst>'.
+///
+#ifndef SWIFT_INSTRUCTION_PASS_WITH_LEGACY
+#define SWIFT_INSTRUCTION_PASS_WITH_LEGACY(Inst, Tag) \
+        SWIFT_INSTRUCTION_PASS(Inst, Tag)
+#endif
+
 /// PASS_RANGE(RANGE_ID, START, END)
 ///   Pass IDs between PassKind::START and PassKind::END, inclusive,
 ///   fall within the set known as
@@ -399,5 +424,7 @@ PASS_RANGE(AllPasses, AADumper, PruneVTables)
 #undef IRGEN_PASS
 #undef SWIFT_FUNCTION_PASS
 #undef SWIFT_FUNCTION_PASS_WITH_LEGACY
+#undef SWIFT_INSTRUCTION_PASS
+#undef SWIFT_INSTRUCTION_PASS_WITH_LEGACY
 #undef PASS
 #undef PASS_RANGE

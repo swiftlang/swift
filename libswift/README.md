@@ -97,6 +97,20 @@ To add a new function pass:
 
 All SIL modifications, which a pass can do, are going through the `FunctionPassContext` - the second parameter of its run-function. In other words, the context is the central place to make modifications. This enables automatic change notifications to the pass manager. Also, it makes it easier to build a concurrent pass manager in future.
 
+### Instruction Passes
+
+In addition to function passes, _libswift_ provides the infrastructure for instruction passes. Instruction passes are invoked from SILCombine (in the C++ SILOptimizer) and correspond to a visit-function in SILCombine.
+
+With instruction passes it's possible to implement small peephole optimizations for certain instruction classes.
+
+To add a new instruction pass:
+
+* add a `SWIFT_INSTRUCTION_PASS` entry in `Passes.def`
+* create a new Swift file in `libswift/Sources/Optimizer/InstructionPasses`
+* add an `InstructionPass` global
+* register the pass in `registerSwiftPasses()`
+* if this passes replaces an existing `SILCombiner` visit function, remove the old visit function
+
 ## Performance
 
 The performance of _libswift_ is very important, because compile time is critical.

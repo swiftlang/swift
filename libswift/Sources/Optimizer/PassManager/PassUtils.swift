@@ -15,6 +15,8 @@ import OptimizerBridging
 
 public typealias BridgedFunctionPassCtxt =
   OptimizerBridging.BridgedFunctionPassCtxt
+public typealias BridgedInstructionPassCtxt =
+  OptimizerBridging.BridgedInstructionPassCtxt
 
 struct FunctionPassContext {
 
@@ -49,8 +51,41 @@ struct FunctionPass {
   }
 }
 
+struct InstructionPassContext {
+  fileprivate let passContext: BridgedPassContext
+
+  func erase(instruction: Instruction) {
+    PassContext_eraseInstruction(passContext, instruction.bridged)
+  }
+
+  private func notifyChanges(_ kind: ChangeNotificationKind) {
+    PassContext_notifyChanges(passContext, kind)
+  }
+}
+
+struct InstructionPass<InstType: Instruction> {
+
+  let name: String
+  let runFunction: (InstType, InstructionPassContext) -> ()
+
+  public init(name: String, _ runFunction: @escaping (InstType, InstructionPassContext) -> ()) {
+    self.name = name
+    self.runFunction = runFunction
+  }
+
+  func run(_ bridgedCtxt: BridgedInstructionPassCtxt) {
+    let inst = bridgedCtxt.instruction.getAs(InstType.self)
+    let context = InstructionPassContext(passContext: bridgedCtxt.passContext)
+    runFunction(inst, context)
+  }
+}
+
 extension StackList {
   init(_ context: FunctionPassContext) {
+    self.init(context: context.passContext)
+  }
+  
+  init(_ context: InstructionPassContext) {
     self.init(context: context.passContext)
   }
 }
@@ -63,6 +98,17 @@ extension Builder {
   }
 
   init(at insPnt: Instruction, _ context: FunctionPassContext) {
+    self.init(insertionPoint: insPnt, location: insPnt.location,
+              passContext: context.passContext)
+  }
+
+  init(at insPnt: Instruction, location: Location,
+       _ context: InstructionPassContext) {
+    self.init(insertionPoint: insPnt, location: location,
+              passContext: context.passContext)
+  }
+
+  init(at insPnt: Instruction, _ context: InstructionPassContext) {
     self.init(insertionPoint: insPnt, location: insPnt.location,
               passContext: context.passContext)
   }

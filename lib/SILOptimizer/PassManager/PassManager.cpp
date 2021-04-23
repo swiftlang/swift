@@ -1101,14 +1101,6 @@ FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
   return prev;
 }
 
-void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
-  if (silCombiner) {
-    // TODO
-  } else {
-    eraseInstructionImpl(inst);
-  }
-}
-
 void LibswiftPassInvocation::eraseInstructionImpl(SILInstruction *inst) {
   inst->removeFromParent();
   toDelete.push_back(inst);
