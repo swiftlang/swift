@@ -82,6 +82,20 @@ For example, to add a new instruction class:
 
 No yet implemented instruction classes are mapped to a "placeholder" instruction, e.g `UnimplementedInstruction`. This ensures that optimizations can process any kind of SIL, even if some instructions don't have a representation in _libswift_ yet.
 
+## The Optimizer
+
+Similar to SIL, the optimizer also uses a small bridging layer (`OptimizerBriding.h`).
+Passes are registered in `registerSwiftPasses()`, called from `initializeLibSwift()`.
+The C++ PassManager can then call a _libwift_ pass like any other `SILFunctionTransform` pass.
+
+To add a new function pass:
+
+* add a `SWIFT_FUNCTION_PASS` entry in `Passes.def`
+* create a new Swift file in `libswift/Sources/Optimizer/FunctionPasses`
+* add a `FunctionPass` global
+* register the pass in `registerSwiftPasses()`
+
+All SIL modifications, which a pass can do, are going through the `FunctionPassContext` - the second parameter of its run-function. In other words, the context is the central place to make modifications. This enables automatic change notifications to the pass manager. Also, it makes it easier to build a concurrent pass manager in future.
 
 ## Performance
 

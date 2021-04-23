@@ -11,8 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 import LibSwiftSIL
+import OptimizerBridging
 
 @_cdecl("initializeLibSwift")
 public func initializeLibSwift() {
   registerSILClasses()
+  registerSwiftPasses()
+}
+
+private func registerPass(
+      _ pass: FunctionPass,
+      _ runFn: @escaping (@convention(c) (BridgedFunctionPassCtxt) -> ())) {
+  pass.name.withBridgedStringRef { nameStr in
+    SILPassManager_registerFunctionPass(nameStr, runFn)
+  }
+}
+
+private func registerSwiftPasses() {
 }

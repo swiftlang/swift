@@ -16,6 +16,7 @@
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -31,6 +32,9 @@
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Chrono.h"
+extern "C" {
+#include "swift/SILOptimizer/OptimizerBridging.h"
+}
 
 using namespace swift;
 
@@ -318,8 +322,9 @@ void swift::executePassPipelinePlan(SILModule *SM,
 
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
                                irgen::IRGenModule *IRMod)
-    : Mod(M), IRMod(IRMod), isMandatory(isMandatory),
-      deserializationNotificationHandler(nullptr) {
+    : Mod(M), IRMod(IRMod),
+      libswiftPassInvocation(this, /*SILCombiner*/ nullptr),
+      isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"
@@ -462,7 +467,19 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                        SILForceVerifyAroundPass.end(), MatchFun)) {
     forcePrecomputeAnalyses(F);
   }
+  
+  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
+         && "change notifications not cleared");
+  
+  // Run it!
   SFT->run();
+
+  if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
+    invalidateAnalysis(F, changeNotifications);
+    changeNotifications = SILAnalysis::InvalidationKind::Nothing;
+  }
+  libswiftPassInvocation.finishedPassRun();
+
   if (SILForceVerifyAll ||
       SILForceVerifyAroundPass.end() !=
           std::find_if(SILForceVerifyAroundPass.begin(),
@@ -1059,3 +1076,58 @@ void SILPassManager::viewCallGraph() {
   llvm::ViewGraph(&OCG, "callgraph");
 #endif
 }
+
+//===----------------------------------------------------------------------===//
+//                           LibswiftPassInvocation
+//===----------------------------------------------------------------------===//
+
+void LibswiftPassInvocation::eraseInstruction(SILInstruction *inst) {
+  if (silCombiner) {
+    // TODO
+  } else {
+    eraseInstructionImpl(inst);
+  }
+}
+
+void LibswiftPassInvocation::eraseInstructionImpl(SILInstruction *inst) {
+  inst->removeFromParent();
+  toDelete.push_back(inst);
+}
+
+void LibswiftPassInvocation::finishedPassRun() {
+  for (SILInstruction *inst : toDelete) {
+    SILInstruction::destroy(inst);
+  }
+  toDelete.clear();
+}
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+inline LibswiftPassInvocation *castToPassInvocation(BridgedPassContext ctxt) {
+  return const_cast<LibswiftPassInvocation *>(
+    static_cast<const LibswiftPassInvocation *>(ctxt.opaqueCtxt));
+}
+
+void PassContext_notifyChanges(BridgedPassContext passContext,
+                               enum ChangeNotificationKind changeKind) {
+  LibswiftPassInvocation *inv = castToPassInvocation(passContext);
+  switch (changeKind) {
+  case instructionsChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
+    break;
+  case callsChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    break;
+  case branchesChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+    break;
+  }
+}
+
+void PassContext_eraseInstruction(BridgedPassContext passContext,
+                                   BridgedInstruction inst) {
+  castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
+}
+
