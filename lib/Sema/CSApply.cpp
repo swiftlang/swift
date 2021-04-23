@@ -3101,6 +3101,7 @@ namespace {
                            DeclNameLoc nameLoc, bool implicit,
                            ConstraintLocator *ctorLocator,
                            SelectedOverload overload) {
+      auto locator = cs.getConstraintLocator(expr);
       auto choice = overload.choice;
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
@@ -3108,9 +3109,8 @@ namespace {
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
-        return buildMemberRef(
-            base, dotLoc, overload, nameLoc, cs.getConstraintLocator(expr),
-            ctorLocator, implicit, AccessSemantics::Ordinary);
+        return buildMemberRef(base, dotLoc, overload, nameLoc, locator,
+                              ctorLocator, implicit, AccessSemantics::Ordinary);
       }
 
       // The subexpression must be either 'self' or 'super'.
@@ -3160,8 +3160,7 @@ namespace {
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
 
-      return finishApply(call, cs.getType(expr), cs.getConstraintLocator(expr),
-                         ctorLocator);
+      return finishApply(call, cs.getType(expr), locator, ctorLocator);
     }
 
     /// Give the deprecation warning for referring to a global function
@@ -4843,19 +4842,19 @@ namespace {
         }
 
         auto kind = origComponent.getKind();
-        auto locator = cs.getConstraintLocator(
-            E, LocatorPathElt::KeyPathComponent(i));
+        auto componentLocator =
+            cs.getConstraintLocator(E, LocatorPathElt::KeyPathComponent(i));
 
-        // Adjust the locator such that it includes any additional elements to
-        // point to the component's callee, e.g a SubscriptMember for a
-        // subscript component.
-        locator = cs.getCalleeLocator(locator);
+        // Get a locator such that it includes any additional elements to point
+        // to the component's callee, e.g a SubscriptMember for a subscript
+        // component.
+        auto calleeLoc = cs.getCalleeLocator(componentLocator);
 
         bool isDynamicMember = false;
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
             kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
-          auto foundDecl = solution.getOverloadChoiceIfAvailable(locator);
+          auto foundDecl = solution.getOverloadChoiceIfAvailable(calleeLoc);
           if (!foundDecl) {
             // If we couldn't resolve the component, leave it alone.
             resolvedComponents.push_back(origComponent);
@@ -4878,9 +4877,9 @@ namespace {
 
         switch (kind) {
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
-          buildKeyPathPropertyComponent(solution.getOverloadChoice(locator),
-                                        origComponent.getLoc(),
-                                        locator, resolvedComponents);
+          buildKeyPathPropertyComponent(solution.getOverloadChoice(calleeLoc),
+                                        origComponent.getLoc(), calleeLoc,
+                                        resolvedComponents);
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
@@ -4889,9 +4888,9 @@ namespace {
             subscriptLabels = origComponent.getSubscriptLabels();
 
           buildKeyPathSubscriptComponent(
-              solution.getOverloadChoice(locator),
-              origComponent.getLoc(), origComponent.getIndexExpr(),
-              subscriptLabels, locator, resolvedComponents);
+              solution.getOverloadChoice(calleeLoc), origComponent.getLoc(),
+              origComponent.getIndexExpr(), subscriptLabels, componentLocator,
+              resolvedComponents);
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
@@ -5140,9 +5139,10 @@ namespace {
         SmallVectorImpl<KeyPathExpr::Component> &components) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
+      auto memberLoc = cs.getCalleeLocator(locator);
 
       // Compute substitutions to refer to the member.
-      auto ref = resolveConcreteDeclRef(subscript, locator);
+      auto ref = resolveConcreteDeclRef(subscript, memberLoc);
 
       // If this is a @dynamicMemberLookup reference to resolve a property
       // through the subscript(dynamicMember:) member, restore the
@@ -5161,12 +5161,15 @@ namespace {
         if (overload.choice.getKind() ==
             OverloadChoiceKind::KeyPathDynamicMemberLookup) {
           indexExpr = buildKeyPathDynamicMemberIndexExpr(
-              indexType->castTo<BoundGenericType>(), componentLoc, locator);
+              indexType->castTo<BoundGenericType>(), componentLoc, memberLoc);
         } else {
           auto fieldName = overload.choice.getName().getBaseIdentifier().str();
           indexExpr = buildDynamicMemberLookupIndexExpr(fieldName, componentLoc,
                                                         indexType);
         }
+        // Record the implicit subscript expr's parameter bindings and matching
+        // direction as `coerceCallArguments` requires them.
+        solution.recordSingleArgMatchingChoice(locator);
       }
 
       auto subscriptType =
@@ -5174,10 +5177,11 @@ namespace {
       auto resolvedTy = subscriptType->getResult();
 
       // Coerce the indices to the type the subscript expects.
-      auto *newIndexExpr =
-          coerceCallArguments(indexExpr, subscriptType, ref,
-                              /*applyExpr*/ nullptr, labels,
-                              locator, /*appliedPropertyWrappers*/ {});
+      auto *newIndexExpr = coerceCallArguments(
+          indexExpr, subscriptType, ref,
+          /*applyExpr*/ nullptr, labels,
+          cs.getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
+          /*appliedPropertyWrappers*/ {});
 
       // We need to be able to hash the captured index values in order for
       // KeyPath itself to be hashable, so check that all of the subscript
@@ -5773,6 +5777,8 @@ Expr *ExprRewriter::coerceCallArguments(
     ArrayRef<Identifier> argLabels,
     ConstraintLocatorBuilder locator,
     ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers) {
+  assert(locator.last() && locator.last()->is<LocatorPathElt::ApplyArgument>());
+
   auto &ctx = getConstraintSystem().getASTContext();
   auto params = funcType->getParams();
   unsigned appliedWrapperIndex = 0;
@@ -5784,11 +5790,6 @@ Expr *ExprRewriter::coerceCallArguments(
     return locator.withPathElement(
         LocatorPathElt::ApplyArgToParam(argIdx, paramIdx, flags));
   };
-
-  bool matchCanFail =
-      llvm::any_of(params, [](const AnyFunctionType::Param &param) {
-        return param.getPlainType()->hasUnresolvedType();
-      });
 
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
@@ -5825,34 +5826,14 @@ Expr *ExprRewriter::coerceCallArguments(
   // Apply labels to arguments.
   AnyFunctionType::relabelParams(args, argLabels);
 
-  MatchCallArgumentListener listener;
   auto unlabeledTrailingClosureIndex =
       arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
 
-  // Determine the trailing closure matching rule that was applied. This
-  // is only relevant for explicit calls and subscripts.
-  auto trailingClosureMatching = TrailingClosureMatching::Forward;
-  {
-    SmallVector<LocatorPathElt, 4> path;
-    auto anchor = locator.getLocatorParts(path);
-    if (!path.empty() && path.back().is<LocatorPathElt::ApplyArgument>() &&
-        !anchor.isExpr(ExprKind::UnresolvedDot)) {
-      auto locatorPtr = cs.getConstraintLocator(locator);
-      assert(solution.trailingClosureMatchingChoices.count(locatorPtr) == 1);
-      trailingClosureMatching = solution.trailingClosureMatchingChoices.find(
-          locatorPtr)->second;
-    }
-  }
-
-  auto callArgumentMatch = constraints::matchCallArguments(
-      args, params, paramInfo, unlabeledTrailingClosureIndex,
-      /*allowFixes=*/false, listener, trailingClosureMatching);
-
-  assert((matchCanFail || callArgumentMatch) &&
-         "Call arguments did not match up?");
-  (void)matchCanFail;
-
-  auto parameterBindings = std::move(callArgumentMatch->parameterBindings);
+  // Determine the parameter bindings that were applied.
+  auto *locatorPtr = cs.getConstraintLocator(locator);
+  assert(solution.argumentMatchingChoices.count(locatorPtr) == 1);
+  auto parameterBindings = solution.argumentMatchingChoices.find(locatorPtr)
+                               ->second.parameterBindings;
 
   // We should either have parentheses or a tuple.
   auto *argTuple = dyn_cast<TupleExpr>(arg);
@@ -6878,11 +6859,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                         ConstraintLocator::ConstructorMember}));
 
         solution.overloadChoices.insert({memberLoc, overload});
-        solution.trailingClosureMatchingChoices.insert(
-            {cs.getConstraintLocator(callLocator,
-                                     ConstraintLocator::ApplyArgument),
-             TrailingClosureMatching::Forward});
       }
+
+      // Record the implicit call's parameter bindings and match direction.
+      solution.recordSingleArgMatchingChoice(callLocator);
 
       finishApply(implicitInit, toType, callLocator, callLocator);
       return implicitInit;

@@ -1031,14 +1031,13 @@ void Solution::dump(raw_ostream &out) const {
 
   out << "\n";
   out << "Trailing closure matching:\n";
-  for (auto &trailingClosureMatching : trailingClosureMatchingChoices) {
+  for (auto &argumentMatching : argumentMatchingChoices) {
     out.indent(2);
-    trailingClosureMatching.first->dump(sm, out);
-    switch (trailingClosureMatching.second) {
+    argumentMatching.first->dump(sm, out);
+    switch (argumentMatching.second.trailingClosureMatching) {
     case TrailingClosureMatching::Forward:
       out << ": forward\n";
       break;
-
     case TrailingClosureMatching::Backward:
       out << ": backward\n";
       break;
