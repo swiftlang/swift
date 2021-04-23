@@ -5852,39 +5852,43 @@ ERROR(atomics_ordering_must_be_constant, none,
 // MARK: access notes
 //------------------------------------------------------------------------------
 
+#define WHICH_ACCESS_NOTE(reason) "specified by access note for %" #reason
+
 REMARK(attr_added_by_access_note, none,
-       "access note for %0 adds %select{attribute|modifier}1 '%2' to this %3",
-       (StringRef, bool, StringRef, DescriptiveDeclKind))
+       "implicitly added '%1' to this %2, as " WHICH_ACCESS_NOTE(0),
+       (StringRef, StringRef, DescriptiveDeclKind))
 NOTE(fixit_attr_added_by_access_note, none,
-     "add %select{attribute|modifier}0 explicitly to silence this warning",
-     (bool))
+     "add '%0' explicitly to silence this warning",
+     (StringRef))
 
 REMARK(attr_removed_by_access_note, none,
-       "access note for %0 removes %select{attribute|modifier}1 '%2' from "
-       "this %3",
-       (StringRef, bool, StringRef, DescriptiveDeclKind))
+       "implicitly removed '%1' from this %3, as " WHICH_ACCESS_NOTE(0),
+       (StringRef, StringRef, DescriptiveDeclKind))
 NOTE(fixit_attr_removed_by_access_note, none,
-     "remove %select{attribute|modifier}0 explicitly to silence this warning",
-     (bool))
+     "remove '%0' explicitly to silence this warning",
+     (StringRef))
 
 REMARK(attr_objc_name_changed_by_access_note, none,
-        "access note for %0 changes the '@objc' name of this %1 to %2",
-        (StringRef, DescriptiveDeclKind, ObjCSelector))
+       "implicitly changed Objective-C name of this %1 to %2, as "
+       WHICH_ACCESS_NOTE(0),
+       (StringRef, DescriptiveDeclKind, ObjCSelector))
 NOTE(fixit_attr_objc_name_changed_by_access_note, none,
-     "change '@objc' name in source code explicitly to silence this warning",
+     "change Objective-C name explicitly to silence this warning",
      ())
 
 // Bad access note diagnostics. These are usually emitted as remarks, but
 // '-Raccess-note=all-validate' emits them as errors.
 
 ERROR(attr_objc_name_conflicts_with_access_note, none,
-      "access note for %0 changes the '@objc' name of this %1 to %2, but "
-      "source code specifies %3; the access note will be ignored",
+      "ignored access note: did not change Objective-C name of this %1 from %2 "
+      "to %3, even though it was " WHICH_ACCESS_NOTE(0),
       (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
 ERROR(wrap_invalid_attr_added_by_access_note, none,
-      "access note for %1 failed to add invalid "
-      "%select{attribute|modifier}2 '%3': %0",
-      (DiagnosticInfo *, StringRef, bool, StringRef))
+      "ignored access note: %0; did not implicitly add '%2' to this %3, even "
+      "though it was " WHICH_ACCESS_NOTE(1),
+      (DiagnosticInfo *, StringRef, StringRef, DescriptiveDeclKind))
+
+#undef WHICH_ACCESS_NOTE
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

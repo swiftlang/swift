@@ -79,7 +79,9 @@ expected_other_diag_re = re.compile(r'expected-(warning|note|remark)' +
 
 """Matches expected-error and its offset."""
 expected_error_re = re.compile(r'expected-error' + offset_re_fragment +
-                               r'\s*(\d*\s*)\{\{')
+                               r'\s*(\d*\s*)\{\{' +
+                               r'([^}\\]*(?:(?:\}?\\.|\}[^}])[^}\\]*)*)' +
+                               r'\}\}')
 
 """Matches the string 'marked @objc'."""
 marked_objc_re = re.compile(r'marked @objc')
@@ -88,19 +90,20 @@ marked_objc_re = re.compile(r'marked @objc')
 fixit_re = re.compile(r'{{\d+-\d+=[^}]*}}')
 
 
-def adjust_comments(offset, comment_str):
+def adjust_comments(offset, inserted_attr, comment_str):
     """Replace expected-errors with expected-remarks, and make other adjustments
        to diagnostics so that they reflect access notes."""
 
-    bad_prefix = u"access note for fancy tests failed to add invalid " + \
-                 u"attribute 'objc': "
+    prefix = u"{{ignored access note: "
+    suffix = u"; did not implicitly add '" + inserted_attr + "' to this }}"
 
     adjusted = expected_other_diag_re.sub(lambda m: u"expected-" + m.group(1) +
                                                     offsetify(offset, m.group(2)),
                                           comment_str)
     adjusted = expected_error_re.sub(lambda m: u"expected-remark" +
                                                offsetify(offset, m.group(1)) + " " +
-                                               m.group(2) + "{{" + bad_prefix,
+                                               m.group(2) + prefix + m.group(3) +
+                                               suffix,
                                      adjusted)
     adjusted = marked_objc_re.sub(u"marked @objc by an access note", adjusted)
     adjusted = fixit_re.sub(u"{{none}}", adjusted)
@@ -129,16 +132,17 @@ def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset, acces
     if offset is None:
         offset = 1
 
-    replacement = u"// access-note-adjust" + offsetify(offset) + u" [attr moved] "
+    inserted_attr = u"@objc"
+    if arg:
+      inserted_attr += u"(" + arg + u")"
 
-    if is_bad:
-        pass
-#        replacement += u"expected-note{{attribute 'objc' was added by access note " + \
-#                       u"for fancy tests}}"
-    else:
-        replacement += u"expected-remark{{access note for fancy tests adds attribute " + \
-                       u"'objc' to this }} expected-note{{add attribute explicitly to " + \
-                       u"silence this warning}}"
+    replacement = u"// access-note-adjust" + offsetify(offset) + \
+                  u"{{" + inserted_attr + "}} [attr moved] "
+
+    if not is_bad:
+        replacement += u"expected-remark{{implicitly added '" + inserted_attr + \
+                       u"' to this }} expected-note{{add '" + inserted_attr + \
+                       u"' explicitly to silence this warning}}"
 
     return replacement
 
@@ -153,9 +157,9 @@ access_note_move_re = re.compile(r'@objc(?:\(([\w:]+)\))?[ \t]*' +
                                  offset_re_fragment +
                                  r'\{\{([^}]*)\}\}')
 
-"""Matches // access-note-adjust <comment>"""
+"""Matches // access-note-adjust{{@objc}} <comment>"""
 adjust_comment_re = re.compile(r'//[ \t]*access-note-adjust' + offset_re_fragment +
-                               r'(.*)')
+                               r'\{\{([^}]*)\}\}[ \t]*(.*)')
 
 
 def replacer(fn, *args):
