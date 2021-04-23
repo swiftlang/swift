@@ -19,6 +19,20 @@ struct S<T> {
   static var instance: Self = S<T>()
 }
 
+struct MyBinding<BindingOuter> {
+  func someGenericFunc<BindingInner>(x: BindingInner) {}
+}
+
+struct MyTextField<TextFieldOuter> {
+  init<TextFieldInner>(text: MyBinding<TextFieldInner>) {}
+}
+
+struct EncodedView {
+    func foo(model: MyBinding<String>) {
+        let _ = MyTextField<String>(text: model)
+    }
+}
+
 // RUN: %sourcekitd-test -req=typecontextinfo -pos=7:12 %s -- %s > %t.response.1
 // RUN: %diff -u %s.response.1 %t.response.1
 // RUN: %sourcekitd-test -req=typecontextinfo -pos=8:12 %s -- %s > %t.response.2
@@ -32,3 +46,6 @@ struct S<T> {
 // RUN: %diff -u %s.response.5 %t.response.5
 // RUN: %sourcekitd-test -req=typecontextinfo -pos=16:18 %s -- %s > %t.response.6
 // RUN: %diff -u %s.response.6 %t.response.6
+
+// RUN: %sourcekitd-test -req=typecontextinfo -pos=32:43 %s -- %s > %t.response.7
+// RUN: %diff -u %s.response.7 %t.response.7
