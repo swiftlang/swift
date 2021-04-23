@@ -300,6 +300,24 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIn('check-swift-iphonesimulator-i386',
                       after.swift_test_run_targets)
 
+    def test_should_skip_testing_32bit_watchos(self):
+        host_target = 'watchsimulator-i386'
+        args = self.default_args()
+        args.build_watchos_simulator = True
+        args.test_watchos_simulator = True
+        args.test_watchos_32bit_simulator = False
+        args.host_target = host_target
+        args.stdlib_deployment_targets = [host_target]
+        args.build_stdlib_deployment_targets = 'all'
+
+        before = HostSpecificConfiguration(host_target, args)
+        self.assertEqual(len(before.swift_test_run_targets), 0)
+
+        args.test_watchos_32bit_simulator = True
+        after = HostSpecificConfiguration(host_target, args)
+        self.assertIn('check-swift-watchsimulator-i386',
+                      after.swift_test_run_targets)
+
     def generate_should_allow_testing_only_host(
             host_target, build_arg_name, test_arg_name, host_test_arg_name):
         def test(self):
@@ -674,6 +692,7 @@ class ToolchainTestCase(unittest.TestCase):
             test_ios_host=False,
             test_ios_simulator=False,
             test_ios_32bit_simulator=False,
+            test_watchos_32bit_simulator=True,
             test_linux=False,
             test_optimize_for_size=False,
             test_optimize_none_with_implicit_dynamic=False,
