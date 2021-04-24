@@ -37,7 +37,7 @@ extension A1 {
     _ = await self.asynchronous(nil)
 
     // Across to a different actor, so Sendable restriction is enforced.
-    _ = other.localLet // expected-warning{{cannot use property 'localLet' with a non-sendable type 'NotConcurrent' across actors}}
+    _ = await other.localLet // expected-warning{{cannot use property 'localLet' with a non-sendable type 'NotConcurrent' across actors}}
     _ = await other.synchronous() // expected-warning{{cannot call function returning non-sendable type 'NotConcurrent?' across actors}}
     _ = await other.asynchronous(nil) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   }
@@ -67,7 +67,7 @@ func globalAsync(_: NotConcurrent?) async {
 }
 
 func globalTest() async {
-  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
+  let a = await globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
   await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
 }
@@ -88,7 +88,7 @@ class ClassWithGlobalActorInits {
 
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
-  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
+  let a = await globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
   await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   _ = await ClassWithGlobalActorInits(nc) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
