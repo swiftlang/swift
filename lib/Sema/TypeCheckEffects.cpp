@@ -1436,6 +1436,11 @@ public:
     DiagnoseErrorOnTry = b;
   }
 
+  /// Return true when the current context is under an interpolated string
+  bool isWithinInterpolatedString() const {
+    return InterpolatedString != nullptr;
+  }
+
   /// Stores the location of the innermost await
   SourceLoc awaitLoc = SourceLoc();
 
@@ -2084,15 +2089,38 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   }
 
   /// Find the top location where we should put the await
-  static Expr* walkToAnchor(Expr *e,
-                            llvm::DenseMap<Expr *, Expr*> &parentMap) {
+  static Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
+                            bool isInterpolatedString) {
     Expr *parent = e;
     Expr *lastParent = e;
     while (parent && !isEffectAnchor(parent)) {
       lastParent = parent;
       parent = parentMap[parent];
     }
-    return parent && !isAnchorTooEarly(parent) ? parent : lastParent;
+
+    if (parent && !isAnchorTooEarly(parent)) {
+      return parent;
+    }
+
+    if (isInterpolatedString) {
+      // TODO: I'm being gentle with the casts to avoid breaking things
+      //       If we see incorrect fix-it locations in string interpolations
+      //       we need to change how this behaves
+      //       Assert builds will crash giving us a bug to fix, non-asserts will
+      //       quietly "just work".
+      assert(parent == nullptr && "Expected to be at top of expression");
+      assert(isa<CallExpr>(lastParent) &&
+             "Expected top of string interpolation to be CalExpr");
+      assert(isa<ParenExpr>(dyn_cast<CallExpr>(lastParent)->getArg()) &&
+             "Expected paren expr in string interpolation call");
+      if (CallExpr *callExpr = dyn_cast<CallExpr>(lastParent)) {
+        if (ParenExpr *body = dyn_cast<ParenExpr>(callExpr->getArg())) {
+          return body->getSubExpr();
+        }
+      }
+    }
+
+    return lastParent;
   }
 
   void flagInvalidCode() {
@@ -2620,7 +2648,8 @@ private:
       // Diagnose async calls that are outside of an await context.
       else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
         Expr *expr = E.dyn_cast<Expr*>();
-        Expr *anchor = walkToAnchor(expr, parentMap);
+        Expr *anchor = walkToAnchor(expr, parentMap,
+                                    CurContext.isWithinInterpolatedString());
 
         auto key = uncoveredAsync.find(anchor);
         if (key == uncoveredAsync.end()) {
