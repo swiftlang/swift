@@ -529,3 +529,9 @@ let _ = derived is (SR13899_Derived) -> Void // expected-warning{{'is' test is a
 let _ = derived is (SR13899_Derived) throws -> Void // expected-warning{{'is' test is always true}}
 let _ = blockp is (SR13899_A) -> Void //expected-warning{{'is' test is always true}}
 let _ = blockp is (SR13899_A) throws -> Void //expected-warning{{'is' test is always true}}
+
+protocol PP1 { }
+protocol PP2: PP1 { }
+extension Optional: PP1 where Wrapped == PP2 { }
+
+nil is PP1 // expected-error {{'nil' requires a contextual type}}

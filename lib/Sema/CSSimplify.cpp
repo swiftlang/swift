@@ -6442,7 +6442,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     return nullptr;
 
   // Both types have to be fixed.
-  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable() ||
+      fromType->hasPlaceholder() || toType->hasPlaceholder())
     return nullptr;
 
   SmallVector<LocatorPathElt, 4> path;
