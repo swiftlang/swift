@@ -26,19 +26,21 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/APIDigester/ModuleAnalyzerNodes.h"
+#include "swift/APIDigester/ModuleDiagsConsumer.h"
+#include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
+#include "swift/Option/Options.h"
 #include <functional>
-#include "swift/APIDigester/ModuleAnalyzerNodes.h"
-#include "swift/APIDigester/ModuleDiagsConsumer.h"
 
 using namespace swift;
 using namespace ide;
 using namespace api;
+using namespace swift::options;
 
 namespace  {
   enum class ActionType {
@@ -54,213 +56,6 @@ namespace  {
     GenerateEmptyBaseline,
   };
 } // end anonymous namespace
-
-namespace options {
-
-static llvm::cl::OptionCategory Category("swift-api-digester Options");
-
-static llvm::cl::list<std::string>
-ModuleNames("module", llvm::cl::ZeroOrMore, llvm::cl::desc("Names of modules"),
-            llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-ModuleList("module-list-file",
-           llvm::cl::desc("File containing a new-line separated list of modules"),
-           llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-ProtReqAllowList("protocol-requirement-allow-list",
-           llvm::cl::desc("File containing a new-line separated list of protocol names"),
-           llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-OutputFile("o", llvm::cl::desc("Output file"),
-           llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-OutputDir("output-dir", llvm::cl::desc("Directory path to where we dump the generated Json files"),
-           llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
-    llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-BaselineSDK("bsdk", llvm::cl::desc("path to the baseline SDK to import frameworks"),
-    llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-Triple("target", llvm::cl::desc("target triple"),
-       llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
-                llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-ResourceDir("resource-dir",
-            llvm::cl::desc("The directory that holds the compiler resource files"),
-            llvm::cl::cat(Category));
-
-static llvm::cl::list<std::string>
-FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"),
-               llvm::cl::cat(Category));
-
-static llvm::cl::list<std::string>
-BaselineFrameworkPaths("BF", llvm::cl::desc("add a directory to the baseline framework search path"),
-                       llvm::cl::cat(Category));
-
-static llvm::cl::list<std::string>
-BaselineModuleInputPaths("BI", llvm::cl::desc("add a module for baseline input"),
-                         llvm::cl::cat(Category));
-
-static llvm::cl::list<std::string>
-ModuleInputPaths("I", llvm::cl::desc("add a module for input"),
-                 llvm::cl::cat(Category));
-
-static llvm::cl::list<std::string>
-CCSystemFrameworkPaths("iframework",
-  llvm::cl::desc("add a directory to the clang importer system framework search path"),
-  llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-AbortOnModuleLoadFailure("abort-on-module-fail",
-                        llvm::cl::desc("Abort if a module failed to load"),
-                        llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-Verbose("v", llvm::cl::desc("Verbose"),
-        llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-DebugMapping("debug-mapping", llvm::cl::desc("Dumping information for debug purposes"),
-             llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false),
-    llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-SwiftOnly("swift-only",
-          llvm::cl::desc("Only include APIs defined from Swift source"),
-          llvm::cl::init(false),
-          llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-DisableOSChecks("disable-os-checks",
-                llvm::cl::desc("Skip OS related diagnostics"),
-                llvm::cl::init(false),
-                llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"),
-            llvm::cl::cat(Category));
-
-static llvm::cl::opt<ActionType>
-Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
-      llvm::cl::cat(Category),
-      llvm::cl::values(
-          clEnumValN(ActionType::DumpSDK,
-                     "dump-sdk",
-                     "Dump SDK content to JSON file"),
-          clEnumValN(ActionType::MigratorGen,
-                     "generate-migration-script",
-                     "Compare SDK content in JSON file and generate migration script"),
-          clEnumValN(ActionType::DiagnoseSDKs,
-                     "diagnose-sdk",
-                     "Diagnose SDK content in JSON file"),
-          clEnumValN(ActionType::DeserializeDiffItems,
-                     "deserialize-diff",
-                     "Deserialize diff items in a JSON file"),
-          clEnumValN(ActionType::DeserializeSDK,
-                     "deserialize-sdk",
-                     "Deserialize sdk digester in a JSON file"),
-          clEnumValN(ActionType::FindUsr,
-                     "find-usr",
-                     "Find USR for decls by given condition"),
-          clEnumValN(ActionType::GenerateNameCorrectionTemplate,
-                     "generate-name-correction",
-                     "Generate name correction template"),
-          clEnumValN(ActionType::GenerateEmptyBaseline,
-                     "generate-empty-baseline",
-                     "Generate an empty baseline")));
-
-static llvm::cl::list<std::string>
-SDKJsonPaths("input-paths",
-            llvm::cl::desc("The SDK contents under comparison"),
-            llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-IgnoreRemovedDeclUSRs("ignored-usrs",
-                      llvm::cl::desc("the file containing USRs of removed decls "
-                                     "that the digester should ignore"),
-                      llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-SwiftVersion("swift-version",
-             llvm::cl::desc("The Swift compiler version to invoke"),
-             llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-OutputInJson("json", llvm::cl::desc("Print output in JSON format."),
-             llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-AvoidLocation("avoid-location",
-              llvm::cl::desc("Avoid serializing the file paths of SDK nodes."),
-              llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-AvoidToolArgs("avoid-tool-args",
-              llvm::cl::desc("Avoid serializing the arguments for invoking the tool."),
-              llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-LocationFilter("location",
-              llvm::cl::desc("Filter nodes with the given location."),
-              llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-CompilerStyleDiags("compiler-style-diags",
-                   llvm::cl::desc("Print compiler style diagnostics to stderr."),
-                   llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-Migrator("migrator",
-         llvm::cl::desc("Dump Json suitable for generating migration script"),
-         llvm::cl::cat(Category));
-
-static llvm::cl::list<std::string>
-PreferInterfaceForModules("use-interface-for-module", llvm::cl::ZeroOrMore,
-                          llvm::cl::desc("Prefer loading these modules via interface"),
-                          llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-BaselineFilePath("baseline-path",
-                 llvm::cl::desc("The path to the Json file that we should use as the baseline"),
-                 llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-BaselineDirPath("baseline-dir",
-                 llvm::cl::desc("The path to a directory containing baseline files: macos.json, iphoneos.json, appletvos.json, watchos.json, and iosmac.json"),
-                 llvm::cl::cat(Category));
-
-static llvm::cl::opt<bool>
-UseEmptyBaseline("empty-baseline",
-                llvm::cl::desc("Use empty baseline for diagnostics"),
-                llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-SerializedDiagPath("serialize-diagnostics-path",
-                   llvm::cl::desc("Serialize diagnostics to a path"),
-                   llvm::cl::cat(Category));
-
-static llvm::cl::opt<std::string>
-BreakageAllowlistPath("breakage-allowlist-path",
-                      llvm::cl::desc("An allowlist of breakages to not complain about"),
-                      llvm::cl::cat(Category));
-
-} // namespace options
 
 namespace {
 
@@ -1086,6 +881,7 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
   llvm::StringSet<> ProtocolReqAllowlist;
   SDKNodeRoot *LeftRoot;
   SDKNodeRoot *RightRoot;
+  bool DebugMapping;
 
   static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
     assert(N);
@@ -1131,11 +927,13 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
   }
 
 public:
-  PrunePass(SDKContext &Ctx): Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()) {}
-  PrunePass(SDKContext &Ctx, llvm::StringSet<> prAllowlist):
-    Ctx(Ctx),
-    UpdateMap(Ctx.getNodeUpdateMap()),
-    ProtocolReqAllowlist(std::move(prAllowlist)) {}
+  PrunePass(SDKContext &Ctx, bool DebugMapping)
+      : Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()),
+        DebugMapping(DebugMapping) {}
+  PrunePass(SDKContext &Ctx, llvm::StringSet<> prAllowlist, bool DebugMapping)
+      : Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()),
+        ProtocolReqAllowlist(std::move(prAllowlist)),
+        DebugMapping(DebugMapping) {}
 
   void diagnoseMissingAvailable(SDKNodeDecl *D) {
     // For extensions of external types, we diagnose individual member's missing
@@ -1163,7 +961,7 @@ public:
     }
   }
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
-    if (options::DebugMapping)
+    if (DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
     switch (Reason) {
     case NodeMatchReason::Added:
@@ -2372,7 +2170,8 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool CompilerStyleDiags,
                                 StringRef SerializedDiagPath,
-                                StringRef BreakageAllowlistPath) {
+                                StringRef BreakageAllowlistPath,
+                                bool DebugMapping) {
   assert(LeftModule);
   assert(RightModule);
   llvm::raw_ostream *OS = &llvm::errs();
@@ -2402,7 +2201,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 RightModule->getJsonFormatVersion()));
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
-  PrunePass Prune(Ctx, std::move(ProtocolReqAllowlist));
+  PrunePass Prune(Ctx, std::move(ProtocolReqAllowlist), DebugMapping);
   Prune.pass(LeftModule, RightModule);
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
   RefinementPass.pass(LeftModule, RightModule);
@@ -2417,7 +2216,8 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 llvm::StringSet<> ProtocolReqAllowlist,
                                 bool CompilerStyleDiags,
                                 StringRef SerializedDiagPath,
-                                StringRef BreakageAllowlistPath) {
+                                StringRef BreakageAllowlistPath,
+                                bool DebugMapping) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2434,7 +2234,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   return diagnoseModuleChange(
       Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
       std::move(ProtocolReqAllowlist), CompilerStyleDiags, SerializedDiagPath,
-      BreakageAllowlistPath);
+      BreakageAllowlistPath, DebugMapping);
 }
 
 static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
@@ -2461,7 +2261,8 @@ static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
 static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
                                    StringRef DiffPath,
                                    llvm::StringSet<> &IgnoredRemoveUsrs,
-                                   CheckerOptions Opts, bool OutputInJson) {
+                                   CheckerOptions Opts, bool OutputInJson,
+                                   bool DebugMapping) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2491,7 +2292,7 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   llvm::errs() << "Detecting type member diffs" << "\n";
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
 
-  PrunePass Prune(Ctx);
+  PrunePass Prune(Ctx, DebugMapping);
   Prune.pass(LeftModule, RightModule);
   llvm::errs() << "Finished pruning" << "\n";
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
@@ -2570,18 +2371,6 @@ static void setSDKPath(CompilerInvocation &InitInvok, bool IsBaseline,
       exit(1);
     }
   }
-}
-
-static void readIgnoredUsrs(llvm::StringSet<> &IgnoredUsrs,
-                            StringRef IgnoreRemovedDeclUSRs) {
-  StringRef Path = IgnoreRemovedDeclUSRs;
-  if (Path.empty())
-    return;
-  if (!fs::exists(Path)) {
-    llvm::errs() << Path << " does not exist.\n";
-    return;
-  }
-  readFileLineByLine(Path, IgnoredUsrs);
 }
 
 static int deserializeDiffItems(APIDiffItemStore &Store, StringRef DiffPath,
@@ -2696,10 +2485,10 @@ static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI,
 class SwiftAPIDigesterInvocation {
 private:
   std::string MainExecutablePath;
+  std::unique_ptr<llvm::opt::OptTable> Table;
   CompilerInvocation InitInvok;
-  ActionType Action;
+  ActionType Action = ActionType::None;
   CheckerOptions CheckerOpts;
-  llvm::StringSet<> Modules;
   llvm::StringSet<> IgnoredUsrs;
   std::string ProtReqAllowList;
   std::vector<std::string> SDKJsonPaths;
@@ -2711,6 +2500,7 @@ private:
   std::string BaselineDirPath;
   bool UseEmptyBaseline;
   bool Verbose;
+  bool DebugMapping;
   std::string BreakageAllowlistPath;
   bool OutputInJson;
   std::string SDK;
@@ -2730,75 +2520,142 @@ private:
 
 public:
   SwiftAPIDigesterInvocation(const std::string &ExecPath)
-      : MainExecutablePath(ExecPath) {}
+      : MainExecutablePath(ExecPath), Table(createSwiftOptTable()) {}
 
   int parseArgs(ArrayRef<const char *> Args) {
-    llvm::cl::HideUnrelatedOptions(options::Category);
-    llvm::cl::ParseCommandLineOptions(
-        Args.size(), llvm::makeArrayRef(Args).data(), "Swift SDK Digester\n");
+    unsigned MissingIndex;
+    unsigned MissingCount;
+    llvm::opt::InputArgList ParsedArgs = Table->ParseArgs(
+        Args, MissingIndex, MissingCount, SwiftAPIDigesterOption);
+    if (MissingCount) {
+      llvm::errs() << "error: missing argument for option '"
+                   << ParsedArgs.getArgString(MissingIndex) << "'\n";
+      return 1;
+    }
 
-    Action = options::Action;
+    if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+      for (const auto *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
+        llvm::errs() << "error: unknown argument '"
+                     << A->getAsString(ParsedArgs) << "'\n";
+      }
+      return 1;
+    }
 
-    readIgnoredUsrs(IgnoredUsrs, options::IgnoreRemovedDeclUSRs);
-    CheckerOpts = getCheckOpts(Args);
+    if (ParsedArgs.getLastArg(OPT_help)) {
+      printHelp();
+      return 1;
+    }
 
-    ProtReqAllowList = options::ProtReqAllowList;
-    SDKJsonPaths = options::SDKJsonPaths;
-    OutputFile = options::OutputFile;
-    OutputDir = options::OutputDir;
-    CompilerStyleDiags = options::CompilerStyleDiags;
-    SerializedDiagPath = options::SerializedDiagPath;
-    BaselineFilePath = options::BaselineFilePath;
-    BaselineDirPath = options::BaselineDirPath;
-    UseEmptyBaseline = options::UseEmptyBaseline;
-    Verbose = options::Verbose;
-    BreakageAllowlistPath = options::BreakageAllowlistPath;
-    OutputInJson = options::OutputInJson;
-    SDK = options::SDK;
-    BaselineSDK = options::BaselineSDK;
-    Triple = options::Triple;
-    SwiftVersion = options::SwiftVersion;
-    CCSystemFrameworkPaths = options::CCSystemFrameworkPaths;
-    BaselineFrameworkPaths = options::BaselineFrameworkPaths;
-    FrameworkPaths = options::FrameworkPaths;
-    BaselineModuleInputPaths = options::BaselineModuleInputPaths;
-    ModuleInputPaths = options::ModuleInputPaths;
-    ModuleList = options::ModuleList;
-    ModuleNames = options::ModuleNames;
-    PreferInterfaceForModules = options::PreferInterfaceForModules;
-    ResourceDir = options::ResourceDir;
-    ModuleCachePath = options::ModuleCachePath;
+    if (auto *A = ParsedArgs.getLastArg(
+            OPT_dump_sdk, OPT_generate_migration_script, OPT_diagnose_sdk,
+            OPT_deserialize_diff, OPT_deserialize_sdk, OPT_find_usr,
+            OPT_generate_name_correction, OPT_generate_empty_baseline)) {
+      switch (A->getOption().getID()) {
+      case OPT_dump_sdk:
+        Action = ActionType::DumpSDK;
+        break;
+      case OPT_generate_migration_script:
+        Action = ActionType::MigratorGen;
+        break;
+      case OPT_diagnose_sdk:
+        Action = ActionType::DiagnoseSDKs;
+        break;
+      case OPT_deserialize_diff:
+        Action = ActionType::DeserializeDiffItems;
+        break;
+      case OPT_deserialize_sdk:
+        Action = ActionType::DeserializeSDK;
+        break;
+      case OPT_find_usr:
+        Action = ActionType::FindUsr;
+        break;
+      case OPT_generate_name_correction:
+        Action = ActionType::GenerateNameCorrectionTemplate;
+        break;
+      case OPT_generate_empty_baseline:
+        Action = ActionType::GenerateEmptyBaseline;
+        break;
+      }
+    }
+
+    if (auto *A = ParsedArgs.getLastArg(OPT_ignored_usrs)) {
+      auto Path = A->getValue();
+      if (!fs::exists(Path)) {
+        llvm::errs() << Path << " does not exist.\n";
+        return 1;
+      }
+      readFileLineByLine(Path, IgnoredUsrs);
+    }
+
+    ProtReqAllowList =
+        ParsedArgs.getLastArgValue(OPT_protocol_requirement_allow_list).str();
+    SDKJsonPaths = ParsedArgs.getAllArgValues(OPT_input_paths);
+    OutputFile = ParsedArgs.getLastArgValue(OPT_o).str();
+    OutputDir = ParsedArgs.getLastArgValue(OPT_output_dir).str();
+    CompilerStyleDiags = ParsedArgs.hasArg(OPT_compiler_style_diags);
+    SerializedDiagPath =
+        ParsedArgs.getLastArgValue(OPT_serialize_diagnostics_path).str();
+    BaselineFilePath = ParsedArgs.getLastArgValue(OPT_baseline_path).str();
+    BaselineDirPath = ParsedArgs.getLastArgValue(OPT_baseline_dir).str();
+    UseEmptyBaseline = ParsedArgs.hasArg(OPT_empty_baseline);
+    Verbose = ParsedArgs.hasArg(OPT_v);
+    BreakageAllowlistPath =
+        ParsedArgs.getLastArgValue(OPT_breakage_allowlist_path).str();
+    OutputInJson = ParsedArgs.hasArg(OPT_json);
+    SDK = ParsedArgs.getLastArgValue(OPT_sdk).str();
+    BaselineSDK = ParsedArgs.getLastArgValue(OPT_bsdk).str();
+    Triple = ParsedArgs.getLastArgValue(OPT_target).str();
+    SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
+    CCSystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_iframework);
+    BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
+    FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);
+    BaselineModuleInputPaths = ParsedArgs.getAllArgValues(OPT_BI);
+    ModuleInputPaths = ParsedArgs.getAllArgValues(OPT_I);
+    ModuleList = ParsedArgs.getLastArgValue(OPT_module_list_file).str();
+    ModuleNames = ParsedArgs.getAllArgValues(OPT_module);
+    PreferInterfaceForModules =
+        ParsedArgs.getAllArgValues(OPT_use_interface_for_module);
+    ResourceDir = ParsedArgs.getLastArgValue(OPT_resource_dir).str();
+    ModuleCachePath = ParsedArgs.getLastArgValue(OPT_module_cache_path).str();
+    DebugMapping = ParsedArgs.hasArg(OPT_debug_mapping);
+
+    CheckerOpts.AvoidLocation = ParsedArgs.hasArg(OPT_avoid_location);
+    CheckerOpts.AvoidToolArgs = ParsedArgs.hasArg(OPT_avoid_tool_args);
+    CheckerOpts.ABI = ParsedArgs.hasArg(OPT_abi);
+    CheckerOpts.Migrator = ParsedArgs.hasArg(OPT_migrator);
+    CheckerOpts.Verbose = Verbose;
+    CheckerOpts.AbortOnModuleLoadFailure =
+        ParsedArgs.hasArg(OPT_abort_on_module_fail);
+    CheckerOpts.LocationFilter = ParsedArgs.getLastArgValue(OPT_location);
+    CheckerOpts.PrintModule = ParsedArgs.hasArg(OPT_print_module);
+    // When ABI checking is enabled, we should only include Swift symbols
+    // because the checking logics are language-specific.
+    CheckerOpts.SwiftOnly =
+        ParsedArgs.hasArg(OPT_abi) || ParsedArgs.hasArg(OPT_swift_only);
+    CheckerOpts.SkipOSCheck = ParsedArgs.hasArg(OPT_disable_os_checks);
+    CheckerOpts.CompilerStyle =
+        CompilerStyleDiags || !SerializedDiagPath.empty();
+    for (auto Arg : Args)
+      CheckerOpts.ToolArgs.push_back(Arg);
+
+    if (!SDK.empty()) {
+      auto Ver = getSDKBuildVersion(SDK);
+      if (!Ver.empty()) {
+        CheckerOpts.ToolArgs.push_back("-sdk-version");
+        CheckerOpts.ToolArgs.push_back(Ver);
+      }
+    }
 
     return 0;
   }
 
-  CheckerOptions getCheckOpts(ArrayRef<const char *> Args) {
-    CheckerOptions Opts;
-    Opts.AvoidLocation = options::AvoidLocation;
-    Opts.AvoidToolArgs = options::AvoidToolArgs;
-    Opts.ABI = options::Abi;
-    Opts.Migrator = options::Migrator;
-    Opts.Verbose = options::Verbose;
-    Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
-    Opts.LocationFilter = options::LocationFilter;
-    Opts.PrintModule = options::PrintModule;
-    // When ABI checking is enabled, we should only include Swift symbols
-    // because the checking logics are language-specific.
-    Opts.SwiftOnly = options::Abi || options::SwiftOnly;
-    Opts.SkipOSCheck = options::DisableOSChecks;
-    Opts.CompilerStyle =
-        options::CompilerStyleDiags || !options::SerializedDiagPath.empty();
-    for (auto Arg : Args)
-      Opts.ToolArgs.push_back(Arg);
-
-    if (!options::SDK.empty()) {
-      auto Ver = getSDKBuildVersion(options::SDK);
-      if (!Ver.empty()) {
-        Opts.ToolArgs.push_back("-sdk-version");
-        Opts.ToolArgs.push_back(Ver);
-      }
-    }
-    return Opts;
+  void printHelp() {
+    std::string ExecutableName =
+        llvm::sys::path::stem(MainExecutablePath).str();
+    Table->PrintHelp(llvm::outs(), ExecutableName.c_str(), "Swift API Digester",
+                     /*IncludedFlagsBitmask*/ SwiftAPIDigesterOption,
+                     /*ExcludedFlagsBitmask*/ 0,
+                     /*ShowAllAliases*/ false);
   }
 
   bool hasBaselineInput() {
@@ -2934,7 +2791,8 @@ public:
 
   int run(ArrayRef<const char *> Args) {
     switch (Action) {
-    case ActionType::DumpSDK:
+    case ActionType::DumpSDK: {
+      llvm::StringSet<> Modules;
       return (prepareForDump(InitInvok, Modules))
                  ? 1
                  : dumpSDKContent(InitInvok, Modules,
@@ -2942,6 +2800,7 @@ public:
                                       InitInvok.getLangOptions().Target,
                                       CheckerOpts.ABI, OutputFile, OutputDir),
                                   CheckerOpts);
+    }
     case ActionType::MigratorGen:
     case ActionType::DiagnoseSDKs: {
       ComparisonInputMode Mode = checkComparisonInputMode();
@@ -2955,35 +2814,35 @@ public:
                "Only BothJson mode is supported");
         return generateMigrationScript(SDKJsonPaths[0], SDKJsonPaths[1],
                                        OutputFile, IgnoredUsrs, CheckerOpts,
-                                       OutputInJson);
+                                       OutputInJson, DebugMapping);
       }
       switch (Mode) {
       case ComparisonInputMode::BothJson: {
         return diagnoseModuleChange(
             SDKJsonPaths[0], SDKJsonPaths[1], OutputFile, CheckerOpts,
             std::move(protocolAllowlist), CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath);
+            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
       }
       case ComparisonInputMode::BaselineJson: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getBaselineFromJson(Ctx), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath);
+            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
       }
       case ComparisonInputMode::BothLoad: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getSDKRoot(Ctx, true), getSDKRoot(Ctx, false), OutputFile,
             std::move(protocolAllowlist), CompilerStyleDiags,
-            SerializedDiagPath, BreakageAllowlistPath);
+            SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
       }
       }
     }
     case ActionType::DeserializeSDK:
     case ActionType::DeserializeDiffItems: {
       if (SDKJsonPaths.size() != 1) {
-        llvm::cl::PrintHelpMessage();
+        printHelp();
         return 1;
       }
       if (Action == ActionType::DeserializeDiffItems) {
@@ -3009,14 +2868,14 @@ public:
     }
     case ActionType::FindUsr: {
       if (SDKJsonPaths.size() != 1) {
-        llvm::cl::PrintHelpMessage();
+        printHelp();
         return 1;
       }
       return findDeclUsr(SDKJsonPaths[0], CheckerOpts);
     }
     case ActionType::None:
       llvm::errs() << "Action required\n";
-      llvm::cl::PrintHelpMessage();
+      printHelp();
       return 1;
     }
   }
@@ -3026,16 +2885,13 @@ int swift_api_digester_main(ArrayRef<const char *> Args, const char *Argv0,
                             void *MainAddr) {
   INITIALIZE_LLVM();
 
-  // LLVM Command Line parsing expects to trim off argv[0].
-  SmallVector<const char *, 8> ArgsWithArgv0{Argv0};
-  ArgsWithArgv0.append(Args.begin(), Args.end());
-
   std::string MainExecutablePath = fs::getMainExecutable(Argv0, MainAddr);
   SwiftAPIDigesterInvocation Invocation(MainExecutablePath);
-  if (Invocation.parseArgs(ArgsWithArgv0) != 0)
+
+  if (Invocation.parseArgs(Args) != 0)
     return EXIT_FAILURE;
 
-  if (Invocation.run(ArgsWithArgv0) != 0)
+  if (Invocation.run(Args) != 0)
     return EXIT_FAILURE;
 
   return EXIT_SUCCESS;
