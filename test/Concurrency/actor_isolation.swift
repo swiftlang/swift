@@ -48,7 +48,7 @@ class Point {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-actor MyActor: MySuperActor {
+actor MyActor: MySuperActor { // expected-error{{actor types do not support inheritance}}
   nonisolated let immutable: Int = 17
   // expected-note@+2 2{{property declared here}}
   // expected-note@+1 6{{mutation of this property is only permitted within the actor}}
