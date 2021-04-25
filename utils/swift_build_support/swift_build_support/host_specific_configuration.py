@@ -271,6 +271,9 @@ class HostSpecificConfiguration(object):
         if not args.test_ios_32bit_simulator:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.i386)
+        if not args.test_watchos_32bit_simulator:
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator.i386)
         if host_target == StdlibDeploymentTarget.OSX.x86_64.name:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.arm64)
@@ -287,6 +290,8 @@ class HostSpecificConfiguration(object):
                 StdlibDeploymentTarget.AppleTVSimulator.x86_64)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.i386)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator.x86_64)
 
         return platforms_archs_to_skip_test
 

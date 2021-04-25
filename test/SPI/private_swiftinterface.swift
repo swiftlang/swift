@@ -42,6 +42,14 @@
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.private.swiftinterface -module-name Merged
 
+/// Both the public and private textual interfaces should have
+/// SPI information with `-library-level spi`.
+// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/SPIModule.swiftinterface -emit-private-module-interface-path %t/SPIModule.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name SPIModule -library-level spi
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.swiftinterface
+// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.private.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.swiftinterface
+// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.private.swiftinterface -module-name SPIModule
+
 @_spi(HelperSPI) @_spi(OtherSPI) @_spi(OtherSPI) import SPIHelper
 // CHECK-PUBLIC: import SPIHelper
 // CHECK-PRIVATE: @_spi(OtherSPI) @_spi(HelperSPI) import SPIHelper

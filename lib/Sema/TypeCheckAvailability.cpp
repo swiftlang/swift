@@ -179,7 +179,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
       (Ctx.LangOpts.DisableAvailabilityChecking
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(D->getEndLoc(), DC));
-  bool spi = false;
+  bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
@@ -208,7 +208,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
 
-  bool spi = false;
+  bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;

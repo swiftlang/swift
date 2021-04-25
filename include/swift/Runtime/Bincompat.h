@@ -22,7 +22,17 @@ namespace bincompat {
 
 /// Whether protocol conformance iteration should be reversed, to prefer
 /// conformances from images that are later in the list over earlier ones.
+/// Default is false starting with Swift 5.4.
 bool workaroundProtocolConformanceReverseIteration();
+
+/// Whether we should crash when we encounter a non-nullable Obj-C
+/// reference with a null value as the source of a cast.
+/// Default is true starting with Swift 5.4.
+bool unexpectedObjCNullWhileCastingIsFatal();
+
+/// Whether we should use the legacy semantics for casting nil optionals
+/// to nested optionals
+bool useLegacyOptionalNilInjection();
 
 } // namespace bincompat
 

@@ -372,6 +372,18 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
+bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
+  WrappedValueMismatch failure(solution, getFromType(), getToType(), getLocator());
+  return failure.diagnoseAsError();
+}
+
+AllowWrappedValueMismatch *AllowWrappedValueMismatch::create(ConstraintSystem &cs,
+                                                             Type lhs,
+                                                             Type rhs,
+                                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowWrappedValueMismatch(cs, lhs, rhs, locator);
+}
+
 /// Computes the contextual type information for a type mismatch of a
 /// component in a structural type (tuple or function type).
 ///

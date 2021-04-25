@@ -31,7 +31,7 @@ actor Alex {
 func referenceGlobalActor() async {
   let a = Alex()
   _ = a.method
-  _ = a.const_memb
+  _ = a.const_memb // expected-error{{property access is 'async' but is not marked with 'await'}}
   _ = a.mut_memb  // expected-error{{property access is 'async' but is not marked with 'await'}}
 
   _ = a[1]  // expected-error{{subscript access is 'async' but is not marked with 'await'}}
@@ -110,7 +110,7 @@ func fromAsync() async {
   let a = Alex()
   let fn = a.method
   fn() // expected-error{{call is 'async' but is not marked with 'await'}}
-  _ = a.const_memb
+  _ = a.const_memb // expected-error{{property access is 'async' but is not marked with 'await'}}
   _ = a.mut_memb  // expected-error{{property access is 'async' but is not marked with 'await'}}
 
   _ = a[1]  // expected-error{{subscript access is 'async' but is not marked with 'await'}}

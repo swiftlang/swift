@@ -341,14 +341,11 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_ldadd_cfile_path);
   auto moduleSummaryOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_summary_path);
-  auto symbolGraphOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_symbol_graph_dir);
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput ||
-      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput ||
-      !symbolGraphOutput) {
+      !moduleSourceInfoOutput || !ldAddCFileOutput || !moduleSummaryOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -371,7 +368,6 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
     sop.LdAddCFilePath = (*ldAddCFileOutput)[i];
     sop.ModuleSummaryOutputPath = (*moduleSummaryOutput)[i];
-    sop.SymbolGraphOutputDir = (*symbolGraphOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -463,11 +459,6 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       OPT_emit_module_summary, pathsFromArguments.ModuleSummaryOutputPath,
       file_types::TY_SwiftModuleSummaryFile, "",
       defaultSupplementaryOutputPathExcludingExtension);
-  
-  auto symbolGraphOutputDir = determineSupplementaryOutputFilename(
-      OPT_emit_symbol_graph_dir, pathsFromArguments.SymbolGraphOutputDir,
-      file_types::TY_SymbolGraphOutputPath, "",
-      defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-interface-path
   auto ModuleInterfaceOutputPath =
@@ -501,7 +492,6 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
   sop.LdAddCFilePath = pathsFromArguments.LdAddCFilePath;
   sop.ModuleSummaryOutputPath = moduleSummaryOutputPath;
-  sop.SymbolGraphOutputDir = symbolGraphOutputDir;
   return sop;
 }
 
@@ -584,7 +574,6 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SwiftModuleSummaryFile, paths.ModuleSummaryOutputPath},
       {file_types::TY_PrivateSwiftModuleInterfaceFile,
        paths.PrivateModuleInterfaceOutputPath},
-      {file_types::TY_SymbolGraphOutputPath, paths.SymbolGraphOutputDir},
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
@@ -608,8 +597,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_emit_private_module_interface_path,
         options::OPT_emit_module_source_info_path,
         options::OPT_emit_tbd_path,
-        options::OPT_emit_ldadd_cfile_path,
-        options::OPT_emit_symbol_graph_dir)) {
+        options::OPT_emit_ldadd_cfile_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");

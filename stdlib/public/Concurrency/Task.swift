@@ -50,6 +50,7 @@ extension Task {
   /// this function was called.
   ///
   /// All functions available on the Task
+  @available(*, deprecated, message: "`Task.current` has been deprecated and will be removed, use static functions on Task instead.")
   public static var current: Task? {
     guard let _task = _getCurrentAsyncTask() else {
       return nil
@@ -88,6 +89,7 @@ extension Task {
   ///
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.currentPriority`
+  @available(*, deprecated, message: "Storing `Task` instances has been deprecated, and as such instance functions on Task are deprecated and will be removed soon. Use the static 'Task.currentPriority' instead.")
   public var priority: Priority {
     getJobFlags(_task).priority
   }
@@ -158,6 +160,7 @@ extension Task {
     }
 
     /// Returns the `Task` that this handle refers to.
+    @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
     public var task: Task {
       Task(_task)
     }
@@ -481,6 +484,55 @@ public func detach<T>(
   return Task.Handle<T, Error>(task)
 }
 
+/// Run given `operation` as asynchronously in its own top-level task.
+///
+/// The `async` function should be used when creating asynchronous work
+/// that operates on behalf of the synchronous function that calls it.
+/// Like `detach`, the async function creates a separate, top-level task.
+/// Unlike `detach`, the task creating by `async` inherits the priority and
+/// actor context of the caller, so the `operation` is treated more like an
+/// asynchronous extension to the synchronous operation. Additionally, `async`
+/// does not return a handle to refer to the task.
+///
+/// - Parameters:
+///   - priority: priority of the task. If unspecified, the priority will
+///               be inherited from the task that is currently executing
+///               or, if there is none, from the platform's understanding of
+///               which thread is executing.
+///   - operation: the operation to execute
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public func async(
+  priority: Task.Priority = .unspecified,
+  @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Void
+) {
+  // Determine the priority at which we should create this task
+  let actualPriority: Task.Priority
+  if priority == .unspecified {
+    actualPriority = withUnsafeCurrentTask { task in
+      // If we are running on behalf of a task,
+      if let task = task {
+        return task.priority
+      }
+
+      return Task.Priority(rawValue: _getCurrentThreadPriority()) ?? .unspecified
+    }
+  } else {
+    actualPriority = priority
+  }
+
+  // Set up the job flags for a new task.
+  var flags = Task.JobFlags()
+  flags.kind = .task
+  flags.priority = actualPriority
+  flags.isFuture = true
+
+  // Create the asynchronous task future.
+  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+
+  // Enqueue the resulting job.
+  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+}
+
 // ==== Async Handler ----------------------------------------------------------
 
 // TODO: remove this?
@@ -622,6 +674,7 @@ public struct UnsafeCurrentTask {
   ///
   /// Operations on `Task` (unlike `UnsafeCurrentTask`) are safe to be called
   /// from any other task (or thread).
+  @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
   public var task: Task {
     Task(_task)
   }
@@ -745,6 +798,10 @@ func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
                                _ _filenameIsASCII: Builtin.Int1,
                                _ _line: Builtin.Word,
                                _ _executor: Builtin.Executor)
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_silgen_name("swift_task_getCurrentThreadPriority")
+func _getCurrentThreadPriority() -> Int
 
 #if _runtime(_ObjC)
 
