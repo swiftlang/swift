@@ -59,11 +59,6 @@ namespace options {
 
 static llvm::cl::OptionCategory Category("swift-api-digester Options");
 
-static llvm::cl::opt<bool>
-IncludeAllModules("include-all",
-                  llvm::cl::desc("Include all modules from the SDK"),
-                  llvm::cl::cat(Category));
-
 static llvm::cl::list<std::string>
 ModuleNames("module", llvm::cl::ZeroOrMore, llvm::cl::desc("Names of modules"),
             llvm::cl::cat(Category));
@@ -194,12 +189,6 @@ static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
             llvm::cl::desc("The SDK contents under comparison"),
             llvm::cl::cat(Category));
-
-static llvm::cl::list<std::string>
-ApisPrintUsrs("api-usrs",
-              llvm::cl::desc("The name of APIs to print their usrs, "
-                             "e.g. Type::Function"),
-              llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 IgnoreRemovedDeclUSRs("ignored-usrs",
@@ -2711,7 +2700,6 @@ private:
   ActionType Action;
   CheckerOptions CheckerOpts;
   llvm::StringSet<> Modules;
-  std::vector<std::string> PrintApis;
   llvm::StringSet<> IgnoredUsrs;
   std::string ProtReqAllowList;
   std::vector<std::string> SDKJsonPaths;
@@ -2753,8 +2741,6 @@ public:
 
     readIgnoredUsrs(IgnoredUsrs, options::IgnoreRemovedDeclUSRs);
     CheckerOpts = getCheckOpts(Args);
-    for (auto Name : options::ApisPrintUsrs)
-      PrintApis.push_back(Name);
 
     ProtReqAllowList = options::ProtReqAllowList;
     SDKJsonPaths = options::SDKJsonPaths;
