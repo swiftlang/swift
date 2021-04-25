@@ -2852,44 +2852,44 @@ static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
   exit(1);
 }
 
-int swift_api_digester_main(ArrayRef<const char *> Args, const char *Argv0,
-                            void *MainAddr) {
-  INITIALIZE_LLVM();
+class SwiftAPIDigesterInvocation {
+private:
+  std::string MainExecutablePath;
 
-  // LLVM Command Line parsing expects to trim off argv[0].
-  SmallVector<const char *, 8> ArgsWithArgv0{Argv0};
-  ArgsWithArgv0.append(Args.begin(), Args.end());
+public:
+  SwiftAPIDigesterInvocation(const std::string &ExecPath)
+      : MainExecutablePath(ExecPath) {}
 
-  std::string MainExecutablePath = fs::getMainExecutable(Argv0, MainAddr);
+  int parseArgs(ArrayRef<const char *> Args) { return 0; }
 
-  llvm::cl::HideUnrelatedOptions(options::Category);
-  llvm::cl::ParseCommandLineOptions(ArgsWithArgv0.size(),
-                                    llvm::makeArrayRef(ArgsWithArgv0).data(),
-                                    "Swift SDK Digester\n");
-  CompilerInvocation InitInvok;
+  int run(ArrayRef<const char *> Args) {
+    llvm::cl::HideUnrelatedOptions(options::Category);
+    llvm::cl::ParseCommandLineOptions(
+        Args.size(), llvm::makeArrayRef(Args).data(), "Swift SDK Digester\n");
+    CompilerInvocation InitInvok;
 
-  llvm::StringSet<> Modules;
-  std::vector<std::string> PrintApis;
-  llvm::StringSet<> IgnoredUsrs;
-  readIgnoredUsrs(IgnoredUsrs);
-  CheckerOptions Opts = getCheckOpts(Args);
-  for (auto Name : options::ApisPrintUsrs)
-    PrintApis.push_back(Name);
-  switch (options::Action) {
-  case ActionType::DumpSDK:
-    return (prepareForDump(MainExecutablePath, InitInvok, Modules))
-               ? 1
-               : dumpSDKContent(
-                     InitInvok, Modules,
-                     getJsonOutputFilePath(InitInvok.getLangOptions().Target,
-                                           Opts.ABI),
-                     Opts);
-  case ActionType::MigratorGen:
-  case ActionType::DiagnoseSDKs: {
-    ComparisonInputMode Mode = checkComparisonInputMode();
-    llvm::StringSet<> protocolAllowlist;
-    if (!options::ProtReqAllowList.empty()) {
-      if (readFileLineByLine(options::ProtReqAllowList, protocolAllowlist))
+    llvm::StringSet<> Modules;
+    std::vector<std::string> PrintApis;
+    llvm::StringSet<> IgnoredUsrs;
+    readIgnoredUsrs(IgnoredUsrs);
+    CheckerOptions Opts = getCheckOpts(Args);
+    for (auto Name : options::ApisPrintUsrs)
+      PrintApis.push_back(Name);
+    switch (options::Action) {
+    case ActionType::DumpSDK:
+      return (prepareForDump(MainExecutablePath, InitInvok, Modules))
+                 ? 1
+                 : dumpSDKContent(
+                       InitInvok, Modules,
+                       getJsonOutputFilePath(InitInvok.getLangOptions().Target,
+                                             Opts.ABI),
+                       Opts);
+    case ActionType::MigratorGen:
+    case ActionType::DiagnoseSDKs: {
+      ComparisonInputMode Mode = checkComparisonInputMode();
+      llvm::StringSet<> protocolAllowlist;
+      if (!options::ProtReqAllowList.empty()) {
+        if (readFileLineByLine(options::ProtReqAllowList, protocolAllowlist))
           return 1;
     }
     if (options::Action == ActionType::MigratorGen) {
@@ -2962,4 +2962,24 @@ int swift_api_digester_main(ArrayRef<const char *> Args, const char *Argv0,
     llvm::cl::PrintHelpMessage();
     return 1;
   }
+  }
+};
+
+int swift_api_digester_main(ArrayRef<const char *> Args, const char *Argv0,
+                            void *MainAddr) {
+  INITIALIZE_LLVM();
+
+  // LLVM Command Line parsing expects to trim off argv[0].
+  SmallVector<const char *, 8> ArgsWithArgv0{Argv0};
+  ArgsWithArgv0.append(Args.begin(), Args.end());
+
+  std::string MainExecutablePath = fs::getMainExecutable(Argv0, MainAddr);
+  SwiftAPIDigesterInvocation Invocation(MainExecutablePath);
+  if (Invocation.parseArgs(ArgsWithArgv0) != 0)
+    return EXIT_FAILURE;
+
+  if (Invocation.run(ArgsWithArgv0) != 0)
+    return EXIT_FAILURE;
+
+  return EXIT_SUCCESS;
 }
