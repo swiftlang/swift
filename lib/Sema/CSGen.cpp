@@ -3626,8 +3626,10 @@ static bool generateWrappedPropertyTypeConstraints(
   }
 
   // The property type must be equal to the wrapped value type
-  cs.addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType,
-      cs.getConstraintLocator(wrappedVar, LocatorPathElt::ContextualType()));
+  cs.addConstraint(
+      ConstraintKind::Equal, propertyType, wrappedValueType,
+      cs.getConstraintLocator(
+          wrappedVar, LocatorPathElt::ContextualType(CTP_WrappedProperty)));
   cs.setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
                        CTP_WrappedProperty);
   return false;
@@ -3637,8 +3639,8 @@ static bool generateWrappedPropertyTypeConstraints(
 static bool generateInitPatternConstraints(
     ConstraintSystem &cs, SolutionApplicationTarget target, Expr *initializer) {
   auto pattern = target.getInitializationPattern();
-  auto locator =
-      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  auto locator = cs.getConstraintLocator(
+      initializer, LocatorPathElt::ContextualType(CTP_Initialization));
   Type patternType = cs.generateConstraints(
       pattern, locator, target.shouldBindPatternVarsOneWay(),
       target.getInitializationPatternBindingDecl(),
@@ -3669,8 +3671,8 @@ generateForEachStmtConstraints(
   bool isAsync = stmt->getAwaitLoc().isValid();
 
   auto locator = cs.getConstraintLocator(sequence);
-  auto contextualLocator =
-      cs.getConstraintLocator(sequence, LocatorPathElt::ContextualType());
+  auto contextualLocator = cs.getConstraintLocator(
+      sequence, LocatorPathElt::ContextualType(CTP_ForEachStmt));
 
   // The expression type must conform to the Sequence protocol.
   auto sequenceProto = TypeChecker::getProtocol(
@@ -3787,8 +3789,9 @@ bool ConstraintSystem::generateConstraints(
     if (target.isOptionalSomePatternInit()) {
       assert(!target.getExprContextualType() &&
              "some pattern cannot have contextual type pre-configured");
-      auto *convertTypeLocator =
-          getConstraintLocator(expr, LocatorPathElt::ContextualType());
+      auto *convertTypeLocator = getConstraintLocator(
+          expr, LocatorPathElt::ContextualType(
+                    target.getExprContextualTypePurpose()));
       Type var = createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
       target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
     }
@@ -3810,7 +3813,7 @@ bool ConstraintSystem::generateConstraints(
       ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
       bool isOpaqueReturnType = target.infersOpaqueReturnType();
       auto *convertTypeLocator =
-          getConstraintLocator(expr, LocatorPathElt::ContextualType());
+          getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
 
       auto getLocator = [&](Type ty) -> ConstraintLocator * {
         // If we have a placeholder originating from a PlaceholderTypeRepr,
@@ -3973,11 +3976,10 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
         return true;
       }
 
-      addConstraint(ConstraintKind::Conversion,
-                    getType(condExpr),
-                    boolTy,
-                    getConstraintLocator(condExpr,
-                                         LocatorPathElt::ContextualType()));
+      addConstraint(
+          ConstraintKind::Conversion, getType(condExpr), boolTy,
+          getConstraintLocator(condExpr,
+                               LocatorPathElt::ContextualType(CTP_Condition)));
       continue;
     }
 

@@ -767,7 +767,7 @@ protected:
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
-          subjectExpr, LocatorPathElt::ContextualType());
+          subjectExpr, LocatorPathElt::ContextualType(CTP_Initialization));
       Type subjectType = cs->getType(subjectExpr);
 
       if (cs->generateConstraints(caseStmt, dc, subjectType, locator)) {
@@ -851,7 +851,7 @@ protected:
     cs->addConstraint(
         ConstraintKind::Equal, cs->getType(arrayInitExpr), arrayType,
         cs->getConstraintLocator(
-          arrayInitExpr, LocatorPathElt::ContextualType()));
+            arrayInitExpr, LocatorPathElt::ContextualType(CTP_Initialization)));
 
     // Form a call to Array.append(_:) to add the result of executing each
     // iteration of the loop body to the array formed above.
