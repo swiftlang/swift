@@ -654,11 +654,27 @@ public:
   bool isRedundantExplicitRequirement(const ExplicitRequirement &req) const;
 
 private:
-  void computeRedundantRequirements(const ProtocolDecl *requirementSignatureSelfProto);
+  using GetKindAndRHS = llvm::function_ref<std::pair<RequirementKind, RequirementRHS>()>;
+  void getBaseRequirements(
+      GetKindAndRHS getKindAndRHS,
+      const RequirementSource *source,
+      const ProtocolDecl *requirementSignatureSelfProto,
+      ASTContext &ctx, SmallVectorImpl<ExplicitRequirement> &result);
+
+  template<typename T, typename Filter>
+  void checkRequirementRedundancy(
+      const ExplicitRequirement &req,
+      const std::vector<Constraint<T>> &constraints,
+      const ProtocolDecl *requirementSignatureSelfProto,
+      Filter filter);
+
+  void computeRedundantRequirements(
+      const ProtocolDecl *requirementSignatureSelfProto);
 
   void diagnoseRedundantRequirements() const;
 
-  void diagnoseConflictingConcreteTypeRequirements() const;
+  void diagnoseConflictingConcreteTypeRequirements(
+      const ProtocolDecl *requirementSignatureSelfProto);
 
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.

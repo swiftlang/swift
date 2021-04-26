@@ -445,21 +445,6 @@ public:
       this->rhs = type->getCanonicalType();
   }
 
-  /// For a Constraint<T> with an explicit requirement source, we recover the
-  /// subject type from the requirement source and the right hand side from the
-  /// constraint.
-  ///
-  /// The requirement kind must be passed in since Constraint<T>'s kind is
-  /// implicit by virtue of which list it appears under inside its equivalence
-  /// class, and is not stored inside the constraint.
-  template<typename T>
-  static ExplicitRequirement fromExplicitConstraint(RequirementKind kind,
-                                                    Constraint<T> constraint) {
-    assert(!constraint.source->isDerivedNonRootRequirement());
-
-    return ExplicitRequirement(kind, constraint.source, constraint.value);
-  }
-
   static std::pair<RequirementKind, RequirementRHS>
   getKindAndRHS(const RequirementSource *source,
                 ASTContext &ctx) {
@@ -532,55 +517,16 @@ public:
       return std::make_pair(RequirementKind::Superclass, type);
     }
 
+    case RequirementSource::RequirementSignatureSelf:
+      return std::make_pair(RequirementKind::Conformance,
+                            source->getProtocolDecl());
+
     default: {
       source->dump(llvm::errs(), &ctx.SourceMgr, 0);
       llvm::errs() << "\n";
       llvm_unreachable("Unhandled source kind");
     }
     }
-  }
-
-  static ExplicitRequirement fromRequirementSource(const RequirementSource *source,
-                                                   ASTContext &ctx) {
-    auto *parent = source->parent;
-
-    RequirementKind kind;
-    RequirementRHS rhs;
-    std::tie(kind, rhs) = getKindAndRHS(source, ctx);
-
-    return ExplicitRequirement(kind, parent, rhs);
-  }
-
-  /// To recover the root explicit requirement from a Constraint<T>, we walk the
-  /// requirement source up the root, and look at both the root and the next
-  /// innermost child.
-  /// Together, these give us the subject type (via the root) and the right hand
-  /// side of the requirement (from the next innermost child).
-  ///
-  /// The requirement kind must be passed in since Constraint<T>'s kind is
-  /// implicit by virtue of which list it appears under inside its equivalence
-  /// class, and is not stored inside the constraint.
-  ///
-  /// The constraint's actual value is ignored; that's the right hand
-  /// side of the derived constraint, not the right hand side of the original
-  /// explicit requirement.
-  template<typename T>
-  static ExplicitRequirement fromDerivedConstraint(Constraint<T> constraint,
-                                                   ASTContext &ctx) {
-    assert(constraint.source->isDerivedNonRootRequirement());
-
-    const RequirementSource *root = constraint.source;
-    const RequirementSource *child = nullptr;
-
-    while (root->parent && root->isDerivedRequirement()) {
-      child = root;
-      root = root->parent;
-    }
-
-    assert(child != nullptr);
-    assert(root != nullptr);
-
-    return fromRequirementSource(child, ctx);
   }
 
   RequirementKind getKind() const {
@@ -661,7 +607,6 @@ template<> struct DenseMapInfo<swift::GenericSignatureBuilder::ExplicitRequireme
 
 namespace {
   struct ConflictingConcreteTypeRequirement {
-    ExplicitRequirement concreteTypeRequirement;
     ExplicitRequirement otherRequirement;
     Type resolvedConcreteType;
     RequirementRHS otherRHS;
@@ -5776,13 +5721,13 @@ namespace {
         bool thisIsNonRedundantExplicit =
             (!constraint.source->isDerivedNonRootRequirement() &&
              !builder.isRedundantExplicitRequirement(
-               ExplicitRequirement::fromExplicitConstraint(
-                 kind, constraint)));
+               ExplicitRequirement(
+                 kind, constraint.source, constraint.value)));
         bool representativeIsNonRedundantExplicit =
             (!representativeConstraint->source->isDerivedNonRootRequirement() &&
              !builder.isRedundantExplicitRequirement(
-               ExplicitRequirement::fromExplicitConstraint(
-                 kind, *representativeConstraint)));
+               ExplicitRequirement(
+                 kind, representativeConstraint->source, representativeConstraint->value)));
 
         if (thisIsNonRedundantExplicit != representativeIsNonRedundantExplicit) {
           if (thisIsNonRedundantExplicit)
@@ -5876,510 +5821,6 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
   }
 }
 
-static bool compareSourceLocs(SourceManager &SM, SourceLoc lhsLoc, SourceLoc rhsLoc) {
-  if (lhsLoc.isValid() != rhsLoc.isValid())
-    return lhsLoc.isValid();
-
-  if (lhsLoc.isValid() && rhsLoc.isValid()) {
-    unsigned lhsBuffer = SM.findBufferContainingLoc(lhsLoc);
-    unsigned rhsBuffer = SM.findBufferContainingLoc(rhsLoc);
-
-    // If the buffers are the same, use source location ordering.
-    if (lhsBuffer == rhsBuffer) {
-      if (SM.isBeforeInBuffer(lhsLoc, rhsLoc))
-        return true;
-    } else {
-      // Otherwise, order by buffer identifier.
-      if (SM.getIdentifierForBuffer(lhsBuffer)
-               .compare(SM.getIdentifierForBuffer(lhsBuffer)))
-        return true;
-    }
-  }
-
-  return false;
-}
-
-/// A directed graph where the vertices are explicit requirement sources and
-/// an edge (v, w) records that the explicit source v implies the explicit
-/// source w.
-///
-/// The roots of the strongly connected component graph are the basic set of
-/// explicit requirements which imply everything else. We pick the best
-/// representative from each root strongly connected component to form the
-/// final set of non-redundant explicit requirements.
-class RedundantRequirementGraph {
-  /// 2**16 explicit requirements ought to be enough for everybody.
-  using VertexID = uint16_t;
-  using ComponentID = uint16_t;
-
-  struct Vertex {
-    ExplicitRequirement req;
-
-    explicit Vertex(ExplicitRequirement req) : req(req) {}
-
-    /// The SCC that this vertex belongs to.
-    ComponentID component = UndefinedComponent;
-
-    /// State for the SCC algorithm.
-    VertexID index = UndefinedIndex;
-    VertexID lowLink = -1;
-    bool onStack = false;
-
-    /// Outgoing edges.
-    SmallVector<VertexID, 1> successors;
-
-#ifndef NDEBUG
-    bool sawVertex = false;
-#endif
-
-    static const ComponentID UndefinedComponent = -1;
-    static const VertexID UndefinedIndex = -1;
-  };
-
-  /// Maps each requirement source to a unique 16-bit ID.
-  llvm::SmallDenseMap<ExplicitRequirement, VertexID, 2> reqs;
-
-  SmallVector<Vertex, 2> vertices;
-
-  ComponentID componentCount = 0;
-  VertexID vertexCount = 0;
-
-  SmallVector<VertexID, 2> stack;
-
-public:
-  template<typename T>
-  void handleConstraintsImpliedByConcrete(
-      RequirementKind kind,
-      const SmallVectorImpl<Constraint<T>> &impliedByConcrete,
-      const Optional<ExplicitRequirement> &concreteTypeRequirement) {
-    // This can occur if the combination of a superclass requirement and
-    // protocol conformance requirement force a type to become concrete.
-    if (!concreteTypeRequirement)
-      return;
-
-    for (auto constraint : impliedByConcrete) {
-      if (constraint.source->isDerivedNonRootRequirement())
-        continue;
-
-      auto req = ExplicitRequirement::fromExplicitConstraint(kind, constraint);
-      addEdge(*concreteTypeRequirement, req);
-    }
-  }
-
-  template<typename T>
-  Optional<ExplicitRequirement>
-  addConstraintsFromEquivClass(
-      RequirementKind kind,
-      const SmallVectorImpl<Constraint<T>> &exact,
-      const SmallVectorImpl<Constraint<T>> &lessSpecific,
-      ASTContext &ctx) {
-    // The set of 'redundant explicit requirements', which are known to be less
-    // specific than some other explicit requirements. An example is a type
-    // parameter with multiple superclass constraints:
-    //
-    // class A {}
-    // class B : A {}
-    // class C : B {}
-    //
-    // func f<T>(_: T) where T : A, T : B, T : C {}
-    //
-    // 'T : C' supercedes 'T : A' and 'T : B', because C is a subclass of
-    // 'A' and 'B'.
-    SmallVector<ExplicitRequirement, 1> redundantExplicitReqs;
-
-    // The set of all other explicit requirements, which are known to be the most
-    // specific. These imply the less specific 'redundant explicit sources'
-    // above.
-    //
-    // Also, if there is more than one most specific explicit requirements, they
-    // all imply each other.
-    SmallVector<ExplicitRequirement, 1> explicitReqs;
-
-    // The set of root explicit requirements for each derived requirements.
-    //
-    // These 'root requirements' imply the 'explicit requirements'.
-    SmallVector<ExplicitRequirement, 1> rootReqs;
-
-    for (auto constraint : exact) {
-      if (constraint.source->isDerivedNonRootRequirement()) {
-        auto req = ExplicitRequirement::fromDerivedConstraint(
-            constraint, ctx);
-
-        rootReqs.push_back(req);
-      } else {
-        auto req = ExplicitRequirement::fromExplicitConstraint(
-            kind, constraint);
-
-        VertexID v = addVertex(req);
-#ifndef NDEBUG
-        // Record that we saw an actual explicit requirement rooted at this vertex,
-        // for verification purposes.
-        vertices[v].sawVertex = true;
-#endif
-        (void) v;
-
-        explicitReqs.push_back(req);
-      }
-    }
-
-    for (auto constraint : lessSpecific) {
-      if (constraint.source->isDerivedNonRootRequirement())
-        continue;
-
-      auto req = ExplicitRequirement::fromExplicitConstraint(kind, constraint);
-
-      VertexID v = addVertex(req);
-#ifndef NDEBUG
-      // Record that we saw an actual explicit requirement rooted at this vertex,
-      // for verification purposes.
-      vertices[v].sawVertex = true;
-#endif
-      (void) v;
-
-      redundantExplicitReqs.push_back(req);
-    }
-
-    // Get the "best" explicit requirement that implies the rest.
-    Optional<ExplicitRequirement> result;
-    if (!rootReqs.empty())
-      result = rootReqs[0];
-    else if (!explicitReqs.empty())
-      result = explicitReqs[0];
-
-    // If all requirements are derived, there is nothing to do.
-    if (explicitReqs.empty()) {
-      if (!redundantExplicitReqs.empty()) {
-        assert(!rootReqs.empty());
-        for (auto rootReq : rootReqs) {
-          for (auto redundantReq : redundantExplicitReqs) {
-            addEdge(rootReq, redundantReq);
-          }
-        }
-      }
-      return result;
-    }
-
-    // If there are multiple most specific explicit requirements, they will form a cycle.
-    if (explicitReqs.size() > 1) {
-      for (unsigned index : indices(explicitReqs)) {
-        auto firstReq = explicitReqs[index];
-        auto secondReq = explicitReqs[(index + 1) % explicitReqs.size()];
-        addEdge(firstReq, secondReq);
-      }
-    }
-
-    // The cycle of most specific explicit requirements implies all less specific
-    // explicit requirements.
-    for (auto redundantReq : redundantExplicitReqs) {
-      addEdge(explicitReqs[0], redundantReq);
-    }
-
-    // The root explicit requirement of each derived requirement implies the cycle of
-    // most specific explicit requirements.
-    for (auto rootReq : rootReqs) {
-      addEdge(rootReq, explicitReqs[0]);
-    }
-
-    return result;
-  }
-
-private:
-  /// If we haven't seen this requirement yet, add it and
-  /// return a new ID. Otherwise, return an existing ID.
-  VertexID addVertex(ExplicitRequirement req) {
-    assert(!req.getSource()->isDerivedNonRootRequirement());
-
-    VertexID id = vertices.size();
-
-    // Check for wrap-around.
-    if (id != vertices.size()) {
-      llvm::errs() << "Too many explicit requirements";
-      abort();
-    }
-
-    assert(reqs.size() == vertices.size());
-
-    auto inserted = reqs.insert(std::make_pair(req, id));
-
-    // Check if we've already seen this vertex.
-    if (!inserted.second)
-      return inserted.first->second;
-
-    vertices.emplace_back(req);
-    return id;
-  }
-
-  /// Add a directed edge from one requirement to another.
-  /// If we haven't seen either requirement yet, we add a
-  /// new vertex; this allows visiting equivalence classes in
-  /// a single pass, without having to build the set of vertices
-  /// first.
-  void addEdge(ExplicitRequirement fromReq,
-               ExplicitRequirement toReq) {
-    assert(!fromReq.getSource()->isDerivedNonRootRequirement());
-    assert(!toReq.getSource()->isDerivedNonRootRequirement());
-
-    VertexID from = addVertex(fromReq);
-    VertexID to = addVertex(toReq);
-
-    vertices[from].successors.push_back(to);
-  }
-
-  /// Tarjan's algorithm.
-  void computeSCCs() {
-    for (VertexID v : indices(vertices)) {
-      if (vertices[v].index == Vertex::UndefinedIndex)
-        strongConnect(v);
-    }
-  }
-
-  void strongConnect(VertexID v) {
-    // Set the depth index for v to the smallest unused index.
-    assert(vertices[v].index == Vertex::UndefinedIndex);
-    vertices[v].index = vertexCount;
-    assert(vertices[v].lowLink == Vertex::UndefinedIndex);
-    vertices[v].lowLink = vertexCount;
-
-    vertexCount++;
-
-    stack.push_back(v);
-    assert(!vertices[v].onStack);
-    vertices[v].onStack = true;
-
-    // Consider successors of v.
-    for (VertexID w : vertices[v].successors) {
-      if (vertices[w].index == Vertex::UndefinedIndex) {
-        // Successor w has not yet been visited; recurse on it.
-        strongConnect(w);
-
-        assert(vertices[w].lowLink != Vertex::UndefinedIndex);
-        vertices[v].lowLink = std::min(vertices[v].lowLink,
-                                       vertices[w].lowLink);
-      } else if (vertices[w].onStack) {
-        // Successor w is in stack S and hence in the current SCC.
-        //
-        // If w is not on stack, then (v, w) is an edge pointing
-        // to an SCC already found and must be ignored.
-        assert(vertices[w].lowLink != Vertex::UndefinedIndex);
-        vertices[v].lowLink = std::min(vertices[v].lowLink,
-                                       vertices[w].index);
-      }
-    }
-
-    // If v is a root node, pop the stack and generate an SCC.
-    if (vertices[v].lowLink == vertices[v].index) {
-      VertexID w = Vertex::UndefinedIndex;
-
-      do {
-        w = stack.back();
-        assert(vertices[w].onStack);
-        stack.pop_back();
-
-        vertices[w].onStack = false;
-        assert(vertices[w].component == Vertex::UndefinedComponent);
-
-        vertices[w].component = componentCount;
-      } while (v != w);
-
-      componentCount++;
-    }
-  }
-
-public:
-  using RedundantRequirementMap =
-      llvm::DenseMap<ExplicitRequirement,
-                     llvm::SmallDenseSet<ExplicitRequirement, 2>>;
-
-  void computeRedundantRequirements(SourceManager &SM,
-                                    RedundantRequirementMap &redundant) {
-    // First, compute SCCs.
-    computeSCCs();
-
-    // The set of edges pointing to each connected component.
-    SmallVector<SmallVector<ComponentID, 2>, 2> inboundComponentEdges;
-    inboundComponentEdges.resize(componentCount);
-
-    // The set of edges originating from this connected component.
-    SmallVector<SmallVector<ComponentID, 2>, 2> outboundComponentEdges;
-    outboundComponentEdges.resize(componentCount);
-
-    // Visit all vertices and build the adjacency sets for the connected
-    // component graph.
-    for (const auto &vertex : vertices) {
-      assert(vertex.component != Vertex::UndefinedComponent);
-      for (auto successor : vertex.successors) {
-        ComponentID otherComponent = vertices[successor].component;
-        if (vertex.component != otherComponent) {
-          inboundComponentEdges[otherComponent].push_back(vertex.component);
-          outboundComponentEdges[vertex.component].push_back(otherComponent);
-        }
-      }
-    }
-
-    auto isRootComponent = [&](ComponentID component) -> bool {
-      return inboundComponentEdges[component].empty();
-    };
-
-    // The set of root components.
-    llvm::SmallDenseSet<ComponentID, 2> rootComponents;
-
-    // The best explicit requirement for each root component.
-    SmallVector<Optional<ExplicitRequirement>, 2> bestExplicitReq;
-    bestExplicitReq.resize(componentCount);
-
-    // Visit all vertices and find the best requirement for each root component.
-    for (const auto &vertex : vertices) {
-      if (isRootComponent(vertex.component)) {
-        rootComponents.insert(vertex.component);
-
-        // If this vertex is part of a root SCC, see if the requirement is
-        // better than the one we have so far.
-        auto &best = bestExplicitReq[vertex.component];
-        if (isBetterExplicitRequirement(SM, best, vertex.req))
-          best = vertex.req;
-      }
-    }
-
-    // The set of root components that each component is reachable from.
-    SmallVector<llvm::SmallDenseSet<ComponentID, 2>, 2> reachableFromRoot;
-    reachableFromRoot.resize(componentCount);
-
-    // Traverse the graph of connected components starting from the roots.
-    for (auto rootComponent : rootComponents) {
-      SmallVector<ComponentID, 2> worklist;
-
-      auto addToWorklist = [&](ComponentID nextComponent) {
-        if (!reachableFromRoot[nextComponent].count(rootComponent))
-          worklist.push_back(nextComponent);
-      };
-
-      addToWorklist(rootComponent);
-
-      while (!worklist.empty()) {
-        auto component = worklist.back();
-        worklist.pop_back();
-
-        reachableFromRoot[component].insert(rootComponent);
-
-        for (auto nextComponent : outboundComponentEdges[component])
-          addToWorklist(nextComponent);
-      }
-    }
-
-    // Compute the mapping of redundant requirements to the best root
-    // requirement that implies them.
-    for (const auto &vertex : vertices) {
-      if (isRootComponent(vertex.component)) {
-        // A root component is reachable from itself, and itself only.
-        assert(reachableFromRoot[vertex.component].size() == 1);
-        assert(reachableFromRoot[vertex.component].count(vertex.component) == 1);
-      } else {
-        assert(!bestExplicitReq[vertex.component].hasValue() &&
-               "Recorded best requirement for non-root SCC?");
-      }
-
-      // We have a non-root component. This requirement is always
-      // redundant.
-      auto reachableFromRootSet = reachableFromRoot[vertex.component];
-      assert(reachableFromRootSet.size() > 0);
-
-      for (auto rootComponent : reachableFromRootSet) {
-        assert(isRootComponent(rootComponent));
-
-        auto best = bestExplicitReq[rootComponent];
-        assert(best.hasValue() &&
-               "Did not record best requirement for root SCC?");
-
-        assert(vertex.req != *best || vertex.component == rootComponent);
-        if (vertex.req != *best) {
-          redundant[vertex.req].insert(*best);
-        }
-      }
-    }
-  }
-
-private:
-  bool isBetterExplicitRequirement(SourceManager &SM,
-                                   Optional<ExplicitRequirement> optExisting,
-                                   ExplicitRequirement current) {
-    if (!optExisting.hasValue())
-      return true;
-
-    auto existing = *optExisting;
-
-    auto *existingSource = existing.getSource();
-    auto *currentSource = current.getSource();
-
-    // Prefer explicit sources over inferred ones, so that you can
-    // write either of the following without a warning:
-    //
-    // func foo<T>(_: Set<T>) {}
-    // func foo<T : Hashable>(_: Set<T>) {}
-    bool existingInferred = existingSource->isInferredRequirement();
-    bool currentInferred = currentSource->isInferredRequirement();
-    if (existingInferred != currentInferred)
-      return currentInferred;
-
-    // Prefer a RequirementSignatureSelf over anything else.
-    if ((currentSource->kind == RequirementSource::RequirementSignatureSelf) ||
-        (existingSource->kind == RequirementSource::RequirementSignatureSelf))
-      return (currentSource->kind == RequirementSource::RequirementSignatureSelf);
-
-    // Prefer sources with a shorter type.
-    auto existingType = existingSource->getStoredType();
-    auto currentType = currentSource->getStoredType();
-    int cmpTypes = compareDependentTypes(currentType, existingType);
-    if (cmpTypes != 0)
-      return cmpTypes < 0;
-
-    auto existingLoc = existingSource->getLoc();
-    auto currentLoc = currentSource->getLoc();
-
-    return compareSourceLocs(SM, currentLoc, existingLoc);
-  }
-
-public:
-  void dump(llvm::raw_ostream &out, SourceManager *SM) const {
-    out << "* Vertices:\n";
-    for (const auto &vertex : vertices) {
-      out << "Component " << vertex.component << ", ";
-      vertex.req.dump(out, SM);
-      out << "\n";
-    }
-
-    out << "* Edges:\n";
-    for (const auto &from : vertices) {
-      for (VertexID w : from.successors) {
-        const auto &to = vertices[w];
-
-        from.req.dump(out, SM);
-        out << " -> ";
-        to.req.dump(out, SM);
-        out << "\n";
-      }
-    }
-  }
-
-#ifndef NDEBUG
-  void verifyAllVerticesWereSeen(SourceManager *SM) const {
-    for (const auto &vertex : vertices) {
-      if (!vertex.sawVertex) {
-        // We found a vertex that was referenced by an edge, but was
-        // never added explicitly. This means we have a derived
-        // requirement rooted at the source, but we never saw the
-        // corresponding explicit requirement. This should not happen.
-        llvm::errs() << "Found an orphaned vertex:\n";
-        vertex.req.dump(llvm::errs(), SM);
-        llvm::errs() << "\nRedundant requirement graph:\n";
-        dump(llvm::errs(), SM);
-        abort();
-      }
-    }
-  }
-#endif
-
-};
-
 void GenericSignatureBuilder::ExplicitRequirement::dump(
     llvm::raw_ostream &out, SourceManager *SM) const {
   switch (getKind()) {
@@ -6438,6 +5879,85 @@ static bool isConcreteConformance(const EquivalenceClass &equivClass,
   return false;
 }
 
+void GenericSignatureBuilder::getBaseRequirements(
+    GenericSignatureBuilder::GetKindAndRHS getKindAndRHS,
+    const RequirementSource *source,
+    const ProtocolDecl *requirementSignatureSelfProto,
+    ASTContext &ctx, SmallVectorImpl<ExplicitRequirement> &result) {
+  // If we're building a generic signature, the base requirement is
+  // built from the root of the path.
+  if (source->parent == nullptr) {
+    RequirementKind kind;
+    RequirementRHS rhs;
+    std::tie(kind, rhs) = getKindAndRHS();
+    result.push_back(ExplicitRequirement(kind, source, rhs));
+    return;
+  }
+
+  // If we're building a requirement signature, there can be multiple
+  // base requirements from the same protocol appearing along the path.
+  if (requirementSignatureSelfProto != nullptr &&
+      source->isProtocolRequirement() &&
+      source->getProtocolDecl() == requirementSignatureSelfProto) {
+    auto *shortSource = source->withoutRedundantSubpath(
+        *this, source->getRoot(), source->parent);
+    RequirementKind kind;
+    RequirementRHS rhs;
+    std::tie(kind, rhs) = getKindAndRHS();
+    result.push_back(ExplicitRequirement(kind, shortSource, rhs));
+  }
+
+  getBaseRequirements(
+      [&]() {
+        return ExplicitRequirement::getKindAndRHS(source, ctx);
+      },
+      source->parent, requirementSignatureSelfProto, ctx, result);
+}
+
+template<typename T, typename Filter>
+void GenericSignatureBuilder::checkRequirementRedundancy(
+    const ExplicitRequirement &req,
+    const std::vector<Constraint<T>> &constraints,
+    const ProtocolDecl *requirementSignatureSelfProto,
+    Filter filter) {
+  assert(!constraints.empty());
+
+  for (const auto &constraint : constraints) {
+    if (filter(constraint))
+      continue;
+
+    SmallVector<ExplicitRequirement, 2> result;
+    getBaseRequirements(
+        [&]() {
+          return std::make_pair(req.getKind(), constraint.value);
+        },
+        constraint.source, requirementSignatureSelfProto, Context, result);
+    assert(result.size() > 0);
+
+    bool anyWereRedundant =
+        llvm::any_of(result, [&](const ExplicitRequirement &otherReq) {
+          // Don't consider paths that are based on the requirement
+          // itself; such a path doesn't "prove" this requirement,
+          // since if we drop the requirement the path is no longer
+          // valid.
+          if (req == otherReq)
+            return true;
+
+          // Don't consider paths based on requirements that are already
+          // known to be redundant either, since those paths become
+          // invalid once redundant requirements are dropped.
+          return isRedundantExplicitRequirement(otherReq);
+        });
+
+    // If this requirement can be derived from a set of
+    // non-redundant base requirements, then this requirement
+    // is redundant.
+    if (!anyWereRedundant) {
+      Impl->RedundantRequirements[req].insert(result.front());
+    }
+  }
+}
+
 void GenericSignatureBuilder::computeRedundantRequirements(
     const ProtocolDecl *requirementSignatureSelfProto) {
   assert(!Impl->computedRedundantRequirements &&
@@ -6446,250 +5966,282 @@ void GenericSignatureBuilder::computeRedundantRequirements(
   Impl->computedRedundantRequirements = true;
 #endif
 
-  RedundantRequirementGraph graph;
+  // This sort preserves iteration order with the legacy algorithm.
+  SmallVector<ExplicitRequirement, 2> requirements(
+      Impl->ExplicitRequirements.begin(),
+      Impl->ExplicitRequirements.end());
+  std::stable_sort(requirements.begin(), requirements.end(),
+                   [](const ExplicitRequirement &req1,
+                      const ExplicitRequirement &req2) {
+                      if (req1.getSource()->isInferredRequirement() &&
+                          !req2.getSource()->isInferredRequirement())
+                        return true;
 
-  // Visit each equivalence class, recording all explicit requirement sources,
-  // and the root of each derived requirement source that implies an explicit
-  // source.
-  for (auto &equivClass : Impl->EquivalenceClasses) {
-    for (auto &entry : equivClass.conformsTo) {
-      SmallVector<Constraint<ProtocolDecl *>, 2> exact;
-      SmallVector<Constraint<ProtocolDecl *>, 2> lessSpecific;
+                      if (compareDependentTypes(req1.getSubjectType(),
+                                                req2.getSubjectType()) > 0)
+                        return true;
 
-      for (const auto &constraint : entry.second) {
-        auto *source = constraint.source;
+                      return false;
+                   });
 
-        // FIXME: Remove this check.
-        bool derivedViaConcrete = false;
-        if (source->getMinimalConformanceSource(
-            *this, constraint.getSubjectDependentType({ }), entry.first,
-            derivedViaConcrete)
-            != source)
-          continue;
+  for (const auto &req : requirements) {
+    auto subjectType = req.getSubjectType();
 
-        if (derivedViaConcrete)
-          continue;
-
-        // FIXME: Check for a conflict via the concrete type.
-        exact.push_back(constraint);
-
-        if (!source->isDerivedRequirement()) {
-          if (isConcreteConformance(equivClass, entry.first, *this)) {
-            Impl->ExplicitConformancesImpliedByConcrete.insert(
-                ExplicitRequirement::fromExplicitConstraint(
-                    RequirementKind::Conformance, constraint));
-          }
-        }
-      }
-
-      graph.addConstraintsFromEquivClass(RequirementKind::Conformance,
-                                         exact, lessSpecific, Context);
-    }
+    auto *equivClass = resolveEquivalenceClass(subjectType,
+                                         ArchetypeResolutionKind::AlreadyKnown);
+    assert(equivClass &&
+           "Explicit requirement names an unknown equivalence class?");
 
     Type resolvedConcreteType;
-    Optional<ExplicitRequirement> concreteTypeRequirement;
-
-    if (equivClass.concreteType) {
+    if (equivClass->concreteType) {
       resolvedConcreteType =
-        getCanonicalTypeInContext(equivClass.concreteType, { });
-
-      SmallVector<Constraint<Type>, 2> exact;
-      SmallVector<Constraint<Type>, 2> lessSpecific;
-
-      for (const auto &constraint : equivClass.concreteTypeConstraints) {
-        auto *source = constraint.source;
-        Type t = constraint.value;
-
-        // FIXME: Remove this check.
-        bool derivedViaConcrete = false;
-        if (source->getMinimalConformanceSource(
-            *this, constraint.getSubjectDependentType({ }), nullptr,
-            derivedViaConcrete)
-            != source)
-          continue;
-
-        if (derivedViaConcrete)
-          continue;
-
-        if (t->isEqual(resolvedConcreteType)) {
-          exact.push_back(constraint);
-          continue;
-        }
-
-        auto resolvedType = getCanonicalTypeInContext(t, { });
-        if (resolvedType->isEqual(resolvedConcreteType)) {
-          exact.push_back(constraint);
-        }
-
-        // Record the conflict.
-        if (!source->isDerivedRequirement()) {
-          auto req =
-              ExplicitRequirement::fromExplicitConstraint(
-                  RequirementKind::SameType, constraint);
-          Impl->ConflictingRequirements.insert(
-              std::make_pair(req, resolvedConcreteType));
-        }
-
-        lessSpecific.push_back(constraint);
-      }
-
-      concreteTypeRequirement =
-          graph.addConstraintsFromEquivClass(RequirementKind::SameType,
-                                             exact, lessSpecific, Context);
+          getCanonicalTypeInContext(equivClass->concreteType,
+                                    getGenericParams());
     }
 
     Type resolvedSuperclass;
-    Optional<ExplicitRequirement> superclassRequirement;
-
-    if (equivClass.superclass) {
-      // Resolve any thus-far-unresolved dependent types.
+    if (equivClass->superclass) {
       resolvedSuperclass =
-        getCanonicalTypeInContext(equivClass.superclass, getGenericParams());
-
-      SmallVector<Constraint<Type>, 2> exact;
-      SmallVector<Constraint<Type>, 2> lessSpecific;
-      SmallVector<Constraint<Type>, 2> impliedByConcrete;
-
-      for (const auto &constraint : equivClass.superclassConstraints) {
-        auto *source = constraint.source;
-        Type t = constraint.value;
-
-        // FIXME: Remove this check.
-        bool derivedViaConcrete = false;
-        if (source->getMinimalConformanceSource(
-            *this, constraint.getSubjectDependentType({ }), nullptr,
-            derivedViaConcrete)
-            != source)
-          continue;
-
-        if (derivedViaConcrete)
-          continue;
-
-        if (resolvedConcreteType) {
-          Type resolvedType = getCanonicalTypeInContext(t, { });
-          if (resolvedType->isExactSuperclassOf(resolvedConcreteType))
-            impliedByConcrete.push_back(constraint);
-        }
-
-        if (t->isEqual(resolvedSuperclass)) {
-          exact.push_back(constraint);
-          continue;
-        }
-
-        Type resolvedType = getCanonicalTypeInContext(t, { });
-        if (resolvedType->isEqual(resolvedSuperclass)) {
-          exact.push_back(constraint);
-          continue;
-        }
-
-        // Check for a conflict.
-        if (!source->isDerivedRequirement() &&
-            !resolvedType->isExactSuperclassOf(resolvedSuperclass)) {
-          auto req =
-              ExplicitRequirement::fromExplicitConstraint(
-                  RequirementKind::Superclass, constraint);
-          Impl->ConflictingRequirements.insert(
-              std::make_pair(req, resolvedSuperclass));
-        }
-
-        lessSpecific.push_back(constraint);
-      }
-
-      superclassRequirement =
-          graph.addConstraintsFromEquivClass(RequirementKind::Superclass,
-                                             exact, lessSpecific, Context);
-
-      graph.handleConstraintsImpliedByConcrete(RequirementKind::Superclass,
-                                               impliedByConcrete,
-                                               concreteTypeRequirement);
+          getCanonicalTypeInContext(equivClass->superclass,
+                                    getGenericParams());
     }
 
-    Optional<ExplicitRequirement> layoutRequirement;
+    switch (req.getKind()) {
+    case RequirementKind::Conformance: {
+      // TODO: conflicts with concrete
+      auto *proto = req.getRHS().get<ProtocolDecl *>();
 
-    if (equivClass.layout) {
-      SmallVector<Constraint<LayoutConstraint>, 2> exact;
-      SmallVector<Constraint<LayoutConstraint>, 2> lessSpecific;
-      SmallVector<Constraint<LayoutConstraint>, 2> impliedByConcrete;
+      auto found = equivClass->conformsTo.find(proto);
+      assert(found != equivClass->conformsTo.end());
 
-      for (const auto &constraint : equivClass.layoutConstraints) {
-        auto *source = constraint.source;
-        auto layout = constraint.value;
+      checkRequirementRedundancy(
+          req, found->second,
+          requirementSignatureSelfProto,
+          [&](const Constraint<ProtocolDecl *> &constraint) {
+            // FIXME: Remove this.
+            bool derivedViaConcrete;
+            auto minimalSource =
+              constraint.source->getMinimalConformanceSource(
+                  *this,
+                  constraint.getSubjectDependentType({ }),
+                  proto, derivedViaConcrete);
+            if (minimalSource != constraint.source)
+              return true;
 
-        // FIXME: Remove this check.
-        bool derivedViaConcrete = false;
-        if (source->getMinimalConformanceSource(
-            *this, constraint.getSubjectDependentType({ }), nullptr,
-            derivedViaConcrete)
-            != source)
-          continue;
+            if (derivedViaConcrete)
+              return true;
 
-        if (derivedViaConcrete)
-          continue;
+            return false;
+          });
+
+      if (isConcreteConformance(*equivClass, proto, *this))
+        Impl->ExplicitConformancesImpliedByConcrete.insert(req);
+
+      break;
+    }
+
+    case RequirementKind::Superclass: {
+      auto superclass = getCanonicalTypeInContext(
+          req.getRHS().get<Type>(), { });
+
+      if (!superclass->isExactSuperclassOf(resolvedSuperclass)) {
+        // Case 1. We have a requirement 'T : C', and we've
+        // previously resolved the superclass of 'T' to some
+        // class 'D' where 'C' is not a superclass of 'D'.
+        //
+        // This means 'T : C' conflicts with some other
+        // requirement that implies 'T : D'.
+        Impl->ConflictingRequirements[req] = resolvedSuperclass;
+
+        checkRequirementRedundancy(
+            req, equivClass->superclassConstraints,
+            requirementSignatureSelfProto,
+            [&](const Constraint<Type> &constraint) {
+              auto otherSuperclass = getCanonicalTypeInContext(
+                 constraint.value, { });
+              // Filter out requirements where the superclass
+              // is not equal to the resolved superclass.
+              if (!resolvedSuperclass->isEqual(otherSuperclass))
+               return true;
+
+              return false;
+            });
+      } else {
+        // Case 2. We have a requirement 'T : C', and we've
+        // previously resolved the superclass of 'T' to some
+        // class 'D' where 'C' is a superclass of 'D'.
+        //
+        // This means that 'T : C' is made redundant by any
+        // requirement that implies 'T : B', such that 'C' is a
+        // superclass of 'B'.
+        checkRequirementRedundancy(
+            req, equivClass->superclassConstraints,
+            requirementSignatureSelfProto,
+            [&](const Constraint<Type> &constraint) {
+              auto otherSuperclass = getCanonicalTypeInContext(
+                 constraint.value, { });
+              // Filter out requirements where the superclass is less
+              // specific than the original requirement.
+              if (!superclass->isExactSuperclassOf(otherSuperclass))
+               return true;
+
+              return false;
+            });
 
         if (resolvedConcreteType) {
-          if (typeImpliesLayoutConstraint(resolvedConcreteType, layout)) {
-            impliedByConcrete.push_back(constraint);
+          // We have a superclass requirement 'T : C' and a same-type
+          // requirement 'T == D'.
+          if (resolvedSuperclass->isExactSuperclassOf(resolvedConcreteType)) {
+            // 'C' is a superclass of 'D', so 'T : C' is redundant.
+            checkRequirementRedundancy(
+                req, equivClass->concreteTypeConstraints,
+                requirementSignatureSelfProto,
+                [&](const Constraint<Type> &constraint) {
+                  auto otherType = getCanonicalTypeInContext(
+                      constraint.value, { });
+                  if (!resolvedSuperclass->isExactSuperclassOf(otherType))
+                    return true;
 
-            if (!source->isDerivedRequirement()) {
-              Impl->ExplicitConformancesImpliedByConcrete.insert(
-                  ExplicitRequirement::fromExplicitConstraint(
-                      RequirementKind::Layout, constraint));
-            }
+                  return false;
+                });
+          } else {
+            // 'C' is not a superclass of 'D'; we have a conflict.
+            Impl->ConflictingConcreteTypeRequirements.push_back(
+                {req, resolvedConcreteType, resolvedSuperclass});
           }
         }
-
-        if (layout == equivClass.layout) {
-          exact.push_back(constraint);
-          continue;
-        }
-
-        // Check for a conflict.
-        if (!source->isDerivedRequirement() &&
-            !layout.merge(equivClass.layout)->isKnownLayout()) {
-          auto req =
-              ExplicitRequirement::fromExplicitConstraint(
-                  RequirementKind::Layout, constraint);
-          Impl->ConflictingRequirements.insert(
-              std::make_pair(req, equivClass.layout));
-        }
-
-        lessSpecific.push_back(constraint);
       }
 
-      layoutRequirement =
-          graph.addConstraintsFromEquivClass(RequirementKind::Layout,
-                                             exact, lessSpecific, Context);
-
-      graph.handleConstraintsImpliedByConcrete(RequirementKind::Layout,
-                                               impliedByConcrete,
-                                               concreteTypeRequirement);
+      break;
     }
 
-    if (resolvedConcreteType && resolvedSuperclass) {
-      if (!resolvedSuperclass->isExactSuperclassOf(resolvedConcreteType)) {
-        Impl->ConflictingConcreteTypeRequirements.push_back(
-            {*concreteTypeRequirement, *superclassRequirement,
-             resolvedConcreteType, resolvedSuperclass});
+    case RequirementKind::Layout: {
+      // TODO: less-specific constraints
+      // TODO: conflicts with other layout constraints
+      // TODO: conflicts with concrete and superclass
+      auto layout = req.getRHS().get<LayoutConstraint>();
+
+      if (!layout.merge(equivClass->layout)->isKnownLayout()) {
+        // Case 1. We have a requirement 'T : L1', and we've
+        // previously resolved the layout of 'T' to some
+        // layout constraint 'L2', where 'L1' and 'L2' are not
+        // mergeable.
+        //
+        // This means that 'T : L1' conflicts with some other
+        // requirement that implies 'T : L2'.
+        Impl->ConflictingRequirements[req] = equivClass->layout;
+
+        checkRequirementRedundancy(
+            req, equivClass->layoutConstraints,
+            requirementSignatureSelfProto,
+            [&](const Constraint<LayoutConstraint> &constraint) {
+              auto otherLayout = constraint.value;
+              // Filter out requirements where the layout is not
+              // equal to the resolved layout.
+              if (equivClass->layout != otherLayout)
+               return true;
+
+              return false;
+            });
+      } else if (layout == equivClass->layout) {
+        // Case 2. We have a requirement 'T : L1', and we know
+        // the most specific resolved layout for 'T' is also 'L1'.
+        //
+        // This means that 'T : L1' is made redundant by any
+        // requirement that implies 'T : L1'.
+        checkRequirementRedundancy(
+            req, equivClass->layoutConstraints,
+            requirementSignatureSelfProto,
+            [&](const Constraint<LayoutConstraint> &constraint) {
+              // Filter out requirements where the implied layout is
+              // not equal to the resolved layout.
+              auto otherLayout = constraint.value;
+              if (layout != otherLayout)
+                return true;
+
+              return false;
+            });
+
+        if (resolvedConcreteType) {
+          auto layout = req.getRHS().get<LayoutConstraint>();
+          if (typeImpliesLayoutConstraint(resolvedConcreteType,
+                                          layout)) {
+            Impl->ExplicitConformancesImpliedByConcrete.insert(req);
+
+            checkRequirementRedundancy(
+                req, equivClass->concreteTypeConstraints,
+                requirementSignatureSelfProto,
+                [&](const Constraint<Type> &constraint) {
+                  // Filter out requirements where the concrete type
+                  // does not have the resolved layout.
+                  auto otherType = getCanonicalTypeInContext(
+                      constraint.value, { });
+                  if (!typeImpliesLayoutConstraint(otherType, layout))
+                    return true;
+
+                  return false;
+                });
+          } else if (typeConflictsWithLayoutConstraint(resolvedConcreteType,
+                                                       layout)) {
+            // We have a concrete type requirement 'T == C' and 'C' does
+            // not satisfy 'L1'.
+            Impl->ConflictingConcreteTypeRequirements.push_back(
+                {req, resolvedConcreteType, equivClass->layout});
+          }
+        }
+      } else {
+        // Case 3. We have a requirement 'T : L1', and we know
+        // the most specific resolved layout for 'T' is some other
+        // layout 'L2', such that 'L2' is mergeable with 'L1'.
+        //
+        // This means that 'T : L1' is made redundant by any
+        // requirement that implies 'T : L3', where L3 is
+        // mergeable with L1.
+        checkRequirementRedundancy(
+            req, equivClass->layoutConstraints,
+            requirementSignatureSelfProto,
+            [&](const Constraint<LayoutConstraint> &constraint) {
+              auto otherLayout = constraint.value;
+              // Filter out requirements where the implied layout
+              // is not mergeable with the original requirement's
+              // layout.
+              if (!layout.merge(otherLayout)->isKnownLayout())
+                return true;
+
+              return false;
+            });
+
+        if (resolvedConcreteType) {
+          auto layout = req.getRHS().get<LayoutConstraint>();
+          if (typeImpliesLayoutConstraint(resolvedConcreteType, layout)) {
+            Impl->ExplicitConformancesImpliedByConcrete.insert(req);
+
+            checkRequirementRedundancy(
+                req, equivClass->concreteTypeConstraints,
+                requirementSignatureSelfProto,
+                [&](const Constraint<Type> &constraint) {
+                  // Filter out requirements where the concrete type
+                  // does not have the resolved layout.
+                  auto otherType = getCanonicalTypeInContext(
+                      constraint.value, { });
+
+                  if (!typeImpliesLayoutConstraint(otherType,
+                                                   equivClass->layout))
+                    return true;
+
+                  return false;
+                });
+          }
+        }
       }
-    } else if (resolvedConcreteType && equivClass.layout) {
-      if (typeConflictsWithLayoutConstraint(resolvedConcreteType,
-                                            equivClass.layout)) {
-        Impl->ConflictingConcreteTypeRequirements.push_back(
-            {*concreteTypeRequirement, *layoutRequirement,
-             resolvedConcreteType, equivClass.layout});
-      }
+
+      break;
+    }
+
+    case RequirementKind::SameType:
+      llvm_unreachable("Should not see same type requirements here");
     }
   }
-
-  auto &SM = getASTContext().SourceMgr;
-
-#ifndef NDEBUG
-  graph.verifyAllVerticesWereSeen(&SM);
-#endif
-
-  // Determine which explicit requirement sources are actually redundant.
-  assert(Impl->RedundantRequirements.empty());
-  graph.computeRedundantRequirements(SM, Impl->RedundantRequirements);
 }
 
 void
@@ -6701,7 +6253,7 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
 
   computeRedundantRequirements(requirementSignatureSelfProto);
   diagnoseRedundantRequirements();
-  diagnoseConflictingConcreteTypeRequirements();
+  diagnoseConflictingConcreteTypeRequirements(requirementSignatureSelfProto);
 
   assert(!Impl->finalized && "Already finalized builder");
 #ifndef NDEBUG
@@ -7478,15 +7030,40 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
   }
 }
 
-void GenericSignatureBuilder::diagnoseConflictingConcreteTypeRequirements() const {
+void GenericSignatureBuilder::diagnoseConflictingConcreteTypeRequirements(
+    const ProtocolDecl *requirementSignatureSelfProto) {
   for (auto pair : Impl->ConflictingConcreteTypeRequirements) {
-    SourceLoc loc = pair.concreteTypeRequirement.getSource()->getLoc();
+    auto subjectType = pair.otherRequirement.getSubjectType();
+
+    auto *equivClass = resolveEquivalenceClass(subjectType,
+                                         ArchetypeResolutionKind::AlreadyKnown);
+    assert(equivClass &&
+           "Explicit requirement names an unknown equivalence class?");
+
+    auto foundConcreteRequirement = llvm::find_if(
+        equivClass->concreteTypeConstraints,
+        [&](const Constraint<Type> &constraint) {
+          SmallVector<ExplicitRequirement, 2> result;
+          getBaseRequirements(
+              [&]() {
+                return std::make_pair(RequirementKind::SameType, constraint.value);
+              },
+              constraint.source, requirementSignatureSelfProto, Context, result);
+
+        return
+            !llvm::any_of(result, [&](const ExplicitRequirement &otherReq) {
+              return isRedundantExplicitRequirement(otherReq);
+            });
+        });
+
+    assert(foundConcreteRequirement != equivClass->concreteTypeConstraints.end());
+
+    SourceLoc loc = foundConcreteRequirement->source->getLoc();
     SourceLoc otherLoc = pair.otherRequirement.getSource()->getLoc();
 
     if (loc.isInvalid() && otherLoc.isInvalid())
       continue;
 
-    auto subjectType = pair.concreteTypeRequirement.getSubjectType();
     SourceLoc subjectLoc = (loc.isInvalid() ? otherLoc : loc);
 
     Impl->HadAnyError = true;
