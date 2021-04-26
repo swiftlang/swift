@@ -236,7 +236,9 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
   @asyncHandler
   override func j() { // okay, isolated to GenericGlobalActor<String>
     onGenericGlobalActorString() // okay
-    onGenericGlobalActorInt() // expected-error{{call is 'async' but is not marked with 'await'}}
+
+    // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
+    onGenericGlobalActorInt() // expected-note{{call is 'async'}}
   }
 }
 
@@ -250,7 +252,8 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
 @SomeGlobalActor func sibling() { foo() }
 
 func bar() async {
-  foo() // expected-error{{call is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
+  foo() // expected-note{{call is 'async'}}
 }
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}

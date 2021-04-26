@@ -16,7 +16,9 @@ var asyncThrowsProp : Int {
 func hello() async {
   _ = intThrowsProp // expected-error{{property access can throw, but it is not marked with 'try' and the error is not handled}}
 
-  _ = intAsyncProp // expected-error{{property access is 'async' but is not marked with 'await'}}
+
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = intAsyncProp // expected-note{{property access is 'async'}}
 }
 
 class C {
@@ -34,6 +36,6 @@ var refTypeAsyncProp : C {
 func salam() async {
   _ = refTypeThrowsProp // expected-error{{property access can throw, but it is not marked with 'try' and the error is not handled}}
 
-
-  _ = refTypeAsyncProp // expected-error {{property access is 'async' but is not marked with 'await'}}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = refTypeAsyncProp // expected-note {{property access is 'async'}}
 }

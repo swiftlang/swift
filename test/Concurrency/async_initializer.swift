@@ -6,7 +6,8 @@
 // some functions to play with
 
 func f() async {
-  let _ = Person() // expected-error {{call is 'async' but is not marked with 'await'}} {{11-11=await }}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}} {{11-11=await }}
+  let _ = Person() // expected-note {{call is 'async'}}
 }
 
 func g() {}
@@ -16,7 +17,9 @@ func g() {}
 
 class Person {
   init() async {
-    f() // expected-error {{call is 'async' but is not marked with 'await'}} {{5-5=await }}
+
+    // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
+    f() // expected-note{{call is 'async'}}
   }
 
   convenience init(_ s: String) async {
@@ -76,7 +79,8 @@ class MyType {
 }
 
 func beep() async {
-  let _ = MyType(f) // expected-error{{call is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{11-11=await }}
+  let _ = MyType(f) // expected-note{{call is 'async'}}
   let _ = await MyType(f)
 
   let _ = MyType(g)
