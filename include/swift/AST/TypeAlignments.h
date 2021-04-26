@@ -38,6 +38,7 @@ namespace swift {
   class DifferentiableAttr;
   class Expr;
   class ExtensionDecl;
+  class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
   class GenericTypeParamDecl;
@@ -123,6 +124,7 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)
 
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ASTContext, swift::ASTContextAlignInBits);
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::FileUnit, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DifferentiableAttr, swift::PointerAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::CaptureListExpr, swift::ExprAlignInBits)
