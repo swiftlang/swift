@@ -50,6 +50,7 @@ extension Task {
   /// this function was called.
   ///
   /// All functions available on the Task
+  @available(*, deprecated, message: "`Task.current` has been deprecated and will be removed, use static functions on Task instead.")
   public static var current: Task? {
     guard let _task = _getCurrentAsyncTask() else {
       return nil
@@ -88,6 +89,7 @@ extension Task {
   ///
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.currentPriority`
+  @available(*, deprecated, message: "Storing `Task` instances has been deprecated, and as such instance functions on Task are deprecated and will be removed soon. Use the static 'Task.currentPriority' instead.")
   public var priority: Priority {
     getJobFlags(_task).priority
   }
@@ -158,6 +160,7 @@ extension Task {
     }
 
     /// Returns the `Task` that this handle refers to.
+    @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
     public var task: Task {
       Task(_task)
     }
@@ -671,6 +674,7 @@ public struct UnsafeCurrentTask {
   ///
   /// Operations on `Task` (unlike `UnsafeCurrentTask`) are safe to be called
   /// from any other task (or thread).
+  @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
   public var task: Task {
     Task(_task)
   }
