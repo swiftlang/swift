@@ -484,6 +484,26 @@ public func detach<T>(
   return Task.Handle<T, Error>(task)
 }
 
+@discardableResult
+@_alwaysEmitIntoClient
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public func asyncDetached<T>(
+  priority: Task.Priority = .unspecified,
+  operation: __owned @Sendable @escaping () async -> T
+) -> Task.Handle<T, Never> {
+  return detach(priority: priority, operation: operation)
+}
+
+@discardableResult
+@_alwaysEmitIntoClient
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public func asyncDetached<T>(
+  priority: Task.Priority = .unspecified,
+  operation: __owned @Sendable @escaping () async throws -> T
+) -> Task.Handle<T, Error> {
+  return detach(priority: priority, operation: operation)
+}
+
 /// Run given `operation` as asynchronously in its own top-level task.
 ///
 /// The `async` function should be used when creating asynchronous work
