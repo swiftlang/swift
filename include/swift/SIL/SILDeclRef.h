@@ -152,6 +152,10 @@ struct SILDeclRef {
     /// References the function used to initialize a property wrapper storage
     /// instance from a projected value.
     PropertyWrapperInitFromProjectedValue,
+
+    /// The main entry-point function. This may reference a SourceFile for a
+    /// top-level main, or a decl for e.g an @main decl.
+    EntryPoint,
   };
   
   /// The AST node represented by this SILDeclRef.
@@ -220,6 +224,12 @@ struct SILDeclRef {
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
 
+  /// Produces a SILDeclRef for a synthetic main entry-point such as @main.
+  static SILDeclRef getMainDeclEntryPoint(ValueDecl *decl);
+
+  /// Produces a SILDeclRef for the entry-point of a main FileUnit.
+  static SILDeclRef getMainFileEntryPoint(FileUnit *file);
+
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }
   
@@ -236,7 +246,13 @@ struct SILDeclRef {
   AutoClosureExpr *getAutoClosureExpr() const;
   FuncDecl *getFuncDecl() const;
   AbstractFunctionDecl *getAbstractFunctionDecl() const;
-  
+  FileUnit *getFileUnit() const {
+    return loc.get<FileUnit *>();
+  }
+
+  /// Retrieves the ASTContext from the underlying AST node being stored.
+  ASTContext &getASTContext() const;
+
   llvm::Optional<AnyFunctionRef> getAnyFunctionRef() const;
   
   SILLocation getAsRegularLocation() const;
