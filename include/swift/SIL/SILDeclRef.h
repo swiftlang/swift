@@ -42,6 +42,7 @@ namespace swift {
   class AutoClosureExpr;
   class ASTContext;
   class ClassDecl;
+  class FileUnit;
   class SILFunctionType;
   enum IsSerialized_t : unsigned char;
   enum class SubclassScope : unsigned char;
@@ -83,7 +84,14 @@ enum ForDefinition_t : bool {
 /// declaration, such as uncurry levels of a function, the allocating and
 /// initializing entry points of a constructor, etc.
 struct SILDeclRef {
-  using Loc = llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *>;
+  /// The type of AST node location being stored.
+  enum LocKind {
+    Decl,
+    Closure,
+    File
+  };
+  using Loc = llvm::PointerUnion<ValueDecl *, AbstractClosureExpr *,
+                                 FileUnit *>;
 
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
@@ -146,7 +154,7 @@ struct SILDeclRef {
     PropertyWrapperInitFromProjectedValue,
   };
   
-  /// The ValueDecl or AbstractClosureExpr represented by this SILDeclRef.
+  /// The AST node represented by this SILDeclRef.
   Loc loc;
   /// The Kind of this SILDeclRef.
   Kind kind : 4;
@@ -158,6 +166,17 @@ struct SILDeclRef {
   PointerUnion<AutoDiffDerivativeFunctionIdentifier *,
                const GenericSignatureImpl *>
       pointer;
+
+  /// Returns the type of AST node location being stored by the SILDeclRef.
+  LocKind getLocKind() const {
+    if (loc.is<ValueDecl *>())
+      return LocKind::Decl;
+    if (loc.is<AbstractClosureExpr *>())
+      return LocKind::Closure;
+    if (loc.is<FileUnit *>())
+      return LocKind::File;
+    llvm_unreachable("Unhandled location kind!");
+  }
 
   /// The derivative function identifier.
   AutoDiffDerivativeFunctionIdentifier * getDerivativeFunctionIdentifier() const {

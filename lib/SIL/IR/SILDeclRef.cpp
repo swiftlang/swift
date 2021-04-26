@@ -170,14 +170,17 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
 }
 
 Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
-  if (auto vd = loc.dyn_cast<ValueDecl*>()) {
-    if (auto afd = dyn_cast<AbstractFunctionDecl>(vd)) {
+  switch (getLocKind()) {
+  case LocKind::Decl:
+    if (auto *afd = getAbstractFunctionDecl())
       return AnyFunctionRef(afd);
-    } else {
-      return None;
-    }
+    return None;
+  case LocKind::Closure:
+    return AnyFunctionRef(getAbstractClosureExpr());
+  case LocKind::File:
+    return None;
   }
-  return AnyFunctionRef(loc.get<AbstractClosureExpr*>());
+  llvm_unreachable("Unhandled case in switch");
 }
 
 bool SILDeclRef::isThunk() const {
@@ -226,9 +229,16 @@ bool SILDeclRef::isClangGenerated(ClangNode node) {
 }
 
 bool SILDeclRef::isImplicit() const {
-  if (hasDecl())
+  switch (getLocKind()) {
+  case LocKind::Decl:
     return getDecl()->isImplicit();
-  return getAbstractClosureExpr()->isImplicit();
+  case LocKind::Closure:
+    return getAbstractClosureExpr()->isImplicit();
+  case LocKind::File:
+    // Files are currently never considered implicit.
+    return false;
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
@@ -681,17 +691,23 @@ bool SILDeclRef::isNativeToForeignThunk() const {
   if (!isForeign)
     return false;
 
-  // We can have native-to-foreign thunks over closures.
-  if (!hasDecl())
+  switch (getLocKind()) {
+  case LocKind::Decl:
+    // A decl with a clang node doesn't have a native entry-point to forward
+    // onto.
+    if (getDecl()->hasClangNode())
+      return false;
+
+    // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
+    return kind == Kind::Func || kind == Kind::Initializer ||
+           kind == Kind::Deallocator;
+  case LocKind::Closure:
+    // We can have native-to-foreign thunks over closures.
     return true;
-
-  // A decl with a clang node doesn't have a native entry-point to forward onto.
-  if (getDecl()->hasClangNode())
+  case LocKind::File:
     return false;
-
-  // Only certain kinds of SILDeclRef can expose native-to-foreign thunks.
-  return kind == Kind::Func || kind == Kind::Initializer ||
-         kind == Kind::Deallocator;
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 /// Use the Clang importer to mangle a Clang declaration.
@@ -781,8 +797,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   switch (kind) {
   case SILDeclRef::Kind::Func:
-    if (!hasDecl())
-      return mangler.mangleClosureEntity(getAbstractClosureExpr(), SKind);
+    if (auto *ACE = getAbstractClosureExpr())
+      return mangler.mangleClosureEntity(ACE, SKind);
 
     // As a special case, functions can have manually mangled names.
     // Use the SILGen name only for the original non-thunked, non-curried entry
@@ -1056,9 +1072,15 @@ SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {
 }
 
 SILLocation SILDeclRef::getAsRegularLocation() const {
-  if (hasDecl())
+  switch (getLocKind()) {
+  case LocKind::Decl:
     return RegularLocation(getDecl());
-  return RegularLocation(getAbstractClosureExpr());
+  case LocKind::Closure:
+    return RegularLocation(getAbstractClosureExpr());
+  case LocKind::File:
+    return RegularLocation::getModuleLocation();
+  }
+  llvm_unreachable("Unhandled case in switch");
 }
 
 SubclassScope SILDeclRef::getSubclassScope() const {
