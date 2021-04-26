@@ -432,7 +432,7 @@ public:
 
   virtual StringRef getModuleDefiningPath() const override;
 
-  Decl *getMainDecl() const override;
+  ValueDecl *getMainDecl() const override;
 
   bool hasEntryPoint() const override;
 
