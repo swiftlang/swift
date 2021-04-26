@@ -315,6 +315,7 @@ void SILDeclRef::print(raw_ostream &OS) const {
 
   switch (kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::EntryPoint:
     break;
   case SILDeclRef::Kind::Allocator:
     OS << "!allocator";

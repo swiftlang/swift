@@ -16,6 +16,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
@@ -183,6 +184,18 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
   llvm_unreachable("Unhandled case in switch");
 }
 
+ASTContext &SILDeclRef::getASTContext() const {
+  switch (getLocKind()) {
+  case LocKind::Decl:
+    return getDecl()->getASTContext();
+  case LocKind::Closure:
+    return getAbstractClosureExpr()->getASTContext();
+  case LocKind::File:
+    return getFileUnit()->getASTContext();
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
 bool SILDeclRef::isThunk() const {
   return isForeignToNativeThunk() || isNativeToForeignThunk();
 }
@@ -251,6 +264,10 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (getAbstractClosureExpr()) {
     return isSerialized() ? SILLinkage::Shared : SILLinkage::Private;
   }
+
+  // The main entry-point is public.
+  if (kind == Kind::EntryPoint)
+    return SILLinkage::Public;
 
   // Add External to the linkage (e.g. Public -> PublicExternal) if this is a
   // declaration not a definition.
@@ -417,6 +434,23 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
   return result;
 }
 
+SILDeclRef SILDeclRef::getMainDeclEntryPoint(ValueDecl *decl) {
+  auto *file = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
+  assert(file->getMainDecl() == decl);
+  SILDeclRef result;
+  result.loc = decl;
+  result.kind = Kind::EntryPoint;
+  return result;
+}
+
+SILDeclRef SILDeclRef::getMainFileEntryPoint(FileUnit *file) {
+  assert(file->hasEntryPoint() && !file->getMainDecl());
+  SILDeclRef result;
+  result.loc = file;
+  result.kind = Kind::EntryPoint;
+  return result;
+}
+
 bool SILDeclRef::hasClosureExpr() const {
   return loc.is<AbstractClosureExpr *>()
     && isa<ClosureExpr>(getAbstractClosureExpr());
@@ -499,6 +533,9 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
     return IsNotSerialized;
   }
+
+  if (kind == Kind::EntryPoint)
+    return IsNotSerialized;
 
   if (isIVarInitializerOrDestroyer())
     return IsNotSerialized;
@@ -869,6 +906,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
                                                       SKind);
+
+  case SILDeclRef::Kind::EntryPoint: {
+    return getASTContext().getEntryPointFunctionName();
+  }
   }
 
   llvm_unreachable("bad entity kind!");
@@ -1187,7 +1228,12 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 }
 
 unsigned SILDeclRef::getParameterListCount() const {
-  if (!hasDecl() || kind == Kind::DefaultArgGenerator)
+  // Only decls can introduce currying.
+  if (!hasDecl())
+    return 1;
+
+  // Always uncurried even if the underlying function is curried.
+  if (kind == Kind::DefaultArgGenerator || kind == Kind::EntryPoint)
     return 1;
 
   auto *vd = getDecl();
