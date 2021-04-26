@@ -854,12 +854,8 @@ func _getCurrentThreadPriority() -> Int
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-  // TODO: We can probably do better than detach
-  // if we're already running on behalf of a task,
-  // if the receiver of the method invocation is itself an Actor, or in other
-  // situations.
 #if compiler(>=5.5) && $Sendable
-  detach { await body() }
+  async { await body() }
 #endif
 }
 
