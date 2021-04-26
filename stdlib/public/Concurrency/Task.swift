@@ -540,6 +540,10 @@ public func async(
     actualPriority = priority
   }
 
+  let adjustedPriority = actualPriority == .userInteractive
+    ? .userInitiated
+    : actualPriority
+
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
   flags.kind = .task
