@@ -1821,12 +1821,6 @@ public:
         }
       }
 
-      if (E->isSuper() != E->getArg()->isSuperExpr()) {
-        Out << "Function application's isSuper() bit mismatch.\n";
-        E->dump(Out);
-        Out << "\n";
-        abort();
-      }
       verifyCheckedBase(E);
     }
 
