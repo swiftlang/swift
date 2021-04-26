@@ -4897,6 +4897,9 @@ struct DynamicReplacementKey {
   uint16_t getExtraDiscriminator() const {
     return flags & 0x0000FFFF;
   }
+  bool isAsync() const {
+    return ((flags >> 16 ) & 0x1);
+  }
 };
 
 /// A record describing a dynamic function replacement.

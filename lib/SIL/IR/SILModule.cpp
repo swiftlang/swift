@@ -724,8 +724,9 @@ void SILModule::registerDeserializationNotificationHandler(
   deserializationNotificationHandlers.add(std::move(handler));
 }
 
-SILValue SILModule::getOpenedArchetypeDef(CanArchetypeType archetype) {
-  SILValue &def = openedArchetypeDefs[archetype];
+SILValue SILModule::getOpenedArchetypeDef(CanArchetypeType archetype,
+                                          SILFunction *inFunction) {
+  SILValue &def = openedArchetypeDefs[{archetype, inFunction}];
   if (!def) {
     numUnresolvedOpenedArchetypes++;
     def = ::new PlaceholderValue(SILType::getPrimitiveAddressType(archetype));
@@ -741,7 +742,7 @@ bool SILModule::hasUnresolvedOpenedArchetypeDefinitions() {
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
   if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
     if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
-      SILValue &val = openedArchetypeDefs[archeTy];
+      SILValue &val = openedArchetypeDefs[{archeTy, inst->getFunction()}];
       if (val) {
         if (!isa<PlaceholderValue>(val)) {
           // Print a useful error message (and not just abort with an assert).
@@ -765,6 +766,19 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
   }
 }
 
+void SILModule::notifyMovedInstruction(SILInstruction *inst,
+                                       SILFunction *fromFunction) {
+  if (auto *svi = dyn_cast<SingleValueInstruction>(inst)) {
+    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+      OpenedArchetypeKey key = {archeTy, fromFunction};
+      assert(openedArchetypeDefs.lookup(key) == svi &&
+             "archetype def was not registered");
+      openedArchetypeDefs.erase(key);
+      openedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
+    }
+  }
+}
+
 void SILModule::registerDeleteNotificationHandler(
     DeleteNotificationHandler *handler) {
   // Ask the handler (that can be an analysis, a pass, or some other data
@@ -783,9 +797,10 @@ void SILModule::notifyDeleteHandlers(SILNode *node) {
   // Update openedArchetypeDefs.
   if (auto *svi = dyn_cast<SingleValueInstruction>(node)) {
     if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
-      assert(openedArchetypeDefs.lookup(archeTy) == svi &&
+      OpenedArchetypeKey key = {archeTy, svi->getFunction()};
+      assert(openedArchetypeDefs.lookup(key) == svi &&
              "archetype def was not registered");
-      openedArchetypeDefs.erase(archeTy);
+      openedArchetypeDefs.erase(key);
     }
   }
 

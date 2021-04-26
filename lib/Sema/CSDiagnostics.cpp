@@ -348,6 +348,16 @@ bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
   return decl->isStatic();
 }
 
+bool WrappedValueMismatch::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto elt = locator->castLastElementTo<LocatorPathElt::WrappedValue>();
+
+  emitDiagnostic(diag::composed_property_wrapper_mismatch, getFromType(),
+                 resolveType(elt.getType())->getString(), getToType());
+
+  return true;
+}
+
 bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
@@ -639,11 +649,10 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_condition_value;
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
-  case CTP_ComposedPropertyWrapper:
-    return diag::composed_property_wrapper_mismatch;
 
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
+  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
@@ -3132,11 +3141,10 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
-  case CTP_ComposedPropertyWrapper:
-    return diag::composed_property_wrapper_mismatch;
 
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
+  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:

@@ -43,7 +43,9 @@ LANGUAGE_FEATURE(RethrowsProtocol, 0, "@rethrows protocol", true)
 LANGUAGE_FEATURE(GlobalActors, 0, "Global actors", langOpts.EnableExperimentalConcurrency)
 LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
 LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
+LANGUAGE_FEATURE(BuiltinExecutor, 0, "Executor builtins", true)
 LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins", true)
 LANGUAGE_FEATURE(BuiltinTaskGroup, 0, "TaskGroup builtins", true)
+LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
 
 #undef LANGUAGE_FEATURE

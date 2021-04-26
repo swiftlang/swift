@@ -383,6 +383,30 @@ SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
   return newBlock;
 }
 
+void SILFunction::moveAllBlocksFromOtherFunction(SILFunction *F) {
+  BlockList.splice(begin(), F->BlockList);
+  
+  SILModule &mod = getModule();
+  for (SILBasicBlock &block : *this) {
+    for (SILInstruction &inst : block) {
+      mod.notifyMovedInstruction(&inst, F);
+    }
+  }
+}
+
+void SILFunction::moveBlockFromOtherFunction(SILBasicBlock *blockInOtherFunction,
+                                iterator insertPointInThisFunction) {
+  SILFunction *otherFunc = blockInOtherFunction->getParent();
+  assert(otherFunc != this);
+  BlockList.splice(insertPointInThisFunction, otherFunc->BlockList,
+                   blockInOtherFunction);
+
+  SILModule &mod = getModule();
+  for (SILInstruction &inst : *blockInOtherFunction) {
+    mod.notifyMovedInstruction(&inst, otherFunc);
+  }
+}
+
 void SILFunction::moveBlockBefore(SILBasicBlock *BB, SILFunction::iterator IP) {
   assert(BB->getParent() == this);
   if (SILFunction::iterator(BB) == IP)
