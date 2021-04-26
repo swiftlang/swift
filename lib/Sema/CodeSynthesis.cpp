@@ -626,7 +626,6 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
     type = funcTy->getResult();
   auto *superclassCtorRefExpr =
       new (ctx) DotSyntaxCallExpr(ctorRefExpr, SourceLoc(), superRef, type);
-  superclassCtorRefExpr->setIsSuper(true);
   superclassCtorRefExpr->setThrows(false);
 
   auto *bodyParams = ctor->getParameters();
