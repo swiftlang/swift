@@ -1359,6 +1359,7 @@ static llvm::StringLiteral platformsWithLegacyLayouts[][2] = {
   {"iphonesimulator", "x86_64"},
   {"macosx", "x86_64"},
   {"watchos", "armv7k"},
+  {"watchos", "arm64_32"},
   {"watchsimulator", "i386"}
 };
 

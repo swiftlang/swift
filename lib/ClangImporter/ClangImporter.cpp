@@ -635,6 +635,7 @@ importer::getNormalInvocationArguments(
         invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM_"});
         break;
       case llvm::Triple::aarch64:
+      case llvm::Triple::aarch64_32:
         invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM64_"});
         break;
       case llvm::Triple::x86:
@@ -765,6 +766,7 @@ importer::addCommonInvocationArguments(
              (triple.isiOS() || triple.isWatchOS()))
       invocationArgStrs.push_back("-mcpu=apple-a12");
     else if (triple.getArch() == llvm::Triple::aarch64 ||
+             triple.getArch() == llvm::Triple::aarch64_32 ||
              triple.getArch() == llvm::Triple::aarch64_be) {
       invocationArgStrs.push_back("-mcpu=apple-a7");
     }
