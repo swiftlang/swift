@@ -663,8 +663,6 @@ private:
 
   void diagnoseConflictingConcreteTypeRequirements() const;
 
-  bool hasExplicitConformancesImpliedByConcrete() const;
-
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
