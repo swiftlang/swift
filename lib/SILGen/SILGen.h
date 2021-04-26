@@ -86,8 +86,6 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
-  SILFunction *emitTopLevelFunction(SILLocation Loc);
-
   size_t anonymousSymbolCounter = 0;
 
   Optional<SILDeclRef> StringToNSStringFn;
