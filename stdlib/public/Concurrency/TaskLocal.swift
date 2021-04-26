@@ -77,20 +77,22 @@ extension Task {
   public static func local<Key>(
     _ keyPath: KeyPath<TaskLocalValues, Key>
   ) -> Key.Value where Key: TaskLocalKey {
-    guard let task = Task.current else {
-      return Key.defaultValue
-    }
+    withUnsafeCurrentTask { current in
+      guard let task = current else {
+        return Key.defaultValue
+      }
 
-    let value = _taskLocalValueGet(
-      task._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
-    guard let rawValue = value else {
-      return Key.defaultValue
-    }
+      let value = _taskLocalValueGet(
+        task._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
+      guard let rawValue = value else {
+        return Key.defaultValue
+      }
 
-    // Take the value; The type should be correct by construction
-    let storagePtr =
-      rawValue.bindMemory(to: Key.Value.self, capacity: 1)
-    return UnsafeMutablePointer<Key.Value>(mutating: storagePtr).pointee
+      // Take the value; The type should be correct by construction
+      let storagePtr =
+        rawValue.bindMemory(to: Key.Value.self, capacity: 1)
+      return UnsafeMutablePointer<Key.Value>(mutating: storagePtr).pointee
+    }
   }
 
   /// Bind the task local key to the given value for the scope of the `body` function.
@@ -106,7 +108,9 @@ extension Task {
     boundTo value: Key.Value,
     operation: () async throws -> BodyResult
   ) async rethrows -> BodyResult where Key: TaskLocalKey {
-    let _task = Task.current!._task // !-safe, guaranteed to have task available inside async function
+    let _task = withUnsafeCurrentTask { current in
+      current!._task // !-safe, guaranteed to have task available inside async function
+    }
 
     _taskLocalValuePush(_task, keyType: Key.self, value: value)
     defer { _taskLocalValuePop(_task) }
