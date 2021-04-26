@@ -288,13 +288,14 @@ DECL_NODES = [
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='MemberDeclList',
-                   collection_element_name='Member'),
-             Child('RightBrace', kind='RightBraceToken'),
+                   collection_element_name='Member', is_indented=True),
+             Child('RightBrace', kind='RightBraceToken', 
+                   requires_leading_newline=True),
          ]),
 
     # member-decl-list = member-decl member-decl-list?
     Node('MemberDeclList', kind='SyntaxCollection',
-         element='MemberDeclListItem'),
+         element='MemberDeclListItem', elements_separated_by_newline=True),
 
     # member-decl = decl ';'?
     Node('MemberDeclListItem', kind='Syntax', omit_when_empty=True,

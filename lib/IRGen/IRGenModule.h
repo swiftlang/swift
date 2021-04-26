@@ -1044,7 +1044,8 @@ public:
                                             llvm::Type *resultType,
                                             ArrayRef<llvm::Type*> paramTypes,
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline = false);
+                        bool setIsNoInline = false,
+                        bool forPrologue = false);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);

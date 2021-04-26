@@ -1324,7 +1324,7 @@ public:
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
       if (auto OpenedA = getOpenedArchetypeOf(A)) {
-        auto *openingInst = F->getModule().getOpenedArchetypeInst(OpenedA);
+        auto *openingInst = F->getModule().getOpenedArchetypeInst(OpenedA, F);
         require(I == nullptr || openingInst == I ||
                 properlyDominates(openingInst, I),
                 "Use of an opened archetype should be dominated by a "
@@ -1458,7 +1458,8 @@ public:
         FoundOpenedArchetypes.insert(A);
         // Also check that they are properly tracked inside the current
         // function.
-        auto *openingInst = F.getModule().getOpenedArchetypeInst(A);
+        auto *openingInst = F.getModule().getOpenedArchetypeInst(A,
+                              AI->getFunction());
         require(openingInst == AI ||
                 properlyDominates(openingInst, AI),
                 "Use of an opened archetype should be dominated by a "
@@ -3406,7 +3407,8 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
-    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
 
@@ -3439,7 +3441,8 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_ref result must be an opened existential archetype");
-    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
             "SILFunction");
   }
@@ -3461,7 +3464,8 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box result must be an opened existential archetype");
-    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box should be registered in "
             "SILFunction");
   }
@@ -3483,7 +3487,8 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box_value result not an opened existential archetype");
-    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box_value should be "
             "registered in SILFunction");
   }
@@ -3529,7 +3534,7 @@ public:
     require(archetype, "open_existential_metatype result must be an opened "
                        "existential metatype");
     require(
-        I->getModule().getOpenedArchetypeInst(archetype) == I,
+        I->getModule().getOpenedArchetypeInst(archetype, I->getFunction()) == I,
         "Archetype opened by open_existential_metatype should be registered in "
         "SILFunction");
   }
@@ -3548,7 +3553,8 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype, "open_existential_value result must be an opened "
                        "existential archetype");
-    require(OEI->getModule().getOpenedArchetypeInst(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential should be registered in "
             "SILFunction");
   }
@@ -3836,7 +3842,7 @@ public:
       SILValue Def;
       if (t->isOpenedExistential()) {
         auto archetypeTy = cast<ArchetypeType>(t);
-        Def = I->getModule().getOpenedArchetypeInst(archetypeTy);
+        Def = I->getModule().getOpenedArchetypeInst(archetypeTy, I->getFunction());
         require(Def, "Opened archetype should be registered in SILModule");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam() ||

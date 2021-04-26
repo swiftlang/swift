@@ -64,6 +64,7 @@ extension Task {
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
+  @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon. Use the static 'Task.isCancelled' instead.")
   public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }

@@ -1680,7 +1680,8 @@ llvm::GlobalVariable *IRGenModule::getGlobalForDynamicallyReplaceableThunk(
 ///      struct ChainEntry *next;
 ///   }
 static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
-    IRGenModule &IGM, LinkEntity entity, llvm::Function *implFunction = nullptr,
+    IRGenModule &IGM, LinkEntity entity,
+    llvm::Constant *implFunction = nullptr,
     ForDefinition_t forDefinition = ForDefinition) {
 
   auto linkEntry = IGM.getGlobalForDynamicallyReplaceableThunk(
@@ -1697,8 +1698,12 @@ static llvm::GlobalVariable *getChainEntryForDynamicReplacement(
                                  llvm::ConstantInt::get(IGM.Int32Ty, 0)};
     auto *storageAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
         nullptr, linkEntry, indices);
-
-    auto &schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+    bool isAsyncFunction =
+        entity.hasSILFunction() && entity.getSILFunction()->isAsync();
+    auto &schema =
+        isAsyncFunction
+            ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+            : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
     assert(entity.hasSILFunction() || entity.isOpaqueTypeDescriptorAccessor());
     auto authEntity = entity.hasSILFunction()
                           ? PointerAuthEntity(entity.getSILFunction())
@@ -1782,7 +1787,11 @@ void IRGenerator::emitDynamicReplacements() {
         LinkEntity::forDynamicallyReplaceableFunctionKey(origFunc));
 
     llvm::Constant *newFnPtr = llvm::ConstantExpr::getBitCast(
-        IGM.getAddrOfSILFunction(newFunc, NotForDefinition), IGM.Int8PtrTy);
+        newFunc->isAsync()
+            ? IGM.getAddrOfAsyncFunctionPointer(
+                  LinkEntity::forSILFunction(newFunc))
+            : IGM.getAddrOfSILFunction(newFunc, NotForDefinition),
+        IGM.Int8PtrTy);
 
     auto replacement = replacementsArray.beginStruct();
     replacement.addRelativeAddress(keyRef); // tagged relative reference.
@@ -2605,15 +2614,21 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
   ConstantInitBuilder builder(IGM);
   auto B = builder.beginStruct(IGM.DynamicReplacementKeyTy);
   B.addRelativeAddress(linkEntry);
-  auto schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+  bool isAsyncFunction =
+      keyEntity.hasSILFunction() && keyEntity.getSILFunction()->isAsync();
+  auto schema = isAsyncFunction
+                    ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                    : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
   if (schema) {
     assert(keyEntity.hasSILFunction() ||
            keyEntity.isOpaqueTypeDescriptorAccessor());
     auto authEntity = keyEntity.hasSILFunction()
                           ? PointerAuthEntity(keyEntity.getSILFunction())
                           : PointerAuthEntity::Special::TypeDescriptor;
-    B.addInt32(PointerAuthInfo::getOtherDiscriminator(IGM, schema, authEntity)
-                   ->getZExtValue());
+    B.addInt32((uint32_t)PointerAuthInfo::getOtherDiscriminator(IGM, schema,
+                                                                authEntity)
+                   ->getZExtValue() |
+               ((uint32_t)isAsyncFunction ? 0x10000 : 0x0));
   } else
     B.addInt32(0);
   B.finishAndSetAsInitializer(key);
@@ -2637,7 +2652,12 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
 
   // Create and initialize the first link entry for the chain of replacements.
   // The first implementation is initialized with 'implFn'.
-  auto linkEntry = getChainEntryForDynamicReplacement(*this, varEntity, IGF.CurFn);
+  auto *funPtr =
+      f->isAsync()
+          ? IGF.IGM.getAddrOfAsyncFunctionPointer(LinkEntity::forSILFunction(f))
+          : IGF.CurFn;
+  auto linkEntry =
+      getChainEntryForDynamicReplacement(*this, varEntity, funPtr);
 
   // Create the key data structure. This is used from other modules to refer to
   // the chain of replacements.
@@ -2654,7 +2674,7 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       FunctionPtrTy->getPointerTo());
 
   auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
-      IGF.CurFn, FunctionPtrTy);
+      funPtr, FunctionPtrTy);
 
   auto &schema = f->isAsync()
                      ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
@@ -2683,32 +2703,152 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
   IGF.Builder.CreateCondBr(hasReplFn, origEntryBB, replacedBB);
 
   IGF.Builder.emitBlock(replacedBB);
+  if (f->isAsync()) {
+    auto &IGM = IGF.IGM;
+    auto &Builder = IGF.Builder;
+    PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
+    auto authEntity = PointerAuthEntity(f);
+    auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
+    auto *fnType = signature.getType()->getPointerTo();
+    auto *realReplFn = Builder.CreateBitCast(ReplFn, fnType);
+    auto asyncFnPtr =
+        FunctionPointer(silFunctionType, realReplFn, authInfo, signature);
+    PointerAuthInfo codeAuthInfo =
+        asyncFnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
+    auto newFnPtr = FunctionPointer(
+        FunctionPointer::Kind::Function, asyncFnPtr.getPointer(IGF),
+        codeAuthInfo, Signature::forAsyncAwait(IGM, silFunctionType));
+    SmallVector<llvm::Value *, 16> forwardedArgs;
+    for (auto &arg : IGF.CurFn->args())
+      forwardedArgs.push_back(&arg);
+    auto layout = getAsyncContextLayout(
+        IGM, silFunctionType, silFunctionType,
+        f->getForwardingSubstitutionMap(), false,
+        FunctionPointer::Kind(
+            FunctionPointer::BasicKind::AsyncFunctionPointer));
+    llvm::Value *dynamicContextSize32;
+    llvm::Value *calleeFunction;
+    auto initialContextSize = Size(0);
+    std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
+        IGF, silFunctionType->getRepresentation(), asyncFnPtr, nullptr,
+        std::make_pair(false, true), initialContextSize);
+    auto *dynamicContextSize =
+        Builder.CreateZExt(dynamicContextSize32, IGM.SizeTy);
+    auto calleeContextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
+    auto calleeContext =
+        layout.emitCastTo(IGF, calleeContextBuffer.getAddress());
+    auto saveValue = [&](ElementLayout layout, Explosion &explosion) -> void {
+      Address addr = layout.project(IGF, calleeContext, /*offsets*/ llvm::None);
+      auto &ti = cast<LoadableTypeInfo>(layout.getType());
+      ti.initialize(IGF, explosion, addr, /*isOutlined*/ false);
+    };
 
-  // Call the replacement function.
-  SmallVector<llvm::Value *, 16> forwardedArgs;
-  for (auto &arg : IGF.CurFn->args())
-    forwardedArgs.push_back(&arg);
-  auto *fnType = signature.getType()->getPointerTo();
-  auto *realReplFn = IGF.Builder.CreateBitCast(ReplFn, fnType);
+    // Set caller info into the context.
+    { // caller context
+      Explosion explosion;
+      auto fieldLayout = layout.getParentLayout();
+      auto *context = IGF.getAsyncContext();
+      if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
+        Address fieldAddr =
+            fieldLayout.project(IGF, calleeContext, /*offsets*/ llvm::None);
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
+        context = emitPointerAuthSign(IGF, context, authInfo);
+      }
+      explosion.add(context);
+      saveValue(fieldLayout, explosion);
+    }
 
-  auto authEntity = PointerAuthEntity(f);
-  auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
+    auto currentResumeFn =
+        Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+    { // Return to caller function.
+      auto fieldLayout = layout.getResumeParentLayout();
+      llvm::Value *fnVal = currentResumeFn;
+      // Sign the pointer.
+      if (auto schema = IGM.getOptions().PointerAuth.AsyncContextResume) {
+        Address fieldAddr =
+            fieldLayout.project(IGF, calleeContext, /*offsets*/ llvm::None);
+        auto authInfo = PointerAuthInfo::emit(
+            IGF, schema, fieldAddr.getAddress(), PointerAuthEntity());
+        fnVal = emitPointerAuthSign(IGF, fnVal, authInfo);
+      }
+      fnVal = Builder.CreateBitCast(fnVal, IGM.TaskContinuationFunctionPtrTy);
+      Explosion explosion;
+      explosion.add(fnVal);
+      saveValue(fieldLayout, explosion);
+    }
 
-  auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(silFunctionType, realReplFn, authInfo, signature)
-          .getAsFunction(IGF),
-      forwardedArgs);
-  if (Res->getCallingConv() == llvm::CallingConv::SwiftTail &&
-      Res->getCaller()->getCallingConv() == llvm::CallingConv::SwiftTail) {
-    Res->setTailCallKind(IGF.IGM.AsyncTailCallKind);
+    // Setup the suspend point.
+    SmallVector<llvm::Value *, 8> arguments;
+    auto signature = newFnPtr.getSignature();
+    auto asyncContextIndex = signature.getAsyncContextIndex();
+    auto paramAttributeFlags =
+        asyncContextIndex |
+        (signature.getAsyncResumeFunctionSwiftSelfIndex() << 8);
+    // Index of swiftasync context | ((index of swiftself) << 8).
+    arguments.push_back(IGM.getInt32(paramAttributeFlags));
+    arguments.push_back(currentResumeFn);
+    auto resumeProjFn = IGF.getOrCreateResumePrjFn(true /*forProlog*/);
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+    auto dispatchFn = IGF.createAsyncDispatchFn(
+        getFunctionPointerForDispatchCall(IGM, newFnPtr), forwardedArgs);
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(dispatchFn, IGM.Int8PtrTy));
+    arguments.push_back(Builder.CreateBitOrPointerCast(newFnPtr.getRawPointer(),
+                                                       IGM.Int8PtrTy));
+    if (auto authInfo = newFnPtr.getAuthInfo()) {
+      arguments.push_back(newFnPtr.getAuthInfo().getDiscriminator());
+    }
+    unsigned argIdx = 0;
+    for (auto arg : forwardedArgs) {
+      // Replace the context argument.
+      if (argIdx == asyncContextIndex)
+        arguments.push_back(Builder.CreateBitOrPointerCast(
+            calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
+      else
+        arguments.push_back(arg);
+      argIdx++;
+    }
+    auto resultTy =
+        cast<llvm::StructType>(signature.getType()->getReturnType());
+    auto suspend = IGF.emitSuspendAsyncCall(
+        asyncContextIndex, resultTy, arguments, false /*restore context*/);
+    { // Restore the context.
+      llvm::Value *calleeContext =
+          Builder.CreateExtractValue(suspend, asyncContextIndex);
+      auto context = IGF.emitAsyncResumeProjectContext(calleeContext);
+      IGF.storeCurrentAsyncContext(context);
+    }
+
+    emitDeallocAsyncContext(IGF, calleeContextBuffer);
+    forwardAsyncCallResult(IGF, silFunctionType, layout, suspend);
   } else {
-    Res->setTailCall();
-  }
-  if (IGF.CurFn->getReturnType()->isVoidTy())
-    IGF.Builder.CreateRetVoid();
-  else
-    IGF.Builder.CreateRet(Res);
+    // Call the replacement function.
+    SmallVector<llvm::Value *, 16> forwardedArgs;
+    for (auto &arg : IGF.CurFn->args())
+      forwardedArgs.push_back(&arg);
+    auto *fnType = signature.getType()->getPointerTo();
+    auto *realReplFn = IGF.Builder.CreateBitCast(ReplFn, fnType);
 
+    auto authEntity = PointerAuthEntity(f);
+    auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
+
+    auto *Res = IGF.Builder.CreateCall(
+        FunctionPointer(silFunctionType, realReplFn, authInfo, signature)
+            .getAsFunction(IGF),
+        forwardedArgs);
+    if (Res->getCallingConv() == llvm::CallingConv::SwiftTail &&
+        Res->getCaller()->getCallingConv() == llvm::CallingConv::SwiftTail) {
+      Res->setTailCallKind(IGF.IGM.AsyncTailCallKind);
+    } else {
+      Res->setTailCall();
+    }
+    if (IGF.CurFn->getReturnType()->isVoidTy())
+      IGF.Builder.CreateRetVoid();
+    else
+      IGF.Builder.CreateRet(Res);
+  }
   IGF.Builder.emitBlock(origEntryBB);
 
 }
@@ -2747,8 +2887,12 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : dispatchFn->args())
     forwardedArgs.push_back(&arg);
-
-  auto &schema = IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
+  bool isAsyncFunction =
+      keyEntity.hasSILFunction() && keyEntity.getSILFunction()->isAsync();
+  auto &schema =
+      isAsyncFunction
+          ? IGM.getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+          : IGM.getOptions().PointerAuth.SwiftDynamicReplacements;
   assert(keyEntity.hasSILFunction() ||
          keyEntity.isOpaqueTypeDescriptorAccessor());
   auto authEntity = keyEntity.hasSILFunction()
@@ -2870,12 +3014,16 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   for (auto &arg : implFn->args())
     forwardedArgs.push_back(&arg);
 
-  auto &schema = getOptions().PointerAuth.SwiftDynamicReplacements;
+  auto &schema = f->isAsync()
+                     ? getOptions().PointerAuth.AsyncSwiftDynamicReplacements
+                     : getOptions().PointerAuth.SwiftDynamicReplacements;
   auto authInfo = PointerAuthInfo::emit(
       IGF, schema, fnPtrAddr,
       PointerAuthEntity(f->getDynamicallyReplacedFunction()));
   auto *Res = IGF.Builder.CreateCall(
-      FunctionPointer(fnType, typeFnPtr, authInfo, signature), forwardedArgs);
+      FunctionPointer(fnType, typeFnPtr, authInfo, signature)
+          .getAsFunction(IGF),
+      forwardedArgs);
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
@@ -5164,7 +5312,8 @@ llvm::Constant *
 IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
                                        ArrayRef<llvm::Type*> paramTys,
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline) {
+                        bool setIsNoInline,
+                        bool forPrologue) {
   llvm::FunctionType *fnTy =
     llvm::FunctionType::get(resultTy, paramTys, false);
 
@@ -5174,7 +5323,7 @@ IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
 
   if (llvm::Function *def = shouldDefineHelper(*this, fn, setIsNoInline)) {
     IRGenFunction IGF(*this, def);
-    if (DebugInfo)
+    if (DebugInfo && !forPrologue)
       DebugInfo->emitArtificialFunction(IGF, def);
     generate(IGF);
   }

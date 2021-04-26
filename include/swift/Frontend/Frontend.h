@@ -529,6 +529,14 @@ public:
     return getMainModule()->getPrimarySourceFiles();
   }
 
+  /// Verify that if an implicit import of the `Concurrency` module if expected,
+  /// it can actually be imported. Emit a warning, otherwise.
+  void verifyImplicitConcurrencyImport();
+
+  /// Whether the Swift Concurrency support library can be imported
+  /// i.e. if it can be found.
+  bool canImportSwiftConcurrency() const;
+
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.

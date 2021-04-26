@@ -1018,6 +1018,10 @@ def create_argument_parser():
            toggle_false('test_ios_32bit_simulator'),
            default=False,
            help='skip testing iOS 32 bit simulator targets')
+    option('--skip-test-watchos-32bit-simulator',
+           toggle_false('test_watchos_32bit_simulator'),
+           default=True,
+           help='skip testing watchOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),
            help='skip testing iOS device targets on the host machine (the '
