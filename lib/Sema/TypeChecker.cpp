@@ -460,13 +460,6 @@ bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
                             true);
 }
 
-bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
-  auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
-  DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
-  return true;
-}
-
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
   if (C.TypeCheckerOpts.DebugForbidTypecheckPrefix.empty())
     return;
