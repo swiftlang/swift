@@ -187,9 +187,9 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
     auto *typeVar = cs.createTypeVariable(cs.getConstraintLocator({}),
                                           /*options=*/0);
 
-    cs.addConstraint(
-        ConstraintKind::Conversion, typeVar, GPT1,
-        cs.getConstraintLocator({}, LocatorPathElt::ContextualType()));
+    cs.addConstraint(ConstraintKind::Conversion, typeVar, GPT1,
+                     cs.getConstraintLocator({}, LocatorPathElt::ContextualType(
+                                                     CTP_Initialization)));
 
     auto bindings = inferBindings(cs, typeVar);
     ASSERT_TRUE(bindings.getConformanceRequirements().empty());

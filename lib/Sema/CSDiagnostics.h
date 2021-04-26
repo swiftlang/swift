@@ -594,8 +594,11 @@ public:
                     ConstraintLocator *locator)
       : ContextualFailure(
             solution,
-            solution.getConstraintSystem().getContextualTypePurpose(
-                locator->getAnchor()),
+            locator->isForContextualType()
+                ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
+                      .getPurpose()
+                : solution.getConstraintSystem().getContextualTypePurpose(
+                      locator->getAnchor()),
             lhs, rhs, locator) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
