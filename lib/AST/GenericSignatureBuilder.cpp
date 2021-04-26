@@ -439,19 +439,11 @@ class GenericSignatureBuilder::ExplicitRequirement {
 public:
   ExplicitRequirement(RequirementKind kind,
                       const RequirementSource *source,
-                      Type type)
-    : sourceAndKind(source, kind),
-      rhs(type ? type->getCanonicalType() : Type()) {}
-
-  ExplicitRequirement(RequirementKind kind,
-                      const RequirementSource *source,
-                      ProtocolDecl *proto)
-    : sourceAndKind(source, kind), rhs(proto) {}
-
-  ExplicitRequirement(RequirementKind kind,
-                      const RequirementSource *source,
-                      LayoutConstraint layout)
-    : sourceAndKind(source, kind), rhs(layout) {}
+                      RequirementRHS rhs)
+    : sourceAndKind(source, kind), rhs(rhs) {
+    if (auto type = rhs.dyn_cast<Type>())
+      this->rhs = type->getCanonicalType();
+  }
 
   /// For a Constraint<T> with an explicit requirement source, we recover the
   /// subject type from the requirement source and the right hand side from the
@@ -468,36 +460,10 @@ public:
     return ExplicitRequirement(kind, constraint.source, constraint.value);
   }
 
-  /// To recover the root explicit requirement from a Constraint<T>, we walk the
-  /// requirement source up the root, and look at both the root and the next
-  /// innermost child.
-  /// Together, these give us the subject type (via the root) and the right hand
-  /// side of the requirement (from the next innermost child).
-  ///
-  /// The requirement kind must be passed in since Constraint<T>'s kind is
-  /// implicit by virtue of which list it appears under inside its equivalence
-  /// class, and is not stored inside the constraint.
-  ///
-  /// The constraint's actual value is ignored; that's the right hand
-  /// side of the derived constraint, not the right hand side of the original
-  /// explicit requirement.
-  template<typename T>
-  static ExplicitRequirement fromDerivedConstraint(RequirementKind kind,
-                                                   Constraint<T> constraint) {
-    assert(constraint.source->isDerivedNonRootRequirement());
-
-    const RequirementSource *root = constraint.source;
-    const RequirementSource *child = nullptr;
-
-    while (root->parent && root->isDerivedRequirement()) {
-      child = root;
-      root = root->parent;
-    }
-
-    assert(root != nullptr);
-    assert(child != nullptr);
-
-    switch (child->kind) {
+  static std::pair<RequirementKind, RequirementRHS>
+  getKindAndRHS(const RequirementSource *source,
+                ASTContext &ctx) {
+    switch (source->kind) {
     // If we have a protocol requirement source whose parent is the root, then
     // we have an implied constraint coming from a protocol's requirement
     // signature:
@@ -511,8 +477,8 @@ public:
     // Therefore the original constraint was 'T : Sequence'.
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement: {
-      auto *proto = child->getProtocolDecl();
-      return ExplicitRequirement(RequirementKind::Conformance, root, proto);
+      auto *proto = source->getProtocolDecl();
+      return std::make_pair(RequirementKind::Conformance, proto);
     }
 
     // If we have a superclass or concrete source whose parent is the root, then
@@ -528,29 +494,28 @@ public:
     // respectively.
     case RequirementSource::Superclass:
     case RequirementSource::Concrete: {
-      Type conformingType = child->getStoredType();
+      Type conformingType = source->getStoredType();
       if (conformingType) {
         // A concrete requirement source for a self-conforming exitential type
         // stores the original type, and not the conformance, because there is
         // no way to recover the original type from the conformance.
         assert(conformingType->isExistentialType());
       } else {
-        auto conformance = child->getProtocolConformance();
+        auto conformance = source->getProtocolConformance();
         if (conformance.isConcrete())
           conformingType = conformance.getConcrete()->getType();
         else {
           // If the conformance was abstract or invalid, we're dealing with
           // invalid code. We have no way to recover the superclass type, so
           // just stick an ErrorType in there.
-          auto &ctx = constraint.getSubjectDependentType({ })->getASTContext();
           conformingType = ErrorType::get(ctx);
         }
       }
 
-      auto kind = (child->kind == RequirementSource::Superclass
+      auto kind = (source->kind == RequirementSource::Superclass
                    ? RequirementKind::Superclass
                    : RequirementKind::SameType);
-      return ExplicitRequirement(kind, root, conformingType);
+      return std::make_pair(kind, conformingType);
     }
 
     // If we have a layout source whose parent is the root, then
@@ -563,17 +528,59 @@ public:
     // by a superclass constraint, ensuring that it supercedes an explicit
     // 'T : AnyObject' constraint).
     case RequirementSource::Layout: {
-      auto type = child->getStoredType();
-      return ExplicitRequirement(RequirementKind::Superclass, root, type);
+      auto type = source->getStoredType();
+      return std::make_pair(RequirementKind::Superclass, type);
     }
 
     default: {
-      auto &SM = constraint.getSubjectDependentType({ })->getASTContext().SourceMgr;
-      constraint.source->dump(llvm::errs(), &SM, 0);
+      source->dump(llvm::errs(), &ctx.SourceMgr, 0);
       llvm::errs() << "\n";
-      llvm_unreachable("Unknown root kind");
+      llvm_unreachable("Unhandled source kind");
     }
     }
+  }
+
+  static ExplicitRequirement fromRequirementSource(const RequirementSource *source,
+                                                   ASTContext &ctx) {
+    auto *parent = source->parent;
+
+    RequirementKind kind;
+    RequirementRHS rhs;
+    std::tie(kind, rhs) = getKindAndRHS(source, ctx);
+
+    return ExplicitRequirement(kind, parent, rhs);
+  }
+
+  /// To recover the root explicit requirement from a Constraint<T>, we walk the
+  /// requirement source up the root, and look at both the root and the next
+  /// innermost child.
+  /// Together, these give us the subject type (via the root) and the right hand
+  /// side of the requirement (from the next innermost child).
+  ///
+  /// The requirement kind must be passed in since Constraint<T>'s kind is
+  /// implicit by virtue of which list it appears under inside its equivalence
+  /// class, and is not stored inside the constraint.
+  ///
+  /// The constraint's actual value is ignored; that's the right hand
+  /// side of the derived constraint, not the right hand side of the original
+  /// explicit requirement.
+  template<typename T>
+  static ExplicitRequirement fromDerivedConstraint(Constraint<T> constraint,
+                                                   ASTContext &ctx) {
+    assert(constraint.source->isDerivedNonRootRequirement());
+
+    const RequirementSource *root = constraint.source;
+    const RequirementSource *child = nullptr;
+
+    while (root->parent && root->isDerivedRequirement()) {
+      child = root;
+      root = root->parent;
+    }
+
+    assert(child != nullptr);
+    assert(root != nullptr);
+
+    return fromRequirementSource(child, ctx);
   }
 
   RequirementKind getKind() const {
@@ -5818,7 +5825,8 @@ public:
   addConstraintsFromEquivClass(
       RequirementKind kind,
       const SmallVectorImpl<Constraint<T>> &exact,
-      const SmallVectorImpl<Constraint<T>> &lessSpecific) {
+      const SmallVectorImpl<Constraint<T>> &lessSpecific,
+      ASTContext &ctx) {
     // The set of 'redundant explicit requirements', which are known to be less
     // specific than some other explicit requirements. An example is a type
     // parameter with multiple superclass constraints:
@@ -5848,11 +5856,13 @@ public:
 
     for (auto constraint : exact) {
       if (constraint.source->isDerivedNonRootRequirement()) {
-        auto req = ExplicitRequirement::fromDerivedConstraint(kind, constraint);
+        auto req = ExplicitRequirement::fromDerivedConstraint(
+            constraint, ctx);
 
         rootReqs.push_back(req);
       } else {
-        auto req = ExplicitRequirement::fromExplicitConstraint(kind, constraint);
+        auto req = ExplicitRequirement::fromExplicitConstraint(
+            kind, constraint);
 
         VertexID v = addVertex(req);
 #ifndef NDEBUG
@@ -6241,14 +6251,17 @@ void GenericSignatureBuilder::ExplicitRequirement::dump(
     break;
   }
 
-  getSource()->dump(out, SM, 0);
-  out << " : ";
+  out << getSubjectType() << " : ";
   if (auto type = rhs.dyn_cast<Type>())
     out << type;
   else if (auto *proto = rhs.dyn_cast<ProtocolDecl *>())
     out << proto->getName();
   else
     out << rhs.get<LayoutConstraint>();
+
+  out << "(source: ";
+  getSource()->dump(out, SM, 0);
+  out << ")";
 }
 
 static bool typeImpliesLayoutConstraint(Type t, LayoutConstraint layout) {
@@ -6324,7 +6337,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
       }
 
       graph.addConstraintsFromEquivClass(RequirementKind::Conformance,
-                                         exact, lessSpecific);
+                                         exact, lessSpecific, Context);
     }
 
     Type resolvedConcreteType;
@@ -6376,7 +6389,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
 
       concreteTypeRequirement =
           graph.addConstraintsFromEquivClass(RequirementKind::SameType,
-                                             exact, lessSpecific);
+                                             exact, lessSpecific, Context);
     }
 
     Type resolvedSuperclass;
@@ -6438,7 +6451,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
 
       superclassRequirement =
           graph.addConstraintsFromEquivClass(RequirementKind::Superclass,
-                                             exact, lessSpecific);
+                                             exact, lessSpecific, Context);
 
       graph.handleConstraintsImpliedByConcrete(RequirementKind::Superclass,
                                                impliedByConcrete,
@@ -6499,7 +6512,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
 
       layoutRequirement =
           graph.addConstraintsFromEquivClass(RequirementKind::Layout,
-                                             exact, lessSpecific);
+                                             exact, lessSpecific, Context);
 
       graph.handleConstraintsImpliedByConcrete(RequirementKind::Layout,
                                                impliedByConcrete,
@@ -8641,7 +8654,8 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           const ProtocolDecl *requirementSignatureSelfProto,
                                           bool rebuildingWithoutRedundantConformances) && {
   // Finalize the builder, producing any necessary diagnostics.
-  finalize(getGenericParams(), allowConcreteGenericParams,
+  finalize(getGenericParams(),
+           allowConcreteGenericParams,
            requirementSignatureSelfProto);
 
   if (rebuildingWithoutRedundantConformances) {
