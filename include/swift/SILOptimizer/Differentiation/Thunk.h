@@ -108,8 +108,8 @@ SILValue reabstractFunction(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
-    AutoDiffDerivativeFunctionKind kind, AutoDiffConfig desiredConfig,
-    AutoDiffConfig actualConfig, ADContext &adContext);
+    AutoDiffDerivativeFunctionKind kind, const AutoDiffConfig &desiredConfig,
+    const AutoDiffConfig &actualConfig, ADContext &adContext);
 
 /// Get or create a derivative function parameter index subset thunk from
 /// `actualIndices` to `desiredIndices` for the given associated function

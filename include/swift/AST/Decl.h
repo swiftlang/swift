@@ -5718,7 +5718,7 @@ public:
   ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
 
   /// Add the given derivative function configuration.
-  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
+  void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
