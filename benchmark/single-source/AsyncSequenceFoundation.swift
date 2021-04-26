@@ -22,8 +22,7 @@ import _Concurrency
 public let AsyncSequenceFoundation = [
   BenchmarkInfo(name: "LoopbackLinesNaive",
                 runFunction: run_loopbackLines_naive,
-                tags: [.concurrency],
-                setUpFunction: setup_loopbackLines_naive
+                tags: [.concurrency]
                 )
 ]
 
@@ -342,24 +341,16 @@ extension AsyncSequence where Self.Element == UInt8 {
  This version doesn't use custom executors, and uses a simplistic implementation
  of Async{Line, Character, UnicodeScalar}Sequence
  */
-var pipe: Pipe! = nil
-var reader: FileHandle! = nil
-var writer: FileHandle! = nil
-var lines: Data! = nil
-
-@available(macOS 9999, *)
-public func setup_loopbackLines_naive() {
-  pipe = Pipe()
-  reader = pipe.fileHandleForReading
-  writer = pipe.fileHandleForWriting
-  
-  let string = "a\nb"
-  lines = string.data(using: .utf8)!
-}
-
 @available(macOS 9999, *)
 public func run_loopbackLines_naive(_ N: Int) async {
-  Task.runDetached {
+  let pipe = Pipe()
+  let reader = pipe.fileHandleForReading
+  let writer = pipe.fileHandleForWriting
+  //short string because we're not using the fast line breaker, and want to
+  //focus on AsyncSequence overhead
+  let lines = "a\nb".data(using: .utf8)!
+  
+  let handle = Task.runDetached {
     for _ in 0..<N {
       writer.write(lines)
     }
@@ -374,6 +365,8 @@ public func run_loopbackLines_naive(_ N: Int) async {
   } catch {
     
   }
+  //wait for everything before moving to the next iteration
+  let _ = try! await handle.get()
 }
 
 #endif
