@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library)
 
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
 // UNSUPPORTED: use_os_stdlib
 
 // https://bugs.swift.org/browse/SR-14466
