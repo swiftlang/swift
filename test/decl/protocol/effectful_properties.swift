@@ -108,7 +108,8 @@ func asNone<U : None>(u : U) async throws {
 }
 
 func asAsync<U : A>(u : U) async {
-  _ = u.someProp // expected-error {{property access is 'async' but is not marked with 'await'}}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = u.someProp // expected-note@:7{{property access is 'async'}}
 
   _ = await u.someProp
 }
@@ -123,10 +124,11 @@ func asThrows<U : T>(u : U) throws {
 }
 
 func asAsyncThrows<U : AT>(u : U) async throws {
-  // expected-note@+5 {{did you mean to handle error as optional value?}}
-  // expected-note@+4 {{did you mean to disable error propagation?}}
-  // expected-note@+3 {{did you mean to use 'try'?}}
-  // expected-error@+2 {{property access is 'async' but is not marked with 'await'}}
+  // expected-note@+6 {{did you mean to handle error as optional value?}}
+  // expected-note@+5 {{did you mean to disable error propagation?}}
+  // expected-note@+4 {{did you mean to use 'try'?}}
+  // expected-error@+3 {{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+  // expected-note@+2 {{property access is 'async'}}
   // expected-error@+1 {{property access can throw but is not marked with 'try'}}
     _ = u.someProp
 

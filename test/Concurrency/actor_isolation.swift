@@ -104,8 +104,10 @@ func checkAsyncPropertyAccess() async {
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can only be mutated from inside the actor}}
 
   _ = act.point
-  _ = act.otherPoint // expected-error{{property access is 'async' but is not marked with 'await'}}
-  // expected-warning@-1{{cannot use property 'otherPoint' with a non-sendable type 'Point' across actors}}
+  _ = act.otherPoint
+  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@-2{{property access is 'async'}}
+  // expected-warning@-3{{cannot use property 'otherPoint' with a non-sendable type 'Point' across actors}}
   _ = await act.otherPoint // expected-warning{{cannot use property 'otherPoint' with a non-sendable type 'Point' across actors}}
 }
 
@@ -189,7 +191,8 @@ extension MyActor {
     // Accesses on other actors can only reference immutable data synchronously,
     // otherwise the access is treated as async
     _ = otherActor.immutable // okay
-    _ = otherActor.mutable // expected-error{{property access is 'async' but is not marked with 'await'}}
+    _ = otherActor.mutable  // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{property access is 'async'}}
     _ = await otherActor.mutable
     otherActor.mutable = 0  // expected-error{{actor-isolated property 'mutable' can only be mutated on 'self'}}
     acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can only be used 'inout' on 'self'}}
@@ -197,9 +200,13 @@ extension MyActor {
     // expected-warning@+1{{no 'async' operations occur within 'await' expression}}
     await otherActor.mutable = 0
 
-    _ = otherActor.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
+    _ = otherActor.synchronous()
+    // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-2{{call is 'async'}}
     _ = await otherActor.asynchronous()
-    _ = otherActor.text[0] // expected-error{{property access is 'async' but is not marked with 'await'}}
+    _ = otherActor.text[0]
+    // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-2{{property access is 'async'}}
     _ = await otherActor.text[0] // okay
 
     // Global data is okay if it is immutable.
@@ -214,7 +221,9 @@ extension MyActor {
     Self.synchronousStatic()
 
     // Global actors
-    syncGlobalActorFunc() // expected-error{{call is 'async' but is not marked with 'await'}}
+    syncGlobalActorFunc() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
+    // expected-note@-1{{call is 'async'}}
+
     await asyncGlobalActorFunc()
 
     // Closures.
@@ -389,7 +398,8 @@ actor Crystal {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @SomeGlobalActor func goo1() async {
   let _ = goo2
-  goo2() // expected-error{{call is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
+  goo2() // expected-note{{call is 'async'}}
 }
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @asyncHandler @SomeOtherGlobalActor func goo2() { await goo1() }
@@ -398,7 +408,9 @@ actor Crystal {
 func testGlobalActorClosures() {
   let _: Int = acceptAsyncClosure { @SomeGlobalActor in
     syncGlobalActorFunc()
-    syncOtherGlobalActorFunc() // expected-error{{call is 'async' but is not marked with 'await'}}
+    syncOtherGlobalActorFunc() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
+    // expected-note@-1{{call is 'async'}}
+
     await syncOtherGlobalActorFunc()
     return 17
   }
@@ -418,41 +430,54 @@ extension MyActor {
     await asyncOtherGlobalActorFunc()
 
     _ = immutable
-    _ = mutable // expected-error{{property access is 'async' but is not marked with 'await'}}
+    _ = mutable // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{property access is 'async'}}
     _ = await mutable
-    _ = synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
+    _ = synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{call is 'async'}}
     _ = await synchronous()
-    _ = text[0] // expected-error{{property access is 'async' but is not marked with 'await'}}
+    _ = text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1{{property access is 'async'}}
+
     _ = await text[0]
 
     // Accesses on 'self' are only okay for immutable and asynchronous, because
     // we are outside of the actor instance.
     _ = self.immutable
-    _ = self.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
+    _ = self.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{call is 'async'}}
     _ = await self.synchronous()
 
     _ = await self.asynchronous()
-    _ = self.text[0] // expected-error{{property access is 'async' but is not marked with 'await'}}
-    _ = self[0] // expected-error{{subscript access is 'async' but is not marked with 'await'}}
+    _ = self.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{property access is 'async'}}
+    _ = self[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{subscript access is 'async'}}
     _ = await self.text[0]
     _ = await self[0]
 
     // Accesses on 'super' are not okay without 'await'; we're outside of the actor.
-    _ = super.superState // expected-error{{property access is 'async' but is not marked with 'await'}}
+    _ = super.superState // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{property access is 'async'}}
     _ = await super.superState
-    super.superMethod() // expected-error{{call is 'async' but is not marked with 'await'}}
+    super.superMethod() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
+  // expected-note@-1{{call is 'async'}}
+
     await super.superMethod()
     await super.superAsyncMethod()
-    _ = super[0] // expected-error{{subscript access is 'async' but is not marked with 'await'}}
+    _ = super[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{subscript access is 'async'}}
     _ = await super[0]
 
     // Accesses on other actors can only reference immutable data or
     // call asychronous methods
     _ = otherActor.immutable // okay
-    _ = otherActor.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
+    _ = otherActor.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{call is 'async'}}
     _ = otherActor.synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
     _ = await otherActor.asynchronous()
-    _ = otherActor.text[0] // expected-error{{property access is 'async' but is not marked with 'await'}}
+    _ = otherActor.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    // expected-note@-1{{property access is 'async'}}
     _ = await otherActor.text[0]
   }
 }
@@ -508,19 +533,25 @@ func testGlobalRestrictions(actor: MyActor) async {
   _ = actor.asynchronous
 
   // any kind of method can be called from outside the actor, so long as it's marked with 'await'
-  _ = actor.synchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
-  _ = actor.asynchronous() // expected-error{{call is 'async' but is not marked with 'await'}}
+  _ = actor.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@-1{{call is 'async}}
+  _ = actor.asynchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@-1{{call is 'async'}}
+
   _ = await actor.synchronous()
   _ = await actor.asynchronous()
 
   // stored and computed properties can be accessed. Only immutable stored properties can be accessed without 'await'
   _ = actor.immutable
   _ = await actor.immutable // expected-warning {{no 'async' operations occur within 'await' expression}}
-  _ = actor.mutable  // expected-error{{property access is 'async' but is not marked with 'await'}}
+  _ = actor.mutable  // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@-1{{property access is 'async'}}
   _ = await actor.mutable
-  _ = actor.text[0] // expected-error{{property access is 'async' but is not marked with 'await'}}
+  _ = actor.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@-1{{property access is 'async'}}
   _ = await actor.text[0]
-  _ = actor[0] // expected-error{{subscript access is 'async' but is not marked with 'await'}}
+  _ = actor[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@-1{{subscript access is 'async'}}
   _ = await actor[0]
 
   // @actorIndependent declarations are permitted.
@@ -548,7 +579,9 @@ func testGlobalRestrictions(actor: MyActor) async {
     _ = i
   }
 
-  print("\(number)") //expected-error {{property access is 'async' but is not marked with 'await'}}
+  print("\(number)") //expected-error {{expression is 'async' but is not marked with 'await'}}{{12-12=await }}
+  //expected-note@-1{{property access is 'async'}}
+
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -717,7 +750,8 @@ class SomeClassWithInits {
       // okay
       await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
       self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
-      // expected-error@-1{{call is 'async' but is not marked with 'await'}}
+      // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+      // expected-note@-2{{call is 'async'}}
 
       print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
     }
@@ -755,8 +789,12 @@ actor MyActorP: P {
 func testCrossActorProtocol<T: P>(t: T) async {
   await t.f()
   await t.g()
-  t.f() // expected-error{{call is 'async' but is not marked with 'await'}}
-  t.g() // expected-error{{call is 'async' but is not marked with 'await'}}
+  t.f()
+  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
+  // expected-note@-2{{call is 'async'}}
+  t.g()
+  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
+  // expected-note@-2{{call is 'async'}}
 }
 
 // ----------------------------------------------------------------------
