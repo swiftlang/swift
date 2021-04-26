@@ -273,7 +273,7 @@ public:
     return dyn_cast_or_null<ClassDecl>(getMainDecl());
   }
   bool hasMainDecl() const { return getMainDecl(); }
-  virtual Decl *getMainDecl() const { return nullptr; }
+  virtual ValueDecl *getMainDecl() const { return nullptr; }
   FuncDecl *getMainFunc() const {
     return dyn_cast_or_null<FuncDecl>(getMainDecl());
   }
