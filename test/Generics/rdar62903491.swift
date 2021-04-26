@@ -5,7 +5,7 @@ protocol P {
   associatedtype X : P
 }
 
-// Anything that mentions 'T : P' minimizes to 'U : P'.
+// Anything that mentions 'T : P' and 'U : P' minimizes to 'U : P'.
 
 // expected-warning@+2 {{redundant conformance constraint 'U' : 'P'}}
 // expected-note@+1 {{conformance constraint 'U' : 'P' implied here}}
@@ -31,6 +31,8 @@ func oneProtocol4<T, U>(_: T, _: U) where U : P, T.X == U, T : P, U.X == T {}
 // CHECK-LABEL: oneProtocol4
 // CHECK: Generic signature: <T, U where T : P, T == U.X, U == T.X>
 
+// Anything that only mentions 'T : P' minimizes to 'T : P'.
+
 func oneProtocol5<T, U>(_: T, _: U) where T : P, T.X == U, U.X == T {}
 // CHECK-LABEL: oneProtocol5
 // CHECK: Generic signature: <T, U where T : P, T == U.X, U == T.X>
@@ -39,14 +41,12 @@ func oneProtocol6<T, U>(_: T, _: U) where T.X == U, U.X == T, T : P {}
 // CHECK-LABEL: oneProtocol6
 // CHECK: Generic signature: <T, U where T : P, T == U.X, U == T.X>
 
-// Anything that mentions 'U : P' but not 'T : P' minimizes to 'U : P'.
+// Anything that only mentions 'U : P' minimizes to 'U : P'.
 
-// FIXME: Need to emit warning here too
 func oneProtocol7<T, U>(_: T, _: U) where U : P, T.X == U, U.X == T {}
 // CHECK-LABEL: oneProtocol7
 // CHECK: Generic signature: <T, U where T == U.X, U : P, U == T.X>
 
-// FIXME: Need to emit warning here too
 func oneProtocol8<T, U>(_: T, _: U) where T.X == U, U.X == T, U : P {}
 // CHECK-LABEL: oneProtocol8
 // CHECK: Generic signature: <T, U where T == U.X, U : P, U == T.X>
