@@ -25,6 +25,7 @@
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
 #include "Debug.h"
+#include "Error.h"
 
 #include <dispatch/dispatch.h>
 
@@ -633,7 +634,7 @@ static void swift_task_future_waitImpl(OpaqueValue *result,
     return waitingTask->runInFullyEstablishedContext();
 
   case FutureFragment::Status::Error:
-    fatalError(0, "future reported an error, but wait cannot throw");
+    swift_Concurrency_fatalError(0, "future reported an error, but wait cannot throw");
   }
 }
 

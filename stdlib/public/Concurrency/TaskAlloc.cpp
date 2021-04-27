@@ -20,6 +20,9 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
+#include "Error.h"
+
+#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
 #include <stdlib.h>
 
