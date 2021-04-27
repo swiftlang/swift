@@ -577,8 +577,10 @@ ConstraintSystem::determineBestBindings() {
 
     return bindings || !bindings.Defaults.empty() ||
            llvm::any_of(bindings.Protocols, [&](Constraint *constraint) {
-             return bool(
-                 TypeChecker::getDefaultType(constraint->getProtocol(), DC));
+             return constraint->getKind() ==
+                        ConstraintKind::LiteralConformsTo &&
+                    bool(TypeChecker::getDefaultType(constraint->getProtocol(),
+                                                     DC));
            });
   };
 
