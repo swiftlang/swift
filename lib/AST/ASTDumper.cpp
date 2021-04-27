@@ -2621,8 +2621,6 @@ public:
 
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
     printCommon(E, NodeName);
-    if (E->isSuper())
-      PrintWithColorRAII(OS, ExprModifierColor) << " super";
     if (E->isThrowsSet()) {
       PrintWithColorRAII(OS, ExprModifierColor)
         << (E->throws() ? " throws" : " nothrow");

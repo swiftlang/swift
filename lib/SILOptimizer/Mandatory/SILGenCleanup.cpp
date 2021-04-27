@@ -55,11 +55,18 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
   /// is nextII->getParent()->end().
   SILBasicBlock::iterator deleteDeadOperands(SILBasicBlock::iterator nextII,
                                              SILBasicBlock::iterator endII) {
-    // Each iteration, we store the instructions that will be deleted in the
-    // iteration here and use it to ensure that nextII is moved past /all/
-    // instructions that we are going to delete no matter the order (since we
-    // are visiting instructions in non-deterministic order).
-    SmallPtrSet<SILInstruction *, 16> willBeDeletedInIteration;
+    auto callbacks = InstModCallbacks().onDelete([&](SILInstruction *deadInst) {
+      LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
+
+      // If nextII is the instruction we are going to delete, move nextII past
+      // it.
+      if (deadInst->getIterator() == nextII)
+        ++nextII;
+
+      // Then remove the instruction from the set and delete it.
+      deadOperands.erase(deadInst);
+      deadInst->eraseFromParent();
+    });
 
     while (!deadOperands.empty()) {
       SILInstruction *deadOperInst = *deadOperands.begin();
@@ -67,38 +74,8 @@ struct SILGenCanonicalize final : CanonicalizeInstruction {
       // Make sure at least the first instruction is removed from the set.
       deadOperands.erase(deadOperInst);
 
-      // Then add our initial instruction to the will be deleted set.
-      willBeDeletedInIteration.insert(deadOperInst);
-      SWIFT_DEFER { willBeDeletedInIteration.clear(); };
-
-      eliminateDeadInstruction(deadOperInst, [&](SILInstruction *deadInst) {
-        LLVM_DEBUG(llvm::dbgs() << "Trivially dead: " << *deadInst);
-
-        // Add our instruction to the will be deleted set.
-        willBeDeletedInIteration.insert(deadInst);
-
-        // Then look through /all/ instructions that we are going to delete in
-        // this iteration until we hit the end of the list. This ensures that in
-        // a situation like the following:
-        //
-        // ```
-        //   (%1, %2) = multi_result_inst %0   (a)
-        //   inst_to_delete %1                 (b)
-        //   inst_to_delete %2                 (c)
-        // ```
-        //
-        // If nextII is on (b), but we visit (c) before visiting (b), then we
-        // will end up with nextII on (c) after we are done and then delete
-        // (c). In contrast by using the set when we process (b) after (c), we
-        // first see that (b) is nextII [since it is in the set] so move to (c)
-        // and then see that (c) is in the set as well (since we inserted it
-        // previously) and skip that.
-        while (nextII != endII && willBeDeletedInIteration.count(&*nextII))
-          ++nextII;
-
-        // Then remove the instruction from the set.
-        deadOperands.erase(deadInst);
-      });
+      // Then delete this instruction/everything else that we can.
+      eliminateDeadInstruction(deadOperInst, callbacks);
     }
     return nextII;
   }

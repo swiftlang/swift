@@ -129,8 +129,13 @@ func testTypesConcurrencyContext() async {
   let _: () -> Int = f1 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
   let _: () -> Int = f2 // expected-error{{converting function value of type '@SomeGlobalActor () -> Int' to '() -> Int' loses global actor 'SomeGlobalActor'}}
 
-  _ = f1() // expected-error{{call is 'async' but is not marked with 'await'}}
-  _ = f2() // expected-error{{call is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = f1() //expected-note{{call is 'async}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = f2() //expected-note{{call is 'async'}}
+
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = f1() + f2() // expected-note 2 {{call is 'async'}}
 
   _ = await f1()
   _ = await f2()

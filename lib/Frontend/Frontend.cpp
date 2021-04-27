@@ -761,8 +761,12 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
     return true;
   if (target.isOSLinux())
     return true;
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   if (target.isOSWASI())
     return true;
+  if (target.isOSOpenBSD())
+    return true;
+#endif
   return false;
 }
 

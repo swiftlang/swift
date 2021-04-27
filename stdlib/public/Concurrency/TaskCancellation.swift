@@ -66,7 +66,13 @@ extension Task {
   /// - SeeAlso: `checkCancellation()`
   @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon. Use the static 'Task.isCancelled' instead.")
   public var isCancelled: Bool {
-    _taskIsCancelled(_task)
+    withUnsafeCurrentTask { task in
+      guard let task = task else {
+        return false
+      }
+
+      return _taskIsCancelled(task._task)
+    }
   }
 
   /// Check if the task is cancelled and throw an `CancellationError` if it was.
