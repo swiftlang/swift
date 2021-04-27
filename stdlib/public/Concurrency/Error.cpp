@@ -1,4 +1,4 @@
-//===--- Mutex.cpp - Mutex support code -----------------------------------===//
+//===--- Error.cpp - Error handling support code --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,10 +12,8 @@
 
 #include "Error.h"
 
-#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
-
-// Include the runtime's mutex support code.
-// FIXME: figure out some reasonable way to share this stuff
-
-#include "../runtime/MutexPThread.cpp"
-#include "../runtime/MutexWin32.cpp"
+// swift::fatalError is not exported from libswiftCore and not shared, so define another
+// internal function instead.
+SWIFT_NORETURN void swift::swift_Concurrency_fatalError(uint32_t flags, const char *format, ...) {
+  abort();
+}
