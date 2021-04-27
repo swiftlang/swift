@@ -105,14 +105,13 @@ static void swift_asyncLet_startImpl(AsyncLet *alet,
   flags.task_setIsFuture(true);
   flags.task_setIsChildTask(true);
 
-  auto childTaskAndContext = swift_task_create_future_no_escaping(
+  auto childTaskAndContext = swift_task_create_async_let_future(
       flags,
       futureResultType,
       closureEntryPoint,
       closureContext);
 
   AsyncTask *childTask = childTaskAndContext.Task;
-  swift_retain(childTask);
 
   assert(childTask->isFuture());
   assert(childTask->hasChildFragment());
@@ -165,7 +164,13 @@ static void swift_asyncLet_endImpl(AsyncLet *alet) {
   // TODO: we need to implicitly await either before the end or here somehow.
 
   // and finally, release the task and free the async-let
-  swift_release(task);
+  AsyncTask *parent = swift_task_getCurrent();
+  assert(parent && "async-let must have a parent task");
+
+#if SWIFT_TASK_PRINTF_DEBUG
+  fprintf(stderr, "[%p] async let end of task %p, parent: %p\n", pthread_self(), task, parent);
+#endif
+  _swift_task_dealloc_specific(parent, task);
 }
 
 // =============================================================================
