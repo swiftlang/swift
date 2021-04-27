@@ -575,14 +575,15 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
 
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
 
-  auto deleteCallback = [this](SILInstruction *deletedI) {
-    if (NextIter == deletedI->getIterator())
-      ++NextIter;
-    if (DeletionCallback)
-      DeletionCallback(deletedI);
-  };
+  auto callbacks = InstModCallbacks().onNotifyWillBeDeleted(
+      [this](SILInstruction *deletedI) {
+        if (NextIter == deletedI->getIterator())
+          ++NextIter;
+        if (DeletionCallback)
+          DeletionCallback(deletedI);
+      });
   recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(), true,
-                                             deleteCallback);
+                                             callbacks);
 }
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
