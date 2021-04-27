@@ -3107,13 +3107,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // Check for instance members and initializers of actor types,
   // which are part of actor-isolated state.
   if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
-    if (nominal->isActor() &&
-        (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
-      defaultIsolation = nominal->isDistributedActor() ?
-                         ActorIsolation::forDistributedActorInstance(nominal) :
-                         ActorIsolation::forActorInstance(nominal);
-    } else if (isa<ConstructorDecl>(value)) {
-      defaultIsolation = ActorIsolation::forActorInstance(nominal);
+    if (nominal->isActor()) {
+      if (value->isInstanceMember() || isa<ConstructorDecl>(value)) {
+        defaultIsolation = nominal->isDistributedActor() ?
+                           ActorIsolation::forDistributedActorInstance(nominal) :
+                           ActorIsolation::forActorInstance(nominal);
+      } else if (isa<ConstructorDecl>(value)) {
+        defaultIsolation = ActorIsolation::forActorInstance(nominal);
+      }
     }
   }
 

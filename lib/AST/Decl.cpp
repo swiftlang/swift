@@ -4158,10 +4158,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
           argumentNames[1] == Context.Id_using) {
         action.emplace(ImplicitMemberAction::ResolveDistributedActor);
       }
-    } else if (member.isSimpleName() &&
-               baseName.getKind() == DeclBaseName::Kind::Normal &&
-               baseName == "actorAddress") {
-      assert(false && "address!!!!!!!!!!!!!!!!!!!!!!!!");
     }
   }
 

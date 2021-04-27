@@ -4661,7 +4661,7 @@ public:
       return false;
     if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
       return false;
-    if (!IsDistributedEnabled && DeclAttribute::isConcurrencyOnly(DAK))
+    if (!IsDistributedEnabled && DeclAttribute::isDistributedOnly(DAK))
       return false;
     if (!DK.hasValue())
       return true;
