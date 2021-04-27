@@ -755,7 +755,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printType(Type T) { printTypeWithOptions(T, Options); }
 
   void printTransformedTypeWithOptions(Type T, PrintOptions options) {
-    if (CurrentType && Current) {
+    if (CurrentType && Current && CurrentType->mayHaveMembers()) {
       if (T->hasArchetype()) {
         // Get the interface type, since TypeLocs still have
         // contextual types in them.

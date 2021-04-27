@@ -437,6 +437,26 @@ public func detach<T>(
   return Task.Handle<T, Error>(task)
 }
 
+@discardableResult
+@_alwaysEmitIntoClient
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public func asyncDetached<T>(
+  priority: Task.Priority = .unspecified,
+  operation: __owned @Sendable @escaping () async -> T
+) -> Task.Handle<T, Never> {
+  return detach(priority: priority, operation: operation)
+}
+
+@discardableResult
+@_alwaysEmitIntoClient
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public func asyncDetached<T>(
+  priority: Task.Priority = .unspecified,
+  operation: __owned @Sendable @escaping () async throws -> T
+) -> Task.Handle<T, Error> {
+  return detach(priority: priority, operation: operation)
+}
+
 /// Run given `operation` as asynchronously in its own top-level task.
 ///
 /// The `async` function should be used when creating asynchronous work
@@ -755,12 +775,8 @@ func _getCurrentThreadPriority() -> Int
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-  // TODO: We can probably do better than detach
-  // if we're already running on behalf of a task,
-  // if the receiver of the method invocation is itself an Actor, or in other
-  // situations.
 #if compiler(>=5.5) && $Sendable
-  detach { await body() }
+  async { await body() }
 #endif
 }
 
