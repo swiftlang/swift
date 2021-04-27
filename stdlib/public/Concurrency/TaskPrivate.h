@@ -34,6 +34,10 @@ class TaskGroup;
 /// Initialize the task-local allocator in the given task.
 void _swift_task_alloc_initialize(AsyncTask *task);
 
+void _swift_task_alloc_initialize_with_slab(AsyncTask *task,
+                   void *firstSlabBuffer,
+                   size_t bufferCapacity);
+
 /// Destroy the task-local allocator in the given task.
 void _swift_task_alloc_destroy(AsyncTask *task);
 
@@ -55,7 +59,7 @@ void runJobInEstablishedExecutorContext(Job *job);
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
 
-AsyncTaskAndContext swift_task_create_future_no_escaping(JobFlags flags,
+AsyncTaskAndContext swift_task_create_async_let_future(JobFlags flags,
                      const Metadata *futureResultType,
                      void *closureEntry,
                      void *closureContext);
