@@ -37,6 +37,7 @@ TEST_SUBSETS = [
     'only_validation',
     'only_long',
     'only_stress',
+    'only_early_swiftdriver'
 ]
 
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
