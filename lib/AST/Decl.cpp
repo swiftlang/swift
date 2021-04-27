@@ -7378,7 +7378,7 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
 }
 
 void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
-    AutoDiffConfig config) {
+    const AutoDiffConfig &config) {
   prepareDerivativeFunctionConfigurations();
   DerivativeFunctionConfigs->insert(config);
 }

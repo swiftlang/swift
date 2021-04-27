@@ -184,7 +184,7 @@ void collectAllActualResultsInTypeOrder(
 }
 
 void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, AutoDiffConfig parentConfig,
+    ApplyInst *ai, const AutoDiffConfig &parentConfig,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
@@ -452,7 +452,7 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
                                    IndexSubset *&minimalASTParameterIndices) {
   Optional<AutoDiffConfig> minimalConfig = None;
   auto configs = original->getDerivativeFunctionConfigurations();
-  for (auto config : configs) {
+  for (auto &config : configs) {
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
         config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());

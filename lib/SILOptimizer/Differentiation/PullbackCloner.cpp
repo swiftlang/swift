@@ -149,7 +149,7 @@ private:
   }
   DifferentiationInvoker getInvoker() const { return vjpCloner.getInvoker(); }
   LinearMapInfo &getPullbackInfo() const { return vjpCloner.getPullbackInfo(); }
-  AutoDiffConfig getConfig() const { return vjpCloner.getConfig(); }
+  const AutoDiffConfig &getConfig() const { return vjpCloner.getConfig(); }
   const DifferentiableActivityInfo &getActivityInfo() const {
     return vjpCloner.getActivityInfo();
   }
