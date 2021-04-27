@@ -913,7 +913,7 @@ public:
         continue;
       }
 
-      // Does it make sense to substitute types?
+      ModuleDecl *M = DC->getParentModule();
 
       // If the base type is AnyObject, we might be doing a dynamic
       // lookup, so the base type won't match the type of the member's
@@ -930,16 +930,35 @@ public:
                           (BaseTy->getNominalOrBoundGenericNominal() ||
                            BaseTy->is<ArchetypeType>()) &&
                           VD->getDeclContext()->isTypeContext());
-      ModuleDecl *M = DC->getParentModule();
+
+      /// Substitute generic parameters in the signature of a found decl. The
+      /// returned type can be used to determine if we have already found a
+      /// conflicting declaration.
+      auto substGenericArgs = [&](CanType SignatureType, ValueDecl *VD,
+                                  Type BaseTy) -> CanType {
+        if (!SignatureType || !shouldSubst) {
+          return SignatureType;
+        }
+        if (auto GenFuncSignature =
+                SignatureType->getAs<GenericFunctionType>()) {
+          GenericEnvironment *GenEnv;
+          if (auto *GenCtx = VD->getAsGenericContext()) {
+            GenEnv = GenCtx->getGenericEnvironment();
+          } else {
+            GenEnv = DC->getGenericEnvironmentOfContext();
+          }
+          auto subs = BaseTy->getMemberSubstitutionMap(M, VD, GenEnv);
+          auto CT = GenFuncSignature->substGenericArgs(subs);
+          if (!CT->hasError()) {
+            return CT->getCanonicalType();
+          }
+        }
+        return SignatureType;
+      };
 
       auto FoundSignature = VD->getOverloadSignature();
-      auto FoundSignatureType = VD->getOverloadSignatureType();
-      if (FoundSignatureType && shouldSubst) {
-        auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
-        auto CT = FoundSignatureType.subst(subs);
-        if (!CT->hasError())
-          FoundSignatureType = CT->getCanonicalType();
-      }
+      auto FoundSignatureType =
+          substGenericArgs(VD->getOverloadSignatureType(), VD, BaseTy);
 
       bool FoundConflicting = false;
       for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
@@ -952,14 +971,9 @@ public:
           continue;
 
         auto OtherSignature = OtherVD->getOverloadSignature();
-        auto OtherSignatureType = OtherVD->getOverloadSignatureType();
-        if (OtherSignatureType && shouldSubst) {
-          auto ActualBaseTy = getBaseTypeForMember(M, OtherVD, BaseTy);
-          auto subs = ActualBaseTy->getMemberSubstitutionMap(M, OtherVD);
-          auto CT = OtherSignatureType.subst(subs);
-          if (!CT->hasError())
-            OtherSignatureType = CT->getCanonicalType();
-        }
+        auto ActualBaseTy = getBaseTypeForMember(M, OtherVD, BaseTy);
+        auto OtherSignatureType = substGenericArgs(
+            OtherVD->getOverloadSignatureType(), OtherVD, ActualBaseTy);
 
         if (conflicting(M->getASTContext(), FoundSignature, FoundSignatureType,
                         OtherSignature, OtherSignatureType,
