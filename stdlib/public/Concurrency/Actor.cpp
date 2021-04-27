@@ -1682,10 +1682,6 @@ void swift::swift_defaultActor_destroy(DefaultActor *_actor) {
   asImpl(_actor)->destroy();
 }
 
-// TODO: most likely where we'd need to create the "proxy instance" instead?
-  asImpl(_actor)->enqueue(job);
-}
-
 void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
   asImpl(_actor)->deallocate();
 }
@@ -1714,22 +1710,22 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
+void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
+  asImpl(_actor)->enqueue(job);
+}
+
 // TODO: most likely where we'd need to create the "proxy instance" instead?
-void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) {
+void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: !!!!! remove distributed C++ impl not needed?
   auto actor = asImpl(_actor);
   actor->initialize(/*remote=*/true);
 }
 
-void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
+void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: !!!!! remove distributed C++ impl not needed?
   // TODO: need to resign the address before we destroy:
   //       something like: actor.transport.resignAddress(actor.address)
 
   // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
   asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
-}
-
-void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
-  asImpl(_actor)->enqueue(job);
 }
 
 bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {

@@ -3939,10 +3939,6 @@ RValue CallEmission::applyNormalCall(SGFContext C) {
 
   auto mv = callee.getFnValue(SGF, borrowedSelf);
 
-  Optional<ValueDecl*> calleeDeclInfo;
-  if (implicitlyAsync)
-    calleeDeclInfo = callee.getDecl();
-
   // Emit the uncurried call.
   return SGF.emitApply(
       std::move(resultPlan), std::move(argScope), uncurriedLoc.getValue(), mv,
@@ -4438,6 +4434,10 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
     assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
 
     switch (*implicitAsyncIsolation) {
+    case ActorIsolation::DistributedActorInstance: {
+      // TODO: if the actor is remote there is no need to hop
+      LLVM_FALLTHROUGH;
+    }
     case ActorIsolation::ActorInstance:
       breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation,
                                         args.back());

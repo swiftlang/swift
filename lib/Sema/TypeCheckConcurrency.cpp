@@ -716,27 +716,6 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
 
     auto isolation = getActorIsolation(cast<ValueDecl>(decl));
 
-    // local 'let' declarations are immutable, so they can be accessed across
-    // actors.
-    bool isAccessibleAcrossActors = false;
-    if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (isolation == ActorIsolation::DistributedActorInstance) {
-        // Distributed actors always isolate their state, and it is only
-        // accessible via `self`.
-        return forDistributedActorSelf(isolation.getActor(),
-                                       /*isCrossActor*/ false); // TODO: is this right?
-      }
-
-      // Otherwise, it is allowed to reach into actor properties,
-      // however only if they are `let`s.
-      //
-      // Distributed actor independent properties are allowed to be accessed
-      // synchronously, so they are not considered "cross actor". These are
-      // ONLY very special properties: transport and address.
-      if (var->isLet() && !var->isDistributedActorIndependent())
-        isAccessibleAcrossActors = true;
-    }
-
     // A function that provides an asynchronous context has no restrictions
     // on its access.
     //
@@ -1551,6 +1530,7 @@ namespace {
         if (!isa<AccessorDecl>(fn) && !fn->isAsyncContext()) {
           switch (getActorIsolation(fn)) {
           case ActorIsolation::ActorInstance:
+          case ActorIsolation::DistributedActorInstance:
           case ActorIsolation::GlobalActor:
           case ActorIsolation::GlobalActorUnsafe:
           case ActorIsolation::Independent:
@@ -3102,6 +3082,7 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
 
     switch (isolation) {
     case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
       break;
@@ -3792,6 +3773,7 @@ AnyFunctionType *swift::applyGlobalActorType(
   Type globalActorType;
   switch (auto isolation = getActorIsolation(funcOrEnum)) {
   case ActorIsolation::ActorInstance:
+  case ActorIsolation::DistributedActorInstance:
   case ActorIsolation::Independent:
   case ActorIsolation::Unspecified:
     return fnType;

@@ -469,7 +469,9 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       if (auto destructor = dyn_cast<DestructorDecl>(dc)) {
         switch (getActorIsolation(destructor)) {
         case ActorIsolation::ActorInstance:
+        case ActorIsolation::DistributedActorInstance: {
           return true;
+        }
 
         case ActorIsolation::GlobalActor:
         case ActorIsolation::GlobalActorUnsafe:

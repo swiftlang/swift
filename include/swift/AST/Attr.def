@@ -664,12 +664,12 @@ SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  115)
+  117)
 
 SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
   OnParam | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  116)
+  118)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

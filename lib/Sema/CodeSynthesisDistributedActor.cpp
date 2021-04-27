@@ -214,7 +214,9 @@ createDistributedActor_init_local(ClassDecl *classDecl,
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
           /*Failable=*/false, SourceLoc(),
-          /*Throws=*/false, SourceLoc(), paramList, // TODO: make it throws?
+          /*Async=*/false, SourceLoc(),
+          /*Throws=*/false, SourceLoc(),
+          paramList,
           /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
@@ -336,7 +338,9 @@ createDistributedActor_init_resolve(ClassDecl *classDecl,
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
           /*Failable=*/false, SourceLoc(),
-          /*Throws=*/true, SourceLoc(), paramList,
+          /*Async=*/false, SourceLoc(),
+          /*Throws=*/true, SourceLoc(),
+          paramList,
           /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();

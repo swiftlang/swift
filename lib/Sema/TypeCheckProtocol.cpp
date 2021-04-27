@@ -2753,6 +2753,7 @@ bool ConformanceChecker::checkActorIsolation(
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
                   witness, /*fromExpression=*/false)) {
+  case ActorIsolationRestriction::DistributedActorSelf: {
     if (witness->isSynthesized()) {
       // Some of our synthesized properties get special treatment,
       // they are always available, regardless if the actor is remote even.
