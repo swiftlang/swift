@@ -2021,7 +2021,7 @@ function(add_swift_target_library name)
               NOT "${DEP}" STREQUAL "dispatch" AND
               NOT "${DEP}" STREQUAL "BlocksRuntime")
             add_dependencies(${VARIANT_NAME}
-              "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+              "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
           endif()
         endforeach()
 
@@ -2266,12 +2266,18 @@ function(add_swift_target_library name)
         if(TARGET "swift-stdlib${VARIANT_SUFFIX}" AND
            TARGET "swift-test-stdlib${VARIANT_SUFFIX}")
           add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
-              ${lipo_target}
-              ${lipo_target_static})
+              "${lipo_target}-${arch}")
+          if (lipo_target_static)
+            add_dependencies("swift-stdlib${VARIANT_SUFFIX}"
+                "${lipo_target_static}-${arch}")
+          endif()
           if(NOT "${name}" IN_LIST FILTERED_UNITTESTS)
             add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
-                ${lipo_target}
-                ${lipo_target_static})
+                "${lipo_target}-${arch}")
+            if (lipo_target_static)
+              add_dependencies("swift-test-stdlib${VARIANT_SUFFIX}"
+                "${lipo_target_static}-${arch}")
+            endif()
           endif()
         endif()
       endforeach()
@@ -2456,7 +2462,7 @@ function(add_swift_target_executable name)
       # libraries.
       _list_add_string_suffix(
           "${SWIFTEXE_TARGET_DEPENDS}"
-          "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
+          "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}"
           SWIFTEXE_TARGET_DEPENDS_with_suffix)
       _add_swift_target_executable_single(
           ${VARIANT_NAME}
