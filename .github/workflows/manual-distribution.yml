@@ -52,6 +52,9 @@ jobs:
             "5.4")
               ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.4} 5.4 "${{ github.event.inputs.toolchain_name }}"
             ;;
+            "5.5")
+              ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.5} 5.5 "${{ github.event.inputs.toolchain_name }}"
+            ;;
             *)
               echo "Unrecognised release channel: ${{ github.event.inputs.channel }}"
               exit 1

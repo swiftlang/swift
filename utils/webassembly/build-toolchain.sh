@@ -150,7 +150,7 @@ create_darwin_info_plist() {
   echo "-- Create Info.plist --"
   PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
 
-  DARWIN_TOOLCHAIN_VERSION="5.3.${YEAR}${MONTH}${DAY}"
+  DARWIN_TOOLCHAIN_VERSION="5.5.${YEAR}${MONTH}${DAY}"
   BUNDLE_PREFIX="org.swiftwasm"
   DARWIN_TOOLCHAIN_BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
   DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT="Swift for WebAssembly Snapshot"
