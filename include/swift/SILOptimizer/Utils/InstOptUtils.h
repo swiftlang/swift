@@ -99,28 +99,9 @@ class InstModCallbacks {
   bool wereAnyCallbacksInvoked = false;
 
 public:
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc)
-      : deleteInstFunc(deleteInstFunc) {}
-
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
-                   decltype(createdNewInstFunc) createdNewInstFunc)
-      : createdNewInstFunc(createdNewInstFunc), deleteInstFunc(deleteInstFunc) {
-  }
-
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
-                   decltype(setUseValueFunc) setUseValueFunc)
-      : setUseValueFunc(setUseValueFunc), deleteInstFunc(deleteInstFunc) {}
-
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
-                   decltype(createdNewInstFunc) createdNewInstFunc,
-                   decltype(setUseValueFunc) setUseValueFunc)
-      : createdNewInstFunc(createdNewInstFunc),
-        setUseValueFunc(setUseValueFunc), deleteInstFunc(deleteInstFunc) {}
-
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
-  InstModCallbacks(InstModCallbacks &&) = default;
 
   /// Return a copy of self with deleteInstFunc set to \p newDeleteInstFunc.
   InstModCallbacks onDelete(decltype(deleteInstFunc) newDeleteInstFunc) const {
