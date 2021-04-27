@@ -379,7 +379,8 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 /// and the contextual type.
 static Optional<std::tuple<ContextualTypePurpose, Type, Type>>
 getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
-  if (locator->findLast<LocatorPathElt::ContextualType>()) {
+  if (auto contextualTypeElt =
+          locator->findLast<LocatorPathElt::ContextualType>()) {
     assert(locator->isLastElement<LocatorPathElt::ContextualType>() ||
            locator->isLastElement<LocatorPathElt::FunctionArgument>());
 
@@ -387,7 +388,7 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
     auto anchor = locator->getAnchor();
     auto contextualType = cs.getContextualType(anchor);
     auto exprType = cs.getType(anchor);
-    return std::make_tuple(cs.getContextualTypePurpose(anchor), exprType,
+    return std::make_tuple(contextualTypeElt->getPurpose(), exprType,
                            contextualType);
   } else if (auto argApplyInfo = solution.getFunctionArgApplyInfo(locator)) {
     return std::make_tuple(CTP_CallArgument,
@@ -1328,7 +1329,8 @@ bool IgnoreAssignmentDestinationType::diagnose(const Solution &solution,
 
   AssignmentTypeMismatchFailure failure(
       solution, CTP, getFromType(), getToType(),
-      cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
+      cs.getConstraintLocator(AE->getSrc(),
+                              LocatorPathElt::ContextualType(CTP)));
   return failure.diagnose(asNote);
 }
 
