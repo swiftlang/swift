@@ -8770,6 +8770,8 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
     }
   }
 
+  bool wasReduced = false;
+
   // Try removing each requirement in turn.
   for (unsigned victimIndex : indices(requirements)) {
     PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
@@ -8792,6 +8794,9 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
     // just continue.
     if (builder.Impl->HadAnyError) continue;
 
+    // Record that we were able to remove a single requirement.
+    wasReduced = true;
+
     // Form a generic signature from the result.
     auto newSig =
       std::move(builder).computeGenericSignature(
@@ -8808,6 +8813,13 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
       context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_minimal,
                              reqString, sig->getAsString());
     }
+  }
+
+  // Any signature with one or more requirements should be reducible to
+  // a signature with exactly one fewer requirement.
+  if (!requirements.empty() && !wasReduced) {
+    context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_reducible,
+                           sig->getAsString());
   }
 }
 
