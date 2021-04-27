@@ -143,18 +143,22 @@ public:
                     DeadEndBlocks &deadEndBlocks)
       : compilingWithOptimization(optimized), worklist("MC"), madeChange(false),
         iteration(0),
-        instModCallbacks(
-            [&](SILInstruction *instruction) {
-              worklist.erase(instruction);
-              instructionsPendingDeletion.push_back(instruction);
-            },
-            [&](SILInstruction *instruction) { worklist.add(instruction); },
-            [this](Operand *use, SILValue newValue) {
-              use->set(newValue);
-              worklist.add(use->getUser());
-            }),
+        instModCallbacks(),
         createdInstructions(createdInstructions),
-        deadEndBlocks(deadEndBlocks){};
+        deadEndBlocks(deadEndBlocks) {
+    instModCallbacks = InstModCallbacks()
+      .onDelete([&](SILInstruction *instruction) {
+        worklist.erase(instruction);
+        instructionsPendingDeletion.push_back(instruction);
+      })
+      .onCreateNewInst([&](SILInstruction *instruction) {
+        worklist.add(instruction);
+      })
+      .onSetUseValue([this](Operand *use, SILValue newValue) {
+        use->set(newValue);
+        worklist.add(use->getUser());
+      });
+  };
 
   void addReachableCodeToWorklist(SILFunction &function);
 
