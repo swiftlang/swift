@@ -1,4 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
-actor class C { } // expected-error{{'actor' modifier is only valid when experimental concurrency is enabled}}
+actor C {
+  nonisolated func f() { } // expected-error{{'nonisolated' modifier is only valid when experimental concurrency is enabled}}
+}
+
+
 
