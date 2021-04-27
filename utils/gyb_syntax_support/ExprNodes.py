@@ -543,7 +543,8 @@ EXPR_NODES = [
              Child('RootExpr', kind='Expr', is_optional=True,
                    node_choices=[
                        Child('IdentifierExpr', kind='IdentifierExpr'),
-                       Child('SpecializeExpr', kind='SpecializeExpr')
+                       Child('SpecializeExpr', kind='SpecializeExpr'),
+                       Child('OptionalChainingExpr', kind='OptionalChainingExpr'),
                    ]),
              Child('Expression', kind='Expr'),
          ]),

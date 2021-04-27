@@ -107,3 +107,20 @@ bb0(%0 : @owned $Error, %1 : $Builtin.RawUnsafeContinuation):
   %21 = tuple ()
   return %21 : $()
 }
+
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc  void @task_group_create_destroy
+sil hidden [ossa] @task_group_create_destroy : $@async () -> () {
+bb0:
+  // CHECK:      [[TASKGROUP:%.*]] = alloca [32 x i8*], align 16
+  // CHECK:      [[T0:%.*]] = bitcast [32 x i8*]* [[TASKGROUP]] to i8*
+  // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_initialize(i8* [[T0]])
+  %0 = builtin "createTaskGroup"() : $Builtin.RawPointer
+
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_destroy(i8* [[T0]])
+  // CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[T0]])
+  builtin "destroyTaskGroup"(%0 : $Builtin.RawPointer) : $()
+
+  %21 = tuple ()
+  return %21 : $()
+}

@@ -569,8 +569,8 @@ private:
     case Node::Kind::AutoDiffSubsetParametersThunk:
     case Node::Kind::AutoDiffFunctionKind:
     case Node::Kind::DifferentiabilityWitness:
+    case Node::Kind::NoDerivative:
     case Node::Kind::IndexSubset:
-    case Node::Kind::AsyncNonconstantPartialApplyThunk:
     case Node::Kind::AsyncAwaitResumePartialFunction:
     case Node::Kind::AsyncSuspendResumePartialFunction:
       return false;
@@ -809,6 +809,12 @@ private:
     unsigned startIndex = 0;
     bool isSendable = false, isAsync = false, isThrows = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::DifferentiableFunctionType) {
+      diffKind =
+          (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
       ++startIndex;
@@ -825,12 +831,6 @@ private:
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
-    }
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::DifferentiableFunctionType) {
-      diffKind =
-          (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
-      ++startIndex;
     }
 
     switch (diffKind) {
@@ -1420,6 +1420,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Owned:
     Printer << "__owned ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::NoDerivative:
+    Printer << "@noDerivative ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NonObjCAttribute:
@@ -2807,23 +2811,21 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::AsyncFunctionPointer:
     Printer << "async function pointer to ";
     return nullptr;
-  case Node::Kind::AsyncNonconstantPartialApplyThunk:
-    Printer << "(";
-    print(Node->getChild(0));
-    Printer << ")";
-    Printer << " thunk for non-constant partial apply in ";
-    return nullptr;
   case Node::Kind::AsyncAwaitResumePartialFunction:
-    Printer << "(";
-    print(Node->getChild(0));
-    Printer << ")";
-    Printer << " await resume partial function for ";
+    if (Options.ShowAsyncResumePartial) {
+      Printer << "(";
+      print(Node->getChild(0));
+      Printer << ")";
+      Printer << " await resume partial function for ";
+    }
     return nullptr;
   case Node::Kind::AsyncSuspendResumePartialFunction:
-    Printer << "(";
-    print(Node->getChild(0));
-    Printer << ")";
-    Printer << " suspend resume partial function for ";
+    if (Options.ShowAsyncResumePartial) {
+      Printer << "(";
+      print(Node->getChild(0));
+      Printer << ")";
+      Printer << " suspend resume partial function for ";
+    }
     return nullptr;
   }
 

@@ -39,6 +39,7 @@ class EnumElementDecl;
 class Expr;
 class FuncDecl;
 class Initializer;
+class LangOptions;
 class PatternBindingDecl;
 class ProtocolConformance;
 class TopLevelCodeDecl;
@@ -187,7 +188,11 @@ public:
   }
 
   /// Determine the isolation rules for a given declaration.
-  static ActorIsolationRestriction forDeclaration(ConcreteDeclRef declRef);
+  ///
+  /// \param fromExpression Indicates that the reference is coming from an
+  /// expression.
+  static ActorIsolationRestriction forDeclaration(
+      ConcreteDeclRef declRef, bool fromExpression = true);
 
   operator Kind() const { return kind; };
 };
@@ -226,6 +231,10 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind,
     DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
+
+/// Whether we should diagnose cases where Sendable conformances are
+/// missing.
+bool shouldDiagnoseNonSendableViolations(const LangOptions &langOpts);
 
 /// How the concurrent value check should be performed.
 enum class SendableCheck {

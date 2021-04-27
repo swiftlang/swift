@@ -879,13 +879,13 @@ SourceFile::getBasicLocsForDecl(const Decl *D) const {
   Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
 
   for (const auto &SRC : D->getRawComment(/*SerializedOK*/false).Comments) {
-    Result.DocRanges.push_back(std::make_pair(
-      LineColumn { SRC.StartLine, SRC.StartColumn },
-      SRC.Range.getByteLength())
-    );
+    auto LineAndCol = SM.getLineAndColumnInBuffer(SRC.Range.getStart());
+    Result.DocRanges.push_back(
+        std::make_pair(SourcePosition{LineAndCol.first, LineAndCol.second},
+                       SRC.Range.getByteLength()));
   }
 
-  auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
+  auto setLineColumn = [&SM](SourcePosition &Home, SourceLoc Loc) {
     if (Loc.isValid()) {
       std::tie(Home.Line, Home.Column) = SM.getPresumedLineAndColumnForLoc(Loc);
     }

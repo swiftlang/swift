@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
 #include "swift/SymbolGraphGen/PathComponent.h"
+#include "swift/SymbolGraphGen/FragmentInfo.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -98,12 +99,23 @@ public:
     return SynthesizedBaseTypeDecl;
   }
 
+  /// Reteive the path components associated with this symbol, from outermost
+  /// to innermost (this symbol).
   void getPathComponents(SmallVectorImpl<PathComponent> &Components) const;
+
+  /// Retrieve information about all symbols referenced in the declaration
+  /// fragment printed for this symbol.
+  void getFragmentInfo(SmallVectorImpl<FragmentInfo> &FragmentInfo) const;
 
   /// Print the symbol path to an output stream.
   void printPath(llvm::raw_ostream &OS) const;
 
   void getUSR(SmallVectorImpl<char> &USR) const;
+  
+  /// If this symbol is inheriting docs from a parent class, protocol, or default
+  /// implementation, returns that decl. Returns null if there are no docs or if
+  /// the symbol has its own doc comments to render.
+  const ValueDecl *getDeclInheritingDocs() const;
 
   static bool supportsKind(DeclKind Kind);
 };

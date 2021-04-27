@@ -329,12 +329,17 @@ class ABC: AB, ABCProtocol {
   var a = LifetimeTracked(1)
   var b = LifetimeTracked(2)
   var c = LifetimeTracked(3)
+  subscript(x: Int) -> Int {
+    get { return x + 27 }
+    set { }
+  }
 }
 
 protocol ABCProtocol {
   var a: LifetimeTracked { get }
   var b: LifetimeTracked { get set }
   var c: LifetimeTracked { get nonmutating set }
+  subscript(x: Int) -> Int { get set }
 }
 
 keyPath.test("dynamically-typed application") {
@@ -369,6 +374,7 @@ keyPath.test("dynamically-typed application") {
   let protoErasedPathA = \ABCProtocol.a
   let protoErasedPathB = \ABCProtocol.b
   let protoErasedPathC = \ABCProtocol.c
+  let protoErasedSubscript = \ABCProtocol[100]
 
   do {
     expectTrue(protoErasedSubject.a ===
@@ -389,6 +395,8 @@ keyPath.test("dynamically-typed application") {
     expectTrue(protoErasedSubject.c ===
                   protoErasedSubject[keyPath: protoErasedPathC])
     expectTrue(protoErasedSubject.c === newC)
+
+    expectTrue(protoErasedSubject[keyPath: protoErasedSubscript] == 127)
   }
 }
 

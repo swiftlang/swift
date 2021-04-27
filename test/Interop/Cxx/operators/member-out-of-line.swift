@@ -59,4 +59,20 @@ OperatorsTestSuite.test("ReadWriteIntArray.subscript (out-of-line)") {
   expectEqual(234, resultAfter)
 }
 
+OperatorsTestSuite.test("NonTrivialIntArrayByVal.subscript (out-of-line)") {
+  var arr = NonTrivialIntArrayByVal(1)
+
+  let result0 = arr[0]
+  let result2 = arr[2]
+  let result4 = arr[4]
+
+  expectEqual(1, result0)
+  expectEqual(3, result2)
+  expectEqual(5, result4)
+
+  arr.setValueAtIndex(42, 3)
+  let result5 = arr[3]
+  expectEqual(42, result5)
+}
+
 runAllTests()

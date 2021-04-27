@@ -164,25 +164,28 @@ namespace {
     }
 
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getFunctionPointerExtraInhabitantCount(IGM);
+      return PointerInfo::forFunction(IGM).getExtraInhabitantCount(IGM);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                        unsigned bits,
                                        unsigned index) const override {
-      return getFunctionPointerFixedExtraInhabitantValue(IGM, bits, index, 0);
+      return PointerInfo::forFunction(IGM)
+               .getFixedExtraInhabitantValue(IGM, bits, index, 0);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
                                          SILType T, bool isOutlined)
     const override {
-      return getFunctionPointerExtraInhabitantIndex(IGF, src);
+      return PointerInfo::forFunction(IGF.IGM)
+               .getExtraInhabitantIndex(IGF, src);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                               Address dest, SILType T, bool isOutlined)
     const override {
-      return storeFunctionPointerExtraInhabitant(IGF, index, dest);
+      return PointerInfo::forFunction(IGF.IGM)
+               .storeExtraInhabitant(IGF, index, dest);
     }
   };
 
@@ -341,20 +344,29 @@ namespace {
     }
 
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getFunctionPointerExtraInhabitantCount(IGM);
+      return PointerInfo::forFunction(IGM)
+               .getExtraInhabitantCount(IGM);
     }
 
     APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                        unsigned bits,
                                        unsigned index) const override {
-      return getFunctionPointerFixedExtraInhabitantValue(IGM, bits, index, 0);
+      return PointerInfo::forFunction(IGM)
+               .getFixedExtraInhabitantValue(IGM, bits, index, 0);
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
                                          SILType T, bool isOutlined)
     const override {
-      src = projectFunction(IGF, src);
-      return getFunctionPointerExtraInhabitantIndex(IGF, src);
+      return PointerInfo::forFunction(IGF.IGM)
+               .getExtraInhabitantIndex(IGF, projectFunction(IGF, src));
+    }
+
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                              Address dest, SILType T, bool isOutlined)
+    const override {
+      return PointerInfo::forFunction(IGF.IGM)
+               .storeExtraInhabitant(IGF, index, projectFunction(IGF, dest));
     }
 
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
@@ -364,13 +376,6 @@ namespace {
       mask.appendSetBits(pointerSize.getValueInBits());
       mask.appendClearBits(pointerSize.getValueInBits());
       return mask.build().getValue();
-    }
-
-    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T, bool isOutlined)
-    const override {
-      dest = projectFunction(IGF, dest);
-      return storeFunctionPointerExtraInhabitant(IGF, index, dest);
     }
   };
 
@@ -768,15 +773,12 @@ protected:
         origParams(subIGF.collectParameters()) {}
 
 public:
-  enum class DynamicFunctionKind {
-    Witness,
-    PartialApply,
-  };
   virtual void begin(){};
 
   virtual void gatherArgumentsFromApply() = 0;
 
-  virtual void mapAsyncParameters() {}
+  virtual void mapAsyncParameters(FunctionPointer fnPtr) {}
+  virtual void recordAsyncParametersInsertionPoint(){};
 
   void gatherArgumentsFromApply(bool isAsync) {
     // Lower the forwarded arguments in the original function's generic context.
@@ -831,7 +833,7 @@ public:
     }
 
     if (isAsync)
-      mapAsyncParameters();
+      recordAsyncParametersInsertionPoint();
 
     // Reemit the parameters as unsubstituted.
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
@@ -921,12 +923,10 @@ public:
 
   llvm::Value *getContext() { return origParams.claimNext(); }
 
-  virtual llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) = 0;
+  virtual llvm::Value *getDynamicFunctionPointer() = 0;
   virtual llvm::Value *getDynamicFunctionContext() = 0;
-  virtual void addDynamicFunctionContext(Explosion &explosion,
-                                         DynamicFunctionKind kind) = 0;
-  virtual void addDynamicFunctionPointer(Explosion &explosion,
-                                         DynamicFunctionKind kind) = 0;
+  virtual void addDynamicFunctionContext(Explosion &explosion) = 0;
+  virtual void addDynamicFunctionPointer(Explosion &explosion) = 0;
 
   void addSelf(Explosion &explosion) { addArgument(explosion); }
   void addWitnessSelfMetadata(llvm::Value *value) {
@@ -965,16 +965,12 @@ public:
   void gatherArgumentsFromApply() override {
     super::gatherArgumentsFromApply(false);
   }
-  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
-    return args.takeLast();
-  }
+  llvm::Value *getDynamicFunctionPointer() override { return args.takeLast(); }
   llvm::Value *getDynamicFunctionContext() override { return args.takeLast(); }
-  void addDynamicFunctionContext(Explosion &explosion,
-                                 DynamicFunctionKind kind) override {
+  void addDynamicFunctionContext(Explosion &explosion) override {
     addArgument(explosion);
   }
-  void addDynamicFunctionPointer(Explosion &explosion,
-                                 DynamicFunctionKind kind) override {
+  void addDynamicFunctionPointer(Explosion &explosion) override {
     addArgument(explosion);
   }
   void forwardErrorResult() override {
@@ -1045,13 +1041,6 @@ class AsyncPartialApplicationForwarderEmission
   Address context;
   Address calleeContextBuffer;
   unsigned currentArgumentIndex;
-  struct DynamicFunction {
-    using Kind = DynamicFunctionKind;
-    Kind kind;
-    llvm::Value *pointer;
-    llvm::Value *context;
-  };
-  Optional<DynamicFunction> dynamicFunction = llvm::None;
   struct Self {
     enum class Kind {
       Method,
@@ -1061,6 +1050,7 @@ class AsyncPartialApplicationForwarderEmission
     llvm::Value *value;
   };
   Optional<Self> self = llvm::None;
+  unsigned asyncParametersInsertionIndex = 0;
 
   void saveValue(ElementLayout layout, Explosion &explosion) {
     Address addr = layout.project(subIGF, context, /*offsets*/ llvm::None);
@@ -1088,15 +1078,18 @@ public:
 
   void begin() override { super::begin(); }
 
-  void mapAsyncParameters() override {
+  void recordAsyncParametersInsertionPoint() override {
     // Ignore the original context.
     (void)origParams.claimNext();
 
+    asyncParametersInsertionIndex = args.size();
+  }
+  void mapAsyncParameters(FunctionPointer fnPtr) override {
     llvm::Value *dynamicContextSize32;
     auto initialContextSize = Size(0);
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        subIGF, origType->getRepresentation(), *staticFnPtr,
-        nullptr, std::make_pair(true, true), initialContextSize);
+        subIGF, origType->getRepresentation(), fnPtr, nullptr,
+        std::make_pair(true, true), initialContextSize);
     auto *dynamicContextSize =
         subIGF.Builder.CreateZExt(dynamicContextSize32, subIGF.IGM.SizeTy);
     calleeContextBuffer =
@@ -1104,8 +1097,9 @@ public:
     context = layout.emitCastTo(subIGF, calleeContextBuffer.getAddress());
     auto calleeContext =
         layout.emitCastTo(subIGF, calleeContextBuffer.getAddress());
-    args.add(subIGF.Builder.CreateBitOrPointerCast(
-        calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
+    args.insert(asyncParametersInsertionIndex,
+                subIGF.Builder.CreateBitOrPointerCast(
+                    calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
 
     // Set caller info into the context.
     { // caller context
@@ -1146,20 +1140,14 @@ public:
   void gatherArgumentsFromApply() override {
     super::gatherArgumentsFromApply(true);
   }
-  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
-    llvm_unreachable(
-        "async partial applies never have dynamic function pointers");
-  }
+  llvm::Value *getDynamicFunctionPointer() override { return args.takeLast(); }
   llvm::Value *getDynamicFunctionContext() override {
     return args.takeLast();
   }
-  void addDynamicFunctionContext(Explosion &explosion,
-                                 DynamicFunction::Kind kind) override {
+  void addDynamicFunctionContext(Explosion &explosion) override {
     addArgument(explosion);
   }
-  void addDynamicFunctionPointer(Explosion &explosion,
-                                 DynamicFunction::Kind kind) override {
-    assert(false);
+  void addDynamicFunctionPointer(Explosion &explosion) override {
     addArgument(explosion);
   }
 
@@ -1167,23 +1155,12 @@ public:
     // Nothing to do here.  The error result pointer is already in the
     // appropriate position.
   }
-  FunctionPointer getFunctionPointerForDispatchCall(const FunctionPointer &fn) {
-    auto &IGM = subIGF.IGM;
-    // Strip off the return type. The original function pointer signature
-    // captured both the entry point type and the resume function type.
-    auto *fnTy = llvm::FunctionType::get(
-        IGM.VoidTy, fn.getSignature().getType()->params(), false /*vaargs*/);
-    auto signature =
-        Signature(fnTy, fn.getSignature().getAttributes(), IGM.SwiftAsyncCC);
-    auto fnPtr =
-        FunctionPointer(FunctionPointer::Kind::Function, fn.getRawPointer(),
-                        fn.getAuthInfo(), signature);
-    return fnPtr;
-  }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
+    PointerAuthInfo newAuthInfo =
+        fnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
-        FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF),
-        fnPtr.getAuthInfo(), Signature::forAsyncAwait(subIGF.IGM, origType));
+        FunctionPointer::Kind::Function, fnPtr.getPointer(subIGF), newAuthInfo,
+        Signature::forAsyncAwait(subIGF.IGM, origType));
     auto &Builder = subIGF.Builder;
 
     auto argValues = args.claimAll();
@@ -1203,7 +1180,7 @@ public:
     arguments.push_back(
         Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
     auto dispatchFn = subIGF.createAsyncDispatchFn(
-        getFunctionPointerForDispatchCall(newFnPtr), argValues);
+        getFunctionPointerForDispatchCall(IGM, newFnPtr), argValues);
     arguments.push_back(
         Builder.CreateBitOrPointerCast(dispatchFn, IGM.Int8PtrTy));
     arguments.push_back(
@@ -1219,35 +1196,7 @@ public:
   }
   void createReturn(llvm::CallInst *call) override {
     emitDeallocAsyncContext(subIGF, calleeContextBuffer);
-    auto numAsyncContextParams =
-        Signature::forAsyncReturn(IGM, outType).getAsyncContextIndex() + 1;
-    llvm::Value *result = call;
-    auto *suspendResultTy = cast<llvm::StructType>(result->getType());
-    Explosion resultExplosion;
-    Explosion errorExplosion;
-    SILFunctionConventions conv(outType, subIGF.getSILModule());
-    auto hasError = outType->hasErrorResult();
-
-    Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
-    SmallVector<llvm::Value *, 16> nativeResultsStorage;
-
-    if (suspendResultTy->getNumElements() == numAsyncContextParams) {
-      // no result to forward.
-      assert(!hasError);
-    } else {
-      auto &Builder = subIGF.Builder;
-      auto resultTys =
-          makeArrayRef(suspendResultTy->element_begin() + numAsyncContextParams,
-                       suspendResultTy->element_end());
-
-      for (unsigned i = 0, e = resultTys.size(); i != e; ++i) {
-        llvm::Value *elt =
-            Builder.CreateExtractValue(result, numAsyncContextParams + i);
-        nativeResultsStorage.push_back(elt);
-      }
-      nativeResults = nativeResultsStorage;
-    }
-    emitAsyncReturn(subIGF, layout, origType, nativeResults);
+    forwardAsyncCallResult(subIGF, origType, layout, call);
   }
   void end() override {
     assert(context.isValid());
@@ -1518,6 +1467,8 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
     auto argIndex = emission->getCurrentArgumentIndex();
     if (haveContextArgument)
       argIndex += polyArgs.size();
+    if (origType->isAsync())
+      argIndex += 1;
 
     llvm::Type *expectedArgTy = origSig.getType()->getParamType(argIndex);
 
@@ -1669,20 +1620,10 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
       } else {
         switch (extraFieldIndex) {
         case 0:
-          emission->addDynamicFunctionContext(
-              param, isWitnessMethodCallee
-                         ? PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::Witness
-                         : PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::PartialApply);
+          emission->addDynamicFunctionContext(param);
           break;
         case 1:
-          emission->addDynamicFunctionPointer(
-              param, isWitnessMethodCallee
-                         ? PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::Witness
-                         : PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::PartialApply);
+          emission->addDynamicFunctionPointer(param);
           break;
         default:
           llvm_unreachable("unexpected extra field in thick context");
@@ -1724,21 +1665,28 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Otherwise, it was the last thing we added to the layout.
 
     assert(lastCapturedFieldPtr);
-    auto authInfo = PointerAuthInfo::emit(subIGF,
-                            IGM.getOptions().PointerAuth.PartialApplyCapture,
-                            lastCapturedFieldPtr,
-                            PointerAuthEntity::Special::PartialApplyCapture);
+    auto authInfo = PointerAuthInfo::emit(
+        subIGF,
+        origType->isAsync()
+            ? IGM.getOptions().PointerAuth.AsyncPartialApplyCapture
+            : IGM.getOptions().PointerAuth.PartialApplyCapture,
+        lastCapturedFieldPtr, PointerAuthEntity::Special::PartialApplyCapture);
 
     // The dynamic function pointer is packed "last" into the context,
     // and we pulled it out as an argument.  Just pop it off.
-    auto fnPtr = emission->getDynamicFunctionPointer(authInfo);
+    auto fnPtr = emission->getDynamicFunctionPointer();
 
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
-    return FunctionPointer(FunctionPointer::Kind::Function, fnPtr, authInfo,
-                           origSig);
+    return FunctionPointer(origType->isAsync()
+                               ? FunctionPointer::Kind::AsyncFunctionPointer
+                               : FunctionPointer::Kind::Function,
+                           fnPtr, authInfo, origSig);
   }();
+
+  if (origType->isAsync())
+    emission->mapAsyncParameters(fnPtr);
 
   // Derive the context argument if needed.  This is either:
   //   - the saved context argument, in which case it was the last
@@ -1770,12 +1718,7 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
     if (isMethodCallee) {
       emission->addSelf(explosion);
     } else {
-      emission->addDynamicFunctionContext(
-          explosion, isWitnessMethodCallee
-                         ? PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::Witness
-                         : PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::PartialApply);
+      emission->addDynamicFunctionContext(explosion);
     }
 
   // Pass a placeholder for thin function calls.
@@ -1872,13 +1815,6 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   // Reserve space for polymorphic bindings.
   auto bindings = NecessaryBindings::forPartialApplyForwarder(
       IGF.IGM, origType, subs, considerParameterSources);
-
-  // TODO: Revisit.  Now that async thick functions are always represented with
-  //       an async function pointer, it should again be possible to allow
-  //       contexts that consist of only a single swift refcounted value.
-  if (origType->isAsync()) {
-    hasSingleSwiftRefcountedContext = No;
-  }
 
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
@@ -2040,13 +1976,8 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
                                       origSig, origType, substType,
                                       outType, subs, nullptr, argConventions);
-    if (origType->isAsync()) {
-      llvm_unreachable(
-          "async functions never have a single refcounted context");
-    } else {
-      forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
-      forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
-    }
+    forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
+    forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
     out.add(forwarder);
 
     llvm::Value *ctx = args.claimNext();
@@ -2120,16 +2051,18 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       // We don't add non-constant function pointers to the explosion above,
       // so we need to handle them specially now.
       if (i == nonStaticFnIndex) {
-        llvm::Value *fnPtr;
-        if (auto &schema = IGF.getOptions().PointerAuth.PartialApplyCapture) {
-          auto schemaAuthInfo =
-            PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
-                           PointerAuthEntity::Special::PartialApplyCapture);
+        llvm::Value *fnPtr = fn.getRawPointer();
+        if (auto &schema =
+                origType->isAsync()
+                    ? IGF.getOptions().PointerAuth.AsyncPartialApplyCapture
+                    : IGF.getOptions().PointerAuth.PartialApplyCapture) {
+          auto schemaAuthInfo = PointerAuthInfo::emit(
+              IGF, schema, fieldAddr.getAddress(),
+              PointerAuthEntity::Special::PartialApplyCapture);
           fnPtr =
               emitPointerAuthResign(IGF, fn, schemaAuthInfo).getRawPointer();
-        } else {
-          fnPtr = fn.getRawPointer();
         }
+
         fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
         IGF.Builder.CreateStore(fnPtr, fieldAddr);
         continue;
@@ -2354,43 +2287,54 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }
 
-llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
-  auto name = "__swift_async_resume_project_context";
+llvm::Value *
+IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+  auto addr = Builder.CreateBitOrPointerCast(calleeContext, IGM.Int8PtrPtrTy);
+  Address callerContextAddr(addr, IGM.getPointerAlignment());
+  llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
+    auto authInfo =
+        PointerAuthInfo::emit(*this, schema, addr, PointerAuthEntity());
+    callerContext = emitPointerAuthAuth(*this, callerContext, authInfo);
+  }
+  // TODO: remove this once all platforms support lowering the intrinsic.
+  // At the time of this writing only arm64 supports it.
+  if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {
+    llvm::Value *storedCallerContext = callerContext;
+    auto contextLocationInExtendedFrame =
+        Address(Builder.CreateIntrinsicCall(
+                    llvm::Intrinsic::swift_async_context_addr, {}),
+                IGM.getPointerAlignment());
+    // On arm64e we need to sign this pointer address discriminated
+    // with 0xc31a and process dependent key.
+    if (auto schema =
+            IGM.getOptions().PointerAuth.AsyncContextExtendedFrameEntry) {
+      auto authInfo = PointerAuthInfo::emit(
+          *this, schema, contextLocationInExtendedFrame.getAddress(),
+          PointerAuthEntity());
+      storedCallerContext =
+          emitPointerAuthSign(*this, storedCallerContext, authInfo);
+    }
+    Builder.CreateStore(storedCallerContext, contextLocationInExtendedFrame);
+  }
+  return callerContext;
+}
+
+llvm::Function *IRGenFunction::getOrCreateResumePrjFn(bool forPrologue) {
+  // The prologue version lacks artificial debug info as this would cause
+  // verification errors when it gets inlined.
+  auto name = forPrologue ? "__swift_async_resume_project_context_prologue"
+                          : "__swift_async_resume_project_context";
   auto Fn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       name, IGM.Int8PtrTy, {IGM.Int8PtrTy},
       [&](IRGenFunction &IGF) {
         auto it = IGF.CurFn->arg_begin();
         auto &Builder = IGF.Builder;
-        auto addr = Builder.CreateBitOrPointerCast(&(*it), IGF.IGM.Int8PtrPtrTy);
-        Address callerContextAddr(addr, IGF.IGM.getPointerAlignment());
-        llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
-        if (auto schema = IGF.IGM.getOptions().PointerAuth.AsyncContextParent) {
-          auto authInfo =
-              PointerAuthInfo::emit(IGF, schema, addr, PointerAuthEntity());
-          callerContext = emitPointerAuthAuth(IGF, callerContext, authInfo);
-        }
-        // TODO: remove this once all platforms support lowering the intrinsic.
-        // At the time of this writing only arm64 supports it.
-        if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {
-          llvm::Value *storedCallerContext = callerContext;
-          auto contextLocationInExtendedFrame =
-              Address(Builder.CreateIntrinsicCall(
-                          llvm::Intrinsic::swift_async_context_addr, {}),
-                      IGM.getPointerAlignment());
-          // On arm64e we need to sign this pointer address discriminated
-          // with 0xc31a and process dependent key.
-          if (auto schema = IGF.IGM.getOptions()
-                                .PointerAuth.AsyncContextExtendedFrameEntry) {
-            auto authInfo = PointerAuthInfo::emit(
-                IGF, schema, contextLocationInExtendedFrame.getAddress(),
-                PointerAuthEntity());
-            storedCallerContext = emitPointerAuthSign(IGF, storedCallerContext, authInfo);
-          }
-          Builder.CreateStore(storedCallerContext, contextLocationInExtendedFrame);
-        }
+        auto addr = &(*it);
+        auto callerContext = IGF.emitAsyncResumeProjectContext(addr);
         Builder.CreateRet(callerContext);
       },
-      false /*isNoInline*/));
+      false /*isNoInline*/, forPrologue));
   Fn->addFnAttr(llvm::Attribute::AlwaysInline);
   return Fn;
 }
@@ -2429,7 +2373,8 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   dispatch->setCallingConv(IGM.SwiftAsyncCC);
   dispatch->setDoesNotThrow();
   IRGenFunction dispatchIGF(IGM, dispatch);
-  if (IGM.DebugInfo)
+  // Don't emit debug info if we are generating a function for the prologue.
+  if (IGM.DebugInfo && Builder.getCurrentDebugLocation())
     IGM.DebugInfo->emitArtificialFunction(dispatchIGF, dispatch);
   auto &Builder = dispatchIGF.Builder;
   auto it = dispatchIGF.CurFn->arg_begin(), end = dispatchIGF.CurFn->arg_end();
@@ -2452,9 +2397,9 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   return dispatch;
 }
 
-void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
+void IRGenFunction::emitSuspensionPoint(Explosion &toExecutor,
                                         llvm::Value *asyncResume) {
-                                        
+
   // Setup the suspend point.
   SmallVector<llvm::Value *, 8> arguments;
   unsigned swiftAsyncContextIndex = 0;
@@ -2469,8 +2414,8 @@ void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
 
   // Extra arguments to pass to the suspension function.
   arguments.push_back(asyncResume);
-  arguments.push_back(
-      Builder.CreateBitOrPointerCast(toExecutor, IGM.SwiftExecutorPtrTy));
+  arguments.push_back(toExecutor.claimNext());
+  arguments.push_back(toExecutor.claimNext());
   arguments.push_back(getAsyncContext());
   auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
                                         false /*packed*/);
@@ -2497,7 +2442,8 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   // @llvm.coro.suspend.async by emitSuspensionPoint.
   SmallVector<llvm::Type*, 8> argTys;
   argTys.push_back(IGM.Int8PtrTy); // resume function
-  argTys.push_back(IGM.SwiftExecutorPtrTy); // target executor
+  argTys.push_back(IGM.ExecutorFirstTy); // target executor (first half)
+  argTys.push_back(IGM.ExecutorSecondTy); // target executor (second half)
   argTys.push_back(getAsyncContext()->getType()); // current context
   auto *suspendFnTy =
       llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
@@ -2513,8 +2459,9 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   auto &Builder = suspendIGF.Builder;
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);
-  llvm::Value *targetExecutor = suspendFn->getArg(1);
-  llvm::Value *context = suspendFn->getArg(2);
+  llvm::Value *targetExecutorFirst = suspendFn->getArg(1);
+  llvm::Value *targetExecutorSecond = suspendFn->getArg(2);
+  llvm::Value *context = suspendFn->getArg(3);
   context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
 
   // Sign the task resume function with the C function pointer schema.
@@ -2528,7 +2475,7 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
 
   auto *suspendCall = Builder.CreateCall(
       IGM.getTaskSwitchFuncFn(),
-      { context, resumeFunction, targetExecutor });
+      { context, resumeFunction, targetExecutorFirst, targetExecutorSecond });
   suspendCall->setDoesNotThrow();
   suspendCall->setCallingConv(IGM.SwiftAsyncCC);
   suspendCall->setTailCallKind(IGM.AsyncTailCallKind);

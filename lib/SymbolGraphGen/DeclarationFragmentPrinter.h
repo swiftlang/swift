@@ -13,6 +13,7 @@
 #ifndef SWIFT_SYMBOLGRAPHGEN_DECLARATIONFRAGMENTPRINTER_H
 #define SWIFT_SYMBOLGRAPHGEN_DECLARATIONFRAGMENTPRINTER_H
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/JSON.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/LLVM.h"
@@ -73,6 +74,9 @@ private:
 
   SmallString<256> USR;
 
+  /// Stores the set of decls referenced in the fragment if non-null.
+  SmallPtrSet<const Decl*, 8> *ReferencedDecls;
+
   StringRef getKindSpelling(FragmentKind Kind) const;
 
   /// Open a new kind of fragment without committing its spelling.
@@ -86,10 +90,12 @@ private:
 public:
   DeclarationFragmentPrinter(const SymbolGraph *SG,
                              llvm::json::OStream &OS,
-                             Optional<StringRef> Key = None)
+                             Optional<StringRef> Key = None,
+                             SmallPtrSet<const Decl*, 8> *ReferencedDecls = nullptr)
     : SG(SG),
       OS(OS),
       Kind(FragmentKind::None),
+      ReferencedDecls(ReferencedDecls),
       NumFragments(0) {
     if (Key) {
       OS.attributeBegin(*Key);

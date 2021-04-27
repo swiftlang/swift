@@ -55,6 +55,8 @@ class LowerHopToActor {
   llvm::ScopedHashTable<SILValue, SILValue> ExecutorForActor;
 
   bool processHop(HopToExecutorInst *hop);
+  bool processExtract(ExtractExecutorInst *extract);
+
   SILValue emitGetExecutor(SILLocation loc, SILValue actor);
 
 public:
@@ -73,6 +75,8 @@ bool LowerHopToActor::run() {
       SILInstruction *inst = &*ii++;
       if (auto *hop = dyn_cast<HopToExecutorInst>(inst)) {
         changed |= processHop(hop);
+      } else if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
+        changed |= processExtract(extract);
       }
     }
   };
@@ -93,11 +97,7 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
 
   // Get the dominating executor value for this actor, if available,
   // or else emit code to derive it.
-  SILValue executor = ExecutorForActor.lookup(actor);
-  if (!executor) {
-    executor = emitGetExecutor(hop->getLoc(), actor);
-    ExecutorForActor.insert(actor, executor);
-  }
+  SILValue executor = emitGetExecutor(hop->getLoc(), actor);
 
   B.createHopToExecutor(hop->getLoc(), executor);
 
@@ -106,7 +106,27 @@ bool LowerHopToActor::processHop(HopToExecutorInst *hop) {
   return true;
 }
 
+bool LowerHopToActor::processExtract(ExtractExecutorInst *extract) {
+  // Dig out the executor.
+  auto executor = extract->getExpectedExecutor();
+  if (!executor->getType().is<BuiltinExecutorType>()) {
+    B.setInsertionPoint(extract);
+
+    executor = emitGetExecutor(extract->getLoc(), executor);
+  }
+
+  extract->replaceAllUsesWith(executor);
+  extract->eraseFromParent();
+  return true;
+}
+
 SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor) {
+  // Get the dominating executor value for this actor, if available,
+  // or else emit code to derive it.
+  SILValue executor = ExecutorForActor.lookup(actor);
+  if (executor)
+    return executor;
+
   // This is okay because actor types have to be classes and so never
   // have multiple abstraction patterns.
   CanType actorType = actor->getType().getASTType();
@@ -126,7 +146,12 @@ SILValue LowerHopToActor::emitGetExecutor(SILLocation loc, SILValue actor) {
 
   // Mark the dependence of the resulting value on the actor value to
   // force the actor to stay alive.
-  return B.createMarkDependence(loc, unmarkedExecutor, actor);
+  executor = B.createMarkDependence(loc, unmarkedExecutor, actor);
+
+  // Cache the result for later.
+  ExecutorForActor.insert(actor, executor);
+
+  return executor;
 }
 
 class LowerHopToActorPass : public SILFunctionTransform {
@@ -134,9 +159,6 @@ class LowerHopToActorPass : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     auto fn = getFunction();
-    if (!fn->isAsync())
-      return;
-
     auto domTree = getAnalysis<DominanceAnalysis>()->get(fn);
     LowerHopToActor pass(getFunction(), domTree);
     if (pass.run())

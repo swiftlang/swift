@@ -137,6 +137,8 @@ public:
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(UnsafeSendable)
   IGNORED_ATTR(UnsafeMainActor)
+  IGNORED_ATTR(ImplicitSelfCapture)
+  IGNORED_ATTR(InheritActorContext)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -570,13 +572,13 @@ isAcceptableOutletType(Type type, bool &isArray, ASTContext &ctx) {
     return diag::iboutlet_nonobjc_class;
   }
 
-  if (nominal == ctx.getStringDecl()) {
+  if (type->isString()) {
     // String is okay because it is bridged to NSString.
     // FIXME: BridgesTypes.def is almost sufficient for this.
     return None;
   }
 
-  if (nominal == ctx.getArrayDecl()) {
+  if (type->isArray()) {
     // Arrays of arrays are not allowed.
     if (isArray)
       return diag::iboutlet_nonobject_type;
@@ -1367,13 +1369,10 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
                                  ignoreLabel))
     return false;
 
-  const auto *param = decl->getIndices()->get(0);
-  if (auto NTD = param->getInterfaceType()->getAnyNominal()) {
-    return NTD == ctx.getKeyPathDecl() ||
-           NTD == ctx.getWritableKeyPathDecl() ||
-           NTD == ctx.getReferenceWritableKeyPathDecl();
-  }
-  return false;
+  auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
+  return paramTy->isKeyPath() ||
+         paramTy->isWritableKeyPath() ||
+         paramTy->isReferenceWritableKeyPath();
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -5464,17 +5463,14 @@ void AttributeChecker::visitActorIndependentAttr(ActorIndependentAttr *attr) {
   // that do not have storage.
   auto dc = D->getDeclContext();
   if (auto var = dyn_cast<VarDecl>(D)) {
-    // @actorIndependent is meaningless on a `let`.
-    if (var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_let);
-      return;
-    }
-
-    // @actorIndependent can not be applied to stored properties, unless if
+    // @actorIndependent can not be applied to mutable stored properties, unless if
     // the 'unsafe' option was specified
     if (var->hasStorage()) {
       switch (attr->getKind()) {
         case ActorIndependentKind::Safe:
+          if (var->isLet())
+            break;
+
           diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
           return;
 
@@ -5506,16 +5502,20 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // that do not have storage.
   auto dc = D->getDeclContext();
   if (auto var = dyn_cast<VarDecl>(D)) {
-    // 'nonisolated' is meaningless on a `let`.
-    if (var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_let);
-      return;
-    }
-
-    // 'nonisolated' can not be applied to stored properties.
+    // 'nonisolated' can only be applied to 'let' stored properties.
+    // Those must be Sendable.
     if (var->hasStorage()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
-      return;
+      if (!var->isLet()) {
+        diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
+        return;
+      }
+
+      // nonisolated lets must have Sendable type.
+      if (shouldDiagnoseNonSendableViolations(dc->getASTContext().LangOpts) &&
+          !isSendableType(dc, var->getType())) {
+        var->diagnose(
+            diag::non_sendable_nonisolated_let, var->getName(), var->getType());
+      }
     }
 
     // @actorIndependent can not be applied to local properties.

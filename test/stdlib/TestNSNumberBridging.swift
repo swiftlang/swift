@@ -25,6 +25,7 @@
 // UNSUPPORTED: CPU=armv7k
 // UNSUPPORTED: CPU=arm64
 // UNSUPPORTED: CPU=arm64e
+// UNSUPPORTED: CPU=arm64_32
 
 import StdlibUnittest
 import Foundation

@@ -535,6 +535,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto *ctorDecl =
     new (C) ConstructorDecl(name, enumDecl->getLoc(),
                             /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
+                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramPL,
                             /*GenericParams=*/nullptr, enumDecl);
@@ -1305,6 +1306,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(),
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), emptyPL,
       /*GenericParams=*/nullptr, structDecl);
 
@@ -1432,6 +1434,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   auto constructor = new (context) ConstructorDecl(
       name, structDecl->getLoc(),
       /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
       /*GenericParams=*/nullptr, structDecl);
 
@@ -1908,9 +1911,9 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto &C = importer.SwiftContext;
   auto swiftValueDecl = dyn_cast_or_null<ValueDecl>(
       importer.importDecl(errorDomainDecl, importer.CurrentVersion));
-  auto stringTy = C.getStringDecl()->getDeclaredInterfaceType();
+  auto stringTy = C.getStringType();
   assert(stringTy && "no string type available");
-  if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isEqual(stringTy)) {
+  if (!swiftValueDecl || !swiftValueDecl->getInterfaceType()->isString()) {
     // Couldn't actually import it as an error enum, fall back to enum
     return false;
   }
@@ -4132,9 +4135,11 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            clangNode, AccessLevel::Public, ctorName, loc, /*failable=*/false,
-            /*FailabilityLoc=*/SourceLoc(), /*Throws=*/false,
-            /*ThrowsLoc=*/SourceLoc(), bodyParams, genericParams, dc);
+            clangNode, AccessLevel::Public, ctorName, loc, 
+            /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
+            /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), 
+            bodyParams, genericParams, dc);
       } else {
         auto resultTy = importedType.getType();
 
@@ -6174,7 +6179,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   // we will store the underlying type and leave it up to the use site
   // to determine whether to use this new_type, or an Unmanaged<CF...> type.
   if (auto genericType = storedUnderlyingType->getAs<BoundGenericType>()) {
-    if (genericType->getDecl() == Impl.SwiftContext.getUnmanagedDecl()) {
+    if (genericType->isUnmanaged()) {
       assert(genericType->getGenericArgs().size() == 1 && "other args?");
       storedUnderlyingType = genericType->getGenericArgs()[0];
     }
@@ -6514,6 +6519,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(),
       failable, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), parameterList,
       /*GenericParams=*/nullptr, dc);
   result->setImplicitlyUnwrappedOptional(isIUO);
@@ -6998,6 +7004,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       objcMethod, AccessLevel::Public, importedName.getDeclName(),
       /*NameLoc=*/SourceLoc(), failability, /*FailabilityLoc=*/SourceLoc(),
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().hasValue(),
       /*ThrowsLoc=*/SourceLoc(), bodyParams,
       /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
@@ -7579,25 +7586,35 @@ synthesizeSubscriptGetterBody(AbstractFunctionDecl *afd, void *context) {
                                                         inoutSelfExpr,
                                                         keyRefExpr);
 
-  // `getterImpl` can return either UnsafePointer or UnsafeMutablePointer.
-  // Retrieve the corresponding `.pointee` declaration.
+  // This default handles C++'s operator[] that returns a value type.
+  Expr *propertyExpr = getterImplCallExpr;
   PointerTypeKind ptrKind;
-  getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind);
-  VarDecl *pointeePropertyDecl = ctx.getPointerPointeePropertyDecl(ptrKind);
 
-  SubstitutionMap subMap =
-      SubstitutionMap::get(ctx.getUnsafePointerDecl()->getGenericSignature(),
-                           { elementTy }, { });
-  auto pointeePropertyRefExpr =
-      new (ctx) MemberRefExpr(getterImplCallExpr,
-                              SourceLoc(),
-                              ConcreteDeclRef(pointeePropertyDecl, subMap),
-                              DeclNameLoc(),
-                              /*implicit=*/ true);
-  pointeePropertyRefExpr->setType(elementTy);
+  // The following check returns true if the subscript operator returns a C++
+  // reference type. This check actually checks to see if the type is a pointer
+  // type, but this does not apply to C pointers because they are Optional types
+  // when imported. TODO: Use a more obvious check here.
+  if (getterImpl->getResultInterfaceType()->getAnyPointerElementType(ptrKind)) {
+    // `getterImpl` can return either UnsafePointer or UnsafeMutablePointer.
+    // Retrieve the corresponding `.pointee` declaration.
+    VarDecl *pointeePropertyDecl = ctx.getPointerPointeePropertyDecl(ptrKind);
+
+    // Handle operator[] that returns a reference type.
+    SubstitutionMap subMap =
+        SubstitutionMap::get(ctx.getUnsafePointerDecl()->getGenericSignature(),
+                             { elementTy }, { });
+    auto pointeePropertyRefExpr =
+        new (ctx) MemberRefExpr(getterImplCallExpr,
+                                SourceLoc(),
+                                ConcreteDeclRef(pointeePropertyDecl, subMap),
+                                DeclNameLoc(),
+                                /*implicit=*/ true);
+    pointeePropertyRefExpr->setType(elementTy);
+    propertyExpr = pointeePropertyRefExpr;
+  }
 
   auto returnStmt = new (ctx) ReturnStmt(SourceLoc(),
-                                         pointeePropertyRefExpr,
+                                         propertyExpr,
                                          /*implicit=*/ true);
 
   auto body = BraceStmt::create(ctx, SourceLoc(), { returnStmt }, SourceLoc(),
@@ -7657,8 +7674,10 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
-  // Unwrap `T`.
-  const auto elementTy = rawElementTy->getAnyPointerElementType();
+  // Unwrap `T`. Use rawElementTy for return by value.
+  const auto elementTy = rawElementTy->getAnyPointerElementType() ?
+                         rawElementTy->getAnyPointerElementType() :
+                         rawElementTy;
 
   auto &ctx = Impl.SwiftContext;
   auto bodyParams = getterImpl->getParameters();
@@ -7737,6 +7756,10 @@ SwiftDeclConverter::makeSubscript(FuncDecl *getter, FuncDecl *setter) {
   }
 
   makeComputed(subscript, getterDecl, setterDecl);
+
+  // Implicitly unwrap Optional types for T *operator[].
+  Impl.recordImplicitUnwrapForDecl(subscript,
+                                   getterImpl->isImplicitlyUnwrappedOptional());
 
   return subscript;
 }

@@ -1,9 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-os %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-os-abi %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
+
+// rdar://76863553
+// UNSUPPORTED: OS=watchos && CPU=x86_64
 
 import Foundation
 
@@ -50,6 +53,7 @@ class ObjcDestructible: NSObject {
 // CHECK-macosx: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"c24@0:8^@16\00"
 // CHECK-ios: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK-tvos: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
+// CHECK-watchos: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK: @_INSTANCE_METHODS__TtC12objc_methods3Foo = internal constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 10,

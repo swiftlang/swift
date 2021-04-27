@@ -2,6 +2,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Foundation
 

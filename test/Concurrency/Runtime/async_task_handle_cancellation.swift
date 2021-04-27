@@ -5,9 +5,14 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // This test is flaky on VS2017 (unknown reasons)
 // UNSUPPORTED: MSVC_VER=15.0
+
+// This test is failing on windows. SR-14447.
+//
+// UNSUPPORTED: OS=windows-msvc
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {

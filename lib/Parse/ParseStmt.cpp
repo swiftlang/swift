@@ -2249,23 +2249,31 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
     SubjectExpr = makeParserErrorResult(new (Context) ErrorExpr(SubjectLoc));
   } else {
     SubjectExpr = parseExprBasic(diag::expected_switch_expr);
-    if (SubjectExpr.hasCodeCompletion()) {
-      return makeParserCodeCompletionResult<Stmt>();
-    }
     if (SubjectExpr.isNull()) {
       SubjectExpr = makeParserErrorResult(new (Context) ErrorExpr(SubjectLoc));
     }
     Status |= SubjectExpr;
   }
 
-  if (!Tok.is(tok::l_brace)) {
-    diagnose(Tok, diag::expected_lbrace_after_switch);
-    return nullptr;
-  }
-  SourceLoc lBraceLoc = consumeToken(tok::l_brace);
+  SourceLoc lBraceLoc;
   SourceLoc rBraceLoc;
-  
   SmallVector<ASTNode, 8> cases;
+
+  if (Status.isErrorOrHasCompletion()) {
+    return makeParserResult(
+        Status, SwitchStmt::create(LabelInfo, SwitchLoc, SubjectExpr.get(),
+                                   lBraceLoc, cases, rBraceLoc,
+                                   /*EndLoc=*/PreviousLoc, Context));
+  }
+
+  if (!consumeIf(tok::l_brace, lBraceLoc)) {
+    diagnose(Tok, diag::expected_lbrace_after_switch);
+    return makeParserResult(
+        Status, SwitchStmt::create(LabelInfo, SwitchLoc, SubjectExpr.get(),
+                                   lBraceLoc, cases, rBraceLoc,
+                                   /*EndLoc=*/PreviousLoc, Context));
+  }
+
   Status |= parseStmtCases(cases, /*IsActive=*/true);
 
   // We cannot have additional cases after a default clause. Complain on
@@ -2288,7 +2296,8 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
 
   return makeParserResult(
       Status, SwitchStmt::create(LabelInfo, SwitchLoc, SubjectExpr.get(),
-                                 lBraceLoc, cases, rBraceLoc, Context));
+                                 lBraceLoc, cases, rBraceLoc,
+                                 /*EndLoc=*/rBraceLoc, Context));
 }
 
 ParserStatus

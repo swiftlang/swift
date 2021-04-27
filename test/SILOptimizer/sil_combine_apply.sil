@@ -335,12 +335,12 @@ bb0(%0 : $*T, %1 : $*T):
 // CHECK: } // end sil function 'sil_combine_applied_partialapply_to_apply_with_dependent_type'
 sil @sil_combine_applied_partialapply_to_apply_with_dependent_type : $@convention(thin) (@in_guaranteed SwiftP) -> () {
 bb0(%0 : $*SwiftP):
-  %1 = open_existential_addr immutable_access %0 : $*SwiftP to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  %2 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP, #SwiftP.foo, %1 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
-  %0c = alloc_stack $@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  copy_addr %1 to [initialization] %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
-  %3 = partial_apply %2<@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
-  dealloc_stack %0c : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %1 = open_existential_addr immutable_access %0 : $*SwiftP to $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %2 = witness_method $@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP, #SwiftP.foo, %1 : $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  %0c = alloc_stack $@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  copy_addr %1 to [initialization] %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
+  %3 = partial_apply %2<@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP>(%0c) : $@convention(witness_method: SwiftP) <τ_0_0 where τ_0_0 : SwiftP> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %0c : $*@opened("4305E696-5685-11E5-9393-B8E856428C60") SwiftP
   %4 = apply %3() : $@callee_owned () -> ()
   %9999 = tuple()
   return %9999 : $()

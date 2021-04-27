@@ -2334,8 +2334,6 @@ public:
 
   Optional<Convention> ConventionArguments;
 
-  // Indicates whether the type's '@differentiable' attribute has a 'linear'
-  // argument.
   DifferentiabilityKind differentiabilityKind =
       DifferentiabilityKind::NonDifferentiable;
 

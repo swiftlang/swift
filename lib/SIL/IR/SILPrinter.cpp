@@ -23,6 +23,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
@@ -1042,9 +1043,13 @@ public:
       printSILUndef(cast<SILUndef>(node));
       return;
 
-#define MULTIPLE_VALUE_INST_RESULT(ID, PARENT) \
-    case SILNodeKind::ID:
-#include "swift/SIL/SILNodes.def"
+    case SILNodeKind::PlaceholderValue:
+      // This should really only happen during debugging.
+      *this << "placeholder<" << cast<PlaceholderValue>(node)->getType()
+            << ">\n";
+      return;
+
+    case SILNodeKind::MultipleValueInstructionResult:
       printSILMultipleValueInstructionResult(
           cast<MultipleValueInstructionResult>(node));
       return;
@@ -2145,6 +2150,10 @@ public:
 
   void visitHopToExecutorInst(HopToExecutorInst *HTEI) {
     *this << getIDAndType(HTEI->getTargetExecutor());
+  }
+
+  void visitExtractExecutorInst(ExtractExecutorInst *AEI) {
+    *this << getIDAndType(AEI->getExpectedExecutor());
   }
 
   void visitSwitchValueInst(SwitchValueInst *SII) {

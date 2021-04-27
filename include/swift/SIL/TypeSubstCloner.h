@@ -150,26 +150,13 @@ public:
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
   using SILClonerWithScopes<ImplClass>::recordFoldedValue;
-  using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
                   SubstitutionMap ApplySubs,
-                  SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   DominanceInfo *DT = nullptr,
                   bool Inlining = false)
-    : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, DT, Inlining),
-      SwiftMod(From.getModule().getSwiftModule()),
-      SubsMap(ApplySubs),
-      Original(From),
-      Inlining(Inlining) {
-  }
-
-  TypeSubstCloner(SILFunction &To,
-                  SILFunction &From,
-                  SubstitutionMap ApplySubs,
-                  bool Inlining = false)
-    : SILClonerWithScopes<ImplClass>(To, Inlining),
+    : SILClonerWithScopes<ImplClass>(To, DT, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ApplySubs),
       Original(From),

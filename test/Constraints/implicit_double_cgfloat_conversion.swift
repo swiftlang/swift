@@ -103,7 +103,7 @@ func test_various_situations_converting_to_double() {
 }
 
 func test_conversions_with_optionals(v: CGFloat?) {
-  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tFAFyYKXEfu_ : $@convention(thin) @async () -> (CGFloat, @error Error)
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_ : $@convention(thin) () -> (CGFloat, @error Error)
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
   let _: Double = (v ?? 0)
 }
@@ -191,4 +191,21 @@ func test_no_ambiguity_with_unary_operators(width: CGFloat, height: CGFloat) {
   // CHECK: function_ref @$s12CoreGraphics7CGFloatV34implicit_double_cgfloat_conversionE1doiyA2C_ACtFZ
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion38test_no_ambiguity_with_unary_operators5width6heighty12CoreGraphics7CGFloatV_AGtF1RL_V1x1yAcdiG_A3GtcfC
   _ = R(x: width / 4, y: -height / 2, width: width, height: height)
+}
+
+func test_conversions_with_optional_promotion(d: Double, cgf: CGFloat) {
+  func test_double(_: Double??) {}
+  func test_cgfloat(_: CGFloat??) {}
+
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK-NEXT: apply
+  // CHECK-NEXT: enum $Optional<Double>, #Optional.some!enumelt
+  // CHECK-NEXT: enum $Optional<Optional<Double>>, #Optional.some!enumelt
+  test_double(cgf)
+
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
+  // CHECK-NEXT: apply
+  // CHECK-NEXT: enum $Optional<CGFloat>, #Optional.some!enumelt
+  // CHECK-NEXT: enum $Optional<Optional<CGFloat>>, #Optional.some!enumelt
+  test_cgfloat(d)
 }

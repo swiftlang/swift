@@ -1189,7 +1189,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   unsigned BufferId = Instance->getPrimarySourceFile()->getBufferID().getValue();
   SourceManager &SM = Instance->getSourceMgr();
   SourceLoc NameLoc = SM.getLocForOffset(BufferId, NameOffset);
-  auto LineAndCol = SM.getPresumedLineAndColumnForLoc(NameLoc);
+  auto LineAndCol = SM.getLineAndColumnInBuffer(NameLoc);
 
   UnresolvedLoc UnresoledName{NameLoc, true};
 
@@ -1210,8 +1210,8 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   llvm::transform(
       Ranges, NoteRegions.begin(),
       [&SM](RenameRangeDetail &Detail) -> NoteRegion {
-        auto Start = SM.getPresumedLineAndColumnForLoc(Detail.Range.getStart());
-        auto End = SM.getPresumedLineAndColumnForLoc(Detail.Range.getEnd());
+        auto Start = SM.getLineAndColumnInBuffer(Detail.Range.getStart());
+        auto End = SM.getLineAndColumnInBuffer(Detail.Range.getEnd());
         return {Detail.RangeKind, Start.first, Start.second,
                 End.first,        End.second,  Detail.Index};
       });
@@ -1888,20 +1888,20 @@ findConcatenatedExpressions(const ResolvedRangeInfo &Info, ASTContext &Ctx) {
       // FIXME: we should have ErrorType instead of null.
       if (E->getType().isNull())
         return true;
-      auto ExprType = E->getType()->getNominalOrBoundGenericNominal();
+
       //Only binary concatenation operators should exist in expression
       if (E->getKind() == ExprKind::Binary) {
         auto *BE = dyn_cast<BinaryExpr>(E);
         auto *OperatorDeclRef = BE->getSemanticFn()->getMemberOperatorRef();
-        if (!(isConcatenationExpr(OperatorDeclRef)
-            && ExprType == Ctx.getStringDecl())) {
+        if (!(isConcatenationExpr(OperatorDeclRef) &&
+            E->getType()->isString())) {
           IsValidInterpolation = false;
           return false;
         }
         return true;
       }
       // Everything that evaluates to string should be gathered.
-      if (ExprType == Ctx.getStringDecl()) {
+      if (E->getType()->isString()) {
         Bucket->insert(E);
         return false;
       }
@@ -3897,15 +3897,6 @@ namespace asyncrefactorings {
 
 // TODO: Should probably split the refactorings into separate files
 
-/// Whether the given type is the stdlib Result type
-bool isResultType(Type Ty) {
-  if (!Ty)
-    return false;
-  if (auto *NTD = Ty->getAnyNominal())
-    return NTD == NTD->getASTContext().getResultDecl();
-  return false;
-}
-
 /// Whether the given type is (or conforms to) the stdlib Error type
 bool isErrorType(Type Ty, ModuleDecl *MD) {
   if (!Ty)
@@ -4116,7 +4107,7 @@ struct AsyncHandlerDesc {
     if (HandlerParams.size() == 1) {
       auto ParamTy =
           HandlerParams.back().getPlainType()->getAs<BoundGenericType>();
-      if (isResultType(ParamTy)) {
+      if (ParamTy && ParamTy->isResult()) {
         auto GenericArgs = ParamTy->getGenericArgs();
         assert(GenericArgs.size() == 2 && "Result should have two params");
         HandlerDesc.Type = HandlerType::RESULT;
@@ -4127,7 +4118,7 @@ struct AsyncHandlerDesc {
     if (HandlerDesc.Type != HandlerType::RESULT) {
       // Only handle non-result parameters
       for (auto &Param : HandlerParams) {
-        if (isResultType(Param.getPlainType()))
+        if (Param.getPlainType() && Param.getPlainType()->isResult())
           return AsyncHandlerDesc();
       }
 
@@ -4336,7 +4327,8 @@ private:
 
   void initFromEnumPattern(const Decl *D, const EnumElementPattern *EEP) {
     if (auto *EED = EEP->getElementDecl()) {
-      if (!isResultType(EED->getParentEnum()->getDeclaredType()))
+      auto eedTy = EED->getParentEnum()->getDeclaredType();
+      if (!eedTy || !eedTy->isResult())
         return;
       if (EED->getNameStr() == StringRef("failure"))
         ErrorCase = true;
@@ -4358,7 +4350,7 @@ private:
       return;
 
     auto *BaseDRE = dyn_cast<DeclRefExpr>(DSC->getBase());
-    if (!isResultType(BaseDRE->getType()))
+    if (!BaseDRE->getType() || !BaseDRE->getType()->isResult())
       return;
 
     auto *FnDRE = dyn_cast<DeclRefExpr>(DSC->getFn());
@@ -4914,7 +4906,7 @@ private:
         RightStartLoc = Lexer::getLocForEndOfToken(SM, FD->getThrowsLoc());
       }
       SourceLoc RightEndLoc =
-          FD->getBody() ? FD->getBody()->getLBraceLoc() : FD->getEndLoc();
+          FD->getBody() ? FD->getBody()->getLBraceLoc() : RightStartLoc;
       addRange(RightStartLoc, RightEndLoc);
       return;
     }

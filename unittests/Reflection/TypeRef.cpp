@@ -250,6 +250,23 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
       FunctionMetadataDifferentiabilityKind::Reverse);
   EXPECT_EQ(F17, F18);
   EXPECT_NE(F17, F19);
+
+  // Test differentiable with @noDerivative.
+  {
+    auto parameters = Parameters1;
+    parameters[1].setNoDerivative();
+    auto f1 = Builder.createFunctionType(
+        parameters, Result, FunctionTypeFlags().withDifferentiable(true),
+        FunctionMetadataDifferentiabilityKind::Reverse);
+    auto f2 = Builder.createFunctionType(
+        parameters, Result, FunctionTypeFlags().withDifferentiable(true),
+        FunctionMetadataDifferentiabilityKind::Reverse);
+    auto f3 = Builder.createFunctionType(
+        Parameters1, Result, FunctionTypeFlags().withDifferentiable(true),
+        FunctionMetadataDifferentiabilityKind::Reverse);
+    EXPECT_EQ(f1, f2);
+    EXPECT_NE(f1, f3);
+  }
 }
 
 TEST(TypeRefTest, UniqueProtocolTypeRef) {

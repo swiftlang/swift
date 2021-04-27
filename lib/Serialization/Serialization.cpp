@@ -31,7 +31,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
@@ -2237,6 +2236,8 @@ static bool contextDependsOn(const NominalTypeDecl *decl,
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
                                         const DeclContext *excluding) {
+  if (!ty)
+    return;
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
@@ -3065,6 +3066,9 @@ public:
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
+      if (extension->getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
+          !inherited.getType())
+        continue;
       assert(!inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
     }
@@ -3885,6 +3889,7 @@ public:
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
+                                  ctor->hasAsync(),
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
@@ -4345,6 +4350,7 @@ public:
       FunctionParamLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
+          S.addDeclBaseNameRef(param.getInternalLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isNoDerivative());
@@ -5633,6 +5639,8 @@ void swift::serialize(ModuleOrSourceFile DC,
         /* PrettyPrint */false,
         AccessLevel::Public,
         /*EmitSynthesizedMembers*/true,
+        /*PrintMessages*/false,
+        /*EmitInheritedDocs*/options.SkipSymbolGraphInheritedDocs,
       };
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }

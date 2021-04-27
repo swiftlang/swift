@@ -1035,7 +1035,9 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   // Note that ObjC classes do not have a metadata header.
 
   /// The metadata for the superclass.  This is null for the root class.
-  ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> Superclass;
+  TargetSignedPointer<Runtime, const TargetClassMetadata<Runtime> *
+                                   __ptrauth_swift_objc_superclass>
+      Superclass;
 
 #if SWIFT_OBJC_INTEROP
   /// The cache data is used for certain dynamic lookups; it is owned
@@ -4288,6 +4290,10 @@ public:
     return FieldOffsetVectorOffset;
   }
 
+  bool isDefaultActor() const {
+    return this->getTypeContextDescriptorFlags().class_isDefaultActor();
+  }
+
   bool hasVTable() const {
     return this->getTypeContextDescriptorFlags().class_hasVTable();
   }
@@ -4890,6 +4896,9 @@ struct DynamicReplacementKey {
 
   uint16_t getExtraDiscriminator() const {
     return flags & 0x0000FFFF;
+  }
+  bool isAsync() const {
+    return ((flags >> 16 ) & 0x1);
   }
 };
 

@@ -272,6 +272,12 @@ namespace irgen {
       IRGenFunction &IGF, Address context);
   Address emitAutoDiffAllocateSubcontext(
       IRGenFunction &IGF, Address context, llvm::Value *size);
+
+  FunctionPointer getFunctionPointerForDispatchCall(IRGenModule &IGM,
+                                                    const FunctionPointer &fn);
+  void forwardAsyncCallResult(IRGenFunction &IGF, CanSILFunctionType fnType,
+                              AsyncContextLayout &layout, llvm::CallInst *call);
+
 } // end namespace irgen
 } // end namespace swift
 

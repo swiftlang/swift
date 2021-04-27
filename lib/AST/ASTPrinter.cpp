@@ -135,6 +135,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
+  result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
 
   // We should print __consuming, __owned, etc for the module interface file.
@@ -535,6 +536,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
   Decl *Current = nullptr;
   Type CurrentType;
 
+  void setCurrentType(Type NewCurrentType) {
+    CurrentType = NewCurrentType;
+    assert(CurrentType.isNull() ||
+           !CurrentType->hasArchetype() &&
+               "CurrentType should be an interface type");
+  }
+
   friend DeclVisitor<PrintAST>;
 
   /// RAII object that increases the indentation level.
@@ -633,7 +641,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       Lines.clear();
 
       StringRef RawText = SRC.RawText.rtrim("\n\r");
-      unsigned WhitespaceToTrim = SRC.StartColumn - 1;
+      unsigned WhitespaceToTrim = SRC.ColumnIndent - 1;
       trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
       for (auto Line : Lines) {
@@ -913,8 +921,25 @@ private:
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
       : Printer(Printer), Options(Options) {
-    if (Options.TransformContext)
-      CurrentType = Options.TransformContext->getBaseType();
+    if (Options.TransformContext) {
+      Type CurrentType = Options.TransformContext->getBaseType();
+      if (CurrentType && CurrentType->hasArchetype()) {
+        // OpenedArchetypeTypes get replaced by a GenericTypeParamType without a
+        // name in mapTypeOutOfContext. The GenericTypeParamType has no children
+        // so we can't use it for TypeTransformContext.
+        // To work around this, replace the OpenedArchetypeType with the type of
+        // the protocol itself.
+        CurrentType = CurrentType.transform([](Type T) -> Type {
+          if (auto *Opened = T->getAs<OpenedArchetypeType>()) {
+            return Opened->getOpenedExistentialType();
+          } else {
+            return T;
+          }
+        });
+        CurrentType = CurrentType->mapTypeOutOfContext();
+      }
+      setCurrentType(CurrentType);
+    }
   }
 
   using ASTVisitor::visit;
@@ -941,11 +966,11 @@ public:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         auto Subs = CurrentType->getContextSubstitutionMap(
           Options.CurrentModule, NTD->getDeclContext());
-        CurrentType = NTD->getDeclaredInterfaceType().subst(Subs);
+        setCurrentType(NTD->getDeclaredInterfaceType().subst(Subs));
       }
     }
 
-    SWIFT_DEFER { CurrentType = OldType; };
+    SWIFT_DEFER { setCurrentType(OldType); };
 
     if (Synthesize) {
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
@@ -2720,7 +2745,51 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinExecutor(Decl *decl) {
+  auto typeHasBuiltinExecutor = [](Type type) {
+    return type.findIf([&](Type type) {
+      if (auto builtinTy = type->getAs<BuiltinType>())
+        return builtinTy->getBuiltinTypeKind()
+            == BuiltinTypeKind::BuiltinExecutor;
+
+      return false;
+    });
+  };
+
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      if (typeHasBuiltinExecutor(type))
+        return true;
+    }
+  }
+
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+    for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
+      if (Type type = patternBinding->getPattern(idx)->getType())
+        if (typeHasBuiltinExecutor(type))
+          return true;
+    }
+  }
+
+  return false;
+}
+
 static bool usesFeatureBuiltinContinuation(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinTaskGroup(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureInheritActorContext(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    for (auto param : *func->getParameters()) {
+      if (param->getAttrs().hasAttribute<InheritActorContextAttr>())
+        return true;
+    }
+  }
+
   return false;
 }
 
@@ -4488,15 +4557,13 @@ public:
 
   void visitBoundGenericType(BoundGenericType *T) {
     if (Options.SynthesizeSugarOnTypes) {
-      auto *NT = T->getDecl();
-      auto &Ctx = T->getASTContext();
-      if (NT == Ctx.getArrayDecl()) {
+      if (T->isArray()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
         Printer << "]";
         return;
       }
-      if (NT == Ctx.getDictionaryDecl()) {
+      if (T->isDictionary()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
         Printer << " : ";
@@ -4504,7 +4571,7 @@ public:
         Printer << "]";
         return;
       }
-      if (NT == Ctx.getOptionalDecl()) {
+      if (T->isOptional()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
         Printer << "?";
         return;
@@ -4801,9 +4868,22 @@ public:
         Printer.printStructurePost(PrintStructureKind::FunctionParameter);
       };
 
-      if (printLabels && Param.hasLabel()) {
+      if ((Options.AlwaysTryPrintParameterLabels || printLabels) &&
+          Param.hasLabel()) {
+        // Label printing was requested and we have an external label. Print it
+        // and omit the internal label.
         Printer.printName(Param.getLabel(),
                           PrintNameContext::FunctionParameterExternal);
+        Printer << ": ";
+      } else if (Options.AlwaysTryPrintParameterLabels &&
+                 Param.hasInternalLabel()) {
+        // We didn't have an external parameter label but were requested to
+        // always try and print parameter labels. Print The internal label.
+        // If we have neither an external nor an internal label, only print the
+        // type.
+        Printer << "_ ";
+        Printer.printName(Param.getInternalLabel(),
+                          PrintNameContext::FunctionParameterLocal);
         Printer << ": ";
       }
 

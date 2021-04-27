@@ -566,38 +566,38 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     } else if (tokenI[1].is(clang::tok::pipepipe)) {
       bool result  = firstValue.getBoolValue() || secondValue.getBoolValue();
       resultValue  = llvm::APSInt::get(result);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Logical AND.
     } else if (tokenI[1].is(clang::tok::ampamp)) {
       bool result  = firstValue.getBoolValue() && secondValue.getBoolValue();
       resultValue  = llvm::APSInt::get(result);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Equality.
     } else if (tokenI[1].is(clang::tok::equalequal)) {
       resultValue     = llvm::APSInt::get(firstValue == secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Less than.
     } else if (tokenI[1].is(clang::tok::less)) {
       resultValue     = llvm::APSInt::get(firstValue < secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Less than or equal.
     } else if (tokenI[1].is(clang::tok::lessequal)) {
       resultValue     = llvm::APSInt::get(firstValue <= secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Greater than.
     } else if (tokenI[1].is(clang::tok::greater)) {
       resultValue     = llvm::APSInt::get(firstValue > secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Greater than or equal.
     } else if (tokenI[1].is(clang::tok::greaterequal)) {
       resultValue     = llvm::APSInt::get(firstValue >= secondValue);
-      resultSwiftType = impl.SwiftContext.getBoolDecl()->getDeclaredInterfaceType();
+      resultSwiftType = impl.SwiftContext.getBoolType();
 
     // Unhandled operators.
     } else {

@@ -938,7 +938,7 @@ public:
 /// Determine whether the given class is a default actor.
 class IsDefaultActorRequest :
     public SimpleRequest<IsDefaultActorRequest,
-                         bool(ClassDecl *),
+                         bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -946,7 +946,8 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl,
+                ModuleDecl *M, ResilienceExpansion expansion) const;
 
 public:
   // Caching

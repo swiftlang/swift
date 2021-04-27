@@ -190,7 +190,8 @@ void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
 // not complete and should not be used for anything other than these asserts.
 struct MinimalDispatchObjectHeader {
   const void *VTable;
-  void *Opaque;
+  int Opaque0;
+  int Opaque1;
   void *Linkage;
 };
 static_assert(

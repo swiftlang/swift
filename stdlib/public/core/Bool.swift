@@ -276,10 +276,10 @@ extension Bool {
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
   @_transparent
-  @_alwaysEmitIntoClient
-  public static func && (lhs: Bool, rhs: @autoclosure () async throws -> Bool) reasync rethrows
+  @inline(__always)
+  public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
       -> Bool {
-    return lhs ? try await rhs() : false
+    return lhs ? try rhs() : false
   }
 
   /// Performs a logical OR operation on two Boolean values.
@@ -316,24 +316,8 @@ extension Bool {
   ///   - lhs: The left-hand side of the operation.
   ///   - rhs: The right-hand side of the operation.
   @_transparent
-  @_alwaysEmitIntoClient
-  public static func || (lhs: Bool, rhs: @autoclosure () async throws -> Bool) reasync rethrows
-      -> Bool {
-    return lhs ? true : try await rhs()
-  }
-
-  // We keep the old entry points around but mark them unavailable for
-  // ABI compatibility.
-  @usableFromInline
-  @available(*, unavailable)
-  internal static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
-      -> Bool {
-    return lhs ? try rhs() : false
-  }
-
-  @usableFromInline
-  @available(*, unavailable)
-  internal static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
+  @inline(__always)
+  public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
       -> Bool {
     return lhs ? true : try rhs()
   }

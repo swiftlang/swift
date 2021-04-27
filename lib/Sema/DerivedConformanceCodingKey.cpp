@@ -78,7 +78,7 @@ deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   auto *rawValueDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_rawValue,
       SourceLoc(), C.Id_rawValue, parentDC);
-  rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredInterfaceType());
+  rawValueDecl->setInterfaceType(C.getIntType());
   rawValueDecl->setSpecifier(ParamSpecifier::Default);
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
@@ -130,6 +130,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   auto *initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
                             /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
+                            /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);
@@ -232,9 +233,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     }
 
     auto *selfRef = DerivedConformance::createSelfDeclRef(strValDecl);
-    auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),
-                                          selfRef, SourceLoc(), cases,
-                                          SourceLoc(), C);
+    auto *switchStmt =
+        SwitchStmt::createImplicit(LabeledStmtInfo(), selfRef, cases, C);
     body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
   }
 
@@ -312,9 +312,8 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   auto *stringValueDecl = initDecl->getParameters()->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),
                                              /*Implicit=*/true);
-  auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),
-                                        stringValueRef, SourceLoc(), cases,
-                                        SourceLoc(), C);
+  auto *switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), stringValueRef, cases, C);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt),
                                  SourceLoc());
   return { body, /*isTypeChecked=*/false };
@@ -331,10 +330,9 @@ static bool canSynthesizeCodingKey(DerivedConformance &derived) {
     auto *parentDC = derived.getConformanceContext();
     rawType = parentDC->mapTypeIntoContext(rawType);
 
-    auto &C = derived.Context;
-    auto *nominal = rawType->getCanonicalType()->getAnyNominal();
-    if (nominal != C.getStringDecl() && nominal != C.getIntDecl())
+    if (!rawType->isString() && !rawType->isInt()) {
       return false;
+    }
   }
 
   auto inherited = enumDecl->getInherited();
@@ -362,9 +360,9 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
   auto name = requirement->getBaseName();
   if (name == Context.Id_stringValue) {
     // Synthesize `var stringValue: String { get }`
-    auto stringType = Context.getStringDecl()->getDeclaredInterfaceType();
-    auto synth = [rawType, stringType](AbstractFunctionDecl *getterDecl) {
-      if (rawType && rawType->isEqual(stringType)) {
+    auto stringType = Context.getStringType();
+    auto synth = [rawType](AbstractFunctionDecl *getterDecl) {
+      if (rawType && rawType->isString()) {
         // enum SomeStringEnum : String {
         //   case A, B, C
         //   @derived var stringValue: String {
@@ -393,11 +391,11 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
 
   } else if (name == Context.Id_intValue) {
     // Synthesize `var intValue: Int? { get }`
-    auto intType = Context.getIntDecl()->getDeclaredInterfaceType();
+    auto intType = Context.getIntType();
     auto optionalIntType = OptionalType::get(intType);
 
-    auto synth = [rawType, intType](AbstractFunctionDecl *getterDecl) {
-      if (rawType && rawType->isEqual(intType)) {
+    auto synth = [rawType](AbstractFunctionDecl *getterDecl) {
+      if (rawType && rawType->isInt()) {
         // enum SomeIntEnum : Int {
         //   case A = 1, B = 2, C = 3
         //   @derived var intValue: Int? {
@@ -422,9 +420,9 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
     if (argumentNames.size() == 1) {
       if (argumentNames[0] == Context.Id_stringValue) {
         // Derive `init?(stringValue:)`
-        auto stringType = Context.getStringDecl()->getDeclaredInterfaceType();
-        auto synth = [rawType, stringType](AbstractFunctionDecl *initDecl) {
-          if (rawType && rawType->isEqual(stringType)) {
+        auto stringType = Context.getStringType();
+        auto synth = [rawType](AbstractFunctionDecl *initDecl) {
+          if (rawType && rawType->isString()) {
             // enum SomeStringEnum : String {
             //   case A = "a", B = "b", C = "c"
             //   @derived init?(stringValue: String) {
@@ -455,9 +453,9 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
         return deriveInitDecl(*this, stringType, Context.Id_stringValue, synth);
       } else if (argumentNames[0] == Context.Id_intValue) {
         // Synthesize `init?(intValue:)`
-        auto intType = Context.getIntDecl()->getDeclaredInterfaceType();
-        auto synthesizer = [rawType, intType](AbstractFunctionDecl *initDecl) {
-          if (rawType && rawType->isEqual(intType)) {
+        auto intType = Context.getIntType();
+        auto synthesizer = [rawType](AbstractFunctionDecl *initDecl) {
+          if (rawType && rawType->isInt()) {
             // enum SomeIntEnum : Int {
             //   case A = 1, B = 2, C = 3
             //   @derived init?(intValue: Int) {

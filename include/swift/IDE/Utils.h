@@ -22,6 +22,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <memory>
 #include <string>
 #include <functional>
@@ -122,16 +123,6 @@ std::unique_ptr<llvm::MemoryBuffer>
 std::unique_ptr<llvm::MemoryBuffer>
   replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
                       bool *HadPlaceholder = nullptr);
-
-void getLocationInfo(
-    const ValueDecl *VD,
-    llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-    StringRef &Filename);
-
-void getLocationInfoForClangNode(ClangNode ClangNode,
-                                 ClangImporter *Importer,
-       llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-                                 StringRef &Filename);
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 

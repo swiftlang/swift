@@ -792,8 +792,10 @@ public:
   /// Check if this type is equal to the empty tuple type.
   bool isVoid();
 
-  /// Check if this type is equal to Swift.Bool.
-  bool isBool();
+  #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+  /** Check if this type is equal to Swift.NAME. */ \
+  bool is##NAME();
+  #include "swift/AST/KnownStdlibTypes.def"
 
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
@@ -804,9 +806,6 @@ public:
   /// Check if this is a CGFloat type from CoreGraphics framework
   /// on macOS or Foundation on Linux.
   bool isCGFloatType();
-
-  /// Check if this is a Double type from standard library.
-  bool isDoubleType();
 
   /// Check if this is either an Array, Set or Dictionary collection type defined
   /// at the top level of the Swift module
@@ -1929,7 +1928,7 @@ class ParameterTypeFlags {
     NonEphemeral = 1 << 2,
     OwnershipShift = 3,
     Ownership    = 7 << OwnershipShift,
-    NoDerivative = 1 << 7,
+    NoDerivative = 1 << 6,
     NumBits = 7
   };
   OptionSet<ParameterFlags> value;
@@ -2785,8 +2784,9 @@ public:
   public:
     explicit Param(Type t,
                    Identifier l = Identifier(),
-                   ParameterTypeFlags f = ParameterTypeFlags())
-        : Ty(t), Label(l), Flags(f) {
+                   ParameterTypeFlags f = ParameterTypeFlags(),
+                   Identifier internalLabel = Identifier())
+        : Ty(t), Label(l), InternalLabel(internalLabel), Flags(f) {
       assert(t && "param type must be non-null");
       assert(!t->is<InOutType>() && "set flags instead");
     }
@@ -2796,8 +2796,18 @@ public:
     /// element type.
     Type Ty;
     
-    // The label associated with the parameter, if any.
+    /// The label associated with the parameter, if any.
     Identifier Label;
+
+    /// The internal label of the parameter, if explicitly specified, otherwise
+    /// empty. The internal label is considered syntactic sugar. It is not
+    /// considered part of the canonical type and is thus also ignored in \c
+    /// operator==.
+    /// E.g.
+    ///  - `name name2: Int` has internal label `name2`
+    ///  - `_ name2: Int` has internal label `name2`
+    ///  - `name: Int` has no internal label
+    Identifier InternalLabel;
     
     /// Parameter specific flags.
     ParameterTypeFlags Flags = {};
@@ -2823,6 +2833,9 @@ public:
 
     bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
+
+    bool hasInternalLabel() const { return !InternalLabel.empty(); }
+    Identifier getInternalLabel() const { return InternalLabel; }
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
 
@@ -2851,6 +2864,11 @@ public:
       return Flags.getValueOwnership();
     }
 
+    /// Returns \c true if the two \c Params are equal in their canonicalized
+    /// form.
+    /// Two \c Params are equal if their external label, flags and
+    /// *canonicalized* types match. The internal label and sugar types are
+    /// *not* considered for type equality.
     bool operator==(Param const &b) const {
       return (Label == b.Label &&
               getPlainType()->isEqual(b.getPlainType()) &&
@@ -2858,16 +2876,22 @@ public:
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
-    Param getWithoutLabel() const { return Param(Ty, Identifier(), Flags); }
-
-    Param withLabel(Identifier newLabel) const {
-      return Param(Ty, newLabel, Flags);
+    /// Return the parameter without external and internal labels.
+    Param getWithoutLabels() const {
+      return Param(Ty, /*Label=*/Identifier(), Flags,
+                   /*InternalLabel=*/Identifier());
     }
 
-    Param withType(Type newType) const { return Param(newType, Label, Flags); }
+    Param withLabel(Identifier newLabel) const {
+      return Param(Ty, newLabel, Flags, InternalLabel);
+    }
+
+    Param withType(Type newType) const {
+      return Param(newType, Label, Flags, InternalLabel);
+    }
 
     Param withFlags(ParameterTypeFlags flags) const {
-      return Param(Ty, Label, flags);
+      return Param(Ty, Label, flags, InternalLabel);
     }
   };
 
@@ -2988,14 +3012,19 @@ public:
     return composeInput(ctx, params.getOriginalArray(), canonicalVararg);
   }
 
-  /// Given two arrays of parameters determine if they are equal.
+  /// Given two arrays of parameters determine if they are equal in their
+  /// canonicalized form. Internal labels and type sugar is *not* taken into
+  /// account.
   static bool equalParams(ArrayRef<Param> a, ArrayRef<Param> b);
 
-  /// Given two arrays of parameters determine if they are equal.
+  /// Given two arrays of parameters determine if they are equal in their
+  /// canonicalized form. Internal labels and type sugar is *not* taken into
+  /// account.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
   /// Given an array of parameters and an array of labels of the
   /// same length, update each parameter to have the corresponding label.
+  /// The internal parameter labels remain the same.
   static void relabelParams(MutableArrayRef<Param> params,
                             ArrayRef<Identifier> labels);
 
@@ -3352,6 +3381,8 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector unsafeSendable;
   SmallBitVector unsafeMainActor;
+  SmallBitVector implicitSelfCapture;
+  SmallBitVector inheritActorContext;
 
 public:
   ParameterListInfo() { }
@@ -3379,6 +3410,17 @@ public:
   /// we will treat it as being part of the main actor but that it is not
   /// part of the type system.
   bool isUnsafeMainActor(unsigned paramIdx) const;
+
+  /// Whether the given parameter is a closure that should allow capture of
+  /// 'self' to be implicit, without requiring "self.".
+  bool isImplicitSelfCapture(unsigned paramIdx) const;
+
+  /// Whether the given parameter is a closure that should inherit the
+  /// actor context from the context in which it was created.
+  bool inheritsActorContext(unsigned paramIdx) const;
+
+  /// Whether there is any contextual information set on this parameter list.
+  bool anyContextualInfo() const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {

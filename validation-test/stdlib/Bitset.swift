@@ -7,7 +7,7 @@ var BitsetTests = TestSuite("Bitset")
 
 BitsetTests.test("_UnsafeBitset.wordCount(forCapacity:)") {
   expectEqual(0, _UnsafeBitset.wordCount(forCapacity: 0))
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
   for i in 1...32 {
     expectEqual(1, _UnsafeBitset.wordCount(forCapacity: i), "i=\(i)")
   }
@@ -36,7 +36,7 @@ BitsetTests.test("_UnsafeBitset.wordCount(forCapacity:)") {
 }
 
 BitsetTests.test("_UnsafeBitset.split(_:)") {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
   for i in 0...31 {
     let comps = _UnsafeBitset.split(i)
     expectEqual(0, comps.word, "i=\(i)")

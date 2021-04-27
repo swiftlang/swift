@@ -35,3 +35,7 @@ const int& ReadWriteIntArray::operator[](int x) const {
 int& ReadWriteIntArray::operator[](int x) {
   return values[x];
 }
+
+int NonTrivialIntArrayByVal::operator[](int x) {
+  return values[x];
+}

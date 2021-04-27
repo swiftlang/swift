@@ -14,7 +14,7 @@
 // RUN: %FileCheck -check-prefix CHECK-OVERWRITTEN %s < main~buildrecord.swiftdeps
 // CHECK-OVERWRITTEN: version: "{{.*}}"
 // CHECK-OVERWRITTEN: options: "{{.*}}"
-// CHECK-OVERWRITTEN: build_time: [{{[0-9]*}}, {{[0-9]*}}]
+// CHECK-OVERWRITTEN: build_{{(start_)?}}time: [{{[0-9]*}}, {{[0-9]*}}]
 // CHECK-OVERWRITTEN: inputs:
 // CHECK-OVERWRITTEN: "{{(./)?}}main.swift": [443865900, 0]
 // CHECK-OVERWRITTEN: "{{(./)?}}other.swift": [443865900, 0]

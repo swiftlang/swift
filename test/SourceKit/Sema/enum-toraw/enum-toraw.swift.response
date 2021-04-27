@@ -18,7 +18,7 @@
     key.column: 1,
     key.filepath: t2.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "missing return in a function expected to return 'Bool'",
+    key.description: "missing return in global function expected to return 'Bool'",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema
   }
 ]

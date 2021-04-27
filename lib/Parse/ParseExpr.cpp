@@ -533,7 +533,7 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
 
     ParserResult<Expr> SubExpr = parseExprUnary(Message, isExprBasic);
     if (SubExpr.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Expr>();
+      return makeParserCodeCompletionResult<Expr>(SubExpr.getPtrOrNull());
     if (SubExpr.isNull())
       return nullptr;
     return makeParserResult(
@@ -1545,7 +1545,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     LLVM_FALLTHROUGH;
   case tok::kw_Self:     // Self
-    return makeParserResult(parseExprIdentifier());
+    return parseExprIdentifier();
 
   case tok::kw_Any: { // Any
     ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
@@ -2192,7 +2192,8 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
 
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
-Expr *Parser::parseExprIdentifier() {
+ParserResult<Expr> Parser::parseExprIdentifier() {
+  ParserStatus status;
   assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
   SyntaxParsingContext IDSyntaxContext(SyntaxContext,
                                        SyntaxKind::IdentifierExpr);
@@ -2217,8 +2218,9 @@ Expr *Parser::parseExprIdentifier() {
   if (canParseAsGenericArgumentList()) {
     SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
     SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
-    auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
-    if (argStat.isErrorOrHasCompletion())
+    auto argStatus = parseGenericArguments(args, LAngleLoc, RAngleLoc);
+    status |= argStatus;
+    if (argStatus.isErrorOrHasCompletion())
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     
     // The result can be empty in error cases.
@@ -2227,7 +2229,8 @@ Expr *Parser::parseExprIdentifier() {
   
   if (name.getBaseName().isEditorPlaceholder()) {
     IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
-    return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
+    return makeParserResult(
+        status, parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier()));
   }
 
   auto refKind = DeclRefKind::Ordinary;
@@ -2237,7 +2240,7 @@ Expr *Parser::parseExprIdentifier() {
     E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, args,
                                          RAngleLoc);
   }
-  return E;
+  return makeParserResult(status, E);
 }
 
 Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -2508,7 +2511,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
         name = Context.getIdentifier(Tok.getText());
-        initializer = parseExprIdentifier();
+        auto initializerResult = parseExprIdentifier();
+        status |= initializerResult;
+        initializer = initializerResult.get();
 
         // It is a common error to try to capture a nested field instead of just
         // a local name, reject it with a specific error message.

@@ -290,7 +290,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
   if let displayStyle = mirror.displayStyle {
     switch displayStyle {
       case .optional:
-        if let child = mirror._children.first {
+        if let child = mirror.children.first {
           _debugPrint_unlocked(child.1, &target)
         } else {
           _debugPrint_unlocked("nil", &target)
@@ -298,7 +298,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
       case .tuple:
         target.write("(")
         var first = true
-        for (label, value) in mirror._children {
+        for (label, value) in mirror.children {
           if first {
             first = false
           } else {
@@ -319,7 +319,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
         printTypeName(mirror.subjectType)
         target.write("(")
         var first = true
-        for (label, value) in mirror._children {
+        for (label, value) in mirror.children {
           if let label = label {
             if first {
               first = false
@@ -345,7 +345,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
           // If the case name is garbage, just print the type name.
           printTypeName(mirror.subjectType)
         }
-        if let (_, value) = mirror._children.first {
+        if let (_, value) = mirror.children.first {
           if Mirror(reflecting: value).displayStyle == .tuple {
             _debugPrint_unlocked(value, &target)
           } else {
@@ -450,19 +450,19 @@ internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
     // count
     switch displayStyle {
     case .tuple:
-      let count = mirror._children.count
+      let count = mirror.children.count
       target.write(count == 1 ? "(1 element)" : "(\(count) elements)")
       return
     case .collection:
-      let count = mirror._children.count
+      let count = mirror.children.count
       target.write(count == 1 ? "1 element" : "\(count) elements")
       return
     case .dictionary:
-      let count = mirror._children.count
+      let count = mirror.children.count
       target.write(count == 1 ? "1 key/value pair" : "\(count) key/value pairs")
       return
     case .`set`:
-      let count = mirror._children.count
+      let count = mirror.children.count
       target.write(count == 1 ? "1 member" : "\(count) members")
       return
     default:

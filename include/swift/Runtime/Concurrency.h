@@ -18,6 +18,7 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/TaskGroup.h"
+#include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/TaskStatus.h"
 
 #pragma clang diagnostic push
@@ -49,7 +50,8 @@ using FutureAsyncSignature =
 /// closure.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future(
-    JobFlags flags, const Metadata *futureResultType,
+    JobFlags flags,
+    const Metadata *futureResultType,
     void *closureEntryPoint,
     HeapObject * /* +1 */ closureContext);
 
@@ -57,7 +59,8 @@ AsyncTaskAndContext swift_task_create_future(
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future_f(
-    JobFlags flags, const Metadata *futureResultType,
+    JobFlags flags,
+    const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize);
 
@@ -74,7 +77,8 @@ AsyncTaskAndContext swift_task_create_group_future(
 /// function, and offer its result to the task group
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_group_future_f(
-    JobFlags flags, TaskGroup *group,
+    JobFlags flags,
+    TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize);
@@ -169,7 +173,7 @@ SWIFT_CC(swiftasync)
 /// \code
 /// func swift_taskGroup_wait_next_throwing(
 ///     waitingTask: Builtin.NativeObject, // current task
-///     group: UnsafeRawPointer
+///     group: Builtin.RawPointer
 /// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -178,25 +182,13 @@ void swift_taskGroup_wait_next_throwing(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
     TaskGroup *group, const Metadata *successType);
 
-/// Create a new `TaskGroup`.
-/// The caller is responsible for retaining and managing the group's lifecycle.
-///
-/// Its Swift signature is
-///
-/// \code
-/// func swift_taskGroup_create() -> Builtin.RawPointer
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-TaskGroup* swift_taskGroup_create(); // TODO: probably remove this call, and just use the initialize always
-
 /// Initialize a `TaskGroup` in the passed `group` memory location.
 /// The caller is responsible for retaining and managing the group's lifecycle.
 ///
 /// Its Swift signature is
 ///
 /// \code
-/// func swift_taskGroup_initialize(group: Builtin.RawPointer
-/// )
+/// func swift_taskGroup_initialize(group: Builtin.RawPointer)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_initialize(TaskGroup *group);
@@ -213,7 +205,6 @@ void swift_taskGroup_initialize(TaskGroup *group);
 /// \code
 /// func swift_taskGroup_attachChild(
 ///     group: Builtin.RawPointer,
-///     parent: Builtin.NativeObject,
 ///     child: Builtin.NativeObject
 /// )
 /// \endcode
@@ -225,7 +216,7 @@ void swift_taskGroup_attachChild(TaskGroup *group, AsyncTask *child);
 /// This function MUST be called from the AsyncTask running the task group.
 ///
 /// \code
-/// func swift_taskGroup_destroy(_ group: UnsafeRawPointer)
+/// func swift_taskGroup_destroy(_ group: Builtin.RawPointer)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_destroy(TaskGroup *group);
@@ -255,7 +246,7 @@ bool swift_taskGroup_addPending(TaskGroup *group, bool unconditionally);
 /// Its Swift signature is
 ///
 /// \code
-/// func swift_taskGroup_cancelAll(group: UnsafeRawPointer)
+/// func swift_taskGroup_cancelAll(group: Builtin.RawPointer)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_cancelAll(TaskGroup *group);
@@ -268,7 +259,7 @@ void swift_taskGroup_cancelAll(TaskGroup *group);
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_taskGroup_isCancelled(group: UnsafeRawPointer)
+/// func swift_taskGroup_isCancelled(group: Builtin.RawPointer)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_taskGroup_isCancelled(TaskGroup *group);
@@ -284,6 +275,63 @@ bool swift_taskGroup_isCancelled(TaskGroup *group);
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_taskGroup_isEmpty(TaskGroup *group);
+
+/// Its Swift signature is
+///
+/// \code
+/// func swift_asyncLet_start<T>(
+///     _ alet: Builtin.RawPointer,
+///     operation: __owned @Sendable () async throws -> T
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_asyncLet_start(
+    AsyncLet *alet,
+    const Metadata *futureResultType,
+    void *closureEntryPoint,
+    void *closureContext);
+
+/// This matches the ABI of a closure `<T>(Builtin.RawPointer) async -> T`
+using AsyncLetWaitSignature =
+    SWIFT_CC(swiftasync)
+    void(OpaqueValue *,
+         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
+
+/// Wait for a non-throwing async-let to complete.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_asyncLet_wait(
+///     _ asyncLet: _owned Builtin.RawPointer
+/// ) async -> Success
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_asyncLet_wait(OpaqueValue *,
+                         SWIFT_ASYNC_CONTEXT AsyncContext *,
+                         AsyncLet *, Metadata *);
+
+/// Wait for a potentially-throwing async-let to complete.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_asyncLet_wait_throwing(
+///     _ asyncLet: _owned Builtin.RawPointer
+/// ) async throws -> Success
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_asyncLet_wait_throwing(OpaqueValue *,
+                                  SWIFT_ASYNC_CONTEXT AsyncContext *,
+                                  AsyncLet *, Metadata *);
+
+/// Its Swift signature is
+///
+/// \code
+/// func swift_asyncLet_end(_ alet: Builtin.RawPointer)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_asyncLet_end(AsyncLet *alet);
 
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
@@ -325,8 +373,7 @@ bool swift_task_removeStatusRecord(TaskStatusRecord *record);
 /// The record must be removed with by the parent invoking
 /// `swift_task_detachChild` when the child has completed.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ChildTaskStatusRecord*
-swift_task_attachChild(AsyncTask *child);
+ChildTaskStatusRecord* swift_task_attachChild(AsyncTask *child);
 
 /// Remove a child task from the parent tracking it.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -512,6 +559,14 @@ void swift_defaultActor_initialize(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_destroy(DefaultActor *actor);
 
+/// Deallocate an instance of a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_deallocate(DefaultActor *actor);
+
+/// Deallocate an instance of what might be a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_defaultActor_deallocateResilient(HeapObject *actor);
+
 /// Initialize the runtime storage for a distributed remote actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_distributedActor_remote_initialize(DefaultActor *actor);
@@ -591,6 +646,17 @@ AsyncTask *swift_task_getCurrent(void);
 /// Return the current thread's active executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 ExecutorRef swift_task_getCurrentExecutor(void);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCurrentExecutor(ExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_reportUnexpectedExecutor(
+    const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
+    uintptr_t line, ExecutorRef executor);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+JobPriority swift_task_getCurrentThreadPriority(void);
 
 }
 

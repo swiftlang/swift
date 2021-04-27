@@ -14,6 +14,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "AvailabilityMixin.h"
@@ -21,6 +22,7 @@
 #include "Symbol.h"
 #include "SymbolGraph.h"
 #include "SymbolGraphASTWalker.h"
+#include "DeclarationFragmentPrinter.h"
 
 using namespace swift;
 using namespace symbolgraphgen;
@@ -170,12 +172,34 @@ void Symbol::serializeRange(size_t InitialIndentation,
   });
 }
 
-void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+const ValueDecl *Symbol::getDeclInheritingDocs() const {
+  // get the decl that would provide docs for this symbol
   const auto *DocCommentProvidingDecl =
-      dyn_cast_or_null<ValueDecl>(
-          getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
-  if (!DocCommentProvidingDecl) {
-    DocCommentProvidingDecl = VD;
+    dyn_cast_or_null<ValueDecl>(
+      getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
+  
+  // if the decl is the same as the one for this symbol, we're not
+  // inheriting docs, so return null. however, if this symbol is
+  // a synthesized symbol, `VD` is actually the source symbol, and
+  // we should point to that one regardless.
+  if (DocCommentProvidingDecl == VD && !SynthesizedBaseTypeDecl) {
+    return nullptr;
+  } else {
+    // otherwise, return whatever `getDocCommentProvidingDecl` returned.
+    // it will be null if there are no decls that provide docs for this
+    // symbol.
+    return DocCommentProvidingDecl;
+  }
+}
+
+void Symbol::serializeDocComment(llvm::json::OStream &OS) const {
+  const auto *DocCommentProvidingDecl = VD;
+  if (!Graph->Walker.Options.SkipInheritedDocs) {
+    DocCommentProvidingDecl = dyn_cast_or_null<ValueDecl>(
+      getDocCommentProvidingDecl(VD, /*AllowSerialized=*/true));
+    if (!DocCommentProvidingDecl) {
+      DocCommentProvidingDecl = VD;
+    }
   }
   auto RC = DocCommentProvidingDecl->getRawComment(/*SerializedOK=*/true);
   if (RC.isEmpty()) {
@@ -516,6 +540,33 @@ Symbol::getPathComponents(SmallVectorImpl<PathComponent> &Components) const {
 
   // The list is leaf-to-root, but we want root-to-leaf, so reverse it.
   std::reverse(Components.begin(), Components.end());
+}
+
+void Symbol::
+getFragmentInfo(SmallVectorImpl<FragmentInfo> &FragmentInfos) const {
+  SmallPtrSet<const Decl*, 8> Referenced;
+
+  auto Options = Graph->getDeclarationFragmentsPrintOptions();
+  if (getBaseType()) {
+    Options.setBaseType(getBaseType());
+    Options.PrintAsMember = true;
+  }
+
+  llvm::json::OStream OS(llvm::nulls());
+  OS.object([&]{
+    DeclarationFragmentPrinter Printer(Graph, OS, {"ignored"}, &Referenced);
+    getSymbolDecl()->print(Printer, Options);
+  });
+
+  for (auto *D: Referenced) {
+    if (!Symbol::supportsKind(D->getKind()))
+      continue;
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      FragmentInfos.push_back(FragmentInfo{VD, {}});
+      Symbol RefSym(Graph, VD, nullptr);
+      RefSym.getPathComponents(FragmentInfos.back().ParentContexts);
+    }
+  }
 }
 
 void Symbol::printPath(llvm::raw_ostream &OS) const {

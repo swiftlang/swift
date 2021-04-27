@@ -1117,9 +1117,7 @@ bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
   // intermediate step. So we conservatively assume that an implicit
   // construction of Double could be a part of an explicit conversion
   // and suppress the warning.
-  auto &astCtx = BI->getModule().getASTContext();
-  auto *typeDecl = callExpr->getType()->getCanonicalType().getAnyNominal();
-  return (typeDecl && typeDecl == astCtx.getDoubleDecl());
+  return callExpr->getType()->isDouble();
 }
 
 static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,

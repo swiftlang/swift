@@ -704,7 +704,7 @@ ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
 ERROR(sema_no_import_target,Fatal,
       "could not find module '%0' for target '%1'; "
-      "found: %2", (StringRef, StringRef, StringRef))
+      "found: %2, at: %3", (StringRef, StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
 NOTE(sema_no_import_no_sdk,none,
@@ -728,6 +728,10 @@ ERROR(module_interface_build_failed,Fatal,
       "the textual interface may be broken by project issues"
       "%select{, differences between compilers (the producer '%3' and this compiler '%4')|}2 or a compiler bug",
       (bool, StringRef, bool, StringRef, StringRef))
+ERROR(module_interface_build_failed_mismatching_compiler,Fatal,
+      "failed to build module '%0'; this SDK is not supported by the compiler "
+      "(the SDK is built with '%1', while this compiler is '%2'). Please select a toolchain which matches the SDK.",
+      (StringRef, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -2605,12 +2609,8 @@ ERROR(override_dynamic_self_mismatch,none,
 ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
-ERROR(override_throws,none,
-      "cannot override non-throwing %select{method|initializer}0 with "
-      "throwing %select{method|initializer}0", (bool))
-// TODO: this really could be merged with the above.
 ERROR(override_with_more_effects,none,
-      "cannot override non-'%1' %0 with '%1' %0",
+      "cannot override non-%1 %0 with %1 %0",
       (DescriptiveDeclKind, StringRef))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
@@ -3903,6 +3903,11 @@ ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
+ERROR(implicit_async_super_init,none,
+      "missing call to superclass's initializer; "
+      "'super.init' is 'async' and requires an explicit call",
+      ())
+
 WARNING(if_always_true,none,
         "'if' condition is always true", ())
 WARNING(while_always_true,none,
@@ -4248,17 +4253,17 @@ WARNING(no_throw_in_do_with_catch,none,
 //------------------------------------------------------------------------------
 // MARK: Concurrency
 //------------------------------------------------------------------------------
-ERROR(async_call_without_await,none,
-      "call is 'async' but is not marked with 'await'", ())
-ERROR(async_call_without_await_in_autoclosure,none,
-      "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
-ERROR(async_call_without_await_in_async_let,none,
-      "call is 'async' in an 'async let' initializer that is not marked "
-      "with 'await'", ())
-ERROR(async_prop_access_without_await,none,
-      "property access is 'async' but is not marked with 'await'", ())
-ERROR(async_subscript_access_without_await,none,
-      "subscript access is 'async' but is not marked with 'await'", ())
+ERROR(async_expr_without_await,none,
+      "expression is 'async' but is not marked with 'await'", ())
+
+NOTE(async_access_without_await,none,
+    "%select{call|property access|subscript access|}0 is 'async'", (unsigned))
+
+NOTE(async_call_without_await_in_autoclosure,none,
+      "call is 'async' in an autoclosure argument", ())
+NOTE(async_call_without_await_in_async_let,none,
+      "call is 'async' in an 'async let' initializer", ())
+
 WARNING(no_async_in_await,none,
         "no 'async' operations occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
@@ -4285,7 +4290,7 @@ NOTE(note_add_globalactor_to_function,none,
      (StringRef, DescriptiveDeclKind, DeclName, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
 ERROR(not_objc_function_async,none,
-      "'async' function cannot be represented in Objective-C", ())
+      "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
 ERROR(actor_isolated_objc,none,
@@ -4305,8 +4310,8 @@ ERROR(async_let_not_initialized,none,
       "'async let' binding requires an initializer expression", ())
 ERROR(async_let_no_variables,none,
       "'async let' requires at least one named variable", ())
-ERROR(async_let_without_await,none,
-      "reference to async let %0 is not marked with 'await'", (DeclName))
+NOTE(async_let_without_await,none,
+      "reference to async let %0 is 'async'", (DeclName))
 ERROR(async_let_in_illegal_context,none,
       "async let %0 cannot be referenced in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
@@ -4346,8 +4351,8 @@ NOTE(objc_ambiguous_async_convention_candidate,none,
 ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
-ERROR(actor_with_nonactor_superclass,none,
-      "actor cannot inherit from non-actor class %0", (DeclName))
+ERROR(actor_inheritance,none,
+      "actor types do not support inheritance", ())
 
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
@@ -4384,6 +4389,12 @@ ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from %select{this|a non-isolated}3%select{| synchronous}5 context",
       (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
+ERROR(actor_isolated_call,none,
+      "call to %0 function in a synchronous %1 context",
+      (ActorIsolation, ActorIsolation))
+ERROR(actor_isolated_call_decl,none,
+      "call to %0 %1 %2 in a synchronous %3 context",
+      (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
@@ -4445,6 +4456,9 @@ ERROR(distributed_actor_remote_func_must_not_be_distributed,none,
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
+NOTE(actor_isolated_let,none,
+     "use `nonisolated` to allow synchronous access to 'let' from outside "
+     "the actor", ())
 WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
@@ -4477,13 +4491,12 @@ WARNING(non_concurrent_property_type,none,
 WARNING(non_concurrent_keypath_capture,none,
         "cannot form key path that captures non-sendable type %0",
         (Type))
-WARNING(non_concurrent_keypath_access,none,
-        "cannot form key path that accesses non-sendable type %0",
-        (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
       "'Sendable'-conforming %2 %3 has non-sendable type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
+ERROR(non_sendable_nonisolated_let,none,
+      "non-isolated let property %0 has non-Sendable type %1", (DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
@@ -4499,10 +4512,6 @@ ERROR(concurrent_value_inherit,none,
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
 
-ERROR(actorindependent_let,none,
-      "'@actorIndependent' is meaningless on 'let' declarations because "
-      "they are immutable",
-      ())
 ERROR(actorindependent_mutable_storage,none,
       "'@actorIndependent' can not be applied to stored properties",
       ())
@@ -4510,10 +4519,6 @@ ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
 
-ERROR(nonisolated_let,none,
-      "'nonisolated' is meaningless on 'let' declarations because "
-      "they are immutable",
-      ())
 ERROR(nonisolated_mutable_storage,none,
       "nonisolated' can not be applied to stored properties",
       ())
@@ -5375,6 +5380,10 @@ ERROR(availabilty_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly "
       "construct a String from subscripted result", ())
 
+NOTE(availability_unavailable_implicit_init, none,
+     "call to unavailable %0 %1 from superclass %2 occurs implicitly at the "
+     "end of this initializer", (DescriptiveDeclKind, DeclName, DeclName))
+
 // Conformance availability checking diagnostics
 
 ERROR(conformance_availability_unavailable, none,
@@ -5747,8 +5756,8 @@ ERROR(wrapped_value_mismatch, none,
       "property type %0 does not match 'wrappedValue' type %1",
       (Type, Type))
 ERROR(composed_property_wrapper_mismatch, none,
-      "composed wrapper type %0 does not match former 'wrappedValue' type %1",
-      (Type, Type))
+      "composed wrapper type %0 does not match type of '%1.wrappedValue', which is %2",
+      (Type, StringRef, Type))
 
 ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "

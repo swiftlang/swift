@@ -1364,7 +1364,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
 static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
                                               Identifier Id) {
   // String -> Builtin.RawPointer
-  auto stringType = NominalType::get(Context.getStringDecl(), Type(), Context);
+  auto stringType = Context.getStringType();
   return getBuiltinFunction(Id, {stringType}, Context.TheRawPointerType);
 }
 
@@ -1427,8 +1427,7 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(
-      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
+  builder.addParameter(makeConcrete(ctx.getIntType()));
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -1439,8 +1438,7 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
 static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(
-      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
+  builder.addParameter(makeConcrete(ctx.getIntType())); // flags
   builder.addParameter(
       makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
@@ -1485,6 +1483,50 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawUnsafeContinuation,
                                         _owned(_error)),
+                            _void);
+}
+
+static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
+//  return getBuiltinFunction(ctx, id, _thin,
+//                            _generics(_unrestricted),
+//                            _parameters(_rawPointer, <function>), TODO: seems we can't express function here?
+//                            _rawPointer)
+
+  ModuleDecl *M = ctx.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+  SynthesisContext SC(ctx, DC);
+
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder); // <T>
+
+  // AsyncLet*
+  builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
+
+  // operation async function pointer: () async throws -> T
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().withNoEscape().build();
+  builder.addParameter(
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+
+  // -> Builtin.RawPointer
+  builder.setResult(makeConcrete(synthesizeType(SC, _rawPointer)));
+  return builder.build(id);
+}
+
+static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
+static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(),
+                            _rawPointer);
+}
+
+static ValueDecl *getDestroyTaskGroup(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
                             _void);
 }
 
@@ -2738,6 +2780,18 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDistributedRemoteActor:
   case BuiltinValueKind::DestroyDistributedActor:
     return getDistributedActorInitDestroy(Context, Id);
+
+  case BuiltinValueKind::StartAsyncLet:
+    return getStartAsyncLet(Context, Id);
+
+  case BuiltinValueKind::EndAsyncLet:
+    return getEndAsyncLet(Context, Id);
+
+  case BuiltinValueKind::CreateTaskGroup:
+    return getCreateTaskGroup(Context, Id);
+
+  case BuiltinValueKind::DestroyTaskGroup:
+    return getDestroyTaskGroup(Context, Id);
 
   case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
   case BuiltinValueKind::ResumeThrowingContinuationReturning:

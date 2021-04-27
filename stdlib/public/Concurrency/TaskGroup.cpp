@@ -452,36 +452,16 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group) {
-//  // nasty trick, but we want to keep the record inside the group as we'll need
-//  // to remove it from the task as the group is destroyed, as well as interact
-//  // with it every time we add child tasks; so it is useful to pre-create it here
-//  // and store it in the group.
-//  //
-//  // The record won't be used by anyone until we're done constructing and setting
-//  // up the group anyway.
-//  void *recordAllocation = swift_task_alloc(task, sizeof(TaskGroupTaskStatusRecord));
-//  auto record = new (recordAllocation)
-//    TaskGroupTaskStatusRecord(reinterpret_cast<TaskGroupImpl*>(_group));
-
-  // TODO: this becomes less weird once we make the fragment BE the group
-
   TaskGroupImpl *impl = new (group) TaskGroupImpl();
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
-  swift_task_addStatusRecord(record);
-}
+  bool notCancelled = swift_task_addStatusRecord(record);
 
-// =============================================================================
-// ==== create -----------------------------------------------------------------
-SWIFT_CC(swift)
-static TaskGroup *swift_taskGroup_createImpl() {
-  // TODO: John suggested we should rather create from a builtin, which would allow us to optimize allocations even more?
-  void *allocation = swift_task_alloc(sizeof(TaskGroup));
-  auto group = reinterpret_cast<TaskGroup *>(allocation);
-  swift_taskGroup_initialize(group);
-  return group;
+  // If the task has already been cancelled, reflect that immediately in
+  // the group status.
+  if (!notCancelled) impl->statusCancel();
 }
 
 // =============================================================================
@@ -514,9 +494,6 @@ void TaskGroupImpl::destroy() {
     taskDequeued = readyQueue.dequeue(item);
   }
   mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-
-  // TODO: get the parent task, do we need to store it?
-  swift_task_dealloc(this);
 }
 
 // =============================================================================
@@ -620,6 +597,8 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
                 waitingTask->ResumeContext);
 
         fillGroupNextResult(waitingContext, result);
+
+        _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
         // TODO: allow the caller to suggest an executor
         swift_task_enqueueGlobal(waitingTask);
@@ -750,6 +729,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.status = PollStatus::Success;
           result.storage = futureFragment->getStoragePtr();
           assert(result.retainedTask && "polled a task, it must be not null");
+          _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
@@ -759,6 +739,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
           assert(result.retainedTask && "polled a task, it must be not null");
+          _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
@@ -775,6 +756,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
 
   // ==== 3) Add to wait queue -------------------------------------------------
   assert(assumed.readyTasks() == 0);
+  _swift_tsan_release(static_cast<Job *>(waitingTask));
   while (true) {
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_weak(

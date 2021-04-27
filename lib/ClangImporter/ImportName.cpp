@@ -1286,6 +1286,7 @@ NameImporter::considerAsyncImport(
 
   // Initializers cannot be 'async'.
   // FIXME: We might eventually allow this.
+  // TODO: should the restriction be lifted in ClangImporter?
   if (isInitializer)
     return notAsync("initializers cannot be async");
 
@@ -1745,12 +1746,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       break;
     case clang::OverloadedOperatorKind::OO_Subscript: {
       auto returnType = functionDecl->getReturnType();
-      if (!returnType->isReferenceType()) {
-        // TODO: support non-reference return types (SR-14351)
-        return ImportedName();
-      }
-      if (returnType->getPointeeType().isConstQualified()) {
+      if ((!returnType->isReferenceType() && !returnType->isAnyPointerType()) ||
+          returnType->getPointeeType().isConstQualified()) {
+        // If we are handling a non-reference return type, treat it as a getter
+        // so that we do not SILGen the value type operator[] as an rvalue.
         baseName = "__operatorSubscriptConst";
+        result.info.accessorKind = ImportedAccessorKind::SubscriptGetter;
+      } else if (returnType->isAnyPointerType()) {
+        baseName = "__operatorSubscript";
         result.info.accessorKind = ImportedAccessorKind::SubscriptGetter;
       } else {
         baseName = "__operatorSubscript";

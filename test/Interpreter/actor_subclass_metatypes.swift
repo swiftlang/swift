@@ -5,6 +5,8 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import ObjectiveC
 import _Concurrency
@@ -22,25 +24,5 @@ actor Actor5<T> {
 Tests.test("base generic class")
   .code {
   let x = Actor5(state: 5)
-  print(type(of: x))
-}
-
-class Actor6<T> : Actor5<T> {
-  override init(state: T) { super.init(state: state) }
-}
-
-Tests.test("non-final sub-generic class parent generic class crash")
-  .code {
-  let x = Actor6(state: 5)
-  print(type(of: x))
-}
-
-final class Actor6Final<T> : Actor5<T> {
-  override init(state: T) { super.init(state: state) }
-}
-
-Tests.test("final sub-generic class parent generic class crash")
-  .code {
-  let x = Actor6Final(state: 5)
   print(type(of: x))
 }

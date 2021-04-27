@@ -1389,13 +1389,12 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto toCollection = E->getType()->getCanonicalType();
 
   // Get the intrinsic function.
-  auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
+  if (fromCollection->isArray()) {
     fn = SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->isDictionary()) {
     fn = SGF.SGM.getDictionaryUpCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
+  } else if (fromCollection->isSet()) {
     fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
@@ -1868,8 +1867,7 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
   // Ensure that the intrinsic function exists.
   auto convertFn = SGM.getConvertToAnyHashable(loc);
   if (!convertFn)
-    return emitUndefRValue(
-        loc, getASTContext().getAnyHashableDecl()->getDeclaredInterfaceType());
+    return emitUndefRValue(loc, getASTContext().getAnyHashableType());
 
   // Construct the substitution for T: Hashable.
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
@@ -2747,8 +2745,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     params.push_back({loweredBaseTy, paramConvention});
     auto &C = SGM.getASTContext();
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
-                                                   ->getCanonicalType(),
+      params.push_back({C.getUnsafeRawPointerType()->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
     SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
@@ -2898,8 +2895,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                         : paramConvention});
     // indexes
     if (!indexes.empty())
-      params.push_back({C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
-                                                   ->getCanonicalType(),
+      params.push_back({C.getUnsafeRawPointerType()->getCanonicalType(),
                         ParameterConvention::Direct_Unowned});
     
     return SILFunctionType::get(genericSig,
@@ -3045,10 +3041,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   }
 
   auto &C = SGM.getASTContext();
-  auto unsafeRawPointerTy = C.getUnsafeRawPointerDecl()->getDeclaredInterfaceType()
-                                                       ->getCanonicalType();
-  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType()->getCanonicalType();
-  auto intTy = C.getIntDecl()->getDeclaredInterfaceType()->getCanonicalType();
+  auto unsafeRawPointerTy = C.getUnsafeRawPointerType()->getCanonicalType();
+  auto boolTy = C.getBoolType()->getCanonicalType();
+  auto intTy = C.getIntType()->getCanonicalType();
 
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
 
@@ -3523,6 +3518,14 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     return storage->isSettable(storage->getDeclContext());
   };
 
+  // We cannot use the same opened archetype in the getter and setter. Therefore
+  // we create a new one for both the getter and the setter.
+  auto renewOpenedArchetypes = [](SubstitutableType *type) -> Type {
+    if (auto *openedTy = dyn_cast<OpenedArchetypeType>(type))
+      return OpenedArchetypeType::get(openedTy->getOpenedExistentialType());
+    return type;
+  };
+
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
@@ -3546,13 +3549,15 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     auto id = getIdForKeyPathComponentComputedProperty(*this, var,
                                                        strategy);
     auto getter = getOrCreateKeyPathGetter(*this, loc,
-             var, subs,
+             var, subs.subst(renewOpenedArchetypes,
+                             MakeAbstractConformanceForGenericType()),
              needsGenericContext ? genericEnv : nullptr,
              expansion, {}, baseTy, componentTy);
     
     if (isSettableInComponent()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
-             var, subs,
+             var, subs.subst(renewOpenedArchetypes,
+                             MakeAbstractConformanceForGenericType()),
              needsGenericContext ? genericEnv : nullptr,
              expansion, {}, baseTy, componentTy);
       return KeyPathPatternComponent::forComputedSettableProperty(id,
@@ -3597,7 +3602,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     
     auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
     auto getter = getOrCreateKeyPathGetter(*this, loc,
-             decl, subs,
+             decl, subs.subst(renewOpenedArchetypes,
+                              MakeAbstractConformanceForGenericType()),
              needsGenericContext ? genericEnv : nullptr,
              expansion,
              indexTypes,
@@ -3606,7 +3612,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
     if (isSettableInComponent()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
-             decl, subs,
+             decl, subs.subst(renewOpenedArchetypes,
+                              MakeAbstractConformanceForGenericType()),
              needsGenericContext ? genericEnv : nullptr,
              expansion,
              indexTypes,
@@ -3848,7 +3855,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   } else {
     arrayType = E->getType()->getCanonicalType();
     auto genericType = cast<BoundGenericStructType>(arrayType);
-    assert(genericType->getDecl() == SGF.getASTContext().getArrayDecl());
+    assert(genericType->isArray());
     elementType = genericType.getGenericArgs()[0];
   }
 

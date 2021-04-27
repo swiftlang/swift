@@ -361,6 +361,9 @@ class InstModCallbacks {
   /// A function sets the value in \p use to be \p newValue.
   ///
   /// Default implementation just calls use->set(newValue).
+  ///
+  /// NOTE: It is assumed that this operation will never invalidate instruction
+  /// iterators.
   std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
 
   /// A boolean that tracks if any of our callbacks were ever called.
@@ -412,6 +415,13 @@ public:
 
   void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
     wereAnyCallbacksInvoked = true;
+
+    // If setUseValueFunc is not set, just call RAUW directly. RAUW in this case
+    // is equivalent to what we do below. We just enable better
+    // performance. This ensures that the default InstModCallback is really
+    // fast.
+    if (!setUseValueFunc)
+      return oldValue->replaceAllUsesWith(newValue);
 
     while (!oldValue->use_empty()) {
       auto *use = *oldValue->use_begin();
