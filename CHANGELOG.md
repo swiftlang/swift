@@ -7,7 +7,7 @@ CHANGELOG
 | Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
 | [Swift 5.5](#swift-55) |            |             |
-| [Swift 5.4](#swift-54) |            |             |
+| [Swift 5.4](#swift-54) | 2021-04-26 | Xcode 12.5  |
 | [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
 | [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
 | [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
@@ -186,6 +186,8 @@ Swift 5.5
 
 Swift 5.4
 ---------
+
+### 2021-04-26 (Xcode 12.5)
 
 * Protocol conformance checking now considers `where` clauses when evaluating if a `typealias` is a suitable witness for an associated type requirement. The following code is now rejected:
 
