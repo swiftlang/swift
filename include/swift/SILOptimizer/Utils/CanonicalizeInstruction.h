@@ -46,17 +46,22 @@ struct CanonicalizeInstruction {
   CanonicalizeInstruction(const char *passDebugType,
                           DeadEndBlocks &deadEndBlocks)
       : deadEndBlocks(deadEndBlocks),
-        callbacks(
-            [&](SILInstruction *toDelete) { killInstruction(toDelete); },
-            [&](SILInstruction *newInst) { notifyNewInstruction(newInst); },
-            [&](Operand *use, SILValue newValue) {
-              use->set(newValue);
-              notifyHasNewUsers(newValue);
-            }) {
+        callbacks() {
 #ifndef NDEBUG
     if (llvm::DebugFlag && !llvm::isCurrentDebugType(debugType))
       debugType = passDebugType;
 #endif
+    callbacks = InstModCallbacks()
+      .onDelete([&](SILInstruction *toDelete) {
+        killInstruction(toDelete);
+      })
+      .onCreateNewInst([&](SILInstruction *newInst) {
+        notifyNewInstruction(newInst);
+      })
+      .onSetUseValue([&](Operand *use, SILValue newValue) {
+        use->set(newValue);
+        notifyHasNewUsers(newValue);
+      });
   }
 
   virtual ~CanonicalizeInstruction();

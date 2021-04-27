@@ -116,19 +116,21 @@ public:
             },
             /* EraseAction */
             [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
-        instModCallbacks(
-            [&](SILInstruction *instToDelete) {
-              eraseInstFromFunction(*instToDelete);
-            },
-            [&](SILInstruction *newlyCreatedInst) {
-              Worklist.add(newlyCreatedInst);
-            },
-            [&](Operand *use, SILValue newValue) {
-              use->set(newValue);
-              Worklist.add(use->getUser());
-            }),
+        instModCallbacks(),
         deBlocks(&B.getFunction()),
-        ownershipFixupContext(instModCallbacks, deBlocks) {}
+        ownershipFixupContext(instModCallbacks, deBlocks) {
+    instModCallbacks = InstModCallbacks()
+      .onDelete([&](SILInstruction *instToDelete) {
+              eraseInstFromFunction(*instToDelete);
+      })
+      .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
+        Worklist.add(newlyCreatedInst);
+      })
+      .onSetUseValue([&](Operand *use, SILValue newValue) {
+        use->set(newValue);
+        Worklist.add(use->getUser());
+      });
+  }
 
   bool runOnFunction(SILFunction &F);
 

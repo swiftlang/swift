@@ -48,11 +48,6 @@ template <class T> class NullablePtr;
 /// that in a loop this property should predict well since you have a single
 /// branch that is going to go the same way everytime.
 class InstModCallbacks {
-  /// A function that takes in an instruction and deletes the inst.
-  ///
-  /// Default implementation is instToDelete->eraseFromParent();
-  std::function<void(SILInstruction *instToDelete)> deleteInstFunc;
-
   /// A function that is called to notify that a new function was created.
   ///
   /// Default implementation is a no-op, but we still mark madeChange.
@@ -66,8 +61,37 @@ class InstModCallbacks {
   /// iterators.
   std::function<void(Operand *use, SILValue newValue)> setUseValueFunc;
 
+  /// A function that takes in an instruction and deletes the inst.
+  ///
+  /// Default implementation is instToDelete->eraseFromParent();
+  ///
+  /// NOTE: The reason why we have deleteInstFunc and notifyWillBeDeletedFunc is
+  /// InstModCallback supports 2 stage deletion where a callee passed
+  /// InstModCallback is allowed to drop all references to the instruction
+  /// before calling deleteInstFunc. In contrast, notifyWillBeDeletedFunc
+  /// assumes that the IR is in a good form before being called so that the
+  /// caller can via the callback gather state about the instruction that will
+  /// be deleted. As an example, see InstructionDeleter::deleteInstruction() in
+  /// InstOptUtils.cpp.
+  std::function<void(SILInstruction *instToDelete)> deleteInstFunc;
+
   /// If non-null, called before an instruction is deleted or has its references
-  /// dropped.
+  /// dropped. If null, no-op.
+  ///
+  /// NOTE: The reason why we have deleteInstFunc and notifyWillBeDeletedFunc is
+  /// InstModCallback supports 2 stage deletion where a callee passed
+  /// InstModCallback is allowed to drop all references to the instruction
+  /// before calling deleteInstFunc. In contrast, notifyWillBeDeletedFunc
+  /// assumes that the IR is in a good form before being called so that the
+  /// caller can via the callback gather state about the instruction that will
+  /// be deleted. As an example, see InstructionDeleter::deleteInstruction() in
+  /// InstOptUtils.cpp.
+  ///
+  /// NOTE: This is called in InstModCallback::deleteInst() if one does not use
+  /// a default bool argument to disable the notification. In general that
+  /// should only be done when one is writing custom handling and is performing
+  /// the notification ones self. It is assumed that the notification will be
+  /// called with a valid instruction.
   std::function<void(SILInstruction *instThatWillBeDeleted)>
       notifyWillBeDeletedFunc;
 
@@ -75,28 +99,9 @@ class InstModCallbacks {
   bool wereAnyCallbacksInvoked = false;
 
 public:
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc)
-      : deleteInstFunc(deleteInstFunc) {}
-
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
-                   decltype(createdNewInstFunc) createdNewInstFunc)
-      : deleteInstFunc(deleteInstFunc), createdNewInstFunc(createdNewInstFunc) {
-  }
-
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
-                   decltype(setUseValueFunc) setUseValueFunc)
-      : deleteInstFunc(deleteInstFunc), setUseValueFunc(setUseValueFunc) {}
-
-  InstModCallbacks(decltype(deleteInstFunc) deleteInstFunc,
-                   decltype(createdNewInstFunc) createdNewInstFunc,
-                   decltype(setUseValueFunc) setUseValueFunc)
-      : deleteInstFunc(deleteInstFunc), createdNewInstFunc(createdNewInstFunc),
-        setUseValueFunc(setUseValueFunc) {}
-
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
-  InstModCallbacks(InstModCallbacks &&) = default;
 
   /// Return a copy of self with deleteInstFunc set to \p newDeleteInstFunc.
   InstModCallbacks onDelete(decltype(deleteInstFunc) newDeleteInstFunc) const {
