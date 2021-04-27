@@ -160,6 +160,9 @@ def no_serialize_debugging_options :
 def autolink_library : Separate<["-"], "autolink-library">,
   HelpText<"Add dependent library">, Flags<[FrontendOption]>;
 
+def public_autolink_library : Separate<["-"], "public-autolink-library">,
+  HelpText<"Add public dependent library">, Flags<[FrontendOption]>;
+
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
