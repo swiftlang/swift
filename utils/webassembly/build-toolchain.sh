@@ -73,8 +73,7 @@ build_host_toolchain() {
     --preset=$HOST_PRESET \
     --build-dir="$HOST_BUILD_DIR" \
     HOST_ARCHITECTURE="$(uname -m)" \
-    INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
-    TOOLCHAIN_NAME="$TOOLCHAIN_NAME"
+    INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR"
 }
 
 build_target_toolchain() {
@@ -190,7 +189,8 @@ create_darwin_info_plist() {
 if [ ${BUILD_HOST_TOOLCHAIN} -eq 1 ]; then
   build_host_toolchain
   rm -rf "$DIST_TOOLCHAIN_DESTDIR"
-  rsync -a "$HOST_TOOLCHAIN_DESTDIR/" "$DIST_TOOLCHAIN_DESTDIR"
+  mkdir -p "$DIST_TOOLCHAIN_SDK"
+  rsync -a "$HOST_TOOLCHAIN_DESTDIR/" "$DIST_TOOLCHAIN_SDK"
 fi
 
 build_target_toolchain

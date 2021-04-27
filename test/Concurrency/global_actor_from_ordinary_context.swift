@@ -31,11 +31,17 @@ actor Alex {
 func referenceGlobalActor() async {
   let a = Alex()
   _ = a.method
-  _ = a.const_memb // expected-error{{property access is 'async' but is not marked with 'await'}}
-  _ = a.mut_memb  // expected-error{{property access is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = a.const_memb // expected-note{{property access is 'async'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = a.mut_memb // expected-note{{property access is 'async'}}
 
-  _ = a[1]  // expected-error{{subscript access is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = a[1]  // expected-note{{subscript access is 'async'}}
   a[0] = 1  // expected-error{{subscript 'subscript(_:)' isolated to global actor 'SomeGlobalActor' can not be mutated from this context}}
+
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = 32 + a[1] // expected-note@:12{{subscript access is 'async'}}
 }
 
 
@@ -102,18 +108,26 @@ class Taylor {
 
 func fromAsync() async {
   let x = syncGlobActorFn
-  x() // expected-error{{call is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
+  x() // expected-note{{call is 'async'}}
+
 
   let y = asyncGlobalActFn
-  y() // expected-error{{call is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
+  y() // expected-note{{call is 'async'}}
 
   let a = Alex()
-  let fn = a.method
-  fn() // expected-error{{call is 'async' but is not marked with 'await'}}
-  _ = a.const_memb // expected-error{{property access is 'async' but is not marked with 'await'}}
-  _ = a.mut_memb  // expected-error{{property access is 'async' but is not marked with 'await'}}
 
-  _ = a[1]  // expected-error{{subscript access is 'async' but is not marked with 'await'}}
+  let fn = a.method
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
+  fn() //expected-note{{call is 'async}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = a.const_memb // expected-note{{property access is 'async'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = a.mut_memb  // expected-note{{property access is 'async'}}
+
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = a[1]  // expected-note{{subscript access is 'async'}}
   _ = await a[1]
   a[0] = 1  // expected-error{{subscript 'subscript(_:)' isolated to global actor 'SomeGlobalActor' can not be mutated from this context}}
 }

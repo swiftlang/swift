@@ -64,8 +64,9 @@ func timeToPlay(gc : Presidio) async {
   _ = (gc as GolfCourse).yards // expected-error{{property access can throw, but it is not marked with 'try' and the error is not handled}}
   _ = try? (gc as GolfCourse).yards
 
-  // expected-error@+2 {{property access can throw, but it is not marked with 'try' and the error is not handled}}
-  // expected-error@+1 {{property access is 'async' but is not marked with 'await'}}
+  // expected-error@+3 {{property access can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@+1:7{{property access is 'async'}}
   _ = (gc as GolfCourse).par
   _ = try? await (gc as GolfCourse).par
 

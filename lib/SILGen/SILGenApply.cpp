@@ -850,7 +850,7 @@ public:
     if (isMethodSelfApply(e->getFn())) {
       selfApply = cast<ApplyExpr>(e->getFn());
 
-      if (selfApply->isSuper()) {
+      if (selfApply->getArg()->isSuperExpr()) {
         applySuper(selfApply);
         return;
       }

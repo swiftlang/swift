@@ -29,7 +29,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   // still async version...
   let _: Int = slowServer.doSomethingConflicted("thinking")
-  // expected-error@-1{{call is 'async' but is not marked with 'await'}}{{16-16=await }}
+  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{16-16=await }}
+  // expected-note@-2{{call is 'async'}}
 
   let _: String? = try await slowServer.fortune()
   let _: Int = try await slowServer.magicNumber(withSeed: 42)

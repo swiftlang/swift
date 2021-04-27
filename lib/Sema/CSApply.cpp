@@ -1179,9 +1179,6 @@ namespace {
       selfCall->setType(refTy->getResult());
       cs.cacheType(selfCall);
 
-      if (selfParamRef->isSuperExpr())
-        selfCall->setIsSuper(true);
-
       auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
       if (!appliedWrappers.empty()) {
         auto fnDecl = AnyFunctionRef(dyn_cast<AbstractFunctionDecl>(member));
@@ -7749,9 +7746,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   apply->setFn(fn);
 
-  // Check whether the argument is 'super'.
-  bool isSuper = apply->getArg()->isSuperExpr();
-
   // For function application, convert the argument to the input type of
   // the function.
   SmallVector<Identifier, 2> argLabelsScratch;
@@ -7768,7 +7762,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
     apply->setArg(arg);
     cs.setType(apply, fnType->getResult());
-    apply->setIsSuper(isSuper);
 
     solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
@@ -8336,8 +8329,8 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
 
   // Convert the initializer to the type of the pattern.
   auto &cs = solution.getConstraintSystem();
-  auto locator =
-      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  auto locator = cs.getConstraintLocator(
+      initializer, LocatorPathElt::ContextualType(CTP_Initialization));
   initializer = solution.coerceToType(initializer, initType, locator);
   if (!initializer)
     return None;
