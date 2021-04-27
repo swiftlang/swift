@@ -375,7 +375,7 @@ var tests = TestSuite("Series")
         }
         ready.wait()
         task.cancel()
-        let result = done.wait(timeout: .now().advanced(by: .seconds(1)))
+        let result = done.wait(timeout: DispatchTime(uptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 1_000_000_000))
         switch result {
         case .timedOut:
           expectFalse(true, "Timeout when awaiting finished state")
@@ -404,7 +404,7 @@ var tests = TestSuite("Series")
         }
         ready.wait()
         task.cancel()
-        let result = done.wait(timeout: .now().advanced(by: .seconds(1)))
+        let result = done.wait(timeout: DispatchTime(uptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 1_000_000_000))
         switch result {
         case .timedOut:
           expectFalse(true, "Timeout when awaiting finished state")
