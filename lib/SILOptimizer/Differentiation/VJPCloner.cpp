@@ -94,7 +94,7 @@ class VJPCloner::Implementation final
 
   ASTContext &getASTContext() const { return vjp->getASTContext(); }
   SILModule &getModule() const { return vjp->getModule(); }
-  AutoDiffConfig getConfig() const {
+  const AutoDiffConfig &getConfig() const {
     return witness->getConfig();
   }
 
@@ -757,7 +757,7 @@ static SubstitutionMap getSubstitutionMap(SILFunction *original,
 /// and VJP generic signature.
 static const DifferentiableActivityInfo &
 getActivityInfoHelper(ADContext &context, SILFunction *original,
-                      AutoDiffConfig config, SILFunction *vjp) {
+                      const AutoDiffConfig &config, SILFunction *vjp) {
   // Get activity info of the original function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
@@ -805,7 +805,7 @@ SILFunction &VJPCloner::getPullback() const { return *impl.pullback; }
 SILDifferentiabilityWitness *VJPCloner::getWitness() const {
   return impl.witness;
 }
-AutoDiffConfig VJPCloner::getConfig() const {
+const AutoDiffConfig &VJPCloner::getConfig() const {
   return impl.getConfig();
 }
 DifferentiationInvoker VJPCloner::getInvoker() const { return impl.invoker; }

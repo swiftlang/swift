@@ -3912,7 +3912,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 
 SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     AbstractFunctionDecl *originalAFD, SILFunction *originalFn,
-    SILFunction *customDerivativeFn, AutoDiffConfig config,
+    SILFunction *customDerivativeFn, const AutoDiffConfig &config,
     AutoDiffDerivativeFunctionKind kind) {
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
