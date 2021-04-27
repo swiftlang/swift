@@ -44,6 +44,10 @@ class SKStressTester(product.Product):
         return False
 
     @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False
+
+    @classmethod
     def is_swiftpm_unified_build_product(cls):
         return True
 

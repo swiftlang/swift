@@ -60,6 +60,10 @@ class Swift(product.Product):
         """
         return True
 
+    @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False
+
     @property
     def _runtime_sanitizer_flags(self):
         sanitizer_list = []
