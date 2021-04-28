@@ -6355,10 +6355,12 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 
 AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   if (!type) {
+    type = getInterfaceType();
+
     if (hasExternalPropertyWrapper()) {
-      type = getPropertyWrapperBackingPropertyType();
-    } else {
-      type = getInterfaceType();
+      if (auto wrapper = getPropertyWrapperBackingPropertyType()) {
+        type = wrapper;
+      }
     }
   }
 
