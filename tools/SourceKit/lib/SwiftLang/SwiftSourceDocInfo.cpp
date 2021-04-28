@@ -850,7 +850,8 @@ getLocationInfo(const ValueDecl *VD,
 
   auto ClangNode = VD->getClangNode();
 
-  if (VD->getLoc().isValid()) {
+  auto Loc = VD->getLoc(/*SerializedOK=*/true);
+  if (Loc.isValid()) {
     auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
       if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
         SourceRange R = FD->getSignatureSourceRange();
@@ -865,14 +866,13 @@ getLocationInfo(const ValueDecl *VD,
     } else if (VD->hasName()) {
       NameLen = VD->getBaseName().userFacingName().size();
     } else {
-      NameLen = getCharLength(SM, VD->getLoc());
+      NameLen = getCharLength(SM, Loc);
     }
 
-    unsigned DeclBufID = SM.findBufferContainingLoc(VD->getLoc());
-    DeclarationLoc = {SM.getLocOffsetInBuffer(VD->getLoc(), DeclBufID),
+    unsigned DeclBufID = SM.findBufferContainingLoc(Loc);
+    DeclarationLoc = {SM.getLocOffsetInBuffer(Loc, DeclBufID),
                       NameLen};
     Filename = SM.getIdentifierForBuffer(DeclBufID);
-
   } else if (ClangNode) {
     ClangImporter *Importer =
         static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
