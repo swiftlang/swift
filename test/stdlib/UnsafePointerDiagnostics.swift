@@ -113,7 +113,7 @@ func unsafeRawBufferPointerConversions(
   _ = UnsafeRawBufferPointer(start: rp, count: 1)
   _ = UnsafeMutableRawBufferPointer(mrbp)
   _ = UnsafeRawBufferPointer(mrbp)
-  _ = UnsafeMutableRawBufferPointer(rbp) // expected-error {{cannot convert value of type 'UnsafeRawBufferPointer' to expected argument type 'UnsafeMutableRawBufferPointer'}}
+  _ = UnsafeMutableRawBufferPointer(rbp) // expected-error {{missing argument label 'mutating:' in call}}
   _ = UnsafeRawBufferPointer(rbp)
   _ = UnsafeMutableRawBufferPointer(mbpi)
   _ = UnsafeRawBufferPointer(mbpi)
