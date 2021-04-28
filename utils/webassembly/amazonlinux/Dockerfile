@@ -13,7 +13,8 @@ RUN yum -y install \
       git cmake clang python swig uuid-devel libicu-devel libedit-devel \
       libxml2-devel sqlite-devel ncurses-devel pkgconfig python-devel \
       python-pkgconfig libbsd-devel libuuid-devel pexpect curl-devel \
-      tzdata rsync wget which python-six ninja-build
+      tzdata rsync wget which python-six ninja-build \
+      python3 python3-devel
 RUN ln -s /usr/bin/ninja-build /usr/bin/ninja
 
 # Install sccache
