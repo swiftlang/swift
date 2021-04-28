@@ -15,6 +15,8 @@
 // RUN: %target-build-swift %S/Inputs/ImportedTypes.swift %S/Inputs/ImportedTypesOther.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect) -I %S/Inputs -whole-module-optimization -num-threads 2
 // RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-cpu
 
+// UNSUPPORTED: CPU=arm64e
+
 // CHECK-32: FIELDS:
 // CHECK-32: =======
 // CHECK-32: TypesToReflect.HasCTypes
