@@ -5004,6 +5004,22 @@ private:
     }
   }
 
+  /// From the given expression \p E, which is an argument to a function call,
+  /// extract the passed closure if there is one. Otherwise return \c nullptr.
+  ClosureExpr *extractCallback(Expr *E) {
+    if (auto Closure = dyn_cast<ClosureExpr>(E)) {
+      return Closure;
+    } else if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
+      return CaptureList->getClosureBody();
+    } else if (auto FunctionConversion = dyn_cast<FunctionConversionExpr>(E)) {
+      // Closure arguments marked as e.g. `@convention(block)` produce arguments
+      // that are `FunctionConversionExpr`.
+      return extractCallback(FunctionConversion->getSubExpr());
+    } else {
+      return nullptr;
+    }
+  }
+
   void addAsyncAlternativeCall(const CallExpr *CE,
                                const AsyncHandlerDesc &HandlerDesc) {
     auto ArgList = callArgs(CE);
@@ -5012,11 +5028,7 @@ private:
       return;
     }
 
-    auto Callback = dyn_cast<ClosureExpr>(ArgList.ref()[HandlerDesc.Index]);
-    auto Capture = dyn_cast<CaptureListExpr>(ArgList.ref()[HandlerDesc.Index]);
-    if (Capture) {
-      Callback = Capture->getClosureBody();
-    }
+    ClosureExpr *Callback = extractCallback(ArgList.ref()[HandlerDesc.Index]);
     if (!Callback) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;
