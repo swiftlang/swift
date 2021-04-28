@@ -15,7 +15,7 @@ struct SomeError: Error, Equatable {
   var value = Int.random(in: 0..<100)
 }
 
-var tests = TestSuite("Series")
+var tests = TestSuite("AsyncStream")
 
 @main struct Main {
   static func main() async {
@@ -25,28 +25,28 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with no awaiting next") {
-        let series = Series(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
+        let series = AsyncStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
         }
       }
 
       tests.test("yield with no awaiting next throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
         }
       }
 
       tests.test("yield with awaiting next") {
-        let series = Series(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
+        let series = AsyncStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
         }
         var iterator = series.makeAsyncIterator()
         expectEqual(await iterator.next(), "hello")
       }
 
       tests.test("yield with awaiting next throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
         }
         var iterator = series.makeAsyncIterator()
         do {
@@ -57,9 +57,9 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2") {
-        let series = Series(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
-          continuation.resume(yielding: "world")
+        let series = AsyncStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
+          continuation.yield("world")
         }
         var iterator = series.makeAsyncIterator()
         expectEqual(await iterator.next(), "hello")
@@ -67,9 +67,9 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
-          continuation.resume(yielding: "world")
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
+          continuation.yield("world")
         }
         var iterator = series.makeAsyncIterator()
         do {
@@ -81,9 +81,9 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 and finish") {
-        let series = Series(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
-          continuation.resume(yielding: "world")
+        let series = AsyncStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
+          continuation.yield("world")
           continuation.finish()
         }
         var iterator = series.makeAsyncIterator()
@@ -93,9 +93,9 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 and finish throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
-          continuation.resume(yielding: "world")
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
+          continuation.yield("world")
           continuation.finish()
         }
         var iterator = series.makeAsyncIterator()
@@ -110,9 +110,9 @@ var tests = TestSuite("Series")
 
       tests.test("yield with awaiting next 2 and throw") {
         let thrownError = SomeError()
-        let series = ThrowingSeries(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
-          continuation.resume(yielding: "world")
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
+          continuation.yield("world")
           continuation.finish(throwing: thrownError)
         }
         var iterator = series.makeAsyncIterator()
@@ -131,25 +131,25 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with no awaiting next detached") {
-        let series = Series(buffering: String.self) { continuation in
+        let series = AsyncStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
+            continuation.yield("hello")
           }
         }
       }
 
       tests.test("yield with no awaiting next detached throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
+            continuation.yield("hello")
           }
         }
       }
 
       tests.test("yield with awaiting next detached") {
-        let series = Series(buffering: String.self) { continuation in
+        let series = AsyncStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
+            continuation.yield("hello")
           }
         }
         var iterator = series.makeAsyncIterator()
@@ -157,9 +157,9 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next detached throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
+            continuation.yield("hello")
           }
         }
         var iterator = series.makeAsyncIterator()
@@ -171,10 +171,10 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 detached") {
-        let series = Series(buffering: String.self) { continuation in
+        let series = AsyncStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
           }
         }
         var iterator = series.makeAsyncIterator()
@@ -183,10 +183,10 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 detached throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
           }
         }
         var iterator = series.makeAsyncIterator()
@@ -199,10 +199,10 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 and finish detached") {
-        let series = Series(buffering: String.self) { continuation in
+        let series = AsyncStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
             continuation.finish()
           }
         }
@@ -213,10 +213,10 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 and finish detached throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
             continuation.finish()
           }
         }
@@ -232,10 +232,10 @@ var tests = TestSuite("Series")
 
       tests.test("yield with awaiting next 2 and throw detached") {
         let thrownError = SomeError()
-        let series = ThrowingSeries(buffering: String.self) { continuation in
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
             continuation.finish(throwing: thrownError)
           }
         }
@@ -255,12 +255,12 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 and finish detached with value after finish") {
-        let series = Series(buffering: String.self) { continuation in
+        let series = AsyncStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
             continuation.finish()
-            continuation.resume(yielding: "This should not be emitted")
+            continuation.yield("This should not be emitted")
           }
         }
         var iterator = series.makeAsyncIterator()
@@ -271,12 +271,12 @@ var tests = TestSuite("Series")
       }
 
       tests.test("yield with awaiting next 2 and finish detached with value after finish throwing") {
-        let series = ThrowingSeries(buffering: String.self) { continuation in
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
             continuation.finish()
-            continuation.resume(yielding: "This should not be emitted")
+            continuation.yield("This should not be emitted")
           }
         }
         var iterator = series.makeAsyncIterator()
@@ -292,10 +292,10 @@ var tests = TestSuite("Series")
 
       tests.test("yield with awaiting next 2 and finish detached with throw after finish throwing") {
         let thrownError = SomeError()
-        let series = ThrowingSeries(buffering: String.self) { continuation in
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
           detach {
-            continuation.resume(yielding: "hello")
-            continuation.resume(yielding: "world")
+            continuation.yield("hello")
+            continuation.yield("world")
             continuation.finish()
             continuation.finish(throwing: thrownError)
           }
@@ -313,9 +313,9 @@ var tests = TestSuite("Series")
 
       tests.test("yield with awaiting next 2 and finish with throw after finish throwing") {
         let thrownError = SomeError()
-        let series = ThrowingSeries(buffering: String.self) { continuation in
-          continuation.resume(yielding: "hello")
-          continuation.resume(yielding: "world")
+        let series = AsyncThrowingStream(buffering: String.self) { continuation in
+          continuation.yield("hello")
+          continuation.yield("world")
           continuation.finish()
           continuation.finish(throwing: thrownError)
         }
@@ -334,7 +334,7 @@ var tests = TestSuite("Series")
         let expectation = Expectation()
 
         func scopedLifetime(_ expectation: Expectation) {
-          let series = Series(buffering: String.self) { continuation in
+          let series = AsyncStream(buffering: String.self) { continuation in
             continuation.onCancel = { expectation.fulfilled = true }
           }
         }
@@ -348,7 +348,7 @@ var tests = TestSuite("Series")
         let expectation = Expectation()
 
         func scopedLifetime(_ expectation: Expectation) {
-          let series = ThrowingSeries(buffering: String.self) { continuation in
+          let series = AsyncThrowingStream(buffering: String.self) { continuation in
             continuation.onCancel = { expectation.fulfilled = true }
           }
         }
@@ -362,8 +362,8 @@ var tests = TestSuite("Series")
         let ready = DispatchSemaphore(value: 0)
         let done = DispatchSemaphore(value: 0)
         let task = detach {
-          let series = Series(buffering: String.self) { continuation in
-            continuation.onCancel = { continuation.resume(yielding: "Hit cancel") }
+          let series = AsyncStream(buffering: String.self) { continuation in
+            continuation.onCancel = { continuation.yield("Hit cancel") }
           }
           ready.signal()
           var iterator = series.makeAsyncIterator()
@@ -387,8 +387,8 @@ var tests = TestSuite("Series")
         let ready = DispatchSemaphore(value: 0)
         let done = DispatchSemaphore(value: 0)
         let task = detach {
-          let series = ThrowingSeries(buffering: String.self) { continuation in
-            continuation.onCancel = { continuation.resume(yielding: "Hit cancel") }
+          let series = AsyncThrowingStream(buffering: String.self) { continuation in
+            continuation.onCancel = { continuation.yield("Hit cancel") }
           }
           ready.signal()
           var iterator = series.makeAsyncIterator()
