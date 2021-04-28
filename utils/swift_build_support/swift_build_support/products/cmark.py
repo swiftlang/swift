@@ -22,6 +22,14 @@ class CMark(product.Product):
         """
         return True
 
+    @classmethod
+    def is_before_build_script_impl_product(cls):
+        """is_before_build_script_impl_product -> bool
+
+        Whether this product is build before any build-script-impl products.
+        """
+        return False
+
     # This is the root of the build-graph, so it doesn't have any dependencies.
     @classmethod
     def get_dependencies(cls):
