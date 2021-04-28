@@ -136,11 +136,6 @@ namespace swift {
   /// Type check a function body element which is at \p TagetLoc .
   bool typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc);
 
-  /// Typecheck top-level code parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
-
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 
