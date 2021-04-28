@@ -442,7 +442,7 @@ public func detach<T>(
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func asyncDetached<T>(
   priority: Task.Priority = .unspecified,
-  operation: __owned @Sendable @escaping () async -> T
+  @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> T
 ) -> Task.Handle<T, Never> {
   return detach(priority: priority, operation: operation)
 }
@@ -452,7 +452,7 @@ public func asyncDetached<T>(
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func asyncDetached<T>(
   priority: Task.Priority = .unspecified,
-  operation: __owned @Sendable @escaping () async throws -> T
+  @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> T
 ) -> Task.Handle<T, Error> {
   return detach(priority: priority, operation: operation)
 }
