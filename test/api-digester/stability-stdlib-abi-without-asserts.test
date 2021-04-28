@@ -5,6 +5,8 @@
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected %t.tmp/changes.txt.tmp
 
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
+
 // Welcome, Build Wrangler!
 //
 // This file lists APIs that have recently changed in a way that potentially
