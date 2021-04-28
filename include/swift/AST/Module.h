@@ -594,9 +594,6 @@ public:
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
 
-  Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) const;
-
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.
   void lookupImportedSPIGroups(
