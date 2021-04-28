@@ -21,10 +21,7 @@ import Swift
 ///
 /// Only code that's running as part of the task can interact with that task,
 /// by invoking the appropriate context-sensitive static functions which operate
-/// on the current task. Because all such functions are asynchronous, they can only
-/// be invoked as part of an existing task, and therefore are guaranteed to be
-/// effective.
-/// ◊TR: What do we mean by "effective" above?
+/// on the current task.
 ///
 /// A task's execution can be seen as a series of periods where the task was
 /// running. Each such period ends at a suspension point or the
@@ -32,22 +29,38 @@ import Swift
 ///
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Unless you're implementing a scheduler,
-/// you don't generally interacted with partial tasks directly.
+/// you don't generally interact with partial tasks directly.
+/// ◊TODO: partial tasks might get replaced with jobs (see PR 36878)
 ///
 /// Task Cancellation
 /// =================
 ///
-/// ◊ a task checks its own cancellation status
-/// ◊ you might need to check cancellation repeatedly for long-running work
-/// ◊ the canonical response to cancelation is to throw `Task.CancellationError`
+/// Tasks include a shared mechanism for indicating cancellation,
+/// but not a shared implementation for how to handle cancellation.
+/// Depending on the work you're doing in the task,
+/// the correct way to stop that work varies.
+/// Likewise,
+/// it's the responsibility of the code running as part of the task
+/// to check for cancellation at the appropriate points when stopping is possible.
+/// In a long-running task, you might need to check for cancellation repeatedly,
+/// and cancellation at different times
+/// might require stopping different aspects of that work.
+/// If you only need to throw an error to stop the work,
+/// call the `Task.checkCancellation()` function to check for cancellation.
+/// Other responses to cancellation include
+/// returning the work completed so far, returning an empty result, or returning `nil`.
 ///
-/// It is intentional that no information is passed to the task about why it
-/// was canceled. A task may be canceled for many reasons, and additional
-/// reasons may accrue / after the initial cancellation (for example, if the
-/// task fails to immediately exit, it may pass a deadline).
-///
-/// The goal of cancellation is to allow tasks to be canceled in a
-/// lightweight way, not to be a secondary method of inter-task communication.
+/// Cancellation is a purely Boolean state;
+/// there's no way to include additional information
+/// like the reason for cancellation.
+/// This reflects the fact that a task can be canceled for many reasons,
+/// and additional reasons can accrue during the cancellation process.
+/// For example,
+/// if it takes the task too long to exit after being canceled,
+/// it could also miss a deadline.
+/// ◊FIXME: Replace above example -- deadlines aren't part of the API yet
+/// Cancellation is a lightweight way to stop a task before it completes,
+/// not a general mechanism for inter-task communication.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct Task {
   internal let _task: Builtin.NativeObject
@@ -63,11 +76,27 @@ public struct Task {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
-  /// Returns the task that this code is being run on.
+  /// Returns the task that this code is being run on,
+  /// or `nil` if this property is accessed outside of any task.
   ///
-  /// All functions available on the task
+  /// If you read this property from the context of an asynchronous function or closure,
+  /// the current task is guaranteed to be non-nil.
+  /// In a synchronous context,
+  /// this property's value depends on whether the synchronous operation was
+  /// itself called from an asynchronous context.
+  /// For example:
   ///
-  /// - Returns: The current task, or `nil` if this method is called outside of any task.
+  ///     func hello() {
+  ///         if Task.current == nil { print("Nil") }
+  ///         else { print("Not nil") }
+  ///     }
+  ///
+  ///     func asynchronous() async { hello() }
+  ///
+  /// In the code above,
+  /// because `hello()` is called by an asynchronous function,
+  /// it prints "Not nil".
+  ///
   public static var current: Task? {
     guard let _task = _getCurrentAsyncTask() else {
       return nil
@@ -92,6 +121,7 @@ extension Task {
   ///
   /// If you access this property outside of any task,
   /// its value is `Priority.default`.
+  /// ◊FIXME: @ktoso said docs & implementation should use .unspecified
   ///
   /// - SeeAlso: `Task.priority`
   public static var currentPriority: Priority {
@@ -136,13 +166,10 @@ extension Task {
   ///   and a higher-priority task calls the `await handle.get()` method,
   ///   then the priority of this task is increased until the task completes.
   ///
-  /// In both cases, priority elevation prevents a low-priority task
+  /// In both cases, priority elevation helps you prevent a low-priority task
   /// blocking the execution of a high priority task,
-  /// also known as *priority inversion*.
-  ///
-  /// ◊TODO: Define the details of task priority; It is likely to be a concept
-  ///       similar to Darwin Dispatch's QoS; bearing in mind that priority is not as
-  ///       much of a thing on other platforms (i.e. server side Linux systems).
+  /// which is also known as *priority inversion*.
+  /// ◊TR: Let's revisit the above
   public enum Priority: Int, Comparable {
     // Values must be same as defined by the internal `JobPriority`.
     case userInteractive = 0x21
@@ -189,11 +216,13 @@ extension Task {
     /// priority of the current task. Note that this may not be as effective as
     /// creating the task with the right priority to in the first place.
     ///
-    /// If task is canceled, this method throws a cancellation error.
-    /// If the task is canceled internally ---
-    /// for example, by checking for cancellation
-    /// and throwing a specific error, or by using `checkCancellation` ---
-    /// this method rethrows the error that was thrown by the task.
+    /// If the task throws an error, this method propogates that error.
+    /// Tasks that respond to cancellation by throwing `Task.CancellationError`
+    /// have that error propogated here upon cancellation.
+    /// ◊TR: I think this is the underlying explanation?
+    /// ◊TR: That is, we don't specifically throw the cancellation error if a task is canceled,
+    /// ◊TR: but rather most tasks will handle cancellation by throwing that error,
+    /// ◊TR: which we propogate here.
     ///
     /// - Returns: The task's result.
     public func get() async throws -> Success {
@@ -206,11 +235,13 @@ extension Task {
     /// priority of the current task. Note that this may not be as effective as
     /// creating the task with the right priority to in the first place.
     ///
-    /// If task is canceled, this method returns a cancellation error.
-    /// If the task is canceled internally ---
-    /// for example, by checking for cancellation
-    /// and throwing a specific error, or by using `checkCancellation` ---
-    /// this method rethrows the error that was thrown by the task.
+    /// If the task throws an error, this method propogates that error.
+    /// Tasks that respond to cancellation by throwing `Task.CancellationError`
+    /// have that error propogated here upon cancellation.
+    /// ◊TR: I think this is the underlying explanation?
+    /// ◊TR: That is, we don't specifically throw the cancellation error if a task is canceled,
+    /// ◊TR: but rather most tasks will handle cancellation by throwing that error,
+    /// ◊TR: which we propogate here.
     ///
     /// - Returns: If the task suceeded, `.success`
     /// with the task's result as the associated value;
@@ -294,10 +325,6 @@ extension Task: Equatable {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   /// Flags for schedulable jobs.
-  ///
-  /// This is a port of the C++ FlagSet.
-  /// ◊TR: What is FlagSet?
-  /// ◊TR: Why does that matter to users that it matches something in C++?
   struct JobFlags {
     /// Kinds of schedulable jobs.
     enum Kind: Int {
@@ -400,15 +427,14 @@ extension Task {
 ///
 /// Avoid using a detached task unless it isn't possible
 /// to model the operation using structured concurrency features like child tasks.
-/// Child tasks inherit the parent task's priority,
-/// task-local storage, and deadlines,
+/// Child tasks inherit the parent task's priority and task-local storage,
 /// and canceling a parent task automatically cancels all of its child tasks.
 /// You need to handle these considerations manually with a detached task.
 ///
-/// A detached task runs to completion
-/// unless it is explicitly canceled by calling the `Task.Handle.cancel()` method.
-/// Specifically, dropping a detached task's handle
-/// doesn't cancel that task.
+/// You need to keep a reference to the task's handle
+/// if you need to cancel it by calling the `Task.Handle.cancel()` method.
+/// Discarding a detached task's handle doesn't implicitly cancel that task,
+/// it only makes it impossible for you to explicitly cancel the task.
 ///
 /// - Parameters:
 ///   - priority: The priority of the task.
@@ -439,12 +465,11 @@ public func detach<T>(
 
 /// Run given throwing `operation` as part of a new top-level task.
 ///
-/// If the operation throws an error, this method rethrows that error.
+/// If the operation throws an error, this method propogates that error.
 ///
 /// Avoid using a detached task unless it isn't possible
 /// to model the operation using structured concurrency features like child tasks.
-/// Child tasks inherit the parent task's priority,
-/// task-local storage, and deadlines,
+/// Child tasks inherit the parent task's priority and task-local storage,
 /// and canceling a parent task automatically cancels all of its child tasks.
 /// You need to handle these considerations manually with a detached task.
 ///
@@ -545,7 +570,12 @@ func _runAsyncHandler(operation: @escaping () async -> ()) {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   /// Suspends the current task,
-  /// and wait for at least the given duration before resuming it.
+  /// and waits for at least the given duration before resuming it.
+  ///
+  /// This method doesn't make guarantee how long the task is suspended.
+  /// Depending on a variety of factors,
+  /// it could be suspended for exactly the given duration,
+  /// or for a much longer duration.
   ///
   /// Calling this method doesn't block the underlying thread.
   ///
@@ -629,8 +659,8 @@ extension Task {
 /// the unsafe task handle passed to the closure is always be non-nil
 /// because an asynchronous function always runs in the context of a task.
 /// However if you call this function from the body of a synchronous function,
-/// the unsafe task handle is `nil`
-/// if the function isn't executing in the context of any task.
+/// and that function isn't executing in the context of any task,
+/// the unsafe task handle is `nil`.
 ///
 /// Don't try to store an unsafe task handle
 /// for use outside this method's closure.
@@ -675,14 +705,12 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 /// to access an instance of `Task` that you can store long-term
 /// and interact with outside of the closure body.
 ///
-/// The subset of APIs of `UnsafeCurrentTask` which also exist on `Task` are
-/// generally safe to be invoked from any task/thread.
-/// ◊TR: Which ones, exactly, is that?  "Generally" isn't good enough here.
-///
-/// All other APIs must not, be called 'from' any other task than the one
-/// represented by this handle itself. Doing so may result in undefined behavior,
-/// and most certainly will break invariants in other places of the program
-/// actively running on this task.
+/// Only APIs on `UnsafeCurrentTask` that are also part of `Task`
+/// are safe to invoke from another task
+/// besides the one that this task handle represents.
+/// Calling other APIs from another task is undefined behavior,
+/// breaks invariants in other parts of the program running on this task,
+/// and may lead to crashes or data loss.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct UnsafeCurrentTask {
   internal let _task: Builtin.NativeObject
@@ -695,8 +723,12 @@ public struct UnsafeCurrentTask {
   /// The current task,
   /// represented in a way that's safe to store for later use.
   ///
-  /// Operations on `Task` (unlike `UnsafeCurrentTask`) are safe to be called
-  /// from any other task (or thread).
+  /// Operations on an instance of `Task` are safe to call from any other task,
+  /// unlike `UnsafeCurrentTask`.
+  ///
+  /// ◊TR: Is this rewrite better?
+  /// ◊TR: I'm rewriting your original abstract to remove code voice,
+  /// ◊TR: which isn't allowed in abstracts.
   @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
   public var task: Task {
     Task(_task)
@@ -704,17 +736,15 @@ public struct UnsafeCurrentTask {
 
   /// A Boolean value that indicates whether the current task was canceled.
   ///
+  /// After the value of this property is true, it will remain true indefinitely.
+  /// There is no uncancellation operation.
+  ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 
   /// The current task's priority.
-  ///
-  /// If there is no current task,
-  /// the value of this property is `Priority.default`.
-  /// ◊TR: When would this happen,
-  /// ◊TR: rather than withUnsafeCurrentTask() passing nil as its closure's argument?
   ///
   /// - SeeAlso: `Task.currentPriority`
   public var priority: Task.Priority {

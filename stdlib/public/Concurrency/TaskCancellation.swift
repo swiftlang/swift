@@ -92,7 +92,8 @@ extension Task {
   ///
   /// The `Task.checkCancellation()` method throws this error
   /// if the current task has been canceled.
-  /// You can use this error in your own cancellation-checking code also.
+  /// You can throw this error in your own cancellation-checking code,
+  /// or another more specific error if needed.
   public struct CancellationError: Error {
     // no extra information, cancellation is intended to be light-weight
     public init() {}
