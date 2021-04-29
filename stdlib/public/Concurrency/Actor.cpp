@@ -18,6 +18,7 @@
 #include "swift/Runtime/Concurrency.h"
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
@@ -177,6 +178,17 @@ public:
   }
 };
 
+#ifdef SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+class ActiveTask {
+public:
+  static void set(AsyncTask *task) {
+    SWIFT_THREAD_SETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY, task);
+  }
+  static AsyncTask *get() {
+    return (AsyncTask *)SWIFT_THREAD_GETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY);
+  }
+};
+#else
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
@@ -189,11 +201,12 @@ public:
 
 /// Define the thread-locals.
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-  Pointer<ExecutorTrackingInfo>,
-  ExecutorTrackingInfo::ActiveInfoInThread);
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
   Pointer<AsyncTask>,
   ActiveTask::Value);
+#endif
+SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+  Pointer<ExecutorTrackingInfo>,
+  ExecutorTrackingInfo::ActiveInfoInThread);
 
 } // end anonymous namespace
 
