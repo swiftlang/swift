@@ -1,3 +1,5 @@
+// XFAIL: OS=linux-gnu && CPU=aarch64
+
 // REQUIRES: asan_runtime
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -sanitize=address -o %t/%target-library-name(TypesToReflect)
