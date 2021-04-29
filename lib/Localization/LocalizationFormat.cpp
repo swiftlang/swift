@@ -14,14 +14,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Range.h"
 #include "swift/Localization/LocalizationFormat.h"
+#include "swift/Basic/Range.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <cstdint>
