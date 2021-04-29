@@ -211,12 +211,12 @@ func test7() {
   #^CASE_0,caseSensitiveCheck,CaseSensitiveCheck^#
 }
 // CASE_0: Results for filterText: caseSensitiveCheck [
-// CASE_0: CaseSensitiveCheck
 // CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
 // CASE_0: caseSensitiveCheck.
 // CASE_0: ]
 // CASE_0: Results for filterText: CaseSensitiveCheck [
-// CASE_0: caseSensitiveCheck
 // CASE_0: CaseSensitiveCheck
+// CASE_0: caseSensitiveCheck
 // CASE_0: CaseSensitiveCheck(
 // CASE_0: ]

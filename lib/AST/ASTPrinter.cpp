@@ -755,13 +755,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printType(Type T) { printTypeWithOptions(T, Options); }
 
   void printTransformedTypeWithOptions(Type T, PrintOptions options) {
-    if (CurrentType && Current) {
-      if (T->hasArchetype()) {
-        // Get the interface type, since TypeLocs still have
-        // contextual types in them.
-        T = T->mapTypeOutOfContext();
-      }
-
+    if (CurrentType && Current && CurrentType->mayHaveMembers()) {
       auto *M = Current->getDeclContext()->getParentModule();
       SubstitutionMap subMap;
 

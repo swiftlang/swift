@@ -187,3 +187,15 @@ func testMissingWrapperType() {
     return
   }
 }
+
+@propertyWrapper
+struct OptionalWrapper<Value> { // expected-note {{'Value' declared as parameter to type 'OptionalWrapper'}}
+  var wrappedValue: Value?
+  var projectedValue: Self { self }
+  init(wrappedValue: Value?) { self.wrappedValue = wrappedValue }
+  init(projectedValue: Self) { self = projectedValue }
+}
+
+// expected-error@+2 {{generic parameter 'Value' could not be inferred}} expected-note@+2 {{}}
+// expected-error@+1 {{property type 'Int' does not match 'wrappedValue' type 'Value?'}}
+func testWrappedValueMismatch(@OptionalWrapper value: Int) {}

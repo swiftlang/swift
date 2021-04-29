@@ -292,7 +292,7 @@ TEST(FuzzyStringMatcher, NormalizeScore) {
   FuzzyStringMatcher n("abc");
   n.normalize = true;
   EXPECT_DOUBLE_EQ(1.0, n.scoreCandidate("abc"));
-  EXPECT_DOUBLE_EQ(1.0, n.scoreCandidate("ABC"));
+  EXPECT_DOUBLE_EQ(0.83333333333333337, n.scoreCandidate("ABC"));
 }
 
 TEST(FuzzyStringMatcher, TokenizingCharacters) {

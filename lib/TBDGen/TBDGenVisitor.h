@@ -140,7 +140,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   /// Adds the symbol for the linear map function of the given kind associated
   /// with the given original function and derivative function configuration.
   void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
-                                    AutoDiffConfig config,
+                                    const AutoDiffConfig &config,
                                     AutoDiffLinearMapKind kind);
 
   /// Adds the symbol for the autodiff function of the given kind associated
@@ -165,7 +165,7 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   /// derivative function configuration.
   void addDerivativeConfiguration(DifferentiabilityKind diffKind,
                                   AbstractFunctionDecl *original,
-                                  AutoDiffConfig config);
+                                  const AutoDiffConfig &config);
 
 public:
   TBDGenVisitor(const llvm::Triple &target, const llvm::DataLayout &dataLayout,

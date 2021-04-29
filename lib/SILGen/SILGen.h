@@ -243,7 +243,7 @@ public:
   /// - The last result in the returned pullback.
   SILFunction *getOrCreateCustomDerivativeThunk(
       AbstractFunctionDecl *originalAFD, SILFunction *originalFn,
-      SILFunction *customDerivativeFn, AutoDiffConfig config,
+      SILFunction *customDerivativeFn, const AutoDiffConfig &config,
       AutoDiffDerivativeFunctionKind kind);
 
   /// Get or create a derivative function vtable entry thunk for the given

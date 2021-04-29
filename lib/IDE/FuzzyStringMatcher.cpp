@@ -47,7 +47,7 @@ FuzzyStringMatcher::FuzzyStringMatcher(StringRef pattern_)
                pattern.size() * pattern.size(); // max run length score
     if (upperCharCount)                         // max uppercase match score
       maxScore += (upperCharCount + 1) * (upperCharCount + 1);
-    maxScore *= 1.1 * 2.5; // exact prefix match bonus
+    maxScore *= 1.1 * 2.5 * 1.2; // exact prefix match bonus
   }
 }
 
@@ -503,8 +503,12 @@ CandidateSpecificMatcher::scoreCandidateTrial(unsigned firstPatternPos) {
   }
 
   // Exact prefix matches are the best.
-  if (!runs.empty() && runs[0].location == 0 && runs[0].length == patternLength)
+  if (!runs.empty() && runs[0].location == 0 && runs[0].length == patternLength) {
     trialScore *= 2.5;
+    // Case sensitive exact prefix matches are the best of the best.
+    if (candidate.startswith(pattern))
+      trialScore *= 1.2;
+  }
 
   // FIXME: popular/unpopular API.
 

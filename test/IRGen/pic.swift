@@ -85,7 +85,7 @@ public func use_global() -> Int {
 // The following checks are temporarily disabled. See rdar://problem/42909618
 // arm64e-LABEL: _$s4main10use_globalSiyF:
 // arm64e:         bl _swift_beginAccess
-// arm64e:         ldr [[REG2:x[0-9]+]], [{{x[0-9]+}}, _$s4main6globalSivp@PAGEOFF]
+// arm64e:          _$s4main6globalSivp@PAGEOFF
 // arm64e:         bl _swift_endAccess
 
 // arm64_32-LABEL: _$s4main10use_globalSiyF:

@@ -6354,10 +6354,12 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 
 AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   if (!type) {
+    type = getInterfaceType();
+
     if (hasExternalPropertyWrapper()) {
-      type = getPropertyWrapperBackingPropertyType();
-    } else {
-      type = getInterfaceType();
+      if (auto wrapper = getPropertyWrapperBackingPropertyType()) {
+        type = wrapper;
+      }
     }
   }
 
@@ -7378,7 +7380,7 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
 }
 
 void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
-    AutoDiffConfig config) {
+    const AutoDiffConfig &config) {
   prepareDerivativeFunctionConfigurations();
   DerivativeFunctionConfigs->insert(config);
 }
