@@ -361,6 +361,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///         collected += value
   ///     }
   ///
+  /// This method must not be called from outside the task
+  /// where this task group was created.
+  /// In most cases, the Swift type system prevents this mistake ---
+  /// for example, because the `add(priority:operation:)` method is mutating,
+  /// that method can't be called from a concurrent execution context like a child task.
+  ///
   /// - Returns: The value returned by the next child task that completes.
   public mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
@@ -606,6 +612,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// and you propagate that error from this method
   /// out of the body of a `TaskGroup.withThrowingTaskGroup(of:returning:body:)` call,
   /// then all remaining child tasks in that group are implicitly canceled.
+  ///
+  /// This method must not be called from outside the task
+  /// where this task group was created.
+  /// In most cases, the Swift type system prevents this mistake ---
+  /// for example, because the `add(priority:operation:)` method is mutating,
+  /// that method can't be called from a concurrent execution context like a child task.
   ///
   /// - Returns: The value returned by the next child task that completes.
   ///
