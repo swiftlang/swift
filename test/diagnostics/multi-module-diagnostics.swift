@@ -3,6 +3,7 @@ open class ParentClass {
   open func overridableMethodA(param: Int) {}
   open func overridableMethodB(param: Int) {}
   open func overridableMethodC(param: Int) {}
+  open func overridableMethodD(param: Int) {}
 }
 #endif
 
@@ -10,9 +11,10 @@ open class ParentClass {
 open class ParentClass {
 #sourceLocation(file: "doesnotexist.swift", line: 10)
   open func overridableMethodA(param: Int) {}
-#sourceLocation(file: "REPLACEDWITHSED", line: 20)
   open func overridableMethodB(param: Int) {}
+#sourceLocation(file: "REPLACEDWITHSED", line: 20)
   open func overridableMethodC(param: Int) {}
+  open func overridableMethodD(param: Int) {}
 #sourceLocation()
 }
 #endif
@@ -24,6 +26,7 @@ open class SubClass: ParentClass {
   open override func overridableMethodA(param: String) {}
   open override func overridableMethodB(param: String) {}
   open override func overridableMethodC(param: String) {}
+  open override func overridableMethodD(param: String) {}
 }
 #endif
 
@@ -41,6 +44,7 @@ open class SubClass: ParentClass {
 // CHECK-EXISTS: moda.swift:3:13: note
 // CHECK-EXISTS: moda.swift:4:13: note
 // CHECK-EXISTS: moda.swift:5:13: note
+// CHECK-EXISTS: moda.swift:6:13: note
 
 // Removed the underlying file, so should use the generated source instead
 // RUN: mv %t/moda.swift %t/moda.swift-moved
@@ -65,7 +69,8 @@ open class SubClass: ParentClass {
 
 // RUN: cp %t/moda.swift %t/alternative.swift
 // RUN: not %target-swift-frontend -typecheck -I %t/mods -D MODB %s 2>&1 | %FileCheck -check-prefix=CHECK-DIRECTIVE %s
-// CHECK-DIRECTIVE: doesnotexist.swift:10:13: note
+// CHECK-DIRECTIVE: {{^}}doesnotexist.swift:10:13: note
+// CHECK-DIRECTIVE: {{^}}doesnotexist.swift:11:13: note
 // CHECK-DIRECTIVE: alternative.swift:20:13: note
 // CHECK-DIRECTIVE: alternative.swift:21:13: note
 
