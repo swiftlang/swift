@@ -775,6 +775,12 @@ bool CompilerInvocation::shouldImportSwiftConcurrency() const {
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
+bool CompilerInvocation::shouldImportSwiftDistributed() const {
+  return !getLangOptions().DisableImplicitDistributedModuleImport &&
+      getFrontendOptions().InputMode !=
+        FrontendOptions::ParseInputMode::SwiftModuleInterface;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds

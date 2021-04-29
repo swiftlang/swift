@@ -114,6 +114,7 @@ struct TestOptions {
   bool isAsyncRequest = false;
   bool timeRequest = false;
   bool DisableImplicitConcurrencyModuleImport = false;
+  bool DisableImplicitDistributedModuleImport = false;
   llvm::Optional<bool> OptimizeForIde;
   bool SuppressDefaultConfigRequest = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;

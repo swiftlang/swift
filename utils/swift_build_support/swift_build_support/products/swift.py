@@ -142,6 +142,11 @@ updated without updating swift.py?")
         return [('SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL',
                  self.args.enable_experimental_concurrency)]
 
+    @property
+    def _enable_experimental_distributed(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
+                 self.args.enable_experimental_distributed)]
+
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,

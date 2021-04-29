@@ -998,8 +998,11 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::Actor:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
-  case KnownProtocolKind::DistributedActor:
+  // case KnownProtocolKind::DistributedActor:
     M = getLoadedModule(Id_Concurrency);
+    break;
+  case KnownProtocolKind::DistributedActor:
+    M = getLoadedModule(Id_Distributed);
     break;
   default:
     M = getStdlibModule();

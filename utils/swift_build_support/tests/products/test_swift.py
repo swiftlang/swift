@@ -92,6 +92,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -108,7 +109,8 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER:BOOL=FALSE',
             '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE'
+            '-DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL=FALSE',
+            '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -334,3 +336,16 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY' in x])
+
+    def test_experimental_distributed_flags(self):
+        self.args.enable_experimental_distributed = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED' in x])

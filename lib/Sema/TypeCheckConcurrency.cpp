@@ -384,10 +384,12 @@ bool IsDefaultActorRequest::evaluate(
 
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  fprintf(stderr, "[%s:%d] (%s) nominal:%p\n", __FILE__, __LINE__, __FUNCTION__, nominal);
   if (auto actor = dyn_cast<ClassDecl>(nominal)) {
+    fprintf(stderr, "[%s:%d] (%s) \n", __FILE__, __LINE__, __FUNCTION__);
     auto distributedAttr = nominal->getAttrs()
         .getAttribute<DistributedActorAttr>();
-
+    fprintf(stderr, "[%s:%d] (%s) \n", __FILE__, __LINE__, __FUNCTION__);
     return distributedAttr != nullptr;
   }
 
@@ -872,8 +874,10 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc);
 static bool isSendableClosure(
     const AbstractClosureExpr *closure, bool forActorIsolation) {
   if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-    if (forActorIsolation && explicitClosure->inheritsActorContext())
+    if (forActorIsolation && explicitClosure->inheritsActorContext()) {
+      fprintf(stderr, "[%s:%d] (%s) is sendable closure FALSE\n", __FILE__, __LINE__, __FUNCTION__);
       return false;
+    }
 
     if (explicitClosure->isUnsafeSendable())
       return true;
@@ -1311,10 +1315,11 @@ namespace {
       const auto End = applyStack.rend();
       for (auto I = applyStack.rbegin(); I != End; ++I)
         if (auto call = dyn_cast<CallExpr>(*I)) {
-          if (setAsync)
-            call->setImplicitlyAsync(true);
-          if (setThrows)
-            call->setImplicitlyThrows(true);
+          call->dump();
+          if (setAsync) fprintf(stderr, "[%s:%d] (%s) ASYNC\n", __FILE__, __LINE__, __FUNCTION__);
+
+          if (setAsync) call->setImplicitlyAsync(true);
+          if (setThrows) call->setImplicitlyThrows(true);
           return;
         }
       llvm_unreachable("expected a CallExpr in applyStack!");
@@ -1756,6 +1761,9 @@ namespace {
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
 
+      fprintf(stderr, "[%s:%d] (%s) tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
+      decl->dump();
+
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
@@ -1786,6 +1794,7 @@ namespace {
         if (!isInAsynchronousContext())
           return AsyncMarkingResult::SyncContext;
 
+        fprintf(stderr, "[%s:%d] (%s) here\n", __FILE__, __LINE__, __FUNCTION__);
         markNearestCallAsImplicitly(/*setAsync=*/true);
         result = AsyncMarkingResult::FoundAsync;
 
@@ -1805,6 +1814,7 @@ namespace {
               return AsyncMarkingResult::SyncContext;
 
             // then this ValueDecl appears as the called value of the ApplyExpr.
+            fprintf(stderr, "[%s:%d] (%s) here\n", __FILE__, __LINE__, __FUNCTION__);
             markNearestCallAsImplicitly(/*setAsync=*/true);
             result = AsyncMarkingResult::FoundAsync;
           }
@@ -1844,6 +1854,7 @@ namespace {
             // outside of the actor.
             //
             // If it already is throwing, no need to mark it implicitly so.
+            fprintf(stderr, "[%s:%d] (%s) here\n", __FILE__, __LINE__, __FUNCTION__);
             markNearestCallAsImplicitly(/*setAsync=*/false, /*setThrows=*/true);
             result = ThrowsMarkingResult::FoundThrows;
           }
@@ -1863,6 +1874,7 @@ namespace {
               if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
                 if (func->isDistributed() && !func->hasThrows()) {
                   // then this ValueDecl appears as the called value of the ApplyExpr.
+                  fprintf(stderr, "[%s:%d] (%s) here\n", __FILE__, __LINE__, __FUNCTION__);
                   markNearestCallAsImplicitly(
                       /*setAsync=*/false,
                       /*setThrows=*/true);
@@ -1982,10 +1994,12 @@ namespace {
 
       bool isDistributedActor = false;
       switch (contextIsolation) {
-      case ActorIsolation::DistributedActorInstance:
+      case ActorIsolation::DistributedActorInstance: {
         isDistributedActor = true;
         LLVM_FALLTHROUGH;
+      }
       case ActorIsolation::ActorInstance: {
+        fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
@@ -2005,6 +2019,7 @@ namespace {
       case ActorIsolation::GlobalActorUnsafe: {
         // Check if this decl reference is the callee of the enclosing Apply,
         // making it OK as an implicitly async call.
+        fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
@@ -2023,6 +2038,7 @@ namespace {
       }
 
       case ActorIsolation::Independent: {
+        fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
@@ -2096,6 +2112,7 @@ namespace {
 //      } // end Unspecified case
 //      } // end switch
 //      llvm_unreachable("unhandled actor isolation kind!");
+        fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
@@ -2387,8 +2404,10 @@ namespace {
 
             assert(func->isDistributed());
 
-            if (!func->hasAsync())
+            if (!func->hasAsync()) {
               tryMarkImplicitlyAsync(memberLoc, memberRef, context);
+              fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
+            }
 
             tryMarkImplicitlyThrows(memberLoc, memberRef, context);
 
@@ -2435,6 +2454,7 @@ namespace {
         auto *selfVar = getReferencedSelf(base);
         if (!selfVar) {
           // Check for implicit async.
+          fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
           auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
           if (result == AsyncMarkingResult::FoundAsync)
             return false; // no problems
@@ -2459,9 +2479,10 @@ namespace {
         // Check whether the current context is differently-isolated.
         auto curDC = const_cast<DeclContext *>(getDeclContext());
         switch (auto contextIsolation = getActorIsolationOfContext(curDC)) {
-          case ActorIsolation::DistributedActorInstance:
+          case ActorIsolation::DistributedActorInstance: {
             isDistributedActor = true;
             LLVM_FALLTHROUGH;
+          }
           case ActorIsolation::ActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
@@ -2480,6 +2501,7 @@ namespace {
             return false;
 
           case ActorIsolation::Independent: {
+            fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
             auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
             if (result == AsyncMarkingResult::FoundAsync)
               return false; // no problems
@@ -2499,6 +2521,7 @@ namespace {
 
           case ActorIsolation::GlobalActor:
           case ActorIsolation::GlobalActorUnsafe: {
+            fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
             auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
             if (result == AsyncMarkingResult::FoundAsync)
               return false; // no problems

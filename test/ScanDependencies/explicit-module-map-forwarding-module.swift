@@ -34,6 +34,7 @@
 // RUN: echo "{" >> %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"_Concurrency\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%/concurrency_module\"," >> %/t/inputs/map.json
+// RUN: echo "\"modulePath\": \"%/distributed_module\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}]" >> %/t/inputs/map.json
 

@@ -69,6 +69,7 @@ struct TestOptions {
   bool rawOutput = false;
   bool structureOutput = false;
   bool disableImplicitConcurrencyModuleImport = false;
+  bool disableImplicitDistributedModuleImport = false;
   ArrayRef<const char *> compilerArgs;
 };
 } // end anonymous namespace

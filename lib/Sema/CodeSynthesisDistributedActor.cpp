@@ -192,6 +192,8 @@ createDistributedActor_init_local(ClassDecl *classDecl,
                                   ASTContext &ctx) {
   auto &C = ctx;
 
+  fprintf(stderr, "[%s:%d] (%s) create\n", __FILE__, __LINE__, __FUNCTION__);
+
 //  auto conformanceDC = derived.getConformanceContext();
   auto conformanceDC = classDecl;
 
@@ -199,6 +201,7 @@ createDistributedActor_init_local(ClassDecl *classDecl,
   //
   // Params: (transport transport: ActorTransport)
   auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+  fprintf(stderr, "[%s:%d] (%s) got transport\n", __FILE__, __LINE__, __FUNCTION__);
   auto *transportParamDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_transport,
       SourceLoc(), C.Id_transport, conformanceDC);
@@ -361,6 +364,8 @@ createDistributedActorInit(ClassDecl *classDecl,
                            ASTContext &ctx) {
   assert(classDecl->isDistributedActor());
 
+  fprintf(stderr, "[%s:%d] (%s) create\n", __FILE__, __LINE__, __FUNCTION__);
+
   auto &C = ctx;
   const auto name = requirement->getName();
   auto argumentNames = name.getArgumentNames();
@@ -371,11 +376,12 @@ createDistributedActorInit(ClassDecl *classDecl,
         return createDistributedActor_init_local(classDecl, ctx);
       }
 
-      if (argumentNames[0] == C.Id_from) {
-        // TODO: do we need to check types of the params here too?
-        // TODO: implement synthesis
-        return nullptr;
-      }
+//      if (argumentNames[0] == C.Id_from) {
+//        // TODO: do we need to check types of the params here too?
+//        // TODO: implement synthesis
+//        return nullptr;
+//      }
+      return nullptr;
       break;
     }
     case 2:
@@ -416,14 +422,6 @@ static void collectNonOveriddenDistributedActorInits(
     // Distributed Actor Constructor
     auto daCtor = cast<ConstructorDecl>(decl);
 
-//    // Skip invalid superclass initializers.
-//    if (daCtor->isInvalid())
-//      continue;
-//
-//    // Skip unavailable superclass initializers.
-//    if (AvailableAttr::isUnavailable(daCtor))
-//      continue;
-//
 // TODO: Don't require it if overriden
 //    if (!overriddenInits.count(daCtor))
     results.push_back(daCtor);
@@ -569,6 +567,9 @@ static void addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   // Bail out if not a distributed actor definition.
   if (!decl->isDistributedActor())
     return;
+
+  decl->dump();
+  fprintf(stderr, "[%s:%d] (%s) ^^^^\n", __FILE__, __LINE__, __FUNCTION__);
 
   addImplicitDistributedActorConstructors(decl);
   addImplicitDistributedActorStoredProperties(decl);
