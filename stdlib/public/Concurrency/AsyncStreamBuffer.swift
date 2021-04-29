@@ -31,6 +31,29 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     case failed(Failure)
   }
 
+  enum TerminationHandler {
+    case nonThrowing(@Sendable (AsyncStream<Element>.Continuation.Termination) -> Void)
+    case throwing(@Sendable (AsyncThrowingStream<Element>.Continuation.Termination) -> Void)
+
+    func cancel() {
+      switch self {
+      case .nonThrowing(let handler):
+        handler(.cancelled)
+      case .throwing(let handler):
+        handler(.cancelled)
+      }
+    }
+
+    func finish(throwing error: Error? = nil) {
+      switch self {
+      case .nonThrowing(let handler):
+        handler(.finished)
+      case .throwing(let handler):
+        handler(.finished(error))
+      }
+    }
+  }
+
   struct State {
     // continuation can be either of two types:
     // UnsafeContinuation<Element?, Error>
@@ -38,7 +61,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     var continuation: Builtin.RawUnsafeContinuation?
     var pending = [Element]()
     var terminal: Terminal?
-    var onTermination: (@Sendable () -> Void)?
+    var onTermination: TerminationHandler?
     let limit: Int
 
     init(limit: Int) {
@@ -53,7 +76,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
   }
 
   deinit {
-    state.onTermination?()
+    state.onTermination?.cancel()
   }
 
   private func lock() {
@@ -68,17 +91,42 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     _unlock(ptr)
   }
 
-  func getOnTermination() -> (@Sendable () -> Void)? {
+  func getOnTermination() -> (@Sendable (AsyncStream<Element>.Continuation.Termination) -> Void)? where Failure == Never {
     lock()
     let handler = state.onTermination
     unlock()
-    return handler
+    switch handler {
+    case .nonThrowing(let onTermination):
+      return onTermination
+    default:
+      return nil
+    }
   }
 
-  func setOnTermination(_ newValue: (@Sendable () -> Void)?) {
+  func getOnTermination() -> (@Sendable (AsyncThrowingStream<Element>.Continuation.Termination) -> Void)? {
+    lock()
+    let handler = state.onTermination
+    unlock()
+    switch handler {
+    case .throwing(let onTermination):
+      return onTermination
+    default:
+      return nil
+    }
+  }
+
+  func setOnTermination(_ newValue: (@Sendable (AsyncStream<Element>.Continuation.Termination) -> Void)?) where Failure == Never {
     lock()
     withExtendedLifetime(state.onTermination) {
-      state.onTermination = newValue
+      state.onTermination = newValue.map { .nonThrowing($0) }
+      unlock()
+    }
+  }
+
+  func setOnTermination(_ newValue: (@Sendable (AsyncThrowingStream<Element>.Continuation.Termination) -> Void)?) {
+    lock()
+    withExtendedLifetime(state.onTermination) {
+      state.onTermination = newValue.map { .throwing($0) }
       unlock()
     }
   }
@@ -90,12 +138,12 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     state.onTermination = nil
     unlock()
     
-    handler?() // handler must be invoked before yielding nil for termination
+    handler?.cancel() // handler must be invoked before yielding nil for termination
 
     yield(nil)
   }
 
-  private func enqueue(_ value: __owned Element?) {
+  private func enqueue(_ value: __owned Element?) -> TerminationHandler? {
     if let value = value {
       if state.terminal == nil {
         state.pending.append(value)
@@ -103,12 +151,14 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
           state.pending.remove(at: 0)
         }
       }
+      return nil
     } else {
-      terminate()
+      return terminate()
     }
   }
 
-  private func terminate(error: __owned Failure? = nil) {
+  private func terminate(error: __owned Failure? = nil) -> TerminationHandler? {
+    let handler = state.onTermination
     state.onTermination = nil
     if state.terminal == nil {
       if let failure = error {
@@ -117,11 +167,14 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         state.terminal = .finished
       }
     }
+    return handler
   }
 
   func yield(_ value: __owned Element?) {
     lock()
-    enqueue(value)
+    let handler = enqueue(value)
+    // the handler should only be present if the value is nil
+    defer { handler?.finish() }
 
     if let raw = state.continuation {
       if state.pending.count > 0 {
@@ -137,7 +190,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         let continuation =
           unsafeBitCast(raw, to: UnsafeContinuation<Element?, Error>.self)
         withExtendedLifetime((state.onTermination, state.terminal)) {
-          terminate()
+          _ = terminate()
           unlock()
         }
         switch terminal {
@@ -159,7 +212,9 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
 
   func yield(_ value: __owned Element?) where Failure == Never {
     lock()
-    enqueue(value)
+    let handler = enqueue(value)
+    // the handler should only be present if the value is nil
+    defer { handler?.finish() }
 
     if let raw = state.continuation {
       if state.pending.count > 0 {
@@ -175,7 +230,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         let continuation =
           unsafeBitCast(raw, to: UnsafeContinuation<Element?, Never>.self)
         withExtendedLifetime((state.onTermination, state.terminal)) {
-          terminate()
+          _ = terminate()
           unlock()
         }
         switch terminal {
@@ -197,13 +252,16 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
 
   func yield(throwing error: __owned Failure) {
     lock()
+    let handler = state.onTermination
+    state.onTermination = nil
+    defer { handler?.finish(throwing: error) }
     if let raw = state.continuation {
       state.continuation = nil
       let terminal = state.terminal
       let continuation =
         unsafeBitCast(raw, to: UnsafeContinuation<Element?, Error>.self)
       withExtendedLifetime((state.onTermination, state.terminal)) {
-        terminate()
+        _ = terminate()
         unlock()
       }
       switch terminal {
@@ -217,7 +275,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
       
     } else {
       withExtendedLifetime((state.onTermination, state.terminal)) {
-        terminate(error: error)
+        _ = terminate(error: error)
         unlock()
       }
     }
@@ -236,7 +294,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
         withExtendedLifetime((state.onTermination, state.terminal)) {
-          terminate()
+          _ = terminate()
           unlock()
         }
         switch terminal {
@@ -259,7 +317,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     await withTaskCancellationHandler { [cancel] in
       cancel()
     } operation: {
-      await withUnsafeContinuation { 
+      await withUnsafeContinuation {
         next($0)
       }
     }
@@ -278,7 +336,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
         withExtendedLifetime((state.onTermination, state.terminal)) {
-          terminate()
+          _ = terminate()
           unlock()
         }
         switch terminal {

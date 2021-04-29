@@ -49,6 +49,11 @@ import Swift
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct AsyncStream<Element> {
   public struct Continuation: Sendable {
+    public enum Termination {
+      case finished
+      case cancelled
+    }
+
     let storage: _AsyncStreamBufferedStorage<Element, Never>
 
     /// Resume the task awaiting the next iteration point by having it return
@@ -83,7 +88,7 @@ public struct AsyncStream<Element> {
     /// Cancelling an active iteration will first invoke the onTermination callback
     /// and then resume yeilding nil. This means that any cleanup state can be
     /// emitted accordingly in the cancellation handler
-    public var onTermination: (@Sendable () -> Void)? {
+    public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
         return storage.getOnTermination()
       }
