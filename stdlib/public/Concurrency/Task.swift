@@ -73,13 +73,21 @@ extension Task {
 
   /// Returns the `current` task's priority.
   ///
-  /// If no current `Task` is available, returns `Priority.default`.
+  /// If no current `Task` is available, queries the system to determine the
+  /// priority at which the current function is running. If the system cannot
+  /// provide an appropriate priority, returns `Priority.default`.
   ///
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.priority`
   public static var currentPriority: Priority {
     withUnsafeCurrentTask { task in
-      task?.priority ?? Priority.default
+      // If we are running on behalf of a task, use that task's priority.
+      if let task = task {
+        return task.priority
+      }
+
+      // Otherwise, query the system.
+      return Task.Priority(rawValue: _getCurrentThreadPriority()) ?? .default
     }
   }
 
@@ -138,6 +146,28 @@ extension Task {
     public static func < (lhs: Priority, rhs: Priority) -> Bool {
       lhs.rawValue < rhs.rawValue
     }
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension Task.Priority {
+  /// Downgrade user-interactive to user-initiated.
+  var _downgradeUserInteractive: Task.Priority {
+    if self == .userInteractive {
+      return .userInitiated
+    }
+
+    return self
+  }
+
+  /// Adjust the given priority (when it is unspecified) by the current
+  /// priority Return the current priority that,
+  var _inheritingContextualPriority: Task.Priority {
+    if self != .unspecified {
+      return self
+    }
+
+    return Task.currentPriority._downgradeUserInteractive
   }
 }
 
@@ -525,29 +555,10 @@ public func async(
   priority: Task.Priority = .unspecified,
   @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Void
 ) {
-  // Determine the priority at which we should create this task
-  let actualPriority: Task.Priority
-  if priority == .unspecified {
-    actualPriority = withUnsafeCurrentTask { task in
-      // If we are running on behalf of a task,
-      if let task = task {
-        return task.priority
-      }
-
-      return Task.Priority(rawValue: _getCurrentThreadPriority()) ?? .unspecified
-    }
-  } else {
-    actualPriority = priority
-  }
-
-  let adjustedPriority = actualPriority == .userInteractive
-    ? .userInitiated
-    : actualPriority
-
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
   flags.kind = .task
-  flags.priority = actualPriority
+  flags.priority = priority._inheritingContextualPriority
   flags.isFuture = true
 
   // Create the asynchronous task future.
