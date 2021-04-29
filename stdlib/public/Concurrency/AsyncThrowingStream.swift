@@ -48,19 +48,19 @@ public struct AsyncThrowingStream<Element> {
 
     /// A callback to invoke when iteration of a AsyncThrowingStream is cancelled.
     ///
-    /// If an `onCancel` callback is set, when iteration of a AsyncStream is
+    /// If an `onTermination` callback is set, when iteration of a AsyncStream is
     /// cancelled via task cancellation that callback is invoked. The callback
     /// is disposed of after any terminal state is reached.
     ///
-    /// Cancelling an active iteration will first invoke the onCancel callback
+    /// Cancelling an active iteration will first invoke the onTermination callback
     /// and then resume yeilding nil. This means that any cleanup state can be
     /// emitted accordingly in the cancellation handler
-    public var onCancel: (@Sendable () -> Void)? {
+    public var onTermination: (@Sendable () -> Void)? {
       get {
-        return storage.onCancel
+        return storage.onTermination
       }
       nonmutating set {
-        storage.onCancel = newValue
+        storage.onTermination = newValue
       }
     }
   }

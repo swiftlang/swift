@@ -38,7 +38,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     var continuation: Builtin.RawUnsafeContinuation?
     var pending = [Element]()
     var terminal: Terminal?
-    var onCancel: (@Sendable () -> Void)?
+    var onTermination: (@Sendable () -> Void)?
     let limit: Int
 
     init(limit: Int) {
@@ -53,7 +53,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
   }
 
   deinit {
-    state.onCancel?()
+    state.onTermination?()
   }
 
   private func lock() {
@@ -68,17 +68,17 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     _unlock(ptr)
   }
 
-  var onCancel: (@Sendable () -> Void)? {
+  var onTermination: (@Sendable () -> Void)? {
     get {
       lock()
-      let handler = state.onCancel
+      let handler = state.onTermination
       unlock()
       return handler
     }
     set {
       lock()
-      withExtendedLifetime(state.onCancel) {
-        state.onCancel = newValue
+      withExtendedLifetime(state.onTermination) {
+        state.onTermination = newValue
         unlock()
       }
     }
@@ -87,8 +87,8 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
   func cancel() {
     lock()
     // swap out the handler before we invoke it to prevent double cancel
-    let handler = state.onCancel
-    state.onCancel = nil
+    let handler = state.onTermination
+    state.onTermination = nil
     unlock()
     
     handler?() // handler must be invoked before yielding nil for termination
@@ -110,7 +110,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
   }
 
   private func terminate(error: __owned Failure? = nil) {
-    state.onCancel = nil
+    state.onTermination = nil
     if state.terminal == nil {
       if let failure = error {
         state.terminal = .failed(failure)
@@ -137,7 +137,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         state.continuation = nil
         let continuation =
           unsafeBitCast(raw, to: UnsafeContinuation<Element?, Error>.self)
-        withExtendedLifetime((state.onCancel, state.terminal)) {
+        withExtendedLifetime((state.onTermination, state.terminal)) {
           terminate()
           unlock()
         }
@@ -175,7 +175,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         state.continuation = nil
         let continuation =
           unsafeBitCast(raw, to: UnsafeContinuation<Element?, Never>.self)
-        withExtendedLifetime((state.onCancel, state.terminal)) {
+        withExtendedLifetime((state.onTermination, state.terminal)) {
           terminate()
           unlock()
         }
@@ -203,7 +203,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
       let terminal = state.terminal
       let continuation =
         unsafeBitCast(raw, to: UnsafeContinuation<Element?, Error>.self)
-      withExtendedLifetime((state.onCancel, state.terminal)) {
+      withExtendedLifetime((state.onTermination, state.terminal)) {
         terminate()
         unlock()
       }
@@ -217,7 +217,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
       }
       
     } else {
-      withExtendedLifetime((state.onCancel, state.terminal)) {
+      withExtendedLifetime((state.onTermination, state.terminal)) {
         terminate(error: error)
         unlock()
       }
@@ -236,7 +236,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         unlock()
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
-        withExtendedLifetime((state.onCancel, state.terminal)) {
+        withExtendedLifetime((state.onTermination, state.terminal)) {
           terminate()
           unlock()
         }
@@ -278,7 +278,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         unlock()
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
-        withExtendedLifetime((state.onCancel, state.terminal)) {
+        withExtendedLifetime((state.onTermination, state.terminal)) {
           terminate()
           unlock()
         }
