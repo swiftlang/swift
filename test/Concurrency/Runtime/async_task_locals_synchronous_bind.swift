@@ -10,14 +10,14 @@
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum TL {
-  @TaskLocal(default: 0)
-  static var number
+  @TaskLocal
+  static var number: Int = 0
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
 func printTaskLocal<V>(
-    _ key: TaskLocal<V>.Access,
+    _ key: TaskLocal<V>,
     _ expected: V? = nil,
     file: String = #file, line: UInt = #line
 ) -> V? {
@@ -36,24 +36,24 @@ func printTaskLocal<V>(
 func synchronous_bind() async {
 
   func synchronous() {
-    printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (1111)
+    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
 
     withUnsafeCurrentTask { task in
       guard let task = task else {
         fatalError()
       }
 
-      task.withTaskLocal(TL.number, boundTo: 2222) {
-        printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (2222)
+      task.withTaskLocal(TL.$number, boundTo: 2222) {
+        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
       }
 
-      printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (1111)
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
     }
 
-    printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (1111)
+    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
   }
 
-  await TL.number.withValue(1111) {
+  await TL.$number.withValue(1111) {
     synchronous()
   }
 }
