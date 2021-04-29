@@ -1,0 +1,6 @@
+framework module MixedFramework {
+  umbrella header "MixedFramework.h"
+
+  export *
+  module * { export * }
+}
