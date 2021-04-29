@@ -732,8 +732,24 @@ extension TaskGroup: AsyncSequence {
   ///
   /// This iterator terminates after all tasks have completed successfully,
   /// or after any task completes by throwing an error.
-  /// If a task completes by throwing an error,
-  /// no further task results are returned.
+  /// However, it's valid to make a new iterator for the task group,
+  /// which you can use to continue iterating over the group's results.
+  /// For example:
+  ///
+  ///     group.spawn { 1 }
+  ///     group.spawn { throw SomeError }
+  ///     group.spawn { 2 }
+  ///     
+  ///     do { 
+  ///         // Assuming the child tasks complete in order, this prints "1"
+  ///         // and then throws an error.
+  ///         for try await r in group { print(r) }
+  ///     } catch {
+  ///         // ... resolve the error ...
+  ///     }
+  ///     
+  ///     // Iterate again
+  ///     for try await r in group { print(r) }
   ///
   /// - SeeAlso: `TaskGroup.next()`
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
