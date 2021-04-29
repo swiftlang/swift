@@ -2,17 +2,19 @@
 // REQUIRES: concurrency
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-enum TL {
+struct TL {
   @TaskLocal
   static var number: Int = 0
 
   @TaskLocal
   static var someNil: Int?
 
-  // TODO: ban non-static task-local definitions
-//  @TaskLocal(default: 0)
-//  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-//  var notStatic
+  @TaskLocal
+  static var noValue: Int // expected-error{{'static var' declaration requires an initializer expression or an explicitly stated getter}}
+  // expected-note@-1{{add an initializer to silence this error}}
+
+  @TaskLocal
+  var notStatic: String? // expected-error{{property 'notStatic', must be static because property wrapper 'TaskLocal<String?>' can only be applied to static properties}}
 }
 
 @TaskLocal // expected-error{{property wrappers are not yet supported in top-level code}}

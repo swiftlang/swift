@@ -88,6 +88,10 @@ struct PropertyWrapperTypeInfo {
   /// ability to reason about the enclosing "self".
   SubscriptDecl *enclosingInstanceProjectedSubscript = nullptr;
 
+  /// Forces that the property wrapper must be declared on a static, or
+  /// global–once supported–property.
+  bool requireNoEnclosingInstance = false;
+
   ///
   /// Whether this is a valid property wrapper.
   bool isValid() const {
