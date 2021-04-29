@@ -12,44 +12,10 @@
 
 import Swift
 
-/// An ordered, asynchronously generated sequence of elements.
-///
-/// AsyncStream is an interface type to adapt from code producing values to an
-/// asynchronous context iterating them. This is itended to be used to allow
-/// callback or delegation based APIs to participate with async/await.
-///
-/// When values are produced from a non async/await source there is a
-/// consideration that must be made on behavioral characteristics of how that
-/// production of values interacts with the iteration. AsyncStream offers a
-/// initialization strategy that provides a method of yielding values into
-/// iteration.
-///
-/// AsyncStream can be initialized with the option to buffer to a given limit.
-/// The default value for this limit is Int.max. The buffering is only for
-/// values that have yet to be consumed by iteration. Values can be yielded in
-/// case to the continuation passed into the build closure. That continuation
-/// is Sendable, in that it is intended to be used from concurrent contexts
-/// external to the iteration of the AsyncStream.
-///
-/// A trivial use case producing values from a detached task would work as such:
-///
-///     let digits = AsyncStream(buffering: Int.self) { continuation in
-///       detach {
-///         for digit in 0..<10 {
-///           continuation.yield(digit)
-///         }
-///         continuation.finish()
-///       }
-///     }
-///
-///     for await digit in digits {
-///       print(digit)
-///     }
-///
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public struct AsyncStream<Element> {
+public struct AsyncThrowingStream<Element> {
   public struct Continuation: Sendable {
-    let storage: _AsyncStreamBufferedStorage<Element, Never>
+    let storage: _AsyncStreamBufferedStorage<Element, Error>
 
     /// Resume the task awaiting the next iteration point by having it return
     /// nomally from its suspension point or buffer the value if no awaiting
@@ -64,17 +30,23 @@ public struct AsyncStream<Element> {
     }
 
     /// Resume the task awaiting the next iteration point by having it return
-    /// nil which signifies the end of the iteration.
+    /// nil or throw which signifies the end of the iteration.
+    ///
+    /// - Parameter error: The error to throw or nil to signify termination.
     ///
     /// Calling this function more than once is idempotent; i.e. finishing more
     /// than once does not alter the state beyond the requirements of
     /// AsyncSequence; which claims that all values past a terminal state are
     /// nil.
-    public func finish() {
-      storage.yield(nil)
+    public func finish(throwing error: __owned Error? = nil) {
+      if let failure = error {
+        storage.yield(throwing: failure)
+      } else {
+        storage.yield(nil)
+      }
     }
 
-    /// A callback to invoke when iteration of a AsyncStream is cancelled.
+    /// A callback to invoke when iteration of a AsyncThrowingStream is cancelled.
     ///
     /// If an `onCancel` callback is set, when iteration of a AsyncStream is
     /// cancelled via task cancellation that callback is invoked. The callback
@@ -93,10 +65,10 @@ public struct AsyncStream<Element> {
     }
   }
 
-  let produce: (UnsafeContinuation<Element?, Never>) -> Void
+  let produce: (UnsafeContinuation<Element?, Error>) -> Void
   let cancel: @Sendable () -> Void
 
-  /// Construct a AsyncStream buffering given an Element type.
+  /// Construct a AsyncThrowingStream buffering given an Element type.
   ///
   /// - Parameter elementType: The type the AsyncStream will produce.
   /// - Parameter maxBufferedElements: The maximum number of elements to
@@ -116,7 +88,7 @@ public struct AsyncStream<Element> {
     maxBufferedElements limit: Int = .max,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _AsyncStreamBufferedStorage<Element, Never> = .create(limit: limit)
+    let storage: _AsyncStreamBufferedStorage<Element, Error> = .create(limit: limit)
     produce = storage.next
     cancel = {
       storage.cancel()
@@ -126,32 +98,23 @@ public struct AsyncStream<Element> {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AsyncStream: AsyncSequence {
-  /// The asynchronous iterator for iterating a AsyncStream.
+extension AsyncThrowingStream: AsyncSequence {
+  /// The asynchronous iterator for iterating a AsyncThrowingStream.
   ///
   /// This type is specificially not Sendable. It is not intended to be used
   /// from multiple concurrent contexts. Any such case that next is invoked
   /// concurrently and contends with another call to next is a programmer error
   /// and will fatalError.
   public struct Iterator: AsyncIteratorProtocol {
-    let produce: (UnsafeContinuation<Element?, Never>) -> Void
+    let produce: (UnsafeContinuation<Element?, Error>) -> Void
     let cancel: @Sendable () -> Void
 
-    /// The next value from the AsyncStream.
-    ///
-    /// When next returns nil this signifies the end of the AsyncStream. Any such
-    /// case that next is invoked concurrently and contends with another call to
-    /// next is a programmer error and will fatalError.
-    ///
-    /// If the task this iterator is running in is canceled while next is
-    /// awaiting a value, this will terminate the AsyncStream and next may return nil
-    /// immediately (or will return nil on subseuqent calls)
-    public mutating func next() async -> Element? {
-      return await withTaskCancellationHandler { [cancel] in
+    public mutating func next() async throws -> Element? {
+      return try await withTaskCancellationHandler { [cancel] in
         cancel()
       } operation: {
-        return await withUnsafeContinuation {
-          (continuation: UnsafeContinuation<Element?, Never>) in
+        return try await withUnsafeThrowingContinuation {
+          (continuation: UnsafeContinuation<Element?, Error>) in
           produce(continuation)
         }
       }
@@ -165,7 +128,7 @@ extension AsyncStream: AsyncSequence {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AsyncStream.Continuation {
+extension AsyncThrowingStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// nomally from its suspension point or buffer the value if no awaiting
   /// next iteration is active.
@@ -174,12 +137,14 @@ extension AsyncStream.Continuation {
   ///
   /// This can be called more than once and returns to the caller immediately
   /// without blocking for any awaiting consuption from the iteration.
-  public func yield(
-    with result: Result<Element, Never>
+  public func yield<Failure: Error>(
+    with result: Result<Element, Failure>
   ) {
     switch result {
       case .success(let val):
         storage.yield(val)
+      case .failure(let err):
+        storage.yield(throwing: err)
     }
   }
 
@@ -193,3 +158,5 @@ extension AsyncStream.Continuation {
     storage.yield(())
   }
 }
+
+
