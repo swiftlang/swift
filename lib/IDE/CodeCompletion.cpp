@@ -1294,8 +1294,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     return new (*Sink.Allocator) CodeCompletionResult(
-        SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
-        NotRecReason, copyString(*Sink.Allocator, BriefComment),
+        SemanticContext, IsArgumentLabels, NumBytesToErase, CCS, AssociatedDecl,
+        ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
   }
@@ -1303,22 +1303,22 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResult::ResultKind::Keyword:
     return new (*Sink.Allocator)
         CodeCompletionResult(
-          KeywordKind, SemanticContext, NumBytesToErase,
+          KeywordKind, SemanticContext, IsArgumentLabels, NumBytesToErase,
           CCS, ExpectedTypeRelation,
           copyString(*Sink.Allocator, BriefDocComment));
 
   case CodeCompletionResult::ResultKind::BuiltinOperator:
   case CodeCompletionResult::ResultKind::Pattern:
     return new (*Sink.Allocator) CodeCompletionResult(
-        Kind, SemanticContext, NumBytesToErase, CCS, ExpectedTypeRelation,
-        CodeCompletionOperatorKind::None,
+        Kind, SemanticContext, IsArgumentLabels, NumBytesToErase, CCS,
+        ExpectedTypeRelation, CodeCompletionOperatorKind::None,
         copyString(*Sink.Allocator, BriefDocComment));
 
   case CodeCompletionResult::ResultKind::Literal:
     assert(LiteralKind.hasValue());
     return new (*Sink.Allocator)
-        CodeCompletionResult(*LiteralKind, SemanticContext, NumBytesToErase,
-                             CCS, ExpectedTypeRelation);
+        CodeCompletionResult(*LiteralKind, SemanticContext, IsArgumentLabels,
+                             NumBytesToErase, CCS, ExpectedTypeRelation);
   }
 
   llvm_unreachable("Unhandled CodeCompletionResult in switch.");
@@ -2895,6 +2895,7 @@ public:
               : CodeCompletionResult::ResultKind::Pattern,
           SemanticContext ? *SemanticContext : getSemanticContextKind(AFD),
           expectedTypeContext);
+      Builder.setIsArgumentLabels();
       if (AFD) {
         Builder.setAssociatedDecl(AFD);
         setClangDeclKeywords(AFD, Pairs, Builder);

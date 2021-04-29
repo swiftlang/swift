@@ -912,7 +912,7 @@ static void transformAndForwardResults(
         CodeCompletionString::create(innerSink.allocator, chunks);
     CodeCompletion::SwiftResult paren(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
-        SemanticContextKind::ExpressionSpecific,
+        SemanticContextKind::ExpressionSpecific, /*IsArgumentLabels=*/false,
         exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
