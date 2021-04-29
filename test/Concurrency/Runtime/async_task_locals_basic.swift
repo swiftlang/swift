@@ -20,17 +20,17 @@ final class StringLike: Sendable, CustomStringConvertible {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum TL {
 
-  @TaskLocal(default: "<undefined>")
-  static var string
+  @TaskLocal
+  static var string: String = "<undefined>"
 
-  @TaskLocal(default: 0)
-  static var number
+  @TaskLocal
+  static var number: Int = 0
 
-  @TaskLocal(default: StringLike("<never>"))
-  static var never
+  @TaskLocal
+  static var never: StringLike = StringLike("<never>")
 
-  @TaskLocal()
-  static var clazz: TaskLocal<ClassTaskLocal?>.Access
+  @TaskLocal
+  static var clazz: ClassTaskLocal?
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -47,7 +47,7 @@ final class ClassTaskLocal: Sendable {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
 func printTaskLocal<V>(
-    _ key: TaskLocal<V>.Access,
+    _ key: TaskLocal<V>,
     _ expected: V? = nil,
     file: String = #file, line: UInt = #line
 ) -> V? {
@@ -64,20 +64,20 @@ func printTaskLocal<V>(
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple() async {
-  printTaskLocal(TL.number) // CHECK: TaskLocal<Int>.Access (0)
-  await TL.number.withValue(1) {
-    printTaskLocal(TL.number) // CHECK-NEXT: TaskLocal<Int>.Access (1)
+  printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
+  await TL.$number.withValue(1) {
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (1)
   }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple_deinit() async {
-  await TL.clazz.withValue(ClassTaskLocal()) {
+  await TL.$clazz.withValue(ClassTaskLocal()) {
     // CHECK: clazz init [[C:.*]]
-    printTaskLocal(TL.clazz) // CHECK: TaskLocal<Optional<ClassTaskLocal>>.Access (Optional(main.ClassTaskLocal))
+    printTaskLocal(TL.$clazz) // CHECK: TaskLocal<Optional<ClassTaskLocal>>(defaultValue: nil) (Optional(main.ClassTaskLocal))
   }
   // CHECK: clazz deinit [[C]]
-  printTaskLocal(TL.clazz) // CHECK: TaskLocal<Optional<ClassTaskLocal>>.Access (nil)
+  printTaskLocal(TL.$clazz) // CHECK: TaskLocal<Optional<ClassTaskLocal>>(defaultValue: nil) (nil)
 }
 
 struct Boom: Error {
@@ -86,7 +86,7 @@ struct Boom: Error {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple_throw() async {
   do {
-    try await TL.clazz.withValue(ClassTaskLocal()) {
+    try await TL.$clazz.withValue(ClassTaskLocal()) {
       throw Boom(value: "oh no!")
     }
   } catch {
@@ -97,59 +97,59 @@ func simple_throw() async {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func nested() async {
-  printTaskLocal(TL.string) // CHECK: TaskLocal<String>.Access (<undefined>)
-  await TL.string.withValue("hello") {
-    printTaskLocal(TL.number) // CHECK-NEXT: TaskLocal<Int>.Access (0)
-    printTaskLocal(TL.string)// CHECK-NEXT: TaskLocal<String>.Access (hello)
-    await TL.number.withValue(2) {
-      printTaskLocal(TL.number) // CHECK-NEXT: TaskLocal<Int>.Access (2)
-      printTaskLocal(TL.string, "hello") // CHECK: TaskLocal<String>.Access (hello)
+  printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  await TL.$string.withValue("hello") {
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
+    printTaskLocal(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (hello)
+    await TL.$number.withValue(2) {
+      printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (2)
+      printTaskLocal(TL.$string, "hello") // CHECK: TaskLocal<String>(defaultValue: <undefined>) (hello)
     }
-    printTaskLocal(TL.number) // CHECK-NEXT: TaskLocal<Int>.Access (0)
-    printTaskLocal(TL.string) // CHECK-NEXT: TaskLocal<String>.Access (hello)
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
+    printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (hello)
   }
-  printTaskLocal(TL.number) // CHECK-NEXT: TaskLocal<Int>.Access (0)
-  printTaskLocal(TL.string) // CHECK-NEXT: TaskLocal<String>.Access (<undefined>)
+  printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
+  printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func nested_allContribute() async {
-  printTaskLocal(TL.string) // CHECK: TaskLocal<String>.Access (<undefined>)
-  await TL.string.withValue("one") {
-    printTaskLocal(TL.string, "one")// CHECK-NEXT: TaskLocal<String>.Access (one)
-    await TL.string.withValue("two") {
-      printTaskLocal(TL.string, "two") // CHECK-NEXT: TaskLocal<String>.Access (two)
-      await TL.string.withValue("three") {
-        printTaskLocal(TL.string, "three") // CHECK-NEXT: TaskLocal<String>.Access (three)
+  printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  await TL.$string.withValue("one") {
+    printTaskLocal(TL.$string, "one")// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    await TL.$string.withValue("two") {
+      printTaskLocal(TL.$string, "two") // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (two)
+      await TL.$string.withValue("three") {
+        printTaskLocal(TL.$string, "three") // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (three)
       }
-      printTaskLocal(TL.string, "two") // CHECK-NEXT: TaskLocal<String>.Access (two)
+      printTaskLocal(TL.$string, "two") // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (two)
     }
-    printTaskLocal(TL.string, "one")// CHECK-NEXT: TaskLocal<String>.Access (one)
+    printTaskLocal(TL.$string, "one")// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
   }
-  printTaskLocal(TL.string) // CHECK-NEXT: TaskLocal<String>.Access (<undefined>)
+  printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func nested_3_onlyTopContributes() async {
-  printTaskLocal(TL.string) // CHECK: TaskLocal<String>.Access (<undefined>)
-  await TL.string.withValue("one") {
-    printTaskLocal(TL.string)// CHECK-NEXT: TaskLocal<String>.Access (one)
-    await TL.number.withValue(2) {
-      printTaskLocal(TL.string) // CHECK-NEXT: TaskLocal<String>.Access (one)
-      await TL.number.withValue(3) {
-        printTaskLocal(TL.string) // CHECK-NEXT: TaskLocal<String>.Access (one)
+  printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  await TL.$string.withValue("one") {
+    printTaskLocal(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    await TL.$number.withValue(2) {
+      printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+      await TL.$number.withValue(3) {
+        printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
       }
-      printTaskLocal(TL.string) // CHECK-NEXT: TaskLocal<String>.Access (one)
+      printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
     }
-    printTaskLocal(TL.string)// CHECK-NEXT: TaskLocal<String>.Access (one)
+    printTaskLocal(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
   }
-  printTaskLocal(TL.string) // CHECK-NEXT: TaskLocal<String>.Access (<undefined>)
+  printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func withLocal_body_mustNotEscape() async {
   var something = "Nice"
-  await TL.string.withValue("xxx") {
+  await TL.$string.withValue("xxx") {
     something = "very nice"
   }
   _ = something // silence not used warning

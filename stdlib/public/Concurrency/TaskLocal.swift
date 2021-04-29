@@ -13,75 +13,157 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
+/// Property wrapper that defines a task-local value key.
+///
+/// A task-local value is a value that can be bound and read in the context of a
+/// `Task`. It is implicitly carried with the task, and is accessible by any
+/// child tasks the task creates (such as TaskGroup or `async let` created tasks).
+///
+/// ### Task-local declarations
+///
+/// Task locals must be declared as static properties (or global properties,
+/// once property wrappers support these), like this:
+///
+///     enum TracingExample {
+///         @TaskLocal
+///         static let traceID: TraceID?
+///     }
+///
+/// ### Default values
+/// Task local values of optional types default to `nil`. It is possible to define
+/// not-optional task-local values, and an explicit default value must then be
+/// defined instead.
+///
+/// The default value is returned whenever the task-local is read
+/// from a context which either: has no task available to read the value from
+/// (e.g. a synchronous function, called without any asynchronous function in its call stack),
+///
+///
+/// ### Reading task-local values
+/// Reading task local values is simple and looks the same as-if reading a normal
+/// static property:
+///
+///     guard let traceID = TracingExample.traceID else {
+///       print("no trace id")
+///       return
+///     }
+///     print(traceID)
+///
+/// It is possible to perform task-local value reads from either asynchronous
+/// or synchronous functions. Within asynchronous functions, as a "current" task
+/// is always guaranteed to exist, this will perform the lookup in the task local context.
+///
+/// A lookup made from the context of a synchronous function, that is not called
+/// from an asynchronous function (!), will immediately return the task-local's
+/// default value.
+///
+/// ### Binding task-local values
+/// Task local values cannot be `set` directly and must instead be bound using
+/// the scoped `$traceID.withValue() { ... }` operation. The value is only bound
+/// for the duration of that scope, and is available to any child tasks which
+/// are created within that scope.
+///
+/// Detached tasks do not inherit task-local values, however tasks created using
+/// the `async {}` operation do inherit task-locals by copying them to the new
+/// asynchronous task, even though it is an un-structured task.
+///
+/// ### Examples
+///
+///     @TaskLocal
+///     static var traceID: TraceID?
+///
+///     print("traceID: \(traceID)") // traceID: nil
+///
+///     $traceID.withValue(1234) { // bind the value
+///       print("traceID: \(traceID)") // traceID: 1234
+///       call() // traceID: 1234
+///
+///       asyncDetached { // detached tasks do not inherit task-local values
+///         call() // traceID: nil
+///       }
+///
+///       async { // async tasks do inherit task locals by copying
+///         call() // traceID: 1234
+///       }
+///     }
+///
+///
+///     func call() {
+///       print("traceID: \(traceID)") // 1234
+///     }
+///
 /// This type must be a `class` so it has a stable identity, that is used as key
 /// value for lookups in the task local storage.
 @propertyWrapper
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public final class TaskLocal<Value: Sendable>: CustomStringConvertible {
-  // only reason this is ! is to store the wrapper `self` in Access so we
-  // can use its identity as the key for lookups.
-  private var access: Access!
+public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
+  let defaultValue: Value
 
-  public init(default defaultValue: Value) {
-    self.access = Access(key: self, defaultValue: defaultValue)
+  public init(wrappedValue defaultValue: Value) {
+    self.defaultValue = defaultValue
   }
 
+  var key: Builtin.RawPointer {
+    unsafeBitCast(self, to: Builtin.RawPointer.self)
+  }
 
-  public struct Access: CustomStringConvertible {
-    let key: Builtin.RawPointer
-    let defaultValue: Value
-
-    init(key: TaskLocal<Value>, defaultValue: Value) {
-      self.key = unsafeBitCast(key, to: Builtin.RawPointer.self)
-      self.defaultValue = defaultValue
-    }
-
-    public func get() -> Value {
-      withUnsafeCurrentTask { task in
-        guard let task = task else {
-          return self.defaultValue
-        }
-
-        let value = _taskLocalValueGet(task._task, key: key)
-
-        guard let rawValue = value else {
-          return self.defaultValue
-        }
-
-        // Take the value; The type should be correct by construction
-        let storagePtr =
-            rawValue.bindMemory(to: Value.self, capacity: 1)
-        return UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
-      }
-    }
-
-    /// Execute the `body` closure
-    @discardableResult
-    public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R,
-                             file: String = #file, line: UInt = #line) async rethrows -> R {
-      // check if we're not trying to bind a value from an illegal context; this may crash
-      _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
-
-      // we need to escape the `_task` since the withUnsafeCurrentTask closure is not `async`.
-      // this is safe, since we know the task will remain alive because we are running inside of it.
-      let _task = withUnsafeCurrentTask { task in
-        task!._task // !-safe, guaranteed to have task available inside async function
+  /// Gets the value currently bound to this task-local from the current task.
+  ///
+  /// If no current task is available in the context where this call is made,
+  /// or if the task-local has no value bound, this will return the `defaultValue`
+  /// of the task local.
+  public func get() -> Value {
+    withUnsafeCurrentTask { task in
+      guard let task = task else {
+        return self.defaultValue
       }
 
-      _taskLocalValuePush(_task, key: key, value: valueDuringBody)
-      defer { _taskLocalValuePop(_task) }
+      let value = _taskLocalValueGet(task._task, key: key)
 
-      return try await body()
-    }
+      guard let rawValue = value else {
+        return self.defaultValue
+      }
 
-    public var description: String {
-      "TaskLocal<\(Value.self)>.Access"
+      // Take the value; The type should be correct by construction
+      let storagePtr =
+          rawValue.bindMemory(to: Value.self, capacity: 1)
+      return UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
     }
   }
 
-  public var wrappedValue: TaskLocal<Value>.Access {
+  /// Binds the task-local to the specific value for the duration of the body.
+  ///
+  /// The value is available throughout the execution of the body closure,
+  /// including any `get` operations performed by child-tasks created during the
+  /// execution of the body closure.
+  ///
+  /// If the same task-local is bound multiple times, be it in the same task, or
+  /// in specific child tasks, the more specific (i.e. "deeper") binding is
+  /// returned when the value is read.
+  ///
+  /// If the value is a reference type, it will be retained for the duration of
+  /// the body closure.
+  @discardableResult
+  public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R,
+                           file: String = #file, line: UInt = #line) async rethrows -> R {
+    // check if we're not trying to bind a value from an illegal context; this may crash
+    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
+
+    // we need to escape the `_task` since the withUnsafeCurrentTask closure is not `async`.
+    // this is safe, since we know the task will remain alive because we are running inside of it.
+    let _task = withUnsafeCurrentTask { task in
+      task!._task // !-safe, guaranteed to have task available inside async function
+    }
+
+    _taskLocalValuePush(_task, key: key, value: valueDuringBody)
+    defer { _taskLocalValuePop(_task) }
+
+    return try await body()
+  }
+
+  public var projectedValue: TaskLocal<Value> {
     get {
-      self.access
+      self
     }
 
     @available(*, unavailable, message: "use 'myTaskLocal.withValue(_:do:)' instead")
@@ -90,17 +172,14 @@ public final class TaskLocal<Value: Sendable>: CustomStringConvertible {
     }
   }
 
+  public var wrappedValue: Value {
+    self.get()
+  }
+
   public var description: String {
-    "\(Self.self)(defaultValue: \(self.access.defaultValue))"
+    "\(Self.self)(defaultValue: \(self.defaultValue))"
   }
 
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension TaskLocal {
-  public convenience init<V>() where Value == Optional<V> {
-    self.init(default: nil)
-  }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -113,13 +192,14 @@ extension UnsafeCurrentTask {
   /// represented by this object.
   @discardableResult
   public func withTaskLocal<Value: Sendable, R>(
-      _ access: TaskLocal<Value>.Access, boundTo valueDuringBody: Value,
+      _ taskLocal: TaskLocal<Value>,
+      boundTo valueDuringBody: Value,
       do body: () throws -> R,
       file: String = #file, line: UInt = #line) rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
-    _taskLocalValuePush(self._task, key: access.key, value: valueDuringBody)
+    _taskLocalValuePush(self._task, key: taskLocal.key, value: valueDuringBody)
     defer { _taskLocalValuePop(_task) }
 
     return try body()

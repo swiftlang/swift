@@ -11,19 +11,19 @@
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum TL {
-  @TaskLocal(default: 2)
-  static var number
+  @TaskLocal
+  static var number: Int = 2
 }
 
 // ==== ------------------------------------------------------------------------
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func bindAroundGroupSpawn() async {
-  await TL.number.withValue(1111) { // ok
+  await TL.$number.withValue(1111) { // ok
     await withTaskGroup(of: Int.self) { group in
 
       // CHECK: error: task-local: detected illegal task-local value binding at {{.*}}illegal_use.swift:[[# @LINE + 1]]
-      await TL.number.withValue(2222) { // bad!
+      await TL.$number.withValue(2222) { // bad!
         print("Survived, inside withValue!") // CHECK-NOT: Survived, inside withValue!
         group.spawn {
           0 // don't actually perform the read, it would be unsafe.
