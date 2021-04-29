@@ -619,10 +619,7 @@ static void writeRawLoc(const ExternalSourceLocs::RawLoc &Loc,
   Writer.write<uint32_t>(Loc.Directive.Offset);
   Writer.write<int32_t>(Loc.Directive.LineOffset);
   Writer.write<uint32_t>(Loc.Directive.Length);
-  llvm::SmallString<128> AbsName = Loc.Directive.Name;
-  if (!AbsName.empty())
-    llvm::sys::fs::make_absolute(AbsName);
-  Writer.write<uint32_t>(Strings.getTextOffset(AbsName.str()));
+  Writer.write<uint32_t>(Strings.getTextOffset(Loc.Directive.Name));
 }
 
 /**
