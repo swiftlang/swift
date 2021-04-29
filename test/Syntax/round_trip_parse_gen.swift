@@ -597,3 +597,10 @@ func foo() {}
 #"abc \#(foo)"#
 ##"abc"##
 ##"abc \##(foo)"##
+
+foo()
+#if true
+  .bar?()!
+#else
+  .baz() {}
+#endif

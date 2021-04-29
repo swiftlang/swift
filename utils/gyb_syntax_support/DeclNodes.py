@@ -106,6 +106,7 @@ DECL_NODES = [
                        Child('Statements', kind='CodeBlockItemList'),
                        Child('SwitchCases', kind='SwitchCaseList'),
                        Child('Decls', kind='MemberDeclList'),
+                       Child('PostfixExpression', kind='Expr'),
                    ]),
          ]),
 

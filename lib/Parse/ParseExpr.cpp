@@ -1087,6 +1087,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (Result.isNull())
       return Result;
 
+    if (InPoundIfEnvironment && Tok.isAtStartOfLine())
+      return Result;
+
     if (Result.hasCodeCompletion() &&
         SourceMgr.getCodeCompletionLoc() == PreviousLoc) {
       // Don't parse suffixes if the expression ended with code completion
@@ -1302,6 +1305,95 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           Result, new (Context) PostfixUnaryExpr(
                       oper, formUnaryArgument(Context, Result.get())));
       SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
+      continue;
+    }
+
+    if (Tok.is(tok::pound_if)) {
+
+      // Helper function to see if we can parse member reference like suffixes
+      // inside '#if'.
+      auto isAtStartOfPostfixExprSuffix = [&]() {
+        if (!Tok.isAny(tok::period, tok::period_prefix)) {
+          return false;
+        }
+        if (!peekToken().isAny(tok::identifier, tok::kw_Self, tok::kw_self,
+                               tok::integer_literal, tok::code_complete) &&
+            !peekToken().isKeyword()) {
+          return false;
+        }
+        return true;
+      };
+
+      // Check if the first '#if' body starts with '.' <identifier>, and parse
+      // it as a "postfix ifconfig expression".
+      bool isPostfixIfConfigExpr = false;
+      {
+        llvm::SaveAndRestore<Optional<StableHasher>> H(CurrentTokenHash, None);
+        Parser::BacktrackingScope Backtrack(*this);
+        // Skip to the first body. We may need to skip multiple '#if' directives
+        // since we support nested '#if's. e.g.
+        //   baseExpr
+        //   #if CONDITION_1
+        //     #if CONDITION_2
+        //       .someMember
+        do {
+          consumeToken(tok::pound_if);
+          skipUntilTokenOrEndOfLine(tok::NUM_TOKENS);
+        } while (Tok.is(tok::pound_if));
+        isPostfixIfConfigExpr = isAtStartOfPostfixExprSuffix();
+      }
+      if (!isPostfixIfConfigExpr)
+        break;
+
+      if (!Tok.isAtStartOfLine()) {
+        diagnose(Tok, diag::statement_same_line_without_newline)
+          .fixItInsert(getEndOfPreviousLoc(), "\n");
+      }
+
+      llvm::SmallPtrSet<Expr *, 4> exprsWithBindOptional;
+      auto ICD =
+          parseIfConfig([&](SmallVectorImpl<ASTNode> &elements, bool isActive) {
+            SyntaxParsingContext postfixCtx(SyntaxContext,
+                                            SyntaxContextKind::Expr);
+            // Although we know the '#if' body starts with period,
+            // '#elseif'/'#else' bodies might start with invalid tokens.
+            if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
+              bool exprHasBindOptional = false;
+              auto expr = parseExprPostfixSuffix(Result, isExprBasic,
+                                                 periodHasKeyPathBehavior,
+                                                 exprHasBindOptional);
+              if (exprHasBindOptional)
+                exprsWithBindOptional.insert(expr.get());
+              elements.push_back(expr.get());
+            }
+
+            // Don't allow any character other than the postfix expression.
+            if (!Tok.isAny(tok::pound_elseif, tok::pound_else, tok::pound_endif,
+                           tok::eof)) {
+              diagnose(Tok, diag::expr_postfix_ifconfig_unexpectedtoken);
+              skipUntilConditionalBlockClose();
+            }
+          });
+      if (ICD.isNull())
+        break;
+
+      SyntaxContext->createNodeInPlace(SyntaxKind::PostfixIfConfigExpr);
+
+      auto activeElements = ICD.get()->getActiveClauseElements();
+      if (activeElements.empty())
+        // There's no active clause, or it was empty. Keep the current result.
+        continue;
+
+      // Extract the parsed expression as the result.
+      assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
+      auto expr = activeElements[0].get<Expr *>();
+      ParserStatus status(ICD);
+      if (SourceMgr.getCodeCompletionLoc().isValid() &&
+          SourceMgr.rangeContainsTokenLoc(expr->getSourceRange(),
+                                          SourceMgr.getCodeCompletionLoc()))
+        status.setHasCodeCompletion();
+      hasBindOptional |= exprsWithBindOptional.contains(expr);
+      Result = makeParserResult(status, expr);
       continue;
     }
 
