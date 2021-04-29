@@ -1001,8 +1001,12 @@ class BuildScriptInvocation(object):
         (impl_product_classes, product_classes) = self.compute_product_classes()
 
         # Execute each "pass".
-
-        # Build...
+        # We are forced to build and install build-script-impl products first,
+        # since some of the later products rely on having a toolchain available
+        # in the build directory.
+        # FIXME: This should end up being a normal consequence of dependency
+        # order instead of having to be separated. This probably relies on
+        # --infer being on by default?
         for host_target in all_hosts:
             # FIXME: We should only compute these once.
             try:
@@ -1019,24 +1023,9 @@ class BuildScriptInvocation(object):
                 print("Running Swift benchmarks for: {}".format(
                     " ".join(config.swift_benchmark_run_targets)))
 
-            for product_class in impl_product_classes:
-                self._execute_build_action(host_target, product_class)
-
-        # Test...
-        for host_target in all_hosts:
-            for product_class in impl_product_classes:
-                self._execute_test_action(host_target, product_class)
-
-        # Install...
-        for host_target in all_hosts:
-            for product_class in impl_product_classes:
-                self._execute_install_action(host_target, product_class)
-
-        # Core Lipo...
-        self._execute_merged_host_lipo_core_action()
-
         # Non-build-script-impl products...
         # Note: currently only supports building for the host.
+        products = []
         for host_target in [self.args.host_target]:
             for product_class in product_classes:
                 if product_class.is_build_script_impl_product():
@@ -1054,20 +1043,45 @@ class BuildScriptInvocation(object):
                     toolchain=self.toolchain,
                     source_dir=self.workspace.source_dir(product_source),
                     build_dir=build_dir)
+                products.append(product)
+
+        # build-script-impl Build + Install...
+        for host_target in all_hosts:
+            for product_class in impl_product_classes:
+                self._execute_build_action(host_target, product_class)
+                self._execute_install_action(host_target, product_class)
+
+        # Core Lipo...
+        self._execute_merged_host_lipo_core_action()
+
+        # non-impl Build + Install...
+        for host_target in [self.args.host_target]:
+            for product in products:
+                product_name = product.product_name()
                 if product.should_clean(host_target):
                     print("--- Cleaning %s ---" % product_name)
                     product.clean(host_target)
                 if product.should_build(host_target):
                     print("--- Building %s ---" % product_name)
                     product.build(host_target)
-                if product.should_test(host_target):
-                    print("--- Running tests for %s ---" % product_name)
-                    product.test(host_target)
-                    print("--- Finished tests for %s ---" % product_name)
                 if product.should_install(host_target) or \
                    (self.install_all and product.should_build(host_target)):
                     print("--- Installing %s ---" % product_name)
                     product.install(host_target)
+
+        # build-script-impl Test...
+        for host_target in all_hosts:
+            for product_class in impl_product_classes:
+                self._execute_test_action(host_target, product_class)
+
+        # non-impl Test...
+        for host_target in [self.args.host_target]:
+            for product in products:
+                product_name = product.product_name()
+                if product.should_test(host_target):
+                    print("--- Running tests for %s ---" % product_name)
+                    product.test(host_target)
+                    print("--- Finished tests for %s ---" % product_name)
 
         # Extract symbols...
         for host_target in all_hosts:
