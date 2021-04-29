@@ -240,6 +240,12 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
       if (isRequirementOrDefaultImplementation(S.getSymbolDecl())) {
         return;
       }
+      if (DC->getSelfNominalTypeDecl() == nullptr) {
+        // If we couldn't look up the type the member is declared on (e.g.
+        // because the member is declared in an extension whose extended type
+        // doesn't exist), don't record a memberOf relationship.
+        return;
+      }
       return recordEdge(S,
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
