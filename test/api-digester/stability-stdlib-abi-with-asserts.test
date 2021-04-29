@@ -7,24 +7,40 @@
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
 
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
+
 // Welcome, Build Wrangler!
 //
-// A failure in this test indicates that there is a potential ABI breaking
-// change in the Standard Library. If you observe a failure, please reach out to
-// the Standard Library team directly to make sure we resolve this quickly!
+// This file lists APIs that are unique to stdlib builds with assertions.
+// (It is combined with the stability-stdlib-abi-without-asserts.test file
+// to generate a full list of potentially breaking API changes. In most cases
+// you'll want to edit that file instead of this one.)
 //
-// Please DO NOT XFAIL THIS TEST. In addition to ignoring the current set of ABI
-// breaks, XFAILing this test also silences any future ABI breaks that may land
-// on this branch, which isn't ideal.
+// A failure in this test indicates that there is a potential breaking change in
+// the Standard Library. If you observe a failure outside of a PR test, please
+// reach out to the Standard Library team directly to make sure this gets
+// resolved quickly! If your own PR fails in this test, you probably have an
+// ABI- or source-breaking change in your commits. Please go and fix it.
 //
-// Instead, consider extending the list of expected changes at the bottom. You
-// can find a diff of what needs to be added in the output of the failed test
-// run. The order of lines doesn't matter, and you can also include comments to
-// refer to any bugs you filed.
+// Please DO NOT DISABLE THIS TEST. In addition to ignoring the current set of
+// ABI breaks, XFAILing this test also silences any future ABI breaks that may
+// land on this branch, which simply generates extra work for the next person
+// that picks up the mess.
 //
-// Thanks! -- Your friendly stdlib engineers
+// Instead of disabling this test, consider extending the list of expected
+// changes at the bottom. (You'll also need to do this if your own PR triggers
+// false positives, or if you have special permission to break things.) You can
+// find a diff of what needs to be added in the output of the failed test run.
+// The order of lines doesn't matter, and you can also include comments to refer
+// to any bugs you filed. Remember that in almost all cases you'll want to edit
+// the stability-stdlib-abi-without-asserts.test file instead of this one.
+//
+// Thank you for your help ensuring the stdlib remains compatible with its past!
+//                                            -- Your friendly stdlib engineers
 
 // REQUIRES: swift_stdlib_asserts
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 // SR-13362
 // We currently only have a baseline for Intel CPUs on macOS.
@@ -35,7 +51,7 @@
 // declarations are shuffled. rdar://problem/46618883
 // UNSUPPORTED: swift_evolve
 
-// *** DO NOT XFAIL THIS TEST *** (See comment above.)
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 Func _collectReferencesInsideObject(_:) is a new API without @available attribute
 Func _loadDestroyTLSCounter() is a new API without @available attribute
@@ -44,3 +60,5 @@ Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
 Struct _GlobalRuntimeFunctionCountersState is a new API without @available attribute
 Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
 Struct _RuntimeFunctionCounters is a new API without @available attribute
+
+// *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
