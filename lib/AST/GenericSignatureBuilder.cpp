@@ -5931,6 +5931,42 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
     // invalid once redundant requirements are dropped.
     if (isRedundantExplicitRequirement(otherReq))
       return None;
+
+    SWIFT_DEFER {
+      visited.erase(otherReq);
+    };
+    visited.insert(otherReq);
+
+    auto otherSubjectType = otherReq.getSubjectType();
+    if (auto *depMemType = otherSubjectType->getAs<DependentMemberType>()) {
+      // If 'req' is based on some other conformance requirement
+      // `T.[P.]A : Q', we want to make sure that we have a
+      // non-redundant derivation for 'T : P'.
+      auto baseType = depMemType->getBase();
+      auto *proto = depMemType->getAssocType()->getProtocol();
+
+      auto *equivClass = resolveEquivalenceClass(baseType,
+                                           ArchetypeResolutionKind::AlreadyKnown);
+      assert(equivClass &&
+             "Explicit requirement names an unknown equivalence class?");
+
+      auto found = equivClass->conformsTo.find(proto);
+      assert(found != equivClass->conformsTo.end());
+
+      bool foundValidDerivation = false;
+      for (const auto &constraint : found->second) {
+        if (isValidRequirementDerivationPath(
+                visited, RequirementKind::Conformance,
+                constraint.source, proto,
+                requirementSignatureSelfProto)) {
+          foundValidDerivation = true;
+          break;
+        }
+      }
+
+      if (!foundValidDerivation)
+        return None;
+    }
   }
 
   return result.front();
@@ -6024,15 +6060,6 @@ void GenericSignatureBuilder::computeRedundantRequirements(
           req, found->second,
           requirementSignatureSelfProto,
           [&](const Constraint<ProtocolDecl *> &constraint) {
-            // FIXME: Remove this.
-            auto minimalSource =
-              constraint.source->getMinimalConformanceSource(
-                  *this,
-                  constraint.getSubjectDependentType({ }),
-                  proto);
-            if (minimalSource != constraint.source)
-              return true;
-
             return false;
           });
 
