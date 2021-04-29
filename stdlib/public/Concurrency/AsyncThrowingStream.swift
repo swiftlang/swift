@@ -57,10 +57,10 @@ public struct AsyncThrowingStream<Element> {
     /// emitted accordingly in the cancellation handler
     public var onTermination: (@Sendable () -> Void)? {
       get {
-        return storage.onTermination
+        return storage.getOnTermination()
       }
       nonmutating set {
-        storage.onTermination = newValue
+        storage.setOnTermination(newValue)
       }
     }
   }

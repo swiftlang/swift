@@ -68,19 +68,18 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     _unlock(ptr)
   }
 
-  var onTermination: (@Sendable () -> Void)? {
-    get {
-      lock()
-      let handler = state.onTermination
+  func getOnTermination() -> (@Sendable () -> Void)? {
+    lock()
+    let handler = state.onTermination
+    unlock()
+    return handler
+  }
+
+  func setOnTermination(_ newValue: (@Sendable () -> Void)?) {
+    lock()
+    withExtendedLifetime(state.onTermination) {
+      state.onTermination = newValue
       unlock()
-      return handler
-    }
-    set {
-      lock()
-      withExtendedLifetime(state.onTermination) {
-        state.onTermination = newValue
-        unlock()
-      }
     }
   }
 
