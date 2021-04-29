@@ -182,10 +182,18 @@ func alreadyThrows(completion: (String) -> Void) throws { }
 // RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 func noParamAutoclosure(completion: @autoclosure () -> Void) { }
 
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix BLOCK-CONVENTION %s
+func blockConvention(completion: @convention(block) () -> Void) { }
+// BLOCK-CONVENTION: func blockConvention() async { }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix C-CONVENTION %s
+func cConvention(completion: @convention(c) () -> Void) { }
+// C-CONVENTION: func cConvention() async { }
+
 // 2. Check that the various ways to call a function (and the positions the
 //    refactoring is called from) are handled correctly
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,CALL-ARG,MANY-CALL,MEMBER-CALL,MEMBER-CALL2,MEMBER-PARENS,EMPTY-CAPTURE,CAPTURE,DEFAULT-ARGS-MISSING,DEFAULT-ARGS-CALL %s
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,CALL-ARG,MANY-CALL,MEMBER-CALL,MEMBER-CALL2,MEMBER-PARENS,EMPTY-CAPTURE,CAPTURE,DEFAULT-ARGS-MISSING,DEFAULT-ARGS-CALL,BLOCK-CONVENTION-CALL,C-CONVENTION-CALL %s
 func testCalls() {
 // CONVERT-FUNC: {{^}}func testCalls() async {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+4):3 | %FileCheck -check-prefix=CALL %s
@@ -326,5 +334,19 @@ func testCalls() {
   }
   // DEFAULT-ARGS-CALL: let str = await defaultArgs(a: 1, b: 2){{$}}
   // DEFAULT-ARGS-CALL-NEXT: {{^}}print("defaultArgs")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=BLOCK-CONVENTION-CALL %s
+  blockConvention {
+    print("blockConvention")
+  }
+  // BLOCK-CONVENTION-CALL: await blockConvention(){{$}}
+  // BLOCK-CONVENTION-CALL-NEXT: {{^}}print("blockConvention")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=C-CONVENTION-CALL %s
+  cConvention {
+    print("cConvention")
+  }
+  // C-CONVENTION-CALL: await cConvention(){{$}}
+  // C-CONVENTION-CALL-NEXT: {{^}}print("cConvention")
 }
 // CONVERT-FUNC: {{^}}}
