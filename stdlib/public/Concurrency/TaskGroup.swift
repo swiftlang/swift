@@ -639,33 +639,15 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     group.spawn { 1 }
   ///     group.spawn { 2 }
   ///
-  ///     await print(group.nextResult())
+  ///     guard let result = await group.nextResult() else {
+  ///         return  // No task to wait on, which won't happen in this example.
+  ///     }
+  ///     
+  ///     switch result { 
+  ///     case .success(let value): print(value)
+  ///     case .failure(let error): print("Failure: \(error)")
+  ///     }
   ///     // Prints either "2" or "1"
-  ///
-  /// If there aren't any pending tasks in the task group,
-  /// this method returns `nil`,
-  /// which lets you write like the following
-  /// to wait for a single task to complete:
-  ///
-  ///     if let first = try await group.next() {
-  ///        return first
-  ///     }
-  ///
-  /// Wait and collect all group child task completions:
-  ///
-  ///     while let first = try await group.next() {
-  ///        collected += value
-  ///     }
-  ///     return collected
-  ///
-  /// Awaiting on an empty group results in the immediate return of a `nil`
-  /// value, without the group task having to suspend.
-  ///
-  /// It is also possible to use `for await` to collect results of a task groups:
-  ///
-  ///     for await try value in group {
-  ///         collected += value
-  ///     }
   ///
   /// If the next child task throws an error
   /// and you propagate that error from this method
