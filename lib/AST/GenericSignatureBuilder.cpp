@@ -2374,6 +2374,13 @@ Type EquivalenceClass::getTypeInContext(GenericSignatureBuilder &builder,
 
 void EquivalenceClass::dump(llvm::raw_ostream &out,
                             GenericSignatureBuilder *builder) const {
+  auto dumpSource = [&](const RequirementSource *source) {
+    source->dump(out, &builder->getASTContext().SourceMgr, 4);
+    if (source->isDerivedRequirement())
+      out << " [derived]";
+    out << "\n";
+  };
+
   out << "Equivalence class represented by "
     << members.front()->getRepresentative()->getDebugName() << ":\n";
   out << "Members: ";
@@ -2387,10 +2394,7 @@ void EquivalenceClass::dump(llvm::raw_ostream &out,
   for (auto entry : conformsTo) {
     out << "  " << entry.first->getNameStr() << "\n";
     for (auto constraint : entry.second) {
-      constraint.source->dump(out, &builder->getASTContext().SourceMgr, 4);
-      if (constraint.source->isDerivedRequirement())
-        out << " [derived]";
-      out << "\n";
+      dumpSource(constraint.source);
     }
   }
 
@@ -2398,18 +2402,33 @@ void EquivalenceClass::dump(llvm::raw_ostream &out,
   for (auto constraint : sameTypeConstraints) {
     out << "  " << constraint.getSubjectDependentType({})
         << " == " << constraint.value << "\n";
-    constraint.source->dump(out, &builder->getASTContext().SourceMgr, 4);
-    if (constraint.source->isDerivedRequirement())
-      out << " [derived]";
-    out << "\n";
+      dumpSource(constraint.source);
   }
 
-  if (concreteType)
+  if (concreteType) {
     out << "Concrete type: " << concreteType.getString() << "\n";
-  if (superclass)
+    for (auto constraint : concreteTypeConstraints) {
+      out << "  " << constraint.getSubjectDependentType({})
+          << " == " << constraint.value << "\n";
+      dumpSource(constraint.source);
+    }
+  }
+  if (superclass) {
     out << "Superclass: " << superclass.getString() << "\n";
-  if (layout)
+    for (auto constraint : superclassConstraints) {
+      out << "  " << constraint.getSubjectDependentType({})
+          << " : " << constraint.value << "\n";
+      dumpSource(constraint.source);
+    }
+  }
+  if (layout) {
     out << "Layout: " << layout.getString() << "\n";
+    for (auto constraint : layoutConstraints) {
+      out << "  " << constraint.getSubjectDependentType({})
+          << " : " << constraint.value << "\n";
+      dumpSource(constraint.source);
+    }
+  }
 
   if (!delayedRequirements.empty()) {
     out << "Delayed requirements:\n";
