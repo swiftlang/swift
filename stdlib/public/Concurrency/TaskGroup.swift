@@ -385,8 +385,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// At the start of the body of a `withTaskGroup(of:returning:body:)` call,
   /// the task group is always empty.
   /// It is guaranteed to be empty when returning from that body,
-  /// either because all child tasks have completed
-  /// or because they've been canceled.
+  /// because a task group waits for all child tasks to complete before returning.
   ///
   /// - Returns: `true` if the group has no pending tasks, `false` otherwise.
   public var isEmpty: Bool {
@@ -696,8 +695,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// At the start of the body of a `withThrowingTaskGroup(of:returning:body:)` call,
   /// the task group is always empty.
   /// It is guaranteed to be empty when returning from that body,
-  /// either because all child tasks have completed
-  /// or because they've been canceled.
+  /// because a task group waits for all child tasks to complete before returning.
   ///
   /// - Returns: `true` if the group has no pending tasks, `false` otherwise.
   public var isEmpty: Bool {
