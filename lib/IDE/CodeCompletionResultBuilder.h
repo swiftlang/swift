@@ -87,6 +87,7 @@ class CodeCompletionResultBuilder {
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unknown;
+  bool IsArgumentLabels = false;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
@@ -152,6 +153,10 @@ public:
 
   void setSemanticContext(SemanticContextKind Kind) {
     SemanticContext = Kind;
+  }
+
+  void setIsArgumentLabels(bool Flag = true) {
+    IsArgumentLabels = Flag;
   }
 
   void
