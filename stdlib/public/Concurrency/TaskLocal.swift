@@ -166,9 +166,25 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
       self
     }
 
-    @available(*, unavailable, message: "use 'myTaskLocal.withValue(_:do:)' instead")
+    @available(*, unavailable, message: "use '$myTaskLocal.withValue(_:do:)' instead")
     set {
       fatalError("Illegal attempt to set a \(Self.self) value, use `withValue(...) { ... }` instead.")
+    }
+  }
+
+  // This subscript is used to enforce that the property wrapper may only be used
+  // on static (or rather, "without enclosing instance") properties.
+  // This is done by marking the `_enclosingInstance` as `Never` which informs
+  // the type-checker that this property-wrapper never wants to have an enclosing
+  // instance (it is impossible to declare a property wrapper inside the `Never`
+  // type).
+  public static subscript(
+    _enclosingInstance object: Never,
+    wrapped wrappedKeyPath: ReferenceWritableKeyPath<Never, Value>,
+    storage storageKeyPath: ReferenceWritableKeyPath<Never, TaskLocal<Value>>
+  ) -> Value {
+    get {
+      fatalError()
     }
   }
 
