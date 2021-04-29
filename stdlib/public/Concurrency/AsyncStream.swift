@@ -620,7 +620,7 @@ extension AsyncThrowingStream.Continuation {
       case .success(let val):
         storage.yield(val)
       case .failure(let err):
-        storage.finish(throwing: err)
+        storage.yield(throwing: err)
     }
   }
 
