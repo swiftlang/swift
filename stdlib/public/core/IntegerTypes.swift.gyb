@@ -1224,6 +1224,66 @@ public struct ${Self}
 
 %   end
 
+  @_alwaysEmitIntoClient
+  internal init<T: BinaryFloatingPoint>(_unchecked source: T) {
+    switch (T.exponentBitCount, T.significandBitCount) {
+%   for (FloatType, FloatBits, FloatExponentBits, FloatSignificandBits) in [
+%     ('Float16',16,5,10), ('Float',32,8,23), ('Double',64,11,52), ('Float80',80,15,63)]:
+%     if FloatType == 'Float16':
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+%     elif FloatType == 'Float80':
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%     end
+    case (${FloatExponentBits}, ${FloatSignificandBits}):
+%     if FloatType == 'Float16':
+      guard #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+        break
+      }
+%     end
+      let source_ = source as? ${FloatType} ?? ${FloatType}(
+        sign: source.sign,
+        exponentBitPattern:
+          ${FloatType}.RawExponent(truncatingIfNeeded: source.exponentBitPattern),
+        significandBitPattern:
+          ${FloatType}.RawSignificand(truncatingIfNeeded: source.significandBitPattern))
+      self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source_._value)
+      return
+%     if FloatType == 'Float16' or FloatType == 'Float80':
+#endif
+%     end
+%   end
+    default: break
+    }
+    self = Self._convert(from: source).value!
+  }
+  
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  public init<T: BinaryFloatingPoint>(_ source: T) {
+    _precondition(source.isFinite,
+      "Floating-point value cannot be converted to ${Self} because it is either infinite or NaN")
+    _precondition(source > ${str(lower)}.0,
+      "Floating-point value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(source < ${str(upper)}.0,
+      "Floating-point value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
+    self.init(_unchecked: source)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  public init?<T: BinaryFloatingPoint>(exactly source: T) {
+    // The value passed as `source` must not be infinite, NaN, or exceed the
+    // bounds of the integer type; the result of `fptosi` or `fptoui` is
+    // undefined if it overflows.
+    guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
+      return nil
+    }
+    guard source == source.rounded(.towardZero) else {
+      return nil
+    }
+    self.init(_unchecked: source)
+  }
+
   @_transparent
   public static func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
     return Bool(Builtin.cmp_eq_Int${bits}(lhs._value, rhs._value))
