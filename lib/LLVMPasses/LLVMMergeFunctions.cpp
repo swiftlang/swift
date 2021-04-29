@@ -664,6 +664,9 @@ static bool isEligibleFunction(Function *F) {
 
   if (F->getFunctionType()->isVarArg())
     return false;
+
+  if (F->getCallingConv() == CallingConv::SwiftTail)
+    return false;
   
   unsigned Benefit = getBenefit(F);
   if (Benefit < FunctionMergeThreshold)
