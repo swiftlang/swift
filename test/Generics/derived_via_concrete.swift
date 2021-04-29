@@ -60,8 +60,14 @@ func derivedViaConcreteZ1<A, B>(_: A, _: B)
 // expected-warning@-1 {{redundant conformance constraint 'A' : 'W'}}
 // expected-note@-2 {{conformance constraint 'A' : 'W' implied here}}
 
+// FIXME: We should not diagnose 'B : AnyObject' as redundant, even
+// though it really is, because it was made redundant by an inferred
+// requirement.
+
 // CHECK: Generic signature: <A, B where A : Z<B>, B : AnyObject>
 func derivedViaConcreteZ2<A, B>(_: A, _: B)
   where A : W, B : AnyObject, A : Z<B> {}
 // expected-warning@-1 {{redundant conformance constraint 'A' : 'W'}}
 // expected-note@-2 {{conformance constraint 'A' : 'W' implied here}}
+// expected-warning@-3 {{redundant constraint 'B' : 'AnyObject'}}
+// expected-note@-4 {{constraint 'B' : 'AnyObject' implied here}}

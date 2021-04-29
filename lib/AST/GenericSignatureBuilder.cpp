@@ -5129,7 +5129,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
       updateLayout(T1, equivClass2->layout);
       equivClass->layoutConstraints.insert(
                                    equivClass->layoutConstraints.end(),
-                                   equivClass2->layoutConstraints.begin() + 1,
+                                   equivClass2->layoutConstraints.begin(),
                                    equivClass2->layoutConstraints.end());
     }
   }
