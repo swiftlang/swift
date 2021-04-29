@@ -24,6 +24,7 @@
 // RUN:             -e _ZNSt10_HashtableImSt4pairIKmSt10unique_ptrIKvSt8functionIFvPS3_EEEESaIS9_ENSt8__detail10_Select1stESt8equal_toImESt4hashImENSB_18_Mod_range_hashingENSB_20_Default_ranged_hashENSB_20_Prime_rehash_policyENSB_17_Hashtable_traitsILb0ELb0ELb1EEEED2Ev \
 // RUN:             -e _ZNSt3_V28__rotateIPcEET_S2_S2_S2_St26random_access_iterator_tag \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z \
+// RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_St9__va_listEmSB_z \
 // RUN:             -e _ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEDnEEEvv \
 // RUN:             -e '_ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA[0-9]\+_cEEEvv' \
@@ -45,6 +46,7 @@
 // RUN:             -e _ZNSt10_HashtableImSt4pairIKmSt10unique_ptrIKvSt8functionIFvPS3_EEEESaIS9_ENSt8__detail10_Select1stESt8equal_toImESt4hashImENSB_18_Mod_range_hashingENSB_20_Default_ranged_hashENSB_20_Prime_rehash_policyENSB_17_Hashtable_traitsILb0ELb0ELb1EEEED2Ev \
 // RUN:             -e _ZNSt3_V28__rotateIPcEET_S2_S2_S2_St26random_access_iterator_tag \
 // RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_P13__va_list_tagEmSB_z \
+// RUN:             -e _ZN9__gnu_cxx12__to_xstringINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEcEET_PFiPT0_mPKS8_St9__va_listEmSB_z \
 // RUN:             -e _ZZNSt19_Sp_make_shared_tag5_S_tiEvE5__tag \
 // RUN:             -e _ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEDnEEEvv \
 // RUN:             -e '_ZSt16__once_call_implISt12_Bind_simpleIFPFvPvEPA[0-9]\+_cEEEvv' \
