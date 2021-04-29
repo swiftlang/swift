@@ -644,3 +644,29 @@ bb3:
   return %10 : $()
 }
 
+struct II { }
+
+struct I {
+  @_hasStorage public let x: II { get }
+}
+
+struct S2 { }
+
+sil @getter : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II
+sil @kpgetter : $@convention(thin) (@in_guaranteed S2, UnsafeRawPointer) -> @out II
+sil @equ : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool
+sil @hsh : $@convention(thin) (UnsafeRawPointer) -> Int
+
+
+// CHECK-LABEL: sil @remove_dead_keypath
+// CHECK-NOT:   keypath
+// CHECK: } // end sil function 'remove_dead_keypath'
+sil @remove_dead_keypath: $@convention(thin) () -> () {
+bb0:
+  %0 = keypath $KeyPath<I, II>, (root $I; stored_property #I.x : $II)
+  %1 = keypath $KeyPath<S2, II>, (root $S2; gettable_property $II, id @getter : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II, getter @kpgetter: $@convention(thin) (@in_guaranteed S2, UnsafeRawPointer) -> @out II, indices [%$0 : $KeyPath<I, II> : $KeyPath<I, II>], indices_equals @equ : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @hsh : $@convention(thin) (UnsafeRawPointer) -> Int) (%0)
+
+  %r = tuple ()
+  return %r : $()
+}
+
