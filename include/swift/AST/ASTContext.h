@@ -73,6 +73,7 @@ namespace swift {
   class DerivativeAttr;
   class DifferentiableAttr;
   class ExtensionDecl;
+  struct ExternalSourceLocs;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -1184,6 +1185,10 @@ public:
 
 private:
   friend Decl;
+
+  Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
+  void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
+
   Optional<std::pair<RawComment, bool>> getRawComment(const Decl *D);
   void setRawComment(const Decl *D, RawComment RC, bool FromSerialized);
 
