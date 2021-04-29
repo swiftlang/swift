@@ -31,6 +31,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -659,10 +660,27 @@ private:
       GetKindAndRHS getKindAndRHS,
       const RequirementSource *source,
       const ProtocolDecl *requirementSignatureSelfProto,
-      ASTContext &ctx, SmallVectorImpl<ExplicitRequirement> &result);
+      SmallVectorImpl<ExplicitRequirement> &result);
 
+  /// Determine if an explicit requirement can be derived from the
+  /// requirement given by \p otherSource and \p otherRHS, using the
+  /// knowledge of any existing redundant requirements discovered so far.
+  Optional<ExplicitRequirement>
+  isValidRequirementDerivationPath(
+    llvm::SmallDenseSet<ExplicitRequirement, 4> &visited,
+    RequirementKind otherKind,
+    const RequirementSource *otherSource,
+    RequirementRHS otherRHS,
+    const ProtocolDecl *requirementSignatureSelfProto);
+
+  /// Determine if the explicit requirement \p req can be derived from any
+  /// of the constraints in \p constraints, using the knowledge of any
+  /// existing redundant requirements discovered so far.
+  ///
+  /// Use \p filter to screen out less-specific and conflicting constraints
+  /// if the requirement is a superclass, concrete type or layout requirement.
   template<typename T, typename Filter>
-  void checkRequirementRedundancy(
+  void checkIfRequirementCanBeDerived(
       const ExplicitRequirement &req,
       const std::vector<Constraint<T>> &constraints,
       const ProtocolDecl *requirementSignatureSelfProto,

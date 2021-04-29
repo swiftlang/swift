@@ -5875,7 +5875,7 @@ void GenericSignatureBuilder::getBaseRequirements(
     GenericSignatureBuilder::GetKindAndRHS getKindAndRHS,
     const RequirementSource *source,
     const ProtocolDecl *requirementSignatureSelfProto,
-    ASTContext &ctx, SmallVectorImpl<ExplicitRequirement> &result) {
+    SmallVectorImpl<ExplicitRequirement> &result) {
   // If we're building a generic signature, the base requirement is
   // built from the root of the path.
   if (source->parent == nullptr) {
@@ -5900,14 +5900,44 @@ void GenericSignatureBuilder::getBaseRequirements(
   }
 
   getBaseRequirements(
-      [&]() {
-        return ExplicitRequirement::getKindAndRHS(source, ctx);
-      },
-      source->parent, requirementSignatureSelfProto, ctx, result);
+      [&]() { return ExplicitRequirement::getKindAndRHS(source, Context); },
+      source->parent, requirementSignatureSelfProto, result);
+}
+
+Optional<ExplicitRequirement>
+GenericSignatureBuilder::isValidRequirementDerivationPath(
+    llvm::SmallDenseSet<ExplicitRequirement, 4> &visited,
+    RequirementKind otherKind,
+    const RequirementSource *otherSource,
+    RequirementRHS otherRHS,
+    const ProtocolDecl *requirementSignatureSelfProto) {
+
+  SmallVector<ExplicitRequirement, 2> result;
+  getBaseRequirements(
+      [&]() { return std::make_pair(otherKind, otherRHS); },
+      otherSource, requirementSignatureSelfProto, result);
+  assert(result.size() > 0);
+
+  for (const auto &otherReq : result) {
+    // Don't consider paths that are based on the requirement
+    // itself; such a path doesn't "prove" this requirement,
+    // since if we drop the requirement the path is no longer
+    // valid.
+    if (visited.count(otherReq))
+      return None;
+
+    // Don't consider paths based on requirements that are already
+    // known to be redundant either, since those paths become
+    // invalid once redundant requirements are dropped.
+    if (isRedundantExplicitRequirement(otherReq))
+      return None;
+  }
+
+  return result.front();
 }
 
 template<typename T, typename Filter>
-void GenericSignatureBuilder::checkRequirementRedundancy(
+void GenericSignatureBuilder::checkIfRequirementCanBeDerived(
     const ExplicitRequirement &req,
     const std::vector<Constraint<T>> &constraints,
     const ProtocolDecl *requirementSignatureSelfProto,
@@ -5918,34 +5948,18 @@ void GenericSignatureBuilder::checkRequirementRedundancy(
     if (filter(constraint))
       continue;
 
-    SmallVector<ExplicitRequirement, 2> result;
-    getBaseRequirements(
-        [&]() {
-          return std::make_pair(req.getKind(), constraint.value);
-        },
-        constraint.source, requirementSignatureSelfProto, Context, result);
-    assert(result.size() > 0);
-
-    bool anyWereRedundant =
-        llvm::any_of(result, [&](const ExplicitRequirement &otherReq) {
-          // Don't consider paths that are based on the requirement
-          // itself; such a path doesn't "prove" this requirement,
-          // since if we drop the requirement the path is no longer
-          // valid.
-          if (req == otherReq)
-            return true;
-
-          // Don't consider paths based on requirements that are already
-          // known to be redundant either, since those paths become
-          // invalid once redundant requirements are dropped.
-          return isRedundantExplicitRequirement(otherReq);
-        });
-
     // If this requirement can be derived from a set of
     // non-redundant base requirements, then this requirement
     // is redundant.
-    if (!anyWereRedundant) {
-      Impl->RedundantRequirements[req].insert(result.front());
+    llvm::SmallDenseSet<ExplicitRequirement, 4> visited;
+    visited.insert(req);
+
+    if (auto representative = isValidRequirementDerivationPath(
+            visited, req.getKind(),
+            constraint.source,
+            constraint.value,
+            requirementSignatureSelfProto)) {
+      Impl->RedundantRequirements[req].insert(*representative);
     }
   }
 }
@@ -6006,7 +6020,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
       auto found = equivClass->conformsTo.find(proto);
       assert(found != equivClass->conformsTo.end());
 
-      checkRequirementRedundancy(
+      checkIfRequirementCanBeDerived(
           req, found->second,
           requirementSignatureSelfProto,
           [&](const Constraint<ProtocolDecl *> &constraint) {
@@ -6041,7 +6055,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
         // requirement that implies 'T : D'.
         Impl->ConflictingRequirements[req] = resolvedSuperclass;
 
-        checkRequirementRedundancy(
+        checkIfRequirementCanBeDerived(
             req, equivClass->superclassConstraints,
             requirementSignatureSelfProto,
             [&](const Constraint<Type> &constraint) {
@@ -6062,7 +6076,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
         // This means that 'T : C' is made redundant by any
         // requirement that implies 'T : B', such that 'C' is a
         // superclass of 'B'.
-        checkRequirementRedundancy(
+        checkIfRequirementCanBeDerived(
             req, equivClass->superclassConstraints,
             requirementSignatureSelfProto,
             [&](const Constraint<Type> &constraint) {
@@ -6081,7 +6095,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
           // requirement 'T == D'.
           if (resolvedSuperclass->isExactSuperclassOf(resolvedConcreteType)) {
             // 'C' is a superclass of 'D', so 'T : C' is redundant.
-            checkRequirementRedundancy(
+            checkIfRequirementCanBeDerived(
                 req, equivClass->concreteTypeConstraints,
                 requirementSignatureSelfProto,
                 [&](const Constraint<Type> &constraint) {
@@ -6119,7 +6133,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
         // requirement that implies 'T : L2'.
         Impl->ConflictingRequirements[req] = equivClass->layout;
 
-        checkRequirementRedundancy(
+        checkIfRequirementCanBeDerived(
             req, equivClass->layoutConstraints,
             requirementSignatureSelfProto,
             [&](const Constraint<LayoutConstraint> &constraint) {
@@ -6137,7 +6151,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
         //
         // This means that 'T : L1' is made redundant by any
         // requirement that implies 'T : L1'.
-        checkRequirementRedundancy(
+        checkIfRequirementCanBeDerived(
             req, equivClass->layoutConstraints,
             requirementSignatureSelfProto,
             [&](const Constraint<LayoutConstraint> &constraint) {
@@ -6156,7 +6170,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
                                           layout)) {
             Impl->ExplicitConformancesImpliedByConcrete.insert(req);
 
-            checkRequirementRedundancy(
+            checkIfRequirementCanBeDerived(
                 req, equivClass->concreteTypeConstraints,
                 requirementSignatureSelfProto,
                 [&](const Constraint<Type> &constraint) {
@@ -6185,7 +6199,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
         // This means that 'T : L1' is made redundant by any
         // requirement that implies 'T : L3', where L3 is
         // mergeable with L1.
-        checkRequirementRedundancy(
+        checkIfRequirementCanBeDerived(
             req, equivClass->layoutConstraints,
             requirementSignatureSelfProto,
             [&](const Constraint<LayoutConstraint> &constraint) {
@@ -6204,7 +6218,7 @@ void GenericSignatureBuilder::computeRedundantRequirements(
           if (typeImpliesLayoutConstraint(resolvedConcreteType, layout)) {
             Impl->ExplicitConformancesImpliedByConcrete.insert(req);
 
-            checkRequirementRedundancy(
+            checkIfRequirementCanBeDerived(
                 req, equivClass->concreteTypeConstraints,
                 requirementSignatureSelfProto,
                 [&](const Constraint<Type> &constraint) {
@@ -6993,15 +7007,18 @@ void GenericSignatureBuilder::diagnoseConflictingConcreteTypeRequirements(
           SmallVector<ExplicitRequirement, 2> result;
           getBaseRequirements(
               [&]() {
-                return std::make_pair(RequirementKind::SameType, constraint.value);
+                return std::make_pair(RequirementKind::SameType,
+                                      constraint.value);
               },
-              constraint.source, requirementSignatureSelfProto, Context, result);
+              constraint.source, requirementSignatureSelfProto, result);
 
-        return
-            !llvm::any_of(result, [&](const ExplicitRequirement &otherReq) {
-              return isRedundantExplicitRequirement(otherReq);
-            });
-        });
+        for (const auto &otherReq : result) {
+          if (isRedundantExplicitRequirement(otherReq))
+            return false;
+        }
+
+        return true;
+      });
 
     assert(foundConcreteRequirement != equivClass->concreteTypeConstraints.end());
 
