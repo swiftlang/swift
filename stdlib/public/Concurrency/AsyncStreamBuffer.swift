@@ -255,6 +255,16 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
       fatalError("attempt to await next() on more than one task")
     }
   }
+  
+  func next() async -> Element? where Failure == Never {
+    await withTaskCancellationHandler { [cancel] in
+      cancel()
+    } operation: {
+      await withUnsafeContinuation { 
+        next($0)
+      }
+    }
+  }
 
   func next(_ continuation: UnsafeContinuation<Element?, Error>) {
     let raw =
@@ -285,6 +295,16 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     } else {
       unlock()
       fatalError("attempt to await next() on more than one task")
+    }
+  }
+  
+  func next() async throws -> Element? {
+    try await withTaskCancellationHandler { [cancel] in
+      cancel()
+    } operation: {
+      try await withUnsafeThrowingContinuation {
+        next($0)
+      }
     }
   }
 

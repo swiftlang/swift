@@ -93,8 +93,7 @@ public struct AsyncStream<Element> {
     }
   }
 
-  let produce: (UnsafeContinuation<Element?, Never>) -> Void
-  let cancel: @Sendable () -> Void
+  let produce: () async -> Element?
 
   /// Construct a AsyncStream buffering given an Element type.
   ///
@@ -118,9 +117,6 @@ public struct AsyncStream<Element> {
   ) {
     let storage: _AsyncStreamBufferedStorage<Element, Never> = .create(limit: limit)
     produce = storage.next
-    cancel = {
-      storage.cancel()
-    }
     build(Continuation(storage: storage))
   }
 }
@@ -134,8 +130,7 @@ extension AsyncStream: AsyncSequence {
   /// concurrently and contends with another call to next is a programmer error
   /// and will fatalError.
   public struct Iterator: AsyncIteratorProtocol {
-    let produce: (UnsafeContinuation<Element?, Never>) -> Void
-    let cancel: @Sendable () -> Void
+    let produce: () async -> Element?
 
     /// The next value from the AsyncStream.
     ///
@@ -147,20 +142,13 @@ extension AsyncStream: AsyncSequence {
     /// awaiting a value, this will terminate the AsyncStream and next may return nil
     /// immediately (or will return nil on subseuqent calls)
     public mutating func next() async -> Element? {
-      return await withTaskCancellationHandler { [cancel] in
-        cancel()
-      } operation: {
-        return await withUnsafeContinuation {
-          (continuation: UnsafeContinuation<Element?, Never>) in
-          produce(continuation)
-        }
-      }
+      await produce()
     }
   }
 
   /// Construct an iterator.
   public func makeAsyncIterator() -> Iterator {
-    return Iterator(produce: produce, cancel: cancel)
+    return Iterator(produce: produce)
   }
 }
 
