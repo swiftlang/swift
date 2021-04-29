@@ -251,7 +251,12 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       // These fields were added later; be resilient against their absence.
       switch (scratch.size()) {
       default:
-        // Add new cases here, in descending order.
+      // Add new cases here, in descending order.
+      case 6:
+      case 5: {
+        result.userModuleVersion = llvm::VersionTuple(scratch[4], scratch[5]);
+        LLVM_FALLTHROUGH;
+      }
       case 4:
         if (scratch[3] != 0) {
           result.compatibilityVersion =
@@ -1172,6 +1177,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Name = info.name;
       TargetTriple = info.targetTriple;
       CompatibilityVersion = info.compatibilityVersion;
+      UserModuleVersion = info.userModuleVersion;
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();
       Bits.IsSIB = extInfo.isSIB();
       Bits.IsTestable = extInfo.isTestable();
