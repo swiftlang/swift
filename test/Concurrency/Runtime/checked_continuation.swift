@@ -41,6 +41,30 @@ struct TestError: Error {}
         }
         await task.get()
       }
+
+      tests.test("test withCheckedThrowingContinuation") {
+        let task2 = detach {
+          do {
+            let x: Int = try await withCheckedThrowingContinuation { c in
+              c.resume(returning: 17)
+            }
+            expectEqual(17, x)
+          } catch {
+          }
+        }
+
+        let task = detach {
+          do {
+            let x: Int = try await withCheckedThrowingContinuation { c in
+              c.resume(returning: 17)
+            }
+            expectEqual(17, x)
+          } catch {
+          }
+        }
+        await task.get()
+        await task2.get()
+      }
     }
 
     await runAllTestsAsync()
