@@ -12,11 +12,15 @@
 // Adds Symbol Graph JSON serialization to other types.
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "swift/Serialization/SerializedModuleLoader.h"
 #include "JSON.h"
 
 void swift::symbolgraphgen::serialize(const llvm::VersionTuple &VT,
@@ -126,6 +130,39 @@ void swift::symbolgraphgen::serialize(const swift::GenericTypeParamType *Param,
     OS.attribute("index", Param->getIndex());
     OS.attribute("depth", Param->getDepth());
   });
+}
+
+void swift::symbolgraphgen::serialize(const ModuleDecl &Module,
+                                      llvm::json::OStream &OS,
+                                      llvm::Triple Target) {
+  auto *MainFile = Module.getFiles().front();
+  switch (MainFile->getKind()) {
+  case FileUnitKind::Builtin:
+    llvm_unreachable("Unexpected module kind: Builtin");
+  case FileUnitKind::DWARFModule:
+    llvm_unreachable("Unexpected module kind: DWARFModule");
+  case FileUnitKind::Synthesized:
+    llvm_unreachable("Unexpected module kind: Synthesized");
+    break;
+  case FileUnitKind::Source:
+    serialize(Module.getASTContext().LangOpts.Target, OS);
+    break;
+  case FileUnitKind::SerializedAST: {
+    auto SerializedAST = cast<SerializedASTFile>(MainFile);
+    auto Target = llvm::Triple(SerializedAST->getTargetTriple());
+    serialize(Target, OS);
+    break;
+  }
+  case FileUnitKind::ClangModule: {
+    auto ClangModule = cast<ClangModuleUnit>(MainFile);
+    if (const auto *Overlay = ClangModule->getOverlayModule()) {
+      serialize(*Overlay, OS, Target);
+    } else {
+      serialize(Target, OS);
+    }
+    break;
+  }
+  }
 }
 
 void
