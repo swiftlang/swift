@@ -29,7 +29,7 @@
 // CHECK:  func getMainDog(_ completion: @escaping @MainActor (String) -> Void)
 // CHECK-NEXT:  var mainDogProp: String { get async }
 
-// CHECK:  @completionHandlerAsync("regularMainDog()", completionHandleIndex: 0)
+// CHECK:  @completionHandlerAsync("regularMainDog()", completionHandlerIndex: 0)
 // CHECK-NEXT:  func regularMainDog(_ completion: @escaping @MainActor (String) -> Void)
 // CHECK-NEXT:  @discardableResult
 // CHECK-NEXT:  func regularMainDog() async -> String
