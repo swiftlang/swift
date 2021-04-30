@@ -356,6 +356,14 @@ public:
     ModuleABIName = name;
   }
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+  void setUserModuleVersion(llvm::VersionTuple UserVer) {
+    UserModuleVersion = UserVer;
+  }
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.

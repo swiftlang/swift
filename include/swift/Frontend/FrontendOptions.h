@@ -84,6 +84,9 @@ public:
   /// For these modules, we should prefer using Swift interface when importing them.
   std::vector<std::string> PreferInterfaceForModules;
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 

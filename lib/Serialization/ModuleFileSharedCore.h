@@ -66,6 +66,9 @@ class ModuleFileSharedCore {
   /// The Swift compatibility version in use when this module was built.
   version::Version CompatibilityVersion;
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 

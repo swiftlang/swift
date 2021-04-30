@@ -1172,6 +1172,11 @@ def working_directory : Separate<["-"], "working-directory">,
 def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
+def user_module_version : Separate<["-"], "user-module-version">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Module version specified from Swift module authors">,
+  MetaVarName<"<vers>">;
+
 // VFS
 
 def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,

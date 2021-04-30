@@ -245,6 +245,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SerializationOpts.AutolinkForceLoad =
       !subInvocation.getIRGenOptions().ForceLoadSymbolName.empty();
+    SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
 
     // Record any non-SDK module interface files for the debug info.
     StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
