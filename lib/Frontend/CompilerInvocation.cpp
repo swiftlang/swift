@@ -704,21 +704,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
+  // Configure lexing to parse and remember comments if:
+  //   - Emitting a swiftdoc/swiftsourceinfo
+  //   - Performing index-while-building
+  //   - Emitting a symbol graph file
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
-  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath()) {
-    Opts.AttachCommentsToDecls = true;
-  }
-
-  // If we are doing index-while-building, configure lexing and parsing to
-  // remember comments.
-  if (!FrontendOpts.IndexStorePath.empty()) {
-    Opts.AttachCommentsToDecls = true;
-  }
-
-  // If we are emitting a symbol graph file, configure lexing and parsing to
-  // remember comments.
-  if (FrontendOpts.EmitSymbolGraph) {
+  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath() ||
+      FrontendOpts.InputsAndOutputs.hasModuleSourceInfoOutputPath() ||
+      !FrontendOpts.IndexStorePath.empty() || FrontendOpts.EmitSymbolGraph) {
     Opts.AttachCommentsToDecls = true;
   }
 
