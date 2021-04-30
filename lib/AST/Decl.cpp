@@ -1581,9 +1581,9 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-bool PatternBindingDecl::isAsyncLet() const {
+bool PatternBindingDecl::isSpawnLet() const {
   if (auto var = getAnchoringVarDecl(0))
-    return var->isAsyncLet();
+    return var->isSpawnLet();
 
   return false;
 }
@@ -5875,8 +5875,8 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
-bool VarDecl::isAsyncLet() const {
-  return getAttrs().hasAttribute<AsyncAttr>();
+bool VarDecl::isSpawnLet() const {
+  return getAttrs().hasAttribute<AsyncAttr>() || getAttrs().hasAttribute<SpawnAttr>();
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {
