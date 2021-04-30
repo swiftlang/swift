@@ -533,6 +533,9 @@ static void collectPossibleCalleesByQualifiedLookup(
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
 
+  if (auto ice = dyn_cast<ImplicitConversionExpr>(baseExpr))
+    baseExpr = ice->getSyntacticSubExpr();
+
   // Re-typecheck TypeExpr so it's typechecked without the arguments which may
   // affects the inference of the generic arguments.
   if (TypeExpr *tyExpr = dyn_cast<TypeExpr>(baseExpr)) {
