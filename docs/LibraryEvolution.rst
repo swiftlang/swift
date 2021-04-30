@@ -150,10 +150,11 @@ The following changes are permitted:
   the outermost wrapper is implementation-detail
   (``@ImplementationDetail @MyWrapper``).
 - Changing or removing a default argument is a `binary-compatible source-breaking change`.
-- Changing arguments in the property-wrapper custom attribute of an API-level wrapper 
-  (``@API(argument: 5)``) or in the custom attributes of compositions
-  where the outermost wrapper is API-level  (``@API @MyWrapper(argument: 5)``) is a 
-  `binary-compatible source-breaking change`.
+- Changing arguments in the property-wrapper custom attribute of an 
+  implementation-detail wrapper (``@ImplementationDetail(argument: 5)``) or 
+  in the custom attributes of compositions where the outermost wrapper is 
+  implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
+  is a `binary-compatible source-breaking change`.
 - Adding or removing the ``@discardableResult`` and ``@warn_unqualified_access``
   attributes.
 
@@ -164,9 +165,10 @@ No other changes are permitted; the following are particularly of note:
   wrappers (``@API``) or compositions where the outermost wrapper is 
   API-level (``@API @MyWrapper``).
 - An ABI-public function may neither add nor remove arguments from the 
-  property-wrapper custom attribute of an API-level wrapper 
-  (``@API(argument: 5)``) or in the custom attributes of compositions
-  where the outermost wrapper is API-level  (``@API @MyWrapper(argument: 5)``).
+  property-wrapper custom attribute of a wrapper supporting projected-value
+  initialization (``@ValueProjecting(argument: 5)``) or in the custom 
+  attributes of compositions where the outermost wrapper is projected-value
+  initializable (``@ValueProjecting @MyWrapper(argument: 5)``).
 - An ABI-public function may not change its generic requirements.
 - An ABI-public function may not change its external parameter names (labels).
 - An ABI-public function may not add, remove, or reorder parameters, whether or
@@ -433,10 +435,11 @@ stored subscripts. This means that the following changes are permitted:
   (``@ImplementationDetail @MyWrapper``).
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- Changing arguments in the property-wrapper custom attribute of an API-level wrapper 
-  (``@API(argument: 5)``) or in the custom attributes of compositions
-  where the outermost wrapper is API-level  (``@API @MyWrapper(argument: 5)``) is a 
-  `binary-compatible source-breaking change`.
+- Changing arguments in the property-wrapper custom attribute of an 
+  implementation-detail wrapper (``@ImplementationDetail(argument: 5)``) or 
+  in the custom attributes of compositions where the outermost wrapper is 
+  implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
+  is a `binary-compatible source-breaking change`.
 
 Like properties, subscripts can be marked ``@inlinable``, which makes
 changing the body of an accessor a `binary-compatible source-breaking change`.
@@ -807,10 +810,11 @@ counterparts with a few small changes:
 - Adding a default argument expression to an index parameter is permitted.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- Changing arguments in the property-wrapper custom attribute of an API-level wrapper 
-  (``@API(argument: 5)``) or in the custom attributes of compositions
-  where the outermost wrapper is API-level  (``@API @MyWrapper(argument: 5)``) is a 
-  `binary-compatible source-breaking change`.
+- Changing arguments in the property-wrapper custom attribute of an 
+  implementation-detail wrapper (``@ImplementationDetail(argument: 5)``) or 
+  in the custom attributes of compositions where the outermost wrapper is 
+  implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
+  is a `binary-compatible source-breaking change`.
 
 Adding a public setter to an ``open`` subscript is a
 `binary-compatible source-breaking change`; any existing overrides will not
