@@ -99,7 +99,7 @@ extension Task {
   /// - SeeAlso: `Task.currentPriority`
   @available(*, deprecated, message: "Storing `Task` instances has been deprecated, and as such instance functions on Task are deprecated and will be removed soon. Use the static 'Task.currentPriority' instead.")
   public var priority: Priority {
-    getJobFlags(_task).priority
+    getJobFlags(_task).priority ?? .default
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -879,7 +879,7 @@ public func _runChildTask<T>(
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
   flags.kind = .task
-  flags.priority = getJobFlags(currentTask).priority
+  flags.priority = getJobFlags(currentTask).priority ?? .unspecified
   flags.isFuture = true
   flags.isChildTask = true
 
