@@ -215,7 +215,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       priority: Task.Priority = .unspecified,
       operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) async -> Bool {
-    return try self.spawnUnlessCancelled(priority: priority) {
+    return self.spawnUnlessCancelled(priority: priority) {
       await operation()
     }
   }
@@ -487,7 +487,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     priority: Task.Priority = .unspecified,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) async -> Bool {
-    return try self.spawnUnlessCancelled(priority: priority) {
+    return self.spawnUnlessCancelled(priority: priority) {
       try await operation()
     }
   }
@@ -856,6 +856,10 @@ func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_wait_next_throwing")
 func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_silgen_name("swift_task_hasTaskGroupStatusRecord")
+func _taskHasTaskGroupStatusRecord() -> Bool
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum PollStatus: Int {

@@ -35,7 +35,6 @@
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using TaskGroup = swift::TaskGroup;
-using TaskLocalInheritance = TaskLocal::TaskLocalInheritance;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);

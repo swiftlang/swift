@@ -5609,6 +5609,11 @@ ERROR(property_wrapper_dynamic_self_type, none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
       "dynamic Self type", (bool))
 
+ERROR(property_wrapper_var_must_be_static, none,
+      "property %0, must be static because property wrapper %1 can only "
+      "be applied to static properties",
+      (Identifier, Type))
+
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
       (Identifier))
