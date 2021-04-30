@@ -2310,6 +2310,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD,
                                         /*isInitializingCtor*/true,
                                         /*wantDynamicSelf*/true);
+      PD->setIsolated(selfParam.isIsolated());
       return selfParam.getPlainType();
     }
 

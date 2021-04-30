@@ -2866,6 +2866,9 @@ public:
     /// Whether the parameter is marked '@_nonEphemeral'
     bool isNonEphemeral() const { return Flags.isNonEphemeral(); }
 
+    /// Whether the parameter is 'isolated'.
+    bool isIsolated() const { return Flags.isIsolated(); }
+
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
 

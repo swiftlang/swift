@@ -1027,9 +1027,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
-    if (Tok.canBeArgumentLabel()
-        && (peekToken().is(tok::colon)
-            || peekToken().canBeArgumentLabel())) {
+    if (startsParameterName(false)) {
       // Consume a name.
       element.NameLoc = consumeArgumentLabel(element.Name,
                                              /*diagnoseDollarPrefix=*/true);

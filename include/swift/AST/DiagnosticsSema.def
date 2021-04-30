@@ -4526,9 +4526,6 @@ ERROR(nonisolated_local_var,none,
       "'nonisolated' can not be applied to local variables",
       ())
 
-ERROR(isolated_param_non_actor,none,
-      "'isolated' parameter cannot have not-actor type %0", (Type))
-
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
       "the actor instance; consider 'nonisolated'",

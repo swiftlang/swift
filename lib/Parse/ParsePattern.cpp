@@ -150,22 +150,37 @@ static ParserStatus parseDefaultArgument(
 
 /// Determine whether we are at the start of a parameter name when
 /// parsing a parameter.
-static bool startsParameterName(Parser &parser, bool isClosure) {
+bool Parser::startsParameterName(bool isClosure) {
   // '_' cannot be a type, so it must be a parameter name.
-  if (parser.Tok.is(tok::kw__))
+  if (Tok.is(tok::kw__))
     return true;
 
   // To have a parameter name here, we need a name.
-  if (!parser.Tok.canBeArgumentLabel())
+  if (!Tok.canBeArgumentLabel())
     return false;
 
-  // If the next token can be an argument label or is ':', this is a name.
-  const auto &nextTok = parser.peekToken();
-  if (nextTok.is(tok::colon) || nextTok.canBeArgumentLabel())
+  // If the next token is ':', this is a name.
+  const auto &nextTok = peekToken();
+  if (nextTok.is(tok::colon))
     return true;
 
-  if (parser.isOptionalToken(nextTok)
-      || parser.isImplicitlyUnwrappedOptionalToken(nextTok))
+  // If the next token can be an argument label, we might have a name.
+  if (nextTok.canBeArgumentLabel()) {
+    // If the first name wasn't "isolated", we're done.
+    if (!Tok.isContextualKeyword("isolated"))
+      return true;
+
+    // "isolated" can be an argument label, but it's also a contextual keyword,
+    // so look ahead one more token see if we have a ':' that would indicate
+    // that this is an argument label.
+    BacktrackingScope backtrackScope(*this);
+    consumeToken();
+    consumeToken();
+    return Tok.is(tok::colon);
+  }
+
+  if (isOptionalToken(nextTok)
+      || isImplicitlyUnwrappedOptionalToken(nextTok))
     return false;
 
   // The identifier could be a name or it could be a type. In a closure, we
@@ -289,7 +304,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
     }
     
-    if (startsParameterName(*this, isClosure)) {
+    if (startsParameterName(isClosure)) {
       // identifier-or-none for the first name
       param.FirstNameLoc = consumeArgumentLabel(param.FirstName,
                                                 /*diagnoseDollarPrefix=*/!isClosure);
