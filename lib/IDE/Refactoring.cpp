@@ -5371,8 +5371,8 @@ bool RefactoringActionConvertToAsync::performChange() {
   assert(FD &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncHandlerDesc TempDesc;
-  AsyncConverter Converter(SM, DiagEngine, FD, TempDesc);
+  auto HandlerDesc = AsyncHandlerDesc::find(FD, /*ignoreName=*/true);
+  AsyncConverter Converter(SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
 
