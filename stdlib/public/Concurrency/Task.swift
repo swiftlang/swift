@@ -235,10 +235,6 @@ extension Task {
     /// If the task throws an error, this method propogates that error.
     /// Tasks that respond to cancellation by throwing `Task.CancellationError`
     /// have that error propogated here upon cancellation.
-    /// ◊TR: I think this is the underlying explanation?
-    /// ◊TR: That is, we don't specifically throw the cancellation error if a task is canceled,
-    /// ◊TR: but rather most tasks will handle cancellation by throwing that error,
-    /// ◊TR: which we propogate here.
     ///
     /// - Returns: If the task suceeded, `.success`
     /// with the task's result as the associated value;
