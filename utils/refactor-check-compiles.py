@@ -70,7 +70,8 @@ def main():
     temp_file_name = os.path.split(args.source_filename)[-1] + '.' + \
         args.pos.replace(':', '.')
     temp_file_path = os.path.join(args.temp_dir, temp_file_name)
-    print(temp_file_path)
+    # FIXME: `refactor-check-compiles` should generate both `-dump-text` and
+    # `dump-rewritten` from a single `swift-refactor` invocation (SR-14587).
     dump_text_output = run_cmd([
         args.swift_refactor,
         '-dump-text',
