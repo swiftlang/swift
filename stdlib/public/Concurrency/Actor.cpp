@@ -59,6 +59,11 @@
 #include <processthreadsapi.h>
 #endif
 
+#if SWIFT_OBJC_INTEROP
+extern "C" void *objc_autoreleasePoolPush();
+extern "C" void objc_autoreleasePoolPop(void *);
+#endif
+
 using namespace swift;
 
 /// Should we yield the thread?
@@ -195,6 +200,10 @@ SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
 void swift::runJobInEstablishedExecutorContext(Job *job) {
   _swift_tsan_acquire(job);
 
+#if SWIFT_OBJC_INTEROP
+  auto pool = objc_autoreleasePoolPush();
+#endif
+
   if (auto task = dyn_cast<AsyncTask>(job)) {
     // Update the active task in the current thread.
     ActiveTask::set(task);
@@ -212,6 +221,10 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // There's no extra bookkeeping to do for simple jobs.
     job->runSimpleInFullyEstablishedContext();
   }
+
+#if SWIFT_OBJC_INTEROP
+  objc_autoreleasePoolPop(pool);
+#endif
 
   _swift_tsan_release(job);
 }
