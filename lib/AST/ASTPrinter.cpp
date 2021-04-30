@@ -3496,6 +3496,10 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
       });
   }
 
+  // handle effects specifiers before the body
+  if (decl->hasAsync()) Printer << " async";
+  if (decl->hasThrows()) Printer << " throws";
+
   printBodyIfNecessary(decl);
 }
 
