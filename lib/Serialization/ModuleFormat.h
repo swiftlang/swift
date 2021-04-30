@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 610; // async initializers for nominal types
+const uint16_t SWIFTMODULE_VERSION_MINOR = 611; // implicit bit for CompletionHandlerAsyncAttr
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1930,6 +1930,7 @@ namespace decls_block {
 
   using CompletionHandlerAsyncDeclAttrLayout = BCRecordLayout<
     CompletionHandlerAsync_DECL_ATTR,
+    BCFixed<1>,                 // Implicit flag.
     BCVBR<5>,                   // Completion handler index
     DeclIDField                 // Mapped async function decl
   >;
