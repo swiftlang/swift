@@ -4430,7 +4430,7 @@ public:
   /// Given expression represents computed result of the closure.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
                              bool isDefaultWrappedValue = false,
-                             bool isAsyncLetWrapper = false);
+                             bool isSpawnLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.

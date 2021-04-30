@@ -440,7 +440,7 @@ public:
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
       isUninitialized = true;
-    } else if (vd->isAsyncLet()) {
+    } else if (vd->isSpawnLet()) {
       // If this is an async let, treat it like a let-value without an
       // initializer. The initializer runs concurrently in a child task,
       // and value will be initialized at the point the variable in the
@@ -1144,7 +1144,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
   // If this is an async let, create a child task to compute the initializer
   // value.
-  if (PBD->isAsyncLet()) {
+  if (PBD->isSpawnLet()) {
     // Look through the implicit await (if present), try (if present), and
     // call to reach the autoclosure that computes the value.
     auto *init = PBD->getExecutableInit(idx);
