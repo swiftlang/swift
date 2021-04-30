@@ -1097,7 +1097,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else {
       Printer << attr->AsyncFunctionName;
     }
-    Printer << "\", completionHandleIndex: " <<
+    Printer << "\", completionHandlerIndex: " <<
         attr->CompletionHandlerIndex << ')';
     break;
   }
@@ -1478,6 +1478,20 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
+}
+
+AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
+  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
+                               implicit ? SourceRange() : getRange(),
+                               Platform, Message, Rename,
+                               Introduced ? *Introduced : llvm::VersionTuple(),
+                               implicit ? SourceRange() : IntroducedRange,
+                               Deprecated ? *Deprecated : llvm::VersionTuple(),
+                               implicit ? SourceRange() : DeprecatedRange,
+                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+                               implicit ? SourceRange() : ObsoletedRange,
+                               PlatformAgnostic,
+                               implicit);
 }
 
 Optional<OriginallyDefinedInAttr::ActiveVersion>

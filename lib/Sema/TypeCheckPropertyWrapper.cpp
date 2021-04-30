@@ -259,12 +259,6 @@ static bool enclosingInstanceTypeIsNever(ASTContext &ctx, SubscriptDecl *subscri
 
   auto paramTy = param->getType();
   auto neverTy = ctx.getNeverType();
-  paramTy->dump();
-  paramTy->getCanonicalType()->dump();
-  neverTy->dump();
-  neverTy->getCanonicalType()->dump();
-  param->dump();
-  param->getType()->dump();
   return neverTy->isEqual(paramTy);
 }
 

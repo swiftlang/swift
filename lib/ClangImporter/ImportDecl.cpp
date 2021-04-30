@@ -8101,7 +8101,7 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
       member->getAttrs().add(
           new (SwiftContext) CompletionHandlerAsyncAttr(
               cast<AbstractFunctionDecl>(*asyncImport), completionIndex,
-              SourceLoc(), SourceLoc(), SourceRange()));
+              SourceLoc(), SourceLoc(), SourceRange(), /*implicit*/ true));
     }
   }
 }
