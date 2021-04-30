@@ -229,8 +229,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValuePush) {
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValueGet) {
-  swift_task_localValueGet(nullptr, nullptr,
-                           swift::TaskLocal::TaskLocalInheritance());
+  swift_task_localValueGet(nullptr, nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValuePop) {
@@ -247,6 +246,10 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_tryAddStatusRecord)
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_removeStatusRecord) {
   swift_task_removeStatusRecord(nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, task_hasTaskGroupStatusRecord) {
+  swift_task_hasTaskGroupStatusRecord();
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_attachChild) {
