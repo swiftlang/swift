@@ -123,28 +123,28 @@ class ClassWrapper<Value> {
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitF : $@convention(thin) (@guaranteed String, Int) -> ()
 func testNonMutatingSetter(@NonMutatingSetterWrapper value1: String, @ClassWrapper value2: Int) {
-  // CHECK: alloc_box ${ var NonMutatingSetterWrapper<String> }, var, name "_value1"
   // CHECK: function_ref @$s26property_wrapper_parameter24NonMutatingSetterWrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin NonMutatingSetterWrapper<τ_0_0>.Type) -> @out NonMutatingSetterWrapper<τ_0_0>
-  // CHECK: alloc_box ${ var ClassWrapper<Int> }, var, name "_value2"
+  // CHECK: debug_value {{.*}} : $NonMutatingSetterWrapper<String>, let, name "_value1"
   // CHECK: function_ref @$s26property_wrapper_parameter12ClassWrapperC12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick ClassWrapper<τ_0_0>.Type) -> @owned ClassWrapper<τ_0_0>
+  // CHECK: debug_value {{.*}} : $ClassWrapper<Int>, let, name "_value2"
 
   _ = value1
   value1 = "hello!"
 
   // getter of value1 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFACL_SSvg : $@convention(thin) (@guaranteed { var NonMutatingSetterWrapper<String> }) -> @owned String
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFACL_SSvg : $@convention(thin) (@guaranteed NonMutatingSetterWrapper<String>) -> @owned String
 
   // setter of value1 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFACL_SSvs : $@convention(thin) (@owned String, @guaranteed { var NonMutatingSetterWrapper<String> }) -> ()
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFACL_SSvs : $@convention(thin) (@owned String, @guaranteed NonMutatingSetterWrapper<String>) -> ()
 
   _ = value2
   value2 = 10
 
   // getter of value2 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFADL_Sivg : $@convention(thin) (@guaranteed { var ClassWrapper<Int> }) -> Int
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFADL_Sivg : $@convention(thin) (@guaranteed ClassWrapper<Int>) -> Int
 
   // setter of value2 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFADL_Sivs : $@convention(thin) (Int, @guaranteed { var ClassWrapper<Int> }) -> ()
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFADL_Sivs : $@convention(thin) (Int, @guaranteed ClassWrapper<Int>) -> ()
 }
 
 @propertyWrapper

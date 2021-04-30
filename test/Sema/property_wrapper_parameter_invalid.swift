@@ -144,6 +144,12 @@ struct InternalWrapper<T> { // expected-note 3 {{type declared here}}
   init(wrappedValue: T) { self.wrappedValue = wrappedValue }
 }
 
+func testWrapperStorageMutability(@InternalWrapper value: Int) {
+  _ = _value
+  // expected-error@+1 {{cannot assign to value: '_value' is immutable}}
+  _value = InternalWrapper(wrappedValue: 10)
+}
+
 // expected-error@+1 {{function cannot be declared public because its parameter uses an internal API wrapper type}}
 public func testComposition1(@PublicWrapper @InternalWrapper value: Int) {}
 
