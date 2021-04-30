@@ -314,6 +314,9 @@ public:
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
 
+  /// True if the "-static" option is set.
+  bool Static = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.
