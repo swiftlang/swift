@@ -26,6 +26,10 @@
 #include <android/log.h>
 #endif
 
+#if defined(_WIN32)
+#include <io.h>
+#endif
+
 using namespace swift;
 
 // =============================================================================
