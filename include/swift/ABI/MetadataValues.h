@@ -2009,6 +2009,7 @@ public:
     Task_IsChildTask      = 24,
     Task_IsFuture         = 25,
     Task_IsGroupChildTask = 26,
+    Task_IsContinuingAsyncTask      = 27,
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
@@ -2038,6 +2039,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsGroupChildTask,
                                 task_isGroupChildTask,
                                 task_setIsGroupChildTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsContinuingAsyncTask,
+                                task_isContinuingAsyncTask,
+                                task_setIsContinuingAsyncTask)
 };
 
 /// Kinds of task status record.

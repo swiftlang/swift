@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -source-filename %s -module-to-print=EffectfulProperties -function-definitions=false -enable-experimental-concurrency > %t/EffectfulProperties.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-implicit-attrs -source-filename %s -module-to-print=EffectfulProperties -function-definitions=false -enable-experimental-concurrency > %t/EffectfulProperties.printed.txt
 // RUN: %FileCheck -input-file %t/EffectfulProperties.printed.txt %s
 
 // REQUIRES: objc_interop
@@ -29,8 +29,9 @@
 // CHECK:  func getMainDog(_ completion: @escaping @MainActor (String) -> Void)
 // CHECK-NEXT:  var mainDogProp: String { get async }
 
-// CHECK:  @completionHandlerAsync("regularMainDog()", completionHandleIndex: 0)
+// CHECK:  @completionHandlerAsync("regularMainDog()", completionHandlerIndex: 0)
 // CHECK-NEXT:  func regularMainDog(_ completion: @escaping @MainActor (String) -> Void)
+// CHECK-NEXT:  @discardableResult
 // CHECK-NEXT:  func regularMainDog() async -> String
 // CHECK: }
 

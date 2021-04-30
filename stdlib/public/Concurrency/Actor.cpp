@@ -274,12 +274,12 @@ static bool isExecutingOnMainThread() {
 }
 
 JobPriority swift::swift_task_getCurrentThreadPriority() {
-  if (isExecutingOnMainThread())
-    return JobPriority::UserInitiated;
-
 #if defined(__APPLE__)
   return static_cast<JobPriority>(qos_class_self());
 #else
+  if (isExecutingOnMainThread())
+    return JobPriority::UserInitiated;
+
   return JobPriority::Unspecified;
 #endif
 }

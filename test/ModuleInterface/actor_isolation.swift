@@ -38,9 +38,3 @@ public class C2 { }
 
 // CHECK: @{{(Test.)?}}SomeGlobalActor public class C2
 public class C3: C2 { }
-
-// CHECK: public actor SomeSubActor
-// CHECK-NEXT: @actorIndependent public func maine()
-public actor SomeSubActor: SomeActor {
-  override public func maine() { }
-}

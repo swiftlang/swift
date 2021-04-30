@@ -95,8 +95,7 @@ actor A {
   }
 }
 
-// NOTE: actor inheritance is probably being removed soon, so just remove this def of B
-actor B: A {
+actor B: A { // expected-error{{actor types do not support inheritance}}
   init(x : String) async {} // expected-error {{missing call to superclass's initializer; 'super.init' is 'async' and requires an explicit call}}
 }
 
