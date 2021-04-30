@@ -83,7 +83,7 @@ struct GlobalCat {
 // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat):
 // CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT]] : $Cat
-// CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+// CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    hop_to_executor [[PREV_EXEC]]
 // CHECK:    [[SWEATER1:%[0-9]+]] = begin_borrow [[SWEATER1_REF]] : $Sweater
@@ -96,7 +96,7 @@ struct GlobalCat {
 // CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT2]] : $Cat
 // CHECK:    [[CAT2_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
-// CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+// CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER2_OWNER:%[0-9]+]] = apply [[CAT2_GETTER]]([[CAT2_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    end_borrow [[CAT2_FOR_LOAD]] : $Cat
 // CHECK:    end_borrow [[CAT2]] : $Cat
@@ -176,7 +176,7 @@ actor Dog {
     // CHECK:    [[BORROWED_BIRB:%[0-9]+]] = begin_borrow [[BIRB]] : $Birb
     // CHECK:    hop_to_executor [[BORROWED_BIRB]] : $Birb
     // CHECK:    [[BORROWED_BIRB_FOR_LOAD:%[0-9]+]] = begin_borrow [[BIRB]] : $Birb
-    // CHECK:    [[FEATHER_GETTER:%[0-9]+]] = class_method [[BORROWED_BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
+    // CHECK:    [[FEATHER_GETTER:%[0-9]+]] = class_method [[BORROWED_BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (isolated Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    [[THE_INT:%[0-9]+]] = apply [[FEATHER_GETTER]]([[BORROWED_BIRB_FOR_LOAD]]) : $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    end_borrow [[BORROWED_BIRB_FOR_LOAD]] : $Birb
     // CHECK:    end_borrow [[BORROWED_BIRB]] : $Birb
@@ -195,13 +195,13 @@ actor Dog {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.bestFriend!getter : (Cat) -> () -> Birb, $@convention(method) (@guaranteed Cat) -> @owned Birb
+    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.bestFriend!getter : (isolated Cat) -> () -> Birb, $@convention(method) (@guaranteed Cat) -> @owned Birb
     // CHECK:    [[BIRB_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Birb
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    [[BIRB:%[0-9]+]] = begin_borrow [[BIRB_REF]] : $Birb
     // CHECK:    hop_to_executor [[BIRB]] : $Birb
     // CHECK:    [[BIRB_FOR_LOAD:%[0-9]+]] = begin_borrow [[BIRB_REF]] : $Birb
-    // CHECK:    [[BIRB_GETTER:%[0-9]+]] = class_method [[BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
+    // CHECK:    [[BIRB_GETTER:%[0-9]+]] = class_method [[BIRB_FOR_LOAD]] : $Birb, #Birb.feathers!getter : (isolated Birb) -> () -> Int, $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    [[THE_INT:%[0-9]+]] = apply [[BIRB_GETTER]]([[BIRB_FOR_LOAD]]) : $@convention(method) (@guaranteed Birb) -> Int
     // CHECK:    end_borrow [[BIRB_FOR_LOAD]] : $Birb
     // CHECK:    end_borrow [[BIRB]] : $Birb
@@ -222,7 +222,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[CAT_BORROW_FOR_HOP]] : $Cat
     // CHECK:   [[CAT_BORROW_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT_REF]] : $Cat
-    // CHECK:   [[GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
+    // CHECK:   [[GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (isolated Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   [[THE_BOOL:%[0-9]+]] = apply [[GETTER]]([[CAT_BORROW_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   end_borrow [[CAT_BORROW_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[CAT_BORROW_FOR_HOP]] : $Cat
@@ -244,7 +244,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[CAT_BORROW_FOR_HOP]] : $Cat
     // CHECK:   [[CAT_BORROW_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT_REF]] : $Cat
-    // CHECK:   [[FRIEND_GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:   [[FRIEND_GETTER:%[0-9]+]] = class_method [[CAT_BORROW_FOR_LOAD]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:   [[FRIEND_REF:%[0-9]+]] = apply [[FRIEND_GETTER]]([[CAT_BORROW_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:   end_borrow [[CAT_BORROW_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[CAT_BORROW_FOR_HOP]] : $Cat
@@ -255,7 +255,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[FRIEND_BORROW_FOR_HOP]] : $Cat
     // CHECK:   [[FRIEND_BORROW_FOR_LOAD:%[0-9]+]] = begin_borrow [[FRIEND_REF]] : $Cat
-    // CHECK:   [[BOOL_GETTER:%[0-9]+]] = class_method [[FRIEND_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
+    // CHECK:   [[BOOL_GETTER:%[0-9]+]] = class_method [[FRIEND_BORROW_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (isolated Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   [[THE_BOOL:%[0-9]+]] = apply [[BOOL_GETTER]]([[FRIEND_BORROW_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:   end_borrow [[FRIEND_BORROW_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[FRIEND_BORROW_FOR_HOP]] : $Cat
@@ -275,7 +275,7 @@ actor Dog {
     // CHECK:   [[INTEGER1:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
     // CHECK:   hop_to_executor [[CAT]] : $Cat
-    // CHECK:   [[SUBSCRIPT_FN:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.subscript!getter : (Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
+    // CHECK:   [[SUBSCRIPT_FN:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.subscript!getter : (isolated Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   [[OTHER_CAT:%[0-9]+]] = apply [[SUBSCRIPT_FN]]([[INTEGER1]], [[CAT]]) : $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
 
     // CHECK:   hop_to_executor [[DOG]] : $Dog
@@ -294,7 +294,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[RVALUE_CAT]] : $Cat
     // CHECK:   [[RVALUE_CAT_FOR_LOAD:%[0-9]+]] = begin_borrow [[RVALUE_CAT_REF]] : $Cat
-    // CHECK:   [[RVALUE_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[RVALUE_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
+    // CHECK:   [[RVALUE_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[RVALUE_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (isolated Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   [[FIRST_CAT_REF:%[0-9]+]] = apply [[RVALUE_CAT_SUBSCRIPT]]([[INT_ONE]], [[RVALUE_CAT_FOR_LOAD]]) : $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   end_borrow [[RVALUE_CAT_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[RVALUE_CAT]] : $Cat
@@ -307,7 +307,7 @@ actor Dog {
 
     // CHECK:   hop_to_executor [[FIRST_CAT]] : $Cat
     // CHECK:   [[FIRST_CAT_FOR_LOAD:%[0-9]+]] = begin_borrow [[FIRST_CAT_REF]] : $Cat
-    // CHECK:   [[FIRST_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[FIRST_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
+    // CHECK:   [[FIRST_CAT_SUBSCRIPT:%[0-9]+]] = class_method [[FIRST_CAT_FOR_LOAD]] : $Cat, #Cat.subscript!getter : (isolated Cat) -> (Int) -> Cat, $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   [[SECOND_CAT_REF:%[0-9]+]] = apply [[FIRST_CAT_SUBSCRIPT]]([[INT_TWO]], [[FIRST_CAT_FOR_LOAD]]) : $@convention(method) (Int, @guaranteed Cat) -> @owned Cat
     // CHECK:   end_borrow [[FIRST_CAT_FOR_LOAD]] : $Cat
     // CHECK:   end_borrow [[FIRST_CAT]] : $Cat
@@ -330,7 +330,7 @@ actor Dog {
 
     // CHECK:     hop_to_executor [[CAT]] : $Cat
     // CHECK:     [[CAT_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT_REF:%[0-9]+]] : $Cat
-    // CHECK:     [[GETTER:%[0-9]+]] = class_method [[CAT_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
+    // CHECK:     [[GETTER:%[0-9]+]] = class_method [[CAT_FOR_LOAD]] : $Cat, #Cat.storedBool!getter : (isolated Cat) -> () -> Bool, $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:     [[THE_BOOL:%[0-9]+]] = apply [[GETTER]]([[CAT_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> Bool
     // CHECK:     end_borrow [[CAT_FOR_LOAD]] : $Cat
     // CHECK:     end_borrow [[CAT]] : $Cat
@@ -348,7 +348,7 @@ actor Dog {
     // CHECK:    hop_to_executor [[SELF]] : $Dog
 
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
     // CHECK:    [[SWEATER1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 
     // CHECK:    hop_to_executor [[SELF]] : $Dog
@@ -361,7 +361,7 @@ actor Dog {
 
     // CHECK:    hop_to_executor [[CAT2]] : $Cat
     // CHECK:    [[CAT2_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
-    // CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
+    // CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (isolated Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
     // CHECK:    [[SWEATER2_OWNER:%[0-9]+]] = apply [[CAT2_GETTER]]([[CAT2_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
     // CHECK:    end_borrow [[CAT2_FOR_LOAD]] : $Cat
     // CHECK:    end_borrow [[CAT2]] : $Cat
@@ -380,13 +380,13 @@ actor Dog {
     // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat, [[SELF:%[0-9]+]] : @guaranteed $Dog):
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    [[FRIEND1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    hop_to_executor [[SELF]] : $Dog
     // CHECK:    [[FRIEND1:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
     // CHECK:    hop_to_executor [[FRIEND1]] : $Cat
     // CHECK:    [[FRIEND1_FOR_LOAD:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
-    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    [[FRIEND2_REF:%[0-9]+]] = apply [[FRIEND1_GETTER]]([[FRIEND1_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    end_borrow [[FRIEND1_FOR_LOAD]] : $Cat
     // CHECK:    end_borrow [[FRIEND1]] : $Cat
@@ -405,7 +405,7 @@ actor Dog {
     // CHECK:    [[FRIEND1_STACK:%[0-9]+]] = alloc_stack $Optional<Cat>
 
     // CHECK:    hop_to_executor [[CAT]] : $Cat
-    // CHECK:    [[MAYBE_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.maybeFriend!getter : (Cat) -> () -> Cat?, $@convention(method) (@guaranteed Cat) -> @owned Optional<Cat>
+    // CHECK:    [[MAYBE_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.maybeFriend!getter : (isolated Cat) -> () -> Cat?, $@convention(method) (@guaranteed Cat) -> @owned Optional<Cat>
     // CHECK:    [[MAYBE_FRIEND:%[0-9]+]] = apply [[MAYBE_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Optional<Cat>
     // CHECK:    store [[MAYBE_FRIEND]] to [init] [[FRIEND1_STACK]] : $*Optional<Cat>
 
@@ -420,7 +420,7 @@ actor Dog {
     // CHECK:    [[FRIEND1:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
     // CHECK:    hop_to_executor [[FRIEND1]] : $Cat
     // CHECK:    [[FRIEND1_FOR_LOAD:%[0-9]+]] = begin_borrow [[FRIEND1_REF]] : $Cat
-    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
+    // CHECK:    [[FRIEND1_GETTER:%[0-9]+]] = class_method [[FRIEND1_FOR_LOAD]] : $Cat, #Cat.friend!getter : (isolated Cat) -> () -> Cat, $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    [[FRIEND2_REF:%[0-9]+]] = apply [[FRIEND1_GETTER]]([[FRIEND1_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Cat
     // CHECK:    end_borrow [[FRIEND1_FOR_LOAD]] : $Cat
     // CHECK:    end_borrow [[FRIEND1]] : $Cat

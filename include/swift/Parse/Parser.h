@@ -1362,6 +1362,9 @@ public:
     EnumElement,
   };
 
+  /// Whether we are at the start of a parameter name when parsing a parameter.
+  bool startsParameterName(bool isClosure);
+
   /// Parse a parameter-clause.
   ///
   /// \verbatim

@@ -3542,8 +3542,9 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  // isolated parameters must be of actor type
   Type type = resolveType(repr->getBase(), options);
+
+  // isolated parameters must be of actor type
   if (!type->hasTypeParameter() && !type->isActorType() && !type->hasError()) {
     diagnoseInvalid(
         repr, repr->getSpecifierLoc(), diag::isolated_parameter_not_actor, type);

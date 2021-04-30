@@ -3240,6 +3240,9 @@ static void printParameterFlags(ASTPrinter &printer,
     break;
   }
 
+  if (flags.isIsolated())
+    printer.printKeyword("isolated", options, " ");
+
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
 }

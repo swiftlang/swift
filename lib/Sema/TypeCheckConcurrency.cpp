@@ -2746,8 +2746,62 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   }
 }
 
+/// Given a property, determine the isolation when it part of a wrapped
+/// property.
+static ActorIsolation getActorIsolationFromWrappedProperty(VarDecl *var) {
+  // If this is a variable with a property wrapper, infer from the property
+  // wrapper's wrappedValue.
+  if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
+    if (auto wrappedValue = wrapperInfo.valueVar) {
+      if (auto isolation = getActorIsolation(wrappedValue))
+        return isolation;
+    }
+  }
+
+  // If this is the backing storage for a property wrapper, infer from the
+  // type of the outermost property wrapper.
+  if (auto originalVar = var->getOriginalWrappedProperty(
+          PropertyWrapperSynthesizedPropertyKind::Backing)) {
+    if (auto backingType =
+            originalVar->getPropertyWrapperBackingPropertyType()) {
+      if (auto backingNominal = backingType->getAnyNominal()) {
+        if (!isa<ClassDecl>(backingNominal) ||
+            !cast<ClassDecl>(backingNominal)->isActor()) {
+          if (auto isolation = getActorIsolation(backingNominal))
+            return isolation;
+        }
+      }
+    }
+  }
+
+  // If this is the projected property for a property wrapper, infer from
+  // the property wrapper's projectedValue.
+  if (auto originalVar = var->getOriginalWrappedProperty(
+          PropertyWrapperSynthesizedPropertyKind::Projection)) {
+    if (auto wrapperInfo =
+            originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
+      if (auto projectedValue = wrapperInfo.projectedValueVar) {
+        if (auto isolation = getActorIsolation(projectedValue))
+          return isolation;
+      }
+    }
+  }
+
+  return ActorIsolation::forUnspecified();
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
+  // If this declaration has actor-isolated "self", it's isolated to that
+  // actor.
+  if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
+    auto actor = value->getDeclContext()->getSelfNominalTypeDecl();
+    assert(actor && "could not find the actor that 'self' is isolated to");
+    return actor->isDistributedActor()
+        ? ActorIsolation::forDistributedActorInstance(actor)
+        : ActorIsolation::forActorInstance(actor);
+  }
+
   // If this declaration has one of the actor isolation attributes, report
   // that.
   if (auto isolationFromAttr = getIsolationFromAttributes(value)) {
@@ -2762,15 +2816,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     if (func->isSendable()) {
       defaultIsolation = ActorIsolation::forIndependent();
-    }
-  }
-
-  // Check for instance members and initializers of actor types,
-  // which are part of actor-isolated state.
-  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
-    if (nominal->isActor() &&
-        (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
-      defaultIsolation = ActorIsolation::forActorInstance(nominal);
     }
   }
 
@@ -2836,43 +2881,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
-    // If this is a variable with a property wrapper, infer from the property
-    // wrapper's wrappedValue.
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (auto wrappedValue = wrapperInfo.valueVar) {
-        if (auto isolation = getActorIsolation(wrappedValue))
-          return inferredIsolation(isolation);
-      }
-    }
-
-    // If this is the backing storage for a property wrapper, infer from the
-    // type of the outermost property wrapper.
-    if (auto originalVar = var->getOriginalWrappedProperty(
-            PropertyWrapperSynthesizedPropertyKind::Backing)) {
-      if (auto backingType =
-              originalVar->getPropertyWrapperBackingPropertyType()) {
-        if (auto backingNominal = backingType->getAnyNominal()) {
-          if (!isa<ClassDecl>(backingNominal) ||
-              !cast<ClassDecl>(backingNominal)->isActor()) {
-            if (auto isolation = getActorIsolation(backingNominal))
-              return inferredIsolation(isolation);
-          }
-        }
-      }
-    }
-
-    // If this is the projected property for a property wrapper, infer from
-    // the property wrapper's projectedValue.
-    if (auto originalVar = var->getOriginalWrappedProperty(
-            PropertyWrapperSynthesizedPropertyKind::Projection)) {
-      if (auto wrapperInfo =
-              originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
-        if (auto projectedValue = wrapperInfo.projectedValueVar) {
-          if (auto isolation = getActorIsolation(projectedValue))
-            return inferredIsolation(isolation);
-        }
-      }
-    }
+    if (auto isolation = getActorIsolationFromWrappedProperty(var))
+      return inferredIsolation(isolation);
   }
 
   if (shouldInferAttributeInContext(value->getDeclContext())) {
@@ -2947,6 +2957,69 @@ ActorIsolation ActorIsolationRequest::evaluate(
   return defaultIsolation;
 }
 
+bool HasIsolatedSelfRequest::evaluate(
+    Evaluator &evaluator, ValueDecl *value) const {
+  // Only ever applies to members of actors.
+  auto dc = value->getDeclContext();
+  auto selfTypeDecl = dc->getSelfNominalTypeDecl();
+  if (!selfTypeDecl || !selfTypeDecl->isActor())
+    return false;
+
+  // For accessors, consider the storage declaration.
+  if (auto accessor = dyn_cast<AccessorDecl>(value))
+    value = accessor->getStorage();
+
+  // Check whether this member can be isolated to an actor at all.
+  auto memberIsolation = getMemberIsolationPropagation(value);
+  if (!memberIsolation)
+    return false;
+
+  switch (*memberIsolation) {
+  case MemberIsolationPropagation::GlobalActor:
+    // Treat constructors as being actor-isolated... for now.
+    if (isa<ConstructorDecl>(value))
+      break;
+
+    return false;
+
+  case MemberIsolationPropagation::AnyIsolation:
+    break;
+  }
+
+  // Check whether the default isolation was overridden by any attributes on
+  // this declaration.
+  if (getIsolationFromAttributes(value))
+    return false;
+
+  // ... or its extension context.
+  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    if (getIsolationFromAttributes(ext))
+      return false;
+  }
+
+  // If this is a variable, check for a property wrapper that alters its
+  // isolation.
+  if (auto var = dyn_cast<VarDecl>(value)) {
+    switch (auto isolation = getActorIsolationFromWrappedProperty(var)) {
+    case ActorIsolation::Independent:
+    case ActorIsolation::Unspecified:
+      break;
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      return false;
+
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
+      if (isolation.getActor() != selfTypeDecl)
+        return false;
+      break;
+    }
+  }
+
+  return true;
+}
+
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isa<TypeDecl>(value))
     return;
@@ -2979,10 +3052,15 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isolation == overriddenIsolation)
     return;
 
+  // If both are actor-instance isolated, we're done.
+  if (isolation.getKind() == overriddenIsolation.getKind() &&
+      (isolation.getKind() == ActorIsolation::ActorInstance ||
+       isolation.getKind() == ActorIsolation::DistributedActorInstance))
+    return;
+
   // If the overridden declaration is from Objective-C with no actor annotation,
-  // and the overriding declaration has been placed in a global actor, allow it.
-  if (overridden->hasClangNode() && !overriddenIsolation &&
-      isolation.isGlobalActor())
+  // allow it.
+  if (overridden->hasClangNode() && !overriddenIsolation)
     return;
 
   // If the overridden declaration uses an unsafe global actor, we can do
