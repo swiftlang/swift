@@ -2132,7 +2132,7 @@ static bool isPrintLikeMethod(DeclName name, const DeclContext *dc) {
 }
 
 using MirroredMethodEntry =
-  std::pair<const clang::ObjCMethodDecl*, ProtocolDecl*>;
+  std::tuple<const clang::ObjCMethodDecl*, ProtocolDecl*, bool /*isAsync*/>;
 
 namespace {
   /// Customized llvm::DenseMapInfo for storing borrowed APSInts.
@@ -7964,11 +7964,6 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (isa<AccessorDecl>(afd))
         return;
 
-      // Asynch methods are also always imported without async, so don't
-      // record them here.
-      if (afd->hasAsync())
-        return;
-
       auto objcMethod =
           dyn_cast_or_null<clang::ObjCMethodDecl>(member->getClangDecl());
       if (!objcMethod)
@@ -7976,7 +7971,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
 
       // For now, just remember that we saw this method.
       methodsByName[objcMethod->getSelector()]
-        .push_back(MirroredMethodEntry{objcMethod, proto});
+        .push_back(std::make_tuple(objcMethod, proto, afd->hasAsync()));
     };
 
     if (name) {
@@ -8053,18 +8048,20 @@ compareMethodsForMirrorImport(ClangImporter::Implementation &importer,
 /// Return true if this method is overridden by any methods in the array.
 static bool suppressOverriddenMethods(ClangImporter::Implementation &importer,
                                       const clang::ObjCMethodDecl *method,
+                                      bool isAsync,
                                MutableArrayRef<MirroredMethodEntry> entries) {
   assert(method && "method was already suppressed");
 
   for (auto &entry: entries) {
-    auto otherMethod = entry.first;
+    auto otherMethod = std::get<0>(entry);
     if (!otherMethod) continue;
+    if (isAsync != std::get<2>(entry)) continue;
 
     assert(method != otherMethod && "found same method twice?");
     switch (compareMethodsForMirrorImport(importer, method, otherMethod)) {
     // If the second method is suppressed, null it out.
     case Suppresses:
-      entry.first = nullptr;
+        std::get<0>(entry) = nullptr;
       continue;
 
     // If the first method is suppressed, return immediately.  We should
@@ -8120,8 +8117,17 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
 void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
                                MutableArrayRef<MirroredMethodEntry> entries,
                                            SmallVectorImpl<Decl *> &members) {
+  // Keep track of the async imports. We'll come back to them.
+  llvm::SmallMapVector<const clang::ObjCMethodDecl*, Decl *, 4> asyncImports;
+
+  // Keep track of all of the synchronous imports.
+  llvm::SmallMapVector<
+      const clang::ObjCMethodDecl*, llvm::TinyPtrVector<Decl *>, 4>
+    syncImports;
+
   for (size_t i = 0, e = entries.size(); i != e; ++i) {
-    auto objcMethod = entries[i].first;
+    auto objcMethod = std::get<0>(entries[i]);
+    bool isAsync = std::get<2>(entries[i]);
 
     // If the method was suppressed by a previous method, ignore it.
     if (!objcMethod)
@@ -8131,7 +8137,8 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
     // that it overrides.  If it is overridden by any of them, suppress it
     // instead; but there's no need to mark that in the array, just continue
     // on to the next method.
-    if (suppressOverriddenMethods(Impl, objcMethod, entries.slice(i + 1)))
+    if (suppressOverriddenMethods(
+            Impl, objcMethod, isAsync, entries.slice(i + 1)))
       continue;
 
     // Okay, the method wasn't suppressed, import it.
@@ -8148,9 +8155,11 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
     }
 
     // Import the method.
-    auto proto = entries[i].second;
+    auto proto = std::get<1>(entries[i]);
     if (auto imported =
-            Impl.importMirroredDecl(objcMethod, dc, getVersion(), proto)) {
+            Impl.importMirroredDecl(objcMethod, dc,
+                                    getVersion().withConcurrency(isAsync),
+                                    proto)) {
       size_t start = members.size();
 
       members.push_back(imported);
@@ -8160,20 +8169,21 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
           members.push_back(alternate);
       }
 
-      if (!getVersion().supportsConcurrency()) {
-        auto asyncVersion = getVersion().withConcurrency(true);
-        if (auto asyncImport = Impl.importMirroredDecl(
-                objcMethod, dc, asyncVersion, proto)) {
-          if (asyncImport != imported) {
-            addCompletionHandlerAttribute(
-                asyncImport,
-                llvm::makeArrayRef(members).drop_front(start),
-                Impl.SwiftContext);
-            members.push_back(asyncImport);
-          }
-        }
+      if (isAsync) {
+        asyncImports[objcMethod] = imported;
+      } else {
+        syncImports[objcMethod] = llvm::TinyPtrVector<Decl *>(
+            llvm::makeArrayRef(members).drop_front(start + 1));
       }
     }
+  }
+
+  // Write up sync and async versions.
+  for (const auto &asyncImport : asyncImports) {
+    addCompletionHandlerAttribute(
+        asyncImport.second,
+        syncImports[asyncImport.first],
+        Impl.SwiftContext);
   }
 }
 
