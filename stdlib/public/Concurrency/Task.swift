@@ -122,16 +122,6 @@ extension Task.Priority {
 
     return self
   }
-
-  /// Adjust the given priority (when it is unspecified) by the current
-  /// priority Return the current priority that,
-  var _inheritingContextualPriority: Task.Priority {
-    if self != .unspecified {
-      return self
-    }
-
-    return Task.currentPriority._downgradeUserInteractive
-  }
 }
 
 // ==== Task Handle ------------------------------------------------------------
@@ -338,6 +328,22 @@ extension Task {
       }
     }
 
+    /// Whether this is a task created by the 'async' operation, which
+    /// conceptually continues the work of the synchronous code that invokes
+    /// it.
+    var isContinuingAsyncTask: Bool {
+      get {
+        (bits & (1 << 27)) != 0
+      }
+
+      set {
+        if newValue {
+          bits = bits | 1 << 27
+        } else {
+          bits = (bits & ~(1 << 27))
+        }
+      }
+    }
   }
 }
 
@@ -483,6 +489,22 @@ public func asyncDetached<T>(
   return detach(priority: priority, operation: operation)
 }
 
+/// ABI stub while we stage in the new signatures
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@usableFromInline
+func async(
+  priority: Task.Priority,
+  @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Void
+) {
+  let adjustedPriority: Task.Priority?
+  if priority == .unspecified {
+    adjustedPriority = nil
+  } else {
+    adjustedPriority = priority
+  }
+  let _: Task.Handle = async(priority: adjustedPriority, operation: operation)
+}
+
 /// Run given `operation` as asynchronously in its own top-level task.
 ///
 /// The `async` function should be used when creating asynchronous work
@@ -494,27 +516,63 @@ public func asyncDetached<T>(
 /// does not return a handle to refer to the task.
 ///
 /// - Parameters:
-///   - priority: priority of the task. If unspecified, the priority will
-///               be inherited from the task that is currently executing
-///               or, if there is none, from the platform's understanding of
-///               which thread is executing.
+///   - priority: priority of the task. If nil, the priority will come from
+///     Task.currentPriority.
 ///   - operation: the operation to execute
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func async(
-  priority: Task.Priority = .unspecified,
-  @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Void
-) {
+public func async<T>(
+  priority: Task.Priority? = nil,
+  @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> T
+) -> Task.Handle<T, Never> {
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
   flags.kind = .task
-  flags.priority = priority._inheritingContextualPriority
+  flags.priority = priority ?? Task.currentPriority._downgradeUserInteractive
   flags.isFuture = true
+  flags.isContinuingAsyncTask = true
 
   // Create the asynchronous task future.
   let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
+  return Task.Handle(task)
+}
+
+/// Run given `operation` as asynchronously in its own top-level task.
+///
+/// The `async` function should be used when creating asynchronous work
+/// that operates on behalf of the synchronous function that calls it.
+/// Like `detach`, the async function creates a separate, top-level task.
+/// Unlike `detach`, the task creating by `async` inherits the priority and
+/// actor context of the caller, so the `operation` is treated more like an
+/// asynchronous extension to the synchronous operation. Additionally, `async`
+/// does not return a handle to refer to the task.
+///
+/// - Parameters:
+///   - priority: priority of the task. If nil, the priority will come from
+///     Task.currentPriority.
+///   - operation: the operation to execute
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public func async<T>(
+  priority: Task.Priority? = nil,
+  @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> T
+) -> Task.Handle<T, Error> {
+  // Set up the job flags for a new task.
+  var flags = Task.JobFlags()
+  flags.kind = .task
+  flags.priority = priority ?? Task.currentPriority._downgradeUserInteractive
+  flags.isFuture = true
+  flags.isContinuingAsyncTask = true
+
+  // Create the asynchronous task future.
+  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+
+  // Enqueue the resulting job.
+  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
+  return Task.Handle(task)
 }
 
 // ==== Async Handler ----------------------------------------------------------
