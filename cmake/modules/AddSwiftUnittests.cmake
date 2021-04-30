@@ -10,9 +10,6 @@ function(add_swift_unittest test_dirname)
   # function defined by AddLLVM.cmake.
   add_unittest(SwiftUnitTests ${test_dirname} ${ARGN})
 
-  target_include_directories(${test_dirname} PUBLIC ${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include)
-  target_include_directories(${test_dirname} PUBLIC ${LLVM_MAIN_SRC_DIR}/utils/unittest/googlemock/include)
-
   # TODO: _add_variant_c_compile_link_flags and these tests should share some
   # sort of logic.
   #
@@ -22,24 +19,6 @@ function(add_swift_unittest test_dirname)
   if (_lto_flag_out)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY COMPILE_FLAGS " ${_lto_flag_out} ")
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY LINK_FLAGS " ${_lto_flag_out} ")
-  endif()
-
-  if(SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
-    # Replace target references with full paths, so that we use LLVM's
-    # build configuration rather than Swift's.
-    get_target_property(libnames ${test_dirname} LINK_LIBRARIES)
-
-    set(new_libnames)
-    foreach(dep ${libnames})
-      if("${dep}" MATCHES "^(LLVM|Clang|gtest)" AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        list(APPEND new_libnames "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
-      else()
-        list(APPEND new_libnames "${dep}")
-      endif()
-    endforeach()
-
-    set_property(TARGET ${test_dirname} PROPERTY LINK_LIBRARIES ${new_libnames})
-    swift_common_llvm_config(${test_dirname} support)
   endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
