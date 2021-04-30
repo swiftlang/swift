@@ -141,6 +141,8 @@ extension Task {
     case `default`       = 0x15
     case utility         = 0x11
     case background      = 0x09
+
+    @available(*, deprecated, message: "unspecified priority will be removed; use nil")
     case unspecified     = 0x00
 
     public static func < (lhs: Priority, rhs: Priority) -> Bool {
@@ -324,13 +326,13 @@ extension Task {
     var isAsyncTask: Bool { kind == .task }
 
     /// The priority given to the job.
-    var priority: Priority {
+    var priority: Priority? {
       get {
-        Priority(rawValue: (bits & 0xFF00) >> 8)!
+        Priority(rawValue: (bits & 0xFF00) >> 8)
       }
 
       set {
-        bits = (bits & ~0xFF00) | (newValue.rawValue << 8)
+        bits = (bits & ~0xFF00) | ((newValue?.rawValue ?? 0) << 8)
       }
     }
 
@@ -521,23 +523,21 @@ public func detach<T>(
 }
 
 @discardableResult
-@_alwaysEmitIntoClient
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func asyncDetached<T>(
-  priority: Task.Priority = .unspecified,
+  priority: Task.Priority? = nil,
   @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> T
 ) -> Task.Handle<T, Never> {
-  return detach(priority: priority, operation: operation)
+  return detach(priority: priority ?? .unspecified, operation: operation)
 }
 
 @discardableResult
-@_alwaysEmitIntoClient
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func asyncDetached<T>(
-  priority: Task.Priority = .unspecified,
+  priority: Task.Priority? = nil,
   @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> T
 ) -> Task.Handle<T, Error> {
-  return detach(priority: priority, operation: operation)
+  return detach(priority: priority ?? .unspecified, operation: operation)
 }
 
 /// ABI stub while we stage in the new signatures
@@ -571,6 +571,7 @@ func async(
 ///     Task.currentPriority.
 ///   - operation: the operation to execute
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@discardableResult
 public func async<T>(
   priority: Task.Priority? = nil,
   @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> T
@@ -606,6 +607,7 @@ public func async<T>(
 ///     Task.currentPriority.
 ///   - operation: the operation to execute
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@discardableResult
 public func async<T>(
   priority: Task.Priority? = nil,
   @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> T
@@ -781,12 +783,10 @@ public struct UnsafeCurrentTask {
 
   /// Returns the `current` task's priority.
   ///
-  /// If no current `Task` is available, returns `Priority.default`.
-  ///
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: Task.Priority {
-    getJobFlags(_task).priority
+    getJobFlags(_task).priority ?? .default
   }
 
 }
