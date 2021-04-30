@@ -219,10 +219,6 @@ extension Task {
     /// If the task throws an error, this method propogates that error.
     /// Tasks that respond to cancellation by throwing `Task.CancellationError`
     /// have that error propogated here upon cancellation.
-    /// ◊TR: I think this is the underlying explanation?
-    /// ◊TR: That is, we don't specifically throw the cancellation error if a task is canceled,
-    /// ◊TR: but rather most tasks will handle cancellation by throwing that error,
-    /// ◊TR: which we propogate here.
     ///
     /// - Returns: The task's result.
     public func get() async throws -> Success {
@@ -725,10 +721,6 @@ public struct UnsafeCurrentTask {
   ///
   /// Operations on an instance of `Task` are safe to call from any other task,
   /// unlike `UnsafeCurrentTask`.
-  ///
-  /// ◊TR: Is this rewrite better?
-  /// ◊TR: I'm rewriting your original abstract to remove code voice,
-  /// ◊TR: which isn't allowed in abstracts.
   @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
   public var task: Task {
     Task(_task)
