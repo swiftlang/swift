@@ -97,6 +97,7 @@ extension Task {
   /// because `hello()` is called by an asynchronous function,
   /// it prints "Not nil".
   ///
+  @available(*, deprecated, message: "`Task.current` has been deprecated and will be removed, use static functions on Task instead.")
   public static var current: Task? {
     guard let _task = _getCurrentAsyncTask() else {
       return nil
