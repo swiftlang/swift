@@ -4762,8 +4762,9 @@ class AsyncConverter : private SourceEntityWalker {
   SmallString<0> Buffer;
   llvm::raw_svector_ostream OS;
 
-  // Decls where any force-unwrap of that decl should be unwrapped, eg. for a
-  // previously optional closure paramter has become a non-optional local
+  // Decls where any force unwrap or optional chain of that decl should be
+  // elided, e.g for a previously optional closure parameter that has become a
+  // non-optional local.
   llvm::DenseSet<const Decl *> Unwraps;
   // Decls whose references should be replaced with, either because they no
   // longer exist or are a different type. Any replaced code should ideally be
@@ -4874,11 +4875,19 @@ private:
                                OS << PLACEHOLDER_END;
                            });
       }
-    } else if (auto *FTE = dyn_cast<ForceValueExpr>(E)) {
-      if (auto *D = FTE->getReferencedDecl().getDecl()) {
+    } else if (isa<ForceValueExpr>(E) || isa<BindOptionalExpr>(E)) {
+      // Remove a force unwrap or optional chain of a returned success value,
+      // as it will no longer be optional. For force unwraps, this is always a
+      // valid transform. For optional chains, it is a locally valid transform
+      // within the optional chain e.g foo?.x -> foo.x, but may change the type
+      // of the overall chain, which could cause errors elsewhere in the code.
+      // However this is generally more useful to the user than just leaving
+      // 'foo' as a placeholder. Note this is only the case when no other
+      // optionals are involved in the chain, e.g foo?.x?.y -> foo.x?.y is
+      // completely valid.
+      if (auto *D = E->getReferencedDecl().getDecl()) {
         if (Unwraps.count(D))
-          return addCustom(FTE->getStartLoc(),
-                           FTE->getEndLoc().getAdvancedLoc(1),
+          return addCustom(E->getStartLoc(), E->getEndLoc().getAdvancedLoc(1),
                            [&]() { OS << newNameFor(D, true); });
       }
     } else if (NestedExprCount == 0) {
