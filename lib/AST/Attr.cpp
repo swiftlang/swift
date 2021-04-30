@@ -1097,7 +1097,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else {
       Printer << attr->AsyncFunctionName;
     }
-    Printer << "\", completionHandleIndex: " <<
+    Printer << "\", completionHandlerIndex: " <<
         attr->CompletionHandlerIndex << ')';
     break;
   }

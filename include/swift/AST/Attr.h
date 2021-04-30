@@ -2077,9 +2077,10 @@ public:
   CompletionHandlerAsyncAttr(AbstractFunctionDecl &asyncFunctionDecl,
                              size_t completionHandlerIndex,
                              SourceLoc completionHandlerIndexLoc,
-                             SourceLoc atLoc, SourceRange range)
+                             SourceLoc atLoc, SourceRange range,
+                             bool implicit)
       : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
-                      /*implicit*/ false),
+                      implicit),
         AsyncFunctionDecl(&asyncFunctionDecl) ,
         CompletionHandlerIndex(completionHandlerIndex),
         CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}

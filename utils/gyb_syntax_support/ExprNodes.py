@@ -592,6 +592,13 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
+    # postfix '#if' expession
+    Node('PostfixIfConfigExpr', kind='Expr',
+         children=[
+             Child('Base', kind='Expr'),
+             Child('Config', kind='IfConfigDecl'),
+         ]),
+
     # <#content#>
     Node('EditorPlaceholderExpr', kind='Expr',
          children=[

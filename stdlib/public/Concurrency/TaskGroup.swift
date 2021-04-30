@@ -215,9 +215,19 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       priority: Task.Priority = .unspecified,
       operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) async -> Bool {
-    return try self.spawnUnlessCancelled(priority: priority) {
+    return self.spawnUnlessCancelled(priority: priority) {
       await operation()
     }
+  }
+
+  // Historical entry point, maintained for ABI compatibility
+  @usableFromInline
+  mutating func spawn(
+    priority: Task.Priority,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    let optPriority: Task.Priority? = priority
+    spawn(priority: optPriority, operation: operation)
   }
 
   /// Add a child task to the group.
@@ -236,7 +246,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   public mutating func spawn(
-    priority: Task.Priority = .unspecified,
+    priority: Task.Priority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
     _ = _taskGroupAddPendingTask(group: _group, unconditionally: true)
@@ -260,6 +270,16 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
   }
 
+    // Historical entry point, maintained for ABI compatibility
+  @usableFromInline
+  mutating func spawnUnlessCancelled(
+    priority: Task.Priority = .unspecified,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    let optPriority: Task.Priority? = priority
+    return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
   /// Add a child task to the group.
   ///
   /// ### Error handling
@@ -276,7 +296,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   public mutating func spawnUnlessCancelled(
-    priority: Task.Priority = .unspecified,
+    priority: Task.Priority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -467,9 +487,19 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     priority: Task.Priority = .unspecified,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) async -> Bool {
-    return try self.spawnUnlessCancelled(priority: priority) {
+    return self.spawnUnlessCancelled(priority: priority) {
       try await operation()
     }
+  }
+
+  // Historical entry point for ABI reasons
+  @usableFromInline
+  mutating func spawn(
+    priority: Task.Priority = .unspecified,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    let optPriority: Task.Priority? = priority
+    return spawn(priority: optPriority, operation: operation)
   }
 
   /// Spawn, unconditionally, a child task in the group.
@@ -488,7 +518,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   public mutating func spawn(
-    priority: Task.Priority = .unspecified,
+    priority: Task.Priority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
     // we always add, so no need to check if group was cancelled
@@ -513,6 +543,16 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
   }
 
+  // Historical entry point for ABI reasons
+  @usableFromInline
+  mutating func spawnUnlessCancelled(
+    priority: Task.Priority,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    let optPriority: Task.Priority? = priority
+    return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
   /// Add a child task to the group.
   ///
   /// ### Error handling
@@ -529,7 +569,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   public mutating func spawnUnlessCancelled(
-    priority: Task.Priority = .unspecified,
+    priority: Task.Priority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
@@ -816,6 +856,10 @@ func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_wait_next_throwing")
 func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_silgen_name("swift_task_hasTaskGroupStatusRecord")
+func _taskHasTaskGroupStatusRecord() -> Bool
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum PollStatus: Int {

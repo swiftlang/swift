@@ -161,4 +161,13 @@ void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((s
 MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @protocol TripleMainActor
 @end
 
+@protocol ProtocolWithAsync
+- (void)protocolMethodWithCompletionHandler:(void (^)(void))completionHandler;
+- (void)customAsyncNameProtocolMethodWithCompletionHandler:(void (^)(void))completionHandler __attribute__((swift_async_name("customAsyncName()")));
+@end
+
+@interface ClassWithAsync: NSObject <ProtocolWithAsync>
+- (void)instanceMethodWithCompletionHandler:(void (^)(void))completionHandler __attribute__((swift_async_name("instanceAsync()")));
+@end
+
 #pragma clang assume_nonnull end
