@@ -1104,7 +1104,8 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   // Remove the leftover copy_value and destroy_value instructions.
   if (!instsToDelete.empty()) {
     recursivelyDeleteTriviallyDeadInstructions(instsToDelete.takeVector(),
-                                               /*force=*/true);
+                                               /*force=*/true,
+                                               instModCallbacks);
     setChanged();
   }
 }
