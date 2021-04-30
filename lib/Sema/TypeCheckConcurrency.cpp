@@ -2073,7 +2073,7 @@ namespace {
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
         switch (autoclosure->getThunkKind()) {
         case AutoClosureExpr::Kind::AsyncLet:
-          return diag::actor_isolated_from_async_let;
+          return diag::actor_isolated_from_spawn_let;
 
         case AutoClosureExpr::Kind::DoubleCurryThunk:
         case AutoClosureExpr::Kind::SingleCurryThunk:

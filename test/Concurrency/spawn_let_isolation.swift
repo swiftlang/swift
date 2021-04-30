@@ -9,14 +9,14 @@ actor MyActor {
   func asynchronous() async -> String { synchronous() }
 
   func testAsyncLetIsolation() async {
-    async let x = self.synchronous()
+    spawn let x = self.synchronous()
 
-    async let y = await self.asynchronous()
+    spawn let y = await self.asynchronous()
 
-    async let z = synchronous()
+    spawn let z = synchronous()
 
     var localText = text
-    async let w = localText.removeLast() // expected-error{{mutation of captured var 'localText' in concurrently-executing code}}
+    spawn let w = localText.removeLast() // expected-error{{mutation of captured var 'localText' in concurrently-executing code}}
 
     _ = await x
     _ = await y
@@ -27,8 +27,8 @@ actor MyActor {
 
 func outside() async {
   let a = MyActor()
-  async let x = a.synchronous() // okay, await is implicit
-  async let y = await a.synchronous()
+  spawn let x = a.synchronous() // okay, await is implicit
+  spawn let y = await a.synchronous()
   _ = await x
   _ = await y
 }
