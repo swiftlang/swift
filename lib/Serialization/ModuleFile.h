@@ -435,6 +435,10 @@ public:
     return Core->ModuleABIName;
   }
 
+  llvm::VersionTuple getUserModuleVersion() const {
+    return Core->UserModuleVersion;
+  }
+
   /// The Swift compatibility version in use when this module was built.
   const version::Version &getCompatibilityVersion() const {
     return Core->CompatibilityVersion;

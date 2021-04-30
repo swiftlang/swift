@@ -2515,6 +2515,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
 
 static void printModuleMetadata(ModuleDecl *MD) {
   auto &OS = llvm::outs();
+  OS << "user module version: " << MD->getUserModuleVersion().getAsString() << "\n";
   OS << "fingerprint=" << MD->getFingerprint().getRawValue() << "\n";
   MD->collectLinkLibraries([&](LinkLibrary lib) {
     OS << "link library: " << lib.getName()
