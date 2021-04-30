@@ -596,4 +596,11 @@ func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSigna
 #"<StringSegment>abc</StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 #"<StringSegment>abc </StringSegment><ExpressionSegment>\#(<TupleExprElement><IdentifierExpr>foo</IdentifierExpr></TupleExprElement>)</ExpressionSegment><StringSegment></StringSegment>"#</StringLiteralExpr><StringLiteralExpr>
 ##"<StringSegment>abc</StringSegment>"##</StringLiteralExpr><StringLiteralExpr>
-##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<TupleExprElement><IdentifierExpr>foo</IdentifierExpr></TupleExprElement>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr>
+##"<StringSegment>abc </StringSegment><ExpressionSegment>\##(<TupleExprElement><IdentifierExpr>foo</IdentifierExpr></TupleExprElement>)</ExpressionSegment><StringSegment></StringSegment>"##</StringLiteralExpr><PostfixIfConfigExpr><FunctionCallExpr><IdentifierExpr>
+
+foo</IdentifierExpr>()</FunctionCallExpr><IfConfigDecl><IfConfigClause>
+#if <BooleanLiteralExpr>true</BooleanLiteralExpr><ForcedValueExpr><FunctionCallExpr><OptionalChainingExpr><MemberAccessExpr>
+  .bar</MemberAccessExpr>?</OptionalChainingExpr>()</FunctionCallExpr>!</ForcedValueExpr></IfConfigClause><IfConfigClause>
+#else<FunctionCallExpr><MemberAccessExpr>
+  .baz</MemberAccessExpr>() <ClosureExpr>{}</ClosureExpr></FunctionCallExpr></IfConfigClause>
+#endif</IfConfigDecl></PostfixIfConfigExpr>

@@ -254,6 +254,7 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
   return llvm::StringSwitch<StringRef>(tripleArchName)
               .Cases("arm64", "aarch64", "arm64")
+              .Cases("arm64_32", "aarch64_32", "arm64_32")
               .Cases("x86_64", "amd64", "x86_64")
               .Cases("i386", "i486", "i586", "i686", "i786", "i886", "i986",
                      "i386")
@@ -262,7 +263,6 @@ getArchForAppleTargetSpecificModuleTriple(const llvm::Triple &triple) {
   //          .Case ("armv7s", "armv7s")
   //          .Case ("armv7k", "armv7k")
   //          .Case ("armv7", "armv7")
-  //          .Case ("arm64_32", "arm64_32")
   //          .Case ("arm64e", "arm64e")
               .Default(tripleArchName);
 }

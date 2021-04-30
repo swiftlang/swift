@@ -19,9 +19,6 @@
 // HEADER:   func flower()
 // HEADER: }
 
-// rdar://77281393
-// UNSUPPORTED: CPU=arm64_32
-
 func grow(_ branch: Trunk.Branch, from trunk: Trunk) {
   branch.flower()
   trunk.addLimb(branch)

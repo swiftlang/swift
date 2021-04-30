@@ -228,15 +228,16 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     CodeCompletionResult *result = nullptr;
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, numBytesToErase, string, declKind, isSystem, moduleName,
-          notRecommended, briefDocComment,
+          context, /*IsArgumentLabels=*/false, numBytesToErase, string,
+          declKind, isSystem, moduleName, notRecommended, briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
           copyArray(*V.Sink.Allocator,
                     ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
           CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
-          CodeCompletionResult(kind, context, numBytesToErase, string,
+          CodeCompletionResult(kind, context, /*IsArgumentLabels=*/false,
+                               numBytesToErase, string,
                                CodeCompletionResult::NotApplicable, opKind);
     }
 
@@ -340,6 +341,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
   {
     endian::Writer LE(results, little);
     for (CodeCompletionResult *R : V.Sink.Results) {
+      assert(!R->isArgumentLabels() && "Argument labels should not be cached");
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
       if (R->getKind() == CodeCompletionResult::Declaration)

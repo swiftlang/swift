@@ -324,6 +324,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// constraint graph during constraint propagation?
   unsigned IsDisabled : 1;
 
+  /// Constraint is disabled in performance mode only, could be attempted
+  /// for diagnostic purposes.
+  unsigned IsDisabledForPerformance : 1;
+
   /// Whether the choice of this disjunction should be recorded in the
   /// solver state.
   unsigned RememberChoice : 1;
@@ -542,18 +546,27 @@ public:
     IsActive = active;
   }
 
-  /// Whether this constraint is active, i.e., in the worklist.
-  bool isDisabled() const { return IsDisabled; }
+  /// Whether this constraint is disabled and shouldn't be attempted by the
+  /// solver.
+  bool isDisabled() const { return IsDisabled || IsDisabledForPerformance; }
+
+  /// Whether this constraint is disabled and shouldn't be attempted by the
+  /// solver only in "performance" mode.
+  bool isDisabledInPerformanceMode() const { return IsDisabledForPerformance; }
 
   /// Set whether this constraint is active or not.
-  void setDisabled() {
+  void setDisabled(bool enableForDiagnostics = false) {
     assert(!isActive() && "Cannot disable constraint marked as active!");
-    IsDisabled = true;
+    if (enableForDiagnostics)
+      IsDisabledForPerformance = true;
+    else
+      IsDisabled = true;
   }
 
   void setEnabled() {
     assert(isDisabled() && "Can't re-enable already active constraint!");
     IsDisabled = false;
+    IsDisabledForPerformance = false;
   }
 
   /// Mark or retrieve whether this constraint should be favored in the system.

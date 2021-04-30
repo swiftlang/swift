@@ -3,8 +3,6 @@
 // RUN:     %S/Inputs/print_clang_header_swift_name.h -skip-unavailable --cc-args %target-cc-options \
 // RUN:     -isysroot %clang-importer-sdk-path -fsyntax-only %t.m -I %S/Inputs | %FileCheck %s
 
-// UNSUPPORTED: CPU=arm64_32
-
 // REQUIRES: objc_interop
 
 // CHECK: enum Normal : Int {

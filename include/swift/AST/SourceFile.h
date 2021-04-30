@@ -399,7 +399,8 @@ public:
 
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
-  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
+  Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const override;
 
   /// Returns the synthesized file for this source file, if it exists.
   SynthesizedFileUnit *getSynthesizedFile() const { return SynthesizedFile; };
