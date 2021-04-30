@@ -4,16 +4,17 @@
 
 actor MyActor { }
 
-class MyActorSubclass1: MyActor { }
+class MyActorSubclass1: MyActor { } // expected-error{{actor types do not support inheritance}}
+// expected-error@-1{{non-final class 'MyActorSubclass1' cannot conform to `Sendable`; use `UnsafeSendable`}}
 
-actor MyActorSubclass2: MyActor { }
+actor MyActorSubclass2: MyActor { } // expected-error{{actor types do not support inheritance}}
 
 // expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{7-13=}}
 actor class MyActorClass { }
 
 class NonActor { }
 
-actor NonActorSubclass : NonActor { } // expected-error{{actor cannot inherit from non-actor class 'NonActor'}}
+actor NonActorSubclass : NonActor { } // expected-error{{actor types do not support inheritance}}
 
 // expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{14-20=}}
 public actor class BobHope {}

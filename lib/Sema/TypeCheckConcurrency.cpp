@@ -270,32 +270,8 @@ bool IsActorRequest::evaluate(
   if (!classDecl)
     return false;
 
-  bool isExplicitActor = classDecl->isExplicitActor() ||
-    classDecl->getAttrs().getAttribute<ActorAttr>();
-
-  // If there is a superclass, we can infer actor-ness from it.
-  if (auto superclassDecl = classDecl->getSuperclassDecl()) {
-    // The superclass is an actor, so we are, too.
-    if (superclassDecl->isActor())
-      return true;
-
-    // The superclass is 'NSObject', which is known to have no state and no
-    // superclass.
-    if (superclassDecl->isNSObject() && isExplicitActor)
-      return true;
-
-    // This class cannot be an actor; complain if the 'actor' modifier was
-    // provided.
-    if (isExplicitActor) {
-      classDecl->diagnose(diag::actor_with_nonactor_superclass,
-                          superclassDecl->getName())
-        .highlight(classDecl->getStartLoc());
-    }
-
-    return false;
-  }
-
-  return isExplicitActor;
+  return classDecl->isExplicitActor() ||
+      classDecl->getAttrs().getAttribute<ActorAttr>();
 }
 
 bool IsDefaultActorRequest::evaluate(
@@ -304,21 +280,6 @@ bool IsDefaultActorRequest::evaluate(
   // If the class isn't an actor, it's not a default actor.
   if (!classDecl->isActor())
     return false;
-
-  // If there is a superclass, and it's an actor, we defer
-  // the decision to it.
-  if (auto superclassDecl = classDecl->getSuperclassDecl()) {
-    // If the superclass is an actor, we inherit its default-actor-ness.
-    if (superclassDecl->isActor())
-      return superclassDecl->isDefaultActor();
-
-    // If the superclass is not an actor, it can only be
-    // a default actor if it's NSObject.  (For now, other classes simply
-    // can't be actors at all.)  We don't need to diagnose this; we
-    // should've done that already in isActor().
-    if (!superclassDecl->isNSObject())
-      return false;
-  }
 
   // If the class is resilient from the perspective of the module
   // module, it's not a default actor.
