@@ -163,7 +163,7 @@ No other changes are permitted; the following are particularly of note:
 - An ABI-public function may not, in any way, change API-level property 
   wrappers (``@API``) or compositions where the outermost wrapper is 
   API-level (``@API @MyWrapper``).
-- An ABI-public function may neither add nor remove arguments in the 
+- An ABI-public function may neither add nor remove arguments from the 
   property-wrapper custom attribute of an API-level wrapper 
   (``@API(argument: 5)``) or in the custom attributes of compositions
   where the outermost wrapper is API-level  (``@API @MyWrapper(argument: 5)``).
