@@ -131,20 +131,20 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     }
   }
 
-  /// Binds the task-local to the specific value for the duration of the body.
+  /// Binds the task-local to the specific value for the duration of the operation.
   ///
-  /// The value is available throughout the execution of the body closure,
+  /// The value is available throughout the execution of the operation closure,
   /// including any `get` operations performed by child-tasks created during the
-  /// execution of the body closure.
+  /// execution of the operation closure.
   ///
   /// If the same task-local is bound multiple times, be it in the same task, or
   /// in specific child tasks, the more specific (i.e. "deeper") binding is
   /// returned when the value is read.
   ///
   /// If the value is a reference type, it will be retained for the duration of
-  /// the body closure.
+  /// the operation closure.
   @discardableResult
-  public func withValue<R>(_ valueDuringBody: Value, do body: () async throws -> R,
+  public func withValue<R>(_ valueDuringOperation: Value, operation: () async throws -> R,
                            file: String = #file, line: UInt = #line) async rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
@@ -155,10 +155,10 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
       task!._task // !-safe, guaranteed to have task available inside async function
     }
 
-    _taskLocalValuePush(_task, key: key, value: valueDuringBody)
+    _taskLocalValuePush(_task, key: key, value: valueDuringOperation)
     defer { _taskLocalValuePop(_task) }
 
-    return try await body()
+    return try await operation()
   }
 
   public var projectedValue: TaskLocal<Value> {
@@ -201,7 +201,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeCurrentTask {
 
-  /// Allows for executing a synchronous `body` while binding a task-local value
+  /// Allows for executing a synchronous `operation` while binding a task-local value
   /// in the current task.
   ///
   /// This function MUST NOT be invoked by any other task than the current task
@@ -209,16 +209,16 @@ extension UnsafeCurrentTask {
   @discardableResult
   public func withTaskLocal<Value: Sendable, R>(
       _ taskLocal: TaskLocal<Value>,
-      boundTo valueDuringBody: Value,
-      do body: () throws -> R,
+      boundTo valueDuringOperation: Value,
+      operation: () throws -> R,
       file: String = #file, line: UInt = #line) rethrows -> R {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
-    _taskLocalValuePush(self._task, key: taskLocal.key, value: valueDuringBody)
+    _taskLocalValuePush(self._task, key: taskLocal.key, value: valueDuringOperation)
     defer { _taskLocalValuePop(_task) }
 
-    return try body()
+    return try operation()
   }
 }
 
