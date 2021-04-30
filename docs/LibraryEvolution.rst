@@ -151,7 +151,7 @@ The following changes are permitted:
   (``@ImplementationDetail @MyWrapper``).
 - Changing or removing a default argument is a `binary-compatible source-breaking change`.
 - Changing arguments in the property-wrapper custom attribute of an 
-  implementation-detail wrapper (``@ImplementationDetail(argument: 5)``) or 
+  implementation-detail wrapper (``@MyWrapper(argument: 5)``) or 
   in the custom attributes of compositions where the outermost wrapper is 
   implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
   is a `binary-compatible source-breaking change`.
@@ -436,7 +436,7 @@ stored subscripts. This means that the following changes are permitted:
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
 - Changing arguments in the property-wrapper custom attribute of an 
-  implementation-detail wrapper (``@ImplementationDetail(argument: 5)``) or 
+  implementation-detail wrapper (``@MyWrapper(argument: 5)``) or 
   in the custom attributes of compositions where the outermost wrapper is 
   implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
   is a `binary-compatible source-breaking change`.
@@ -811,7 +811,7 @@ counterparts with a few small changes:
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
 - Changing arguments in the property-wrapper custom attribute of an 
-  implementation-detail wrapper (``@ImplementationDetail(argument: 5)``) or 
+  implementation-detail wrapper (``@MyWrapper(argument: 5)``) or 
   in the custom attributes of compositions where the outermost wrapper is 
   implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
   is a `binary-compatible source-breaking change`.
