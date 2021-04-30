@@ -416,6 +416,14 @@ public:
     DebugClient = R;
   }
 
+  /// Returns true if this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Bits.ModuleDecl.StaticLibrary;
+  }
+  void setStaticLibrary(bool isStatic = true) {
+    Bits.ModuleDecl.StaticLibrary = isStatic;
+  }
+
   /// Returns true if this module was or is being compiled for testing.
   bool isTestingEnabled() const {
     return Bits.ModuleDecl.TestingEnabled;

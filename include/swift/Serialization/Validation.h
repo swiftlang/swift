@@ -97,6 +97,7 @@ class ExtendedValidationInfo {
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
+    unsigned IsStaticLibrary: 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
     unsigned IsImplicitDynamicEnabled : 1;
@@ -129,6 +130,10 @@ public:
   bool isImplicitDynamicEnabled() { return Bits.IsImplicitDynamicEnabled; }
   void setImplicitDynamicEnabled(bool val) {
     Bits.IsImplicitDynamicEnabled = val;
+  }
+  bool isStaticLibrary() const { return Bits.IsStaticLibrary; }
+  void setIsStaticLibrary(bool val) {
+    Bits.IsStaticLibrary = val;
   }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {

@@ -649,6 +649,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setAlwaysWeakImported(isWeakImported);
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
+    fn->setImportedFromStaticLibrary(MF->isStaticLibrary());
 
     llvm::VersionTuple available;
     DECODE_VER_TUPLE(available);

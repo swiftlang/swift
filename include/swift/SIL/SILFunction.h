@@ -300,6 +300,10 @@ private:
   /// serialization.
   unsigned WasDeserializedCanonical : 1;
 
+  /// True if this function was imported from a module which is compiled as
+  /// static library.
+  unsigned ImportedFromStaticLibrary : 1;
+
   /// True if this is a reabstraction thunk of escaping function type whose
   /// single argument is a potentially non-escaping closure. This is an escape
   /// hatch to allow non-escaping functions to be stored or passed as an
@@ -532,6 +536,14 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
+  }
+
+  /// Returns true if this function was imported from a module which is compiled
+  /// as static library.
+  bool wasImportedFromStaticLibrary() const { return ImportedFromStaticLibrary; }
+
+  void setImportedFromStaticLibrary(bool val = true) {
+    ImportedFromStaticLibrary = val;
   }
 
   /// Returns true if this is a reabstraction thunk of escaping function type

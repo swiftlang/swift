@@ -457,6 +457,11 @@ public:
     return Core->Bits.IsTestable;
   }
 
+  /// Whether this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Core->Bits.IsStaticLibrary;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);

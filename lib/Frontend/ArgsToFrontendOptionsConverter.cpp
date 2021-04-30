@@ -251,6 +251,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
 
+  Opts.Static = Args.hasArg(OPT_static);
+
   return false;
 }
 

@@ -219,6 +219,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
+    ModuleDecl *moduleDecl = decl->getModuleContext();
+    F->setImportedFromStaticLibrary(moduleDecl->isStaticLibrary());
 
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
