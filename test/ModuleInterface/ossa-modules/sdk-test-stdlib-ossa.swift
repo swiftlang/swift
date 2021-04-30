@@ -29,6 +29,9 @@
 
 // RUN: %target-sil-opt -module-name Swift %t/PreBuiltSDKModules/Swift.swiftmodule/*.swiftmodule | grep '@$ss3foos5KlassCyF' | grep '[[]ossa[]]'
 
+// Flacky hangs: rdar://77288690
+// UNSUPPORTED: CPU=arm64, CPU=arm64e
+
 @_fixed_layout
 public final class Klass {
   public init() {
