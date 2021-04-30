@@ -1021,10 +1021,8 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     return addConstraint(equivClass, proto, source);
   };
 
-  bool sawProtocolRequirement = false;
   const ProtocolDecl *requirementSignatureSelfProto = nullptr;
 
-  Type rootType = nullptr;
   Optional<std::pair<const RequirementSource *, const RequirementSource *>>
     redundantSubpath;
   bool isSelfDerived = visitPotentialArchetypesAlongPath(
@@ -1032,22 +1030,6 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     switch (source->kind) {
     case ProtocolRequirement:
     case InferredProtocolRequirement: {
-      // Special handling for top-level requirement signature requirements;
-      // pretend the root type is the subject type as written in the
-      // protocol, and not 'Self', so that we can consider this requirement
-      // self-derived if it depends on one of the conformances that make
-      // the root type valid.
-      if (requirementSignatureSelfProto) {
-        if (source->getProtocolDecl() == requirementSignatureSelfProto &&
-            source->parent->kind == RequirementSource::RequirementSignatureSelf) {
-          rootType = source->getAffectedType();
-          return false;
-        }
-      }
-
-      // Note that we've seen a protocol requirement.
-      sawProtocolRequirement = true;
-
       // If the base has been made concrete, note it.
       auto parentEquivClass =
           builder.resolveEquivalenceClass(parentType,
@@ -1099,7 +1081,6 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     case Explicit:
     case Inferred:
     case NestedTypeNameMatch:
-      rootType = parentType;
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -1128,20 +1109,6 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
   // It's self-derived but we don't have a redundant subpath to eliminate.
   if (isSelfDerived)
     return nullptr;
-
-  // If we haven't seen a protocol requirement, we're done.
-  if (!sawProtocolRequirement) return this;
-
-  // The root might be a nested type, which implies constraints
-  // for each of the protocols of the associated types referenced (if any).
-  for (auto depMemTy = rootType->getAs<DependentMemberType>(); depMemTy;
-       depMemTy = depMemTy->getBase()->getAs<DependentMemberType>()) {
-    auto assocType = depMemTy->getAssocType();
-    assert(assocType);
-    if (addTypeConstraint(depMemTy->getBase(), assocType->getProtocol(),
-                          nullptr))
-      return nullptr;
-  }
 
   return this;
 }
