@@ -4141,6 +4141,14 @@ struct AsyncHandlerDesc {
     return Ty->getParams();
   }
 
+  /// Retrieve the parameters relevant to a successful return from the
+  /// completion handler. This drops the Error parameter if present.
+  ArrayRef<AnyFunctionType::Param> getSuccessParams() const {
+    if (HasError && Type == HandlerType::PARAMS)
+      return params().drop_back();
+    return params();
+  }
+
   /// The `CallExpr` if the given node is a call to the `Handler`
   CallExpr *getAsHandlerCall(ASTNode Node) const {
     if (!isValid())
@@ -4162,13 +4170,16 @@ struct AsyncHandlerDesc {
     auto Args = ArgList.ref();
 
     if (Type == HandlerType::PARAMS) {
-      if (!HasError)
-        return HandlerResult(Args);
-
-      if (!isa<NilLiteralExpr>(Args.back()))
+      // If there's an error parameter and the user isn't passing nil to it,
+      // assume this is the error path.
+      if (HasError && !isa<NilLiteralExpr>(Args.back()))
         return HandlerResult(Args.back(), true);
 
-      return HandlerResult(Args.drop_back());
+      // We can drop the args altogether if they're just Void.
+      if (willAsyncReturnVoid())
+        return HandlerResult();
+
+      return HandlerResult(HasError ? Args.drop_back() : Args);
     } else if (Type == HandlerType::RESULT) {
       if (Args.size() != 1)
         return HandlerResult(Args);
@@ -4187,11 +4198,61 @@ struct AsyncHandlerDesc {
         return HandlerResult(Args);
 
       auto ResultArgList = callArgs(ResultCE);
-      return HandlerResult(ResultArgList.ref()[0],
-                           D->getNameStr() == StringRef("failure"));
+      auto isFailure = D->getNameStr() == StringRef("failure");
+
+      // We can drop the arg altogether if it's just Void.
+      if (!isFailure && willAsyncReturnVoid())
+        return HandlerResult();
+
+      // Otherwise the arg gets the .success() or .failure() call dropped.
+      return HandlerResult(ResultArgList.ref()[0], isFailure);
     }
 
     llvm_unreachable("Unhandled result type");
+  }
+
+  // Convert the type of a success parameter in the completion handler function
+  // to a return type suitable for an async function. If there is an error
+  // parameter present e.g (T?, Error?) -> Void, this unwraps a level of
+  // optionality from T?. If this is a Result<T, U> type, returns the success
+  // type T.
+  swift::Type getSuccessParamAsyncReturnType(swift::Type Ty) const {
+    switch (Type) {
+    case HandlerType::PARAMS: {
+      // If there's an Error parameter in the handler, the success branch can
+      // be unwrapped.
+      if (HasError)
+        Ty = Ty->lookThroughSingleOptionalType();
+
+      return Ty;
+    }
+    case HandlerType::RESULT: {
+      // Result<T, U> maps to T.
+      return Ty->castTo<BoundGenericType>()->getGenericArgs()[0];
+    }
+    case HandlerType::INVALID:
+      llvm_unreachable("Invalid handler type");
+    }
+  }
+
+  /// Gets the return value types for the async equivalent of this handler.
+  ArrayRef<swift::Type>
+  getAsyncReturnTypes(SmallVectorImpl<swift::Type> &Scratch) const {
+    for (auto &Param : getSuccessParams()) {
+      auto Ty = Param.getParameterType();
+      Scratch.push_back(getSuccessParamAsyncReturnType(Ty));
+    }
+    return Scratch;
+  }
+
+  /// Whether the async equivalent of this handler returns Void.
+  bool willAsyncReturnVoid() const {
+    // If all of the success params will be converted to Void return types,
+    // this will be a Void async function.
+    return llvm::all_of(getSuccessParams(), [&](auto &param) {
+      auto Ty = param.getParameterType();
+      return getSuccessParamAsyncReturnType(Ty)->isVoid();
+    });
   }
 };
 
@@ -4911,42 +4972,24 @@ private:
       return;
     }
 
-    auto HandlerParams = TopHandler.params();
-    if (TopHandler.Type == HandlerType::PARAMS && TopHandler.HasError) {
-      HandlerParams = HandlerParams.drop_back();
-    }
-
-    if (HandlerParams.empty()) {
+    SmallVector<Type, 2> Scratch;
+    auto ReturnTypes = TopHandler.getAsyncReturnTypes(Scratch);
+    if (ReturnTypes.empty()) {
       OS << " ";
       return;
     }
 
-    OS << " -> ";
+    // Print the function result type, making sure to omit a '-> Void' return.
+    if (!TopHandler.willAsyncReturnVoid()) {
+      OS << " -> ";
+      if (ReturnTypes.size() > 1)
+        OS << "(";
 
-    if (HandlerParams.size() > 1) {
-      OS << "(";
-    }
-    for (size_t I = 0, E = HandlerParams.size(); I < E; ++I) {
-      if (I > 0) {
-        OS << ", ";
-      }
+      llvm::interleave(
+          ReturnTypes, [&](Type Ty) { Ty->print(OS); }, [&]() { OS << ", "; });
 
-      auto &Param = HandlerParams[I];
-      if (TopHandler.Type == HandlerType::PARAMS) {
-        Type ToPrint = Param.getPlainType();
-        if (TopHandler.HasError)
-          ToPrint = ToPrint->lookThroughSingleOptionalType();
-        ToPrint->print(OS);
-      } else if (TopHandler.Type == HandlerType::RESULT) {
-        auto ResultTy = Param.getPlainType()->getAs<BoundGenericType>();
-        assert(ResultTy && "Result must have generic type");
-        ResultTy->getGenericArgs()[0]->print(OS);
-      } else {
-        llvm_unreachable("Unhandled handler type");
-      }
-    }
-    if (HandlerParams.size() > 1) {
-      OS << ")";
+      if (ReturnTypes.size() > 1)
+        OS << ")";
     }
 
     if (FD->hasBody())
@@ -5073,8 +5116,7 @@ private:
         addFallbackVars(CallbackParams->getArray(), Blocks);
         addDo();
         addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                     /*HasError=*/HandlerDesc.HasError,
-                     /*AddDeclarations=*/!HandlerDesc.HasError);
+                     HandlerDesc, /*AddDeclarations=*/!HandlerDesc.HasError);
         addFallbackCatch(ErrParam);
         OS << "\n";
         convertNodes(CallbackBody);
@@ -5107,10 +5149,9 @@ private:
 
     setNames(Blocks.SuccessBlock, SuccessParams);
     addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                 /*HasError=*/HandlerDesc.HasError,
-                 /*AddDeclarations=*/true);
+                 HandlerDesc, /*AddDeclarations=*/true);
 
-    prepareNamesForBody(HandlerDesc.Type, SuccessParams, ErrParams);
+    prepareNamesForBody(HandlerDesc, SuccessParams, ErrParams);
     convertNodes(Blocks.SuccessBlock.nodes());
 
     if (RequireDo) {
@@ -5120,7 +5161,7 @@ private:
                HandlerDesc.Type != HandlerType::RESULT);
       addCatch(ErrParam);
 
-      prepareNamesForBody(HandlerDesc.Type, ErrParams, SuccessParams);
+      prepareNamesForBody(HandlerDesc, ErrParams, SuccessParams);
       addCatchBody(ErrParam, Blocks.ErrorBlock);
     }
 
@@ -5129,9 +5170,11 @@ private:
 
   void addAwaitCall(const CallExpr *CE, ArrayRef<Expr *> Args,
                     const ClassifiedBlock &SuccessBlock,
-                    ArrayRef<const ParamDecl *> SuccessParams, bool HasError,
-                    bool AddDeclarations) {
-    if (!SuccessParams.empty()) {
+                    ArrayRef<const ParamDecl *> SuccessParams,
+                    const AsyncHandlerDesc &HandlerDesc, bool AddDeclarations) {
+    // Print the bindings to match the completion handler success parameters,
+    // making sure to omit in the case of a Void return.
+    if (!SuccessParams.empty() && !HandlerDesc.willAsyncReturnVoid()) {
       if (AddDeclarations) {
         if (SuccessBlock.allLet()) {
           OS << tok::kw_let;
@@ -5153,7 +5196,7 @@ private:
       OS << " " << tok::equal << " ";
     }
 
-    if (HasError) {
+    if (HandlerDesc.HasError) {
       OS << tok::kw_try << " ";
     }
     OS << "await ";
@@ -5199,16 +5242,21 @@ private:
     OS << "\n" << tok::r_brace;
   }
 
-  void prepareNamesForBody(HandlerType ResultType,
+  void prepareNamesForBody(const AsyncHandlerDesc &HandlerDesc,
                            ArrayRef<const ParamDecl *> CurrentParams,
                            ArrayRef<const ParamDecl *> OtherParams) {
-    switch (ResultType) {
+    switch (HandlerDesc.Type) {
     case HandlerType::PARAMS:
       for (auto *Param : CurrentParams) {
-        if (Param->getType()->getOptionalObjectType()) {
+        auto Ty = Param->getType();
+        if (Ty->getOptionalObjectType()) {
           Unwraps.insert(Param);
           Placeholders.insert(Param);
         }
+        // Void parameters get omitted where possible, so turn any reference
+        // into a placeholder, as its usage is unlikely what the user wants.
+        if (HandlerDesc.getSuccessParamAsyncReturnType(Ty)->isVoid())
+          Placeholders.insert(Param);
       }
       // Use of the other params is invalid within the current body
       Placeholders.insert(OtherParams.begin(), OtherParams.end());
