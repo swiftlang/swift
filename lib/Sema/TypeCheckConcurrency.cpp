@@ -2597,7 +2597,8 @@ static Optional<ActorIsolation> getIsolationFromConformances(
     return None;
 
   Optional<ActorIsolation> foundIsolation;
-  for (auto proto : nominal->getLocalProtocols()) {
+  for (auto proto :
+       nominal->getLocalProtocols(ConformanceLookupKind::NonStructural)) {
     switch (auto protoIsolation = getActorIsolation(proto)) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
