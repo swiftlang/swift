@@ -2688,7 +2688,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   auto call = emitCallSite();
 
   // Async calls need to store the error result that is passed as a parameter.
-  if (IGF.isAsync()) {
+  if (CurCallee.getSubstFunctionType()->isAsync()) {
     auto &IGM = IGF.IGM;
     auto &Builder = IGF.Builder;
     auto numAsyncContextParams =
