@@ -17,6 +17,14 @@
 
 #include "swift/Runtime/Concurrency.h"
 
+#ifdef _WIN32
+// On Windows, an include below triggers an indirect include of minwindef.h
+// which contains a definition of the `max` macro, generating an error in our
+// use of std::max in this file. This define prevents those macros from being
+// defined.
+#define NOMINMAX
+#endif
+
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "../runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/Atomic.h"
