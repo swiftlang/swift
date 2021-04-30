@@ -34,13 +34,8 @@ class TaskLocal {
 public:
   /// Type of the pointed at `next` task local item.
   enum class NextLinkType : uintptr_t {
-    /// This task is known to be a "terminal" node in the lookup of task locals.
-    /// In other words, even if it had a parent, the parent (and its parents)
-    /// are known to not contain any any more task locals, and thus any further
-    /// search beyond this task.
-    IsTerminal = 0b00,
     /// The storage pointer points at the next TaskLocal::Item in this task.
-    IsNext = 0b01,
+    IsNext = 0b00,
     /// The storage pointer points at a item stored by another AsyncTask.
     ///
     /// Note that this may not necessarily be the same as the task's parent
@@ -48,29 +43,7 @@ public:
     /// does not "contribute" any task local values. This is to speed up
     /// lookups by skipping empty parent tasks during get(), and explained
     /// in depth in `createParentLink`.
-    IsParent = 0b11
-  };
-
-  /// Values must match `TaskLocalInheritance` declared in `TaskLocal.swift`.
-  enum class TaskLocalInheritance : uint8_t {
-    /// Default task local value behavior
-    ///
-    /// Values declared with a default-inherited key are accessible from:
-    /// - the current task that has bound the value,
-    /// - any child task of the current task (e.g. created by async let or groups)
-    ///
-    /// Such values are *not* carried through detached tasks.
-    Default = 0,
-
-    /// Special semantics which confine a task's local value to *only* the current
-    /// task. In other words, they ave never inherited by any child task created
-    /// by the current task.
-    ///
-    /// Values declared with a never-inherited key only accessible:
-    /// - specifically from the current task itself
-    ///
-    /// Such values are *not* accessible from child tasks or detached tasks.
-    Never   = 1
+    IsParent = 0b01,
   };
 
   class Item {
@@ -78,29 +51,33 @@ public:
     /// Mask used for the low status bits in a task local chain item.
     static const uintptr_t statusMask = 0x03;
 
-    /// Pointer to the next task local item; be it in this task or in a parent.
-    /// Low bits encode `NextLinkType`.
-    /// Item *next = nullptr;
+    /// Pointer to one of the following:
+    /// - next task local item as OpaqueValue* if it is task-local allocated
+    /// - next task local item as HeapObject* if it is heap allocated "heavy"
+    /// - the parent task's TaskLocal::Storage
+    ///
+    /// Low bits encode `NextLinkType`, based on which the type of the pointer
+    /// is determined.
     uintptr_t next;
 
   public:
     /// The type of the key with which this value is associated.
-    const Metadata *keyType;
+    const HeapObject *key;
     /// The type of the value stored by this item.
     const Metadata *valueType;
 
     // Trailing storage for the value itself. The storage will be
     // uninitialized or contain an instance of \c valueType.
 
-  private:
+  protected:
     explicit Item()
       : next(0),
-        keyType(nullptr),
+        key(nullptr),
         valueType(nullptr) {}
 
-    explicit Item(const Metadata *keyType, const Metadata *valueType)
+    explicit Item(const HeapObject *key, const Metadata *valueType)
       : next(0),
-        keyType(keyType),
+        key(key),
         valueType(valueType) {}
 
   public:
@@ -116,7 +93,7 @@ public:
     static Item *createParentLink(AsyncTask *task, AsyncTask *parent);
 
     static Item *createLink(AsyncTask *task,
-                            const Metadata *keyType,
+                            const HeapObject *key,
                             const Metadata *valueType);
 
     void destroy(AsyncTask *task);
@@ -125,13 +102,13 @@ public:
       return reinterpret_cast<Item *>(next & ~statusMask);
     }
 
-    NextLinkType getNextLinkType() {
+    NextLinkType getNextLinkType() const {
       return static_cast<NextLinkType>(next & statusMask);
     }
 
     /// Item does not contain any actual value, and is only used to point at
     /// a specific parent item.
-    bool isEmpty() {
+    bool isEmpty() const {
       return !valueType;
     }
 
@@ -144,6 +121,7 @@ public:
     /// Compute the offset of the storage from the base of the item.
     static size_t storageOffset(const Metadata *valueType) {
       size_t offset = sizeof(Item);
+
       if (valueType) {
         size_t alignment = valueType->vw_alignment();
         return (offset + alignment - 1) & ~(alignment - 1);
@@ -161,7 +139,6 @@ public:
       return offset;
     }
   };
-
 
   class Storage {
     friend class TaskLocal::Item;
@@ -202,12 +179,10 @@ public:
     void initializeLinkParent(AsyncTask *task, AsyncTask *parent);
 
     void pushValue(AsyncTask *task,
-                   const Metadata *keyType,
+                   const HeapObject *key,
                    /* +1 */ OpaqueValue *value, const Metadata *valueType);
 
-    OpaqueValue* getValue(AsyncTask *task,
-                          const Metadata *keyType,
-                          TaskLocalInheritance inheritance);
+    OpaqueValue* getValue(AsyncTask *task, const HeapObject *key);
 
     void popValue(AsyncTask *task);
 

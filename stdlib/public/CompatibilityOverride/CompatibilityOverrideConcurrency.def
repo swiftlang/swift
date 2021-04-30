@@ -218,19 +218,25 @@ OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     swift::, (TaskGroup *group, bool unconditionally),
                     (group, unconditionally))
 
+
+OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+                    (const unsigned char *file, uintptr_t fileLength,
+                        bool fileIsASCII, uintptr_t line),
+                    (file, fileLength, fileIsASCII, line))
+
 OVERRIDE_TASK_LOCAL(task_localValuePush, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
-                    (AsyncTask *task, const Metadata *keyType,
+                    (AsyncTask *task, const HeapObject *key,
                      OpaqueValue *value, const Metadata *valueType),
-                    (task, keyType, value, valueType))
+                    (task, key, value, valueType))
 
 OVERRIDE_TASK_LOCAL(task_localValueGet, OpaqueValue *,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
-                    (AsyncTask *task, const Metadata *keyType,
-                     TaskLocal::TaskLocalInheritance inheritance),
-                    (task, keyType, inheritance))
+                    (AsyncTask *task, const HeapObject *key),
+                    (task, key))
 
 OVERRIDE_TASK_LOCAL(task_localValuePop, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -247,6 +253,10 @@ OVERRIDE_TASK_STATUS(task_tryAddStatusRecord, bool,
 OVERRIDE_TASK_STATUS(task_removeStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, (TaskStatusRecord *record), (record))
+
+OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, , )
 
 OVERRIDE_TASK_STATUS(task_attachChild, ChildTaskStatusRecord *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
