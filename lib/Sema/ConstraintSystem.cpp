@@ -2517,7 +2517,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
     bool walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        if (patternBinding->isAsyncLet())
+        if (patternBinding->isSpawnLet())
           FoundAsync = true;
 
         return true;
@@ -4987,7 +4987,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
                                              bool isDefaultWrappedValue,
-                                             bool isAsyncLetWrapper) {
+                                             bool isSpawnLetWrapper) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC)) {
@@ -5009,7 +5009,7 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
-  if (isAsyncLetWrapper)
+  if (isSpawnLetWrapper)
     closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
 
   Expr *result = closure;
