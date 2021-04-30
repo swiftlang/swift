@@ -190,6 +190,18 @@ func blockConvention(completion: @convention(block) () -> Void) { }
 func cConvention(completion: @convention(c) () -> Void) { }
 // C-CONVENTION: func cConvention() async { }
 
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-HANDLER %s
+func voidCompletion(completion: (Void) -> Void) {}
+// VOID-HANDLER: func voidCompletion() async {}
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
+func voidAndErrorCompletion(completion: (Void?, Error?) -> Void) {}
+// VOID-AND-ERROR-HANDLER: func voidAndErrorCompletion() async throws {}
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix TOO-MUCH-VOID-AND-ERROR-HANDLER %s
+func tooMuchVoidAndErrorCompletion(completion: (Void?, Void?, Error?) -> Void) {}
+// TOO-MUCH-VOID-AND-ERROR-HANDLER: func tooMuchVoidAndErrorCompletion() async throws {}
+
 // 2. Check that the various ways to call a function (and the positions the
 //    refactoring is called from) are handled correctly
 
@@ -348,5 +360,26 @@ func testCalls() {
   }
   // C-CONVENTION-CALL: await cConvention(){{$}}
   // C-CONVENTION-CALL-NEXT: {{^}}print("cConvention")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL %s
+  voidAndErrorCompletion { v, err in
+    print("void and error completion \(v)")
+  }
+  // VOID-AND-ERROR-CALL: {{^}}try await voidAndErrorCompletion(){{$}}
+  // VOID-AND-ERROR-CALL: {{^}}print("void and error completion \(<#v#>)"){{$}}
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL2 %s
+  voidAndErrorCompletion { _, err in
+    print("void and error completion 2")
+  }
+  // VOID-AND-ERROR-CALL2: {{^}}try await voidAndErrorCompletion(){{$}}
+  // VOID-AND-ERROR-CALL2: {{^}}print("void and error completion 2"){{$}}
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL3 %s
+  tooMuchVoidAndErrorCompletion { v, v1, err in
+    print("void and error completion 3")
+  }
+  // VOID-AND-ERROR-CALL3: {{^}}try await tooMuchVoidAndErrorCompletion(){{$}}
+  // VOID-AND-ERROR-CALL3: {{^}}print("void and error completion 3"){{$}}
 }
 // CONVERT-FUNC: {{^}}}
