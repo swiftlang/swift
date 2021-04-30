@@ -72,6 +72,7 @@ PROTOCOL(CaseIterable)
 PROTOCOL(SIMDScalar)
 PROTOCOL(BinaryInteger)
 PROTOCOL(RangeReplaceableCollection)
+PROTOCOL(SerialExecutor)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)

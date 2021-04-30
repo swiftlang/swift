@@ -230,7 +230,7 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
   %async_f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
   apply %async_f() : $@convention(thin) @async () -> ()
   hop_to_executor %0 : $MyActor  
-  %curExec = builtin "getCurrentExecutor"() : $Builtin.Executor
+  %curExec = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
   hop_to_executor %1 : $MyActor
   %f = function_ref @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
   apply %f(%1) : $@convention(method) (@guaranteed MyActor) -> ()

@@ -19,11 +19,13 @@
 
 #include "BitPatternBuilder.h"
 #include "ExtraInhabitants.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 
 using namespace swift;
@@ -63,14 +65,12 @@ public:
     return ".impl";
   }
 
-  // The identity pointer is a heap object reference, but it's
-  // nullable because of the generic executor.
+  // The identity pointer is a heap object reference.
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
     return true;
   }
-
   PointerInfo getPointerInfo(IRGenModule &IGM) const {
-    return PointerInfo::forHeapObject(IGM).withNullable(IsNullable);
+    return PointerInfo::forHeapObject(IGM);
   }
   unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
     return getPointerInfo(IGM).getExtraInhabitantCount(IGM);
@@ -87,18 +87,17 @@ public:
     src = projectFirstElement(IGF, src);
     return getPointerInfo(IGF.IGM).getExtraInhabitantIndex(IGF, src);
   }
-  APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-    auto pointerSize = IGM.getPointerSize();
-    auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
-    mask.appendSetBits(pointerSize.getValueInBits());
-    mask.appendClearBits(pointerSize.getValueInBits());
-    return mask.build().getValue();
-  }
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                             Address dest, SILType T,
                             bool isOutlined) const override {
-    dest = projectFirstElement(IGF, dest);
-    getPointerInfo(IGF.IGM).storeExtraInhabitant(IGF, index, dest);
+    // Store the extra-inhabitant value in the first (identity) word.
+    auto first = projectFirstElement(IGF, dest);
+    getPointerInfo(IGF.IGM).storeExtraInhabitant(IGF, index, first);
+
+    // Zero the second word.
+    auto second = projectSecondElement(IGF, dest);
+    IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, 0),
+                            second);
   }
 };
 
@@ -126,38 +125,36 @@ const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
   return *ExecutorTI;
 }
 
-void irgen::emitBuildSerialExecutorRef(IRGenFunction &IGF,
-                                       llvm::Value *actor,
-                                       SILType actorType,
-                                       Explosion &out) {
-  auto cls = actorType.getClassOrBoundGenericClass();
+void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
+                                          Explosion &out) {
+  // FIXME
+}
 
-  // HACK: if the actor type is Swift.MainActor, treat it specially.
-  if (cls && cls->getNameStr() == "MainActor" &&
-      cls->getDeclContext()->isModuleScopeContext() &&
-      cls->getModuleContext()->getName().str() == SWIFT_CONCURRENCY_NAME) {
-    llvm::Value *identity = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                              unsigned(ExecutorRefFlags::MainActorIdentity));
-    identity = IGF.Builder.CreateIntToPtr(identity, IGF.IGM.ExecutorFirstTy);
-    out.add(identity);
-
-    llvm::Value *impl = IGF.IGM.getSize(Size(0));
-    out.add(impl);
-    return;
-  }
-
+void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
+                                             llvm::Value *actor,
+                                             Explosion &out) {
+  // The implementation word of a default actor is just a null pointer.
   llvm::Value *identity =
-    IGF.Builder.CreateBitCast(actor, IGF.IGM.ExecutorFirstTy);
-  llvm::Value *impl = IGF.IGM.getSize(Size(0));
+    IGF.Builder.CreatePtrToInt(actor, IGF.IGM.ExecutorFirstTy);
+  llvm::Value *impl = llvm::ConstantInt::get(IGF.IGM.ExecutorSecondTy, 0);
 
-  unsigned flags = 0;
+  out.add(identity);
+  out.add(impl);
+}
 
-  // FIXME: this isn't how we should be doing any of this
-  flags |= unsigned(ExecutorRefFlags::DefaultActor);
+void irgen::emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
+                                               llvm::Value *executor,
+                                               CanType executorType,
+                                       ProtocolConformanceRef executorConf,
+                                               Explosion &out) {
+  // The implementation word of an "ordinary" serial executor is
+  // just the witness table pointer with no flags set.
+  llvm::Value *identity =
+    IGF.Builder.CreatePtrToInt(executor, IGF.IGM.ExecutorFirstTy);
+  llvm::Value *impl =
+    emitWitnessTableRef(IGF, executorType, executorConf);
+  impl = IGF.Builder.CreatePtrToInt(impl, IGF.IGM.ExecutorSecondTy);
 
-  if (flags) {
-    impl = IGF.Builder.CreateOr(impl, IGF.IGM.getSize(Size(flags)));
-  }
   out.add(identity);
   out.add(impl);
 }

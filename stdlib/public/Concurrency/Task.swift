@@ -28,9 +28,9 @@ import Swift
 /// running. Each such period ends at a suspension point or -- finally -- the
 /// completion of the task.
 ///
-/// These partial periods towards the task's completion are `PartialAsyncTask`.
-/// Partial tasks are generally not interacted with by end-users directly,
-/// unless implementing a scheduler.
+/// These partial periods towards the task's completion are
+/// individually schedulable as jobs.  Jobs are generally not interacted
+/// with by end-users directly, unless implementing a scheduler.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct Task {
   // Task instances should not be used as they could be stored away,

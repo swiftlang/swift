@@ -16,6 +16,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
+#include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -286,10 +287,14 @@ bool IsDefaultActorRequest::evaluate(
   if (classDecl->isForeign() || classDecl->isResilient(M, expansion))
     return false;
 
-  // If the class has explicit custom-actor methods, it's not
-  // a default actor.
-  if (classDecl->hasExplicitCustomActorMethods())
-    return false;
+  // Check whether the class has explicit custom-actor methods.
+
+  // If we synthesized the unownedExecutor property, we should've
+  // added a semantics attribute to it (if it was actually a default
+  // actor).
+  if (auto executorProperty = classDecl->getUnownedExecutorProperty())
+    return executorProperty->getAttrs()
+             .hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
 
   return true;
 }
