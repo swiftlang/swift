@@ -164,3 +164,10 @@ class MyButton : NXButton {
 func testButtons(mb: MyButton) {
   mb.onButtonPress()
 }
+
+
+func testMirrored(instance: ClassWithAsync) async {
+  await instance.instanceAsync()
+  await instance.protocolMethod()
+  await instance.customAsyncName()
+}
