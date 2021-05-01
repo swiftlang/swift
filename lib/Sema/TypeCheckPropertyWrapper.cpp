@@ -405,13 +405,6 @@ PropertyWrapperTypeInfoRequest::evaluate(
 
   result.requireNoEnclosingInstance =
       enclosingInstanceTypeIsNever(ctx, result.enclosingInstanceWrappedSubscript);
-//  if (requireNoEnclosingInstance) { //  && !valueVar->isStatic()) {
-//    // this means that the property wrapper must be declared on a static property
-//    valueVar->diagnose(
-//        diag::property_wrapper_var_must_be_static, valueVar->getName());
-//    return PropertyWrapperTypeInfo();
-//    result
-//  }
 
   bool hasInvalidDynamicSelf = false;
   if (result.projectedValueVar &&
