@@ -96,7 +96,8 @@ import Swift
 /// value for lookups in the task local storage.
 @propertyWrapper
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
+// TODO: add Sendable enforcement when we're ready to do so rdar://77441933
+public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
   let defaultValue: Value
 
   public init(wrappedValue defaultValue: Value) {
@@ -207,7 +208,7 @@ extension UnsafeCurrentTask {
   /// This function MUST NOT be invoked by any other task than the current task
   /// represented by this object.
   @discardableResult
-  public func withTaskLocal<Value: Sendable, R>(
+  public func withTaskLocal<Value, R>(
       _ taskLocal: TaskLocal<Value>,
       boundTo valueDuringOperation: Value,
       operation: () throws -> R,
