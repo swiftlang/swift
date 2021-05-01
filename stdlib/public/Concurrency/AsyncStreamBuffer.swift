@@ -143,6 +143,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     yield(nil)
   }
 
+  // This must be called with the lock held and no callouts must occur
   private func enqueue(_ value: __owned Element?) -> TerminationHandler? {
     if let value = value {
       if state.terminal == nil {
@@ -157,6 +158,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     }
   }
 
+  // This must be called with the lock held and no callouts must occur
   private func terminate(error: __owned Failure? = nil) -> TerminationHandler? {
     let handler = state.onTermination
     state.onTermination = nil
@@ -172,9 +174,8 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
 
   func yield(_ value: __owned Element?) {
     lock()
-    let handler = enqueue(value)
     // the handler should only be present if the value is nil
-    defer { handler?.finish() }
+    let handler = enqueue(value)
 
     if let raw = state.continuation {
       if state.pending.count > 0 {
@@ -184,6 +185,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         let toSend = state.pending.first
         state.pending.remove(at: 0)
         unlock()
+        handler?.finish()
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
         state.continuation = nil
@@ -193,6 +195,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
           _ = terminate()
           unlock()
         }
+        handler?.finish()
         switch terminal {
         case .finished:
           continuation.resume(returning: nil)
@@ -201,20 +204,21 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         }
       } else {
         unlock()
+        handler?.finish()
       }
     } else {
       if state.limit == 0 {
         state.pending.remove(at: 0)
       }
       unlock()
+      handler?.finish()
     }
   }
 
   func yield(_ value: __owned Element?) where Failure == Never {
     lock()
-    let handler = enqueue(value)
     // the handler should only be present if the value is nil
-    defer { handler?.finish() }
+    let handler = enqueue(value)
 
     if let raw = state.continuation {
       if state.pending.count > 0 {
@@ -224,6 +228,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         let toSend = state.pending.first
         state.pending.remove(at: 0)
         unlock()
+        handler?.finish()
         continuation.resume(returning: toSend)
       } else if let terminal = state.terminal {
         state.continuation = nil
@@ -233,6 +238,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
           _ = terminate()
           unlock()
         }
+        handler?.finish()
         switch terminal {
         case .finished:
           continuation.resume(returning: nil)
@@ -241,12 +247,14 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         }
       } else {
         unlock()
+        handler?.finish()
       }
     } else {
       if state.limit == 0 {
         state.pending.remove(at: 0)
       }
       unlock()
+      handler?.finish()
     }
   }
 
@@ -254,7 +262,6 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
     lock()
     let handler = state.onTermination
     state.onTermination = nil
-    defer { handler?.finish(throwing: error) }
     if let raw = state.continuation {
       state.continuation = nil
       let terminal = state.terminal
@@ -264,6 +271,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
         _ = terminate()
         unlock()
       }
+      handler?.finish(throwing: error)
       switch terminal {
       case .finished:
         continuation.resume(returning: nil)
@@ -277,6 +285,7 @@ internal final class _AsyncStreamBufferedStorage<Element, Failure: Error>: Unsaf
       withExtendedLifetime((state.onTermination, state.terminal)) {
         _ = terminate(error: error)
         unlock()
+        handler?.finish(throwing: error)
       }
     }
   }
