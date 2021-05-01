@@ -3670,7 +3670,7 @@ NOTE(ambiguous_because_of_trailing_closure,none,
 // Partial application of foreign functions not supported
 ERROR(partial_application_of_function_invalid,none,
       "partial application of %select{"
-        "'mutating' method|"
+        "calling a 'mutating' method without an argument list is not allowed|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation|"
         "'super' instance method with metatype base"
@@ -3678,7 +3678,7 @@ ERROR(partial_application_of_function_invalid,none,
       (unsigned))
 WARNING(partial_application_of_function_invalid_swift4,none,
       "partial application of %select{"
-        "'mutating' method|"
+        "calling a 'mutating' method without an argument list is not allowed|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation|"
         "'super' instance method with metatype base"
