@@ -71,6 +71,7 @@ func manyNested() {
 // MANY-NESTED-NEXT: print("after")
 // MANY-NESTED-NEXT: }
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 func asyncParams(arg: String, _ completion: (String?, Error?) -> Void) {
   simpleErr(arg: arg) { str, err in
@@ -196,3 +197,8 @@ func voidResultCompletion(completion: (Result<Void, Error>) -> Void) {
 // VOID-RESULT-HANDLER-NEXT:     throw CustomError.Bad
 // VOID-RESULT-HANDLER-NEXT:   }
 // VOID-RESULT-HANDLER-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
+func functionWithSomeHandler(handler: (String) -> Void) {}
+// NON-COMPLETION-HANDLER: func functionWithSomeHandler() async -> String {}
