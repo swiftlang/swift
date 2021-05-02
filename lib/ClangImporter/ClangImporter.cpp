@@ -1731,7 +1731,9 @@ bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
-bool ClangImporter::canImportModule(ImportPath::Element moduleID) {
+bool ClangImporter::canImportModule(ImportPath::Element moduleID,
+                                    llvm::VersionTuple version,
+                                    bool underlyingVersion) {
   // Look up the top-level module to see if it exists.
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();

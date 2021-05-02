@@ -27,6 +27,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/VersionTuple.h"
 #include <system_error>
 
 namespace llvm {
@@ -199,7 +200,9 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(ImportPath::Element named) = 0;
+  virtual bool canImportModule(ImportPath::Element named,
+                               llvm::VersionTuple version,
+                               bool underlyingVersion) = 0;
 
   /// Import a module with the given module path.
   ///
