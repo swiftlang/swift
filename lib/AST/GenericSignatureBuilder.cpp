@@ -5878,6 +5878,8 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
     const RequirementSource *otherSource,
     RequirementRHS otherRHS,
     const ProtocolDecl *requirementSignatureSelfProto) {
+  if (auto *Stats = Context.Stats)
+    ++Stats->getFrontendCounters().NumRedundantRequirementSteps;
 
   SmallVector<ExplicitRequirement, 2> result;
   getBaseRequirements(
@@ -5893,18 +5895,116 @@ GenericSignatureBuilder::isValidRequirementDerivationPath(
     if (visited.count(otherReq))
       return None;
 
-    // Don't consider paths based on requirements that are already
-    // known to be redundant either, since those paths become
-    // invalid once redundant requirements are dropped.
-    if (isRedundantExplicitRequirement(otherReq))
-      return None;
-
     SWIFT_DEFER {
       visited.erase(otherReq);
     };
     visited.insert(otherReq);
 
     auto otherSubjectType = otherReq.getSubjectType();
+
+    // If our requirement is based on a path involving some other
+    // redundant requirement, see if we can derive the redundant
+    // requirement using requirements we haven't visited yet.
+    // If not, we go ahead and drop it from consideration.
+    //
+    // We need to do this because sometimes, we don't record all possible
+    // requirement sources that derive a given requirement.
+    //
+    // For example, when a nested type of a type parameter is concretized by
+    // adding a superclass requirement, we only record the requirement source
+    // for the concrete conformance the first time. A subsequently-added
+    // superclass requirement on the same parent type does not record a
+    // redundant concrete conformance for the child type.
+    if (isRedundantExplicitRequirement(otherReq)) {
+      // If we have a redundant explicit requirement source, it really is
+      // redundant; there's no other derivation that would not be redundant.
+      if (!otherSource->isDerivedNonRootRequirement())
+        return None;
+
+      auto *equivClass = resolveEquivalenceClass(otherSubjectType,
+                                           ArchetypeResolutionKind::AlreadyKnown);
+      assert(equivClass &&
+             "Explicit requirement names an unknown equivalence class?");
+
+      switch (otherReq.getKind()) {
+      case RequirementKind::Conformance: {
+        auto *proto = otherReq.getRHS().get<ProtocolDecl *>();
+
+        auto found = equivClass->conformsTo.find(proto);
+        assert(found != equivClass->conformsTo.end());
+
+        bool foundValidDerivation = false;
+        for (const auto &constraint : found->second) {
+          if (isValidRequirementDerivationPath(
+                  visited, otherReq.getKind(),
+                  constraint.source, proto,
+                  requirementSignatureSelfProto)) {
+            foundValidDerivation = true;
+            break;
+          }
+        }
+
+        if (!foundValidDerivation)
+          return None;
+
+        break;
+      }
+
+      case RequirementKind::Superclass: {
+        auto superclass = getCanonicalTypeInContext(
+          otherReq.getRHS().get<Type>(), { });
+
+        for (const auto &constraint : equivClass->superclassConstraints) {
+          auto otherSuperclass = getCanonicalTypeInContext(
+              constraint.value, { });
+
+          if (superclass->isExactSuperclassOf(otherSuperclass)) {
+            bool foundValidDerivation = false;
+            if (isValidRequirementDerivationPath(
+                    visited, otherReq.getKind(),
+                    constraint.source, otherSuperclass,
+                    requirementSignatureSelfProto)) {
+              foundValidDerivation = true;
+              break;
+            }
+
+            if (!foundValidDerivation)
+              return None;
+          }
+        }
+
+        break;
+      }
+
+      case RequirementKind::Layout: {
+        auto layout = otherReq.getRHS().get<LayoutConstraint>();
+
+        for (const auto &constraint : equivClass->layoutConstraints) {
+          auto otherLayout = constraint.value;
+
+          if (layout == otherLayout) {
+            bool foundValidDerivation = false;
+            if (isValidRequirementDerivationPath(
+                    visited, otherReq.getKind(),
+                    constraint.source, otherLayout,
+                    requirementSignatureSelfProto)) {
+              foundValidDerivation = true;
+              break;
+            }
+
+            if (!foundValidDerivation)
+              return None;
+          }
+        }
+
+        break;
+      }
+
+      case RequirementKind::SameType:
+        llvm_unreachable("Should not see same type requirements here");
+      }
+    }
+
     if (auto *depMemType = otherSubjectType->getAs<DependentMemberType>()) {
       // If 'req' is based on some other conformance requirement
       // `T.[P.]A : Q', we want to make sure that we have a
@@ -5974,6 +6074,9 @@ void GenericSignatureBuilder::computeRedundantRequirements(
 #ifndef NDEBUG
   Impl->computedRedundantRequirements = true;
 #endif
+
+  FrontendStatsTracer tracer(Context.Stats,
+                             "compute-redundant-requirements");
 
   // This sort preserves iteration order with the legacy algorithm.
   SmallVector<ExplicitRequirement, 2> requirements(
