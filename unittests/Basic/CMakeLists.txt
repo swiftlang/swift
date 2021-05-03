@@ -11,6 +11,7 @@ add_swift_unittest(SwiftBasicTests
   ClusteredBitVectorTest.cpp
   DemangleTest.cpp
   DiverseStackTest.cpp
+  DiagnosticCollectorTest.cpp
   EditorPlaceholderTest.cpp
   EncodedSequenceTest.cpp
   ExponentialGrowthAppendingBinaryByteStreamTests.cpp
