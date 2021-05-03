@@ -509,7 +509,7 @@ func acceptClosure<T>(_: () -> T) { }
 // ----------------------------------------------------------------------
 func takesUnsafeMainActor(@_unsafeMainActor fn: () -> Void) { }
 
-@MainActor func onlyOnMainActor() { } // expected-note{{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
+@MainActor func onlyOnMainActor() { }
 
 func useUnsafeMainActor() {
   takesUnsafeMainActor {
@@ -525,7 +525,8 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 
 @MainActor func testCallFromMainActor() {
   acceptAsyncSendableClosure {
-    onlyOnMainActor() // expected-error{{call to main actor-isolated global function 'onlyOnMainActor()' in a synchronous nonisolated context}}
+    onlyOnMainActor() // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1 {{call is 'async'}}
   }
 
   acceptAsyncSendableClosure {
