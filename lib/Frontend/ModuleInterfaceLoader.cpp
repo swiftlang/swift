@@ -1191,24 +1191,21 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   auto SB = FileOrError.get()->getBuffer();
   auto VersRe = getSwiftInterfaceFormatVersionRegex();
   auto CompRe = getSwiftInterfaceCompilerVersionRegex();
-  auto FlagRe = getSwiftInterfaceModuleFlagsRegex();
-  SmallVector<StringRef, 1> VersMatches, FlagMatches, CompMatches;
+  SmallVector<StringRef, 1> VersMatches, CompMatches;
 
   if (!VersRe.match(SB, &VersMatches)) {
     diagnose(interfacePath, diagnosticLoc,
              diag::error_extracting_version_from_module_interface);
     return true;
   }
-  if (!FlagRe.match(SB, &FlagMatches)) {
+  if (extractCompilerFlagsFromInterface(SB, ArgSaver, SubArgs)) {
     diagnose(interfacePath, diagnosticLoc,
              diag::error_extracting_version_from_module_interface);
     return true;
   }
   assert(VersMatches.size() == 2);
-  assert(FlagMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
   auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), &Diags);
-  llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
