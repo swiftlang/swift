@@ -33,9 +33,9 @@ func missingTryInBlock<T : AsyncSequence>(_ seq: T) {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) { 
-  execute { // expected-error{{invalid conversion from 'async' function of type '() async -> Void' to synchronous function type '() -> Void'}}
+  execute { // expected-error{{cannot pass function of type '() async -> Void' to parameter expecting synchronous function type}}
     do { 
-      for try await _ in seq { }
+      for try await _ in seq { } // expected-note {{'async' in a closure that does not support concurrency}}
     } catch { }
   }
 }
