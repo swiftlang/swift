@@ -139,6 +139,40 @@ public enum ActorResolved<Act: DistributedActor> {
 /***************************** Actor Address **********************************/
 /******************************************************************************/
 
+/// Uniquely identifies a distributed actor, and enables sending messages even to remote actors.
+///
+/// ## Identity
+/// The address is the source of truth with regards to referring to a _specific_ actor in the system.
+/// This is in contrast to an `ActorPath` which can be thought of as paths in a filesystem, however without any uniqueness
+/// or identity guarantees about the files those paths point to.
+///
+/// ## Lifecycle
+/// Note, that an ActorAddress is a pure value, and as such does not "participate" in an actors lifecycle;
+/// Thus, it may represent an address of an actor that has already terminated, so attempts to locate (resolve)
+/// an `ActorRef` for this address may result with a reference to dead letters (meaning, that the actor this address
+/// had pointed to does not exist, and most likely is dead / terminated).
+///
+/// ## Serialization
+///
+/// An address can be serialized using `Codable` or other serialization mechanisms.
+/// When shared over the network or with other processes it must include the origin's
+/// system address (e.g. the network address of the host, or process identifier).
+///
+/// When using `Codable` serialization this is done automatically, by looking up
+/// the address of the `ActorTransport` the actor is associated with if was a local
+/// instance, or simply carrying the full address if it already was a remote reference.
+///
+/// ## Format
+/// The address consists of the following parts:
+///
+/// ```
+/// |              node                  | path               | incarnation |
+///  (  protocol | name? | host | port  ) ( [segments] name )? (  uint32   )
+/// ```
+///
+/// For example: `sact://human-readable-name@127.0.0.1:7337/user/wallet/id-121242`.
+/// Note that the `ActorIncarnation` is not printed by default in the String representation of a path, yet may be inspected on demand.
+
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
     /// Uniquely specifies the actor transport and the protocol used by it.
