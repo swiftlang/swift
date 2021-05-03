@@ -6067,9 +6067,6 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
                                              SourceLoc const& currentLoc) {
   ParserStatus Status;
 
-  if (!shouldParseExperimentalConcurrency())
-    return Status;
-
   if (isEffectsSpecifier(Tok)) {
     if (currentKind == AccessorKind::Get) {
       Status |=
