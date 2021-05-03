@@ -17,3 +17,5 @@
 __attribute__((swift_async_name("getter:catto()")));
 
 @end
+
+void scheduleButt(Butt *b, NSString *s);
