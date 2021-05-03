@@ -23,15 +23,6 @@ var global: Int = 0
 class NotSendable {}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-enum T2 {
-  @TaskLocal // expected-error{{generic class 'TaskLocal' requires that 'NotSendable' conform to 'Sendable'}}
-  static var notSendable: NotSendable?
-
-  @TaskLocal // expected-error{{generic class 'TaskLocal' requires that 'NotSendable' conform to 'Sendable'}}
-  static var notSendable2: NotSendable = NotSendable()
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test () async {
   TL.number = 10 // expected-error{{cannot assign to property: 'number' is a get-only property}}
   TL.$number = 10 // expected-error{{cannot assign value of type 'Int' to type 'TaskLocal<Int>'}}
