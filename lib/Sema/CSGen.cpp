@@ -4085,8 +4085,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    if (paramType->hasTypeVariable())
-      recordPotentialHole(paramType);
+    recordAnyTypeVarAsPotentialHole(paramType);
 
     auto *loc = getConstraintLocator(locator);
     auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);

@@ -3771,13 +3771,6 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
-  auto markAnyTypeVarsAsPotentialHoles = [&](Type type) {
-    type.visit([&](Type subType) {
-      if (auto *typeVar = subType->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
-  };
-
   if (repairArrayLiteralUsedAsDictionary(*this, lhs, rhs, matchKind,
                                          conversionsOrFixes,
                                          getConstraintLocator(locator)))
@@ -4721,10 +4714,7 @@ bool ConstraintSystem::repairFailures(
     // of the conversion (or pattern match) to have holes. This
     // helps when conversion if between a type and a tuple e.g.
     // `Int` vs. `(_, _)`.
-    rhs.visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordAnyTypeVarAsPotentialHole(rhs);
 
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -4803,8 +4793,8 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::TernaryBranch: {
-    markAnyTypeVarsAsPotentialHoles(lhs);
-    markAnyTypeVarsAsPotentialHoles(rhs);
+    recordAnyTypeVarAsPotentialHole(lhs);
+    recordAnyTypeVarAsPotentialHole(rhs);
 
     // If `if` expression has a contextual type, let's consider it a source of
     // truth and produce a contextual mismatch instead of  per-branch failure,
@@ -4844,8 +4834,8 @@ bool ConstraintSystem::repairFailures(
     // element pattern, call it a contextual mismatch.
     auto pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
     if (lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern)) {
-      markAnyTypeVarsAsPotentialHoles(lhs);
-      markAnyTypeVarsAsPotentialHoles(rhs);
+      recordAnyTypeVarAsPotentialHole(lhs);
+      recordAnyTypeVarAsPotentialHole(rhs);
 
       conversionsOrFixes.push_back(ContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
@@ -8344,10 +8334,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
-    memberType.visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordAnyTypeVarAsPotentialHole(memberType);
 
     return SolutionKind::Solved;
   }
@@ -8492,11 +8479,7 @@ ConstraintSystem::simplifyOneWayConstraint(
 
   // Propagate holes through one-way constraints.
   if (secondSimplified->isPlaceholder()) {
-    first.visit([&](Type subType) {
-      if (auto *typeVar = subType->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
-
+    recordAnyTypeVarAsPotentialHole(first);
     return SolutionKind::Solved;
   }
 
@@ -9944,7 +9927,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (auto *typeVar = type2->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
       if (typeVar->isPlaceholder() || hasFixFor(locator))
-        recordPotentialHole(func1);
+        recordAnyTypeVarAsPotentialHole(func1);
     }
   }
 
@@ -10176,7 +10159,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // If there are any type variables associated with arguments/result
     // they have to be marked as "holes".
-    recordPotentialHole(func1);
+    recordAnyTypeVarAsPotentialHole(func1);
 
     if (desugar2->isPlaceholder())
       return SolutionKind::Solved;
@@ -10450,7 +10433,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
       return SolutionKind::Error;
 
     recordPotentialHole(tv);
-    recordPotentialHole(func1);
+    recordAnyTypeVarAsPotentialHole(func1);
 
     return SolutionKind::Solved;
   }
@@ -11149,8 +11132,14 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   return false;
 }
 
-void ConstraintSystem::recordPotentialHole(Type type) {
-  assert(type->hasTypeVariable());
+void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
+  typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+}
+
+void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
+  if (!type->hasTypeVariable())
+    return;
+
   type.visit([&](Type type) {
     if (auto *typeVar = type->getAs<TypeVariableType>())
       typeVar->getImpl().enableCanBindToHole(getSavedBindings());
@@ -11261,7 +11250,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
           newTupleTypes.push_back(smallerElt);
       } else {
         if (largerElt.getType()->isTypeVariableOrMember())
-          recordPotentialHole(largerElt.getType());
+          recordAnyTypeVarAsPotentialHole(largerElt.getType());
       }
     }
     auto matchingType =
