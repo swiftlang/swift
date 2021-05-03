@@ -82,6 +82,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -2941,6 +2942,16 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   assert(!fnType->isPolymorphic());
   auto argTypes = fnType->getParameters();
 
+  // If the input is synchronous and global-actor-qualified, and the
+  // output is asynchronous, hop to the executor expected by the input.
+  ExecutorBreadcrumb prevExecutor;
+  if (outputSubstType->isAsync() && !inputSubstType->isAsync()) {
+    if (Type globalActor = inputSubstType->getGlobalActor()) {
+      prevExecutor = SGF.emitHopToTargetActor(
+          loc, ActorIsolation::forGlobalActor(globalActor, false), None);
+    }
+  }
+
   // Translate the argument values.  Function parameters are
   // contravariant: we want to switch the direction of transformation
   // on them by flipping inputOrigType and outputOrigType.
@@ -2983,6 +2994,9 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
 
   // Reabstract the result.
   SILValue outerResult = resultPlanner.execute(innerResult);
+
+  // If we hopped to the target's executor, then we need to hop back.
+  prevExecutor.emit(SGF, loc);
 
   scope.pop();
   SGF.B.createReturn(loc, outerResult);
@@ -3329,11 +3343,20 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                       genericEnv,
                                       interfaceSubs,
                                       dynamicSelfType);
+  // An actor-isolated non-async function can be converted to an async function
+  // by inserting a hop to the global actor.
+  CanType globalActorForThunk;
+  if (outputSubstType->isAsync()
+      && !inputSubstType->isAsync()) {
+    globalActorForThunk = CanType(inputSubstType->getGlobalActor());
+  }
+  
   auto thunk = SGF.SGM.getOrCreateReabstractionThunk(
                                        thunkType,
                                        sourceType,
                                        toType,
-                                       dynamicSelfType);
+                                       dynamicSelfType,
+                                       globalActorForThunk);
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -3557,7 +3580,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       dynamicSelfType);
 
   auto *thunk = SGM.getOrCreateReabstractionThunk(
-      thunkType, noEscapingFnTy, escapingFnTy, dynamicSelfType);
+      thunkType, noEscapingFnTy, escapingFnTy, dynamicSelfType, CanType());
 
   if (thunk->empty()) {
     thunk->setWithoutActuallyEscapingThunk();
@@ -3661,7 +3684,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   // Otherwise, it is just a normal reabstraction thunk.
   else {
     name = mangler.mangleReabstractionThunkHelper(
-        thunkType, fromInterfaceType, toInterfaceType, Type(),
+        thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
         getModule().getSwiftModule());
   }
 
