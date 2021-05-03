@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -26,6 +26,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/DiagnosticCollector.h"
 
 using namespace swift;
 
@@ -2076,8 +2077,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     Expr &expr;
   };
 
-  SmallVector<Expr *, 4> errorOrder;
-  llvm::DenseMap<Expr *, std::vector<DiagnosticInfo>> uncoveredAsync;
+  DiagnosticCollector<const Expr *, DiagnosticInfo> uncoveredAsync;
   llvm::DenseMap<Expr *, Expr *> parentMap;
 
   static bool isEffectAnchor(Expr *e) {
@@ -2285,7 +2285,7 @@ public:
   }
 
   ~CheckEffectsCoverage() {
-    for (Expr *anchor: errorOrder) {
+    for (const Expr *anchor : uncoveredAsync) {
       diagnoseUncoveredAsyncSite(anchor);
     }
   }
@@ -2651,15 +2651,8 @@ private:
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
                                     CurContext.isWithinInterpolatedString());
-
-        auto key = uncoveredAsync.find(anchor);
-        if (key == uncoveredAsync.end()) {
-          uncoveredAsync.insert({anchor, {}});
-          errorOrder.push_back(anchor);
-        }
-        uncoveredAsync[anchor].emplace_back(
-            *expr,
-            classification.getAsyncReason());
+        uncoveredAsync.emplaceDiagnostic(anchor, *expr,
+                                         classification.getAsyncReason());
       }
     }
 
@@ -2810,10 +2803,7 @@ private:
   }
 
   void diagnoseUncoveredAsyncSite(const Expr *anchor) const {
-    auto asyncPointIter = uncoveredAsync.find(anchor);
-    if (asyncPointIter == uncoveredAsync.end())
-      return;
-    const std::vector<DiagnosticInfo> &errors = asyncPointIter->getSecond();
+    auto errors = uncoveredAsync.getDiagnostics(anchor);
     SourceLoc awaitInsertLoc = anchor->getStartLoc();
     if (const AnyTryExpr *tryExpr = dyn_cast<AnyTryExpr>(anchor))
       awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
