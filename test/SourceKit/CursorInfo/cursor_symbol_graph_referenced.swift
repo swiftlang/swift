@@ -19,7 +19,7 @@ extension Parent {
 
 // RUN: %empty-directory(%t)
 // RUN: echo 'public struct FromSomeModule {} ' > %t/SomeModule.swift
-// RUN: %target-build-swift %t/SomeModule.swift -module-name SomeModule -emit-module -emit-module-path %t/
+// RUN: %target-build-swift %t/SomeModule.swift -emit-module -module-name SomeModule -o %t/SomeModule.swiftmodule
 
 // References should cover symbols from the symbol graph declaration fragments, even if not present in the original source.
 // RUN:  %sourcekitd-test -req=cursor -pos=3:5 -req-opts=retrieve_symbol_graph=1 %s -- %s -target %target-triple -I %t | %FileCheck -check-prefixes=GLOBAL %s
@@ -133,7 +133,7 @@ extension Parent {
 
 
 // References to unsupported types (like generic parameters) should be ignored.
-// RUN:  %sourcekitd-test -req=cursor -pos=11:14 -req-opts=retrieve_symbol_graph=1 %s -- %s -target %target-triple -I %t | %FileCheck -check-prefixes=NESTED %s
+// RUN: %sourcekitd-test -req=cursor -pos=11:14 -req-opts=retrieve_symbol_graph=1 %s -- %s -target %target-triple -I %t | %FileCheck -check-prefixes=NESTED %s
 //
 // NESTED:      SYMBOL GRAPH BEGIN
 // NESTED:        "declarationFragments": [
@@ -225,8 +225,7 @@ extension Parent {
 // NESTED-NEXT: [[ExtInner_USR]] | internal | {{.*}}cursor_symbol_graph_referenced.swift | cursor_symbol_graph_referenced | User | NonSPI | source.lang.swift
 // NESTED-NEXT:   Parent swift.struct s:30cursor_symbol_graph_referenced6ParentV
 // NESTED-NEXT:   ExtInner swift.struct [[ExtInner_USR]]
-// FIXME: We should get the file path via the swiftsourceinfo file for user modules (rdar://75582627)
-// NESTED-NEXT: [[FromSomeModule_USR]] | public | <empty> | SomeModule | User | NonSPI | source.lang.swift
+// NESTED-NEXT: [[FromSomeModule_USR]] | public | {{.*}}/SomeModule.swift | SomeModule | User | NonSPI | source.lang.swift
 // NESTED-NEXT:   FromSomeModule swift.struct [[FromSomeModule_USR]]
 // NESTED-NEXT: REFERENCED DECLS END
 
