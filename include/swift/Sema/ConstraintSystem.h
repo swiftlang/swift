@@ -5592,6 +5592,11 @@ Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
 /// of operator overload choices.
 bool isOperatorDisjunction(Constraint *disjunction);
 
+/// Find out whether closure body has any `async` or `await` expressions,
+/// declarations, or statements directly in its body (no in other closures
+/// or nested declarations).
+ASTNode findAsyncNode(ClosureExpr *closure);
+
 } // end namespace constraints
 
 template<typename ...Args>
