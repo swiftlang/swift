@@ -30,6 +30,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/CommandLine.h"
 #include <system_error>
 
 using namespace swift;
@@ -945,6 +946,18 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     break;
   }
   }
+}
+
+bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
+                                              llvm::StringSaver &ArgSaver,
+                                              SmallVectorImpl<const char *> &SubArgs) {
+  SmallVector<StringRef, 1> FlagMatches;
+  auto FlagRe = llvm::Regex("^// swift-module-flags:(.*)$", llvm::Regex::Newline);
+  if (!FlagRe.match(buffer, &FlagMatches))
+    return true;
+  assert(FlagMatches.size() == 2);
+  llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
+  return false;
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
