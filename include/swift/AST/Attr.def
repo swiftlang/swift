@@ -646,36 +646,37 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeMainActor, UnsafeMainActor,
   OnParam | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
   114)
-  
-CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
-  DeclModifier | OnClass | OnFunc |
-  ConcurrencyOnly | DistributedOnly |
-  ABIBreakingToAdd | ABIBreakingToRemove |
-  APIBreakingToAdd | APIBreakingToRemove,
-  115)
-
-SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
-  OnFunc | OnVar |
-  ConcurrencyOnly | DistributedOnly | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove |
-  APIBreakingToAdd | APIBreakingToRemove,
-  116)
 
 SIMPLE_DECL_ATTR(_implicitSelfCapture, ImplicitSelfCapture,
   OnParam | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
-  117)
+  115)
 
 SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
   OnParam | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  118)
+  116)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(spawn, Spawn,
   DeclModifier | OnVar | ConcurrencyOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   117)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
+  DeclModifier | OnClass | OnFunc |
+  ConcurrencyOnly | DistributedOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  118)
+
+SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
+  OnFunc | OnVar |
+  ConcurrencyOnly | DistributedOnly | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  119)
+
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -69,9 +69,9 @@
 #include <io.h>
 #include <handleapi.h>
 #include <processthreadsapi.h>
-#if SWIFT_OBJC_INTEROP
 #endif
 
+#if SWIFT_OBJC_INTEROP
 extern "C" void *objc_autoreleasePoolPush();
 extern "C" void objc_autoreleasePoolPop(void *);
 #endif
@@ -1747,10 +1747,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
 
   swift_deallocObject(actor, metadata->getInstanceSize(),
                       metadata->getInstanceAlignMask());
-}
-
-void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
-  asImpl(_actor)->enqueue(job);
 }
 
 // TODO: most likely where we'd need to create the "proxy instance" instead?
