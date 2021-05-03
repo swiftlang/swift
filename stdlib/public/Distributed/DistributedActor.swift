@@ -12,15 +12,17 @@
 
 import Swift
 import _Concurrency
-@_implementationOnly import _SwiftConcurrencyShims
 
-/// Common protocol to which all distributed actors conform.
+/// Common protocol to which all distributed actors conform implicitly.
 ///
-/// The \c DistributedActor protocol provides the core functionality of any
+/// It is not possible to conform to this protocol manually explicitly.
+/// Only a 'distributed actor' declaration or protocol with 'DistributedActor'
+/// requirement may conform to this protocol.
+///
+/// The 'DistributedActor' protocol provides the core functionality of any
 /// distributed actor, which involves transforming actor
 /// which involves enqueuing new partial tasks to be executed at some
-/// point. Actor classes implicitly conform to this protocol as part of their
-/// primary class definition.
+/// point.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol DistributedActor: Actor, Codable {
 
@@ -52,8 +54,6 @@ public protocol DistributedActor: Actor, Codable {
     ///
     /// Conformance to this requirement is synthesized automatically for any
     /// `distributed actor` declaration.
-    // FIXME: don't express it as a protocol requirement, since there never
-    //        is a reason to reach into it externally?
     nonisolated var actorTransport: ActorTransport { get }
 
     /// Logical address which this distributed actor represents.
@@ -74,20 +74,20 @@ extension CodingUserInfoKey {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension DistributedActor {
-    public init(from decoder: Decoder) throws {
-        guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
-            throw DistributedActorCodingError(message:
-            "ActorTransport not available under the decoder.userInfo")
-        }
-
-        var container = try decoder.singleValueContainer()
-        let address = try container.decode(ActorAddress.self)
-        // self = try Self(resolve: address, using: transport) // FIXME: This is going to be solved by the init() work!!!!
-        fatalError("XXXX")
+    nonisolated public init(from decoder: Decoder) throws {
+//        guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
+//            throw DistributedActorCodingError(message:
+//            "ActorTransport not available under the decoder.userInfo")
+//        }
+//
+//        var container = try decoder.singleValueContainer()
+//        let address = try container.decode(ActorAddress.self)
+//         self = try Self(resolve: address, using: transport) // FIXME: This is going to be solved by the init() work!!!!
+        fatalError("\(#function) is not implemented yet for distributed actors'")
     }
 
     @actorIndependent
-    public func encode(to encoder: Encoder) throws {
+    nonisolated public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.actorAddress)
     }

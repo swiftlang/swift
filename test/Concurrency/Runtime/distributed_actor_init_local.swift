@@ -2,8 +2,9 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: distributed
 
-import _Concurrency
+import _Distributed
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor LocalWorker {

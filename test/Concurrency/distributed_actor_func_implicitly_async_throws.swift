@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-distributed
 // REQUIRES: concurrency
+// REQUIRES: distributed
+
+import _Distributed
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor D {

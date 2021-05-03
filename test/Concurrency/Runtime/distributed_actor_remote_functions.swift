@@ -2,8 +2,10 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: distributed
 
 import Dispatch
+import _Distributed
 import _Concurrency
 
 struct Boom: Error {}

@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-distributed
 // REQUIRES: concurrency
+// REQUIRES: distributed
+
+import _Distributed
 
 // Synthesis of distributed actors.
 

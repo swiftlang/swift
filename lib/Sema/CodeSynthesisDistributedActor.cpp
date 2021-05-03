@@ -192,8 +192,6 @@ createDistributedActor_init_local(ClassDecl *classDecl,
                                   ASTContext &ctx) {
   auto &C = ctx;
 
-  fprintf(stderr, "[%s:%d] (%s) create\n", __FILE__, __LINE__, __FUNCTION__);
-
 //  auto conformanceDC = derived.getConformanceContext();
   auto conformanceDC = classDecl;
 
@@ -201,7 +199,6 @@ createDistributedActor_init_local(ClassDecl *classDecl,
   //
   // Params: (transport transport: ActorTransport)
   auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-  fprintf(stderr, "[%s:%d] (%s) got transport\n", __FILE__, __LINE__, __FUNCTION__);
   auto *transportParamDecl = new (C) ParamDecl(
       SourceLoc(), SourceLoc(), C.Id_transport,
       SourceLoc(), C.Id_transport, conformanceDC);
@@ -228,6 +225,9 @@ createDistributedActor_init_local(ClassDecl *classDecl,
   // This constructor is 'required', all distributed actors MUST invoke it.
   auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
   initDecl->getAttrs().add(reqAttr);
+
+  auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
+  initDecl->getAttrs().add(nonIsoAttr);
 
   initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
 
@@ -352,6 +352,9 @@ createDistributedActor_init_resolve(ClassDecl *classDecl,
   // This constructor is 'required', all distributed actors MUST have it.
   initDecl->getAttrs().add(new (C) RequiredAttr(/*IsImplicit*/true));
 
+  auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
+  initDecl->getAttrs().add(nonIsoAttr);
+
   initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
 
   return initDecl;
@@ -364,34 +367,28 @@ createDistributedActorInit(ClassDecl *classDecl,
                            ASTContext &ctx) {
   assert(classDecl->isDistributedActor());
 
-  fprintf(stderr, "[%s:%d] (%s) create\n", __FILE__, __LINE__, __FUNCTION__);
-
   auto &C = ctx;
   const auto name = requirement->getName();
   auto argumentNames = name.getArgumentNames();
 
   switch (argumentNames.size()) {
-    case 1: {
-      if (requirement->isDistributedActorLocalInit()) {
-        return createDistributedActor_init_local(classDecl, ctx);
-      }
-
-//      if (argumentNames[0] == C.Id_from) {
-//        // TODO: do we need to check types of the params here too?
-//        // TODO: implement synthesis
-//        return nullptr;
-//      }
-      return nullptr;
-      break;
+  case 1: {
+    if (requirement->isDistributedActorLocalInit()) {
+      return createDistributedActor_init_local(classDecl, ctx);
     }
-    case 2:
-      if (requirement->isDistributedActorResolveInit()) {
-        return createDistributedActor_init_resolve(classDecl, ctx);
-      }
-      break;
+
+    break;
+  }
+  case 2: {
+    if (requirement->isDistributedActorResolveInit()) {
+      return createDistributedActor_init_resolve(classDecl, ctx);
+    }
+
+    break;
+  }
   }
 
-  return nullptr; // TODO: make it assert(false); after we're done with all
+  return nullptr;
 }
 
 static void collectNonOveriddenDistributedActorInits(
@@ -575,9 +572,6 @@ static void addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
     decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
     return;
   }
-
-  decl->dump();
-  fprintf(stderr, "[%s:%d] (%s) ^^^^\n", __FILE__, __LINE__, __FUNCTION__);
 
   addImplicitDistributedActorConstructors(decl);
   addImplicitDistributedActorStoredProperties(decl);

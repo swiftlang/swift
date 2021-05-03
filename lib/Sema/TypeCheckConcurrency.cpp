@@ -384,17 +384,32 @@ bool IsDefaultActorRequest::evaluate(
 
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  fprintf(stderr, "[%s:%d] (%s) nominal:%p\n", __FILE__, __LINE__, __FUNCTION__, nominal);
-  if (auto actor = dyn_cast<ClassDecl>(nominal)) {
-    fprintf(stderr, "[%s:%d] (%s) \n", __FILE__, __LINE__, __FUNCTION__);
-    auto distributedAttr = nominal->getAttrs()
-        .getAttribute<DistributedActorAttr>();
-    fprintf(stderr, "[%s:%d] (%s) \n", __FILE__, __LINE__, __FUNCTION__);
-    return distributedAttr != nullptr;
+  // Protocols are actors if their `Self` type conforms to `DistributedActor`.
+  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+    // Simple case: we have the `DistributedActor` protocol itself.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::DistributedActor))
+      return true;
+
+    auto actorProto = nominal->getASTContext().getProtocol(
+        KnownProtocolKind::DistributedActor);
+    if (!actorProto)
+      return false;
+
+    auto selfType = Type(protocol->getProtocolSelfType());
+    auto genericSig = protocol->getGenericSignature();
+    if (!genericSig)
+      return false;
+
+    return genericSig->requiresProtocol(selfType, actorProto);
   }
 
-  // TODO: also check for protocols conforming to DistributedActor, similar to isActor
-  return false;
+  // Class declarations are 'distributed actors' if they are declared with 'distributed actor'
+  if(!dyn_cast<ClassDecl>(nominal))
+    return false;
+
+  auto distributedAttr = nominal->getAttrs()
+      .getAttribute<DistributedActorAttr>();
+  return distributedAttr != nullptr;
 }
 
 bool IsDistributedFuncRequest::evaluate(
