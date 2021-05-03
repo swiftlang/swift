@@ -1955,7 +1955,9 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
-bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
+bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName,
+                                     llvm::VersionTuple version,
+                                     bool underlyingVersion) const {
   // If this module has already been successfully imported, it is importable.
   if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
     return true;
@@ -1966,7 +1968,7 @@ bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
 
   // Otherwise, ask the module loaders.
   for (auto &importer : getImpl().ModuleLoaders) {
-    if (importer->canImportModule(ModuleName)) {
+    if (importer->canImportModule(ModuleName, version, underlyingVersion)) {
       return true;
     }
   }
@@ -1974,8 +1976,10 @@ bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
   return false;
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
-  if (canImportModuleImpl(ModuleName)) {
+bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+                                 llvm::VersionTuple version,
+                                 bool underlyingVersion) {
+  if (canImportModuleImpl(ModuleName, version, underlyingVersion)) {
     return true;
   } else {
     FailedModuleImportNames.insert(ModuleName.Item);
@@ -1983,8 +1987,10 @@ bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
   }
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName) const {
-  return canImportModuleImpl(ModuleName);
+bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+                                 llvm::VersionTuple version,
+                                 bool underlyingVersion) const {
+  return canImportModuleImpl(ModuleName, version, underlyingVersion);
 }
 
 ModuleDecl *

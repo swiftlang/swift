@@ -1629,7 +1629,7 @@ std::error_code ExplicitSwiftModuleLoader::findModuleFilesInDirectory(
 }
 
 bool ExplicitSwiftModuleLoader::canImportModule(
-    ImportPath::Element mID) {
+    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
   StringRef moduleName = mID.Item.str();
   auto it = Impl.ExplicitModuleMap.find(moduleName);
   // If no provided explicit module matches the name, then it cannot be imported.
