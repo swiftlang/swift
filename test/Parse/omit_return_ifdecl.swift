@@ -2511,3 +2511,16 @@ var mismatched_implicit_return_ifdecl: Int {
     return 1
     #endif
 }
+
+enum VerticalDirection {
+    case up, down
+}
+func implicitMember() -> VerticalDirection {
+    #if false
+      .up
+    #elseif true
+      .down
+    #else
+      .unknown
+    #endif
+}

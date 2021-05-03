@@ -2520,6 +2520,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
 
 static void printModuleMetadata(ModuleDecl *MD) {
   auto &OS = llvm::outs();
+  OS << "user module version: " << MD->getUserModuleVersion().getAsString() << "\n";
   OS << "fingerprint=" << MD->getFingerprint().getRawValue() << "\n";
   MD->collectLinkLibraries([&](LinkLibrary lib) {
     OS << "link library: " << lib.getName()
@@ -3052,30 +3053,16 @@ public:
     }
   }
 
-  void printSerializedLoc(Decl *D) {
-    auto moduleLoc = cast<FileUnit>(D->getDeclContext()->getModuleScopeContext())->
-      getBasicLocsForDecl(D);
-    if (!moduleLoc.hasValue())
-      return;
-    if (!moduleLoc->Loc.isValid())
-      return;
-    OS << moduleLoc->SourceFilePath
-       << ":" << moduleLoc->Loc.Line
-       << ":" << moduleLoc->Loc.Column << ": ";
-  }
-
   bool walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
       return true;
 
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      SourceLoc Loc = D->getLoc();
+      SourceLoc Loc = D->getLoc(/*SerializedOK=*/true);
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
-      } else {
-        printSerializedLoc(D);
       }
       OS << Decl::getKindName(VD->getKind()) << "/";
       printDeclName(VD);
@@ -3088,13 +3075,11 @@ public:
       printDocComment(D);
       OS << "\n";
     } else if (isa<ExtensionDecl>(D)) {
-      SourceLoc Loc = D->getLoc();
+      SourceLoc Loc = D->getLoc(/*SerializedOK=*/true);
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << SM.getDisplayNameForLoc(Loc)
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
-      } else {
-        printSerializedLoc(D);
       }
       OS << Decl::getKindName(D->getKind()) << "/";
       OS << " ";

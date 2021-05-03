@@ -32,15 +32,27 @@ class Value;
 }
 
 namespace swift {
+class CanType;
+class ProtocolConformanceRef;
 class SILType;
 
 namespace irgen {
 class Explosion;
 class IRGenFunction;
 
-/// Emit the buildSerialExecutorRef builtin.
-void emitBuildSerialExecutorRef(IRGenFunction &IGF, llvm::Value *actor,
-                                SILType actorType, Explosion &out);
+/// Emit the buildMainActorExecutorRef builtin.
+void emitBuildMainActorExecutorRef(IRGenFunction &IGF, Explosion &out);
+
+/// Emit the buildDefaultActorExecutorRef builtin.
+void emitBuildDefaultActorExecutorRef(IRGenFunction &IGF, llvm::Value *actor,
+                                      Explosion &out);
+
+/// Emit the buildOrdinarySerialExecutorRef builtin.
+void emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
+                                        llvm::Value *executor,
+                                        CanType executorType,
+                                        ProtocolConformanceRef executorConformance,
+                                        Explosion &out);
 
 /// Emit the getCurrentExecutor builtin.
 void emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out);

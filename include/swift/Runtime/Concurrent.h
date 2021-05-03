@@ -556,17 +556,16 @@ public:
       storage = newStorage;
       Capacity = newCapacity;
 
-      // Use seq_cst here to ensure that the subsequent load of ReaderCount is
-      // ordered after this store. If ReaderCount is loaded first, then a new
-      // reader could come in between that load and this store, and then we
-      // could end up freeing the old storage pointer while it's still in use.
-      Elements.store(storage, std::memory_order_seq_cst);
+      Elements.store(storage, std::memory_order_release);
     }
     
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
     
-    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
+    // The standard says that std::memory_order_seq_cst only applies to
+    // read-modify-write operations, so we need an explicit fence:
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (ReaderCount.load(std::memory_order_relaxed) == 0)
       deallocateFreeList();
   }
 
@@ -666,6 +665,13 @@ private:
       return x <= 1 ? 0 : log2(x >> 1) + 1;
     }
 
+    // A crude way to detect trivial use-after-free bugs given that a lot of
+    // data structure have a strong bias toward bits that are zero.
+#ifndef NDEBUG
+    static constexpr uint8_t InlineCapacityDebugBits = 0xC0;
+#else
+    static constexpr uint8_t InlineCapacityDebugBits = 0;
+#endif
     static constexpr uintptr_t InlineIndexBits = 4;
     static constexpr uintptr_t InlineIndexMask = 0xF;
     static constexpr uintptr_t InlineCapacity =
@@ -708,7 +714,7 @@ private:
         swift_unreachable("unknown index size");
       }
       Value = reinterpret_cast<uintptr_t>(ptr) | static_cast<uintptr_t>(mode);
-      *reinterpret_cast<uint8_t *>(ptr) = capacityLog2;
+      *reinterpret_cast<uint8_t *>(ptr) = capacityLog2 | InlineCapacityDebugBits;
     }
 
     bool valueIsPointer() { return Value & 3; }
@@ -739,8 +745,11 @@ private:
     }
 
     uint8_t getCapacityLog2() {
-      if (auto *ptr = pointer())
-        return *reinterpret_cast<uint8_t *>(ptr);
+      if (auto *ptr = pointer()) {
+        auto result = *reinterpret_cast<uint8_t *>(ptr);
+        assert((result & InlineCapacityDebugBits) == InlineCapacityDebugBits);
+        return result & ~InlineCapacityDebugBits;
+      }
       return InlineCapacityLog2;
     }
 
@@ -859,7 +868,10 @@ private:
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
-    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
+    // The standard says that std::memory_order_seq_cst only applies to
+    // read-modify-write operations, so we need an explicit fence:
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (ReaderCount.load(std::memory_order_relaxed) == 0)
       ConcurrentFreeListNode::freeAll(&FreeList, free);
   }
 

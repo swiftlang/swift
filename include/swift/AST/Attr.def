@@ -671,6 +671,12 @@ SIMPLE_DECL_ATTR(_inheritActorContext, InheritActorContext,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   118)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(spawn, Spawn,
+  DeclModifier | OnVar | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  117)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

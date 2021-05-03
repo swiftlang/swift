@@ -3095,10 +3095,12 @@ void TypeChecker::checkParameterList(ParameterList *params,
       (void) param->getPropertyWrapperInitializerInfo();
 
     auto *SF = param->getDeclContext()->getParentSourceFile();
-    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
-      if (!isa<ParamDecl>(auxiliaryDecl))
-        DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
-    });
+    if (!param->isInvalid()) {
+      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
+        if (!isa<ParamDecl>(auxiliaryDecl))
+          DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+      });
+    }
   }
 
   // For source compatibilty, allow duplicate internal parameter names

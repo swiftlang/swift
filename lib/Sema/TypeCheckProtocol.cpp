@@ -4617,6 +4617,17 @@ void ConformanceChecker::resolveValueWitnesses() {
       if (checkActorIsolation(requirement, witness))
         return;
 
+      // Ensure that Actor.unownedExecutor is implemented within the
+      // actor class itself.
+      if (requirement->getName().isSimpleName(C.Id_unownedExecutor) &&
+          Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
+          DC != witness->getDeclContext() &&
+          Adoptee->getClassOrBoundGenericClass() &&
+          Adoptee->getClassOrBoundGenericClass()->isActor()) {
+        witness->diagnose(diag::unowned_executor_outside_actor);
+        return;
+      }
+
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
           requirement->getName() == witness->getName() &&
@@ -6288,6 +6299,9 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownDerivableProtocolKind::AdditiveArithmetic:
     return derived.deriveAdditiveArithmetic(Requirement);
+
+  case KnownDerivableProtocolKind::Actor:
+    return derived.deriveActor(Requirement);
 
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);

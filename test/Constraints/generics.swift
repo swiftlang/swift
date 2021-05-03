@@ -648,7 +648,7 @@ let arr = [BottleLayout]()
 let layout = BottleLayout(count:1)
 let ix = arr.firstIndex(of:layout) // expected-error {{referencing instance method 'firstIndex(of:)' on 'Collection' requires that 'BottleLayout' conform to 'Equatable'}}
 
-let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}
+let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{missing argument label 'ascii:' in call}}
 
 // https://bugs.swift.org/browse/SR-9068
 func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
@@ -857,4 +857,16 @@ func rdar56212087() {
   }
 
   setValue(foo("", ""), forKey: "") // Ok (T is inferred as a `String` instead of `Any?`)
+}
+
+// rdar://77233864 - Ternary operator fails to deduce non-default literal type in SwiftUI preview
+func test_ternary_operator_with_regular_conformance_to_literal_protocol() {
+  // Note that in this case `ExpressibleByIntegerLiteral` is a non-literal requirement
+  func test<T: ExpressibleByIntegerLiteral>(_: T) -> T {
+    fatalError()
+  }
+
+  func bug(_: Float?) {}
+
+  bug(true ? test(0) : test(42)) // Ok - type is `CGFloat` for 0 and 42
 }

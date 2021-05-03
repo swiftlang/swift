@@ -287,6 +287,10 @@ struct ASTContext::Implementation {
   /// The module loader used to load Clang modules from DWARF.
   ClangModuleLoader *TheDWARFModuleLoader = nullptr;
 
+  /// Map from Swift declarations to deserialized resolved locations, ie.
+  /// actual \c SourceLocs that require opening their external buffer.
+  llvm::DenseMap<const Decl *, ExternalSourceLocs *> ExternalSourceLocs;
+
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, std::pair<RawComment, bool>> RawComments;
 
@@ -998,7 +1002,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::Actor:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
-  // case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::SerialExecutor:
     M = getLoadedModule(Id_Concurrency);
     break;
   case KnownProtocolKind::DistributedActor:
@@ -1954,7 +1958,9 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
-bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
+bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName,
+                                     llvm::VersionTuple version,
+                                     bool underlyingVersion) const {
   // If this module has already been successfully imported, it is importable.
   if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
     return true;
@@ -1965,7 +1971,7 @@ bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
 
   // Otherwise, ask the module loaders.
   for (auto &importer : getImpl().ModuleLoaders) {
-    if (importer->canImportModule(ModuleName)) {
+    if (importer->canImportModule(ModuleName, version, underlyingVersion)) {
       return true;
     }
   }
@@ -1973,8 +1979,10 @@ bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
   return false;
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
-  if (canImportModuleImpl(ModuleName)) {
+bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+                                 llvm::VersionTuple version,
+                                 bool underlyingVersion) {
+  if (canImportModuleImpl(ModuleName, version, underlyingVersion)) {
     return true;
   } else {
     FailedModuleImportNames.insert(ModuleName.Item);
@@ -1982,8 +1990,10 @@ bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
   }
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName) const {
-  return canImportModuleImpl(ModuleName);
+bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+                                 llvm::VersionTuple version,
+                                 bool underlyingVersion) const {
+  return canImportModuleImpl(ModuleName, version, underlyingVersion);
 }
 
 ModuleDecl *
@@ -2050,6 +2060,20 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
     TheStdlibModule = getLoadedModule(StdlibModuleName);
   }
   return TheStdlibModule;
+}
+
+Optional<ExternalSourceLocs *>
+ASTContext::getExternalSourceLocs(const Decl *D) {
+  auto Known = getImpl().ExternalSourceLocs.find(D);
+  if (Known == getImpl().ExternalSourceLocs.end())
+    return None;
+
+  return Known->second;
+}
+
+void ASTContext::setExternalSourceLocs(const Decl *D,
+                                       ExternalSourceLocs *Locs) {
+  getImpl().ExternalSourceLocs[D] = Locs;
 }
 
 Optional<std::pair<RawComment, bool>> ASTContext::getRawComment(const Decl *D) {

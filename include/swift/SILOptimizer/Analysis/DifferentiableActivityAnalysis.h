@@ -207,7 +207,7 @@ public:
                 IndexSubset *resultIndices) const;
 
   /// Returns true if the given value is active for the given config.
-  bool isActive(SILValue value, AutoDiffConfig config) const {
+  bool isActive(SILValue value, const AutoDiffConfig &config) const {
     return isActive(value, config.parameterIndices, config.resultIndices);
   }
 
@@ -217,7 +217,7 @@ public:
                        IndexSubset *resultIndices) const;
 
   /// Returns the activity of the given value for the given config.
-  Activity getActivity(SILValue value, AutoDiffConfig config) const {
+  Activity getActivity(SILValue value, const AutoDiffConfig &config) const {
     return getActivity(value, config.parameterIndices, config.resultIndices);
   }
 
@@ -227,7 +227,7 @@ public:
             llvm::raw_ostream &s = llvm::dbgs()) const;
 
   /// Prints activity information for the config of the given value.
-  void dump(SILValue value, AutoDiffConfig config,
+  void dump(SILValue value, const AutoDiffConfig &config,
             llvm::raw_ostream &s = llvm::dbgs()) const {
     return dump(value, config.parameterIndices, config.resultIndices, s);
   }
@@ -238,7 +238,8 @@ public:
             llvm::raw_ostream &s = llvm::dbgs()) const;
 
   /// Prints all activity information for the given config.
-  void dump(AutoDiffConfig config, llvm::raw_ostream &s = llvm::dbgs()) const {
+  void dump(const AutoDiffConfig &config,
+            llvm::raw_ostream &s = llvm::dbgs()) const {
     return dump(config.parameterIndices, config.resultIndices, s);
   }
 };

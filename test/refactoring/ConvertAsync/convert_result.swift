@@ -2,6 +2,14 @@ func simple(_ completion: (Result<String, Error>) -> Void) { }
 func noError(_ completion: (Result<String, Never>) -> Void) { }
 func test(_ str: String) -> Bool { return false }
 
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-RESULT %s
+func voidResult(completion: (Result<Void, Never>) -> Void) {}
+// VOID-RESULT: func voidResult() async {}
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-RESULT %s
+func voidAndErrorResult(completion: (Result<Void, Error>) -> Void) {}
+// VOID-AND-ERROR-RESULT: func voidAndErrorResult() async throws {}
+
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=SIMPLE %s
 simple { res in
   print("result \(res)")
@@ -301,3 +309,16 @@ simple { res in
 // NESTEDBREAK-NEXT: print("after")
 // NESTEDBREAK-NOT: }
 
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-RESULT-CALL %s
+voidResult { res in
+  print(res)
+}
+// VOID-RESULT-CALL: {{^}}await voidResult()
+// VOID-RESULT-CALL: {{^}}print(<#res#>)
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-AND-ERROR-RESULT-CALL %s
+voidAndErrorResult { res in
+  print(res)
+}
+// VOID-AND-ERROR-RESULT-CALL: {{^}}try await voidAndErrorResult()
+// VOID-AND-ERROR-RESULT-CALL: {{^}}print(<#res#>)

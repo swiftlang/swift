@@ -79,6 +79,7 @@ struct ValidationInfo {
   StringRef shortVersion = {};
   StringRef miscVersion = {};
   version::Version compatibilityVersion = {};
+  llvm::VersionTuple userModuleVersion;
   size_t bytes = 0;
   Status status = Status::Malformed;
 };

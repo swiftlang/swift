@@ -35,7 +35,6 @@
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using TaskGroup = swift::TaskGroup;
-using TaskLocalInheritance = TaskLocal::TaskLocalInheritance;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -207,7 +206,7 @@ static ExecutorRef executorForEnqueuedJob(Job *job) {
   if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
     return ExecutorRef::generic();
   else if (jobQueue == DISPATCH_QUEUE_MAIN_EXECUTOR)
-    return ExecutorRef::mainExecutor();
+    return _swift_task_getMainExecutor();
   else
     swift_unreachable("jobQueue was not a known value.");
 }
@@ -363,7 +362,7 @@ static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *
 
 /// All `swift_task_create*` variants funnel into this common implementation.
 ///
-/// If \p isAsyncLetTask is true, the \p closureContext is not heap allocated,
+/// If \p isSpawnLetTask is true, the \p closureContext is not heap allocated,
 /// but stack-allocated (and must not be ref-counted).
 /// Also, async-let tasks are not heap allcoated, but allcoated with the parent
 /// task's stack allocator.
@@ -371,7 +370,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     JobFlags flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
-    void *closureContext, bool isAsyncLetTask,
+    void *closureContext, bool isSpawnLetTask,
     size_t initialContextSize) {
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
@@ -416,7 +415,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   constexpr unsigned initialSlabSize = 512;
 
   void *allocation = nullptr;
-  if (isAsyncLetTask) {
+  if (isSpawnLetTask) {
     assert(parent);
     allocation = _swift_task_alloc_specific(parent,
                                         amountToAllocate + initialSlabSize);
@@ -462,7 +461,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task = nullptr;
-  if (isAsyncLetTask) {
+  if (isSpawnLetTask) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
     task = new(allocation) AsyncTask(&taskHeapMetadata,
@@ -527,7 +526,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
   // Initialize the task-local allocator.
-  if (isAsyncLetTask) {
+  if (isSpawnLetTask) {
     initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
                                                    &completeTask);
     assert(parent);
@@ -552,7 +551,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 static AsyncTaskAndContext swift_task_create_group_future_common(
     JobFlags flags, TaskGroup *group, const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
-    void *closureContext, bool isAsyncLetTask,
+    void *closureContext, bool isSpawnLetTask,
     size_t initialContextSize);
 
 AsyncTaskAndContext
@@ -582,7 +581,7 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   return swift_task_create_group_future_common(flags, group,
                                                futureResultType,
                                                function, nullptr,
-                                               /*isAsyncLetTask*/ false,
+                                               /*isSpawnLetTask*/ false,
                                                initialContextSize);
 }
 
@@ -618,7 +617,7 @@ AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
   return swift_task_create_group_future_common(
       flags, nullptr, futureResultType,
       taskEntry, closureContext,
-      /*isAsyncLetTask*/ false,
+      /*isSpawnLetTask*/ false,
       initialContextSize);
 }
 
@@ -637,7 +636,7 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(JobFlags flags,
   return swift_task_create_group_future_common(
       flags, nullptr, futureResultType,
       taskEntry, closureContext,
-      /*isAsyncLetTask*/ true,
+      /*isSpawnLetTask*/ true,
       initialContextSize);
 }
 
@@ -657,7 +656,7 @@ swift::swift_task_create_group_future(
   return swift_task_create_group_future_common(
       flags, group, futureResultType,
       taskEntry, closureContext,
-      /*isAsyncLetTask*/ false,
+      /*isSpawnLetTask*/ false,
       initialContextSize);
 }
 

@@ -1620,6 +1620,9 @@ namespace {
         if (MetadataLayout->hasResilientSuperclass())
           flags.class_setHasResilientSuperclass(true);
 
+        if (getType()->isActor())
+          flags.class_setIsActor(true);
+
         if (getType()->isDefaultActor(IGM.getSwiftModule(),
                                       ResilienceExpansion::Maximal))
           flags.class_setIsDefaultActor(true);
@@ -5157,6 +5160,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
   case KnownProtocolKind::DistributedActor:
+  case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:

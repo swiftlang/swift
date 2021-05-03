@@ -266,6 +266,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   case SyntaxKind::MemberTypeIdentifier:
   case SyntaxKind::FunctionCallExpr:
   case SyntaxKind::SubscriptExpr:
+  case SyntaxKind::PostfixIfConfigExpr:
   case SyntaxKind::ExprList: {
     createNodeInPlace(Kind, getParts().size(), nodeCreateK);
     break;

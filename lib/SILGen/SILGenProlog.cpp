@@ -712,7 +712,7 @@ SILValue SILGenFunction::emitGetCurrentExecutor(SILLocation loc) {
   return B.createBuiltin(
       loc,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::GetCurrentExecutor)),
-      getLoweredType(ctx.TheExecutorType),
+      getLoweredType(OptionalType::get(ctx.TheExecutorType)),
       SubstitutionMap(), { });
 }
 

@@ -527,7 +527,7 @@ static bool stripOwnership(SILFunction &func) {
     auto value = visitor.instructionsToSimplify.pop_back_val();
     if (!value.hasValue())
       continue;
-    InstModCallbacks callbacks([&](SILInstruction *instToErase) {
+    auto callbacks = InstModCallbacks().onDelete([&](SILInstruction *instToErase) {
       visitor.eraseInstruction(instToErase);
     });
     // We are no longer in OSSA, so we don't need to pass in a deBlocks.

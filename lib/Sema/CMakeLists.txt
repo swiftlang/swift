@@ -19,6 +19,7 @@ add_swift_host_library(swiftSema STATIC
   ConstraintLocator.cpp
   ConstraintSystem.cpp
   DebuggerTestingTransform.cpp
+  DerivedConformanceActor.cpp
   DerivedConformanceDistributedActor.cpp
   DerivedConformanceAdditiveArithmetic.cpp
   DerivedConformanceCaseIterable.cpp

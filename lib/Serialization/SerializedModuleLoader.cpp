@@ -30,6 +30,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/CommandLine.h"
 #include <system_error>
 
 using namespace swift;
@@ -725,7 +726,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setHasIncrementalInfo();
     if (!loadedModuleFile->getModuleABIName().empty())
       M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
-
+    M.setUserModuleVersion(loadedModuleFile->getUserModuleVersion());
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status = loadedModuleFile->associateWithFileContext(
         fileUnit, diagLocOrInvalid, Ctx.LangOpts.AllowModuleWithCompilerErrors);
@@ -947,8 +948,20 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   }
 }
 
+bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
+                                              llvm::StringSaver &ArgSaver,
+                                              SmallVectorImpl<const char *> &SubArgs) {
+  SmallVector<StringRef, 1> FlagMatches;
+  auto FlagRe = llvm::Regex("^// swift-module-flags:(.*)$", llvm::Regex::Newline);
+  if (!FlagRe.match(buffer, &FlagMatches))
+    return true;
+  assert(FlagMatches.size() == 2);
+  llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
+  return false;
+}
+
 bool SerializedModuleLoaderBase::canImportModule(
-    ImportPath::Element mID) {
+    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
   // Look on disk.
   SmallVector<char, 0> *unusedModuleInterfacePath = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleBuffer = nullptr;
@@ -962,7 +975,7 @@ bool SerializedModuleLoaderBase::canImportModule(
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    ImportPath::Element mID) {
+    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
   // See if we find it in the registered memory buffers.
   return MemoryBuffers.count(mID.Item.str());
 }
@@ -1243,9 +1256,9 @@ SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
 
-Optional<BasicDeclLocs>
-SerializedASTFile::getBasicLocsForDecl(const Decl *D) const {
-  return File.getBasicDeclLocsForDecl(D);
+Optional<ExternalSourceLocs::RawLocs>
+SerializedASTFile::getExternalRawLocsForDecl(const Decl *D) const {
+  return File.getExternalRawLocsForDecl(D);
 }
 
 Optional<StringRef>

@@ -62,6 +62,7 @@ namespace swift {
   class DynamicSelfType;
   class Type;
   class Expr;
+  struct ExternalSourceLocs;
   class CaptureListExpr;
   class DeclRefExpr;
   class ForeignAsyncConvention;
@@ -688,14 +689,12 @@ private:
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
 
-  struct CachedExternalSourceLocs {
-    SourceLoc Loc;
-    SourceLoc StartLoc;
-    SourceLoc EndLoc;
-    SmallVector<CharSourceRange, 4> DocRanges;
-  };
-  mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
-  const CachedExternalSourceLocs *getSerializedLocs() const;
+  /// Returns the serialized locations of this declaration from the
+  /// corresponding .swiftsourceinfo file. "Empty" (ie. \c BufferID of 0, an
+  /// invalid \c Loc, and empty \c DocRanges) if either there is no
+  /// .swiftsourceinfo or the buffer could not be created, eg. if the file
+  /// no longer exists.
+  const ExternalSourceLocs *getSerializedLocs() const;
 
   /// Directly set the invalid bit
   void setInvalidBit();
@@ -1863,7 +1862,7 @@ public:
   bool isComputingPatternBindingEntry(const VarDecl *vd) const;
 
   /// Is this an "async let" declaration?
-  bool isAsyncLet() const;
+  bool isSpawnLet() const;
 
   /// Gets the text of the initializer expression for the pattern entry at the
   /// given index, stripping out inactive branches of any #ifs inside the
@@ -3792,9 +3791,8 @@ public:
   /// Get the closest-to-root superclass that's an actor class.
   const ClassDecl *getRootActorClass() const;
 
-  /// Does this class explicitly declare any of the methods that
-  /// would prevent it from being a default actor?
-  bool hasExplicitCustomActorMethods() const;
+  /// Fetch this class's unownedExecutor property, if it has one.
+  const VarDecl *getUnownedExecutorProperty() const;
 
   /// Is this the NSObject class type?
   bool isNSObject() const;
@@ -4020,6 +4018,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  Actor,
   DistributedActor,
 };
 
@@ -4959,7 +4958,7 @@ public:
   bool isLet() const { return getIntroducer() == Introducer::Let; }
 
   /// Is this an "async let" property?
-  bool isAsyncLet() const;
+  bool isSpawnLet() const;
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
@@ -5740,7 +5739,7 @@ public:
   ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
 
   /// Add the given derivative function configuration.
-  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
+  void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or

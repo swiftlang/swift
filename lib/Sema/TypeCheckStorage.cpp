@@ -2790,8 +2790,9 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     backingVar = ParamDecl::cloneWithoutType(ctx, param);
     backingVar->setName(name);
   } else {
+    auto introducer = isa<ParamDecl>(var) ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
     backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                   VarDecl::Introducer::Var,
+                                   introducer,
                                    var->getLoc(),
                                    name, dc);
     backingVar->setImplicit();

@@ -1,33 +1,29 @@
 CHANGELOG
 =========
 
-<details>
-<summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
-
-| Version                | Released   | Toolchain   |
-| :--------------------- | :--------- | :---------- |
-| [Swift 5.5](#swift-55) |            |             |
-| [Swift 5.4](#swift-54) |            |             |
-| [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
-| [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
-| [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
-| [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
-| [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
-| [Swift 4.1](#swift-41) | 2018-03-29 | Xcode 9.3   |
-| [Swift 4.0](#swift-40) | 2017-09-19 | Xcode 9.0   |
-| [Swift 3.1](#swift-31) | 2017-03-27 | Xcode 8.3   |
-| [Swift 3.0](#swift-30) | 2016-09-13 | Xcode 8.0   |
-| [Swift 2.2](#swift-22) | 2016-03-21 | Xcode 7.3   |
-| [Swift 2.1](#swift-21) | 2015-10-21 | Xcode 7.1   |
-| [Swift 2.0](#swift-20) | 2015-09-17 | Xcode 7.0   |
-| [Swift 1.2](#swift-12) | 2015-04-08 | Xcode 6.3   |
-| [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
-| [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
-
-</details>
+_**Note:** This is in reverse chronological order, so newer entries are added to the top._
 
 Swift 5.5
 ---------
+
+* [SE-0306][]:
+
+  Swift 5.5 includes support for actors, a new kind of type that isolates its instance data to protect it from concurrent access. Accesses to an actor's instance declarations from outside the must be asynchronous:
+
+  ```swift
+  actor Counter {
+    var value = 0
+
+    func increment() {
+      value = value + 1
+    }
+  }
+
+  func useCounter(counter: Counter) async {
+    print(await counter.value) // interaction must be async
+    await counter.increment()  // interaction must be async
+  }
+  ```
 
 * The determination of whether a call to a `rethrows` function can throw now considers default arguments of `Optional` type.
 
@@ -173,11 +169,11 @@ Swift 5.5
 
   The "for" loop can be used to traverse asynchronous sequences in asynchronous code:
 
-	```swift
+  ```swift
   for try await line in myFile.lines() {
     // Do something with each line
   }
-	```
+  ```
 
   Asynchronous for loops use asynchronous sequences, defined by the protocol
   `AsyncSequence` and its corresponding `AsyncIterator`.
@@ -186,6 +182,8 @@ Swift 5.5
 
 Swift 5.4
 ---------
+
+### 2021-04-26 (Xcode 12.5)
 
 * Protocol conformance checking now considers `where` clauses when evaluating if a `typealias` is a suitable witness for an associated type requirement. The following code is now rejected:
 
@@ -8434,6 +8432,7 @@ Swift 1.0
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
+[SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

@@ -4290,6 +4290,10 @@ public:
     return FieldOffsetVectorOffset;
   }
 
+  bool isActor() const {
+    return this->getTypeContextDescriptorFlags().class_isActor();
+  }
+
   bool isDefaultActor() const {
     return this->getTypeContextDescriptorFlags().class_isDefaultActor();
   }

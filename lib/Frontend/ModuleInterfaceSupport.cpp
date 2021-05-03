@@ -69,11 +69,6 @@ llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
                      ": ([0-9\\.]+)$", llvm::Regex::Newline);
 }
 
-llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
-  return llvm::Regex("^// " SWIFT_MODULE_FLAGS_KEY ":(.*)$",
-                     llvm::Regex::Newline);
-}
-
 llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
   return llvm::Regex("^// " SWIFT_COMPILER_VERSION_KEY
                      ": (.+)$", llvm::Regex::Newline);

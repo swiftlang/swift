@@ -565,7 +565,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
         origType->getInterfaceType()->getCanonicalType()->getAs<SubstitutableType>();
 
     // Make sure any duplicate bindings are equal to the one already recorded.
-    // Otherwise, the substition has conflicting generic arguments.
+    // Otherwise, the substitution has conflicting generic arguments.
     auto bound = substMap.find(interfaceTy);
     if (bound != substMap.end() && !bound->second->isEqual(substType))
       return CanType();
@@ -612,7 +612,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
 
   // Skip disabled overloads in the diagnostic mode if they do not have a
   // fix attached to them e.g. overloads where labels didn't match up.
-  if (choice.isDisabled() && !(CS.shouldAttemptFixes() && choice.hasFix()))
+  if (choice.isDisabled())
     return skip("disabled");
 
   // Skip unavailable overloads (unless in dignostic mode).

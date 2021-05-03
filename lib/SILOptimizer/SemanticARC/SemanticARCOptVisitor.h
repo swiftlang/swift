@@ -52,9 +52,10 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   explicit SemanticARCOptVisitor(SILFunction &fn, DeadEndBlocks &deBlocks,
                                  bool onlyMandatoryOpts)
       : ctx(fn, deBlocks, onlyMandatoryOpts,
-            InstModCallbacks(
-                [this](SILInstruction *inst) { eraseInstruction(inst); },
-                [this](Operand *use, SILValue newValue) {
+            InstModCallbacks()
+                .onDelete(
+                    [this](SILInstruction *inst) { eraseInstruction(inst); })
+                .onSetUseValue([this](Operand *use, SILValue newValue) {
                   use->set(newValue);
                   worklist.insert(newValue);
                 })) {}

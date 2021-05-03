@@ -804,8 +804,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
-    AutoDiffDerivativeFunctionKind kind, AutoDiffConfig desiredConfig,
-    AutoDiffConfig actualConfig, ADContext &adContext) {
+    AutoDiffDerivativeFunctionKind kind, const AutoDiffConfig &desiredConfig,
+    const AutoDiffConfig &actualConfig, ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for derivative function "
              << derivativeFn << " of the original function " << origFnOperand

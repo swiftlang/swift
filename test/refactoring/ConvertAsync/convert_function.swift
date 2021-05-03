@@ -71,6 +71,7 @@ func manyNested() {
 // MANY-NESTED-NEXT: print("after")
 // MANY-NESTED-NEXT: }
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 func asyncParams(arg: String, _ completion: (String?, Error?) -> Void) {
   simpleErr(arg: arg) { str, err in
@@ -148,3 +149,56 @@ func asyncUnhandledCompletion(_ completion: (String) -> Void) {
 // ASYNC-UNHANDLED-NEXT: return "bad"
 // ASYNC-UNHANDLED-NEXT: }
 // ASYNC-UNHANDLED-NEXT: }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
+func voidAndErrorCompletion(completion: (Void?, Error?) -> Void) {
+  if .random() {
+    completion((), nil) // Make sure we drop the ()
+  } else {
+    completion(nil, CustomError.Bad)
+  }
+}
+// VOID-AND-ERROR-HANDLER:      func voidAndErrorCompletion() async throws {
+// VOID-AND-ERROR-HANDLER-NEXT:   if .random() {
+// VOID-AND-ERROR-HANDLER-NEXT:     return // Make sure we drop the ()
+// VOID-AND-ERROR-HANDLER-NEXT:   } else {
+// VOID-AND-ERROR-HANDLER-NEXT:     throw CustomError.Bad
+// VOID-AND-ERROR-HANDLER-NEXT:   }
+// VOID-AND-ERROR-HANDLER-NEXT: }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix TOO-MUCH-VOID-AND-ERROR-HANDLER %s
+func tooMuchVoidAndErrorCompletion(completion: (Void?, Void?, Error?) -> Void) {
+  if .random() {
+    completion((), (), nil) // Make sure we drop the ()s
+  } else {
+    completion(nil, nil, CustomError.Bad)
+  }
+}
+// TOO-MUCH-VOID-AND-ERROR-HANDLER:      func tooMuchVoidAndErrorCompletion() async throws {
+// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT:   if .random() {
+// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT:     return // Make sure we drop the ()s
+// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT:   } else {
+// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT:     throw CustomError.Bad
+// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT:   }
+// TOO-MUCH-VOID-AND-ERROR-HANDLER-NEXT: }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-RESULT-HANDLER %s
+func voidResultCompletion(completion: (Result<Void, Error>) -> Void) {
+  if .random() {
+    completion(.success(())) // Make sure we drop the .success(())
+  } else {
+    completion(.failure(CustomError.Bad))
+  }
+}
+// VOID-RESULT-HANDLER:      func voidResultCompletion() async throws {
+// VOID-RESULT-HANDLER-NEXT:   if .random() {
+// VOID-RESULT-HANDLER-NEXT:     return // Make sure we drop the .success(())
+// VOID-RESULT-HANDLER-NEXT:   } else {
+// VOID-RESULT-HANDLER-NEXT:     throw CustomError.Bad
+// VOID-RESULT-HANDLER-NEXT:   }
+// VOID-RESULT-HANDLER-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
+func functionWithSomeHandler(handler: (String) -> Void) {}
+// NON-COMPLETION-HANDLER: func functionWithSomeHandler() async -> String {}

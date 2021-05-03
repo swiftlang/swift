@@ -54,7 +54,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
 
 LinearMapInfo::LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                              SILFunction *original, SILFunction *derivative,
-                             AutoDiffConfig config,
+                             const AutoDiffConfig &config,
                              const DifferentiableActivityInfo &activityInfo,
                              SILLoopInfo *loopInfo)
     : kind(kind), original(original), derivative(derivative),
@@ -313,8 +313,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
   auto *results = IndexSubset::get(original->getASTContext(), numResults,
                                    activeResultIndices);
   // Create autodiff indices for the `apply` instruction.
-  AutoDiffConfig
-  applyConfig(parameters, results);
+  AutoDiffConfig applyConfig(parameters, results);
 
   // Check for non-differentiable original function type.
   auto checkNondifferentiableOriginalFunctionType = [&](CanSILFunctionType

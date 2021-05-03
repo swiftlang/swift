@@ -466,7 +466,7 @@ static SILValue reapplyFunctionConversion(
 static Optional<std::pair<SILValue, AutoDiffConfig>>
 emitDerivativeFunctionReference(
     DifferentiationTransformer &transformer, SILBuilder &builder,
-    AutoDiffConfig desiredConfig, AutoDiffDerivativeFunctionKind kind,
+    const AutoDiffConfig &desiredConfig, AutoDiffDerivativeFunctionKind kind,
     SILValue original, DifferentiationInvoker invoker,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
   ADContext &context = transformer.getContext();

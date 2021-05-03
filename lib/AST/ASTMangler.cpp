@@ -424,7 +424,7 @@ std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
 std::string ASTMangler::mangleAutoDiffDerivativeFunction(
     const AbstractFunctionDecl *originalAFD,
     AutoDiffDerivativeFunctionKind kind,
-    AutoDiffConfig config,
+    const AutoDiffConfig &config,
     bool isVTableThunk) {
   beginManglingWithAutoDiffOriginalFunction(originalAFD);
   appendAutoDiffFunctionParts(
@@ -434,7 +434,7 @@ std::string ASTMangler::mangleAutoDiffDerivativeFunction(
 
 std::string ASTMangler::mangleAutoDiffLinearMap(
     const AbstractFunctionDecl *originalAFD, AutoDiffLinearMapKind kind,
-    AutoDiffConfig config) {
+    const AutoDiffConfig &config) {
   beginManglingWithAutoDiffOriginalFunction(originalAFD);
   appendAutoDiffFunctionParts("TJ", getAutoDiffFunctionKind(kind), config);
   return finalize();
@@ -456,7 +456,7 @@ void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
 
 void ASTMangler::appendAutoDiffFunctionParts(StringRef op,
                                              AutoDiffFunctionKind kind,
-                                             AutoDiffConfig config) {
+                                             const AutoDiffConfig &config) {
   if (auto sig = config.derivativeGenericSignature)
     appendGenericSignature(sig);
   auto kindCode = (char)kind;
@@ -486,8 +486,8 @@ void ASTMangler::appendIndexSubset(IndexSubset *indices) {
 }
 
 static NodePointer mangleSILDifferentiabilityWitnessAsNode(
-    StringRef originalName, DifferentiabilityKind kind, AutoDiffConfig config,
-    Demangler &demangler) {
+    StringRef originalName, DifferentiabilityKind kind,
+    const AutoDiffConfig &config, Demangler &demangler) {
   auto *diffWitnessNode = demangler.createNode(
       Node::Kind::DifferentiabilityWitness);
   auto origNode = demangler.demangleSymbol(originalName);
@@ -518,8 +518,9 @@ static NodePointer mangleSILDifferentiabilityWitnessAsNode(
   return diffWitnessNode;
 }
 
-std::string ASTMangler::mangleSILDifferentiabilityWitness(
-    StringRef originalName, DifferentiabilityKind kind, AutoDiffConfig config) {
+std::string ASTMangler::mangleSILDifferentiabilityWitness(StringRef originalName,
+                                              DifferentiabilityKind kind,
+                                              const AutoDiffConfig &config) {
   // If the original name was a mangled name, differentiability witnesses must
   // be mangled as node because they contain generic signatures which may repeat
   // entities in the original function name. Mangling as node will make sure the
@@ -545,7 +546,8 @@ std::string ASTMangler::mangleSILDifferentiabilityWitness(
 
 std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
     AutoDiffGeneratedDeclarationKind declKind, StringRef origFnName,
-    unsigned bbId, AutoDiffLinearMapKind linearMapKind, AutoDiffConfig config) {
+    unsigned bbId, AutoDiffLinearMapKind linearMapKind,
+    const AutoDiffConfig &config) {
   beginManglingWithoutPrefix();
 
   Buffer << "_AD__" << origFnName << "_bb" + std::to_string(bbId);

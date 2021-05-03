@@ -166,7 +166,9 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(ImportPath::Element named) override;
+  virtual bool canImportModule(ImportPath::Element named,
+                               llvm::VersionTuple version,
+                               bool underlyingVersion) override;
 
   /// Import a module with the given module path.
   ///
@@ -274,7 +276,8 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~MemoryBufferSerializedModuleLoader();
 
-  bool canImportModule(ImportPath::Element named) override;
+  bool canImportModule(ImportPath::Element named, llvm::VersionTuple version,
+                       bool underlyingVersion) override;
   ModuleDecl *
   loadModule(SourceLoc importLoc,
              ImportPath::Module path) override;
@@ -392,7 +395,8 @@ public:
 
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const override;
 
-  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
+  Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const override;
 
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const override;
 
@@ -457,7 +461,9 @@ public:
   }
 };
 
-
+/// Extract compiler arguments from an interface file buffer.
+bool extractCompilerFlagsFromInterface(StringRef buffer, llvm::StringSaver &ArgSaver,
+                                       SmallVectorImpl<const char *> &SubArgs);
 } // end namespace swift
 
 #endif

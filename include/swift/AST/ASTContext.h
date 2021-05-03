@@ -73,6 +73,7 @@ namespace swift {
   class DerivativeAttr;
   class DifferentiableAttr;
   class ExtensionDecl;
+  struct ExternalSourceLocs;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -891,7 +892,9 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModuleImpl(ImportPath::Element ModulePath) const;
+  bool canImportModuleImpl(ImportPath::Element ModulePath,
+                           llvm::VersionTuple version,
+                           bool underlyingVersion) const;
 public:
   namelookup::ImportCache &getImportCache() const;
 
@@ -920,8 +923,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(ImportPath::Element ModulePath);
-  bool canImportModule(ImportPath::Element ModulePath) const;
+  bool canImportModule(ImportPath::Element ModulePath,
+                       llvm::VersionTuple version = llvm::VersionTuple(),
+                       bool underlyingVersion = false);
+  bool canImportModule(ImportPath::Element ModulePath,
+                       llvm::VersionTuple version = llvm::VersionTuple(),
+                       bool underlyingVersion = false) const;
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
@@ -1184,6 +1191,10 @@ public:
 
 private:
   friend Decl;
+
+  Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
+  void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
+
   Optional<std::pair<RawComment, bool>> getRawComment(const Decl *D);
   void setRawComment(const Decl *D, RawComment RC, bool FromSerialized);
 
