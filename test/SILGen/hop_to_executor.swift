@@ -100,22 +100,23 @@ func testGlobalActorWithClosure() async {
   await { () async in }()
 }
 
+actor MyGenericActor<T> {}
+
 @globalActor
 struct GenericGlobalActorWithGetter<T> {
-  static var shared: MyActor { return MyActor() }
+  static var shared: MyGenericActor<T> { return MyGenericActor() }
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A28GenericGlobalActorWithGetteryyYaF : $@convention(thin) @async () -> () {
 // CHECK:     [[MT:%[0-9]+]] = metatype $@thin GenericGlobalActorWithGetter<Int>.Type
-// CHECK:     [[F:%[0-9]+]] = function_ref @$s4test28GenericGlobalActorWithGetterV6sharedAA02MyD0CvgZ : $@convention(method) <τ_0_0> (@thin GenericGlobalActorWithGetter<τ_0_0>.Type) -> @owned MyActor
-// CHECK:     [[A:%[0-9]+]] = apply [[F]]<Int>([[MT]]) : $@convention(method) <τ_0_0> (@thin GenericGlobalActorWithGetter<τ_0_0>.Type) -> @owned MyActor
-// CHECK:     [[B:%[0-9]+]] = begin_borrow [[A]] : $MyActor
-// CHECK:     hop_to_executor [[B]] : $MyActor
+// CHECK:     [[F:%[0-9]+]] = function_ref @$s4test28GenericGlobalActorWithGetterV6sharedAA02MybD0CyxGvgZ
+// CHECK:     [[A:%[0-9]+]] = apply [[F]]<Int>([[MT]])
+// CHECK:     [[B:%[0-9]+]] = begin_borrow [[A]] : $MyGenericActor<Int>
+// CHECK:     hop_to_executor [[B]] : $MyGenericActor<Int>
 // CHECK: } // end sil function '$s4test0A28GenericGlobalActorWithGetteryyYaF'
 @GenericGlobalActorWithGetter<Int>
 func testGenericGlobalActorWithGetter() async {
 }
-
 
 actor RedActorImpl {
   // CHECK-LABEL: sil hidden [ossa] @$s4test12RedActorImplC5helloyySiF : $@convention(method) (Int, @guaranteed RedActorImpl) -> () {
@@ -261,4 +262,90 @@ extension MyActor {
       synchronous()
     }
   }
+}
+
+func acceptAsyncClosure(_: () async -> Void) { }
+func acceptAsyncClosure2<T>(_: (T) async -> T) { }
+
+public actor MyPublicActor {}
+
+@globalActor
+public struct PublicGlobalActor {
+  public static var shared: MyPublicActor = MyPublicActor()
+}
+
+@globalActor
+private struct PrivateGlobalActor {
+  static var shared: MyActor = MyActor()
+}
+
+func testGlobalActorClosure() {
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test11GlobalActorVTU
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $MyActor
+  // CHECK:         apply %0()
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let ga: @GlobalActor () -> () = { @GlobalActor in print(5) }
+  acceptAsyncClosure(ga)
+
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test8RedActorVTU
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $RedActor
+  // CHECK:         apply %0()
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let ra: @RedActor () -> () = { @RedActor in print(5) }
+  acceptAsyncClosure(ra)
+
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test9BlueActorVTU
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $BlueActor
+  // CHECK:         apply %0()
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let ba: @BlueActor () -> () = { @BlueActor in print(5) }
+  acceptAsyncClosure(ba)
+
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test18PrivateGlobalActor{{.*}}VTU
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $MyActor
+  // CHECK:         apply %0()
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let pga: @PrivateGlobalActor () -> () = { @PrivateGlobalActor in print(5) }
+  acceptAsyncClosure(pga)
+
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test17PublicGlobalActorVTU
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $MyPublicActor
+  // CHECK:         apply %0()
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let pbga: @PublicGlobalActor () -> () = { @PublicGlobalActor in print(5) }
+  acceptAsyncClosure(pbga)
+
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test28GenericGlobalActorWithGetterVySiGTU
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $MyGenericActor<Int>
+  // CHECK:         apply %0()
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let ggai: @GenericGlobalActorWithGetter<Int> () -> ()
+    = { @GenericGlobalActorWithGetter<Int> in print(5) }
+  acceptAsyncClosure(ggai)
+
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sIeg_IegH_TR4test28GenericGlobalActorWithGetterVySSGTU
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $MyGenericActor<String>
+  // CHECK:         apply %0()
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let ggas: @GenericGlobalActorWithGetter<String> () -> ()
+    = { @GenericGlobalActorWithGetter<String> in print(5) }
+  acceptAsyncClosure(ggas)
+}
+
+func testGenericGlobalActorClosure<T>(_: T) {
+  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] [ossa] @$sxxIegnr_xxIegHnr_lTR4test28GenericGlobalActorWithGetterVyxGTU 
+  // CHECK:         [[OLD_EXEC:%.*]] = builtin "getCurrentExecutor"
+  // CHECK:         hop_to_executor {{%.*}} : $MyGenericActor<T>
+  // CHECK:         apply %2(%0, %1)
+  // CHECK:         hop_to_executor [[OLD_EXEC]]
+  let ggat: @GenericGlobalActorWithGetter<T> (T) -> T
+    = { @GenericGlobalActorWithGetter<T> x in x }
+  acceptAsyncClosure2(ggat)
 }
