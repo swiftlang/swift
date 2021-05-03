@@ -1061,24 +1061,10 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If this is a call or subscript, record the argument expression.
-      {
-        if (auto call = dyn_cast<ApplyExpr>(expr)) {
-          if (!isa<SelfApplyExpr>(expr)) {
-            CallArgs.insert(call->getArg());
-          }
-        }
-
-        if (auto *subscript = dyn_cast<SubscriptExpr>(expr)) {
-          CallArgs.insert(subscript->getIndex());
-        }
-
-        if (auto *dynamicSubscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
-          CallArgs.insert(dynamicSubscript->getIndex());
-        }
-
-        if (auto *OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
-          CallArgs.insert(OLE->getArg());
+      // If this is a call, record the argument expression.
+      if (auto call = dyn_cast<ApplyExpr>(expr)) {
+        if (!isa<SelfApplyExpr>(expr)) {
+          CallArgs.insert(call->getArg());
         }
       }
 
