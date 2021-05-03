@@ -4362,6 +4362,9 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can only be referenced "
       "inside the distributed actor",
       (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_needs_explicit_distributed_import,none,
+      "'_Distributed' module not imported, required for 'distributed actor'",
+      ())
 ERROR(actor_isolated_self_independent_context,none,
         "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from a "
         "non-isolated context",

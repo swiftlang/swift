@@ -1422,7 +1422,7 @@ NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
     return remoteDecl;
   }
 
-  remoteFuncDecls.front()->dump();
+  remoteFuncDecls.front()->dump(); // TODO: remove the dump?
   assert(false && "Found some decl, but it is not a func");
 }
 

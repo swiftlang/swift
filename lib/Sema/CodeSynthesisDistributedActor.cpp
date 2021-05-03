@@ -568,6 +568,14 @@ static void addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   if (!decl->isDistributedActor())
     return;
 
+  auto &C = decl->getASTContext();
+
+  if (!C.getLoadedModule(C.Id_Distributed)) {
+    // seems we're missing the _Distributed module, ask to import it explicitly
+    decl->diagnose(diag::distributed_actor_needs_explicit_distributed_import);
+    return;
+  }
+
   decl->dump();
   fprintf(stderr, "[%s:%d] (%s) ^^^^\n", __FILE__, __LINE__, __FUNCTION__);
 
