@@ -18,7 +18,7 @@ import Swift
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   @available(*, deprecated, message: "`Task.Group` was replaced by `ThrowingTaskGroup` and `TaskGroup` and will be removed shortly.")
-  public typealias Group<TaskResult: Sendable> = ThrowingTaskGroup<TaskResult, Error>
+  public typealias Group<TaskResult> = ThrowingTaskGroup<TaskResult, Error>
 
   @available(*, deprecated, message: "`Task.withGroup` was replaced by `withThrowingTaskGroup` and `withTaskGroup` and will be removed shortly.")
   public static func withGroup<TaskResult, BodyResult>(
@@ -81,7 +81,7 @@ extension Task {
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @inlinable
-public func withTaskGroup<ChildTaskResult: Sendable, GroupResult>(
+public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
@@ -160,7 +160,7 @@ public func withTaskGroup<ChildTaskResult: Sendable, GroupResult>(
 ///   - all tasks remaining in the group will be automatically cancelled.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @inlinable
-public func withThrowingTaskGroup<ChildTaskResult: Sendable, GroupResult>(
+public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
@@ -197,7 +197,7 @@ public func withThrowingTaskGroup<ChildTaskResult: Sendable, GroupResult>(
 /// It is created by the `withTaskGroup` function.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct TaskGroup<ChildTaskResult: Sendable> {
+public struct TaskGroup<ChildTaskResult> {
 
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
@@ -457,7 +457,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 /// It is created by the `withTaskGroup` function.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
+public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
