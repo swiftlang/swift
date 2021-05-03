@@ -948,7 +948,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
-    ImportPath::Element mID) {
+    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
   // Look on disk.
   SmallVector<char, 0> *unusedModuleInterfacePath = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleBuffer = nullptr;
@@ -962,7 +962,7 @@ bool SerializedModuleLoaderBase::canImportModule(
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
-    ImportPath::Element mID) {
+    ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
   // See if we find it in the registered memory buffers.
   return MemoryBuffers.count(mID.Item.str());
 }

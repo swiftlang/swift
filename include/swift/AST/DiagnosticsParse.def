@@ -1772,6 +1772,12 @@ WARNING(likely_simulator_platform_condition,none,
       "use 'targetEnvironment(simulator)' instead",
       ())
 
+ERROR(canimport_two_parameters, none, "canImport can take only two parameters", ())
+
+ERROR(canimport_label, none, "2nd parameter of canImport should be labeled as version or underlyingVersion", ())
+
+ERROR(canimport_version, none, "cannot parse module version: %0", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Availability query parsing diagnostics
 //------------------------------------------------------------------------------
