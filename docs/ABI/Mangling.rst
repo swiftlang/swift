@@ -251,6 +251,8 @@ types where the metadata itself has unknown layout.)
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk (obsolete)
 
+  global ::= reabstraction-thunk type 'TU' // reabstraction thunk with global actor constraint
+
 The `from-type` and `to-type` in a reabstraction thunk helper function
 are always non-polymorphic ``<impl-function-type>`` types.
 

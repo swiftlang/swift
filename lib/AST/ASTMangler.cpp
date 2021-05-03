@@ -379,6 +379,7 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
                                             Type FromType,
                                             Type ToType,
                                             Type SelfType,
+                                            Type GlobalActorBound,
                                             ModuleDecl *Module) {
   Mod = Module;
   assert(ThunkType->getPatternSubstitutions().empty() && "not implemented");
@@ -399,6 +400,11 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
     appendOperator("Ty");
   else
     appendOperator("TR");
+  
+  if (GlobalActorBound) {
+    appendType(GlobalActorBound);
+    appendOperator("TU");
+  }
 
   return finalize();
 }

@@ -175,7 +175,8 @@ public:
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
-                                           CanType dynamicSelfType);
+                                           CanType dynamicSelfType,
+                                           CanType fromGlobalActor);
   
   /// Get or create the declaration of a completion handler block
   /// implementation function for an ObjC API that was imported
