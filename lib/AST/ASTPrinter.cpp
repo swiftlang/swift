@@ -2475,6 +2475,12 @@ static bool usesFeatureStaticAssert(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureEffectfulProp(Decl *decl) {
+  if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+    return asd->getEffectfulGetAccessor() != nullptr;
+  return false;
+}
+
 static bool usesFeatureAsyncAwait(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (func->hasAsync())
@@ -2834,6 +2840,12 @@ static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
 
 bool swift::printCompatibilityFeatureChecksPre(
     ASTPrinter &printer, Decl *decl) {
+
+  // A single accessor does not get a feature check,
+  // it should go around the whole decl.
+  if (isa<AccessorDecl>(decl))
+    return false;
+
   auto features = getUniqueFeaturesUsed(decl);
   if (features.empty())
     return false;

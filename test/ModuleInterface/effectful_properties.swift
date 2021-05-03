@@ -3,8 +3,11 @@
 
 public struct MyStruct {}
 
-// CHECK-LABEL: public var status
-// CHECK: get async throws
+// CHECK-LABEL:  #if compiler(>=5.3) && $EffectfulProp
+// CHECK:        public var status: Swift.Bool {
+// CHECK:          get async throws
+// CHECK:        }
+// CHECK:        #endif
 
 public extension MyStruct {
   struct InnerStruct {
@@ -12,11 +15,18 @@ public extension MyStruct {
     }
 }
 
-// CHECK-LABEL: public var hello
-// CHECK: get async
+// CHECK-LABEL:  #if compiler(>=5.3) && $EffectfulProp
+// CHECK:        public var hello: Swift.Int {
+// CHECK:            get async
+// CHECK:          }
+// CHECK:        #endif
 
-// CHECK-LABEL: public subscript
-// CHECK: get async throws
+
+// CHECK-LABEL:  #if compiler(>=5.3) && $EffectfulProp
+// CHECK:        public subscript(x: Swift.Int) -> Swift.Void {
+// CHECK:            get async throws
+// CHECK:          }
+// CHECK:        #endif
 
 public class C {
   public var hello: Int { get async { 0 } }
@@ -26,9 +36,26 @@ public class C {
   }
 }
 
-// CHECK-LABEL: public var world
-// CHECK: get throws
+// CHECK-LABEL:  #if compiler(>=5.3) && $EffectfulProp
+// CHECK:        public var world: Swift.Int {
+// CHECK:          get throws
+// CHECK:        }
+// CHECK:        #endif
 
 public enum E {
   public var world: Int { get throws { 0 } }
+}
+
+// CHECK-LABEL:  #if compiler(>=5.3) && $EffectfulProp
+// CHECK:        var books: Swift.Int { get async }
+// CHECK:        #endif
+
+
+// CHECK-LABEL:  #if compiler(>=5.3) && $EffectfulProp
+// CHECK:        subscript(x: Swift.Int) -> Swift.Int { get throws }
+// CHECK:        #endif
+
+public protocol P {
+  var books: Int { get async }
+  subscript(_ x: Int) -> Int { get throws }
 }
