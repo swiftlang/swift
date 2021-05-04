@@ -80,5 +80,7 @@ WARNING(implicit_bridging_header_imported_from_module,none,
         "is deprecated and will be removed in a later version of Swift",
         (StringRef, Identifier))
 
+ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
