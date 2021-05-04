@@ -462,9 +462,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
 
-    Optional<bool> OptimizeForIDE =
-        Req.getOptionalInt64(KeyOptimizeForIDE)
-            .map([](int64_t v) -> bool { return v; });
     Optional<unsigned> CompletionMaxASTContextReuseCount =
         Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
             .map([](int64_t v) -> unsigned { return v; });
@@ -473,12 +470,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
             .map([](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
-        Config->update(OptimizeForIDE, CompletionMaxASTContextReuseCount,
+        Config->update(CompletionMaxASTContextReuseCount,
                        CompletionCheckDependencyInterval);
 
     getGlobalContext().getSwiftLangSupport().globalConfigurationUpdated(Config);
 
-    dict.set(KeyOptimizeForIDE, UpdatedConfig.OptimizeForIDE);
     dict.set(KeyCompletionMaxASTContextReuseCount,
              UpdatedConfig.CompletionOpts.MaxASTContextReuseCount);
     dict.set(KeyCompletionCheckDependencyInterval,
@@ -1764,11 +1760,12 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.set(KeyModuleName, Symbol.ModuleName);
   if (!Symbol.ModuleInterfaceName.empty())
     Elem.set(KeyModuleInterfaceName, Symbol.ModuleInterfaceName);
-  if (Symbol.DeclarationLoc.hasValue()) {
-    Elem.set(KeyOffset, Symbol.DeclarationLoc.getValue().first);
-    Elem.set(KeyLength, Symbol.DeclarationLoc.getValue().second);
-    if (!Symbol.Filename.empty())
-      Elem.set(KeyFilePath, Symbol.Filename);
+  if (!Symbol.Location.Filename.empty()) {
+    Elem.set(KeyFilePath, Symbol.Location.Filename);
+    Elem.set(KeyOffset, Symbol.Location.Offset);
+    Elem.set(KeyLength, Symbol.Location.Length);
+    Elem.set(KeyLine, Symbol.Location.Line);
+    Elem.set(KeyColumn, Symbol.Location.Column);
   }
 
   if (!Symbol.OverrideUSRs.empty()) {

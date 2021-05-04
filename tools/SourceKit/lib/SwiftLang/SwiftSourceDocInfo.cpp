@@ -600,38 +600,46 @@ mapOffsetToNewerSnapshot(unsigned Offset,
   return None;
 }
 
-/// Tries to remap the location from a previous snapshot to the latest one.
-static llvm::Optional<std::pair<unsigned, unsigned>>
-tryRemappingLocToLatestSnapshot(SwiftLangSupport &Lang,
-                                std::pair<unsigned, unsigned> Range,
-                                StringRef Filename,
-                         ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
-  ImmutableTextSnapshotRef LatestSnap;
-  if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(Filename))
-    LatestSnap = EditorDoc->getLatestSnapshot();
+/// Tries to remap the location from a previous snapshot to the latest one and
+/// then sets the location's line and column.
+static void mapLocToLatestSnapshot(
+    SwiftLangSupport &Lang, LocationInfo &Location,
+    ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
+  auto EditorDoc = Lang.getEditorDocuments()->findByPath(Location.Filename);
+  if (!EditorDoc)
+    return;
+
+  ImmutableTextSnapshotRef LatestSnap = EditorDoc->getLatestSnapshot();
   if (!LatestSnap)
-    return Range;
+    return;
 
   for (auto &PrevSnap : PreviousASTSnaps) {
     if (PrevSnap->isFromSameBuffer(LatestSnap)) {
       if (PrevSnap->getStamp() == LatestSnap->getStamp())
-        return Range;
+        break;
 
-      auto OptBegin = mapOffsetToNewerSnapshot(Range.first,
+      auto OptBegin = mapOffsetToNewerSnapshot(Location.Offset,
                                                PrevSnap, LatestSnap);
-      if (!OptBegin.hasValue())
-        return None;
+      if (!OptBegin.hasValue()) {
+        Location.Filename = StringRef();
+        return;
+      }
 
-      auto OptEnd = mapOffsetToNewerSnapshot(Range.first+Range.second,
+      auto OptEnd = mapOffsetToNewerSnapshot(Location.Offset +
+                                             Location.Length,
                                              PrevSnap, LatestSnap);
-      if (!OptEnd.hasValue())
-        return None;
+      if (!OptEnd.hasValue()) {
+        Location.Filename = StringRef();
+        return;
+      }
 
-      return std::make_pair(*OptBegin, *OptEnd-*OptBegin);
+      Location.Offset = *OptBegin;
+      Location.Length = *OptEnd - *OptBegin;
     }
   }
 
-  return Range;
+  std::tie(Location.Line, Location.Column) =
+      EditorDoc->getLineAndColumnInBuffer(Location.Offset);
 }
 
 
@@ -802,10 +810,9 @@ static ArrayRef<T> copyAndClearArray(llvm::BumpPtrAllocator &Allocator,
   return Ref;
 }
 
-static void getLocationInfoForClangNode(
-    ClangNode ClangNode, ClangImporter *Importer,
-    llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-    StringRef &Filename) {
+static void setLocationInfoForClangNode(ClangNode ClangNode,
+                                        ClangImporter *Importer,
+                                        LocationInfo &Location) {
   clang::ASTContext &ClangCtx = Importer->getClangASTContext();
   clang::SourceManager &ClangSM = ClangCtx.getSourceManager();
 
@@ -826,12 +833,15 @@ static void getLocationInfoForClangNode(
       ClangSM.getDecomposedLoc(CharRange.getBegin());
   if (!Decomp.first.isInvalid()) {
     if (auto FE = ClangSM.getFileEntryForID(Decomp.first)) {
-      Filename = FE->getName();
+      Location.Filename = FE->getName();
 
       std::pair<clang::FileID, unsigned> EndDecomp =
           ClangSM.getDecomposedLoc(CharRange.getEnd());
 
-      DeclarationLoc = {Decomp.second, EndDecomp.second - Decomp.second};
+      Location.Offset = Decomp.second;
+      Location.Length = EndDecomp.second - Decomp.second;
+      Location.Line = ClangSM.getLineNumber(Decomp.first, Decomp.second);
+      Location.Column = ClangSM.getColumnNumber(Decomp.first, Decomp.second);
     }
   }
 }
@@ -841,16 +851,15 @@ static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
   return SM.getByteDistance(TokenRange.Start, CharEndLoc);
 }
 
-static void
-getLocationInfo(const ValueDecl *VD,
-                llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-                StringRef &Filename) {
+static void setLocationInfo(const ValueDecl *VD,
+                            LocationInfo &Location) {
   ASTContext &Ctx = VD->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
 
   auto ClangNode = VD->getClangNode();
 
-  if (VD->getLoc().isValid()) {
+  auto Loc = VD->getLoc(/*SerializedOK=*/true);
+  if (Loc.isValid()) {
     auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
       if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
         SourceRange R = FD->getSignatureSourceRange();
@@ -865,19 +874,19 @@ getLocationInfo(const ValueDecl *VD,
     } else if (VD->hasName()) {
       NameLen = VD->getBaseName().userFacingName().size();
     } else {
-      NameLen = getCharLength(SM, VD->getLoc());
+      NameLen = getCharLength(SM, Loc);
     }
 
-    unsigned DeclBufID = SM.findBufferContainingLoc(VD->getLoc());
-    DeclarationLoc = {SM.getLocOffsetInBuffer(VD->getLoc(), DeclBufID),
-                      NameLen};
-    Filename = SM.getIdentifierForBuffer(DeclBufID);
-
+    unsigned DeclBufID = SM.findBufferContainingLoc(Loc);
+    Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
+    Location.Offset = SM.getLocOffsetInBuffer(Loc, DeclBufID);
+    Location.Length = NameLen;
+    std::tie(Location.Line, Location.Column) = SM.getLineAndColumnInBuffer(
+        Loc, DeclBufID);
   } else if (ClangNode) {
     ClangImporter *Importer =
-        static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-    return getLocationInfoForClangNode(ClangNode, Importer, DeclarationLoc,
-                                       Filename);
+        static_cast<ClangImporter*>(Ctx.getClangModuleLoader());
+    setLocationInfoForClangNode(ClangNode, Importer, Location);
   }
 }
 
@@ -1011,12 +1020,10 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
           Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
 
-  getLocationInfo(DInfo.OriginalProperty, Symbol.DeclarationLoc,
-                  Symbol.Filename);
-  if (Symbol.DeclarationLoc.hasValue()) {
-    Symbol.DeclarationLoc = tryRemappingLocToLatestSnapshot(
-        Lang, *Symbol.DeclarationLoc, Symbol.Filename, PreviousSnaps);
-    if (!Symbol.DeclarationLoc.hasValue()) {
+  setLocationInfo(DInfo.OriginalProperty, Symbol.Location);
+  if (!Symbol.Location.Filename.empty()) {
+    mapLocToLatestSnapshot(Lang, Symbol.Location, PreviousSnaps);
+    if (Symbol.Location.Filename.empty()) {
       return llvm::createStringError(
           llvm::inconvertibleErrorCode(),
           "Failed to remap declaration to latest snapshot.");

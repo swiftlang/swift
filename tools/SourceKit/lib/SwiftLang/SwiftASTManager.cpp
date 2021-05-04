@@ -421,7 +421,7 @@ bool SwiftASTManager::initCompilerInvocation(
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Diags, UnresolvedPrimaryFile, FileSystem,
       Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
-      Impl.Config->shouldOptimizeForIDE(), Impl.SessionTimestamp, Error);
+      Impl.SessionTimestamp, Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
