@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang %S/Inputs/objc_async.m -c -o %t/objc_async_objc.o
+// RUN: %target-clang -fobjc-arc %S/Inputs/objc_async.m -c -o %t/objc_async_objc.o
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-as-library -module-name main -import-objc-header %S/Inputs/objc_async.h %s %t/objc_async_objc.o -o %t/objc_async
 // RUN: %target-run %t/objc_async | %FileCheck %s
 
@@ -28,6 +28,13 @@ func farmTest() async {
   }
 }
 
+class Clbuttic: Butt {
+    override func butt(_ x: Int) async -> Int {
+        print("called into override")
+        return 679
+    }
+}
+
 @main struct Main {
   static func main() async {
     // CHECK: starting 1738
@@ -39,6 +46,10 @@ func farmTest() async {
     // CHECK-NEXT: obtaining cat has failed!
     // CHECK-NEXT: caught exception
     await farmTest()
+
+    // CHECK-NEXT: called into override
+    // CHECK-NEXT: butt {{.*}} named clbuttic occurred at 679
+    scheduleButt(Clbuttic(), "clbuttic")
   }
 }
 

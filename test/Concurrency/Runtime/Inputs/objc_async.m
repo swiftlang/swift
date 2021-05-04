@@ -27,3 +27,10 @@
 }
 
 @end
+
+void scheduleButt(Butt *b, NSString *s) {
+  [b butt: 1738 completionHandler: ^(NSInteger i) {
+    printf("butt %p named %s occurred at %zd", b, [s UTF8String], (ssize_t)i);
+    fflush(stdout);
+  }];
+}
