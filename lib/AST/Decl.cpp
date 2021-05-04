@@ -8299,13 +8299,11 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     }
 
     case ClosureActorIsolation::ActorInstance: {
-      return ActorIsolation::forIndependent();
-//      auto selfDecl = isolation.getActorInstance();
-//      selfDecl->dump();
-//      auto actorClass = selfDecl->getType()->getRValueType()
-//          ->getClassOrBoundGenericClass();
-//      assert(actorClass && "Bad closure actor isolation?");
-//      return ActorIsolation::forActorInstance(actorClass);
+      auto selfDecl = isolation.getActorInstance();
+      auto actorClass = selfDecl->getType()->getRValueType()
+          ->getClassOrBoundGenericClass();
+      assert(actorClass && "Bad closure actor isolation?");
+      return ActorIsolation::forActorInstance(actorClass);
     }
     }
   }
