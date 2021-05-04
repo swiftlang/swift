@@ -563,8 +563,8 @@ ERROR(cannot_pass_async_func_to_sync_parameter,none,
       "cannot pass function of type %0 "
       "to parameter expecting synchronous function type", (Type))
 
-NOTE(async_in_closure_that_does_not_support_concurrency,none,
-     "'async' in a closure that does not support concurrency", ())
+NOTE(async_inferred_from_operation,none,
+     "'async' inferred from asynchronous operation used here", ())
 
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
