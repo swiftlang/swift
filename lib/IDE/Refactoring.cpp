@@ -4688,6 +4688,7 @@ private:
   void classifySwitch(SwitchStmt *SS) {
     if (!IsResultParam || singleSwitchSubject(SS) != ErrParam) {
       CurrentBlock->addNode(SS);
+      return;
     }
 
     for (auto *CS : SS->getCases()) {
