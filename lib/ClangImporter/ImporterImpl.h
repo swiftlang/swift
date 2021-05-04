@@ -1572,8 +1572,8 @@ public:
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
                            const PlatformAvailability &avail)
-      : // An unfortunate workaround until D97702 lands.
-        clang::ModuleFileExtension(static_cast<ModuleFileExtensionKind>(42)),
+      : // Update in response to D97702 landing.
+        clang::ModuleFileExtension(),
         pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
         buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
