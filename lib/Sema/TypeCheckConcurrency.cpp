@@ -2334,6 +2334,10 @@ void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
 }
 
 void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
+  // Disable this check for @LLDBDebuggerFunction functions.
+  if (decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
+    return;
+
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);
