@@ -16,7 +16,7 @@ public struct HasUnavailableConformance1 {}
 
 @available(*, unavailable)
 extension HasUnavailableConformance1 : Horse {}
-// expected-note@-1 7{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
+// expected-note@-1 4{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
 
 func passUnavailableConformance1(x: HasUnavailableConformance1) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
@@ -26,9 +26,9 @@ func passUnavailableConformance1(x: HasUnavailableConformance1) {
 
 @available(*, unavailable)
 func passUnavailableConformance1a(x: HasUnavailableConformance1) {
-  takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
-  x.giddyUp() // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
-  _ = UsesHorse<HasUnavailableConformance1>.self // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
+  takesHorse(x)
+  x.giddyUp()
+  _ = UsesHorse<HasUnavailableConformance1>.self
 }
 
 // Platform unavailability
@@ -351,3 +351,15 @@ extension Car {
 @available(macOS 100, *)
 extension ClownCar : Vehicle {}
 // expected-error@-1 {{protocol 'Vehicle' requires 'move()' to be available in macOS 100 and newer}}
+
+// rdar://problem/75430966 - Allow using unavailable conformances from unavailable contexts.
+@available(*, unavailable)
+public enum UnavailableEnum {
+  case horse
+}
+
+@available(*, unavailable)
+extension UnavailableEnum : Swift.Equatable {}
+
+@available(*, unavailable)
+extension UnavailableEnum : Swift.Hashable {}
