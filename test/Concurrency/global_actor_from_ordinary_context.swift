@@ -1,8 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-// XFAIL: *
-
 // provides coverage for rdar://71548470
 
 actor TestActor {}
