@@ -1,5 +1,4 @@
 // Statically link a program with concurrency module
-// REQUIRES: OS=linux-gnu
 // REQUIRES: static_stdlib
 // REQUIRES: concurrency
 // REQUIRES: libdispatch_static
@@ -13,7 +12,12 @@
 
 // RUN: %t/main | %FileCheck %s
 // CHECK: Hello
-// RUN: ldd %t/main | %FileCheck %s --check-prefix=LDD
+
+// RUN: if [ %target-os == "linux-gnu" ]; \
+// RUN: then \
+// RUN:   ldd %t/main | %FileCheck %s --check-prefix=LDD; \
+// RUN: fi
+
 // LDD-NOT: libswiftCore.so 
 // LDD-NOT: libswift_Concurrency.so 
 
