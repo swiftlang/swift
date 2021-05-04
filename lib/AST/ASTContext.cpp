@@ -1957,40 +1957,39 @@ bool ASTContext::shouldPerformTypoCorrection() {
 
 bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName,
                                      llvm::VersionTuple version,
-                                     bool underlyingVersion) const {
-  // If this module has already been successfully imported, it is importable.
-  if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
-    return true;
-
+                                     bool underlyingVersion,
+                                     bool updateFailingList) const {
   // If we've failed loading this module before, don't look for it again.
   if (FailedModuleImportNames.count(ModuleName.Item))
     return false;
-
+  // If no specific version, the module is importable if it has already been imported.
+  if (version.empty()) {
+    // If this module has already been successfully imported, it is importable.
+    if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
+      return true;
+  }
   // Otherwise, ask the module loaders.
   for (auto &importer : getImpl().ModuleLoaders) {
     if (importer->canImportModule(ModuleName, version, underlyingVersion)) {
       return true;
     }
   }
-
+  if (updateFailingList && version.empty()) {
+    FailedModuleImportNames.insert(ModuleName.Item);
+  }
   return false;
 }
 
 bool ASTContext::canImportModule(ImportPath::Element ModuleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) {
-  if (canImportModuleImpl(ModuleName, version, underlyingVersion)) {
-    return true;
-  } else {
-    FailedModuleImportNames.insert(ModuleName.Item);
-    return false;
-  }
+  return canImportModuleImpl(ModuleName, version, underlyingVersion, true);
 }
 
 bool ASTContext::canImportModule(ImportPath::Element ModuleName,
                                  llvm::VersionTuple version,
                                  bool underlyingVersion) const {
-  return canImportModuleImpl(ModuleName, version, underlyingVersion);
+  return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
 }
 
 ModuleDecl *
