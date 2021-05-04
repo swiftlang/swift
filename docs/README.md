@@ -279,7 +279,7 @@ These documents are known to be out-of-date and are superseded by other
 documentation, primarily [The Swift Programming Language][] (TSPL).
 They are preserved mostly for historical interest.
 
-- [AccessControl.rst](/docs/AccessControl.rst)
+- [AccessControl.md](/docs/AccessControl.md)
 - [Arrays.rst](/docs/Arrays.rst)
   <!-- Has additional notes on bridging that may be of general interest? -->
 - [Generics.rst](/docs/Generics.rst)
