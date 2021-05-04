@@ -4870,18 +4870,16 @@ private:
         bool AddPlaceholder = Placeholders.count(D);
         StringRef Name = newNameFor(D, false);
         if (AddPlaceholder || !Name.empty())
-          return addCustom(DRE->getStartLoc(),
-                           Lexer::getLocForEndOfToken(SM, DRE->getEndLoc()),
-                           [&]() {
-                             if (AddPlaceholder)
-                               OS << PLACEHOLDER_START;
-                             if (!Name.empty())
-                               OS << Name;
-                             else
-                               D->getName().print(OS);
-                             if (AddPlaceholder)
-                               OS << PLACEHOLDER_END;
-                           });
+          return addCustom(DRE->getSourceRange(), [&]() {
+            if (AddPlaceholder)
+              OS << PLACEHOLDER_START;
+            if (!Name.empty())
+              OS << Name;
+            else
+              D->getName().print(OS);
+            if (AddPlaceholder)
+              OS << PLACEHOLDER_END;
+          });
       }
     } else if (isa<ForceValueExpr>(E) || isa<BindOptionalExpr>(E)) {
       // Remove a force unwrap or optional chain of a returned success value,
@@ -4895,19 +4893,18 @@ private:
       // completely valid.
       if (auto *D = E->getReferencedDecl().getDecl()) {
         if (Unwraps.count(D))
-          return addCustom(E->getStartLoc(), E->getEndLoc().getAdvancedLoc(1),
+          return addCustom(E->getSourceRange(),
                            [&]() { OS << newNameFor(D, true); });
       }
     } else if (NestedExprCount == 0) {
       if (CallExpr *CE = TopHandler.getAsHandlerCall(E))
-        return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
-                         [&]() { addHandlerCall(CE); });
+        return addCustom(CE->getSourceRange(), [&]() { addHandlerCall(CE); });
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         auto HandlerDesc = AsyncHandlerDesc::find(
             getUnderlyingFunc(CE->getFn()), StartNode.dyn_cast<Expr *>() == CE);
         if (HandlerDesc.isValid())
-          return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
+          return addCustom(CE->getSourceRange(),
                            [&]() { addAsyncAlternativeCall(CE, HandlerDesc); });
       }
     }
@@ -4923,11 +4920,10 @@ private:
     return true;
   }
 
-  bool addCustom(SourceLoc End, SourceLoc NextAddedLoc,
-                 std::function<void()> Custom = {}) {
-    addRange(LastAddedLoc, End);
+  bool addCustom(SourceRange Range, std::function<void()> Custom = {}) {
+    addRange(LastAddedLoc, Range.Start);
     Custom();
-    LastAddedLoc = NextAddedLoc;
+    LastAddedLoc = Lexer::getLocForEndOfToken(SM, Range.End);
     return false;
   }
 
