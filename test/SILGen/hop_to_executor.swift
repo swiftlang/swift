@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency | %FileCheck --enable-var-scope %s
 // REQUIRES: concurrency
-// XFAIL: *
+
 
 actor MyActor {
 
