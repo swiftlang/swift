@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
-
-// REQUIRES: concurrency
+// RUN: %target-typecheck-verify-swift
 
 enum E : Error {
   case NotAvailable
