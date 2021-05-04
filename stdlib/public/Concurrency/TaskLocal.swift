@@ -95,7 +95,7 @@ import Swift
 /// This type must be a `class` so it has a stable identity, that is used as key
 /// value for lookups in the task local storage.
 @propertyWrapper
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 // TODO: add Sendable enforcement when we're ready to do so rdar://77441933
 public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
   let defaultValue: Value
@@ -199,7 +199,7 @@ public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
 
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension UnsafeCurrentTask {
 
   /// Allows for executing a synchronous `operation` while binding a task-local value
@@ -225,7 +225,7 @@ extension UnsafeCurrentTask {
 
 // ==== ------------------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValuePush")
 public func _taskLocalValuePush<Value>(
   _ task: Builtin.NativeObject,
@@ -233,13 +233,13 @@ public func _taskLocalValuePush<Value>(
   value: __owned Value
 ) // where Key: TaskLocal
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValuePop")
 public func _taskLocalValuePop(
   _ task: Builtin.NativeObject
 )
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValueGet")
 public func _taskLocalValueGet(
   _ task: Builtin.NativeObject,
@@ -248,7 +248,7 @@ public func _taskLocalValueGet(
 
 // ==== Checks -----------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @usableFromInline
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
@@ -259,7 +259,7 @@ func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) 
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @usableFromInline
 @_silgen_name("swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup")
 func _reportIllegalTaskLocalBindingWithinWithTaskGroup(

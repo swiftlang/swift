@@ -13,13 +13,13 @@
 import Swift
 
 /// A service which can execute jobs.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol Executor: AnyObject, Sendable {
   func enqueue(_ job: UnownedJob)
 }
 
 /// A service which can execute jobs.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol SerialExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
   // get a redundant witness-table entry for it.  This allows us to
@@ -44,7 +44,7 @@ public protocol SerialExecutor: Executor {
 /// also keep the actor's associated executor alive; if they are
 /// different objects, the executor must be referenced strongly by the
 /// actor.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @frozen
 public struct UnownedSerialExecutor {
   #if compiler(>=5.5) && $BuiltinExecutor
@@ -70,14 +70,14 @@ public struct UnownedSerialExecutor {
 }
 
 // Used by the concurrency runtime
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("_swift_task_enqueueOnExecutor")
 internal func _enqueueOnExecutor<E>(job: UnownedJob, executor: E)
 where E: SerialExecutor {
   executor.enqueue(job)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_transparent
 public // COMPILER_INTRINSIC
 func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
