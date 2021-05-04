@@ -35,7 +35,7 @@ func missingTryInBlock<T : AsyncSequence>(_ seq: T) {
 func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) { 
   execute { // expected-error{{cannot pass function of type '() async -> Void' to parameter expecting synchronous function type}}
     do { 
-      for try await _ in seq { } // expected-note {{'async' in a closure that does not support concurrency}}
+      for try await _ in seq { } // expected-note {{'async' inferred from asynchronous operation used here}}
     } catch { }
   }
 }

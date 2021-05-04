@@ -5896,9 +5896,8 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
       // 'async' effect is inferred from the body of the closure.
       if (asyncLoc.isInvalid()) {
         if (auto asyncNode = findAsyncNode(closure)) {
-          emitDiagnosticAt(
-              ::getLoc(asyncNode),
-              diag::async_in_closure_that_does_not_support_concurrency);
+          emitDiagnosticAt(::getLoc(asyncNode),
+                           diag::async_inferred_from_operation);
         }
       }
     }

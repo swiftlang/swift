@@ -48,7 +48,7 @@ func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
   let _: String = withUnsafeContinuation { continuation in // expected-error{{cannot pass function of type '(UnsafeContinuation<String, Never>) async -> Void' to parameter expecting synchronous function type}}
-    let s = await someAsyncFunc() // expected-note {{'async' in a closure that does not support concurrency}}
+    let s = await someAsyncFunc() // expected-note {{'async' inferred from asynchronous operation used here}}
     continuation.resume(returning: s)
   }
 
