@@ -268,7 +268,7 @@ You can see the status of different proposals at
 - [ErrorHandlingRationale.rst](/docs/ErrorHandlingRationale.rst):
   Surveys error-handling in a variety of languages, and describes the rationale
   behind the design of error handling in Swift.
-- [weak.rst](/docs/weak.rst):
+- [WeakReferences.md](/docs/WeakReferences.md):
   Discusses weak references, including the designs in different languages,
   and proposes changes to Swift (pre-1.0).
   <!-- NOTE: Outdated -->
