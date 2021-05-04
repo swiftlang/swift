@@ -46,7 +46,8 @@ bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
           llvm::MemoryBuffer::getMemBuffer(moduleData, info.name, false));
 
         // Register the memory buffer.
-        Loader.registerMemoryBuffer(info.name, std::move(bitstream));
+        Loader.registerMemoryBuffer(info.name, std::move(bitstream),
+                                    info.userModuleVersion);
         foundModules.push_back(info.name.str());
       }
     } else {

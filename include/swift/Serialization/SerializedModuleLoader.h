@@ -250,7 +250,13 @@ public:
 /// Imports serialized Swift modules from a MemoryBuffer into an ASTContext.
 /// This interface is primarily used by LLDB.
 class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
-  llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
+
+  struct MemoryBufferInfo {
+    std::unique_ptr<llvm::MemoryBuffer> buffer;
+    llvm::VersionTuple userVersion;
+  };
+
+  llvm::StringMap<MemoryBufferInfo> MemoryBuffers;
 
   MemoryBufferSerializedModuleLoader(ASTContext &ctx,
                                      DependencyTracker *tracker,
@@ -289,8 +295,9 @@ public:
   ///
   /// FIXME: make this an actual import *path* once submodules are designed.
   void registerMemoryBuffer(StringRef importPath,
-                            std::unique_ptr<llvm::MemoryBuffer> input) {
-    MemoryBuffers[importPath] = std::move(input);
+                            std::unique_ptr<llvm::MemoryBuffer> input,
+                            llvm::VersionTuple version) {
+    MemoryBuffers[importPath] = {std::move(input), version};
   }
 
   void collectVisibleTopLevelModuleNames(

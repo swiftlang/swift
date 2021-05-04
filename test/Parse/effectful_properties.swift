@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
-// REQUIRES: concurrency
+// RUN: %target-typecheck-verify-swift
 
 struct MyProps {
   var prop1 : Int {
@@ -112,10 +111,9 @@ var bad1 : Int {
 }
 
 var bad2 : Int {
-  get reasync { 0 }  // expected-error{{only function declarations may be marked 'reasync'; did you mean 'async'?}}
+  get reasync { 0 }  // expected-error{{expected '{' to start getter definition}}
 
-  // expected-error@+1 {{'set' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}}
-  set reasync { }   // expected-error{{'set' accessor cannot have specifier 'reasync'}}
+  set reasync { }
 }
 
 var bad3 : Int {
@@ -158,18 +156,12 @@ var bad8 : Double {
 }
 
 protocol BadP {
-  // expected-error@+3 {{'set' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}}
-  // expected-error@+2 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}}
-  // expected-error@+1 {{only function declarations may be marked 'reasync'; did you mean 'async'?}}
-  var prop1 : Int { get reasync rethrows set }
-
   var prop2 : Int { get bogus rethrows set } // expected-error{{expected get or set in a protocol property}}
 
   // expected-error@+2 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}}
   // expected-error@+1 {{expected get or set in a protocol property}}
   var prop3 : Int { get rethrows bogus set }
 
-  // expected-error@+2 {{only function declarations may be marked 'reasync'; did you mean 'async'?}}
   // expected-error@+1 {{expected get or set in a protocol property}}
   var prop4 : Int { get reasync bogus set }
 

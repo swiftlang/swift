@@ -799,6 +799,8 @@ ERROR(serialization_error_type,Fatal,
 ERROR(serialization_allowing_error_type,none,
       "allowing deserialization of error type '%0' in module '%1'",
       (StringRef, StringRef))
+WARNING(serialization_malformed_sourceinfo,none,
+      "unable to use malformed module source info '%0'", (StringRef))
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -942,6 +944,9 @@ REMARK(cross_import_added,none,
 REMARK(module_loaded,none,
        "loaded module at %0",
        (StringRef))
+
+WARNING(cannot_find_project_version,none,
+        "cannot find user version number for %0 module '%1'; version number ignored", (StringRef, StringRef))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,

@@ -3859,11 +3859,6 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableExperimentalDistributed = true;
   }
 
-  // We disable source location resolutions from .swiftsourceinfo files by
-  // default to match sourcekitd-test's and ide clients' expected behavior
-  // (passing optimize-for-ide in the global configuration request).
-  if (!options::EnableSwiftSourceInfo)
-    InitInvok.getFrontendOptions().IgnoreSwiftSourceInfo = true;
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {

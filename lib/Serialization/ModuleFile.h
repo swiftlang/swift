@@ -480,6 +480,13 @@ public:
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
 
+  /// \c true if this module has a corresponding .swiftsourceinfo file.
+  bool hasSourceInfoFile() const { return Core->hasSourceInfoFile(); }
+
+  /// \c true if this module has information from a corresponding
+  /// .swiftsourceinfo file (ie. the file exists and has been read).
+  bool hasSourceInfo() const { return Core->hasSourceInfo(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded

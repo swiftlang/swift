@@ -315,7 +315,7 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
 
   {
     // Print line and column number.
-    auto Loc = D->getLoc();
+    auto Loc = D->getLoc(/*SerializedOK=*/true);
     if (Loc.isValid()) {
       const auto &SM = D->getASTContext().SourceMgr;
       StringRef FileName = SM.getDisplayNameForLoc(Loc);

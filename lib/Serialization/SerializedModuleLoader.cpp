@@ -687,10 +687,16 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework) {
   assert(moduleInputBuffer);
+
+  // The buffers are moved into the shared core, so grab their IDs now in case
+  // they're needed for diagnostics later.
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
   StringRef moduleDocBufferID;
   if (moduleDocInputBuffer)
     moduleDocBufferID = moduleDocInputBuffer->getBufferIdentifier();
+  StringRef moduleSourceInfoID;
+  if (moduleSourceInfoInputBuffer)
+    moduleSourceInfoID = moduleSourceInfoInputBuffer->getBufferIdentifier();
 
   if (moduleInputBuffer->getBufferSize() % 4 != 0) {
     if (diagLoc)
@@ -743,6 +749,12 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
         (Ctx.LangOpts.AllowModuleWithCompilerErrors &&
          (loadInfo.status == serialization::Status::TargetTooNew ||
           loadInfo.status == serialization::Status::TargetIncompatible))) {
+      if (loadedModuleFile->hasSourceInfoFile() &&
+          !loadedModuleFile->hasSourceInfo())
+        Ctx.Diags.diagnose(diagLocOrInvalid,
+                           diag::serialization_malformed_sourceinfo,
+                           moduleSourceInfoID);
+
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
@@ -962,22 +974,91 @@ bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
 
 bool SerializedModuleLoaderBase::canImportModule(
     ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
+  // If underlying version is specified, this should be handled by Clang importer.
+  if (!version.empty() && underlyingVersion)
+    return false;
   // Look on disk.
-  SmallVector<char, 0> *unusedModuleInterfacePath = nullptr;
+  SmallVectorImpl<char> *unusedModuleInterfacePath = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleBuffer = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleDocBuffer = nullptr;
   std::unique_ptr<llvm::MemoryBuffer> *unusedModuleSourceInfoBuffer = nullptr;
   bool isFramework = false;
   bool isSystemModule = false;
-  return findModule(mID, unusedModuleInterfacePath, unusedModuleBuffer,
-                    unusedModuleDocBuffer, unusedModuleSourceInfoBuffer,
-                    isFramework, isSystemModule);
+
+  llvm::SmallString<256> moduleInterfacePath;
+  std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
+  std::unique_ptr<llvm::MemoryBuffer> moduleDocBuffer;
+  if (!version.empty()) {
+    unusedModuleInterfacePath = &moduleInterfacePath;
+    unusedModuleBuffer = &moduleInputBuffer;
+    unusedModuleDocBuffer = &moduleDocBuffer;
+  }
+
+  auto found = findModule(mID, unusedModuleInterfacePath, unusedModuleBuffer,
+                          unusedModuleDocBuffer, unusedModuleSourceInfoBuffer,
+                          isFramework, isSystemModule);
+  // If we cannot find the module, don't continue.
+  if (!found)
+    return false;
+  // If no version number is specified, don't continue.
+  if (version.empty())
+    return true;
+  assert(found);
+  assert(!version.empty());
+  assert(!underlyingVersion);
+  llvm::VersionTuple currentVersion;
+  if (!moduleInterfacePath.empty()) {
+    // Read the inteface file and extract its compiler arguments line
+    if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
+      llvm::BumpPtrAllocator alloc;
+      llvm::StringSaver argSaver(alloc);
+      SmallVector<const char*, 8> args;
+      (void)extractCompilerFlagsFromInterface((*file)->getBuffer(), argSaver, args);
+      for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
+        // Check the version number specified via -user-module-version.
+        StringRef current(args[I]), next(args[I + 1]);
+        if (current == "-user-module-version") {
+          currentVersion.tryParse(next);
+          break;
+        }
+      }
+    }
+  }
+  // If failing to extract the user version from the interface file, try the binary
+  // format, if present.
+  if (currentVersion.empty() && unusedModuleBuffer) {
+    auto metaData =
+      serialization::validateSerializedAST((*unusedModuleBuffer)->getBuffer());
+    currentVersion = metaData.userModuleVersion;
+  }
+
+  if (currentVersion.empty()) {
+    Ctx.Diags.diagnose(mID.Loc, diag::cannot_find_project_version, "Swift",
+                       mID.Item.str());
+    return true;
+  }
+
+  return currentVersion >= version;
 }
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
     ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
-  // See if we find it in the registered memory buffers.
-  return MemoryBuffers.count(mID.Item.str());
+  // If underlying version is specified, this should be handled by Clang importer.
+  if (!version.empty() && underlyingVersion)
+    return false;
+  auto mIt = MemoryBuffers.find(mID.Item.str());
+  if (mIt == MemoryBuffers.end())
+    return false;
+  if (version.empty())
+    return true;
+  if (mIt->second.userVersion.empty()) {
+    Ctx.Diags.diagnose(mID.Loc, diag::cannot_find_project_version, "Swift",
+                       mID.Item.str());
+    return true;
+  }
+  assert(!version.empty());
+  assert(!(mIt->second.userVersion.empty()));
+  return mIt->second.userVersion >= version;
 }
 
 ModuleDecl *
@@ -1055,7 +1136,7 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   bool isFramework = false;
   std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer;
-  moduleInputBuffer = std::move(bufIter->second);
+  moduleInputBuffer = std::move(bufIter->second.buffer);
   MemoryBuffers.erase(bufIter);
   assert(moduleInputBuffer);
 

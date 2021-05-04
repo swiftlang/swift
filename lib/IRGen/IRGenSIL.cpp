@@ -1958,7 +1958,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     if (IGF.CurSILFn->isDynamicallyReplaceable()) {
       IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
       // Remap the entry block.
-      IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(&IGF.CurFn->back(), {});
+      IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(IGF.Builder.GetInsertBlock(), {});
     }
   }
 

@@ -347,7 +347,7 @@ private:
     DelayedPatternContexts;
 
   /// Cache of module names that fail the 'canImport' test in this context.
-  llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
+  mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -894,7 +894,8 @@ public:
   /// module is loaded in full.
   bool canImportModuleImpl(ImportPath::Element ModulePath,
                            llvm::VersionTuple version,
-                           bool underlyingVersion) const;
+                           bool underlyingVersion,
+                           bool updateFailingList) const;
 public:
   namelookup::ImportCache &getImportCache() const;
 
