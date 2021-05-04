@@ -46,7 +46,10 @@ func firstHashValue(_ x: P) -> Int {
 }
 
 let osHasWorkaround: Bool
-if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
+// These are deliberately not the standard 9999, as we don't want to hit the
+// special case where it's always available, and we don't want this check to be
+// rewritten in any find/replace operations.
+if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *) {
   osHasWorkaround = true
 } else {
   osHasWorkaround = false
