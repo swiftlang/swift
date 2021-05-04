@@ -333,26 +333,37 @@ protocol MyProtocol {
   // PROTO-MEMBER: func protoMember() async -> String{{$}}
 }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-COMPLETION %s
 func nonCompletion(a: Int) { }
+// NON-COMPLETION: func nonCompletion(a: Int) async { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-RESULTS %s
 func multipleResults(completion: (Result<String, Error>, Result<String, Error>) -> Void) { }
+// MULTIPLE-RESULTS: func multipleResults(completion: (Result<String, Error>, Result<String, Error>) -> Void) async { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NOT-LAST %s
 func completionNotLast(completion: (String) -> Void, a: Int) { }
+// NOT-LAST: func completionNotLast(completion: (String) -> Void, a: Int) async { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
 func nonVoid(completion: (String) -> Void) -> Int { return 0 }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=COMPLETION-NON-VOID %s
 func completionNonVoid(completion: (String) -> Int) -> Void { }
+// COMPLETION-NON-VOID: func completionNonVoid(completion: (String) -> Int) async -> Void { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1
 func alreadyThrows(completion: (String) -> Void) throws { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=AUTO-CLOSURE %s
 func noParamAutoclosure(completion: @autoclosure () -> Void) { }
+// AUTO-CLOSURE: func noParamAutoclosure(completion: @autoclosure () -> Void) async { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix BLOCK-CONVENTION %s
 func blockConvention(completion: @convention(block) () -> Void) { }
