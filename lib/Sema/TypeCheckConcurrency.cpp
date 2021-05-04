@@ -1337,8 +1337,6 @@ namespace {
         if (auto call = dyn_cast<CallExpr>(*I)) {
           if (setAsync) call->setImplicitlyAsync(true);
           if (setThrows) call->setImplicitlyThrows(true);
-
-          assert(false);
           return;
         }
       llvm_unreachable("expected a CallExpr in applyStack!");
@@ -1876,29 +1874,30 @@ namespace {
             // outside of the actor.
             //
             // If it already is throwing, no need to mark it implicitly so.
+            markNearestCallAsImplicitly(
+                /*setAsync=*/false, /*setThrows=*/true);
             result = ThrowsMarkingResult::FoundThrows;
           }
+        }
+      } else if (!applyStack.empty()) {
+        fprintf(stderr, "[%s:%d] (%s) !applyStack.empty()\n", __FILE__, __LINE__, __FUNCTION__);
+        // Check our applyStack metadata from the traversal.
+        // Our goal is to identify whether the actor reference appears
+        // as the called value of the enclosing ApplyExpr. We cannot simply
+        // inspect Parent here because of expressions like (callee)()
+        // and the fact that the reference may be just an argument to an apply
+        ApplyExpr *apply = applyStack.back();
+        Expr *fn = apply->getFn()->getValueProvidingExpr();
+        if (auto memberRef = findMemberReference(fn)) {
+          auto concDecl = memberRef->first;
+          if (decl == concDecl.getDecl() && !apply->implicitlyThrows()) {
 
-        } else if (!applyStack.empty()) {
-          // Check our applyStack metadata from the traversal.
-          // Our goal is to identify whether the actor reference appears
-          // as the called value of the enclosing ApplyExpr. We cannot simply
-          // inspect Parent here because of expressions like (callee)()
-          // and the fact that the reference may be just an argument to an apply
-          ApplyExpr *apply = applyStack.back();
-          Expr *fn = apply->getFn()->getValueProvidingExpr();
-          if (auto memberRef = findMemberReference(fn)) {
-            auto concDecl = memberRef->first;
-            if (decl == concDecl.getDecl() && !apply->implicitlyThrows()) {
-
-              if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-                if (func->isDistributed() && !func->hasThrows()) {
-                  // then this ValueDecl appears as the called value of the ApplyExpr.
-                  markNearestCallAsImplicitly(
-                      /*setAsync=*/false,
-                      /*setThrows=*/true);
-                  result = ThrowsMarkingResult::FoundThrows;
-                }
+            if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+              if (func->isDistributed() && !func->hasThrows()) {
+                // then this ValueDecl appears as the called value of the ApplyExpr.
+                markNearestCallAsImplicitly(
+                    /*setAsync=*/false, /*setThrows=*/true);
+                result = ThrowsMarkingResult::FoundThrows;
               }
             }
           }
@@ -2370,14 +2369,12 @@ namespace {
 
             assert(func->isDistributed());
 
-            if (!func->hasAsync()) {
-              tryMarkImplicitlyAsync(memberLoc, memberRef, context);
-              fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
-            }
+            fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyAsync\n", __FILE__, __LINE__, __FUNCTION__);
+            tryMarkImplicitlyAsync(memberLoc, memberRef, context);
 
+            fprintf(stderr, "[%s:%d] (%s) CALL tryMarkImplicitlyThrows\n", __FILE__, __LINE__, __FUNCTION__);
             tryMarkImplicitlyThrows(memberLoc, memberRef, context);
 
-            // TODO: mark implicitly async here?
             // TODO: we don't really need to do anythign with the result, dont get it?
 
             // distributed func reference, that passes all checks, great!
