@@ -322,3 +322,25 @@ voidAndErrorResult { res in
 }
 // VOID-AND-ERROR-RESULT-CALL: {{^}}try await voidAndErrorResult()
 // VOID-AND-ERROR-RESULT-CALL: {{^}}print(<#res#>)
+
+// Make sure we ignore an unrelated switch.
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=IGNORE-UNRELATED %s
+simple { res in
+  print("before")
+  switch Bool.random() {
+  case true:
+    break
+  case false:
+    break
+  }
+  print("after")
+}
+// IGNORE-UNRELATED:      let res = try await simple()
+// IGNORE-UNRELATED-NEXT: print("before")
+// IGNORE-UNRELATED-NEXT: switch Bool.random() {
+// IGNORE-UNRELATED-NEXT:  case true:
+// IGNORE-UNRELATED-NEXT:  {{^}} break{{$}}
+// IGNORE-UNRELATED-NEXT:  case false:
+// IGNORE-UNRELATED-NEXT:  {{^}} break{{$}}
+// IGNORE-UNRELATED-NEXT:  }
+// IGNORE-UNRELATED-NEXT: print("after")
