@@ -1737,7 +1737,8 @@ static bool isInsideCompatibleUnavailableDeclaration(
   // but allow the use of types.
   PlatformKind platform = attr->Platform;
   if (platform == PlatformKind::none &&
-      !isa<TypeDecl>(D)) {
+      !isa<TypeDecl>(D) &&
+      !isa<ExtensionDecl>(D)) {
     return false;
   }
 
