@@ -238,7 +238,7 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
     onGenericGlobalActorString() // okay
 
     // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-    onGenericGlobalActorInt() // expected-note{{call is 'async'}}
+    onGenericGlobalActorInt() // expected-note{{calls to instance method 'onGenericGlobalActorInt()' from outside of its actor context are implicitly asynchronous}}
   }
 }
 
@@ -253,7 +253,7 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
 
 func bar() async {
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  foo() // expected-note{{call is 'async'}}
+  foo() // expected-note{{calls to global function 'foo()' from outside of its actor context are implicitly asynchronous}}
 }
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
@@ -509,7 +509,7 @@ func acceptClosure<T>(_: () -> T) { }
 // ----------------------------------------------------------------------
 func takesUnsafeMainActor(@_unsafeMainActor fn: () -> Void) { }
 
-@MainActor func onlyOnMainActor() { } // expected-note{{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
+@MainActor func onlyOnMainActor() { }
 
 func useUnsafeMainActor() {
   takesUnsafeMainActor {
@@ -525,7 +525,8 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 
 @MainActor func testCallFromMainActor() {
   acceptAsyncSendableClosure {
-    onlyOnMainActor() // expected-error{{call to main actor-isolated global function 'onlyOnMainActor()' in a synchronous nonisolated context}}
+    onlyOnMainActor() // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1 {{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
   }
 
   acceptAsyncSendableClosure {

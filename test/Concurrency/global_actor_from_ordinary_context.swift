@@ -109,7 +109,7 @@ class Taylor {
 func fromAsync() async {
   let x = syncGlobActorFn
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  x() // expected-note{{call is 'async'}}
+  x() // expected-note{{calls to let 'x' from outside of its actor context are implicitly asynchronous}}
 
 
   let y = asyncGlobalActFn
@@ -120,7 +120,7 @@ func fromAsync() async {
 
   let fn = a.method
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  fn() //expected-note{{call is 'async}}
+  fn() //expected-note{{calls to let 'fn' from outside of its actor context are implicitly asynchronous}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = a.const_memb // expected-note{{property access is 'async'}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}

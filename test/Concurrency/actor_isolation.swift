@@ -71,7 +71,7 @@ actor MyActor: MySuperActor { // expected-error{{actor types do not support inhe
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 19{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String {
     super.superState += 4
     return synchronous()
@@ -202,7 +202,7 @@ extension MyActor {
 
     _ = otherActor.synchronous()
     // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-2{{call is 'async'}}
+    // expected-note@-2{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
     _ = await otherActor.asynchronous()
     _ = otherActor.text[0]
     // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
@@ -222,7 +222,7 @@ extension MyActor {
 
     // Global actors
     syncGlobalActorFunc() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-    // expected-note@-1{{call is 'async'}}
+    // expected-note@-1{{calls to global function 'syncGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
 
     await asyncGlobalActorFunc()
 
@@ -399,7 +399,7 @@ actor Crystal {
 @SomeGlobalActor func goo1() async {
   let _ = goo2
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  goo2() // expected-note{{call is 'async'}}
+  goo2() // expected-note{{calls to global function 'goo2()' from outside of its actor context are implicitly asynchronous}}
 }
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @asyncHandler @SomeOtherGlobalActor func goo2() { await goo1() }
@@ -409,7 +409,7 @@ func testGlobalActorClosures() {
   let _: Int = acceptAsyncClosure { @SomeGlobalActor in
     syncGlobalActorFunc()
     syncOtherGlobalActorFunc() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-    // expected-note@-1{{call is 'async'}}
+    // expected-note@-1{{calls to global function 'syncOtherGlobalActorFunc()' from outside of its actor context are implicitly asynchronous}}
 
     await syncOtherGlobalActorFunc()
     return 17
@@ -434,7 +434,7 @@ extension MyActor {
     // expected-note@-1{{property access is 'async'}}
     _ = await mutable
     _ = synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{call is 'async'}}
+    // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
     _ = await synchronous()
     _ = text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}
     // expected-note@-1{{property access is 'async'}}
@@ -445,7 +445,7 @@ extension MyActor {
     // we are outside of the actor instance.
     _ = self.immutable
     _ = self.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{call is 'async'}}
+    // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
     _ = await self.synchronous()
 
     _ = await self.asynchronous()
@@ -461,7 +461,7 @@ extension MyActor {
     // expected-note@-1{{property access is 'async'}}
     _ = await super.superState
     super.superMethod() // expected-error{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-  // expected-note@-1{{call is 'async'}}
+  // expected-note@-1{{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
 
     await super.superMethod()
     await super.superAsyncMethod()
@@ -473,7 +473,7 @@ extension MyActor {
     // call asychronous methods
     _ = otherActor.immutable // okay
     _ = otherActor.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    // expected-note@-1{{call is 'async'}}
+    // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
     _ = otherActor.synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
     _ = await otherActor.asynchronous()
     _ = otherActor.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
@@ -534,7 +534,7 @@ func testGlobalRestrictions(actor: MyActor) async {
 
   // any kind of method can be called from outside the actor, so long as it's marked with 'await'
   _ = actor.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  // expected-note@-1{{call is 'async}}
+  // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   _ = actor.asynchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   // expected-note@-1{{call is 'async'}}
 
@@ -751,7 +751,7 @@ class SomeClassWithInits {
       await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
       self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
       // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-      // expected-note@-2{{call is 'async'}}
+      // expected-note@-2{{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
 
       print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
     }
@@ -791,10 +791,10 @@ func testCrossActorProtocol<T: P>(t: T) async {
   await t.g()
   t.f()
   // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  // expected-note@-2{{call is 'async'}}
+  // expected-note@-2{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
   t.g()
   // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  // expected-note@-2{{call is 'async'}}
+  // expected-note@-2{{calls to instance method 'g()' from outside of its actor context are implicitly asynchronous}}
 }
 
 // ----------------------------------------------------------------------
@@ -807,7 +807,8 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 extension MyActor {
   func testSendableAndInheriting() {
     acceptAsyncSendableClosure {
-      synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
+      synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}
+      // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
     }
 
     acceptAsyncSendableClosure {
