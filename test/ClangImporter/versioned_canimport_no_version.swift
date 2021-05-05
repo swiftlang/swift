@@ -15,6 +15,6 @@
 import Simple
 
 func canImportVersioned() {
-#if canImport(Simple, underlyingVersion: 3.3) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
+#if canImport(Simple, _underlyingVersion: 3.3) // expected-warning {{cannot find user version number for Clang module 'Simple'; version number ignored}}
 #endif
 }
