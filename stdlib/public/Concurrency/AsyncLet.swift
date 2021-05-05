@@ -16,7 +16,7 @@ import Swift
 // ==== Async Let -------------------------------------------------------------
 // Only has internal / builtin functions as it is not really accessible directly
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_asyncLet_start")
 public func _asyncLetStart<T>(
   asyncLet: Builtin.RawPointer,
@@ -24,16 +24,16 @@ public func _asyncLetStart<T>(
 )
 
 /// Similar to _taskFutureGet but for AsyncLet
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_asyncLet_wait")
 public func _asyncLetGet<T>(asyncLet: Builtin.RawPointer) async -> T
 
 ///// Similar to _taskFutureGetThrowing but for AsyncLet
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_asyncLet_wait_throwing")
 public func _asyncLetGetThrowing<T>(asyncLet: Builtin.RawPointer) async throws -> T
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_asyncLet_end")
 public func _asyncLetEnd(
   asyncLet: Builtin.RawPointer // TODO: should this take __owned?
