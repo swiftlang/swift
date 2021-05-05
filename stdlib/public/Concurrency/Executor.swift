@@ -15,7 +15,7 @@ import Swift
 // TODO: Custom Executors proposal will define these types
 //       https://forums.swift.org/t/support-custom-executors-in-swift-concurrency/44425/38
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @frozen
 public struct UnownedExecutorRef: Equatable {
   let identity: OpaquePointer
@@ -23,7 +23,7 @@ public struct UnownedExecutorRef: Equatable {
 }
 
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_transparent
 public // COMPILER_INTRINSIC
 func _checkExpectedExecutor(Builtin
