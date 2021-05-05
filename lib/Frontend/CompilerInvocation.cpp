@@ -416,9 +416,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
 
-  Opts.DisableImplicitDistributedModuleImport |=
-    Args.hasArg(OPT_disable_implicit_distributed_module_import);
-
   /// experimental distributed also implicitly enables experimental concurrency
   Opts.EnableExperimentalDistributed |=
     Args.hasArg(OPT_enable_experimental_distributed);

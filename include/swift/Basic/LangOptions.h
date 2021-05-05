@@ -280,10 +280,6 @@ namespace swift {
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY;
 
-    /// Disable the implicit import of the _Distributed module.
-    bool DisableImplicitDistributedModuleImport =
-        !SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

@@ -105,10 +105,6 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
     "disable-implicit-concurrency-module-import">,
   HelpText<"Disable implicit import of the _Concurrency module">;
 
-def disable_implicit_distributed_module_import : Flag<["-"],
-    "disable-implicit-distributed-module-import">,
-  HelpText<"Disable implicit import of the _Distributed module">;
-
 def end_pos : Separate<["-"], "end-pos">, HelpText<"line:col">;
 def end_pos_EQ : Joined<["-"], "end-pos=">, Alias<end_pos>;
 

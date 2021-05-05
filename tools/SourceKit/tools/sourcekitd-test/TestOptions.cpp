@@ -384,10 +384,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       DisableImplicitConcurrencyModuleImport = true;
       break;
 
-    case OPT_disable_implicit_distributed_module_import:
-      DisableImplicitDistributedModuleImport = true;
-      break;
-
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'
