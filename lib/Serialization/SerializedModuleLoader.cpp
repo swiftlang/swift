@@ -722,6 +722,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
 
     // We've loaded the file. Now try to bring it into the AST.
     fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
+    M.setStaticLibrary(loadedModuleFile->isStaticLibrary());
     if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
     if (loadedModuleFile->arePrivateImportsEnabled())

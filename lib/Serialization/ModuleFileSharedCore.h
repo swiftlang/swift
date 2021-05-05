@@ -326,6 +326,9 @@ private:
     /// Whether this module file is actually a .sib file.
     unsigned IsSIB: 1;
 
+    /// Whether this module is compiled as static library.
+    unsigned IsStaticLibrary: 1;
+
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
 
