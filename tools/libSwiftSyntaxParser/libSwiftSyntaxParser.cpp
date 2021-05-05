@@ -111,6 +111,16 @@ struct DeferredTokenNode {
       : IsMissing(IsMissing), TokenKind(TokenKind),
         LeadingTrivia(LeadingTrivia), TrailingTrivia(TrailingTrivia),
         Range(Range) {}
+
+  /// Returns the length of this token or \c 0 if the token is missing.
+  size_t getLength() const {
+    if (IsMissing) {
+      return 0;
+    } else {
+      assert(Range.isValid());
+      return Range.getByteLength();
+    }
+  }
 };
 
 struct DeferredLayoutNode {
@@ -272,7 +282,7 @@ private:
         break;
       case RecordedOrDeferredNode::Kind::DeferredToken:
         length += static_cast<const DeferredTokenNode *>(child.getOpaque())
-                      ->Range.getByteLength();
+                      ->getLength();
         break;
       }
     }
@@ -373,7 +383,7 @@ private:
       case RecordedOrDeferredNode::Kind::DeferredToken:
         StartLoc = StartLoc.getAdvancedLoc(
             static_cast<const DeferredTokenNode *>(Child.getOpaque())
-                ->Range.getByteLength());
+                ->getLength());
         break;
       }
     }
