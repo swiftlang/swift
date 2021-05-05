@@ -15,7 +15,7 @@ if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
   list(APPEND swift_stdlib_unittest_link_libraries "swift_Concurrency")
 endif()
 #if (SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
-#  list(APPEND swift_stdlib_unittest_link_libraries "swift_Distributed")
+  list(APPEND swift_stdlib_unittest_link_libraries "swift_Distributed")
 #endif()
 
 add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
