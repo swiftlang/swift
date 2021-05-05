@@ -24,7 +24,7 @@ func forceBeingAsync() async -> Void { }
 @main struct Main {
 
 static func main() async {
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    if #available(SwiftStdlib 5.5, *) {
       tests.test("yield with no awaiting next") {
         let task = detach {
           let continuation = YieldingContinuation(yielding: String.self)

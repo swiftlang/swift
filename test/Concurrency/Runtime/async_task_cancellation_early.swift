@@ -10,7 +10,7 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_detach_cancel_child_early() async {
   print(#function) // CHECK: test_detach_cancel_child_early
   let h: Task.Handle<Bool, Error> = detach {
@@ -35,7 +35,7 @@ func test_detach_cancel_child_early() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_detach_cancel_child_early()

@@ -11,7 +11,7 @@
 // this needs to match with the check count below.
 let NUM_TASKS : Int = 100
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 final class Capture : Sendable {
     func doSomething() { }
     deinit {
@@ -20,7 +20,7 @@ final class Capture : Sendable {
     }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main
 struct App {
     static func main() async {

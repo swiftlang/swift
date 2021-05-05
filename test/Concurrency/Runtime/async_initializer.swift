@@ -7,7 +7,7 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 actor NameGenerator {
   private var counter = 0
   private var prefix : String
@@ -18,13 +18,13 @@ actor NameGenerator {
    }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 protocol Person {
   init() async
   var name : String { get set }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 class EarthPerson : Person {
   private static let oracle = NameGenerator("Earthling")
 
@@ -39,7 +39,7 @@ class EarthPerson : Person {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 class NorthAmericaPerson : EarthPerson {
   private static let oracle = NameGenerator("NorthAmerican")
   required init() async {
@@ -52,7 +52,7 @@ class NorthAmericaPerson : EarthPerson {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 class PrecariousClass {
   init?(nilIt : Int) async {
     let _ : Optional<Int> = await (detach { nil }).get()
@@ -86,7 +86,7 @@ enum Something : Error {
   case bogus
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 struct PrecariousStruct {
   init?(nilIt : Int) async {
     let _ : Optional<Int> = await (detach { nil }).get()
@@ -121,7 +121,7 @@ struct PrecariousStruct {
 // CHECK-NEXT: struct threw
 // CHECK: done
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct RunIt {
   static func main() async {
     let people : [Person] = [
