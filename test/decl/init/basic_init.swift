@@ -44,7 +44,7 @@ extension InitStruct {
 struct MyStruct {
   init(k: Int) {
   }
-  convenience init() {  // expected-error {{delegating initializers in structs are not marked with 'convenience'}} {{3-15=}}
+  convenience init() {  // expected-error {{initializers in structs are not marked with 'convenience'}} {{3-15=}}
     self.init(k: 1)
   }
 }
