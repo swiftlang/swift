@@ -1336,7 +1336,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       emitNativeToForeignThunk(thunk);
   }
 
-  if (AFD->getAttrs().hasAttribute<DistributedActorAttr>()) {
+  if (AFD->isDistributed()) {
     auto thunk = SILDeclRef(AFD).asDistributed();
     if (!hasFunction(thunk))
       emitDistributedThunk(thunk);

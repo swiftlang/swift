@@ -732,7 +732,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  if (AFD->getAttrs().hasAttribute<DistributedActorAttr>()) {
+  if (AFD->isDistributed()) {
     addSymbol(SILDeclRef(AFD).asDistributed());
   }
 

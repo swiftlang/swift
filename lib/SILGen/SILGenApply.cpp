@@ -1052,7 +1052,7 @@ public:
     }
 
     SILDeclRef constant = SILDeclRef(afd);
-    if (afd->getAttrs().hasAttribute<DistributedActorAttr>()) {
+    if (afd->isDistributed()) {
       constant = constant.asDistributed(true);
     } else {
       constant = constant.asForeign(requiresForeignEntryPoint(afd));
@@ -5005,7 +5005,7 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
 
-  if (call->getAttrs().hasAttribute<DistributedActorAttr>()) {
+  if (call->isDistributed()) {
     callRef = callRef.asDistributed(true);
   }
 
