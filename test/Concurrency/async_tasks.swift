@@ -55,6 +55,13 @@ func test_unsafeContinuations() async {
   let _: String = await withUnsafeContinuation { continuation in
     continuation.resume(returning: "")
   }
+
+  // rdar://76475495 - suppress warnings for invalid expressions
+  func test_invalid_async_no_warnings() async -> Int {
+	  return await withUnsafeContinuation {
+		  $0.resume(throwing: 1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Never'}}
+	  }
+  }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
