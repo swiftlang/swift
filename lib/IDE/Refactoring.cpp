@@ -4525,6 +4525,7 @@ struct CallbackClassifier {
   /// names from `Body`. Errors are added through `DiagEngine`, possibly
   /// resulting in partially filled out blocks.
   static void classifyInto(ClassifiedBlocks &Blocks,
+                           llvm::DenseSet<SwitchStmt *> &HandledSwitches,
                            DiagnosticEngine &DiagEngine,
                            ArrayRef<const ParamDecl *> SuccessParams,
                            const ParamDecl *ErrParam, HandlerType ResultType,
@@ -4536,25 +4537,30 @@ struct CallbackClassifier {
     if (ErrParam)
       ParamsSet.insert(ErrParam);
 
-    CallbackClassifier Classifier(Blocks, DiagEngine, ParamsSet, ErrParam,
+    CallbackClassifier Classifier(Blocks, HandledSwitches, DiagEngine,
+                                  ParamsSet, ErrParam,
                                   ResultType == HandlerType::RESULT);
     Classifier.classifyNodes(Body);
   }
 
 private:
   ClassifiedBlocks &Blocks;
+  llvm::DenseSet<SwitchStmt *> &HandledSwitches;
   DiagnosticEngine &DiagEngine;
   ClassifiedBlock *CurrentBlock;
   llvm::DenseSet<const Decl *> ParamsSet;
   const ParamDecl *ErrParam;
   bool IsResultParam;
 
-  CallbackClassifier(ClassifiedBlocks &Blocks, DiagnosticEngine &DiagEngine,
+  CallbackClassifier(ClassifiedBlocks &Blocks,
+                     llvm::DenseSet<SwitchStmt *> &HandledSwitches,
+                     DiagnosticEngine &DiagEngine,
                      llvm::DenseSet<const Decl *> ParamsSet,
                      const ParamDecl *ErrParam, bool IsResultParam)
-      : Blocks(Blocks), DiagEngine(DiagEngine),
-        CurrentBlock(&Blocks.SuccessBlock), ParamsSet(ParamsSet),
-        ErrParam(ErrParam), IsResultParam(IsResultParam) {}
+      : Blocks(Blocks), HandledSwitches(HandledSwitches),
+        DiagEngine(DiagEngine), CurrentBlock(&Blocks.SuccessBlock),
+        ParamsSet(ParamsSet), ErrParam(ErrParam), IsResultParam(IsResultParam) {
+  }
 
   void classifyNodes(ArrayRef<ASTNode> Nodes) {
     for (auto I = Nodes.begin(), E = Nodes.end(); I < E; ++I) {
@@ -4688,6 +4694,7 @@ private:
   void classifySwitch(SwitchStmt *SS) {
     if (!IsResultParam || singleSwitchSubject(SS) != ErrParam) {
       CurrentBlock->addNode(SS);
+      return;
     }
 
     for (auto *CS : SS->getCases()) {
@@ -4725,6 +4732,8 @@ private:
       if (DiagEngine.hadAnyError())
         return;
     }
+    // Mark this switch statement as having been transformed.
+    HandledSwitches.insert(SS);
   }
 };
 
@@ -4782,6 +4791,9 @@ class AsyncConverter : private SourceEntityWalker {
   // declarations of old parameters, as well as the replacement for any
   // references to it
   llvm::DenseMap<const Decl *, std::string> Names;
+
+  /// The switch statements that have been re-written by this transform.
+  llvm::DenseSet<SwitchStmt *> HandledSwitches;
 
   // These are per-node (ie. are saved and restored on each convertNode call)
   SourceLoc LastAddedLoc;
@@ -4853,6 +4865,9 @@ private:
       NestedExprCount++;
       return true;
     }
+    // Note we don't walk into any nested local function decls. If we start
+    // doing so in the future, be sure to update the logic that deals with
+    // converting unhandled returns into placeholders in walkToStmtPre.
     return false;
   }
 
@@ -4870,18 +4885,16 @@ private:
         bool AddPlaceholder = Placeholders.count(D);
         StringRef Name = newNameFor(D, false);
         if (AddPlaceholder || !Name.empty())
-          return addCustom(DRE->getStartLoc(),
-                           Lexer::getLocForEndOfToken(SM, DRE->getEndLoc()),
-                           [&]() {
-                             if (AddPlaceholder)
-                               OS << PLACEHOLDER_START;
-                             if (!Name.empty())
-                               OS << Name;
-                             else
-                               D->getName().print(OS);
-                             if (AddPlaceholder)
-                               OS << PLACEHOLDER_END;
-                           });
+          return addCustom(DRE->getSourceRange(), [&]() {
+            if (AddPlaceholder)
+              OS << PLACEHOLDER_START;
+            if (!Name.empty())
+              OS << Name;
+            else
+              D->getName().print(OS);
+            if (AddPlaceholder)
+              OS << PLACEHOLDER_END;
+          });
       }
     } else if (isa<ForceValueExpr>(E) || isa<BindOptionalExpr>(E)) {
       // Remove a force unwrap or optional chain of a returned success value,
@@ -4895,19 +4908,18 @@ private:
       // completely valid.
       if (auto *D = E->getReferencedDecl().getDecl()) {
         if (Unwraps.count(D))
-          return addCustom(E->getStartLoc(), E->getEndLoc().getAdvancedLoc(1),
+          return addCustom(E->getSourceRange(),
                            [&]() { OS << newNameFor(D, true); });
       }
     } else if (NestedExprCount == 0) {
       if (CallExpr *CE = TopHandler.getAsHandlerCall(E))
-        return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
-                         [&]() { addHandlerCall(CE); });
+        return addCustom(CE->getSourceRange(), [&]() { addHandlerCall(CE); });
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         auto HandlerDesc = AsyncHandlerDesc::find(
             getUnderlyingFunc(CE->getFn()), StartNode.dyn_cast<Expr *>() == CE);
         if (HandlerDesc.isValid())
-          return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
+          return addCustom(CE->getSourceRange(),
                            [&]() { addAsyncAlternativeCall(CE, HandlerDesc); });
       }
     }
@@ -4915,6 +4927,38 @@ private:
     NestedExprCount++;
     return true;
   }
+
+  bool replaceRangeWithPlaceholder(SourceRange range) {
+    return addCustom(range, [&]() {
+      OS << PLACEHOLDER_START;
+      addRange(range, /*toEndOfToken*/ true);
+      OS << PLACEHOLDER_END;
+    });
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    // Some break and return statements need to be turned into placeholders,
+    // as they may no longer perform the control flow that the user is
+    // expecting.
+    if (!S->isImplicit()) {
+      // For a break, if it's jumping out of a switch statement that we've
+      // re-written as a part of the transform, turn it into a placeholder, as
+      // it would have been lifted out of the switch statement.
+      if (auto *BS = dyn_cast<BreakStmt>(S)) {
+        if (auto *SS = dyn_cast<SwitchStmt>(BS->getTarget())) {
+          if (HandledSwitches.contains(SS))
+            replaceRangeWithPlaceholder(S->getSourceRange());
+        }
+      }
+
+      // For a return, if it's not nested inside another closure or function,
+      // turn it into a placeholder, as it will be lifted out of the callback.
+      if (isa<ReturnStmt>(S) && NestedExprCount == 0)
+        replaceRangeWithPlaceholder(S->getSourceRange());
+    }
+    return true;
+  }
+
 #undef PLACEHOLDER_START
 #undef PLACEHOLDER_END
 
@@ -4923,11 +4967,10 @@ private:
     return true;
   }
 
-  bool addCustom(SourceLoc End, SourceLoc NextAddedLoc,
-                 std::function<void()> Custom = {}) {
-    addRange(LastAddedLoc, End);
+  bool addCustom(SourceRange Range, std::function<void()> Custom = {}) {
+    addRange(LastAddedLoc, Range.Start);
     Custom();
-    LastAddedLoc = NextAddedLoc;
+    LastAddedLoc = Lexer::getLocForEndOfToken(SM, Range.End);
     return false;
   }
 
@@ -5118,9 +5161,9 @@ private:
     if (!HandlerDesc.HasError) {
       Blocks.SuccessBlock.addAllNodes(CallbackBody);
     } else if (!CallbackBody.empty()) {
-      CallbackClassifier::classifyInto(Blocks, DiagEngine, SuccessParams,
-                                       ErrParam, HandlerDesc.Type,
-                                       CallbackBody);
+      CallbackClassifier::classifyInto(Blocks, HandledSwitches, DiagEngine,
+                                       SuccessParams, ErrParam,
+                                       HandlerDesc.Type, CallbackBody);
       if (DiagEngine.hadAnyError()) {
         // Can only fallback when the results are params, in which case only
         // the names are used (defaulted to the names of the params if none)
