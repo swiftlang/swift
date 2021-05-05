@@ -4,7 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-import Dispatch
 import _Distributed
 import _Concurrency
 
