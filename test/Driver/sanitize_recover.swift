@@ -1,4 +1,3 @@
-// REQUIRES: rdar72434165
 // RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -sanitize-recover=foo %s 2>&1 | %FileCheck -check-prefix=SAN_RECOVER_INVALID_ARG %s
 // RUN: not %swiftc_driver -driver-print-jobs -sanitize=address -sanitize-recover=thread %s 2>&1 | %FileCheck -check-prefix=SAN_RECOVER_UNSUPPORTED_ARG %s
 // RUN: %swiftc_driver -v -sanitize-recover=address %s -o %t 2>&1 | %FileCheck -check-prefix=SAN_RECOVER_MISSING_INSTRUMENTATION_OPTION %s
