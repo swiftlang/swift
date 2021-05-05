@@ -3725,8 +3725,17 @@ namespace {
 
       // It is import that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      if (!isCxxRecordImportable(decl))
+      if (!isCxxRecordImportable(decl)) {
+        // Anonymous unions can have valid and invalid decls inside of them.
+        // When the getters and setters for such unions are generated, if the
+        // __Unnamed_union___Anonymous_field is missing due to a field not
+        // being visited here then code in makeIndirectFieldAccessors() will
+        // assert. For now this could be considered a workaround.
+        // TODO: Investigate if there is a better way to avoid asserting.
+        if (decl->isAnonymousStructOrUnion() && decl->isUnion())
+          VisitRecordDecl(decl);
         return nullptr;
+      }
 
       return VisitRecordDecl(decl);
     }
