@@ -83,32 +83,41 @@ internal final class CheckedContinuationCanary {
   }
 }
 
-/// A wrapper class for `UnsafeContinuation` that logs misuses of the
-/// continuation, logging a message if the continuation is resumed
-/// multiple times, or if an object is destroyed without its continuation
-/// ever being resumed.
+/// A mechanism to interface
+/// between synchronous and asynchronous code,
+/// logging correctness violations.
 ///
-/// Raw `UnsafeContinuation`, like other unsafe constructs, requires the
-/// user to apply it correctly in order to maintain invariants. The key
-/// invariant is that the continuation must be resumed exactly once,
-/// and bad things happen if this invariant is not upheld--if a continuation
-/// is abandoned without resuming the task, then the task will be stuck in
-/// the suspended state forever, and conversely, if the same continuation is
-/// resumed multiple times, it will put the task in an undefined state.
+/// A *continuation* is an opaque representation of program state.
+/// To create a continuation in asynchronous code,
+/// call the `withUnsafeContinuation(_:)` or
+/// `withUnsafeThrowingContinuation(_:)` function.
+/// To resume the asynchronous task,
+/// call the `resume(returning:)`,
+/// `resume(throwing:)`,
+/// `resume(with:)`,
+/// or `resume()` method.
 ///
-/// `UnsafeContinuation` avoids enforcing these invariants at runtime because
-/// it aims to be a low-overhead mechanism for interfacing Swift tasks with
-/// event loops, delegate methods, callbacks, and other non-`async` scheduling
-/// mechanisms. However, during development, being able to verify that the
+/// - Important: You must call a resume methods exactly once
+///   on every execution path through the program.
+///
+/// Resuming from a continuation more than once is undefined behavior.
+/// Never resuming leaves the task in a suspended state,
+/// leaking any associated resources.
+/// `CheckedContinuation` logs a message
+/// if either of these invariants is violated.
+///
+/// `CheckedContinuation` performs runtime checks
+/// for missing or multiple resume operations.
+/// `UnsafeContinuation` avoids enforcing these invariants at runtime
+/// because it aims to be a low-overhead mechanism
+/// for interfacing Swift tasks with
+/// event loops, delegate methods, callbacks,
+/// and other non-`async` scheduling mechanisms.
+/// However, during development, being able to verify that the
 /// invariants are being upheld in testing is important.
-///
-/// `CheckedContinuation` is designed to be a drop-in API replacement for
-/// `UnsafeContinuation` that can be used for testing purposes, at the cost of
-/// an extra allocation and indirection for the wrapper object. Changing a call
-/// of `withUnsafeContinuation` or `withUnsafeThrowingContinuation` into a call
-/// of `withCheckedContinuation` or `withCheckedThrowingContinuation` should be
-/// enough to obtain the extra checking without further source modification in
-/// most circumstances.
+/// Because both types have the same interface,
+/// you can replace one with the other in most circumstances,
+/// without the need for any other changes.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct CheckedContinuation<T, E: Error> {
   private let canary: CheckedContinuationCanary
@@ -241,6 +250,7 @@ extension CheckedContinuation {
   }
 }
 
+/// XXX FIXME - abstract
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func withCheckedContinuation<T>(
     function: String = #function,
@@ -251,6 +261,7 @@ public func withCheckedContinuation<T>(
   }
 }
 
+/// XXX FIXME - abstract
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
