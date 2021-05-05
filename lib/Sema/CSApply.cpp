@@ -25,6 +25,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -7038,6 +7039,38 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
         // Propagating the global actor bit might have satisfied the entire
         // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
+    /// Whether the given effect should be propagated to a closure expression.
+    auto shouldApplyEffect = [&](EffectKind kind) -> bool {
+      auto last = locator.last();
+      if (!(last && last->is<LocatorPathElt::ApplyArgToParam>()))
+        return true;
+
+      // The effect should not be applied if the closure is an argument
+      // to a function where that effect is polymorphic.
+      if (auto *call = getAsExpr<ApplyExpr>(locator.getAnchor())) {
+        if (auto *declRef = dyn_cast<DeclRefExpr>(call->getFn())) {
+          if (auto *fn = dyn_cast<AbstractFunctionDecl>(declRef->getDecl()))
+            return !fn->hasPolymorphicEffect(kind);
+        }
+      }
+
+      return true;
+    };
+
+    // If we have a ClosureExpr, we can safely propagate 'async' to the closure.
+    fromEI = fromFunc->getExtInfo();
+    if (toEI.isAsync() && !fromEI.isAsync() && shouldApplyEffect(EffectKind::Async)) {
+      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withAsync());
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating 'async' might have satisfied the entire conversion.
+        // If so, we're done, otherwise keep converting.
         if (fromFunc->isEqual(toType))
           return expr;
       }
