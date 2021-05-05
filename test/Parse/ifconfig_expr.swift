@@ -127,27 +127,27 @@ func ifconfigExprInExpr(baseExpr: MyStruct) {
 }
 
 func canImportVersioned() {
-#if canImport(A, version: 2)
+#if canImport(A, _version: 2)
   let a = 1
 #endif
 
-#if canImport(A, version: 2.2)
+#if canImport(A, _version: 2.2)
   let a = 1
 #endif
 
-#if canImport(A, underlyingVersion: 4)
+#if canImport(A, _underlyingVersion: 4)
   let a = 1
 #endif
 
-#if canImport(A, underlyingVersion: 2.200)
+#if canImport(A, _underlyingVersion: 2.200)
   let a = 1
 #endif
 
-#if canImport(A, unknown: 2.2) // expected-error {{2nd parameter of canImport should be labeled as version or underlyingVersion}}
+#if canImport(A, unknown: 2.2) // expected-error {{2nd parameter of canImport should be labeled as _version or _underlyingVersion}}
   let a = 1
 #endif
 
-#if canImport(A, 2.2) // expected-error {{2nd parameter of canImport should be labeled as version or underlyingVersion}}
+#if canImport(A, 2.2) // expected-error {{2nd parameter of canImport should be labeled as _version or _underlyingVersion}}
   let a = 1
 #endif
 
