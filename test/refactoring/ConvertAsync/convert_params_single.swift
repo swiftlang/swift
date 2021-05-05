@@ -357,7 +357,7 @@ withError { res, err in
 // NESTEDRET-NEXT: let str = try await withError()
 // NESTEDRET-NEXT: print("before")
 // NESTEDRET-NEXT: if test(str) {
-// NESTEDRET-NEXT: return
+// NESTEDRET-NEXT:   <#return#>
 // NESTEDRET-NEXT: }
 // NESTEDRET-NEXT: print("got result \(str)")
 // NESTEDRET-NEXT: print("after")
