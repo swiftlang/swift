@@ -475,6 +475,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
 
   setAccess(AccessLevel::Public);
 
+  Bits.ModuleDecl.StaticLibrary = 0;
   Bits.ModuleDecl.TestingEnabled = 0;
   Bits.ModuleDecl.FailedToLoad = 0;
   Bits.ModuleDecl.RawResilienceStrategy = 0;

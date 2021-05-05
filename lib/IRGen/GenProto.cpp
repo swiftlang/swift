@@ -1117,9 +1117,15 @@ public:
 
   llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
                                       CanType conformingType) const override {
-    if (IGM.getOptions().LazyInitializeProtocolConformances &&
-        RootConformance->getDeclContext()->getParentModule() != IGM.getSwiftModule())
-      return nullptr;
+    if (IGM.getOptions().LazyInitializeProtocolConformances) {
+      const auto *MD = RootConformance->getDeclContext()->getParentModule();
+      // If the protocol conformance is defined in the current module or the
+      // module will be statically linked, then we can statically initialize the
+      // conformance as we know that the protocol conformance is guaranteed to
+      // be present.
+      if (!(MD == IGM.getSwiftModule() || MD->isStaticLibrary()))
+        return nullptr;
+    }
     return IGM.getAddrOfWitnessTable(RootConformance);
   }
 };

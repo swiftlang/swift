@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 612; // add user-defined module version
+const uint16_t SWIFTMODULE_VERSION_MINOR = 613; // isStaticLibrary option
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -788,6 +788,7 @@ namespace options_block {
     SDK_PATH = 1,
     XCC,
     IS_SIB,
+    IS_STATIC_LIBRARY,
     IS_TESTABLE,
     RESILIENCE_STRATEGY,
     ARE_PRIVATE_IMPORTS_ENABLED,
@@ -809,6 +810,10 @@ namespace options_block {
   using IsSIBLayout = BCRecordLayout<
     IS_SIB,
     BCFixed<1> // Is this an intermediate file?
+  >;
+
+  using IsStaticLibraryLayout = BCRecordLayout<
+    IS_STATIC_LIBRARY
   >;
 
   using IsTestableLayout = BCRecordLayout<
