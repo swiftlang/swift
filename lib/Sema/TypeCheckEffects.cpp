@@ -2620,9 +2620,10 @@ private:
 
   void checkThrowAsyncSite(ASTNode E, bool requiresTry,
                            const Classification &classification) {
-    // Suppress all diagnostics when there's an un-analyzable throw site.
+    // Suppress all diagnostics when there's an un-analyzable throw/async site.
     if (classification.isInvalid()) {
       Flags.set(ContextFlags::HasAnyThrowSite);
+      Flags.set(ContextFlags::HasAnyAsyncSite);
       if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
       return;
     }
