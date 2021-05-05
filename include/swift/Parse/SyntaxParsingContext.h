@@ -44,6 +44,14 @@ enum class SyntaxContextKind {
   Syntax,
 };
 
+} // end namespace swift
+
+namespace llvm {
+raw_ostream &operator<<(raw_ostream &OS, swift::SyntaxContextKind Kind);
+} // end namespace llvm
+
+namespace swift {
+
 enum class SyntaxNodeCreationKind {
   /// This is for \c SyntaxParsingContext to collect the syntax data and create
   /// a 'recorded' ParsedRawSyntaxNode object, which would be a result of
@@ -355,6 +363,9 @@ public:
 
   /// Dump the nodes that are in the storage stack of the SyntaxParsingContext
   SWIFT_DEBUG_DUMPER(dumpStorage());
+
+  void dumpStack(llvm::raw_ostream &OS) const;
+  SWIFT_DEBUG_DUMPER(dumpStack()) { dumpStack(llvm::errs()); }
 };
 
 } // namespace swift
