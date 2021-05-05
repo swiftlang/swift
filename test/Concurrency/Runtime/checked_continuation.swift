@@ -5,6 +5,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// UNSUPPORTED: OS=windows-msvc
+
 import _Concurrency
 import StdlibUnittest
 
