@@ -59,7 +59,8 @@ class SwiftTestCase(unittest.TestCase):
             force_optimized_typechecker=False,
             enable_stdlibcore_exclusivity_checking=False,
             enable_experimental_differentiable_programming=False,
-            enable_experimental_concurrency=False)
+            enable_experimental_concurrency=False,
+            enable_experimental_distributed=False,)
 
         # Setup shell
         shell.dry_run = True
