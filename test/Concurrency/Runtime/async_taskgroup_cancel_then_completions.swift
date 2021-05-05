@@ -10,14 +10,14 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
 // FIXME: this is a workaround since (A, B) today isn't inferred to be Sendable
 //        and causes an error, but should be a warning (this year at least)
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
   let first: A
   let second: B
@@ -28,7 +28,7 @@ struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_taskGroup_cancel_then_completions() async {
   // CHECK: test_taskGroup_cancel_then_completions
   print("before \(#function)")
@@ -73,7 +73,7 @@ func test_taskGroup_cancel_then_completions() async {
   print("result: \(result)") // CHECK: result: 3
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_then_completions()

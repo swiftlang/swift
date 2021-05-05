@@ -6,12 +6,12 @@ enum PictureData {
   case failedToLoadImagePlaceholder
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_cancellation_checkCancellation() async throws {
   try Task.checkCancellation()
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_cancellation_guard_isCancelled(_ any: Any) async -> PictureData {
   guard !Task.isCancelled else {
     return PictureData.failedToLoadImagePlaceholder
@@ -20,12 +20,12 @@ func test_cancellation_guard_isCancelled(_ any: Any) async -> PictureData {
   return PictureData.value("...")
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 struct SomeFile: Sendable {
   func close() {}
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> PictureData {
   let handle: Task.Handle<PictureData, Error> = detach {
     let file = SomeFile()
@@ -39,7 +39,7 @@ func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> Pic
   handle.cancel()
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_cancellation_loop() async -> Int {
   struct SampleTask { func process() async {} }
 
