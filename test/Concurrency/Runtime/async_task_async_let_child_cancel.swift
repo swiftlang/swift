@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 
 // UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: use_os_stdlib
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printWaitPrint(_ int: Int) async -> Int {

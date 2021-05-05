@@ -5,6 +5,7 @@
 
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: use_os_stdlib
 
 actor Simple {
   var count = 0
