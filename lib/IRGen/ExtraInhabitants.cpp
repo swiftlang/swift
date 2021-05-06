@@ -25,7 +25,7 @@
 using namespace swift;
 using namespace irgen;
 
-static unsigned getNumLowObjCReservedBits(const IRGenModule &IGM) {
+static uint8_t getNumLowObjCReservedBits(const IRGenModule &IGM) {
   if (!IGM.ObjCInterop)
     return 0;
 
@@ -34,16 +34,25 @@ static unsigned getNumLowObjCReservedBits(const IRGenModule &IGM) {
   return mask.asAPInt().countTrailingOnes();
 }
 
+PointerInfo PointerInfo::forHeapObject(const IRGenModule &IGM) {
+  return { Alignment(1), getNumLowObjCReservedBits(IGM), IsNotNullable };
+}
+
+PointerInfo PointerInfo::forFunction(const IRGenModule &IGM) {
+  return { Alignment(1), 0, IsNotNullable };
+}
+
 /*****************************************************************************/
 
 /// Return the number of extra inhabitants for a pointer that reserves
 /// the given number of low bits.
-static unsigned getPointerExtraInhabitantCount(const IRGenModule &IGM,
-                                               unsigned numReservedLowBits) {  
+unsigned PointerInfo::getExtraInhabitantCount(const IRGenModule &IGM) const {
   // FIXME: We could also make extra inhabitants using spare bits, but we
   // probably don't need to.
   uint64_t rawCount =
-    IGM.TargetInfo.LeastValidPointerValue >> numReservedLowBits;
+    IGM.TargetInfo.LeastValidPointerValue >> NumReservedLowBits;
+
+  if (Nullable) rawCount--;
   
   // The runtime limits the count.
   return std::min(uint64_t(ValueWitnessFlags::MaxNumExtraInhabitants),
@@ -54,35 +63,23 @@ unsigned irgen::getHeapObjectExtraInhabitantCount(const IRGenModule &IGM) {
   // This must be consistent with the extra inhabitant count produced
   // by the runtime's getHeapObjectExtraInhabitantCount function in
   // KnownMetadata.cpp.
-  return getPointerExtraInhabitantCount(IGM, getNumLowObjCReservedBits(IGM));
-}
-
-unsigned irgen::getFunctionPointerExtraInhabitantCount(IRGenModule &IGM) {
-  return getPointerExtraInhabitantCount(IGM, 0);
-}
-
-unsigned irgen::getAlignedPointerExtraInhabitantCount(IRGenModule &IGM,
-                                                      Alignment align) {
-  // For all of the operations on current platforms, we totally ignore
-  // alignment because we assume we can get what we consider to be an
-  // adequate number of extra inhabitants from LeastValidPointerValue.
-  // If we have to revisit that for a future ABI, we can take advantage
-  // of alignment bits.
-  return getPointerExtraInhabitantCount(IGM, 0);
+  return PointerInfo::forHeapObject(IGM).getExtraInhabitantCount(IGM);
 }
 
 /*****************************************************************************/
 
-static APInt
-getPointerFixedExtraInhabitantValue(const IRGenModule &IGM, unsigned bits,
-                                    unsigned index, unsigned offset,
-                                    unsigned numReservedLowBits) {
+APInt PointerInfo::getFixedExtraInhabitantValue(const IRGenModule &IGM,
+                                                unsigned bits,
+                                                unsigned index,
+                                                unsigned offset) const {
   unsigned pointerSizeInBits = IGM.getPointerSize().getValueInBits();
-  assert(index < getPointerExtraInhabitantCount(IGM, numReservedLowBits) &&
+  assert(index < getExtraInhabitantCount(IGM) &&
          "pointer extra inhabitant out of bounds");
   assert(bits >= pointerSizeInBits + offset);
 
-  uint64_t value = (uint64_t)index << numReservedLowBits;
+  if (Nullable) index++;
+
+  uint64_t value = (uint64_t)index << NumReservedLowBits;
 
   auto valueBits = BitPatternBuilder(IGM.Triple.isLittleEndian());
   valueBits.appendClearBits(offset);
@@ -98,30 +95,14 @@ APInt irgen::getHeapObjectFixedExtraInhabitantValue(const IRGenModule &IGM,
   // This must be consistent with the extra inhabitant calculation implemented
   // in the runtime's storeHeapObjectExtraInhabitant and
   // getHeapObjectExtraInhabitantIndex functions in KnownMetadata.cpp.
-  return getPointerFixedExtraInhabitantValue(IGM, bits, index, offset,
-                                             getNumLowObjCReservedBits(IGM));
-}
-
-APInt irgen::getFunctionPointerFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                         unsigned bits,
-                                                         unsigned index,
-                                                         unsigned offset) {
-  return getPointerFixedExtraInhabitantValue(IGM, bits, index, offset, 0);
-}
-
-APInt irgen::getAlignedPointerExtraInhabitantValue(IRGenModule &IGM,
-                                                   Alignment align,
-                                                   unsigned bits,
-                                                   unsigned index,
-                                                   unsigned offset) {
-  return getPointerFixedExtraInhabitantValue(IGM, bits, index, offset, 0);
+  return PointerInfo::forHeapObject(IGM)
+           .getFixedExtraInhabitantValue(IGM, bits, index, offset);
 }
 
 /*****************************************************************************/
 
-static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
-                                                   Address src,
-                                                   unsigned numReservedLowBits) {
+llvm::Value *PointerInfo::getExtraInhabitantIndex(IRGenFunction &IGF,
+                                                  Address src) const {
   llvm::BasicBlock *contBB = IGF.createBasicBlock("is-valid-pointer");
   SmallVector<std::pair<llvm::BasicBlock*, llvm::Value*>, 3> phiValues;
   auto invalidIndex = llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
@@ -140,12 +121,22 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
     IGF.Builder.CreateCondBr(isValid, contBB, invalidBB);
     IGF.Builder.emitBlock(invalidBB);
   }
-                       
+
+  // If null is not an extra inhabitant, check if the inhabitant is null.
+  if (Nullable) {
+    auto null = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+    auto isNonNull = IGF.Builder.CreateICmpNE(val, null);
+    phiValues.push_back({IGF.Builder.GetInsertBlock(), invalidIndex});
+    llvm::BasicBlock *nonnullBB = IGF.createBasicBlock("is-nonnull-pointer");
+    IGF.Builder.CreateCondBr(isNonNull, nonnullBB, contBB);
+    IGF.Builder.emitBlock(nonnullBB);
+  }
+
   // Check if the inhabitant has any reserved low bits set.
   // FIXME: This check is unneeded if the type is known to be pure Swift.
-  if (numReservedLowBits) {
+  if (NumReservedLowBits) {
     auto objcMask =
-      llvm::ConstantInt::get(IGF.IGM.SizeTy, (1 << numReservedLowBits) - 1);
+      llvm::ConstantInt::get(IGF.IGM.SizeTy, (1 << NumReservedLowBits) - 1);
     llvm::Value *masked = IGF.Builder.CreateAnd(val, objcMask);
     llvm::Value *maskedZero = IGF.Builder.CreateICmpEQ(masked,
                                      llvm::ConstantInt::get(IGF.IGM.SizeTy, 0));
@@ -155,15 +146,20 @@ static llvm::Value *getPointerExtraInhabitantIndex(IRGenFunction &IGF,
     IGF.Builder.CreateCondBr(maskedZero, untaggedBB, contBB);
     IGF.Builder.emitBlock(untaggedBB);
   }
-  
+
   // The inhabitant is an invalid pointer. Derive its extra inhabitant index.
   {
     llvm::Value *index = val;
 
     // Shift away the reserved bits.
-    if (numReservedLowBits) {
-      index = IGF.Builder.CreateLShr(index, 
-                    llvm::ConstantInt::get(IGF.IGM.SizeTy, numReservedLowBits));
+    if (NumReservedLowBits) {
+      index = IGF.Builder.CreateLShr(index,
+                                  IGF.IGM.getSize(Size(NumReservedLowBits)));
+    }
+
+    // Subtract one if we have a nullable type.
+    if (Nullable) {
+      index = IGF.Builder.CreateSub(index, IGF.IGM.getSize(Size(1)));
     }
 
     // Truncate down to i32 if necessary.
@@ -189,34 +185,25 @@ llvm::Value *irgen::getHeapObjectExtraInhabitantIndex(IRGenFunction &IGF,
   // This must be consistent with the extra inhabitant calculation implemented
   // in the runtime's getHeapObjectExtraInhabitantIndex function in
   // KnownMetadata.cpp.
-  return getPointerExtraInhabitantIndex(IGF, src,
-                                        getNumLowObjCReservedBits(IGF.IGM));
-}
-
-llvm::Value *irgen::getFunctionPointerExtraInhabitantIndex(IRGenFunction &IGF,
-                                                           Address src) {
-  return getPointerExtraInhabitantIndex(IGF, src, 0);
-}
-
-llvm::Value *irgen::getAlignedPointerExtraInhabitantIndex(IRGenFunction &IGF,
-                                                          Alignment align,
-                                                          Address src) {
-  return getPointerExtraInhabitantIndex(IGF, src, 0);
+  return PointerInfo::forHeapObject(IGF.IGM).getExtraInhabitantIndex(IGF, src);
 }
 
 /*****************************************************************************/
 
-static void storePointerExtraInhabitant(IRGenFunction &IGF,
-                                        llvm::Value *index,
-                                        Address dest,
-                                        unsigned numReservedLowBits) {
+void PointerInfo::storeExtraInhabitant(IRGenFunction &IGF,
+                                       llvm::Value *index,
+                                       Address dest) const {
   if (index->getType() != IGF.IGM.SizeTy) {
     index = IGF.Builder.CreateZExt(index, IGF.IGM.SizeTy);
   }
 
-  if (numReservedLowBits) {
+  if (Nullable) {
+    index = IGF.Builder.CreateAdd(index, IGF.IGM.getSize(Size(1)));
+  }
+
+  if (NumReservedLowBits) {
     index = IGF.Builder.CreateShl(index,
-                  llvm::ConstantInt::get(IGF.IGM.SizeTy, numReservedLowBits));
+                  llvm::ConstantInt::get(IGF.IGM.SizeTy, NumReservedLowBits));
   }
 
   dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.SizeTy->getPointerTo());
@@ -229,19 +216,6 @@ void irgen::storeHeapObjectExtraInhabitant(IRGenFunction &IGF,
   // This must be consistent with the extra inhabitant calculation implemented
   // in the runtime's storeHeapObjectExtraInhabitant function in
   // KnownMetadata.cpp.
-  storePointerExtraInhabitant(IGF, index, dest,
-                              getNumLowObjCReservedBits(IGF.IGM));
-}
-
-void irgen::storeFunctionPointerExtraInhabitant(IRGenFunction &IGF,
-                                                llvm::Value *index,
-                                                Address dest) {
-  storePointerExtraInhabitant(IGF, index, dest, 0);
-}
-
-void irgen::storeAlignedPointerExtraInhabitant(IRGenFunction &IGF,
-                                               Alignment align,
-                                               llvm::Value *index,
-                                               Address dest) {
-  storePointerExtraInhabitant(IGF, index, dest, 0);
+  PointerInfo::forHeapObject(IGF.IGM)
+    .storeExtraInhabitant(IGF, index, dest);
 }

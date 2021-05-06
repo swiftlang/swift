@@ -3,5 +3,5 @@
 
 let j = 1
 
-_ = "a" + j + "b" + j + "c" + j
+_ = "a" + j + "b" + j + "c" + j + "d" + j
 // expected-error@-1 {{reasonable time}}

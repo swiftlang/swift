@@ -294,11 +294,8 @@ bool ArrayAllocation::replaceAppendContentOf() {
     ArraySemanticsCall AppendContentsOf(AppendContentOfCall);
     assert(AppendContentsOf && "Must be AppendContentsOf call");
 
-    NominalTypeDecl *AppendSelfArray = AppendContentsOf.getSelf()->getType().
-    getASTType()->getAnyNominal();
-
     // In case if it's not an Array, but e.g. an ContiguousArray
-    if (AppendSelfArray != Ctx.getArrayDecl())
+    if (!AppendContentsOf.getSelf()->getType().getASTType()->isArray())
       continue;
 
     SILType ArrayType = ArrayValue->getType();

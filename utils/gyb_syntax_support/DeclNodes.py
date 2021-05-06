@@ -106,6 +106,7 @@ DECL_NODES = [
                        Child('Statements', kind='CodeBlockItemList'),
                        Child('SwitchCases', kind='SwitchCaseList'),
                        Child('Decls', kind='MemberDeclList'),
+                       Child('PostfixExpression', kind='Expr'),
                    ]),
          ]),
 
@@ -288,13 +289,14 @@ DECL_NODES = [
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Members', kind='MemberDeclList',
-                   collection_element_name='Member'),
-             Child('RightBrace', kind='RightBraceToken'),
+                   collection_element_name='Member', is_indented=True),
+             Child('RightBrace', kind='RightBraceToken', 
+                   requires_leading_newline=True),
          ]),
 
     # member-decl-list = member-decl member-decl-list?
     Node('MemberDeclList', kind='SyntaxCollection',
-         element='MemberDeclListItem'),
+         element='MemberDeclListItem', elements_separated_by_newline=True),
 
     # member-decl = decl ';'?
     Node('MemberDeclListItem', kind='Syntax', omit_when_empty=True,
@@ -533,6 +535,15 @@ DECL_NODES = [
                       '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
+             Child('AsyncKeyword', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['async'], is_optional=True),
+             Child('ThrowsKeyword', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'ThrowsToken',
+                       'RethrowsToken',
+                   ]),
              Child('Body', kind='CodeBlock', is_optional=True),
          ]),
 

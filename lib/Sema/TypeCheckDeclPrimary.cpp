@@ -2314,6 +2314,14 @@ public:
     // Check for circular inheritance.
     (void)CD->getSuperclassDecl();
 
+    if (auto superclass = CD->getSuperclassDecl()) {
+      // Actors cannot have superclasses, nor can they be superclasses.
+      if (CD->isActor() && !superclass->isNSObject())
+        CD->diagnose(diag::actor_inheritance);
+      else if (superclass->isActor())
+        CD->diagnose(diag::actor_inheritance);
+    }
+
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
 
@@ -3026,10 +3034,12 @@ void TypeChecker::checkParameterList(ParameterList *params,
       (void) param->getPropertyWrapperInitializerInfo();
 
     auto *SF = param->getDeclContext()->getParentSourceFile();
-    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
-      if (!isa<ParamDecl>(auxiliaryDecl))
-        DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
-    });
+    if (!param->isInvalid()) {
+      param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
+        if (!isa<ParamDecl>(auxiliaryDecl))
+          DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+      });
+    }
   }
 
   // For source compatibilty, allow duplicate internal parameter names

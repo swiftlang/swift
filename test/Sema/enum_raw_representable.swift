@@ -56,10 +56,14 @@ enum Color : Int {
     return nil
   }
 
-  var rawValue: Double {
-  // expected-error@-1 {{invalid redeclaration of synthesized implementation for protocol requirement 'rawValue'}}
+  var rawValue: Double { // expected-note {{found this candidate}}
     return 1.0
   }
+}
+
+func useRawValue(of color: Color) {
+  _ = color.rawValue
+  // expected-error@-1 {{ambiguous use of 'rawValue'}}
 }
 
 var colorRaw: Color.RawValue = 7.5

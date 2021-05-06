@@ -3,6 +3,7 @@
 // REQUIRES: libdispatch
 // UNSUPPORTED: OS=linux-gnu
 // UNSUPPORTED: OS=linux-android
+// UNSUPPORTED: OS=openbsd
 
 import Dispatch
 import StdlibUnittest

@@ -1,6 +1,6 @@
 // XFAIL: CPU=powerpc64le
 // XFAIL: CPU=s390x
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-cpu
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-ptrsize
 
 sil_stage canonical
 
@@ -23,6 +23,8 @@ entry:
 // CHECK-LABEL-arm64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
 // CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
 // CHECK-LABEL-aarch64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
+// CHECK-LABEL-arm64_32:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
+// CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
 sil @does_throw : $@convention(thin) () -> @error Error {
   // CHECK: [[T0:%.*]] = call swiftcc %swift.error* @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned Error
@@ -45,6 +47,8 @@ sil @does_throw : $@convention(thin) () -> @error Error {
 // CHECK-LABEL-arm64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
 // CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
 // CHECK-LABEL-aarch64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
+// CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
+// CHECK-LABEL-arm64_32:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(%swift.refcounted* swiftself %0, %swift.error** swifterror %1) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error Error {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
@@ -68,6 +72,7 @@ entry(%0 : $AnyObject):
   // CHECK-arm64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-arm64e:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-aarch64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
+  // CHECK-arm64_32:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-powerpc64le: [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 

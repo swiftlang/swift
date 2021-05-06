@@ -64,8 +64,8 @@ class ParsedRawSyntaxNode {
   /// when it is being passed around.
   CharSourceRange Range;
 #endif
-  uint16_t SynKind;
-  uint16_t TokKind;
+  syntax::SyntaxKind SynKind;
+  tok TokKind;
   /// Primary used for capturing a deferred missing token.
   bool IsMissing = false;
 
@@ -76,15 +76,14 @@ public:
   // MARK: - Constructors
 
   ParsedRawSyntaxNode()
-      : Data(nullptr, DataKind::Null),
-        SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
-        TokKind(uint16_t(tok::unknown)) {}
+      : Data(nullptr, DataKind::Null), SynKind(syntax::SyntaxKind::Unknown),
+        TokKind(tok::unknown) {}
 
 #ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
   ParsedRawSyntaxNode(RecordedOrDeferredNode Data, syntax::SyntaxKind SynKind,
                       tok TokKind, bool IsMissing, CharSourceRange Range)
-      : Data(Data), Range(Range), SynKind(uint16_t(SynKind)),
-        TokKind(uint16_t(TokKind)), IsMissing(IsMissing) {
+      : Data(Data), Range(Range), SynKind(SynKind), TokKind(TokKind),
+        IsMissing(IsMissing) {
     assert(getKind() == SynKind && "Syntax kind with too large value!");
     assert(getTokenKind() == TokKind && "Token kind with too large value!");
   }
@@ -97,8 +96,7 @@ public:
 #else
   ParsedRawSyntaxNode(RecordedOrDeferredNode Data, syntax::SyntaxKind SynKind,
                       tok TokKind, bool IsMissing)
-      : Data(Data), SynKind(uint16_t(SynKind)), TokKind(uint16_t(TokKind)),
-        IsMissing(IsMissing) {
+      : Data(Data), SynKind(SynKind), TokKind(TokKind), IsMissing(IsMissing) {
     assert(getKind() == SynKind && "Syntax kind with too large value!");
     assert(getTokenKind() == TokKind && "Token kind with too large value!");
   }
@@ -175,8 +173,8 @@ public:
 
   // MARK: - Retrieving additional node info
 
-  syntax::SyntaxKind getKind() const { return syntax::SyntaxKind(SynKind); }
-  tok getTokenKind() const { return tok(TokKind); }
+  syntax::SyntaxKind getKind() const { return SynKind; }
+  tok getTokenKind() const { return TokKind; }
 
   bool isToken() const {
     return getKind() == syntax::SyntaxKind::Token;
@@ -210,8 +208,8 @@ public:
 
   void reset() {
     Data = RecordedOrDeferredNode(nullptr, DataKind::Null);
-    SynKind = uint16_t(syntax::SyntaxKind::Unknown);
-    TokKind = uint16_t(tok::unknown);
+    SynKind = syntax::SyntaxKind::Unknown;
+    TokKind = tok::unknown;
     IsMissing = false;
 #ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
     Range = CharSourceRange();

@@ -208,3 +208,34 @@ bb2:
   return %r : $()
 }
 
+//   This pattern is definitely optimizable, but it's *not* supposed to
+//   be optimized by simply removing the hop before the builtin.
+// CHECK-LABEL: sil [ossa] @handleGetCurrentExecutor : $@convention(method) @async (@guaranteed MyActor, @guaranteed MyActor) -> () {
+// CHECK:       bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    function_ref
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    hop_to_executor
+// CHECK-NEXT:    builtin
+// CHECK-NEXT:    hop_to_executor
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    function_ref
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'handleGetCurrentExecutor'
+sil [ossa] @handleGetCurrentExecutor : $@convention(method) @async (@guaranteed MyActor, @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
+  hop_to_executor %0 : $MyActor
+  %async_f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply %async_f() : $@convention(thin) @async () -> ()
+  hop_to_executor %0 : $MyActor  
+  %curExec = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+  hop_to_executor %1 : $MyActor
+  %f = function_ref @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
+  apply %f(%1) : $@convention(method) (@guaranteed MyActor) -> ()
+  hop_to_executor %0 : $MyActor
+  %r = tuple ()
+  return %r : $()
+}
+

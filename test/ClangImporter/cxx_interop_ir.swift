@@ -9,17 +9,17 @@ func indirectUsage() {
   useT(makeT())
 }
 
-// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s6cxx_ir14reflectionInfo3argypXpSo2nsV10CXXInteropE1TV_tF"
-// CHECK: %0 = call swiftcc %swift.metadata_response @"$sSo2nsV10CXXInteropE1TVMa"({{i64|i32}} 0)
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s6cxx_ir14reflectionInfo3argypXpSo2nsO10CXXInteropE1TV_tF"
+// CHECK: %0 = call swiftcc %swift.metadata_response @"$sSo2nsO10CXXInteropE1TVMa"({{i64|i32}} 0)
 func reflectionInfo(arg: namespacedT) -> Any.Type {
   return type(of: arg)
 }
 
-// CHECK: define hidden swiftcc void @"$s6cxx_ir24namespaceManglesIntoName3argySo2nsV10CXXInteropE1TV_tF"
+// CHECK: define hidden swiftcc void @"$s6cxx_ir24namespaceManglesIntoName3argySo2nsO10CXXInteropE1TV_tF"
 func namespaceManglesIntoName(arg: namespacedT) {
 }
 
-// CHECK: define hidden swiftcc void @"$s6cxx_ir42namespaceManglesIntoNameForUsingShadowDecl3argySo2nsV10CXXInteropE14NamespacedTypeV_tF"
+// CHECK: define hidden swiftcc void @"$s6cxx_ir42namespaceManglesIntoNameForUsingShadowDecl3argySo2nsO10CXXInteropE14NamespacedTypeV_tF"
 func namespaceManglesIntoNameForUsingShadowDecl(arg: NamespacedType) {
 }
 

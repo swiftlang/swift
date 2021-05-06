@@ -18,6 +18,7 @@
 #define SWIFT_ABI_EXECUTOR_H
 
 #include <inttypes.h>
+#include "swift/ABI/Actor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Casting.h"
 
@@ -26,20 +27,44 @@ class AsyncContext;
 class AsyncTask;
 class DefaultActor;
 class Job;
+class SerialExecutorWitnessTable;
 
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
-SWIFT_EXPORT_FROM(swift_Concurrency)
-Metadata* MainActorMetadata;
-
-/// An ExecutorRef isn't necessarily just a pointer to an executor
-/// object; it may have other bits set.
+/// An unmanaged reference to an executor.
+///
+/// This type corresponds to the type Optional<Builtin.Executor> in
+/// Swift.  The representation of nil in Optional<Builtin.Executor>
+/// aligns with what this type calls the generic executor, so the
+/// notional subtype of this type which is never generic corresponds
+/// to the type Builtin.Executor.
+///
+/// An executor reference is divided into two pieces:
+///
+/// - The identity, which is just a (potentially ObjC) object
+///   reference; when this is null, the reference is generic.
+///   Equality of executor references is based solely on equality
+///   of identity.
+///
+/// - The implementation, which is an optional reference to a
+///   witness table for the SerialExecutor protocol.  When this
+///   is null, but the identity is non-null, the reference is to
+///   a default actor.  The low bits of the implementation pointer
+///   are reserved for the use of marking interesting properties
+///   about the executor's implementation.  The runtime masks these
+///   bits off before accessing the witness table, so setting them
+///   in the future should back-deploy as long as the witness table
+///   reference is still present.
 class ExecutorRef {
-  static constexpr uintptr_t IsDefaultActor = 1;
-  static constexpr uintptr_t PointerMask = 7;
+  HeapObject *Identity; // Not necessarily Swift reference-countable
+  uintptr_t Implementation;
 
-  uintptr_t Value;
+  // We future-proof the ABI here by masking the low bits off the
+  // implementation pointer before using it as a witness table.
+  enum: uintptr_t {
+    WitnessTableMask = ~uintptr_t(alignof(void*) - 1)
+  };
 
-  constexpr ExecutorRef(uintptr_t value) : Value(value) {}
+  constexpr ExecutorRef(HeapObject *identity, uintptr_t implementation)
+    : Identity(identity), Implementation(implementation) {}
 
 public:
   /// A generic execution environment.  When running in a generic
@@ -47,65 +72,48 @@ public:
   /// to an actor.  As an executor request, this represents a request
   /// to drop whatever the current actor is.
   constexpr static ExecutorRef generic() {
-    return ExecutorRef(0);
-  }
-
-  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-  /// NOTE: I didn't go with Executor::forMainActor(DefaultActor*) because
-  /// __swift_run_job_main_executor can't take more than one argument.
-  constexpr static ExecutorRef mainExecutor() {
-    return ExecutorRef(2);
+    return ExecutorRef(nullptr, 0);
   }
 
   /// Given a pointer to a default actor, return an executor reference
   /// for it.
   static ExecutorRef forDefaultActor(DefaultActor *actor) {
     assert(actor);
-    return ExecutorRef(reinterpret_cast<uintptr_t>(actor) | IsDefaultActor);
+    return ExecutorRef(actor, 0);
+  }
+
+  HeapObject *getIdentity() const {
+    return Identity;
   }
 
   /// Is this the generic executor reference?
   bool isGeneric() const {
-    return Value == 0;
-  }
-
-  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-  bool isMainExecutor() const {
-    if (Value == ExecutorRef::mainExecutor().Value)
-      return true;
-
-    HeapObject *heapObj = reinterpret_cast<HeapObject*>(Value & ~PointerMask);
-
-    if (heapObj == nullptr || MainActorMetadata == nullptr)
-      return false;
-
-    Metadata const* metadata = swift_getObjectType(heapObj);
-    return metadata == MainActorMetadata;
+    return Identity == 0;
   }
 
   /// Is this a default-actor executor reference?
   bool isDefaultActor() const {
-    return Value & IsDefaultActor;
+    return !isGeneric() && Implementation == 0;
   }
   DefaultActor *getDefaultActor() const {
     assert(isDefaultActor());
-    return reinterpret_cast<DefaultActor*>(Value & ~PointerMask);
+    return reinterpret_cast<DefaultActor*>(Identity);
   }
 
-  uintptr_t getRawValue() const {
-    return Value;
+  const SerialExecutorWitnessTable *getSerialExecutorWitnessTable() const {
+    assert(!isGeneric() && !isDefaultActor());
+    auto table = Implementation & WitnessTableMask;
+    return reinterpret_cast<const SerialExecutorWitnessTable*>(table);
   }
 
   /// Do we have to do any work to start running as the requested
   /// executor?
   bool mustSwitchToRun(ExecutorRef newExecutor) const {
-    return *this != newExecutor;
+    return Identity != newExecutor.Identity;
   }
 
   bool operator==(ExecutorRef other) const {
-    return Value == other.Value
-    /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-          || (isMainExecutor() && other.isMainExecutor());
+    return Identity == other.Identity;
   }
   bool operator!=(ExecutorRef other) const {
     return !(*this == other);

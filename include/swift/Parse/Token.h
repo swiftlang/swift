@@ -130,8 +130,8 @@ public:
   }
   
   bool isContextualKeyword(StringRef ContextKW) const {
-    return is(tok::identifier) && !isEscapedIdentifier() &&
-           Text == ContextKW;
+    return isAny(tok::identifier, tok::contextual_keyword) &&
+           !isEscapedIdentifier() && Text == ContextKW;
   }
   
   /// Return true if this is a contextual keyword that could be the start of a

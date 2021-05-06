@@ -12,6 +12,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency
 import ResilientProtocol
@@ -20,7 +21,7 @@ func call<T : Protokol>(_ t: T) async {
   await t.protocolinstanceVoidToVoid()
 }
 
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main4callyyxY17ResilientProtocol8ProtokolRzlF"(
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main4callyyxYa17ResilientProtocol8ProtokolRzlF"(
 func test_case() async {
   let impl = Impl()
   await call(impl) // CHECK: Impl()

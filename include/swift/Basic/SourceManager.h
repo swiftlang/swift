@@ -24,6 +24,18 @@ namespace swift {
 
 /// This class manages and owns source buffers.
 class SourceManager {
+public:
+  /// A \c #sourceLocation-defined virtual file region, representing the source
+  /// source after a \c #sourceLocation (or between two). It provides a
+  /// filename and line offset to be applied to \c SourceLoc's within its
+  /// \c Range.
+  struct VirtualFile {
+    CharSourceRange Range;
+    std::string Name;
+    int LineOffset;
+  };
+
+private:
   llvm::SourceMgr LLVMSourceMgr;
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
   unsigned CodeCompletionBufferID = 0U;
@@ -52,12 +64,6 @@ class SourceManager {
   };
   ReplacedRangeType ReplacedRange;
 
-  // \c #sourceLocation directive handling.
-  struct VirtualFile {
-    CharSourceRange Range;
-    std::string Name;
-    int LineOffset;
-  };
   std::map<const char *, VirtualFile> VirtualFiles;
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
@@ -142,6 +148,10 @@ public:
 
   /// Adds a memory buffer to the SourceManager, taking ownership of it.
   unsigned addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer);
+
+  /// Add a \c #sourceLocation-defined virtual file region of \p Length.
+  void createVirtualFile(SourceLoc Loc, StringRef Name, int LineOffset,
+                         unsigned Length);
 
   /// Add a \c #sourceLocation-defined virtual file region.
   ///
@@ -275,20 +285,32 @@ public:
 
   std::string getLineString(unsigned BufferID, unsigned LineNumber);
 
+  /// Retrieve the buffer ID for \p Path, loading if necessary.
+  unsigned getExternalSourceBufferID(StringRef Path);
+
   SourceLoc getLocFromExternalSource(StringRef Path, unsigned Line, unsigned Col);
-private:
+
+  /// Retrieve the virtual file for the given \p Loc, or nullptr if none exists.
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;
-  unsigned getExternalSourceBufferId(StringRef Path);
+
+  /// Whether or not \p Loc is after a \c #sourceLocation directive, ie. its
+  /// file, line, and column should be reported using the information in the
+  /// directive.
+  bool isLocInVirtualFile(SourceLoc Loc) const {
+    return getVirtualFile(Loc) != nullptr;
+  }
+
+  /// Return a SourceLoc in \c this corresponding to \p otherLoc, which must be
+  /// owned by \p otherManager. Returns an invalid SourceLoc if it cannot be
+  /// translated.
+  SourceLoc getLocForForeignLoc(SourceLoc otherLoc, SourceManager &otherMgr);
+
+private:
   int getLineOffset(SourceLoc Loc) const {
     if (auto VFile = getVirtualFile(Loc))
       return VFile->LineOffset;
     else
       return 0;
-  }
-
-public:
-  bool isLocInVirtualFile(SourceLoc Loc) const {
-    return getVirtualFile(Loc) != nullptr;
   }
 };
 

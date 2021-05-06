@@ -149,7 +149,7 @@ private:
   }
   DifferentiationInvoker getInvoker() const { return vjpCloner.getInvoker(); }
   LinearMapInfo &getPullbackInfo() const { return vjpCloner.getPullbackInfo(); }
-  AutoDiffConfig getConfig() const { return vjpCloner.getConfig(); }
+  const AutoDiffConfig &getConfig() const { return vjpCloner.getConfig(); }
   const DifferentiableActivityInfo &getActivityInfo() const {
     return vjpCloner.getActivityInfo();
   }
@@ -1801,7 +1801,7 @@ bool PullbackCloner::Implementation::run() {
       // Do not diagnose `Optional`-typed values, which will have special-case
       // differentiation support.
       if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
-        if (enumDecl != getContext().getASTContext().getOptionalDecl()) {
+        if (!type.getASTType()->isOptional()) {
           getContext().emitNondifferentiabilityError(
               v, getInvoker(), diag::autodiff_enums_unsupported);
           errorOccurred = true;
@@ -2188,8 +2188,7 @@ void PullbackCloner::Implementation::accumulateAdjointForOptional(
   // Handle `switch_enum` on `Optional`.
   // `Optional<T>`
   auto optionalTy = remapType(optionalValue->getType());
-  assert(optionalTy.getASTType().getEnumOrBoundGenericEnum() ==
-         getASTContext().getOptionalDecl());
+  assert(optionalTy.getASTType()->isOptional());
   // `T`
   auto wrappedType = optionalTy.getOptionalObjectType();
   // `T.TangentVector`
@@ -2346,6 +2345,9 @@ SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
   // Propagate pullback struct argument.
   TangentBuilder pullbackTrampolineBBBuilder(
       pullbackTrampolineBB, getContext());
+  pullbackTrampolineBBBuilder.setCurrentDebugScope(
+      remapScope(origPredBB->getTerminator()->getDebugScope()));
+
   auto *pullbackTrampolineBBArg = pullbackTrampolineBB->getArguments().front();
   if (vjpCloner.getLoopInfo()->getLoopFor(origPredBB)) {
     assert(pullbackTrampolineBBArg->getType() ==
@@ -2431,10 +2433,8 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           if (!termInst)
             return false;
           if (auto *sei = dyn_cast<SwitchEnumInst>(termInst)) {
-            auto *optionalEnumDecl = ctx.getOptionalDecl();
             auto operandTy = sei->getOperand()->getType();
-            return operandTy.getASTType().getEnumOrBoundGenericEnum() ==
-                   optionalEnumDecl;
+            return operandTy.getASTType()->isOptional();
           }
           return false;
         };
@@ -3026,7 +3026,7 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   auto *eltIndexLiteral =
       builder.createIntegerLiteral(loc, builtinIntType, eltIndex);
   auto intType = SILType::getPrimitiveObjectType(
-      ctx.getIntDecl()->getDeclaredInterfaceType()->getCanonicalType());
+      ctx.getIntType()->getCanonicalType());
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
   auto *swiftModule = getModule().getSwiftModule();

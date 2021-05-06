@@ -39,5 +39,8 @@ KNOWN_SDK_TYPE_DECL(ObjectiveC, ObjCBool, StructDecl, 0)
 // standardized
 KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeContinuation, NominalTypeDecl, 2)
 KNOWN_SDK_TYPE_DECL(Concurrency, MainActor, NominalTypeDecl, 0)
+KNOWN_SDK_TYPE_DECL(Concurrency, UnownedSerialExecutor, NominalTypeDecl, 0)
+
+KNOWN_SDK_TYPE_DECL(Concurrency, TaskLocal, ClassDecl, 1)
 
 #undef KNOWN_SDK_TYPE_DECL

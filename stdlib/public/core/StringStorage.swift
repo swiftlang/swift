@@ -54,7 +54,7 @@ fileprivate struct _CapacityAndFlags {
   // in the bottom 48 bits, and flags in the top 16.
   fileprivate var _storage: UInt64
 
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   fileprivate init(realCapacity: Int, flags: UInt16) {
     let realCapUInt = UInt64(UInt(bitPattern: realCapacity))
     _internalInvariant(realCapUInt == realCapUInt & _CountAndFlags.countMask)
@@ -249,7 +249,7 @@ fileprivate func _allocateStringStorage(
 // renamed. The old name must not be used in the new runtime.
 final internal class __StringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   // The total allocated storage capacity. Note that this includes the required
   // nul-terminator.
   private var _realCapacity: Int
@@ -312,7 +312,7 @@ extension __StringStorage {
 
     _internalInvariant(capAndFlags.capacity >= capacity)
 
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     storage._realCapacity = capAndFlags._realCapacity
     storage._count = countAndFlags.count
     storage._countFlags = countAndFlags.flags
@@ -358,7 +358,7 @@ extension __StringStorage {
     let count = try initializer(buffer)
 
     let countAndFlags = _CountAndFlags(mortalCount: count, isASCII: false)
-    #if arch(i386) || arch(arm) || arch(wasm32)
+    #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     storage._count = countAndFlags.count
     storage._countFlags = countAndFlags.flags
     #else
@@ -511,7 +511,7 @@ extension __StringStorage {
   internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
     let countAndFlags = _CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self._count = countAndFlags.count
     self._countFlags = countAndFlags.flags
 #else
@@ -657,7 +657,7 @@ final internal class __SharedStringStorage
   internal var _owner: AnyObject?
   internal var start: UnsafePointer<UInt8>
 
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   internal var _count: Int
   internal var _countFlags: UInt16
 
@@ -679,7 +679,7 @@ final internal class __SharedStringStorage
   ) {
     self._owner = nil
     self.start = ptr
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self._count = countAndFlags.count
     self._countFlags = countAndFlags.flags
 #else

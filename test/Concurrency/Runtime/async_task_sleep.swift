@@ -5,6 +5,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency
 // FIXME: should not depend on Dispatch

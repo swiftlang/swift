@@ -90,4 +90,99 @@ OperatorsTestSuite.test("DifferentTypesArray.subscript (inline)") {
   expectEqual(1.5.rounded(.up), resultDouble.rounded(.up))
 }
 
+OperatorsTestSuite.test("IntArrayByVal.subscript (inline)") {
+  var arr = IntArrayByVal()
+  let result0 = arr[0]
+  let result1 = arr[1]
+  let result2 = arr[2]
+
+  expectEqual(1, result0)
+  expectEqual(2, result1)
+  expectEqual(3, result2)
+
+  arr.setValueAtIndex(42, 2)
+  let result3 = arr[2]
+  expectEqual(42, result3)
+}
+
+OperatorsTestSuite.test("NonTrivialIntArrayByVal.subscript (inline)") {
+  var arr = NonTrivialIntArrayByVal(1)
+
+  let result0 = arr[0]
+  let result2 = arr[2]
+  let result4 = arr[4]
+
+  expectEqual(1, result0)
+  expectEqual(3, result2)
+  expectEqual(5, result4)
+
+  arr.setValueAtIndex(42, 2)
+  let result5 = arr[2]
+  expectEqual(42, result5)
+}
+
+OperatorsTestSuite.test("DifferentTypesArrayByVal.subscript (inline)") {
+  var arr = DifferentTypesArrayByVal()
+
+  let resultInt: Int32 = arr[2]
+  let resultDouble: Double = arr[0.1]
+
+  expectEqual(3, resultInt)
+  expectEqual(1.5.rounded(.down), resultDouble.rounded(.down))
+  expectEqual(1.5.rounded(.up), resultDouble.rounded(.up))
+}
+
+OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
+  var arr = NonTrivialArrayByVal()
+  let NonTrivialByVal = arr[0];
+  let cStr = NonTrivialByVal.Str!
+  expectEqual("Non-Trivial", String(cString: cStr))
+
+  expectEqual(1, NonTrivialByVal.a)
+  expectEqual(2, NonTrivialByVal.b)
+  expectEqual(3, NonTrivialByVal.c)
+  expectEqual(4, NonTrivialByVal.d)
+  expectEqual(5, NonTrivialByVal.e)
+  expectEqual(6, NonTrivialByVal.f)
+}
+
+OperatorsTestSuite.test("PtrByVal.subscript (inline)") {
+  var arr = PtrByVal()
+  expectEqual(64, arr[0]![0])
+  arr[0]![0] = 23
+  expectEqual(23, arr[0]![0])
+}
+
+OperatorsTestSuite.test("ConstOpPtrByVal.subscript (inline)") {
+  var arr = ConstOpPtrByVal()
+  expectEqual(64, arr[0]![0])
+}
+
+OperatorsTestSuite.test("ConstPtrByVal.subscript (inline)") {
+  var arr = ConstPtrByVal()
+  expectEqual(64, arr[0]![0])
+}
+
+OperatorsTestSuite.test("RefToPtr.subscript (inline)") {
+  var arr = RefToPtr()
+  let ptr: UnsafeMutablePointer<Int32> =
+    UnsafeMutablePointer<Int32>.allocate(capacity: 64)
+  ptr[0] = 23
+
+  expectEqual(64, arr[0]![0])
+  arr[0] = ptr
+  expectEqual(23, arr[0]![0])
+}
+
+OperatorsTestSuite.test("PtrToPtr.subscript (inline)") {
+  var arr = PtrToPtr()
+  let ptr: UnsafeMutablePointer<Int32> =
+    UnsafeMutablePointer<Int32>.allocate(capacity: 64)
+  ptr[0] = 23
+
+  expectEqual(64, arr[0]![0]![0])
+  arr[0]![0] = ptr
+  expectEqual(23, arr[0]![0]![0])
+}
+
 runAllTests()

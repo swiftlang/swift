@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name accessors -swift-version 5 -enable-experimental-concurrency | %FileCheck --enable-var-scope %s
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend -emit-silgen %s -module-name accessors -swift-version 5 | %FileCheck --enable-var-scope %s
 
 class C {
   // CHECK-DAG: sil hidden [ossa] @$s9accessors1CC16prop_asyncThrowsSivg : $@convention(method) @async (@guaranteed C) -> (Int, @error Error) {
@@ -50,19 +49,19 @@ actor A {
 
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s9accessors19testImplicitlyAsync1aSiAA1AC_tYF : $@convention(thin) @async (@guaranteed A) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s9accessors19testImplicitlyAsync1aSiAA1AC_tYaF : $@convention(thin) @async (@guaranteed A) -> Int {
 // CHECK:         hop_to_executor
 // CHECK:         apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) (@guaranteed A) -> Int
 // CHECK:         hop_to_executor
-// CHECK:       } // end sil function '$s9accessors19testImplicitlyAsync1aSiAA1AC_tYF'
+// CHECK:       } // end sil function '$s9accessors19testImplicitlyAsync1aSiAA1AC_tYaF'
 func testImplicitlyAsync(a : A) async -> Int {
   return await a.computedProp
 }
 
 
-// CHECK-LABEL: sil hidden [ossa] @$s9accessors15testNormalAsync1aSiAA1AC_tYF : $@convention(thin) @async (@guaranteed A) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s9accessors15testNormalAsync1aSiAA1AC_tYaF : $@convention(thin) @async (@guaranteed A) -> Int {
 // CHECK:          apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(method) @async (@guaranteed A) -> Int
-// CHECK:       } // end sil function '$s9accessors15testNormalAsync1aSiAA1AC_tYF'
+// CHECK:       } // end sil function '$s9accessors15testNormalAsync1aSiAA1AC_tYaF'
 func testNormalAsync(a : A) async -> Int {
   return await a.asyncProp
 }

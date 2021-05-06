@@ -118,7 +118,7 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
         unsigned NewlineBytes = swift::measureNewline(Cleaned);
         Cleaned = Cleaned.drop_front(NewlineBytes);
         CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(NewlineBytes);
-        HasASCIIArt = measureASCIIArt(Cleaned, C.StartColumn - 1) != 0;
+        HasASCIIArt = measureASCIIArt(Cleaned, C.ColumnIndent - 1) != 0;
       }
 
       while (!Cleaned.empty()) {
@@ -129,7 +129,7 @@ LineList MarkupContext::getLineList(swift::RawComment RC) {
         // Skip over ASCII art, if present.
         if (HasASCIIArt)
           if (unsigned ASCIIArtBytes =
-              measureASCIIArt(Cleaned, C.StartColumn - 1)) {
+                  measureASCIIArt(Cleaned, C.ColumnIndent - 1)) {
             Cleaned = Cleaned.drop_front(ASCIIArtBytes);
             CleanedStartLoc =
             CleanedStartLoc.getAdvancedLocOrInvalid(ASCIIArtBytes);

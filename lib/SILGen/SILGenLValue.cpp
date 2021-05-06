@@ -2816,12 +2816,11 @@ SILGenFunction::maybeEmitValueOfLocalVarDecl(
   if (It != VarLocs.end()) {
     // If the variable is part of an async let, ensure that the child task
     // has completed first.
-    if (var->isAsyncLet() && accessKind != AccessKind::Write) {
+    if (var->isSpawnLet() && accessKind != AccessKind::Write) {
       auto patternBinding = var->getParentPatternBinding();
       unsigned index = patternBinding->getPatternEntryIndexForVarDecl(var);
       completeAsyncLetChildTask(patternBinding, index);
     }
-
 
     // If this has an address, return it.  By-value let's have no address.
     SILValue ptr = It->second.value;

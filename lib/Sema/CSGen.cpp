@@ -383,7 +383,7 @@ namespace {
       return true;
 
     // Don't favor narrowing conversions.
-    if (argTy->isDoubleType() && paramTy->isCGFloatType())
+    if (argTy->isDouble() && paramTy->isCGFloatType())
       return false;
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
@@ -420,7 +420,7 @@ namespace {
         // it is the same as the parameter type.
         // Check whether there is a default type to compare against.
         if (paramTy->isEqual(defaultType) ||
-            (defaultType->isDoubleType() && paramTy->isCGFloatType()))
+            (defaultType->isDouble() && paramTy->isCGFloatType()))
           return true;
       }
     }
@@ -570,7 +570,7 @@ namespace {
       // in order to preserve current behavior, let's not favor overloads
       // which would result in conversion from CGFloat to Double; otherwise
       // it would lead to ambiguities.
-      if (argTy->isCGFloatType() && paramTy->isDoubleType())
+      if (argTy->isCGFloatType() && paramTy->isDouble())
         return false;
 
       return isFavoredParamAndArg(CS, paramTy, argTy) &&
@@ -733,10 +733,10 @@ namespace {
       // Avoid favoring overloads that would require narrowing conversion
       // to match the arguments.
       {
-        if (firstArgTy->isDoubleType() && firstParamTy->isCGFloatType())
+        if (firstArgTy->isDouble() && firstParamTy->isCGFloatType())
           return false;
 
-        if (secondArgTy->isDoubleType() && secondParamTy->isCGFloatType())
+        if (secondArgTy->isDouble() && secondParamTy->isCGFloatType())
           return false;
       }
 
@@ -1148,8 +1148,7 @@ namespace {
         if (TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc()))
           return nullptr;
 
-        auto unsafeRawPointer = ctx.getUnsafeRawPointerDecl();
-        return unsafeRawPointer->getDeclaredInterfaceType();
+        return ctx.getUnsafeRawPointerType();
       }
 
       default:
@@ -1251,29 +1250,6 @@ namespace {
           if (!knownType->hasPlaceholder()) {
             // Set the favored type for this expression to the known type.
             CS.setFavoredType(E, knownType.getPointer());
-          }
-        }
-
-        // This can only happen when failure diagnostics is trying
-        // to type-check expressions inside of a single-statement
-        // closure which refer to anonymous parameters, in this case
-        // let's either use type as written or allocate a fresh type
-        // variable, just like we do for closure type.
-        // FIXME: We should eliminate this case.
-        if (auto *PD = dyn_cast<ParamDecl>(VD)) {
-          if (!CS.hasType(PD)) {
-            if (knownType &&
-                (knownType->hasUnboundGenericType() ||
-                 knownType->hasPlaceholder())) {
-              knownType = CS.replaceInferableTypesWithTypeVars(knownType,
-                                                               locator);
-            }
-
-            CS.setType(
-                PD, knownType ? knownType
-                         : CS.createTypeVariable(locator,
-                                                 TVO_CanBindToLValue |
-                                                 TVO_CanBindToNoEscape));
           }
         }
       }
@@ -1477,6 +1453,14 @@ namespace {
     }
 
     Type visitUnresolvedDotExpr(UnresolvedDotExpr *expr) {
+      // UnresolvedDot applies the base to remove a single curry level from a
+      // member reference without using an applicable function constraint so
+      // we record the call argument matching here so it can be found later when
+      // a solution is applied to the AST.
+      CS.recordMatchCallArgumentResult(
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
+          MatchCallArgumentResult::forArity(1));
+
       // If this is Builtin.type_join*, just return any type and move
       // on since we're going to discard this, and creating any type
       // variables for the reference will cause problems.
@@ -2381,7 +2365,7 @@ namespace {
       }
 
       case PatternKind::Bool:
-        return setType(CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType());
+        return setType(CS.getASTContext().getBoolType());
 
       case PatternKind::EnumElement: {
         auto enumPattern = cast<EnumElementPattern>(pattern);
@@ -3060,7 +3044,7 @@ namespace {
     }
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-      return CS.getASTContext().getBoolDecl()->getDeclaredInterfaceType();
+      return CS.getASTContext().getBoolType();
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
@@ -3606,6 +3590,7 @@ static bool generateWrappedPropertyTypeConstraints(
   auto dc = wrappedVar->getInnermostDeclContext();
 
   Type wrappedValueType;
+  Type wrapperType;
   auto wrapperAttributes = wrappedVar->getAttachedPropertyWrappers();
   for (unsigned i : indices(wrapperAttributes)) {
     // FIXME: We should somehow pass an OpenUnboundGenericTypeFn to
@@ -3617,29 +3602,34 @@ static bool generateWrappedPropertyTypeConstraints(
       return true;
 
     auto *typeExpr = wrapperAttributes[i]->getTypeExpr();
-    auto *locator = cs.getConstraintLocator(typeExpr);
-    auto wrapperType = cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
-    cs.setType(typeExpr, wrapperType);
 
     if (!wrappedValueType) {
       // Equate the outermost wrapper type to the initializer type.
+      auto *locator = cs.getConstraintLocator(typeExpr);
+      wrapperType =
+          cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
       if (initializerType)
         cs.addConstraint(ConstraintKind::Equal, wrapperType, initializerType, locator);
     } else {
       // The former wrappedValue type must be equal to the current wrapper type
-      cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType,
-                       cs.getConstraintLocator(locator, LocatorPathElt::ContextualType()));
-      cs.setContextualType(typeExpr, TypeLoc::withoutLoc(wrappedValueType),
-                           CTP_ComposedPropertyWrapper);
+      auto *locator = cs.getConstraintLocator(
+          typeExpr, LocatorPathElt::WrappedValue(wrapperType));
+      wrapperType =
+          cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
+      cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType, locator);
     }
+
+    cs.setType(typeExpr, wrapperType);
 
     wrappedValueType = wrapperType->getTypeOfMember(
         dc->getParentModule(), wrapperInfo.valueVar);
   }
 
   // The property type must be equal to the wrapped value type
-  cs.addConstraint(ConstraintKind::Equal, propertyType, wrappedValueType,
-      cs.getConstraintLocator(wrappedVar, LocatorPathElt::ContextualType()));
+  cs.addConstraint(
+      ConstraintKind::Equal, propertyType, wrappedValueType,
+      cs.getConstraintLocator(
+          wrappedVar, LocatorPathElt::ContextualType(CTP_WrappedProperty)));
   cs.setContextualType(wrappedVar, TypeLoc::withoutLoc(wrappedValueType),
                        CTP_WrappedProperty);
   return false;
@@ -3649,8 +3639,8 @@ static bool generateWrappedPropertyTypeConstraints(
 static bool generateInitPatternConstraints(
     ConstraintSystem &cs, SolutionApplicationTarget target, Expr *initializer) {
   auto pattern = target.getInitializationPattern();
-  auto locator =
-      cs.getConstraintLocator(initializer, LocatorPathElt::ContextualType());
+  auto locator = cs.getConstraintLocator(
+      initializer, LocatorPathElt::ContextualType(CTP_Initialization));
   Type patternType = cs.generateConstraints(
       pattern, locator, target.shouldBindPatternVarsOneWay(),
       target.getInitializationPatternBindingDecl(),
@@ -3681,8 +3671,8 @@ generateForEachStmtConstraints(
   bool isAsync = stmt->getAwaitLoc().isValid();
 
   auto locator = cs.getConstraintLocator(sequence);
-  auto contextualLocator =
-      cs.getConstraintLocator(sequence, LocatorPathElt::ContextualType());
+  auto contextualLocator = cs.getConstraintLocator(
+      sequence, LocatorPathElt::ContextualType(CTP_ForEachStmt));
 
   // The expression type must conform to the Sequence protocol.
   auto sequenceProto = TypeChecker::getProtocol(
@@ -3799,8 +3789,9 @@ bool ConstraintSystem::generateConstraints(
     if (target.isOptionalSomePatternInit()) {
       assert(!target.getExprContextualType() &&
              "some pattern cannot have contextual type pre-configured");
-      auto *convertTypeLocator =
-          getConstraintLocator(expr, LocatorPathElt::ContextualType());
+      auto *convertTypeLocator = getConstraintLocator(
+          expr, LocatorPathElt::ContextualType(
+                    target.getExprContextualTypePurpose()));
       Type var = createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
       target.setExprConversionType(TypeChecker::getOptionalType(expr->getLoc(), var));
     }
@@ -3822,7 +3813,7 @@ bool ConstraintSystem::generateConstraints(
       ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
       bool isOpaqueReturnType = target.infersOpaqueReturnType();
       auto *convertTypeLocator =
-          getConstraintLocator(expr, LocatorPathElt::ContextualType());
+          getConstraintLocator(expr, LocatorPathElt::ContextualType(ctp));
 
       auto getLocator = [&](Type ty) -> ConstraintLocator * {
         // If we have a placeholder originating from a PlaceholderTypeRepr,
@@ -3985,11 +3976,10 @@ bool ConstraintSystem::generateConstraints(StmtCondition condition,
         return true;
       }
 
-      addConstraint(ConstraintKind::Conversion,
-                    getType(condExpr),
-                    boolTy,
-                    getConstraintLocator(condExpr,
-                                         LocatorPathElt::ContextualType()));
+      addConstraint(
+          ConstraintKind::Conversion, getType(condExpr), boolTy,
+          getConstraintLocator(condExpr,
+                               LocatorPathElt::ContextualType(CTP_Condition)));
       continue;
     }
 
@@ -4095,8 +4085,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    if (paramType->hasTypeVariable())
-      recordPotentialHole(paramType);
+    recordAnyTypeVarAsPotentialHole(paramType);
 
     auto *loc = getConstraintLocator(locator);
     auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);

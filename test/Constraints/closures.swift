@@ -1077,3 +1077,31 @@ let _: (@convention(c) () -> Void)? = Bool.random() ? nil : {} // OK on type che
 let _: (@convention(block) () -> Void)? = Bool.random() ? {} : {} // OK
 let _: (@convention(thin) () -> Void)? = Bool.random() ? {} : {} // OK
 let _: (@convention(c) () -> Void)? = Bool.random() ? {} : {} // OK on type checking, diagnostics are deffered to SIL
+
+// Make sure that diagnostic is attached to the closure even when body is empty (implicitly returns `Void`)
+var emptyBodyMismatch: () -> Int {
+  return { // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+    return
+  }
+}
+
+// rdar://76250381 - crash when passing an argument to a closure that takes no arguments
+struct R_76250381<Result, Failure: Error> {
+  func test(operation: @escaping () -> Result) -> Bool {
+    return try self.crash { group in // expected-error {{contextual closure type '() -> Result' expects 0 arguments, but 1 was used in closure body}}
+      operation(&group) // expected-error {{argument passed to call that takes no arguments}}
+    }
+  }
+
+  func crash(_: @escaping () -> Result) -> Bool {
+    return false
+  }
+}
+
+// SR-13483
+(0..<10).map { x, y in } 
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 2 were used in closure body}}
+(0..<10).map { x, y, z in } 
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 3 were used in closure body}}
+(0..<10).map { x, y, z, w in } 
+// expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 4 were used in closure body}}

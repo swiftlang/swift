@@ -454,7 +454,6 @@ UID_KINDS = [
     KIND('StatNumRequests', 'source.statistic.num-requests'),
     KIND('StatNumSemaRequests', 'source.statistic.num-semantic-requests'),
     KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
-    KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
     KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
     KIND('Swift', 'source.lang.swift'),
     KIND('ObjC', 'source.lang.objc'),

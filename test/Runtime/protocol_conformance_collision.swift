@@ -15,6 +15,7 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=watchos
 
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Accelerate
 import Foundation
@@ -46,10 +47,10 @@ func firstHashValue(_ x: P) -> Int {
 }
 
 let osHasWorkaround: Bool
-// These are deliberately NOT version 9999, as we don't want to hit the special
-// case where development runtimes always return true for 9999. This check needs
-// to be false until real version numbers are put in.
-if #available(macOS 99990, iOS 99990, tvOS 99990, watchOS 99990, *) {
+// These are deliberately not the standard 9999, as we don't want to hit the
+// special case where it's always available, and we don't want this check to be
+// rewritten in any find/replace operations.
+if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *) {
   osHasWorkaround = true
 } else {
   osHasWorkaround = false

@@ -26,7 +26,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -1234,7 +1234,7 @@ public:
 /// functions.
 bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
                 SmallVectorImpl<SILFunction *> &FunctionsAdded) {
-  BasicBlockWorklist<128> Worklist(Fun->getEntryBlock());
+  BasicBlockWorklist Worklist(Fun->getEntryBlock());
   OutlinePatterns patterns(FuncBuilder);
   bool changed = false;
 

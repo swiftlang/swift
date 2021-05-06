@@ -151,6 +151,8 @@ CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
+CONSTANT_OWNERSHIP_INST(None, ExtractExecutor)
+
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
@@ -285,29 +287,19 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *arg) {
   return arg->getOwnershipKind();
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::
+visitPlaceholderValue(PlaceholderValue *v) {
+  return OwnershipKind::None;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::
+visitMultipleValueInstructionResult(MultipleValueInstructionResult *Result) {
+  return Result->getOwnershipKind();
+}
+
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitSILPhiArgument(SILPhiArgument *Arg) {
   return Arg->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
-    DestructureStructResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
-    DestructureTupleResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginApplyResult(
-    BeginApplyResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginCOWMutationResult(
-    BeginCOWMutationResult *Result) {
-  return Result->getOwnershipKind();
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
@@ -552,7 +544,13 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
-CONSTANT_OWNERSHIP_BUILTIN(None, BuildSerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildDefaultActorExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildMainActorExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
+CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
+CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
+CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

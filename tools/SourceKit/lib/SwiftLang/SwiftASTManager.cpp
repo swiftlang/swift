@@ -421,7 +421,7 @@ bool SwiftASTManager::initCompilerInvocation(
   return ide::initCompilerInvocation(
       Invocation, OrigArgs, Diags, UnresolvedPrimaryFile, FileSystem,
       Impl.RuntimeResourcePath, Impl.DiagnosticDocumentationPath,
-      Impl.Config->shouldOptimizeForIDE(), Impl.SessionTimestamp, Error);
+      Impl.SessionTimestamp, Error);
 }
 
 bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
@@ -846,6 +846,11 @@ ASTUnitRef ASTProducer::createASTUnit(
     // FIXME: Report the diagnostic.
     LOG_WARN_FUNC("Compilation setup failed!!!");
     Error = "compilation setup failed";
+    return nullptr;
+  }
+  if (CompIns.loadStdlibIfNeeded()) {
+    LOG_WARN_FUNC("Loading the stdlib failed");
+    Error = "Loading the stdlib failed";
     return nullptr;
   }
   registerIDERequestFunctions(CompIns.getASTContext().evaluator);

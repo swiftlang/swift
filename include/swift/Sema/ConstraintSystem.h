@@ -90,46 +90,6 @@ void *operator new(size_t bytes, swift::constraints::ConstraintSystem& cs,
 
 namespace swift {
 
-/// This specifies the purpose of the contextual type, when specified to
-/// typeCheckExpression.  This is used for diagnostic generation to produce more
-/// specified error messages when the conversion fails.
-///
-enum ContextualTypePurpose {
-  CTP_Unused,           ///< No contextual type is specified.
-  CTP_Initialization,   ///< Pattern binding initialization.
-  CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
-  CTP_ReturnSingleExpr, ///< Value implicitly returned from a function.
-  CTP_YieldByValue,     ///< By-value yield operand.
-  CTP_YieldByReference, ///< By-reference yield operand.
-  CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
-  CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
-  CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
-
-  /// Default value in @autoclosure parameter
-  /// 'foo(a : @autoclosure () -> Int = 42)'.
-  CTP_AutoclosureDefaultParameter,
-
-  CTP_CalleeResult,     ///< Constraint is placed on the result of a callee.
-  CTP_CallArgument,     ///< Call to function or operator requires type.
-  CTP_ClosureResult,    ///< Closure result expects a specific type.
-  CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
-  CTP_DictionaryKey,    ///< DictionaryExpr keys should have a specific type.
-  CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
-  CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
-  CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
-  CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
-                             ///< result type.
-  CTP_Condition,        ///< Condition expression of various statements e.g.
-                        ///< `if`, `for`, `while` etc.
-  CTP_ForEachStmt,      ///< "expression/sequence" associated with 'for-in' loop
-                        ///< is expected to conform to 'Sequence' protocol.
-  CTP_WrappedProperty,  ///< Property type expected to match 'wrappedValue' type
-  CTP_ComposedPropertyWrapper, ///< Composed wrapper type expected to match
-                               ///< former 'wrappedValue' type
-
-  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
-};
-
 /// Specify how we handle the binding of underconstrained (free) type variables
 /// within a solution to a constraint system.
 enum class FreeTypeVariableBinding {
@@ -1111,6 +1071,43 @@ public:
   }
 };
 
+/// Describes the arguments to which a parameter binds.
+/// FIXME: This is an awful data structure. We want the equivalent of a
+/// TinyPtrVector for unsigned values.
+using ParamBinding = SmallVector<unsigned, 1>;
+
+/// The result of calling matchCallArguments().
+struct MatchCallArgumentResult {
+  /// The direction of trailing closure matching that was performed.
+  TrailingClosureMatching trailingClosureMatching;
+
+  /// The parameter bindings determined by the match.
+  SmallVector<ParamBinding, 4> parameterBindings;
+
+  /// When present, the forward and backward scans each produced a result,
+  /// and the parameter bindings are different. The primary result will be
+  /// forwarding, and this represents the backward binding.
+  Optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
+
+  friend bool operator==(const MatchCallArgumentResult &lhs,
+                         const MatchCallArgumentResult &rhs) {
+    if (lhs.trailingClosureMatching != rhs.trailingClosureMatching)
+      return false;
+    if (lhs.parameterBindings != rhs.parameterBindings)
+      return false;
+    return lhs.backwardParameterBindings == rhs.backwardParameterBindings;
+  }
+
+  /// Generate a result that maps the provided number of arguments to the same
+  /// number of parameters via forward match.
+  static MatchCallArgumentResult forArity(unsigned argCount) {
+    SmallVector<ParamBinding, 4> Bindings;
+    for (unsigned i : range(argCount))
+      Bindings.push_back({i});
+    return {TrailingClosureMatching::Forward, Bindings, None};
+  }
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1159,9 +1156,9 @@ public:
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// For locators associated with call expressions, the trailing closure
-  /// matching rule that was applied.
-  llvm::SmallMapVector<ConstraintLocator*, TrailingClosureMatching, 4>
-    trailingClosureMatchingChoices;
+  /// matching rule and parameter bindings that were applied.
+  llvm::SmallMapVector<ConstraintLocator *, MatchCallArgumentResult, 4>
+      argumentMatchingChoices;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -1202,6 +1199,10 @@ public:
 
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::MapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
+
+  /// Record a new argument matching choice for given locator that maps a
+  /// single argument to a single parameter.
+  void recordSingleArgMatchingChoice(ConstraintLocator *locator);
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -2210,9 +2211,9 @@ private:
       AppliedDisjunctions;
 
   /// For locators associated with call expressions, the trailing closure
-  /// matching rule that was applied.
-  std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
-      trailingClosureMatchingChoices;
+  /// matching rule and parameter bindings that were applied.
+  std::vector<std::pair<ConstraintLocator *, MatchCallArgumentResult>>
+      argumentMatchingChoices;
 
   /// The set of implicit value conversions performed by the solver on
   /// a current path to reach a solution.
@@ -2709,8 +2710,8 @@ public:
     /// The length of \c AppliedDisjunctions.
     unsigned numAppliedDisjunctions;
 
-    /// The length of \c trailingClosureMatchingChoices;
-    unsigned numTrailingClosureMatchingChoices;
+    /// The length of \c argumentMatchingChoices.
+    unsigned numArgumentMatchingChoices;
 
     /// The length of \c OpenedTypes.
     unsigned numOpenedTypes;
@@ -3224,13 +3225,11 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
-  void recordPotentialHole(Type type);
+  void recordPotentialHole(TypeVariableType *typeVar);
+  void recordAnyTypeVarAsPotentialHole(Type type);
 
-  void recordTrailingClosureMatch(
-      ConstraintLocator *locator,
-      TrailingClosureMatching trailingClosureMatch) {
-    trailingClosureMatchingChoices.push_back({locator, trailingClosureMatch});
-  }
+  void recordMatchCallArgumentResult(ConstraintLocator *locator,
+                                     MatchCallArgumentResult result);
 
   /// Walk a closure AST to determine its effects.
   ///
@@ -3754,9 +3753,6 @@ public:
   /// Determine if the type in question is a Set<T> and, if so, provide the
   /// element type of the set.
   static Optional<Type> isSetType(Type t);
-
-  /// Determine if the type in question is AnyHashable.
-  static bool isAnyHashableType(Type t);
 
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
@@ -4435,7 +4431,7 @@ public:
   /// Given expression represents computed result of the closure.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
                              bool isDefaultWrappedValue = false,
-                             bool isAsyncLetWrapper = false);
+                             bool isSpawnLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
@@ -4512,6 +4508,12 @@ private:
                                             ConstraintKind kind,
                                             ConstraintLocatorBuilder locator,
                                             TypeMatchOptions flags);
+
+  /// Similar to \c simplifyConformsToConstraint but also checks for
+  /// optional and pointer derived a given type.
+  SolutionKind simplifyTransitivelyConformsTo(Type type, Type protocol,
+                                              ConstraintLocatorBuilder locator,
+                                              TypeMatchOptions flags);
 
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,
@@ -4870,11 +4872,9 @@ private:
   /// \param diff The differences among the solutions.
   /// \param idx1 The index of the first solution.
   /// \param idx2 The index of the second solution.
-  /// \param isForCodeCompletion Whether solving for code completion.
   static SolutionCompareResult
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
-                   const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-                   bool isForCodeCompletion);
+                   const SolutionDiff &diff, unsigned idx1, unsigned idx2);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution
@@ -4977,27 +4977,6 @@ public:
     return getExpressionTooComplex(solutionMemory);
   }
 
-  typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
-  typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
-      ConstraintMatchLoop;
-  typedef std::function<void(SmallVectorImpl<unsigned> &options)>
-      PartitionAppendCallback;
-
-  // Partition the choices in the disjunction into groups that we will
-  // iterate over in an order appropriate to attempt to stop before we
-  // have to visit all of the options.
-  void partitionDisjunction(ArrayRef<Constraint *> Choices,
-                            SmallVectorImpl<unsigned> &Ordering,
-                            SmallVectorImpl<unsigned> &PartitionBeginning);
-
-  /// Partition the choices in the range \c first to \c last into groups and
-  /// order the groups in the best order to attempt based on the argument
-  /// function type that the operator is applied to.
-  void partitionGenericOperators(ArrayRef<Constraint *> Choices,
-                                 SmallVectorImpl<unsigned>::iterator first,
-                                 SmallVectorImpl<unsigned>::iterator last,
-                                 ConstraintLocator *locator);
-
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
   const FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
@@ -5014,6 +4993,13 @@ public:
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
   void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
+
+  /// Check whether given AST node represents an argument of an application
+  /// of some sort (call, operator invocation, subscript etc.)
+  /// and return AST node representing and argument index. E.g. for regular
+  /// calls `test(42)` passing `42` should return node representing
+  /// entire call and index `0`.
+  Optional<std::pair<Expr *, unsigned>> isArgumentExpr(Expr *expr);
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
@@ -5052,7 +5038,7 @@ public:
     this->locator = cs.getConstraintLocator(locator);
   }
 
-  Type operator()(PlaceholderTypeRepr *placeholderRepr) const {
+  Type operator()(ASTContext &ctx, PlaceholderTypeRepr *placeholderRepr) const {
     return cs.createTypeVariable(
         cs.getConstraintLocator(
             locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
@@ -5085,11 +5071,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
   return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
                              sources);
 }
-
-/// Describes the arguments to which a parameter binds.
-/// FIXME: This is an awful data structure. We want the equivalent of a
-/// TinyPtrVector for unsigned values.
-using ParamBinding = SmallVector<unsigned, 1>;
 
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
@@ -5156,20 +5137,6 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
-};
-
-/// The result of calling matchCallArguments().
-struct MatchCallArgumentResult {
-  /// The direction of trailing closure matching that was performed.
-  TrailingClosureMatching trailingClosureMatching;
-
-  /// The parameter bindings determined by the match.
-  SmallVector<ParamBinding, 4> parameterBindings;
-
-  /// When present, the forward and backward scans each produced a result,
-  /// and the parameter bindings are different. The primary result will be
-  /// forwarding, and this represents the backward binding.
-  Optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
 };
 
 /// Match the call arguments (as described by the given argument type) to
@@ -5322,6 +5289,8 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type,
 Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
                                    ConstraintLocator *memberLocator);
 
+ValueDecl *getOverloadChoiceDecl(Constraint *choice);
+
 class DisjunctionChoice {
   ConstraintSystem &CS;
   unsigned Index;
@@ -5340,14 +5309,27 @@ public:
 
   bool attempt(ConstraintSystem &cs) const;
 
-  bool isDisabled() const { return Choice->isDisabled(); }
+  bool isDisabled() const {
+    if (!Choice->isDisabled())
+      return false;
+
+    // If solver is in a diagnostic mode, let's allow
+    // constraints that have fixes or have been disabled
+    // in attempt to produce a solution faster for
+    // well-formed expressions.
+    if (CS.shouldAttemptFixes()) {
+      return !(hasFix() || Choice->isDisabledInPerformanceMode());
+    }
+
+    return true;
+  }
 
   bool hasFix() const {
     return bool(Choice->getFix());
   }
 
   bool isUnavailable() const {
-    if (auto *decl = getDecl(Choice))
+    if (auto *decl = getOverloadChoiceDecl(Choice))
       return CS.isDeclUnavailable(decl, Choice->getLocator());
     return false;
   }
@@ -5375,22 +5357,11 @@ private:
   void propagateConversionInfo(ConstraintSystem &cs) const;
 
   static ValueDecl *getOperatorDecl(Constraint *choice) {
-    auto *decl = getDecl(choice);
+    auto *decl = getOverloadChoiceDecl(choice);
     if (!decl)
       return nullptr;
 
     return decl->isOperator() ? decl : nullptr;
-  }
-
-  static ValueDecl *getDecl(Constraint *constraint) {
-    if (constraint->getKind() != ConstraintKind::BindOverload)
-      return nullptr;
-
-    auto choice = constraint->getOverloadChoice();
-    if (choice.getKind() != OverloadChoiceKind::Decl)
-      return nullptr;
-
-    return choice.getDecl();
   }
 };
 
@@ -5554,7 +5525,7 @@ public:
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
     // Order and partition the disjunction choices.
-    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
+    partitionDisjunction(Ordering, PartitionBeginning);
   }
 
   void setNeedsGenericOperatorOrdering(bool flag) {
@@ -5580,16 +5551,27 @@ public:
     if (needsGenericOperatorOrdering && choice.isGenericOperator()) {
       unsigned nextPartitionIndex = (PartitionIndex < PartitionBeginning.size() ?
                                      PartitionBeginning[PartitionIndex] : Ordering.size());
-      CS.partitionGenericOperators(Choices,
-                                   Ordering.begin() + currIndex,
-                                   Ordering.begin() + nextPartitionIndex,
-                                   Disjunction->getLocator());
+      partitionGenericOperators(Ordering.begin() + currIndex,
+                                Ordering.begin() + nextPartitionIndex);
       needsGenericOperatorOrdering = false;
     }
 
     return DisjunctionChoice(CS, currIndex, Choices[Ordering[currIndex]],
                              IsExplicitConversion, isBeginningOfPartition);
   }
+
+private:
+  // Partition the choices in the disjunction into groups that we will
+  // iterate over in an order appropriate to attempt to stop before we
+  // have to visit all of the options.
+  void partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
+                            SmallVectorImpl<unsigned> &PartitionBeginning);
+
+  /// Partition the choices in the range \c first to \c last into groups and
+  /// order the groups in the best order to attempt based on the argument
+  /// function type that the operator is applied to.
+  void partitionGenericOperators(SmallVectorImpl<unsigned>::iterator first,
+                                 SmallVectorImpl<unsigned>::iterator last);
 };
 
 /// Determine whether given type is a known one
@@ -5613,6 +5595,15 @@ void performSyntacticDiagnosticsForTarget(
 /// protocol is contextually bound to some concrete type via same-type
 /// generic requirement and if so return that type or null type otherwise.
 Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
+
+/// Determine whether given disjunction constraint represents a set
+/// of operator overload choices.
+bool isOperatorDisjunction(Constraint *disjunction);
+
+/// Find out whether closure body has any `async` or `await` expressions,
+/// declarations, or statements directly in its body (no in other closures
+/// or nested declarations).
+ASTNode findAsyncNode(ClosureExpr *closure);
 
 } // end namespace constraints
 

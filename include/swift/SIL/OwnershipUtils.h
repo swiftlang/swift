@@ -894,8 +894,10 @@ public:
       ;
     case ValueKind::ApplyInst:
       return Kind::Apply;
-    case ValueKind::BeginApplyResult:
-      return Kind::BeginApply;
+    case ValueKind::MultipleValueInstructionResult:
+      if (isaResultOf<BeginApplyInst>(value))
+        return Kind::BeginApply;
+      return Kind::Invalid;
     case ValueKind::StructInst:
       return Kind::Struct;
     case ValueKind::TupleInst:

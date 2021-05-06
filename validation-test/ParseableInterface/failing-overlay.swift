@@ -3,4 +3,4 @@
 
 import ImportsOverlay
 
-// CHECK: HasOverlay.swiftinterface:1:1: error: failed to build module 'HasOverlay' for importation due to the errors above; the textual interface may be broken by project issues, differences between compilers (the producer '(unspecified, file possibly handwritten)' and this compiler '{{.*Swift version.*}}') or a compiler bug
+// CHECK: HasOverlay.swiftinterface:1:1: error: failed to build module 'HasOverlay'; this SDK is not supported by the compiler (the SDK is built with '(unspecified, file possibly handwritten)', while this compiler is '{{.*Swift version.*}}'). Please select a toolchain which matches the SDK.

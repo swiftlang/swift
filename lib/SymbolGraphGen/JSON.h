@@ -43,6 +43,7 @@ void serialize(const llvm::Triple &T, llvm::json::OStream &OS);
 void serialize(const ExtensionDecl *Extension, llvm::json::OStream &OS);
 void serialize(const Requirement &Req, llvm::json::OStream &OS);
 void serialize(const swift::GenericTypeParamType *Param, llvm::json::OStream &OS);
+void serialize(const ModuleDecl &M, llvm::json::OStream &OS, llvm::Triple Target);
 
 void filterGenericParams(
     TypeArrayView<GenericTypeParamType> GenericParams,

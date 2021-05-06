@@ -743,6 +743,8 @@ public:
                          llvm::VersionTuple Obsoleted
                          = llvm::VersionTuple());
 
+  AvailableAttr *clone(ASTContext &C, bool implicit) const;
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;
   }
@@ -2077,9 +2079,10 @@ public:
   CompletionHandlerAsyncAttr(AbstractFunctionDecl &asyncFunctionDecl,
                              size_t completionHandlerIndex,
                              SourceLoc completionHandlerIndexLoc,
-                             SourceLoc atLoc, SourceRange range)
+                             SourceLoc atLoc, SourceRange range,
+                             bool implicit)
       : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
-                      /*implicit*/ false),
+                      implicit),
         AsyncFunctionDecl(&asyncFunctionDecl) ,
         CompletionHandlerIndex(completionHandlerIndex),
         CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
@@ -2324,8 +2327,6 @@ public:
 
   Optional<Convention> ConventionArguments;
 
-  // Indicates whether the type's '@differentiable' attribute has a 'linear'
-  // argument.
   DifferentiabilityKind differentiabilityKind =
       DifferentiabilityKind::NonDifferentiable;
 

@@ -893,15 +893,6 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
   return None;
 }
 
-bool ConstraintSystem::isAnyHashableType(Type type) {
-  if (auto st = type->getAs<StructType>()) {
-    auto &ctx = type->getASTContext();
-    return st->getDecl() == ctx.getAnyHashableDecl();
-  }
-
-  return false;
-}
-
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
                                              bool wantRValue) const {
@@ -1233,6 +1224,16 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
                            functionType->getExtInfo());
 }
 
+/// Determine whether the given locator is for a witness or requirement.
+static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
+  if (auto last = locator.last()) {
+    return last->getKind() == ConstraintLocator::ProtocolRequirement ||
+           last->getKind() == ConstraintLocator::Witness;
+  }
+
+  return false;
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
@@ -1245,9 +1246,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     OpenedTypeMap replacements;
 
-    auto openedType =
-        openFunctionType(func->getInterfaceType()->castTo<AnyFunctionType>(),
-                         locator, replacements, func->getDeclContext());
+    AnyFunctionType *funcType = func->getInterfaceType()
+        ->castTo<AnyFunctionType>();
+    if (!isRequirementOrWitness(locator))
+      funcType = applyGlobalActorType(funcType, func, useDC);
+    auto openedType = openFunctionType(
+        funcType, locator, replacements, func->getDeclContext());
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
@@ -1274,10 +1278,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto numLabelsToRemove = getNumRemovedArgumentLabels(
         funcDecl, /*isCurriedInstanceReference=*/false, functionRefKind);
 
+    if (!isRequirementOrWitness(locator))
+      funcType = applyGlobalActorType(funcType, funcDecl, useDC);
+
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
-
     openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                      openedType->getAs<FunctionType>(),
                                                      locator);
@@ -1514,16 +1520,6 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                    cs.getConstraintLocator(locator));
 }
 
-/// Determine whether the given locator is for a witness or requirement.
-static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
-  if (auto last = locator.last()) {
-    return last->getKind() == ConstraintLocator::ProtocolRequirement ||
-           last->getKind() == ConstraintLocator::Witness;
-  }
-
-  return false;
-}
-
 Type constraints::getDynamicSelfReplacementType(
     Type baseObjTy, const ValueDecl *member, ConstraintLocator *memberLocator) {
   // Constructions must always have their dynamic 'Self' result type replaced
@@ -1623,6 +1619,9 @@ ConstraintSystem::getTypeOfMemberReference(
       isa<EnumElementDecl>(value)) {
     // This is the easy case.
     funcType = value->getInterfaceType()->castTo<AnyFunctionType>();
+
+    if (!isRequirementOrWitness(locator))
+      funcType = applyGlobalActorType(funcType, value, useDC);
   } else {
     // For a property, build a type (Self) -> PropType.
     // For a subscript, build a type (Self) -> (Indices...) -> ElementType.
@@ -2487,52 +2486,6 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
     bool foundThrow() { return FoundThrow; }
   };
 
-  // A walker that looks for 'async' and 'await' expressions
-  // that aren't nested within closures or nested declarations.
-  class FindInnerAsync : public ASTWalker {
-    bool FoundAsync = false;
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If we've found an 'await', record it and terminate the traversal.
-      if (isa<AwaitExpr>(expr)) {
-        FoundAsync = true;
-        return { false, nullptr };
-      }
-
-      // Do not recurse into other closures.
-      if (isa<ClosureExpr>(expr))
-        return { false, expr };
-
-      return { true, expr };
-    }
-
-    bool walkToDeclPre(Decl *decl) override {
-      // Do not walk into function or type declarations.
-      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        if (patternBinding->isAsyncLet())
-          FoundAsync = true;
-
-        return true;
-      }
-
-      return false;
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override { 
-      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
-        if (forEach->getAwaitLoc().isValid()) {
-          FoundAsync = true;
-          return { false, nullptr };
-        }
-      }
-
-      return { true, stmt };
-    }
-
-  public:
-    bool foundAsync() { return FoundAsync; }
-  };
-
   // If either 'throws' or 'async' was explicitly specified, use that
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
@@ -2553,13 +2506,11 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
 
   auto throwFinder = FindInnerThrows(*this, expr);
   body->walk(throwFinder);
-  auto asyncFinder = FindInnerAsync();
-  body->walk(asyncFinder);
   auto result = ASTExtInfoBuilder()
-    .withThrows(throwFinder.foundThrow())
-    .withAsync(asyncFinder.foundAsync())
-    .withConcurrent(concurrent)
-    .build();
+                    .withThrows(throwFinder.foundThrow())
+                    .withAsync(bool(findAsyncNode(expr)))
+                    .withConcurrent(concurrent)
+                    .build();
   closureEffectsCache[expr] = result;
   return result;
 }
@@ -2643,7 +2594,7 @@ void ConstraintSystem::bindOverloadType(
         fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
-    assert(isKnownKeyPathDecl(getASTContext(), keyPathDecl) &&
+    assert(isKnownKeyPathType(keyPathTy) &&
            "parameter is supposed to be a keypath");
 
     auto *keyPathLoc = getConstraintLocator(
@@ -2713,8 +2664,8 @@ void ConstraintSystem::bindOverloadType(
       // form additional `applicable fn` constraint here and bind it to a
       // function type, but it would create inconsistency with how properties
       // are handled, which means more special handling in CSApply.
-      if (keyPathDecl == getASTContext().getWritableKeyPathDecl() ||
-          keyPathDecl == getASTContext().getReferenceWritableKeyPathDecl())
+      if (keyPathTy->isWritableKeyPath() ||
+          keyPathTy->isReferenceWritableKeyPath())
         dynamicResultTy->getImpl().setCanBindToLValue(getSavedBindings(),
                                                       /*enabled=*/true);
 
@@ -2890,7 +2841,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // If we're choosing an asynchronous declaration within a synchronous
     // context, or vice-versa, increase the async/async mismatch score.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->isAsyncContext() != isAsynchronousContext(useDC)) {
+      if (!func->hasPolymorphicEffect(EffectKind::Async) &&
+          func->isAsyncContext() != isAsynchronousContext(useDC)) {
         increaseScore(
             func->isAsyncContext() ? SK_AsyncInSyncMismatch : SK_SyncInAsync);
       }
@@ -3063,6 +3015,16 @@ Type ConstraintSystem::simplifyType(Type type) const {
 
         return getRepresentative(tvt);
       });
+}
+
+void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
+  auto &cs = getConstraintSystem();
+  assert(argumentMatchingChoices.find(locator) ==
+             argumentMatchingChoices.end() &&
+         "recording multiple bindings for same locator");
+  argumentMatchingChoices.insert(
+      {cs.getConstraintLocator(locator, ConstraintLocator::ApplyArgument),
+       MatchCallArgumentResult::forArity(1)});
 }
 
 Type Solution::simplifyType(Type type) const {
@@ -3706,7 +3668,11 @@ static bool diagnoseAmbiguity(
                  })) {
         // All fixes have to do with arguments, so let's show the parameter
         // lists.
-        auto *fn = type->getAs<AnyFunctionType>();
+        //
+        // It's possible that function type is wrapped in an optional
+        // if it's from `@objc optional` method, so we need to ignore that.
+        auto *fn =
+            type->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
         assert(fn);
 
         if (fn->getNumParams() == 1) {
@@ -3804,12 +3770,14 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     const auto &solution = *entry.first;
     const auto *fix = entry.second;
 
-    if (fix->getLocator()->isForContextualType()) {
+    auto *locator = fix->getLocator();
+
+    if (locator->isForContextualType()) {
       contextualFixes.push_back({&solution, fix});
       continue;
     }
 
-    auto *calleeLocator = solution.getCalleeLocator(fix->getLocator());
+    auto *calleeLocator = solution.getCalleeLocator(locator);
     fixesByCallee[calleeLocator].push_back({&solution, fix});
   }
 
@@ -4567,46 +4535,13 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // It's only valid to use `&` in argument positions, but we need
   // to figure out exactly where it was used.
   if (auto *argExpr = getAsExpr<InOutExpr>(locator->getAnchor())) {
-    auto *argList = cs.getParentExpr(argExpr);
-    assert(argList);
+    auto argInfo = cs.isArgumentExpr(argExpr);
+    assert(argInfo && "Incorrect use of `inout` expression");
 
-    // `inout` expression might be wrapped in a number of
-    // parens e.g. `test(((&x)))`.
-    if (isa<ParenExpr>(argList)) {
-      for (;;) {
-        auto nextParent = cs.getParentExpr(argList);
-        assert(nextParent && "Incorrect use of `inout` expression");
+    Expr *call;
+    unsigned argIdx;
 
-        // e.g. `test((&x), x: ...)`
-        if (isa<TupleExpr>(nextParent)) {
-          argList = nextParent;
-          break;
-        }
-
-        // e.g. `test(((&x)))`
-        if (isa<ParenExpr>(nextParent)) {
-          argList = nextParent;
-          continue;
-        }
-
-        break;
-      }
-    }
-
-    unsigned argIdx = 0;
-    if (auto *tuple = dyn_cast<TupleExpr>(argList)) {
-      auto arguments = tuple->getElements();
-
-      for (auto idx : indices(arguments)) {
-        if (arguments[idx]->getSemanticsProvidingExpr() == argExpr) {
-          argIdx = idx;
-          break;
-        }
-      }
-    }
-
-    auto *call = cs.getParentExpr(argList);
-    assert(call);
+    std::tie(call, argIdx) = *argInfo;
 
     ParameterTypeFlags flags;
     locator = cs.getConstraintLocator(
@@ -4714,15 +4649,9 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
-  if (auto *BGT = type->getAs<BoundGenericType>())
-    return isKnownKeyPathDecl(type->getASTContext(), BGT->getDecl());
-  return false;
-}
-
-bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
-  return decl == ctx.getKeyPathDecl() || decl == ctx.getWritableKeyPathDecl() ||
-         decl == ctx.getReferenceWritableKeyPathDecl() ||
-         decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
+  return type->isKeyPath() || type->isWritableKeyPath() ||
+         type->isReferenceWritableKeyPath() || type->isPartialKeyPath() ||
+         type->isAnyKeyPath();
 }
 
 bool constraints::hasExplicitResult(ClosureExpr *closure) {
@@ -4784,6 +4713,58 @@ bool constraints::isStandardComparisonOperator(ASTNode node) {
     return opName->isStandardComparisonOperator();
   }
   return false;
+}
+
+Optional<std::pair<Expr *, unsigned>>
+ConstraintSystem::isArgumentExpr(Expr *expr) {
+  auto *argList = getParentExpr(expr);
+
+  if (isa<ParenExpr>(argList)) {
+    for (;;) {
+      auto *parent = getParentExpr(argList);
+      if (!parent)
+        return None;
+
+      if (isa<TupleExpr>(parent)) {
+        argList = parent;
+        break;
+      }
+
+      // Drop all of the semantically insignificant parens
+      // that might be wrapping an argument e.g. `test(((42)))`
+      if (isa<ParenExpr>(parent)) {
+        argList = parent;
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  if (!(isa<ParenExpr>(argList) || isa<TupleExpr>(argList)))
+    return None;
+
+  auto *application = getParentExpr(argList);
+  if (!application)
+    return None;
+
+  if (!(isa<ApplyExpr>(application) || isa<SubscriptExpr>(application) ||
+        isa<ObjectLiteralExpr>(application)))
+    return None;
+
+  unsigned argIdx = 0;
+  if (auto *tuple = dyn_cast<TupleExpr>(argList)) {
+    auto arguments = tuple->getElements();
+
+    for (auto idx : indices(arguments)) {
+      if (arguments[idx]->getSemanticsProvidingExpr() == expr) {
+        argIdx = idx;
+        break;
+      }
+    }
+  }
+
+  return std::make_pair(application, argIdx);
 }
 
 bool constraints::isOperatorArgument(ConstraintLocator *locator,
@@ -4964,7 +4945,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
                                              bool isDefaultWrappedValue,
-                                             bool isAsyncLetWrapper) {
+                                             bool isSpawnLetWrapper) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC)) {
@@ -4986,7 +4967,7 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
-  if (isAsyncLetWrapper)
+  if (isSpawnLetWrapper)
     closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
 
   Expr *result = closure;
@@ -5683,4 +5664,77 @@ TypeVarBindingProducer::getDefaultBinding(Constraint *constraint) const {
   return requiresOptionalAdjustment(binding)
              ? binding.withType(OptionalType::get(type))
              : binding;
+}
+
+ValueDecl *constraints::getOverloadChoiceDecl(Constraint *choice) {
+  if (choice->getKind() != ConstraintKind::BindOverload)
+    return nullptr;
+  return choice->getOverloadChoice().getDeclOrNull();
+}
+
+bool constraints::isOperatorDisjunction(Constraint *disjunction) {
+  assert(disjunction->getKind() == ConstraintKind::Disjunction);
+
+  auto choices = disjunction->getNestedConstraints();
+  assert(!choices.empty());
+
+  auto *decl = getOverloadChoiceDecl(choices.front());
+  return decl ? decl->isOperator() : false;
+}
+
+ASTNode constraints::findAsyncNode(ClosureExpr *closure) {
+  auto *body = closure->getBody();
+  if (!body)
+    return ASTNode();
+
+  // A walker that looks for 'async' and 'await' expressions
+  // that aren't nested within closures or nested declarations.
+  class FindInnerAsync : public ASTWalker {
+    ASTNode AsyncNode;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // If we've found an 'await', record it and terminate the traversal.
+      if (isa<AwaitExpr>(expr)) {
+        AsyncNode = expr;
+        return {false, nullptr};
+      }
+
+      // Do not recurse into other closures.
+      if (isa<ClosureExpr>(expr))
+        return {false, expr};
+
+      return {true, expr};
+    }
+
+    bool walkToDeclPre(Decl *decl) override {
+      // Do not walk into function or type declarations.
+      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+        if (patternBinding->isSpawnLet())
+          AsyncNode = patternBinding;
+
+        return true;
+      }
+
+      return false;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
+        if (forEach->getAwaitLoc().isValid()) {
+          AsyncNode = forEach;
+          return {false, nullptr};
+        }
+      }
+
+      return {true, stmt};
+    }
+
+  public:
+    ASTNode getAsyncNode() { return AsyncNode; }
+  };
+
+  FindInnerAsync asyncFinder;
+  body->walk(asyncFinder);
+
+  return asyncFinder.getAsyncNode();
 }

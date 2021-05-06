@@ -54,9 +54,6 @@ class ExistentialSpecializerCloner
   SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
       &ExistentialArgDescriptor;
 
-  // Use one OpenedArchetypesTracker while cloning.
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
-
   // AllocStack instructions introduced in the new prolog that require cleanup.
   SmallVector<AllocStackInst *, 4> AllocStackInsts;
   // Temporary values introduced in the new prolog that require cleanup.
@@ -80,10 +77,7 @@ public:
       : SuperTy(*NewF, *OrigF, Subs), OrigF(OrigF),
         ArgumentDescList(ArgumentDescList),
         ArgToGenericTypeMap(ArgToGenericTypeMap),
-        ExistentialArgDescriptor(ExistentialArgDescriptor),
-        OpenedArchetypesTracker(NewF) {
-    getBuilder().setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  }
+        ExistentialArgDescriptor(ExistentialArgDescriptor) {}
 
   void cloneAndPopulateFunction();
 };
@@ -415,8 +409,6 @@ void ExistentialTransform::populateThunkBody() {
 
   /// Builder to add new instructions in the Thunk.
   SILBuilder Builder(ThunkBody);
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
-  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   Builder.setCurrentDebugScope(ThunkBody->getParent()->getDebugScope());
 
   /// Location to insert new instructions.

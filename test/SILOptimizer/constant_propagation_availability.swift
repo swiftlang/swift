@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -target x86_64-apple-macos10.15 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_15 %s
-// RUN: %target-swift-frontend -target x86_64-apple-macos10.14 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_14 %s
-// RUN: %target-swift-frontend -O -target x86_64-apple-macos10.15 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_15 %s
-// RUN: %target-swift-frontend -O -target x86_64-apple-macos10.14 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_14 %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos10.15 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_15 %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos10.14 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_14 %s
+// RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.15 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_15 %s
+// RUN: %target-swift-frontend -O -target %target-cpu-apple-macos10.14 -emit-sil %s | %FileCheck --check-prefix=CHECK-macosx10_14 %s
 
 // REQUIRES: OS=macosx
 

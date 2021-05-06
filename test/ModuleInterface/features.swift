@@ -11,7 +11,10 @@
 
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: public actor MyActor
-// CHECK: }
+// CHECK:        @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
+// CHECK-NEXT:     get
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
 // CHECK-NEXT: #endif
 public actor MyActor {
 }
@@ -142,6 +145,11 @@ public func runSomethingConcurrently(body: @Sendable () -> Void) { }
 // CHECK-NEXT: func stage
 // CHECK-NEXT: #endif
 public func stage(with actor: MyActor) { }
+
+// CHECK: #if compiler(>=5.3) && $AsyncAwait && $Sendable && $InheritActorContext
+// CHECK-NEXT: func asyncIsh
+// CHECK-NEXT: #endif
+public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () async -> Void) { }
 
 // CHECK-NOT: extension MyActor : Swift.Sendable
 

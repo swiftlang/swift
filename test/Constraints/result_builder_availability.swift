@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target x86_64-apple-macosx10.50
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.50
 
 // REQUIRES: OS=macosx
 

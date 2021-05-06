@@ -61,6 +61,9 @@ def SwiftAPIExtractOption : OptionFlag;
 // The option should be accepted by swift-symbolgraph-extract.
 def SwiftSymbolGraphExtractOption : OptionFlag;
 
+// The option should be accepted by swift-api-digester.
+def SwiftAPIDigesterOption : OptionFlag;
+
 /////////
 // Options
 
@@ -177,14 +180,15 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
 def help : Flag<["-", "--"], "help">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
          SwiftIndentOption, SwiftAPIExtractOption,
-         SwiftSymbolGraphExtractOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
   Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Display available options, including hidden options">;
 
-def v : Flag<["-"], "v">, Flags<[DoesNotAffectIncrementalBuild]>,
+def v : Flag<["-"], "v">,
+  Flags<[DoesNotAffectIncrementalBuild, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Show commands to run and use verbose output">;
 def version : Flag<["-", "--"], "version">, Flags<[FrontendOption]>,
   HelpText<"Print version information and exit">;
@@ -200,18 +204,20 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
          NoInteractiveOption, SwiftIndentOption, ArgumentIsPath,
-         SwiftAPIExtractOption]>,
+         SwiftAPIExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
 def sdk : Separate<["-"], "sdk">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
 def swift_version : Separate<["-"], "swift-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
@@ -229,7 +235,7 @@ def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
 def F : JoinedOrSeparate<["-"], "F">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<F>;
@@ -239,7 +245,7 @@ def Fsystem : Separate<["-"], "Fsystem">,
   HelpText<"Add directory to system framework search path">;
 
 def I : JoinedOrSeparate<["-"], "I">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to the import search path">;
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
@@ -346,11 +352,13 @@ def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Serialize diagnostics in a binary format">;
 def serialize_diagnostics_path : Separate<["-"], "serialize-diagnostics-path">,
-  Flags<[FrontendOption, NoBatchOption, ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
+         ArgumentIsPath, SupplementaryOutput]>,
   HelpText<"Emit a serialized diagnostics file to <path>">,
   MetaVarName<"<path>">;
 def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
-  Flags<[FrontendOption, NoBatchOption, ArgumentIsPath, SupplementaryOutput]>,
+  Flags<[FrontendOption, SwiftAPIDigesterOption, NoBatchOption,
+         ArgumentIsPath, SupplementaryOutput]>,
   Alias<serialize_diagnostics_path>;
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
@@ -382,7 +390,7 @@ def localization_path : Separate<["-"], "localization-path">,
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, SwiftAPIExtractOption,
-         SwiftSymbolGraphExtractOption]>,
+         SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Specifies the Clang module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
@@ -605,6 +613,16 @@ def warn_swift3_objc_inference_minimal :
   Flag<["-"], "warn-swift3-objc-inference-minimal">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def enable_actor_data_race_checks :
+  Flag<["-"], "enable-actor-data-race-checks">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit runtime checks for actor data races">;
+
+def disable_actor_data_race_checks :
+  Flag<["-"], "disable-actor-data-race-checks">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable runtime checks for actor data races">;
 
 def warn_implicit_overrides :
   Flag<["-"], "warn-implicit-overrides">,
@@ -1034,12 +1052,13 @@ def Xllvm : Separate<["-"], "Xllvm">,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to LLVM.">;
 
 def resource_dir : Separate<["-"], "resource-dir">,
-  Flags<[FrontendOption, SwiftSymbolGraphExtractOption, HelpHidden, ArgumentIsPath]>,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption, HelpHidden, ArgumentIsPath]>,
   MetaVarName<"</usr/lib/swift>">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption]>,
   HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
@@ -1161,6 +1180,11 @@ def working_directory : Separate<["-"], "working-directory">,
 def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
+def user_module_version : Separate<["-"], "user-module-version">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"Module version specified from Swift module authors">,
+  MetaVarName<"<vers>">;
+
 // VFS
 
 def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
@@ -1200,8 +1224,9 @@ def pretty_print: Flag<["-"], "pretty-print">,
 
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
-  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, ArgumentIsPath]>,
-  HelpText<"Symbol Graph JSON Output Directory (Required)">,
+  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
+         ArgumentIsPath]>,
+  HelpText<"Output directory">,
   MetaVarName<"<dir>">;
 
 def skip_synthesized_members: Flag<[ "-" ], "skip-synthesized-members">,
@@ -1212,5 +1237,158 @@ def minimum_access_level : Separate<["-"], "minimum-access-level">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Include symbols with this access level or more">,
   MetaVarName<"<level>">;
+
+def skip_inherited_docs : Flag<["-"], "skip-inherited-docs">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
+
+// swift-api-digester-only options
+def dump_sdk: Flag<["-", "--"], "dump-sdk">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Dump SDK content to JSON file">;
+
+def generate_migration_script: Flag<["-", "--"], "generate-migration-script">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Compare SDK content in JSON file and generate migration script">;
+
+def diagnose_sdk: Flag<["-", "--"], "diagnose-sdk">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Diagnose SDK content in JSON file">;
+
+def deserialize_diff: Flag<["-", "--"], "deserialize-diff">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Deserialize diff items in a JSON file">;
+
+def deserialize_sdk: Flag<["-", "--"], "deserialize-sdk">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Deserialize sdk digester in a JSON file">;
+
+def find_usr: Flag<["-", "--"], "find-usr">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Find USR for decls by given condition">;
+
+def generate_name_correction: Flag<["-", "--"], "generate-name-correction">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Generate name correction template">;
+
+def generate_empty_baseline: Flag<["-", "--"], "generate-empty-baseline">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Generate an empty baseline">;
+
+def empty_baseline: Flag<["-", "--"], "empty-baseline">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Use empty baseline for diagnostics">;
+
+def ignored_usrs: Separate<["-", "--"], "ignored-usrs">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"the file containing USRs of removed decls that the digester should ignore">,
+  MetaVarName<"<path>">;
+
+def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"File containing a new-line separated list of protocol names">,
+  MetaVarName<"<path>">;
+
+def input_paths: Separate<["-", "--"], "input-paths">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"The SDK contents under comparison">,
+  MetaVarName<"<path>">;
+
+def compiler_style_diags: Flag<["-", "--"], "compiler-style-diags">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Print compiler style diagnostics to stderr.">;
+
+def json: Flag<["-", "--"], "json">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Print output in JSON format.">;
+
+def avoid_location: Flag<["-", "--"], "avoid-location">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Avoid serializing the file paths of SDK nodes.">;
+
+def location: Separate<["-", "--"], "location">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Filter nodes with the given location.">,
+  MetaVarName<"<location>">;
+
+def avoid_tool_args: Flag<["-", "--"], "avoid-tool-args">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Avoid serializing the arguments for invoking the tool.">;
+
+def abi: Flag<["-", "--"], "abi">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Dumping ABI interface">;
+
+def swift_only: Flag<["-", "--"], "swift-only">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Only include APIs defined from Swift source">;
+
+def disable_os_checks: Flag<["-", "--"], "disable-os-checks">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Skip OS related diagnostics">;
+
+def print_module: Flag<["-", "--"], "print-module">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Print module names in diagnostics">;
+
+def migrator: Flag<["-", "--"], "migrator">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Dump Json suitable for generating migration script">;
+
+def abort_on_module_fail: Flag<["-", "--"], "abort-on-module-fail">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Abort if a module failed to load">;
+
+def debug_mapping: Flag<["-", "--"], "debug-mapping">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Dumping information for debug purposes">;
+
+def BF : JoinedOrSeparate<["-"], "BF">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"add a directory to the baseline framework search path">;
+def BF_EQ : Joined<["-"], "BF=">, Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  Alias<BF>;
+
+def BI : JoinedOrSeparate<["-"], "BI">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"add a module for baseline input">;
+def BI_EQ : Joined<["-"], "BI=">, Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  Alias<BI>;
+
+def iframework : JoinedOrSeparate<["-"], "iframework">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"add a directory to the clang importer system framework search path">;
+
+def baseline_path : JoinedOrSeparate<["-"], "baseline-path">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"The path to the Json file that we should use as the baseline">;
+
+def baseline_dir : JoinedOrSeparate<["-"], "baseline-dir">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"The path to a directory containing baseline files: macos.json, iphoneos.json, appletvos.json, watchos.json, and iosmac.json">;
+
+def breakage_allowlist_path : JoinedOrSeparate<["-"], "breakage-allowlist-path">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"An allowlist of breakages to not complain about">;
+
+def bsdk : JoinedOrSeparate<["-"], "bsdk">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"path to the baseline SDK to import frameworks">;
+
+def module_list_file : JoinedOrSeparate<["-"], "module-list-file">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
+  HelpText<"File containing a new-line separated list of modules">;
+
+def module: Separate<["-", "--"], "module">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Names of modules">,
+  MetaVarName<"<name>">;
+
+def use_interface_for_module: Separate<["-", "--"], "use-interface-for-module">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Prefer loading these modules via interface">,
+  MetaVarName<"<name>">;
 
 include "FrontendOptions.td"

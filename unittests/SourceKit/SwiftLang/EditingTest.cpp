@@ -101,8 +101,7 @@ private:
   }
 
   void handleSourceText(StringRef Text) override {}
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                        std::unordered_set<unsigned> &ReusedNodeIds) override {}
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override {}
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return SyntaxTreeTransferMode::Off;

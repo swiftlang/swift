@@ -184,7 +184,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   bool isNilInitialized =
     var->getAttrs().hasAttribute<LazyAttr>() ||
     (!isExplicitlyInitialized && isDefaultInitializable &&
-     var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
+     var->getValueInterfaceType()->isOptional() &&
      (var->getAttachedPropertyWrappers().empty() ||
       var->isPropertyMemberwiseInitializedWithWrappedType()));
   if (isNilInitialized) {
@@ -319,6 +319,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   auto *ctor =
     new (ctx) ConstructorDecl(name, Loc,
                               /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               paramList, /*GenericParams=*/nullptr, decl);
 
@@ -625,7 +626,6 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
     type = funcTy->getResult();
   auto *superclassCtorRefExpr =
       new (ctx) DotSyntaxCallExpr(ctorRefExpr, SourceLoc(), superRef, type);
-  superclassCtorRefExpr->setIsSuper(true);
   superclassCtorRefExpr->setThrows(false);
 
   auto *bodyParams = ctor->getParameters();
@@ -744,6 +744,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               classDecl->getBraces().Start,
                               superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
+                              /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
                               bodyParams, genericParams, classDecl);
@@ -1310,10 +1311,6 @@ ResolveEffectiveMemberwiseInitRequest::evaluate(Evaluator &evaluator,
         continue;
       storedProperties.push_back(vd);
     }
-    // Return false if initializer does not have interface type set. It is not
-    // possible to determine whether it is a memberwise initializer.
-    if (!initDecl->hasInterfaceType())
-      return false;
     auto initDeclType =
         initDecl->getMethodInterfaceType()->getAs<AnyFunctionType>();
     // Return false if initializer does not have a valid interface type.

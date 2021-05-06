@@ -466,7 +466,7 @@ static SILValue reapplyFunctionConversion(
 static Optional<std::pair<SILValue, AutoDiffConfig>>
 emitDerivativeFunctionReference(
     DifferentiationTransformer &transformer, SILBuilder &builder,
-    AutoDiffConfig desiredConfig, AutoDiffDerivativeFunctionKind kind,
+    const AutoDiffConfig &desiredConfig, AutoDiffDerivativeFunctionKind kind,
     SILValue original, DifferentiationInvoker invoker,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
   ADContext &context = transformer.getContext();
@@ -864,9 +864,9 @@ static void emitFatalError(ADContext &context, SILFunction *f,
     if (arg->getOwnershipKind() == OwnershipKind::Owned)
       builder.emitDestroyOperation(loc, arg);
   // Fatal error with a nice message.
-  auto neverResultInfo =
-      SILResultInfo(context.getModule().getASTContext().getNeverType(),
-                    ResultConvention::Unowned);
+  auto neverTy =
+      context.getModule().getASTContext().getNeverType()->getCanonicalType();
+  auto neverResultInfo = SILResultInfo(neverTy, ResultConvention::Unowned);
   // Fatal error function must have type `@convention(thin) () -> Never`.
   auto fatalErrorFnType = SILFunctionType::get(
       /*genericSig*/ nullptr, SILFunctionType::ExtInfo::getThin(),
@@ -1043,8 +1043,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   if (newThunk->empty()) {
     if (auto newThunkGenSig = thunkType->getSubstGenericSignature())
       newThunk->setGenericEnvironment(newThunkGenSig->getGenericEnvironment());
-    // TODO(TF-1206): Enable ownership in all differentiation thunks.
-    newThunk->setOwnershipEliminated();
+
     BasicTypeSubstCloner cloner(thunk, newThunk);
     cloner.cloneFunction();
     auto *retInst = cast<ReturnInst>(newThunk->findReturnBB()->getTerminator());

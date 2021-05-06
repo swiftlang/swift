@@ -732,9 +732,11 @@ public:
   llvm::PointerType *AsyncFunctionPointerPtrTy;
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
+  llvm::PointerType *SwiftAsyncLetPtrTy;
   llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::PointerType *SwiftJobPtrTy;
-  llvm::PointerType *SwiftExecutorPtrTy;
+  llvm::IntegerType *ExecutorFirstTy;
+  llvm::IntegerType *ExecutorSecondTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
   llvm::StructType *AsyncTaskAndContextTy;
@@ -908,7 +910,7 @@ public:
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();
   const TypeInfo &getTaskContinuationFunctionPtrTypeInfo();
-  const TypeInfo &getSwiftExecutorPtrTypeInfo();
+  const LoadableTypeInfo &getExecutorTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size, Alignment align);
   const LoadableTypeInfo &
@@ -1041,7 +1043,8 @@ public:
                                             llvm::Type *resultType,
                                             ArrayRef<llvm::Type*> paramTypes,
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
-                        bool setIsNoInline = false);
+                        bool setIsNoInline = false,
+                        bool forPrologue = false);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);

@@ -1460,8 +1460,15 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   for (auto input : objcFnTy->getParameters()) {
     SILType argTy = getSILType(input, objcFnTy);
     SILValue arg = F.begin()->createFunctionArgument(argTy);
-    
-    if (!input.isConsumed()) {
+    // Copy block arguments.
+    if (argTy.isBlockPointerCompatible()) {
+      auto argCopy = B.createCopyBlock(loc, arg);
+      // If the argument is consumed, we're still responsible for releasing the
+      // original.
+      if (input.isConsumed())
+        emitManagedRValueWithCleanup(arg);
+      arg = argCopy;
+    } else if (!input.isConsumed()) {
       arg = emitObjCUnconsumedArgument(*this, loc, arg);
     }
     auto managedArg = emitManagedRValueWithCleanup(arg);
@@ -1484,7 +1491,7 @@ SILFunction *SILGenFunction::emitNativeAsyncToForeignThunk(SILDeclRef thunk) {
   assert(thunkSuffix[1] == 'T'
          && thunkSuffix[0] == 'o'
          && "not an objc thunk?");
-  closureName += "yyYcfU_"; // closure with type () async -> ()
+  closureName += "yyYacfU_"; // closure with type () async -> ()
   closureName.push_back(thunkSuffix[1]);
   closureName.push_back(thunkSuffix[0]);
 

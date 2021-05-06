@@ -22,7 +22,6 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
@@ -814,8 +813,8 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   if (!VI) return false;
 
   llvm::SmallSetVector<SILInstruction *, 16> Candidates;
-  auto OldOpenedArchetype = getOpenedArchetypeOf(Inst);
-  auto NewOpenedArchetype = getOpenedArchetypeOf(VI);
+  auto OldOpenedArchetype = Inst->getOpenedArchetype();
+  auto NewOpenedArchetype = VI->getOpenedArchetype();
 
   // Collect all candidates that may contain opened archetypes
   // that need to be replaced.
@@ -848,16 +847,12 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   }
 
   // Now process candidates.
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(Inst->getFunction());
-  // Register the new archetype to be used.
-  OpenedArchetypesTracker.registerOpenedArchetypes(VI);
   // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(Inst->getFunction());
   Cloner.registerOpenedExistentialRemapping(
       OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
   auto &Builder = Cloner.getBuilder();
-  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
   llvm::SmallPtrSet<SILInstruction *, 16> Processed;
   // Now clone each candidate and replace the opened archetype
@@ -902,8 +897,6 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
     if (!DependsOnOldOpenedArchetype)
       continue;
 
-    Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
-        Candidate->getTypeDependentOperands());
     Builder.setInsertionPoint(Candidate);
     auto NewI = Cloner.clone(Candidate);
     // Result types of candidate's uses instructions may be using this archetype.
@@ -1265,10 +1258,6 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
     return false;
 
   SILBuilder Builder(FromAI);
-  // Make archetypes used by the ToAI available to the builder.
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(FromAI->getFunction());
-  OpenedArchetypesTracker.registerUsedOpenedArchetypes(ToAI);
-  Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
 
   assert(FromAI->getArguments().size() == ToAI->getArguments().size() &&
          "Invalid number of arguments");

@@ -1526,6 +1526,28 @@ const ValueBase *SILInstructionResultArray::back() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                           SingleValueInstruction
+//===----------------------------------------------------------------------===//
+
+CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
+  switch (getKind()) {
+  case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenExistentialBoxInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+  case SILInstructionKind::OpenExistentialMetatypeInst:
+  case SILInstructionKind::OpenExistentialValueInst: {
+    auto Ty = getOpenedArchetypeOf(getType().getASTType());
+    assert(Ty && Ty->isOpenedExistential() &&
+           "Type should be an opened archetype");
+    return Ty;
+  }
+  default:
+    return CanArchetypeType();
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                         Multiple Value Instruction
 //===----------------------------------------------------------------------===//
 
@@ -1539,9 +1561,8 @@ MultipleValueInstruction::getIndexOfResult(SILValue Target) const {
 }
 
 MultipleValueInstructionResult::MultipleValueInstructionResult(
-    ValueKind valueKind, unsigned index, SILType type,
-    ValueOwnershipKind ownershipKind)
-    : ValueBase(valueKind, type) {
+    unsigned index, SILType type, ValueOwnershipKind ownershipKind)
+    : ValueBase(ValueKind::MultipleValueInstructionResult, type) {
   setOwnershipKind(ownershipKind);
   setIndex(index);
 }
@@ -1561,7 +1582,7 @@ ValueOwnershipKind MultipleValueInstructionResult::getOwnershipKind() const {
   return ValueOwnershipKind(Bits.MultipleValueInstructionResult.VOKind);
 }
 
-MultipleValueInstruction *MultipleValueInstructionResult::getParent() {
+MultipleValueInstruction *MultipleValueInstructionResult::getParentImpl() const {
   char *Ptr = reinterpret_cast<char *>(
       const_cast<MultipleValueInstructionResult *>(this));
 

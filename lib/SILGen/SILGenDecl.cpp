@@ -440,7 +440,7 @@ public:
       // buffer.  DI will make sure it is only assigned to once.
       needsTemporaryBuffer = true;
       isUninitialized = true;
-    } else if (vd->isAsyncLet()) {
+    } else if (vd->isSpawnLet()) {
       // If this is an async let, treat it like a let-value without an
       // initializer. The initializer runs concurrently in a child task,
       // and value will be initialized at the point the variable in the
@@ -1142,11 +1142,9 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
-  // TODO: need to allocate the variable, stackalloc it? pass the address to the start()
-
   // If this is an async let, create a child task to compute the initializer
   // value.
-  if (PBD->isAsyncLet()) {
+  if (PBD->isSpawnLet()) {
     // Look through the implicit await (if present), try (if present), and
     // call to reach the autoclosure that computes the value.
     auto *init = PBD->getExecutableInit(idx);
@@ -1159,50 +1157,23 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
            "Could not find async let autoclosure");
     bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
 
-    // TODO: there's a builtin to make an address into a raw pointer
-    //       --- note dont need that; just have the builtin take it inout?
-    //       --- the builtin can take the address (for start())
-
-    // TODO: make a builtin start async let
-    // Builtin.startAsyncLet -- and in the builtin create the async let record
-
-    // TODO: make a builtin for end async let
-
-    // TODO: IRGen would make a local allocation for the builtins
-
-    // TODO: remember if we did an await already?
-
-    // TODO: force in typesystem that we always await; then end aysnc let does not have to be async
-    // the local let variable is actually owning the result
-    // - but since throwing we can't know; maybe we didnt await on a thing yet
-    // so we do need the tracking if we waited on a thing
-
-    // TODO: awaiting an async let should be able to take ownership
-    // that means we will not await on this async let again, maybe?
-    // it means that the async let destroy should not destroy the result anymore
-
     // Emit the closure for the child task.
-    SILValue childTask;
+    // Prepare the opaque `AsyncLet` representation.
+    SILValue alet;
     {
-      FullExpr Scope(Cleanups, CleanupLocation(init));
       SILLocation loc(PBD);
-      // TODO: opaque object in the async context that represents the async let
-      //
-      childTask = emitRunChildTask(
+      alet = emitAsyncLetStart(
           loc,
           init->getType(),
           emitRValue(init).getScalarValue()
         ).forward(*this);
     }
 
-    // Destroy the task at the end of the scope.
-    enterDestroyCleanup(childTask);
-
-    // Push a cleanup that will cancel the child task at the end of the scope.
-    enterCancelAsyncTaskCleanup(childTask); // TODO: this is "went out scope" rather than just a cancel
+    // Push a cleanup to destroy the AsyncLet along with the task and child record.
+    enterAsyncLetCleanup(alet);
 
     // Save the child task so we can await it as needed.
-    AsyncLetChildTasks[{PBD, idx}] = { childTask, isThrowing };
+    AsyncLetChildTasks[{PBD, idx}] = { alet, isThrowing };
 
     // Mark as uninitialized; actual initialization will occur when the
     // variables are referenced.
@@ -1359,9 +1330,13 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
       // Check the running OS version to determine whether it is in the range
       // specified by elt.
       VersionRange OSVersion = elt.getAvailability()->getAvailableRange();
-      assert(!OSVersion.isEmpty());
-
-      if (OSVersion.isAll()) {
+      
+      // The OS version might be left empty if availability checking was
+      // disabled. Treat it as always-true in that case.
+      assert(!OSVersion.isEmpty()
+             || getASTContext().LangOpts.DisableAvailabilityChecking);
+        
+      if (OSVersion.isEmpty() || OSVersion.isAll()) {
         // If there's no check for the current platform, this condition is
         // trivially true.
         SILType i1 = SILType::getBuiltinIntegerType(1, getASTContext());
@@ -1521,6 +1496,33 @@ namespace {
 CleanupHandle SILGenFunction::enterCancelAsyncTaskCleanup(SILValue task) {
   Cleanups.pushCleanupInState<CancelAsyncTaskCleanup>(
       CleanupState::Active, task);
+  return Cleanups.getTopCleanup();
+}
+
+namespace {
+/// A cleanup that destroys the AsyncLet along with the child task and record.
+class AsyncLetCleanup: public Cleanup {
+  SILValue alet;
+public:
+  AsyncLetCleanup(SILValue alet) : alet(alet) { }
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.emitEndAsyncLet(l, alet);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "AsyncLetCleanup\n"
+                 << "AsyncLet:" << alet << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::enterAsyncLetCleanup(SILValue alet) {
+  Cleanups.pushCleanupInState<AsyncLetCleanup>(
+      CleanupState::Active, alet);
   return Cleanups.getTopCleanup();
 }
 

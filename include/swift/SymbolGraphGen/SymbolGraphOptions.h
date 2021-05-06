@@ -35,6 +35,13 @@ struct SymbolGraphOptions {
   /// Emit members gotten through class inheritance or protocol default
   /// implementations with compound, "SYNTHESIZED" USRs.
   bool EmitSynthesizedMembers;
+  
+  /// Whether to print informational messages when rendering
+  /// a symbol graph.
+  bool PrintMessages;
+  
+  /// Whether to skip docs for symbols with compound, "SYNTHESIZED" USRs.
+  bool SkipInheritedDocs;
 };
 
 } // end namespace symbolgraphgen

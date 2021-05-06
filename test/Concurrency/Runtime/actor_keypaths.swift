@@ -3,9 +3,11 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 actor Page {
-    let initialNumWords : Int
+    nonisolated let initialNumWords : Int
 
     @actorIndependent(unsafe)
     var numWords : Int
@@ -17,7 +19,7 @@ actor Page {
 }
 
 actor Book {
-    let pages : [Page]
+    nonisolated let pages : [Page]
 
     init(_ numPages : Int) {
         var stack : [Page] = []

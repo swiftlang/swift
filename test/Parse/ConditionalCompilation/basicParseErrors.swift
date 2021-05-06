@@ -27,8 +27,8 @@ func h() {}
 #else /* aaa */
 #endif /* bbb */
 
-#if foo.bar() 
-      .baz() // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
+#if foo.bar() // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
+      .baz()
 
 #endif
 

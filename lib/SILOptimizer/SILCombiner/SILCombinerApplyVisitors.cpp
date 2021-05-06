@@ -416,7 +416,7 @@ bool SILCombiner::tryOptimizeKeypathKVCString(ApplyInst *AI,
   // Method should return `String?`
   auto &C = calleeFn->getASTContext();
   auto objTy = AI->getType().getOptionalObjectType();
-  if (!objTy || objTy.getStructOrBoundGenericStruct() != C.getStringDecl())
+  if (!objTy || !objTy.getASTType()->isString())
     return false;
   
   auto objcString = kp->getPattern()->getObjCString();
@@ -808,8 +808,7 @@ SILCombiner::buildConcreteOpenedExistentialInfo(Operand &ArgOperand) {
 void SILCombiner::buildConcreteOpenedExistentialInfos(
     FullApplySite Apply,
     llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
-    SILBuilderContext &BuilderCtx,
-    SILOpenedArchetypesTracker &OpenedArchetypesTracker) {
+    SILBuilderContext &BuilderCtx) {
   for (unsigned ArgIdx = 0, e = Apply.getNumArguments(); ArgIdx < e;
        ++ArgIdx) {
     auto ArgASTType = Apply.getArgument(ArgIdx)->getType().getASTType();
@@ -823,16 +822,6 @@ void SILCombiner::buildConcreteOpenedExistentialInfos(
     auto COEI = OptionalCOEI.getValue();
     assert(COEI.isValid());
     COEIs.try_emplace(ArgIdx, COEI);
-
-    ConcreteExistentialInfo &CEI = *COEI.CEI;
-    if (CEI.ConcreteType->isOpenedExistential()) {
-      // Temporarily record this opened existential def in this local
-      // BuilderContext before rewriting any uses of the ConcreteType.
-      OpenedArchetypesTracker.addOpenedArchetypeDef(
-          cast<ArchetypeType>(CEI.ConcreteType), CEI.ConcreteTypeDef);
-    } else if (auto *I = CEI.ConcreteValue->getDefiningInstruction()) {
-      OpenedArchetypesTracker.registerUsedOpenedArchetypes(I);
-    }
   }
 }
 
@@ -1293,11 +1282,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
   // insert an uncheched cast to the concrete type, and it tracks the defintion
   // of any opened archetype needed to use the concrete type.
   SILBuilderContext BuilderCtx(Builder.getModule(), Builder.getTrackingList());
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(&Builder.getFunction());
-  BuilderCtx.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> COEIs;
-  buildConcreteOpenedExistentialInfos(Apply, COEIs, BuilderCtx,
-                                      OpenedArchetypesTracker);
+  buildConcreteOpenedExistentialInfos(Apply, COEIs, BuilderCtx);
 
   // Bail, if no argument has a concrete existential to propagate.
   if (COEIs.empty())
@@ -1369,10 +1355,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply) {
   // init_existential or looking up sole conforming type.
   llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> COEIs;
   SILBuilderContext BuilderCtx(Builder.getModule(), Builder.getTrackingList());
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(&Builder.getFunction());
-  BuilderCtx.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  buildConcreteOpenedExistentialInfos(Apply, COEIs, BuilderCtx,
-                                      OpenedArchetypesTracker);
+  buildConcreteOpenedExistentialInfos(Apply, COEIs, BuilderCtx);
 
   // Bail, if no argument has a concrete existential to propagate.
   if (COEIs.empty())

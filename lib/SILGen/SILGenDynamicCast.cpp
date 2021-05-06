@@ -351,16 +351,15 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   auto fromCollection = sourceType->getCanonicalType();
   auto toCollection = destType->getCanonicalType();
   // Get the intrinsic function.
-  auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
+  if (fromCollection->isArray()) {
     fn = conditional ? SGF.SGM.getArrayConditionalCast(loc)
                      : SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->isDictionary()) {
     fn = (conditional
            ? SGF.SGM.getDictionaryDownCastConditional(loc)
            : SGF.SGM.getDictionaryDownCast(loc));
-  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
+  } else if (fromCollection->isSet()) {
     fn = (conditional
            ? SGF.SGM.getSetDownCastConditional(loc)
            : SGF.SGM.getSetDownCast(loc));

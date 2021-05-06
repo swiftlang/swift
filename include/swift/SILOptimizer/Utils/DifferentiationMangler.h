@@ -29,15 +29,15 @@ public:
   /// Returns the mangled name for a differentiation function of the given kind.
   std::string mangleAutoDiffFunction(StringRef originalName,
                                      Demangle::AutoDiffFunctionKind kind,
-                                     AutoDiffConfig config);
+                                     const AutoDiffConfig &config);
   /// Returns the mangled name for a derivative function of the given kind.
   std::string mangleDerivativeFunction(StringRef originalName,
                                        AutoDiffDerivativeFunctionKind kind,
-                                       AutoDiffConfig config);
+                                       const AutoDiffConfig &config);
   /// Returns the mangled name for a linear map of the given kind.
   std::string mangleLinearMap(StringRef originalName,
                               AutoDiffLinearMapKind kind,
-                              AutoDiffConfig config);
+                              const AutoDiffConfig &config);
   /// Returns the mangled name for a derivative function subset parameters
   /// thunk.
   std::string mangleDerivativeFunctionSubsetParametersThunk(

@@ -63,6 +63,7 @@ struct DemangleOptions {
   bool DisplayStdlibModule = true;
   bool DisplayObjCModule = true;
   bool PrintForTypeName = false;
+  bool ShowAsyncResumePartial = true;
 
   /// If this is nonempty, entities in this module name will not be qualified.
   llvm::StringRef HidingCurrentModule;

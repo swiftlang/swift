@@ -27,6 +27,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -97,54 +98,6 @@ simplifyAndReplace(SILInstruction *inst, CanonicalizeInstruction &pass) {
 //===----------------------------------------------------------------------===//
 //                        Canonicalize Memory Operations
 //===----------------------------------------------------------------------===//
-
-namespace {
-
-struct LoadOperation {
-  llvm::PointerUnion<LoadInst *, LoadBorrowInst *> value;
-
-  LoadOperation(SILInstruction *input) : value(nullptr) {
-    if (auto *li = dyn_cast<LoadInst>(input)) {
-      value = li;
-      return;
-    }
-
-    if (auto *lbi = dyn_cast<LoadBorrowInst>(input)) {
-      value = lbi;
-      return;
-    }
-  }
-
-  operator bool() const { return !value.isNull(); }
-
-  SingleValueInstruction *operator*() const {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>();
-    return value.get<LoadBorrowInst *>();
-  }
-
-  const SingleValueInstruction *operator->() const {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>();
-    return value.get<LoadBorrowInst *>();
-  }
-
-  SingleValueInstruction *operator->() {
-    if (value.is<LoadInst *>())
-      return value.get<LoadInst *>();
-    return value.get<LoadBorrowInst *>();
-  }
-
-  Optional<LoadOwnershipQualifier> getOwnershipQualifier() const {
-    if (auto *lbi = value.dyn_cast<LoadBorrowInst *>()) {
-      return None;
-    }
-
-    return value.get<LoadInst *>()->getOwnershipQualifier();
-  }
-};
-
-} // anonymous namespace
 
 // Replace all uses of an original struct or tuple extract instruction with the
 // given load instruction. The caller ensures that the load only loads the

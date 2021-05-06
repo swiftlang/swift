@@ -1233,11 +1233,8 @@ public:
     llvm::transform(
         Replacements, std::back_inserter(AllEdits),
         [&](const Replacement &R) -> Edit {
-          std::pair<unsigned, unsigned> Start =
-                                            SM.getPresumedLineAndColumnForLoc(
-                                                R.Range.getStart()),
-                                        End = SM.getPresumedLineAndColumnForLoc(
-                                            R.Range.getEnd());
+          auto Start = SM.getLineAndColumnInBuffer(R.Range.getStart());
+          auto End = SM.getLineAndColumnInBuffer(R.Range.getEnd());
           SmallVector<NoteRegion, 4> SubRanges;
           auto RawRanges = R.RegionsWorthNote;
           llvm::transform(
@@ -1305,9 +1302,9 @@ public:
     for (const auto &R : Ranges) {
       SourceKit::RenameRangeDetail Result;
       std::tie(Result.StartLine, Result.StartColumn) =
-          SM.getPresumedLineAndColumnForLoc(R.Range.getStart());
+          SM.getLineAndColumnInBuffer(R.Range.getStart());
       std::tie(Result.EndLine, Result.EndColumn) =
-          SM.getPresumedLineAndColumnForLoc(R.Range.getEnd());
+          SM.getLineAndColumnInBuffer(R.Range.getEnd());
       Result.ArgIndex = R.Index;
       Result.Kind =
           SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);

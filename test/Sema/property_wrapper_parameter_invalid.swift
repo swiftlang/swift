@@ -144,6 +144,12 @@ struct InternalWrapper<T> { // expected-note 3 {{type declared here}}
   init(wrappedValue: T) { self.wrappedValue = wrappedValue }
 }
 
+func testWrapperStorageMutability(@InternalWrapper value: Int) {
+  _ = _value
+  // expected-error@+1 {{cannot assign to value: '_value' is immutable}}
+  _value = InternalWrapper(wrappedValue: 10)
+}
+
 // expected-error@+1 {{function cannot be declared public because its parameter uses an internal API wrapper type}}
 public func testComposition1(@PublicWrapper @InternalWrapper value: Int) {}
 
@@ -164,3 +170,38 @@ public func testComposition2(@InternalWrapper @PublicWrapper value: Int) {}
 // expected-error@+2 {{generic struct 'InternalWrapper' is internal and cannot be referenced from an '@inlinable' function}}
 // expected-error@+1 {{initializer 'init(wrappedValue:)' is internal and cannot be referenced from an '@inlinable' function}}
 @inlinable func testComposition6(@InternalWrapper @PublicWrapper value: Int) {}
+
+protocol Q {
+  associatedtype A
+}
+
+// expected-note@+1 {{where 'T' = 'Int'}}
+func takesClosure<T: Q>(type: T.Type, _ closure: (T.A) -> Void) {}
+
+func testMissingWrapperType() {
+  // expected-error@+1 {{global function 'takesClosure(type:_:)' requires that 'Int' conform to 'Q'}}
+  takesClosure(type: Int.self) { $value in
+    return
+  }
+
+  struct S: Q {
+    typealias A = (Int, Int)
+  }
+
+  // expected-error@+1 {{inferred projection type 'S.A' (aka '(Int, Int)') is not a property wrapper}}
+  takesClosure(type: S.self) { $value in
+    return
+  }
+}
+
+@propertyWrapper
+struct OptionalWrapper<Value> { // expected-note {{'Value' declared as parameter to type 'OptionalWrapper'}}
+  var wrappedValue: Value?
+  var projectedValue: Self { self }
+  init(wrappedValue: Value?) { self.wrappedValue = wrappedValue }
+  init(projectedValue: Self) { self = projectedValue }
+}
+
+// expected-error@+2 {{generic parameter 'Value' could not be inferred}} expected-note@+2 {{}}
+// expected-error@+1 {{property type 'Int' does not match 'wrappedValue' type 'Value?'}}
+func testWrappedValueMismatch(@OptionalWrapper value: Int) {}

@@ -322,6 +322,12 @@ enum class FixKind : uint8_t {
   /// even though result type of the reference doesn't conform
   /// to an expected protocol.
   AllowInvalidStaticMemberRefOnProtocolMetatype,
+
+  /// Allow the wrappedValue type of any property wrapper that is a
+  /// part of a composed property wrapper to mismatch the type of
+  /// another property wrapper that is a part of the same composed
+  /// property wrapper.
+  AllowWrappedValueMismatch,
 };
 
 class ConstraintFix {
@@ -613,6 +619,20 @@ public:
   static TreatArrayLiteralAsDictionary *create(ConstraintSystem &cs,
                                                Type dictionaryTy, Type arrayTy,
                                                ConstraintLocator *loc);
+};
+
+class AllowWrappedValueMismatch : public ContextualMismatch {
+  AllowWrappedValueMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                            ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowWrappedValueMismatch, lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override { return "fix wrapped value type mismatch"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowWrappedValueMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                           ConstraintLocator *locator);
 };
 
 /// Mark function type as explicitly '@escaping'.

@@ -129,6 +129,13 @@ void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
 #define REGISTER_FUNC(...) _dyld_register_func_for_add_image(__VA_ARGS__)
 #endif
 
+// WARNING: the callbacks are called from unsafe contexts (with the dyld and
+// ObjC runtime locks held) and must be very careful in what they do. Locking
+// must be arranged to avoid deadlocks (other code must never call out to dyld
+// or ObjC holding a lock that gets taken in one of these callbacks) and the
+// new/delete operators must not be called, in case a program supplies an
+// overload which does not cooperate with these requirements.
+
 void swift::initializeProtocolLookup() {
   REGISTER_FUNC(addImageCallback<TextSegment, ProtocolsSection,
                                  addImageProtocolsBlockCallbackUnsafe>);

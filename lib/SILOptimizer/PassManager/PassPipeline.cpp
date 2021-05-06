@@ -185,6 +185,14 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
   return P;
 }
 
+SILPassPipelinePlan SILPassPipelinePlan::getLowerHopToActorPassPipeline(
+    const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
+  P.startPipeline("Lower Hop to Actor");
+  P.addLowerHopToActor();
+  return P;
+}
+
 //===----------------------------------------------------------------------===//
 //                       Ownership Eliminator Pipeline
 //===----------------------------------------------------------------------===//
@@ -477,7 +485,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
-  if (!P.getOptions().DisableCopyPropagation) {
+  if (P.getOptions().EnableCopyPropagation) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
@@ -753,7 +761,6 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // Insert SIL passes to run during IRGen.
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
-  P.addPartialApplyLowering();
   P.addAllocStackHoisting();
   P.addLoadableByAddress();
 

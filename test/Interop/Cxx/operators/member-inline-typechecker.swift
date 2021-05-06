@@ -30,3 +30,10 @@ let writeOnlyValue = writeOnlyIntArray[2]
 var diffTypesArray = DifferentTypesArray()
 let diffTypesResultInt: Int32 = diffTypesArray[0]
 let diffTypesResultDouble: Double = diffTypesArray[0.5]
+
+var nonTrivialIntArrayByVal = NonTrivialIntArrayByVal(3)
+let nonTrivialValueByVal = nonTrivialIntArrayByVal[1]
+
+var diffTypesArrayByVal = DifferentTypesArrayByVal()
+let diffTypesResultIntByVal: Int32 = diffTypesArrayByVal[0]
+let diffTypesResultDoubleByVal: Double = diffTypesArrayByVal[0.5]

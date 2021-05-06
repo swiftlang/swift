@@ -400,6 +400,36 @@ static bool swift_task_removeStatusRecordImpl(TaskStatusRecord *record) {
   return !oldStatus.isCancelled();
 }
 
+SWIFT_CC(swift)
+static bool swift_task_hasTaskGroupStatusRecordImpl() {
+  auto task = swift_task_getCurrent();
+
+  Optional<StatusRecordLockRecord> recordLockRecord;
+
+  // Acquire the status record lock.
+  auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
+      /*forCancellation*/ false);
+  assert(!oldStatus.isLocked());
+
+  // Scan for the task group record within all the active records.
+  auto foundTaskGroupRecord = false;
+  for (auto record: oldStatus.records()) {
+    if (record->getKind() == TaskStatusRecordKind::TaskGroup) {
+      foundTaskGroupRecord = true;
+      break; // out of the for loop
+    }
+  }
+
+  // Release the status record lock, being sure to flag that
+  // the task is now cancelled.
+  ActiveTaskStatus cancelledStatus(oldStatus.getInnermostRecord(),
+      /*cancelled*/ false, // FIXME: is this right, or must be the same as previous cancelled status?
+      /*locked*/ false);
+  releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
+
+  return foundTaskGroupRecord;
+}
+
 /**************************************************************************/
 /************************** CHILD TASK MANAGEMENT *************************/
 /**************************************************************************/

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -6,6 +6,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 enum GeneralError : Error {
   case UnknownBallKind

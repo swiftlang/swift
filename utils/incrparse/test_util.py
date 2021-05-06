@@ -145,7 +145,6 @@ def prepareForIncrParse(test_file, test_case, pre_edit_file, post_edit_file,
 
 
 def serializeIncrParseMarkupFile(test_file, test_case, mode,
-                                 serialization_mode,
                                  omit_node_ids, output_file, diags_output_file,
                                  temp_dir, swift_syntax_test,
                                  print_visual_reuse_info):
@@ -190,15 +189,6 @@ def serializeIncrParseMarkupFile(test_file, test_case, mode,
 
         if omit_node_ids:
             command.extend(['-omit-node-ids'])
-
-        if serialization_mode == 'full':
-            # Nothing to do. This is the default behaviour of swift-syntax-test
-            pass
-        elif serialization_mode == 'incremental':
-            command.extend(['-incremental-serialization'])
-        else:
-            raise ValueError('Unknown serialization mode "%s"' %
-                             serialization_mode)
 
         if mode == 'pre-edit':
             command.extend(['-input-source-filename', pre_edit_file])
@@ -277,12 +267,6 @@ def main():
     post-edit file from scratch
     ''')
     parser.add_argument(
-        '--serialization-mode', choices=['full', 'incremental'],
-        default='full', help='''
-    Only applicable if `--mode` is `incremental`. Whether to serialize the
-    entire tree or use the incremental transfer mode. Default is `full`.
-    ''')
-    parser.add_argument(
         '--omit-node-ids', default=False, action='store_true',
         help='Don\'t include the ids of the nodes in the serialized syntax \
         tree')
@@ -307,7 +291,6 @@ def main():
     test_file = args.file.name
     test_case = args.test_case
     mode = args.mode
-    serialization_mode = args.serialization_mode
     omit_node_ids = args.omit_node_ids
     output_file = args.output_file
     temp_dir = args.temp_dir
@@ -318,7 +301,6 @@ def main():
         serializeIncrParseMarkupFile(test_file=test_file,
                                      test_case=test_case,
                                      mode=mode,
-                                     serialization_mode=serialization_mode,
                                      omit_node_ids=omit_node_ids,
                                      output_file=output_file,
                                      diags_output_file=None,

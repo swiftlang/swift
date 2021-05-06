@@ -30,7 +30,7 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
-      RememberChoice(false), IsFavored(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Nested(constraints), Locator(locator) {
   assert(kind == ConstraintKind::Disjunction);
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -41,7 +41,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(Kind), HasRestriction(false), IsActive(false), IsDisabled(false),
-      RememberChoice(false), IsFavored(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Type()},
       Locator(locator) {
   switch (Kind) {
@@ -56,6 +56,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
@@ -109,7 +110,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(Kind), HasRestriction(false), IsActive(false), IsDisabled(false),
-      RememberChoice(false), IsFavored(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Third},
       Locator(locator) {
   switch (Kind) {
@@ -124,6 +125,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
@@ -166,7 +168,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
-      RememberChoice(false), IsFavored(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Member{first, second, {member}, useDC},
       Locator(locator) {
   assert(kind == ConstraintKind::ValueMember ||
@@ -185,7 +187,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
-      RememberChoice(false), IsFavored(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Locator(locator) {
   Member.First = first;
   Member.Second = second;
@@ -205,8 +207,8 @@ Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::BindOverload), TheFix(fix), HasRestriction(false),
-      IsActive(false), IsDisabled(bool(fix)), RememberChoice(false),
-      IsFavored(false),
+      IsActive(false), IsDisabled(bool(fix)), IsDisabledForPerformance(false),
+      RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Overload{type, choice, useDC},
       Locator(locator) {
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
@@ -217,8 +219,8 @@ Constraint::Constraint(ConstraintKind kind,
                        Type second, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), Restriction(restriction), HasRestriction(true),
-      IsActive(false), IsDisabled(false), RememberChoice(false),
-      IsFavored(false),
+      IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
+      RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
   assert(!first.isNull());
@@ -230,7 +232,8 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
                        Type second, ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), TheFix(fix), HasRestriction(false), IsActive(false),
-      IsDisabled(false), RememberChoice(false), IsFavored(false),
+      IsDisabled(false), IsDisabledForPerformance(false), RememberChoice(false),
+      IsFavored(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
   assert(!first.isNull());
@@ -241,7 +244,8 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
           Kind == ConstraintKind::LiteralConformsTo ||
-          Kind == ConstraintKind::SelfObjectOfProtocol)
+          Kind == ConstraintKind::SelfObjectOfProtocol ||
+          Kind == ConstraintKind::TransitivelyConformsTo)
           && "Not a conformance constraint");
   return Types.Second->castTo<ProtocolType>()->getDecl();
 }
@@ -259,6 +263,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
@@ -357,6 +362,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << " operator arg conv "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
   case ConstraintKind::LiteralConformsTo: Out << " literal conforms to "; break;
+  case ConstraintKind::TransitivelyConformsTo: Out << " transitive conformance to "; break;
   case ConstraintKind::CheckedCast: Out << " checked cast to "; break;
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
   case ConstraintKind::ApplicableFunction: Out << " applicable fn "; break;
@@ -599,6 +605,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Defaultable:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
@@ -659,6 +666,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
   // Conformance constraints expect an existential on the right-hand side.
   assert((kind != ConstraintKind::ConformsTo &&
+          kind != ConstraintKind::TransitivelyConformsTo &&
           kind != ConstraintKind::SelfObjectOfProtocol) ||
          second->isExistentialType());
 

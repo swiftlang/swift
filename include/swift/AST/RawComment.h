@@ -13,14 +13,14 @@
 #ifndef SWIFT_AST_RAW_COMMENT_H
 #define SWIFT_AST_RAW_COMMENT_H
 
-#include "swift/Basic/Fingerprint.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
 class SourceFile;
+class SourceManager;
 
 struct SingleRawComment {
   enum class CommentKind {
@@ -34,12 +34,10 @@ struct SingleRawComment {
   StringRef RawText;
 
   unsigned Kind : 8;
-  unsigned StartColumn : 16;
-  unsigned StartLine;
-  unsigned EndLine;
+  unsigned ColumnIndent : 16;
 
   SingleRawComment(CharSourceRange Range, const SourceManager &SourceMgr);
-  SingleRawComment(StringRef RawText, unsigned StartColumn);
+  SingleRawComment(StringRef RawText, unsigned ColumnIndent);
 
   SingleRawComment(const SingleRawComment &) = default;
   SingleRawComment &operator=(const SingleRawComment &) = default;
@@ -80,78 +78,6 @@ struct CommentInfo {
   RawComment Raw;
   uint32_t Group;
   uint32_t SourceOrder;
-};
-
-struct LineColumn {
-  uint32_t Line = 0;
-  uint32_t Column = 0;
-  bool isValid() const { return Line && Column; }
-};
-
-struct BasicDeclLocs {
-  StringRef SourceFilePath;
-  SmallVector<std::pair<LineColumn, uint32_t>, 4> DocRanges;
-  LineColumn Loc;
-  LineColumn StartLoc;
-  LineColumn EndLoc;
-};
-
-class BasicSourceFileInfo {
-  /// If this is non-null, fields other than 'FilePath' hasn't been populated.
-  /// The 'getInt()' part indicates this instance is constructed with a
-  /// SourceFile.
-  llvm::PointerIntPair<const SourceFile *, 1, bool> SFAndIsFromSF;
-
-  StringRef FilePath;
-  Fingerprint InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
-  /// Does *not* include the type-body hashes of the top level types.
-  /// Just the `SourceFile` hashes.
-  /// Used for incremental imports.
-  Fingerprint InterfaceHashExcludingTypeMembers = Fingerprint::ZERO();
-  llvm::sys::TimePoint<> LastModified = {};
-  uint64_t FileSize = 0;
-
-  // Populate the from 'SF' member if exist. 'SF' will be cleared.
-  void populateWithSourceFileIfNeeded();
-
-public:
-  BasicSourceFileInfo(StringRef FilePath,
-                      Fingerprint InterfaceHashIncludingTypeMembers,
-                      Fingerprint InterfaceHashExcludingTypeMembers,
-                      llvm::sys::TimePoint<> LastModified, uint64_t FileSize)
-      : FilePath(FilePath),
-        InterfaceHashIncludingTypeMembers(InterfaceHashIncludingTypeMembers),
-        InterfaceHashExcludingTypeMembers(InterfaceHashExcludingTypeMembers),
-        LastModified(LastModified), FileSize(FileSize) {}
-
-  ///  Construct with a `SourceFile`. `getInterfaceHashIncludingTypeMembers()`,
-  ///  `getInterfaceHashExcludingTypeMembers()`, `getLastModified()` and `getFileSize()` are laizily
-  ///  populated when accessed.
-  BasicSourceFileInfo(const SourceFile *SF);
-
-  bool isFromSourceFile() const;
-
-  StringRef getFilePath() const { return FilePath; }
-
-  Fingerprint getInterfaceHashIncludingTypeMembers() const {
-    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
-    return InterfaceHashIncludingTypeMembers;
-  }
-
-  Fingerprint getInterfaceHashExcludingTypeMembers() const {
-    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
-    return InterfaceHashExcludingTypeMembers;
-  }
-
-  llvm::sys::TimePoint<> getLastModified() const {
-    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
-    return LastModified;
-  }
-
-  uint64_t getFileSize() const {
-    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
-    return FileSize;
-  }
 };
 
 } // namespace swift

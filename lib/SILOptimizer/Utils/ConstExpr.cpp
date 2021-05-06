@@ -332,8 +332,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   // If this is a destructure_result, then we can return the element being
   // extracted.
-  if (isa<DestructureStructResult>(value) ||
-      isa<DestructureTupleResult>(value)) {
+  if (isaResultOf<DestructureStructInst>(value) ||
+      isaResultOf<DestructureTupleInst>(value)) {
     auto *result = cast<MultipleValueInstructionResult>(value);
     SILValue aggValue = result->getParent()->getOperand(0);
     auto val = getConstantValue(aggValue);
@@ -822,7 +822,7 @@ extractStringOrStaticStringValue(SymbolicValue stringValue) {
 /// element type.  Otherwise, return a null Type.
 static Type getArrayElementType(Type ty) {
   if (auto bgst = ty->getAs<BoundGenericStructType>())
-    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+    if (bgst->isArray())
       return bgst->getGenericArgs()[0];
   return Type();
 }
@@ -832,20 +832,16 @@ static Type getArrayElementType(Type ty) {
 /// type, \c true if it is a signed integer type and \c false if it is an
 /// unsigned integer type.
 static Optional<bool> getSignIfStdlibIntegerType(Type ty) {
-  StructDecl *decl = ty->getStructOrBoundGenericStruct();
-  if (!decl)
-    return None;
-  ASTContext &astCtx = ty->getASTContext();
-  if (decl == astCtx.getIntDecl() || decl == astCtx.getInt8Decl() ||
-      decl == astCtx.getInt16Decl() || decl == astCtx.getInt32Decl() ||
-      decl == astCtx.getInt64Decl()) {
+  if (ty->isInt() || ty->isInt8() || ty->isInt16() || ty->isInt32() ||
+      ty->isInt64()) {
     return true;
   }
-  if (decl == astCtx.getUIntDecl() || decl == astCtx.getUInt8Decl() ||
-      decl == astCtx.getUInt16Decl() || decl == astCtx.getUInt32Decl() ||
-      decl == astCtx.getUInt64Decl()) {
+
+  if (ty->isUInt() || ty->isUInt8() || ty->isUInt16() || ty->isUInt32() ||
+      ty->isUInt64()) {
     return false;
   }
+
   return None;
 }
 

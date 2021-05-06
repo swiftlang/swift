@@ -158,7 +158,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     CodeCompletion::SwiftResult swiftResult(
         CodeCompletion::SwiftResult::ResultKind::Pattern,
         SemanticContextKind::ExpressionSpecific,
-        /*NumBytesToErase=*/0, completionString,
+        /*IsArgumentLabels=*/false, /*NumBytesToErase=*/0, completionString,
         CodeCompletionResult::ExpectedTypeRelation::Unknown);
 
     CompletionBuilder builder(sink, swiftResult);
@@ -666,6 +666,9 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
       !skipMetaGroups)
     return ResultBucket::ExpressionSpecific;
 
+  if (completion->isArgumentLabels() && !skipMetaGroups)
+    return ResultBucket::ExpressionSpecific;
+
   if (completion->isOperator())
     return ResultBucket::Operator;
 
@@ -1167,14 +1170,15 @@ Completion *CompletionBuilder::finish() {
 
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(
-          semanticContext, current.getNumBytesToErase(), completionString,
+          semanticContext, current.isArgumentLabels(),
+          current.getNumBytesToErase(), completionString,
           current.getAssociatedDeclKind(), current.isSystem(),
-          current.getModuleName(), current.isNotRecommended(),
-          current.getNotRecommendedReason(), current.getBriefDocComment(),
-          current.getAssociatedUSRs(), current.getDeclKeywords(),
-          typeRelation, opKind);
+          current.getModuleName(), current.getNotRecommendedReason(),
+          current.getBriefDocComment(), current.getAssociatedUSRs(),
+          current.getDeclKeywords(), typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext,
+                         current.isArgumentLabels(),
                          current.getNumBytesToErase(), completionString,
                          typeRelation, opKind);
     }

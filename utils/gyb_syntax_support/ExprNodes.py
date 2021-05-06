@@ -543,7 +543,8 @@ EXPR_NODES = [
              Child('RootExpr', kind='Expr', is_optional=True,
                    node_choices=[
                        Child('IdentifierExpr', kind='IdentifierExpr'),
-                       Child('SpecializeExpr', kind='SpecializeExpr')
+                       Child('SpecializeExpr', kind='SpecializeExpr'),
+                       Child('OptionalChainingExpr', kind='OptionalChainingExpr'),
                    ]),
              Child('Expression', kind='Expr'),
          ]),
@@ -589,6 +590,13 @@ EXPR_NODES = [
                    is_optional=True),
              Child('Name', kind='Expr'),
              Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # postfix '#if' expession
+    Node('PostfixIfConfigExpr', kind='Expr',
+         children=[
+             Child('Base', kind='Expr'),
+             Child('Config', kind='IfConfigDecl'),
          ]),
 
     # <#content#>

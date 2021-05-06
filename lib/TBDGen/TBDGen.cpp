@@ -28,6 +28,7 @@
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
@@ -559,7 +560,7 @@ void TBDGenVisitor::addConformances(const IterableDeclContext *IDC) {
 }
 
 void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
-                                                 AutoDiffConfig config,
+                                                 const AutoDiffConfig &config,
                                                  AutoDiffLinearMapKind kind) {
   auto &ctx = original->getASTContext();
   auto declRef =
@@ -635,7 +636,7 @@ void TBDGenVisitor::addDifferentiabilityWitness(
 
 void TBDGenVisitor::addDerivativeConfiguration(DifferentiabilityKind diffKind,
                                                AbstractFunctionDecl *original,
-                                               AutoDiffConfig config) {
+                                               const AutoDiffConfig &config) {
   auto inserted = AddedDerivatives.insert({original, config});
   if (!inserted.second)
     return;

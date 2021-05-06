@@ -28,7 +28,7 @@ actor A {
     _ = #keyPath(A.z)
   }
 
-  let w: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
+  nonisolated let w: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
 
   var x: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
 

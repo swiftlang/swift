@@ -179,6 +179,8 @@ KNOWN_SETTINGS=(
     llvm-install-components                       ""                "a semicolon-separated list of LLVM components to install"
     llvm-lit-args                                 ""                "If set, override the lit args passed to LLVM"
     enable-llvm-assertions                        "1"               "set to enable llvm assertions"
+    llvm-ninja-targets                            ""                "list of ninja targets to build for LLVM"
+    llvm-ninja-targets-for-cross-compile-hosts    ""                "list of ninja targets to build for LLVM for hosts that are cross-compiled"
 
     ## Swift Options
     swift-analyze-code-coverage                   "not-merged"      "Code coverage analysis mode for Swift (false, not-merged, merged). Defaults to false if the argument is not present, and not-merged if the argument is present without a modifier."
@@ -258,6 +260,16 @@ for component in ${components[@]} ; do
   )
 done
 
+function log_event() {
+    build_script_log_path=${BUILD_DIR}/.build_script_log
+    event_type=$1
+    event_command=$2
+    evnet_duration=$3
+
+    build_event="{\"event\":\"${event_type}\", \"command\":\"${event_command}\", \"duration\":\"${evnet_duration}\"}"
+    echo "${build_event}" >> ${build_script_log_path}
+}
+
 # Centralized access point for traced command invocation.
 # Every operation that might mutates file system should be called via
 # these functions.
@@ -266,10 +278,14 @@ function call() {
     if [[ ${DRY_RUN} ]] || [[ "${VERBOSE_BUILD}" ]]; then
         echo "${PS4}"$(quoted_print "$@")
     fi
+
+    SECONDS=0
     if [[ ! ${DRY_RUN} ]]; then
+        log_event "start" "$(quoted_print "$@")" "${SECONDS}"
         { set -x; } 2>/dev/null
         "$@"
         { set +x; } 2>/dev/null
+        log_event "finish" "$(quoted_print "$@")" "${SECONDS}"
     fi
 }
 
@@ -418,8 +434,10 @@ function verify_host_is_supported() {
       | appletvsimulator-arm64  \
       | appletvos-arm64         \
       | watchsimulator-i386     \
+      | watchsimulator-x86_64   \
       | watchsimulator-arm64    \
       | watchos-armv7k          \
+      | watchos-arm64_32        \
       | android-armv7           \
       | android-aarch64         \
       | android-x86_64)
@@ -626,6 +644,13 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
+                watchsimulator-x86_64)
+                    SWIFT_HOST_TRIPLE="x86_64-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}-simulator"
+                    llvm_target_arch="X86"
+
+                    SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
+                    cmake_osx_deployment_target=""
+                    ;;
                 watchsimulator-arm64)
                     xcrun_sdk_name="watchsimulator"
                     llvm_target_arch="AArch64"
@@ -644,6 +669,13 @@ function set_build_options_for_host() {
                 watchos-armv7k)
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     llvm_target_arch="ARM"
+
+                    SWIFT_HOST_VARIANT_SDK="WATCHOS"
+                    cmake_osx_deployment_target=""
+                    ;;
+                watchos-arm64_32)
+                    SWIFT_HOST_TRIPLE="arm64_32-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+                    llvm_target_arch="AArch64"
 
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
                     cmake_osx_deployment_target=""
@@ -1019,7 +1051,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx-arm64* | iphone* | appletv* | watch* | linux-armv6 | linux-armv7 | android-* )
+        macosx* | iphone* | appletv* | watch* | linux-armv6 | linux-armv7 | android-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1416,7 +1448,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                           call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}"
+                           call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}" || call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                         else
                            call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                         fi
@@ -1432,7 +1464,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
                         if [[ "$OS" == "tvos" ]]; then
-                           call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}"
+                           call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}" || call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                         else
                            call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                         fi
@@ -1636,6 +1668,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             llvm)
+                if [[ -n "${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS}" && $(is_cross_tools_host ${host}) ]] ; then
+                    build_targets=("${LLVM_NINJA_TARGETS_FOR_CROSS_COMPILE_HOSTS[@]}")
+                elif [[ -n "${LLVM_NINJA_TARGETS}" ]] ; then
+                    build_targets=("${LLVM_NINJA_TARGETS[@]}")
+                fi
+                # indicating we don't want to build LLVM should
+                # override any custom ninja target we specified
                 if [ "${BUILD_LLVM}" == "0" ] ; then
                     build_targets=(clean)
                 fi
@@ -1927,6 +1966,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD:PATH="$(build_directory ${host} libdispatch_static)"
                 )
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
@@ -3293,7 +3333,7 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
         else
             LIPO_PATH="${HOST_LIPO}"
         fi
-        call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+        call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --explicit-src-files="$(get_host_install_prefix ${host})lib/swift/${host%%-*}/lib_InternalSwiftScan.dylib" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
         if [[ $(should_execute_action "${mergedHost}-lipo") ]]; then
             # Build and test the lipo-ed package.

@@ -179,7 +179,7 @@ ExportContext ExportContext::forDeclSignature(Decl *D) {
       (Ctx.LangOpts.DisableAvailabilityChecking
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(D->getEndLoc(), DC));
-  bool spi = false;
+  bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
@@ -208,7 +208,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
        ? AvailabilityContext::alwaysAvailable()
        : TypeChecker::overApproximateAvailabilityAtLocation(loc, DC));
 
-  bool spi = false;
+  bool spi = Ctx.LangOpts.LibraryLevel == LibraryLevel::SPI;
   bool implicit = false;
   bool deprecated = false;
   Optional<PlatformKind> unavailablePlatformKind;
@@ -1737,7 +1737,8 @@ static bool isInsideCompatibleUnavailableDeclaration(
   // but allow the use of types.
   PlatformKind platform = attr->Platform;
   if (platform == PlatformKind::none &&
-      !isa<TypeDecl>(D)) {
+      !isa<TypeDecl>(D) &&
+      !isa<ExtensionDecl>(D)) {
     return false;
   }
 
@@ -2462,19 +2463,18 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
 
   // The subscripts taking T<Int> do not return Substring, and our
   // special fixit does not help here.
-  auto intDecl = Context.getIntDecl();
   auto nominalTypeParam = genericArgs[0]->getAs<NominalType>();
   if (!nominalTypeParam)
     return false;
 
-  if (nominalTypeParam->getDecl() == intDecl)
+  if (nominalTypeParam->isInt())
     return false;
 
   auto resultTy = fnTy->getResult()->getAs<NominalType>();
   if (!resultTy)
     return false;
 
-  return resultTy->getDecl() == stringDecl;
+  return resultTy->isString();
 }
 
 bool swift::diagnoseExplicitUnavailability(

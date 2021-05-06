@@ -73,6 +73,7 @@ namespace swift {
   class DerivativeAttr;
   class DifferentiableAttr;
   class ExtensionDecl;
+  struct ExternalSourceLocs;
   class ForeignRepresentationInfo;
   class FuncDecl;
   class GenericContext;
@@ -346,7 +347,7 @@ private:
     DelayedPatternContexts;
 
   /// Cache of module names that fail the 'canImport' test in this context.
-  llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
+  mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -482,7 +483,10 @@ public:
   
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of Swift.NAME. */ \
-  DECL_CLASS *get##NAME##Decl() const;
+  DECL_CLASS *get##NAME##Decl() const; \
+\
+  /** Retrieve the type of Swift.NAME. */ \
+  Type get##NAME##Type() const;
 #include "swift/AST/KnownStdlibTypes.def"
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
@@ -491,14 +495,17 @@ public:
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
 
+  /// Retrieve the declaration of Swift.Void.
+  TypeAliasDecl *getVoidDecl() const;
+
+  /// Retrieve the type of Swift.Void.
+  Type getVoidType() const;
+
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
   /// Retrieve the type Swift.AnyObject.
   CanType getAnyObjectType() const;
-
-  /// Retrieve the type Swift.Never.
-  CanType getNeverType() const;
 
 #define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of MODULE.NAME. */ \
@@ -879,6 +886,16 @@ public:
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
+
+  /// Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  bool canImportModuleImpl(ImportPath::Element ModulePath,
+                           llvm::VersionTuple version,
+                           bool underlyingVersion,
+                           bool updateFailingList) const;
 public:
   namelookup::ImportCache &getImportCache() const;
 
@@ -907,7 +924,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(ImportPath::Element ModulePath);
+  bool canImportModule(ImportPath::Element ModulePath,
+                       llvm::VersionTuple version = llvm::VersionTuple(),
+                       bool underlyingVersion = false);
+  bool canImportModule(ImportPath::Element ModulePath,
+                       llvm::VersionTuple version = llvm::VersionTuple(),
+                       bool underlyingVersion = false) const;
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
@@ -1170,8 +1192,12 @@ public:
 
 private:
   friend Decl;
-  Optional<RawComment> getRawComment(const Decl *D);
-  void setRawComment(const Decl *D, RawComment RC);
+
+  Optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
+  void setExternalSourceLocs(const Decl *D, ExternalSourceLocs *Locs);
+
+  Optional<std::pair<RawComment, bool>> getRawComment(const Decl *D);
+  void setRawComment(const Decl *D, RawComment RC, bool FromSerialized);
 
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);

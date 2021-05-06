@@ -25,9 +25,35 @@
 #include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxFactory.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::syntax;
+
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &OS,
+                                    SyntaxContextKind Kind) {
+  switch (Kind) {
+  case SyntaxContextKind::Decl:
+    OS << "Decl";
+    break;
+  case SyntaxContextKind::Stmt:
+    OS << "Stmt";
+    break;
+  case SyntaxContextKind::Expr:
+    OS << "Expr";
+    break;
+  case SyntaxContextKind::Type:
+    OS << "Type";
+    break;
+  case SyntaxContextKind::Pattern:
+    OS << "Pattern";
+    break;
+  case SyntaxContextKind::Syntax:
+    OS << "Syntax";
+    break;
+  }
+  return OS;
+}
 
 void SyntaxParseActions::_anchor() {}
 
@@ -266,6 +292,7 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
   case SyntaxKind::MemberTypeIdentifier:
   case SyntaxKind::FunctionCallExpr:
   case SyntaxKind::SubscriptExpr:
+  case SyntaxKind::PostfixIfConfigExpr:
   case SyntaxKind::ExprList: {
     createNodeInPlace(Kind, getParts().size(), nodeCreateK);
     break;
@@ -352,6 +379,38 @@ void SyntaxParsingContext::dumpStorage() const  {
     llvm::errs() << "\n";
     if (i + 1 == Offset)
       llvm::errs() << "--------------\n";
+  }
+}
+
+void SyntaxParsingContext::dumpStack(llvm::raw_ostream &OS) const {
+  if (!isRoot()) {
+    getParent()->dumpStack(OS);
+  }
+  switch (Mode) {
+  case AccumulationMode::CreateSyntax:
+    llvm::errs() << "CreateSyntax (" << SynKind << ")\n";
+    break;
+  case AccumulationMode::DeferSyntax:
+    llvm::errs() << "DeferSyntax (" << SynKind << ")\n";
+    break;
+  case AccumulationMode::CoerceKind:
+    llvm::errs() << "CoerceKind (" << CtxtKind << ")\n";
+    break;
+  case AccumulationMode::Transparent:
+    llvm::errs() << "Transparent\n";
+    break;
+  case AccumulationMode::Discard:
+    llvm::errs() << "Discard\n";
+    break;
+  case AccumulationMode::SkippedForIncrementalUpdate:
+    llvm::errs() << "SkippedForIncrementalUpdate\n";
+    break;
+  case AccumulationMode::Root:
+    llvm::errs() << "Root\n";
+    break;
+  case AccumulationMode::NotSet:
+    llvm::errs() << "NotSet\n";
+    break;
   }
 }
 

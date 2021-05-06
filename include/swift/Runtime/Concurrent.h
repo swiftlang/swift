@@ -416,6 +416,35 @@ public:
   }
 };
 
+/// A simple linked list representing pointers that need to be freed. This is
+/// not a concurrent data structure, just a bit of support used in the types
+/// below.
+struct ConcurrentFreeListNode {
+  ConcurrentFreeListNode *Next;
+  void *Ptr;
+
+  static void add(ConcurrentFreeListNode **head, void *ptr) {
+    auto *newNode = reinterpret_cast<ConcurrentFreeListNode *>(
+        malloc(sizeof(ConcurrentFreeListNode)));
+    newNode->Next = *head;
+    newNode->Ptr = ptr;
+    *head = newNode;
+  }
+
+  /// Free all nodes in the free list, resetting `head` to `NULL`. Calls
+  /// `FreeFn` on the Ptr field of every node.
+  template <typename FreeFn>
+  static void freeAll(ConcurrentFreeListNode **head, const FreeFn &freeFn) {
+    auto *node = *head;
+    while (node) {
+      auto *next = node->Next;
+      freeFn(node->Ptr);
+      free(node);
+      node = next;
+    }
+    *head = nullptr;
+  }
+};
 
 /// An append-only array that can be read without taking locks. Writes
 /// are still locked and serialized, but only with respect to other
@@ -454,8 +483,8 @@ private:
   std::atomic<size_t> ReaderCount;
   std::atomic<Storage *> Elements;
   Mutex WriterLock;
-  std::vector<Storage *> FreeList;
-  
+  ConcurrentFreeListNode *FreeList{nullptr};
+
   void incrementReaders() {
     ReaderCount.fetch_add(1, std::memory_order_acquire);
   }
@@ -465,10 +494,9 @@ private:
   }
   
   void deallocateFreeList() {
-    for (Storage *storage : FreeList)
-      storage->deallocate();
-    FreeList.clear();
-    FreeList.shrink_to_fit();
+    ConcurrentFreeListNode::freeAll(&FreeList, [](void *ptr) {
+      reinterpret_cast<Storage *>(ptr)->deallocate();
+    });
   }
   
 public:
@@ -522,23 +550,22 @@ public:
       if (storage) {
         std::copy(storage->data(), storage->data() + count, newStorage->data());
         newStorage->Count.store(count, std::memory_order_release);
-        FreeList.push_back(storage);
+        ConcurrentFreeListNode::add(&FreeList, storage);
       }
       
       storage = newStorage;
       Capacity = newCapacity;
 
-      // Use seq_cst here to ensure that the subsequent load of ReaderCount is
-      // ordered after this store. If ReaderCount is loaded first, then a new
-      // reader could come in between that load and this store, and then we
-      // could end up freeing the old storage pointer while it's still in use.
-      Elements.store(storage, std::memory_order_seq_cst);
+      Elements.store(storage, std::memory_order_release);
     }
     
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
     
-    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
+    // The standard says that std::memory_order_seq_cst only applies to
+    // read-modify-write operations, so we need an explicit fence:
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (ReaderCount.load(std::memory_order_relaxed) == 0)
       deallocateFreeList();
   }
 
@@ -638,6 +665,13 @@ private:
       return x <= 1 ? 0 : log2(x >> 1) + 1;
     }
 
+    // A crude way to detect trivial use-after-free bugs given that a lot of
+    // data structure have a strong bias toward bits that are zero.
+#ifndef NDEBUG
+    static constexpr uint8_t InlineCapacityDebugBits = 0xC0;
+#else
+    static constexpr uint8_t InlineCapacityDebugBits = 0;
+#endif
     static constexpr uintptr_t InlineIndexBits = 4;
     static constexpr uintptr_t InlineIndexMask = 0xF;
     static constexpr uintptr_t InlineCapacity =
@@ -680,7 +714,7 @@ private:
         swift_unreachable("unknown index size");
       }
       Value = reinterpret_cast<uintptr_t>(ptr) | static_cast<uintptr_t>(mode);
-      *reinterpret_cast<uint8_t *>(ptr) = capacityLog2;
+      *reinterpret_cast<uint8_t *>(ptr) = capacityLog2 | InlineCapacityDebugBits;
     }
 
     bool valueIsPointer() { return Value & 3; }
@@ -711,8 +745,11 @@ private:
     }
 
     uint8_t getCapacityLog2() {
-      if (auto *ptr = pointer())
-        return *reinterpret_cast<uint8_t *>(ptr);
+      if (auto *ptr = pointer()) {
+        auto result = *reinterpret_cast<uint8_t *>(ptr);
+        assert((result & InlineCapacityDebugBits) == InlineCapacityDebugBits);
+        return result & ~InlineCapacityDebugBits;
+      }
       return InlineCapacityLog2;
     }
 
@@ -797,28 +834,6 @@ private:
     ElemTy *data() { return &Elem; }
   };
 
-  /// A simple linked list representing pointers that need to be freed.
-  struct FreeListNode {
-    FreeListNode *Next;
-    void *Ptr;
-
-    static void add(FreeListNode **head, void *ptr) {
-      auto *newNode = new FreeListNode{*head, ptr};
-      *head = newNode;
-    }
-
-    static void freeAll(FreeListNode **head) {
-      auto *node = *head;
-      while (node) {
-        auto *next = node->Next;
-        free(node->Ptr);
-        delete node;
-        node = next;
-      }
-      *head = nullptr;
-    }
-  };
-
   /// The number of readers currently active, equal to the number of snapshot
   /// objects currently alive.
   std::atomic<uint32_t> ReaderCount{0};
@@ -840,7 +855,7 @@ private:
   MutexTy WriterLock;
 
   /// The list of pointers to be freed once no readers are active.
-  FreeListNode *FreeList{nullptr};
+  ConcurrentFreeListNode *FreeList{nullptr};
 
   void incrementReaders() {
     ReaderCount.fetch_add(1, std::memory_order_acquire);
@@ -853,8 +868,11 @@ private:
   /// Free all the arrays in the free lists if there are no active readers. If
   /// there are active readers, do nothing.
   void deallocateFreeListIfSafe() {
-    if (ReaderCount.load(std::memory_order_seq_cst) == 0)
-      FreeListNode::freeAll(&FreeList);
+    // The standard says that std::memory_order_seq_cst only applies to
+    // read-modify-write operations, so we need an explicit fence:
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (ReaderCount.load(std::memory_order_relaxed) == 0)
+      ConcurrentFreeListNode::freeAll(&FreeList, free);
   }
 
   /// Grow the elements array, adding the old array to the free list and
@@ -868,7 +886,7 @@ private:
     if (elements) {
       memcpy(newElements->data(), elements->data(),
              elementCount * sizeof(ElemTy));
-      FreeListNode::add(&FreeList, elements);
+      ConcurrentFreeListNode::add(&FreeList, elements);
     }
 
     // Use seq_cst here to ensure that the subsequent load of ReaderCount is
@@ -916,7 +934,7 @@ private:
     Indices.store(newIndices.Value, std::memory_order_seq_cst);
 
     if (auto *ptr = indices.pointer())
-      FreeListNode::add(&FreeList, ptr);
+      ConcurrentFreeListNode::add(&FreeList, ptr);
 
     return newIndices;
   }
@@ -1122,8 +1140,8 @@ public:
     Elements.store(nullptr, std::memory_order_relaxed);
 
     if (auto *ptr = indices.pointer())
-      FreeListNode::add(&FreeList, ptr);
-    FreeListNode::add(&FreeList, elements);
+      ConcurrentFreeListNode::add(&FreeList, ptr);
+    ConcurrentFreeListNode::add(&FreeList, elements);
 
     deallocateFreeListIfSafe();
   }

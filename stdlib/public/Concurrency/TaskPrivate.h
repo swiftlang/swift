@@ -25,11 +25,18 @@
 
 namespace swift {
 
+// Uncomment to enable helpful debug spew to stderr
+//#define SWIFT_TASK_PRINTF_DEBUG 1
+
 class AsyncTask;
 class TaskGroup;
 
 /// Initialize the task-local allocator in the given task.
 void _swift_task_alloc_initialize(AsyncTask *task);
+
+void _swift_task_alloc_initialize_with_slab(AsyncTask *task,
+                   void *firstSlabBuffer,
+                   size_t bufferCapacity);
 
 /// Destroy the task-local allocator in the given task.
 void _swift_task_alloc_destroy(AsyncTask *task);
@@ -51,6 +58,11 @@ void runJobInEstablishedExecutorContext(Job *job);
 
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
+
+AsyncTaskAndContext swift_task_create_async_let_future(JobFlags flags,
+                     const Metadata *futureResultType,
+                     void *closureEntry,
+                     void *closureContext);
 
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
@@ -76,6 +88,14 @@ void _swift_tsan_release(void *addr);
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
 #define DISPATCH_QUEUE_MAIN_EXECUTOR (void *)2
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+// FIXME: remove this and switch to a representation that uses
+// _dispatch_main_q somehow
+extern "C" SWIFT_CC(swift)
+ExecutorRef _swift_task_getMainExecutor();
+#pragma clang diagnostic pop
+
 // ==== ------------------------------------------------------------------------
 
 namespace {
@@ -87,6 +107,12 @@ namespace {
 ///
 ///   @_silgen_name("swift_task_future_wait_throwing")
 ///   func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
+///
+///   @_silgen_name("swift_asyncLet_wait")
+///   func _asyncLetGet<T>(_ task: Builtin.RawPointer) async -> T
+///
+///   @_silgen_name("swift_asyncLet_waitThrowing")
+///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:

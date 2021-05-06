@@ -250,17 +250,25 @@ NOTE(designated_init_c_struct_fix,none,
 
 
 // Control flow diagnostics.
-ERROR(missing_return,none,
-      "missing return in a %select{function|closure}1 expected to return %0",
-      (Type, unsigned))
-ERROR(missing_return_last_expr,none,
-      "missing return in a %select{function|closure}1 expected to return %0; "
-      "did you mean to return the last expression?",
-      (Type, unsigned))
-ERROR(missing_never_call,none,
-      "%select{function|closure}1 with uninhabited return type %0 is missing "
+ERROR(missing_return_closure,none,
+      "missing return in closure expected to return %0",
+      (Type))
+ERROR(missing_never_call_closure,none,
+      "closure with uninhabited return type %0 is missing "
       "call to another never-returning function on all paths",
-      (Type, unsigned))
+      (Type))
+
+ERROR(missing_return_decl,none,
+      "missing return in %1 expected to return %0",
+      (Type, DescriptiveDeclKind))
+ERROR(missing_never_call_decl,none,
+      "%1 with uninhabited return type %0 is missing "
+      "call to another never-returning function on all paths",
+      (Type, DescriptiveDeclKind))
+
+NOTE(missing_return_last_expr_note,none,
+    "did you mean to return the last expression?", ())
+
 ERROR(guard_body_must_not_fallthrough,none,
       "'guard' body must not fall through, consider using a 'return' or 'throw'"
       " to exit the scope", ())

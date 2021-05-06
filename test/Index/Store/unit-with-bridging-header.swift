@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-pch -index-store-path %t/idx -o %t/bridge-head.pch %S/Inputs/bridge-head.h
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -import-objc-header %t/bridge-head.pch -primary-file %s -o %t/s1.o -index-store-path %t/idx
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-concurrency-module-import -emit-pch -index-store-path %t/idx -o %t/bridge-head.pch %S/Inputs/bridge-head.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-concurrency-module-import -typecheck -import-objc-header %t/bridge-head.pch -primary-file %s -o %t/s1.o -index-store-path %t/idx
 // RUN: c-index-test core -print-record %t/idx | %FileCheck %s --check-prefix=PCH-RECORD
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s --check-prefix=PCH-UNIT
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -import-objc-header %S/Inputs/bridge-head.h -primary-file %s -o %t/s1.o -index-store-path %t/idx2
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-implicit-concurrency-module-import -typecheck -import-objc-header %S/Inputs/bridge-head.h -primary-file %s -o %t/s1.o -index-store-path %t/idx2
 // RUN: c-index-test core -print-unit %t/idx2 | %FileCheck --check-prefix=TEXTUAL-UNIT %s
 
 // PCH-RECORD: bridge-include.h

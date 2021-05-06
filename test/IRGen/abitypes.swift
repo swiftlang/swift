@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -enable-objc-interop | %FileCheck -check-prefix=%target-cpu-%target-os %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir -enable-objc-interop | %FileCheck -check-prefix=%target-cpu-%target-os-abi %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux, windows, openbsd
@@ -17,6 +17,7 @@ import Foundation
 // arm64e-ios: [[ARM64E_MYRECT:%.*]] = type { float, float, float, float }
 // arm64-tvos: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 // armv7k-watchos: [[ARMV7K_MYRECT:%.*]] = type { float, float, float, float }
+// arm64_32-watchos: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 // arm64-macosx: [[ARM64_MYRECT:%.*]] = type { float, float, float, float }
 
 class Foo {
@@ -40,6 +41,10 @@ class Foo {
   // i386-watchos: define hidden void @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(%TSo6MyRectV* noalias nocapture sret({{.*}}) %0, i8* %1, i8* %2) {{[#0-9]*}} {
   // armv7k-watchos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
   // armv7k-watchos: define hidden [[ARMV7K_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1) {{[#0-9]*}} {
+  // armv64_32-watchos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
+  // armv64_32-watchos: define hidden [[ARMV7K_MYRECT]] @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1) {{[#0-9]*}} {
+  // x86_64-watchos: define hidden swiftcc { float, float, float, float } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}F"(%T8abitypes3FooC* swiftself %0) {{.*}} {
+  // x86_64-watchos: define hidden { <2 x float>, <2 x float> } @"$s8abitypes3FooC3bar{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1) {{[#0-9]*}} {
   @objc dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)
   }
@@ -65,6 +70,8 @@ class Foo {
   // armv7s-ios: define hidden float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x i32] %2) {{[#0-9]*}} {
   // armv7k-watchos: define hidden swiftcc float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
   // armv7k-watchos: define hidden float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x float] %2) {{[#0-9]*}} {
+  // arm64_32-watchos: define hidden swiftcc float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, %T8abitypes3FooC* swiftself %4) {{.*}} {
+  // arm64_32-watchos: define hidden float @"$s8abitypes3FooC12getXFromRect{{[_0-9a-zA-Z]*}}FTo"(i8* %0, i8* %1, [4 x float] %2) {{[#0-9]*}} {
   @objc dynamic func getXFromRect(_ r: MyRect) -> Float {
     return r.x
   }
@@ -107,6 +114,15 @@ class Foo {
   // armv7k-watchos: [[LOADED:%.*]] = load [4 x float], [4 x float]* [[CAST]]
   // armv7k-watchos: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
   // armv7k-watchos: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x float])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x float] [[LOADED]])
+
+  // arm64_32-watchos: define hidden swiftcc float @"$s8abitypes3FooC17getXFromRectSwift{{[_0-9a-zA-Z]*}}F"(float %0, float %1, float %2, float %3, [[SELF:%.*]]* swiftself %4) {{.*}} {
+  // arm64_32-watchos: [[DEBUGVAR:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
+  // arm64_32-watchos: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
+  // arm64_32-watchos: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 4
+  // arm64_32-watchos: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x float]*
+  // arm64_32-watchos: [[LOADED:%.*]] = load [4 x float], [4 x float]* [[CAST]]
+  // arm64_32-watchos: [[SELFCAST:%.*]] = bitcast [[SELF]]* %4 to i8*
+  // arm64_32-watchos: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x float])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x float] [[LOADED]])
   func getXFromRectSwift(_ r: MyRect) -> Float {
     return getXFromRect(r)
   }

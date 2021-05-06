@@ -2842,7 +2842,19 @@ void FindLocalVal::visitBraceStmt(BraceStmt *S, bool isTopLevelCode) {
     if (SM.isBeforeInBuffer(Loc, S->getStartLoc()))
       return;
   } else {
-    if (!isReferencePointInRange(S->getSourceRange()))
+    SourceRange CheckRange = S->getSourceRange();
+    if (S->isImplicit()) {
+      // If the brace statement is implicit, it doesn't have an explicit '}'
+      // token. Thus, the last token in the brace stmt could be a string
+      // literal token, which can *contain* its interpolation segments.
+      // If one of these interpolation segments is the reference point, we'd
+      // return false from `isReferencePointInRange` because the string
+      // literal token's start location is before the interpolation token.
+      // To fix this, adjust the range we are checking to range until the end of
+      // the potential string interpolation token.
+      CheckRange.End = Lexer::getLocForEndOfToken(SM, CheckRange.End);
+    }
+    if (!isReferencePointInRange(CheckRange))
       return;
   }
 
@@ -2867,7 +2879,16 @@ void FindLocalVal::visitSwitchStmt(SwitchStmt *S) {
 }
 
 void FindLocalVal::visitCaseStmt(CaseStmt *S) {
-  if (!isReferencePointInRange(S->getSourceRange()))
+  // The last token in a case stmt can be a string literal token, which can
+  // *contain* its interpolation segments. If one of these interpolation
+  // segments is the reference point, we'd return false from
+  // `isReferencePointInRange` because the string literal token's start location
+  // is before the interpolation token. To fix this, adjust the range we are
+  // checking to range until the end of the potential string interpolation
+  // token.
+  SourceRange CheckRange = {S->getStartLoc(),
+                            Lexer::getLocForEndOfToken(SM, S->getEndLoc())};
+  if (!isReferencePointInRange(CheckRange))
     return;
   // Pattern names aren't visible in the patterns themselves,
   // just in the body or in where guards.

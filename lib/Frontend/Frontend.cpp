@@ -154,11 +154,10 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+  serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   
-  if (!outs.SymbolGraphOutputDir.empty()) {
-    serializationOpts.SymbolGraphOutputDir = outs.SymbolGraphOutputDir;
-  } else if (opts.EmitSymbolGraph) {
+  if (opts.EmitSymbolGraph) {
     if (!opts.SymbolGraphOutputDir.empty()) {
       serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
     } else {
@@ -168,6 +167,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     llvm::sys::fs::make_absolute(OutputDir);
     serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
   }
+  serializationOpts.SkipSymbolGraphInheritedDocs = opts.SkipInheritedDocs;
   
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
@@ -181,6 +181,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
+
+  serializationOpts.StaticLibrary = opts.Static;
 
   return serializationOpts;
 }
@@ -309,6 +311,7 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
         Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                              filename, result.getError().message());
         hadError |= true;
+        continue;
       }
 
       auto bufferID = SourceMgr.addNewSourceBuffer(std::move(result.get()));
@@ -753,9 +756,24 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+/// Enable Swift concurrency on a per-target basis
+static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
+  if (target.isOSDarwin())
+    return true;
+  if (target.isOSWindows())
+    return true;
+  if (target.isOSLinux())
+    return true;
+#if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
+  if (target.isOSOpenBSD())
+    return true;
+#endif
+  return false;
+}
+
 bool CompilerInvocation::shouldImportSwiftConcurrency() const {
-  return getLangOptions().EnableExperimentalConcurrency
-      && !getLangOptions().DisableImplicitConcurrencyModuleImport &&
+  return shouldImportConcurrencyByDefault(getLangOptions().Target) &&
+      !getLangOptions().DisableImplicitConcurrencyModuleImport &&
       getFrontendOptions().InputMode !=
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
@@ -787,6 +805,19 @@ bool CompilerInvocation::shouldImportSwiftONoneSupport() const {
          FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
 }
 
+void CompilerInstance::verifyImplicitConcurrencyImport() {
+  if (Invocation.shouldImportSwiftConcurrency() &&
+      !canImportSwiftConcurrency()) {
+    Diagnostics.diagnose(SourceLoc(),
+                         diag::warn_implicit_concurrency_import_failed);
+  }
+}
+
+bool CompilerInstance::canImportSwiftConcurrency() const {
+  return getASTContext().canImportModule(
+      {getASTContext().getIdentifier(SWIFT_CONCURRENCY_NAME), SourceLoc()});
+}
+
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   auto &frontendOpts = Invocation.getFrontendOptions();
 
@@ -811,6 +842,9 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     pushImport(SWIFT_ONONE_SUPPORT);
   }
 
+  // FIXME: The canImport check is required for compatibility
+  // with older SDKs. Longer term solution is to have the driver make
+  // the decision on the implicit import: rdar://76996377
   if (Invocation.shouldImportSwiftConcurrency()) {
     switch (imports.StdlibKind) {
     case ImplicitStdlibKind::Builtin:
@@ -818,7 +852,8 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
       break;
 
     case ImplicitStdlibKind::Stdlib:
-      pushImport(SWIFT_CONCURRENCY_NAME);
+      if (canImportSwiftConcurrency())
+        pushImport(SWIFT_CONCURRENCY_NAME);
       break;
     }
   }
@@ -1029,6 +1064,8 @@ bool CompilerInstance::loadStdlibIfNeeded() {
                          Invocation.getTargetTriple());
     return true;
   }
+
+  verifyImplicitConcurrencyImport();
 
   // If we failed to load, we should have already diagnosed.
   if (M->failedToLoad()) {

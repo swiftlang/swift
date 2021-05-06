@@ -1087,6 +1087,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (Result.isNull())
       return Result;
 
+    if (InPoundIfEnvironment && Tok.isAtStartOfLine())
+      return Result;
+
     if (Result.hasCodeCompletion() &&
         SourceMgr.getCodeCompletionLoc() == PreviousLoc) {
       // Don't parse suffixes if the expression ended with code completion
@@ -1302,6 +1305,95 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           Result, new (Context) PostfixUnaryExpr(
                       oper, formUnaryArgument(Context, Result.get())));
       SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
+      continue;
+    }
+
+    if (Tok.is(tok::pound_if)) {
+
+      // Helper function to see if we can parse member reference like suffixes
+      // inside '#if'.
+      auto isAtStartOfPostfixExprSuffix = [&]() {
+        if (!Tok.isAny(tok::period, tok::period_prefix)) {
+          return false;
+        }
+        if (!peekToken().isAny(tok::identifier, tok::kw_Self, tok::kw_self,
+                               tok::integer_literal, tok::code_complete) &&
+            !peekToken().isKeyword()) {
+          return false;
+        }
+        return true;
+      };
+
+      // Check if the first '#if' body starts with '.' <identifier>, and parse
+      // it as a "postfix ifconfig expression".
+      bool isPostfixIfConfigExpr = false;
+      {
+        llvm::SaveAndRestore<Optional<StableHasher>> H(CurrentTokenHash, None);
+        Parser::BacktrackingScope Backtrack(*this);
+        // Skip to the first body. We may need to skip multiple '#if' directives
+        // since we support nested '#if's. e.g.
+        //   baseExpr
+        //   #if CONDITION_1
+        //     #if CONDITION_2
+        //       .someMember
+        do {
+          consumeToken(tok::pound_if);
+          skipUntilTokenOrEndOfLine(tok::NUM_TOKENS);
+        } while (Tok.is(tok::pound_if));
+        isPostfixIfConfigExpr = isAtStartOfPostfixExprSuffix();
+      }
+      if (!isPostfixIfConfigExpr)
+        break;
+
+      if (!Tok.isAtStartOfLine()) {
+        diagnose(Tok, diag::statement_same_line_without_newline)
+          .fixItInsert(getEndOfPreviousLoc(), "\n");
+      }
+
+      llvm::SmallPtrSet<Expr *, 4> exprsWithBindOptional;
+      auto ICD =
+          parseIfConfig([&](SmallVectorImpl<ASTNode> &elements, bool isActive) {
+            SyntaxParsingContext postfixCtx(SyntaxContext,
+                                            SyntaxContextKind::Expr);
+            // Although we know the '#if' body starts with period,
+            // '#elseif'/'#else' bodies might start with invalid tokens.
+            if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
+              bool exprHasBindOptional = false;
+              auto expr = parseExprPostfixSuffix(Result, isExprBasic,
+                                                 periodHasKeyPathBehavior,
+                                                 exprHasBindOptional);
+              if (exprHasBindOptional)
+                exprsWithBindOptional.insert(expr.get());
+              elements.push_back(expr.get());
+            }
+
+            // Don't allow any character other than the postfix expression.
+            if (!Tok.isAny(tok::pound_elseif, tok::pound_else, tok::pound_endif,
+                           tok::eof)) {
+              diagnose(Tok, diag::expr_postfix_ifconfig_unexpectedtoken);
+              skipUntilConditionalBlockClose();
+            }
+          });
+      if (ICD.isNull())
+        break;
+
+      SyntaxContext->createNodeInPlace(SyntaxKind::PostfixIfConfigExpr);
+
+      auto activeElements = ICD.get()->getActiveClauseElements();
+      if (activeElements.empty())
+        // There's no active clause, or it was empty. Keep the current result.
+        continue;
+
+      // Extract the parsed expression as the result.
+      assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
+      auto expr = activeElements[0].get<Expr *>();
+      ParserStatus status(ICD);
+      if (SourceMgr.getCodeCompletionLoc().isValid() &&
+          SourceMgr.rangeContainsTokenLoc(expr->getSourceRange(),
+                                          SourceMgr.getCodeCompletionLoc()))
+        status.setHasCodeCompletion();
+      hasBindOptional |= exprsWithBindOptional.contains(expr);
+      Result = makeParserResult(status, expr);
       continue;
     }
 
@@ -1545,7 +1637,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
     LLVM_FALLTHROUGH;
   case tok::kw_Self:     // Self
-    return makeParserResult(parseExprIdentifier());
+    return parseExprIdentifier();
 
   case tok::kw_Any: { // Any
     ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
@@ -2192,7 +2284,8 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
 
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
-Expr *Parser::parseExprIdentifier() {
+ParserResult<Expr> Parser::parseExprIdentifier() {
+  ParserStatus status;
   assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
   SyntaxParsingContext IDSyntaxContext(SyntaxContext,
                                        SyntaxKind::IdentifierExpr);
@@ -2217,8 +2310,9 @@ Expr *Parser::parseExprIdentifier() {
   if (canParseAsGenericArgumentList()) {
     SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
     SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
-    auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
-    if (argStat.isErrorOrHasCompletion())
+    auto argStatus = parseGenericArguments(args, LAngleLoc, RAngleLoc);
+    status |= argStatus;
+    if (argStatus.isErrorOrHasCompletion())
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     
     // The result can be empty in error cases.
@@ -2227,7 +2321,8 @@ Expr *Parser::parseExprIdentifier() {
   
   if (name.getBaseName().isEditorPlaceholder()) {
     IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
-    return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
+    return makeParserResult(
+        status, parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier()));
   }
 
   auto refKind = DeclRefKind::Ordinary;
@@ -2237,7 +2332,7 @@ Expr *Parser::parseExprIdentifier() {
     E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, args,
                                          RAngleLoc);
   }
-  return E;
+  return makeParserResult(status, E);
 }
 
 Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -2508,7 +2603,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
         name = Context.getIdentifier(Tok.getText());
-        initializer = parseExprIdentifier();
+        auto initializerResult = parseExprIdentifier();
+        status |= initializerResult;
+        initializer = initializerResult.get();
 
         // It is a common error to try to capture a nested field instead of just
         // a local name, reject it with a specific error message.

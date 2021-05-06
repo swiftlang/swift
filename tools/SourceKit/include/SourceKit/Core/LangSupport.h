@@ -225,9 +225,7 @@ struct SourceFileRange {
 enum class SyntaxTreeTransferMode {
   /// Don't transfer the syntax tree
   Off,
-  /// Transfer the syntax tree incrementally
-  Incremental,
-  /// Always transfer the entire syntax tree
+  /// Transfer the entire syntax tree
   Full
 };
 
@@ -285,8 +283,7 @@ public:
   virtual void handleSourceText(StringRef Text) = 0;
 
   virtual void
-  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                   std::unordered_set<unsigned> &ReusedNodeIds) = 0;
+  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) = 0;
   virtual bool syntaxTreeEnabled() {
     return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
   }
@@ -408,6 +405,14 @@ struct ReferencedDeclInfo {
         IsSPI(SPI), ParentContexts(Parents) {}
 };
 
+struct LocationInfo {
+  StringRef Filename;
+  unsigned Offset = 0;
+  unsigned Length = 0;
+  unsigned Line = 0;
+  unsigned Column = 0;
+};
+
 struct CursorSymbolInfo {
   UIdent Kind;
   UIdent DeclarationLang;
@@ -433,11 +438,8 @@ struct CursorSymbolInfo {
   /// Non-empty if a generated interface editor document has previously been
   /// opened for the module the symbol came from.
   StringRef ModuleInterfaceName;
-  /// This is an (offset,length) pair. It is set only if the declaration has a
-  /// source location.
-  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc = None;
-  /// Set only if the declaration has a source location.
-  StringRef Filename;
+  /// Filename is non-empty if there's a source location.
+  LocationInfo Location;
   /// For methods this lists the USRs of the overrides in the class hierarchy.
   ArrayRef<StringRef> OverrideUSRs;
   /// Related declarations, overloaded functions etc., in annotated XML form.
@@ -447,7 +449,7 @@ struct CursorSymbolInfo {
   /// Stores the Symbol Graph title, kind, and USR of the parent contexts of the
   /// symbol under the cursor.
   ArrayRef<ParentInfo> ParentContexts;
-  /// The set of decls referenced in the symbol graph delcaration fragments.
+  /// The set of decls referenced in the symbol graph declaration fragments.
   ArrayRef<ReferencedDeclInfo> ReferencedSymbols;
   /// For calls this lists the USRs of the receiver types (multiple only in the
   /// case that the base is a protocol composition).

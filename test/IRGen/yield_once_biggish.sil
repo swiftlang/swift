@@ -5,6 +5,7 @@
 // to just rule out i386 for now.  If we end up with many similar exceptions,
 // we should turn this into a REQUIRES instead.
 // UNSUPPORTED: CPU=i386
+// UNSUPPORTED: CPU=arm64_32
 
 import Builtin
 import Swift

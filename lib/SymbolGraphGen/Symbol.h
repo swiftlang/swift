@@ -111,6 +111,11 @@ public:
   void printPath(llvm::raw_ostream &OS) const;
 
   void getUSR(SmallVectorImpl<char> &USR) const;
+  
+  /// If this symbol is inheriting docs from a parent class, protocol, or default
+  /// implementation, returns that decl. Returns null if there are no docs or if
+  /// the symbol has its own doc comments to render.
+  const ValueDecl *getDeclInheritingDocs() const;
 
   static bool supportsKind(DeclKind Kind);
 };

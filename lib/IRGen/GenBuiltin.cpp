@@ -28,6 +28,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenConcurrency.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
@@ -219,13 +220,42 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  // getCurrentActor has no arguments.
+  // emitGetCurrentExecutor has no arguments.
   if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
-    auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetCurrentExecutorFn(),
-                                        {});
-    call->setDoesNotThrow();
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    out.add(call);
+    emitGetCurrentExecutor(IGF, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::StartAsyncLet) {
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+
+    auto asyncLet = emitBuiltinStartAsyncLet(
+        IGF,
+        taskFunction,
+        taskContext,
+        substitutions
+        );
+
+    out.add(asyncLet);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLet) {
+    emitEndAsyncLet(IGF, args.claimNext());
+    // Ignore a second operand which is inserted by ClosureLifetimeFixup and
+    // only used for dependency tracking.
+    (void)args.claimAll();
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
+    out.add(emitCreateTaskGroup(IGF));
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::DestroyTaskGroup) {
+    emitDestroyTaskGroup(IGF, args.claimNext());
     return;
   }
 
@@ -306,11 +336,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::BuildSerialExecutorRef) {
-    auto executor = args.claimNext();
-    executor = IGF.Builder.CreateBitCast(executor,
-                                         IGF.IGM.SwiftExecutorPtrTy);
-    out.add(executor);
+  if (Builtin.ID == BuiltinValueKind::BuildMainActorExecutorRef) {
+    emitBuildMainActorExecutorRef(IGF, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildDefaultActorExecutorRef) {
+    auto actor = args.claimNext();
+    emitBuildDefaultActorExecutorRef(IGF, actor, out);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::BuildOrdinarySerialExecutorRef) {
+    auto actor = args.claimNext();
+    auto type = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto conf = substitutions.getConformances()[0];
+    emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
     return;
   }
 

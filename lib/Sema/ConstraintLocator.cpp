@@ -60,6 +60,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::DynamicType:
   case ConstraintLocator::SubscriptMember:
   case ConstraintLocator::OpenedGeneric:
+  case ConstraintLocator::WrappedValue:
   case ConstraintLocator::GenericParameter:
   case ConstraintLocator::GenericArgument:
   case ConstraintLocator::NamedTupleElement:
@@ -188,6 +189,10 @@ bool ConstraintLocator::isForGenericParameter() const {
   return isLastElement<LocatorPathElt::GenericParameter>();
 }
 
+bool ConstraintLocator::isForWrappedValue() const {
+  return isLastElement<LocatorPathElt::WrappedValue>();
+}
+
 bool ConstraintLocator::isForSequenceElementType() const {
   return isLastElement<LocatorPathElt::SequenceElementType>();
 }
@@ -216,6 +221,12 @@ GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter.
   return isForGenericParameter() ?
       castLastElementTo<LocatorPathElt::GenericParameter>().getType() : nullptr;
+}
+
+Type ConstraintLocator::getWrappedValue() const {
+  return isForWrappedValue()
+             ? castLastElementTo<LocatorPathElt::WrappedValue>().getType()
+             : Type();
 }
 
 void ConstraintLocator::dump(SourceManager *sm) const {
@@ -268,6 +279,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     case GenericParameter: {
       auto gpElt = elt.castTo<LocatorPathElt::GenericParameter>();
       out << "generic parameter '" << gpElt.getType()->getString(PO) << "'";
+      break;
+    }
+    case WrappedValue: {
+      auto wrappedValueElt = elt.castTo<LocatorPathElt::WrappedValue>();
+      out << "composed property wrapper type '"
+          << wrappedValueElt.getType()->getString(PO) << "'";
       break;
     }
     case ApplyArgument:

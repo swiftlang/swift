@@ -13,6 +13,10 @@ final class Container {
   }
 
   init(_ d: Delegate) { strongRef = d }
+  init(weakDelegate: Delegate, strongDelegate: Delegate) {
+    delegate = weakDelegate
+    strongRef = strongDelegate
+  }
 }
 
 func warningForDeadDelegate(container: Container) {
@@ -62,5 +66,34 @@ func noWarningWithFixLifetime2() {
   storeClosure({ [weak k] in
                  k!.foo()
                })
+}
+
+func warningWithStoreWeakInCalledFunction() {
+  let d = Delegate()
+  let c = Container(weakDelegate: d, strongDelegate: Delegate())  // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+  c.callDelegate()
+}
+
+final class StrongContainer {
+  var k: Delegate
+  init(_ k: Delegate) { self.k = k }
+  func set(_ newk: Delegate) { k = newk }
+  func noset(_ newk: Delegate) { }
+}
+
+final class Testcl {
+  private weak var wk: Delegate?
+
+  func test_set(_ c: StrongContainer) {
+    let k = Delegate()
+    c.set(k)
+    wk = k // No warning here, because k is kept alive by c
+  }
+
+  func test_noset(_ c: StrongContainer) {
+    let k = Delegate()
+    c.noset(k)
+    wk = k // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+  }
 }
 

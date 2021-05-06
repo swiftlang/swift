@@ -124,7 +124,9 @@ out with ``lit.py -h``. We document some of the more useful ones below:
          line, amid a sequence.
 * ``-a`` causes a test's commandline and output to always be printed.
 * ``--filter=<pattern>`` causes only tests with paths matching the given regular
-  expression to be run.
+  expression to be run. Alternately, you can use the `LIT_FILTER='<pattern>'`
+  environment variable, in case you're invoking `lit.py` through some other
+  tool such as `build-script`.
 * ``-i`` causes tests that have a newer modification date and failing tests to
   be run first. This is implemented by updating the mtimes of the tests.
 * ``--no-execute`` causes a dry run to be performed. *NOTE* This means that all

@@ -1,38 +1,74 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
+// UNSUPPORTED: OS=windows-msvc
 
 import _Concurrency
 import StdlibUnittest
 
 struct TestError: Error {}
 
-var tests = TestSuite("CheckedContinuation")
+@main struct Main {
+  static func main() async {
+    var tests = TestSuite("CheckedContinuation")
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-  tests.test("trap on double resume non-throwing continuation") {
-    expectCrashLater()
-    runAsyncAndBlock {
-      let _: Int = await withCheckedContinuation { c in
-        c.resume(returning: 17)
-        c.resume(returning: 38)
-      }
-    }
-  }
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+      tests.test("trap on double resume non-throwing continuation") {
+        expectCrashLater()
 
-  tests.test("trap on double resume throwing continuation") {
-    expectCrashLater()
-    runAsyncAndBlock {
-      do {
-        let _: Int = try await withCheckedThrowingContinuation { c in
-          c.resume(returning: 17)
-          c.resume(throwing: TestError())
+        let task = detach {
+          let _: Int = await withCheckedContinuation { c in
+            c.resume(returning: 17)
+            c.resume(returning: 38)
+          }
         }
-      } catch {
+        await task.get()
+      }
+
+      tests.test("trap on double resume throwing continuation") {
+        expectCrashLater()
+
+        let task = detach {
+          do {
+            let _: Int = try await withCheckedThrowingContinuation { c in
+              c.resume(returning: 17)
+              c.resume(throwing: TestError())
+            }
+          } catch {
+          }
+        }
+        await task.get()
+      }
+
+      tests.test("test withCheckedThrowingContinuation") {
+        let task2 = detach {
+          do {
+            let x: Int = try await withCheckedThrowingContinuation { c in
+              c.resume(returning: 17)
+            }
+            expectEqual(17, x)
+          } catch {
+          }
+        }
+
+        let task = detach {
+          do {
+            let x: Int = try await withCheckedThrowingContinuation { c in
+              c.resume(returning: 17)
+            }
+            expectEqual(17, x)
+          } catch {
+          }
+        }
+        await task.get()
+        await task2.get()
       }
     }
+
+    await runAllTestsAsync()
   }
 }
-
-runAllTests()

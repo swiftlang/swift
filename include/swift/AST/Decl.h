@@ -62,6 +62,7 @@ namespace swift {
   class DynamicSelfType;
   class Type;
   class Expr;
+  struct ExternalSourceLocs;
   class CaptureListExpr;
   class DeclRefExpr;
   class ForeignAsyncConvention;
@@ -587,7 +588,10 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1,
+    /// If the module is compiled as static library.
+    StaticLibrary : 1,
+
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -688,14 +692,12 @@ private:
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
 
-  struct CachedExternalSourceLocs {
-    SourceLoc Loc;
-    SourceLoc StartLoc;
-    SourceLoc EndLoc;
-    SmallVector<CharSourceRange, 4> DocRanges;
-  };
-  mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
-  const CachedExternalSourceLocs *getSerializedLocs() const;
+  /// Returns the serialized locations of this declaration from the
+  /// corresponding .swiftsourceinfo file. "Empty" (ie. \c BufferID of 0, an
+  /// invalid \c Loc, and empty \c DocRanges) if either there is no
+  /// .swiftsourceinfo or the buffer could not be created, eg. if the file
+  /// no longer exists.
+  const ExternalSourceLocs *getSerializedLocs() const;
 
   /// Directly set the invalid bit
   void setInvalidBit();
@@ -1863,7 +1865,7 @@ public:
   bool isComputingPatternBindingEntry(const VarDecl *vd) const;
 
   /// Is this an "async let" declaration?
-  bool isAsyncLet() const;
+  bool isSpawnLet() const;
 
   /// Gets the text of the initializer expression for the pattern entry at the
   /// given index, stripping out inactive branches of any #ifs inside the
@@ -3766,17 +3768,21 @@ public:
 
   /// Whether the class is (known to be) a default actor.
   bool isDefaultActor() const;
+  bool isDefaultActor(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Whether the class is known to be a *root* default actor,
   /// i.e. the first class in its hierarchy that is a default actor.
   bool isRootDefaultActor() const;
+  bool isRootDefaultActor(ModuleDecl *M, ResilienceExpansion expansion) const;
 
   /// Whether the class was explicitly declared with the `actor` keyword.
   bool isExplicitActor() const { return Bits.ClassDecl.IsActor; }
 
-  /// Does this class explicitly declare any of the methods that
-  /// would prevent it from being a default actor?
-  bool hasExplicitCustomActorMethods() const;
+  /// Get the closest-to-root superclass that's an actor class.
+  const ClassDecl *getRootActorClass() const;
+
+  /// Fetch this class's unownedExecutor property, if it has one.
+  const VarDecl *getUnownedExecutorProperty() const;
 
   /// Is this the NSObject class type?
   bool isNSObject() const;
@@ -4002,6 +4008,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  Actor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -4938,7 +4945,7 @@ public:
   bool isLet() const { return getIntroducer() == Introducer::Let; }
 
   /// Is this an "async let" property?
-  bool isAsyncLet() const;
+  bool isSpawnLet() const;
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
@@ -5713,7 +5720,7 @@ public:
   ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
 
   /// Add the given derivative function configuration.
-  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
+  void addDerivativeFunctionConfiguration(const AutoDiffConfig &config);
 
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
@@ -6764,6 +6771,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   bool Failable, SourceLoc FailabilityLoc,
+                  bool Async, SourceLoc AsyncLoc,
                   bool Throws, SourceLoc ThrowsLoc,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
@@ -6771,8 +6779,10 @@ public:
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
-                 SourceLoc constructorLoc, bool failable,
-                 SourceLoc failabilityLoc, bool throws, SourceLoc throwsLoc,
+                 SourceLoc constructorLoc, 
+                 bool failable, SourceLoc failabilityLoc, 
+                 bool async, SourceLoc asyncLoc,
+                 bool throws, SourceLoc throwsLoc,
                  ParameterList *bodyParams, GenericParamList *genericParams,
                  DeclContext *parent);
 

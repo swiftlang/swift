@@ -1086,7 +1086,7 @@ func rdar74711236() {
       // FIXME: Missing member reference is pattern needs a better diagnostic
       if let type = context?.store { // expected-error {{type of expression is ambiguous without more context}}
         // `isSupported` should be an invalid declaration to trigger a crash in `map(\.option)`
-        let isSupported = context!.supported().contains(type) // expected-error {{missing argument label 'where:' in call}} expected-error {{converting non-escaping value to '(Type) throws -> Bool' may allow it to escape}}
+        let isSupported = context!.supported().contains(type)
         return (isSupported ? [type] : []).map(\.option)
         // expected-error@-1 {{value of type 'Any' has no member 'option'}}
         // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}

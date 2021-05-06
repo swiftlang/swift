@@ -762,7 +762,6 @@ ERROR(expected_dynamic_func_attr,none,
 ERROR(async_after_throws,none,
       "%select{'async'|'reasync'}0 must precede %select{'throws'|'rethrows'}1",
       (bool, bool))
-ERROR(async_init,none, "initializer cannot be marked 'async'", ())
 ERROR(duplicate_effects_specifier,none,
       "'%0' has already been specified", (StringRef))
 
@@ -967,6 +966,8 @@ ERROR(statement_begins_with_closure,none,
       "top-level statement cannot begin with a closure expression", ())
 ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
+ERROR(statement_same_line_without_newline,none,
+      "consecutive statements on a line must be separated by a newline", ())
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
 ERROR(labeled_block_needs_do,none,
@@ -1331,6 +1332,7 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
+// '#assert'
 ERROR(pound_assert_disabled,PointsToFirstBadToken,
       "#assert is an experimental feature that is currently disabled", ())
 ERROR(pound_assert_expected_lparen,PointsToFirstBadToken,
@@ -1341,6 +1343,10 @@ ERROR(pound_assert_expected_expression,PointsToFirstBadToken,
       "expected a condition expression", ())
 ERROR(pound_assert_expected_string_literal,PointsToFirstBadToken,
       "expected a string literal", ())
+
+// Postfix '#if' expressions.
+ERROR(expr_postfix_ifconfig_unexpectedtoken,none,
+      "unexpected tokens in '#if' expression body", ())
 
 //------------------------------------------------------------------------------
 // MARK: Attribute-parsing diagnostics
@@ -1765,6 +1771,12 @@ WARNING(likely_simulator_platform_condition,none,
       "platform condition appears to be testing for simulator environment; "
       "use 'targetEnvironment(simulator)' instead",
       ())
+
+ERROR(canimport_two_parameters, none, "canImport can take only two parameters", ())
+
+ERROR(canimport_label, none, "2nd parameter of canImport should be labeled as _version or _underlyingVersion", ())
+
+ERROR(canimport_version, none, "cannot parse module version: %0", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Availability query parsing diagnostics

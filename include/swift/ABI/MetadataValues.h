@@ -49,6 +49,9 @@ enum {
 
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
+
+  /// The number of words in an AsyncLet (flags + task pointer)
+  NumWords_AsyncLet = 8, // TODO: not sure how much is enough, these likely could be pretty small
 };
 
 struct InProcess;
@@ -126,6 +129,9 @@ const size_t Alignment_DefaultActor = MaximumAlignment;
 
 /// The alignment of a TaskGroup.
 const size_t Alignment_TaskGroup = MaximumAlignment;
+
+/// The alignment of an AsyncLet.
+const size_t Alignment_AsyncLet = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -1209,6 +1215,10 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t OpaqueReadResumeFunction = 56769;
   const uint16_t OpaqueModifyResumeFunction = 3909;
 
+  /// ObjC class pointers.
+  const uint16_t ObjCISA = 0x6AE1;
+  const uint16_t ObjCSuperclass = 0xB5AB;
+
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
 
@@ -1385,6 +1395,19 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
 
     // Type-specific flags:
 
+    /// Set if the class is an actor.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_IsActor = 7,
+
+    /// Set if the class is a default actor class.  Note that this is
+    /// based on the best knowledge available to the class; actor
+    /// classes with resilient superclassess might be default actors
+    /// without knowing it.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_IsDefaultActor = 8,
+
     /// The kind of reference that this class makes to its resilient superclass
     /// descriptor.  A TypeReferenceKind.
     ///
@@ -1464,6 +1487,12 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_AreImmediateMembersNegative,
                                 class_areImmediateMembersNegative,
                                 class_setAreImmediateMembersNegative)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsDefaultActor,
+                                class_isDefaultActor,
+                                class_setIsDefaultActor)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsActor,
+                                class_isActor,
+                                class_setIsActor)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -1986,6 +2015,7 @@ public:
     Task_IsChildTask      = 24,
     Task_IsFuture         = 25,
     Task_IsGroupChildTask = 26,
+    Task_IsContinuingAsyncTask      = 27,
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
@@ -2015,6 +2045,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsGroupChildTask,
                                 task_isGroupChildTask,
                                 task_setIsGroupChildTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsContinuingAsyncTask,
+                                task_isContinuingAsyncTask,
+                                task_setIsContinuingAsyncTask)
 };
 
 /// Kinds of task status record.

@@ -52,6 +52,8 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
   SourceFile *sf = idc->getAsGenericContext()->getParentSourceFile();
   ASTContext &ctx = idc->getDecl()->getASTContext();
+  auto fileUnit
+    = dyn_cast<FileUnit>(idc->getAsGenericContext()->getModuleScopeContext());
   if (!sf) {
     // If there is no parent source file, this is a deserialized or synthesized
     // declaration context, in which case `getMembers()` has all of the members.
@@ -64,8 +66,8 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
     }
 
     Optional<Fingerprint> fp = None;
-    if (!idc->getDecl()->isImplicit()) {
-      fp = idc->getDecl()->getModuleContext()->loadFingerprint(idc);
+    if (!idc->getDecl()->isImplicit() && fileUnit) {
+      fp = fileUnit->loadFingerprint(idc);
     }
     return FingerprintAndMembers{fp, ctx.AllocateCopy(members)};
   }

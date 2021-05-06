@@ -9,7 +9,7 @@ func forceSplit() async {
 func withGenericArg<T>(_ msg: T) async {
   // This odd debug info is part of a contract with CoroSplit/CoroFrame to fix
   // this up after coroutine splitting.
-  // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYlF"(%swift.context* swiftasync %0
+  // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYalF"(%swift.context* swiftasync %0
   // CHECK: call void @llvm.dbg.declare(metadata %swift.context* %0,
   // CHECK-SAME:   metadata ![[MSG:[0-9]+]], metadata !DIExpression(
   // CHECK-SAME:     DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
@@ -18,7 +18,7 @@ func withGenericArg<T>(_ msg: T) async {
   // CHECK-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
 
   await forceSplit()
-  // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYlFTQ0_"(i8* swiftasync %0)
+  // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYalFTQ0_"(i8* swiftasync %0)
   // CHECK: call void @llvm.dbg.declare(metadata i8* %0,
   // CHECK-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(DW_OP_deref,
   // CHECK-SAME:     DW_OP_plus_uconst, [[OFFSET:[0-9]+]],

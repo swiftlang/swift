@@ -783,12 +783,6 @@ public:
   }
 };
 
-static bool hasArrayType(SILValue Value, SILModule &M) {
-  return Value->getType().getNominalOrBoundGenericNominal() ==
-           M.getASTContext().getArrayDecl();
-}
-
-
 /// A dominating cond_fail on the same value ensures that this value is false.
 static bool isValueKnownFalseAt(SILValue Val, SILInstruction *At,
                                 DominanceInfo *DT) {
@@ -1339,7 +1333,7 @@ bool ABCOpt::hoistChecksInLoop(DominanceInfoNode *DTNode, ABCAnalysis &ABC,
     // Check if the loop iterates from 0 to the count of this array.
     if (F.isZeroToCount(ArrayVal) &&
         // This works only for Arrays but not e.g. for ArraySlice.
-        hasArrayType(ArrayVal, Header->getModule())) {
+        ArrayVal->getType().getASTType()->isArray()) {
       // We can remove the check. This is even possible if the block does not
       // dominate the loop exit block.
       Changed = true;

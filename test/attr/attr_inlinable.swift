@@ -229,6 +229,7 @@ public class Derived3 : Base3 {
   @inlinable
   public init(_: Int) {}
   // expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'Base3' occurs implicitly at the end of this initializer}}
 }
 
 @_fixed_layout
@@ -245,6 +246,7 @@ class Derived4 : Middle4 {
   @inlinable
   public init(_: Int) {}
   // expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
+  // expected-note@-2 {{call to unavailable initializer 'init()' from superclass 'Middle4' occurs implicitly at the end of this initializer}}
 }
 
 

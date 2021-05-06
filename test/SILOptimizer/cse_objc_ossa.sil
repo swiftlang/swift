@@ -178,30 +178,30 @@ bb5:
 sil [ossa] @cse_open_existential_in_bbarg2 : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
   %copy0 = copy_value %0 : $AnyObject
-  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb1, bb2
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  dynamic_method_br %1 : $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.foreign, bb1, bb2
 
-bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
-  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+bb1(%3 : $@convention(objc_method) (@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
+  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
   %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
-  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  br bb3(%7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject)
+  %7 = open_existential_ref %copy0 : $AnyObject to $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  br bb3(%7 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject)
 
 bb2:
   destroy_value %copy0 : $AnyObject
-  destroy_value %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %1 : $@opened("DCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
   br bb5
 
-bb3(%9 : @owned $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject):
-  %copy9 = copy_value %9 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+bb3(%9 : @owned $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject):
+  %copy9 = copy_value %9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
   destroy_value %6 : $Optional<NSString>
-  destroy_value %9 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
-  destroy_value %copy9 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %copy9 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
   br bb5
 
 bb4:
   destroy_value %6 : $Optional<NSString>
-  destroy_value %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  destroy_value %7 : $@opened("DCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
   br bb5
 
 bb5:

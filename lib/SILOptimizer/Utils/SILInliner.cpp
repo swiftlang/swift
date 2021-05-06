@@ -276,7 +276,6 @@ public:
   SILInlineCloner(SILFunction *CalleeFunction, FullApplySite Apply,
                   SILOptFunctionBuilder &FuncBuilder, InlineKind IKind,
                   SubstitutionMap ApplySubs,
-                  SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   SILInliner::DeletionFuncTy deletionCallback);
 
   SILFunction *getCalleeFunction() const { return &Original; }
@@ -288,6 +287,7 @@ protected:
 
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
+  void visitHopToExecutorInst(HopToExecutorInst *Inst);
 
   void visitTerminator(SILBasicBlock *BB);
 
@@ -338,7 +338,7 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
          && "Asked to inline function that is unable to be inlined?!");
 
   SILInlineCloner cloner(calleeFunction, apply, FuncBuilder, IKind, ApplySubs,
-                         OpenedArchetypesTracker, DeletionCallback);
+                         DeletionCallback);
   auto nextI = cloner.cloneInline(appliedArgs);
   return std::make_pair(nextI, cloner.getLastClonedBB());
 }
@@ -352,16 +352,7 @@ SILInliner::inlineFullApply(FullApplySite apply,
   for (const auto arg : apply.getArguments())
     appliedArgs.push_back(arg);
 
-  SILFunction *caller = apply.getFunction();
-  SILOpenedArchetypesTracker OpenedArchetypesTracker(caller);
-  caller->getModule().registerDeleteNotificationHandler(
-      &OpenedArchetypesTracker);
-  // The callee only needs to know about opened archetypes used in
-  // the substitution list.
-  OpenedArchetypesTracker.registerUsedOpenedArchetypes(apply.getInstruction());
-
-  SILInliner Inliner(funcBuilder, inlineKind, apply.getSubstitutionMap(),
-                     OpenedArchetypesTracker);
+  SILInliner Inliner(funcBuilder, inlineKind, apply.getSubstitutionMap());
   return Inliner.inlineFunction(apply.getReferencedFunctionOrNull(), apply,
                                 appliedArgs);
 }
@@ -370,10 +361,9 @@ SILInlineCloner::SILInlineCloner(
     SILFunction *calleeFunction, FullApplySite apply,
     SILOptFunctionBuilder &funcBuilder, InlineKind inlineKind,
     SubstitutionMap applySubs,
-    SILOpenedArchetypesTracker &openedArchetypesTracker,
     SILInliner::DeletionFuncTy deletionCallback)
     : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
-              openedArchetypesTracker, /*DT=*/nullptr, /*Inlining=*/true),
+              /*DT=*/nullptr, /*Inlining=*/true),
       FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
       DeletionCallback(deletionCallback) {
 
@@ -585,14 +575,15 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
 
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
 
-  auto deleteCallback = [this](SILInstruction *deletedI) {
-    if (NextIter == deletedI->getIterator())
-      ++NextIter;
-    if (DeletionCallback)
-      DeletionCallback(deletedI);
-  };
+  auto callbacks = InstModCallbacks().onNotifyWillBeDeleted(
+      [this](SILInstruction *deletedI) {
+        if (NextIter == deletedI->getIterator())
+          ++NextIter;
+        if (DeletionCallback)
+          DeletionCallback(deletedI);
+      });
   recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(), true,
-                                             deleteCallback);
+                                             callbacks);
 }
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
@@ -620,7 +611,15 @@ void SILInlineCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 
   return SILCloner<SILInlineCloner>::visitDebugValueAddrInst(Inst);
 }
+void SILInlineCloner::visitHopToExecutorInst(HopToExecutorInst *Inst) {
+  // Drop hop_to_executor in non async functions.
+  if (!Apply.getFunction()->isAsync()) {
+    assert(Apply.isNonAsync());
+    return;
+  }
 
+  return SILCloner<SILInlineCloner>::visitHopToExecutorInst(Inst);
+}
 const SILDebugScope *
 SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (!CalleeScope)
@@ -895,6 +894,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
   case SILInstructionKind::AwaitAsyncContinuationInst:
   case SILInstructionKind::HopToExecutorInst:
+  case SILInstructionKind::ExtractExecutorInst:
 #define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
   case SILInstructionKind::Name##ToRefInst:                                    \
   case SILInstructionKind::RefTo##Name##Inst:                                  \

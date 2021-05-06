@@ -6,6 +6,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 func fib(_ n: Int) -> Int {
   var first = 0

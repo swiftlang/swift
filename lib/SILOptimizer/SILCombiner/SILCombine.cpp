@@ -21,14 +21,17 @@
 #define DEBUG_TYPE "sil-combine"
 
 #include "SILCombiner.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -67,7 +70,7 @@ static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
 /// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
-  BasicBlockWorklist<256> Worklist(BB);
+  BasicBlockWorklist Worklist(BB);
   llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
 
   while (SILBasicBlock *BB = Worklist.pop()) {
@@ -299,10 +302,39 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     }
 
     // Our tracking list has been accumulating instructions created by the
-    // SILBuilder during this iteration. Go through the tracking list and add
-    // its contents to the worklist and then clear said list in preparation for
-    // the next iteration.
+    // SILBuilder during this iteration. In order to finish this round of
+    // SILCombine, go through the tracking list and add its contents to the
+    // worklist and then clear said list in preparation for the next
+    // iteration. We canonicalize any copies that we created in order to
+    // eliminate unnecessary copies introduced by RAUWing when ownership is
+    // enabled.
+    //
+    // NOTE: It is ok if copy propagation results in MadeChanges being set to
+    // true. This is because we only add elements to the tracking list if we
+    // actually made a change to the IR, so MadeChanges should already be true
+    // at this point.
     auto &TrackingList = *Builder.getTrackingList();
+    if (TrackingList.size() && Builder.hasOwnership()) {
+      SmallSetVector<SILValue, 16> defsToCanonicalize;
+      for (auto *trackedInst : TrackingList) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(trackedInst)) {
+          defsToCanonicalize.insert(
+              CanonicalizeOSSALifetime::getCanonicalCopiedDef(cvi));
+        }
+      }
+      if (defsToCanonicalize.size()) {
+        CanonicalizeOSSALifetime canonicalizer(
+            false /*prune debug*/, false /*canonicalize borrows*/,
+            false /*poison refs*/, NLABA, DA, instModCallbacks);
+        auto analysisInvalidation = canonicalizeOSSALifetimes(
+            canonicalizer, defsToCanonicalize.getArrayRef());
+        if (bool(analysisInvalidation)) {
+          NLABA->lockInvalidation();
+          parentTransform->invalidateAnalysis(analysisInvalidation);
+          NLABA->unlockInvalidation();
+        }
+      }
+    }
     for (SILInstruction *I : TrackingList) {
       LLVM_DEBUG(llvm::dbgs() << "SC: add " << *I
                               << " from tracking list to worklist\n");
@@ -359,12 +391,13 @@ class SILCombine : public SILFunctionTransform {
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
     auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
+    auto *NLABA = PM->getAnalysis<NonLocalAccessBlockAnalysis>();
 
     SILOptFunctionBuilder FuncBuilder(*this);
     // Create a SILBuilder with a tracking list for newly added
     // instructions, which we will periodically move to our worklist.
     SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(FuncBuilder, B, AA, DA, PCA, CHA,
+    SILCombiner Combiner(this, FuncBuilder, B, AA, DA, PCA, CHA, NLABA,
                          getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     assert(TrackingList.empty() &&

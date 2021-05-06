@@ -31,7 +31,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
@@ -143,18 +143,22 @@ public:
                     DeadEndBlocks &deadEndBlocks)
       : compilingWithOptimization(optimized), worklist("MC"), madeChange(false),
         iteration(0),
-        instModCallbacks(
-            [&](SILInstruction *instruction) {
-              worklist.erase(instruction);
-              instructionsPendingDeletion.push_back(instruction);
-            },
-            [&](SILInstruction *instruction) { worklist.add(instruction); },
-            [this](Operand *use, SILValue newValue) {
-              use->set(newValue);
-              worklist.add(use->getUser());
-            }),
+        instModCallbacks(),
         createdInstructions(createdInstructions),
-        deadEndBlocks(deadEndBlocks){};
+        deadEndBlocks(deadEndBlocks) {
+    instModCallbacks = InstModCallbacks()
+      .onDelete([&](SILInstruction *instruction) {
+        worklist.erase(instruction);
+        instructionsPendingDeletion.push_back(instruction);
+      })
+      .onCreateNewInst([&](SILInstruction *instruction) {
+        worklist.add(instruction);
+      })
+      .onSetUseValue([this](Operand *use, SILValue newValue) {
+        use->set(newValue);
+        worklist.add(use->getUser());
+      });
+  };
 
   void addReachableCodeToWorklist(SILFunction &function);
 
@@ -206,7 +210,7 @@ static llvm::cl::opt<bool> EnableCanonicalizationAndTrivialDCE(
                    "dead code and canonicalizing SIL"));
 
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
-  BasicBlockWorklist<32> blockWorklist(function.getEntryBlock());
+  BasicBlockWorklist blockWorklist(function.getEntryBlock());
   SmallVector<SILInstruction *, 128> initialInstructionWorklist;
 
   while (SILBasicBlock *block = blockWorklist.pop()) {

@@ -28,7 +28,7 @@ func asyncGlobal8() async throws async -> async Int async {}
 // expected-error@-3{{'async' has already been specified}} {{53-59=}}
 
 class X {
-  init() async { } // expected-error{{initializer cannot be marked 'async'}}
+  init() async { }
 
   deinit async { } // expected-error{{deinitializers cannot have a name}}
 
@@ -75,7 +75,7 @@ func testAwaitExpr() async {
 func getIntSomeday() async -> Int { 5 }
 
 func testAsyncLet() async {
-  async let x = await getIntSomeday()
+  spawn let x = await getIntSomeday()
   _ = await x
 }
 

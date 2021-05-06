@@ -506,10 +506,11 @@ void ScopeCreator::addChildrenForKnownAttributes(ValueDecl *decl,
   SmallVector<DeclAttribute *, 2> relevantAttrs;
 
   for (auto *attr : decl->getAttrs()) {
-    if (isa<DifferentiableAttr>(attr)) {
-      if (!attr->isImplicit())
-        relevantAttrs.push_back(attr);
-    }
+    if (attr->isImplicit())
+      continue;
+
+    if (isa<DifferentiableAttr>(attr))
+      relevantAttrs.push_back(attr);
 
     if (isa<SpecializeAttr>(attr))
       relevantAttrs.push_back(attr);

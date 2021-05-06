@@ -1,4 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -sil-disable-pass=MandatoryCombine %s -emit-ir | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize %s
+
+// UNSUPPORTED: CPU=arm64_32
+
 import Swift
 import Builtin
 

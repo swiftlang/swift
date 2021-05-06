@@ -17,7 +17,7 @@ protocol P {
 }
 
 struct X: P {
-  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s4test1XVAA1PA2aDP1fySSSgSi_SStYFTW : $@convention(witness_method: P) @async (Int, @guaranteed String, @in_guaranteed X) -> @owned Optional<String>
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s4test1XVAA1PA2aDP1fySSSgSi_SStYaFTW : $@convention(witness_method: P) @async (Int, @guaranteed String, @in_guaranteed X) -> @owned Optional<String>
   // CHECK: function_ref @$s4test1XV1fySSSgSi_SStF : $@convention(method) (Int, @guaranteed String, X) -> @owned Optional<String>
   func f(_: Int, _: String) -> String? { nil }
 }

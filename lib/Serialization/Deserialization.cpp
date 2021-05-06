@@ -1528,11 +1528,9 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           // Found a full match in a different module. It should be a different
           // one because otherwise it would have succeeded on the first search.
           // This is usually caused by the use of poorly modularized headers.
-          auto line = "'" +
+          auto line = "There is a matching '" +
                       declName.getString(strScratch).str() +
-                      "' was not found in module '" +
-                      std::string(baseModule->getName().str()) +
-                      "', but there is one in module '" +
+                      "' in module '" +
                       std::string(nameAndModule.first.str()) +
                       "'. If this is imported from clang, please make sure " +
                       "the header is part of a single clang module.";
@@ -1545,7 +1543,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           auto line = "'" +
                       declName.getString(strScratch).str() +
                       "' in module '" +
-                      std::string(baseModule->getName().str()) +
+                      std::string(nameAndModule.first.str()) +
                       "' was filtered out.";
           notes.emplace_back(line);
         }
@@ -2744,7 +2742,7 @@ public:
                                           StringRef blobData) {
     DeclContextID contextID;
     bool isIUO, isFailable;
-    bool isImplicit, isObjC, hasStubImplementation, throws;
+    bool isImplicit, isObjC, hasStubImplementation, throws, async;
     GenericSignatureID genericSigID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
@@ -2755,7 +2753,7 @@ public:
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                isFailable, isIUO, isImplicit,
                                                isObjC, hasStubImplementation,
-                                               throws, storedInitKind,
+                                               async, throws, storedInitKind,
                                                genericSigID,
                                                overriddenID,
                                                rawAccessLevel,
@@ -2810,6 +2808,8 @@ public:
 
     auto ctor = MF.createDecl<ConstructorDecl>(name, SourceLoc(), isFailable,
                                                /*FailabilityLoc=*/SourceLoc(),
+                                               /*Async=*/async,
+                                               /*AsyncLoc=*/SourceLoc(),
                                                /*Throws=*/throws,
                                                /*ThrowsLoc=*/SourceLoc(),
                                                /*BodyParams=*/nullptr,
@@ -4639,16 +4639,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::CompletionHandlerAsync_DECL_ATTR: {
+        bool isImplicit;
         uint64_t handlerIndex;
         uint64_t asyncFunctionDeclID;
         serialization::decls_block::CompletionHandlerAsyncDeclAttrLayout::
-            readRecord(scratch, handlerIndex, asyncFunctionDeclID);
+            readRecord(scratch, isImplicit, handlerIndex, asyncFunctionDeclID);
 
         auto mappedFunctionDecl =
             cast<AbstractFunctionDecl>(MF.getDecl(asyncFunctionDeclID));
         Attr = new (ctx) CompletionHandlerAsyncAttr(
             *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
-            /*atLoc*/ SourceLoc(), /*range*/ SourceRange());
+            /*atLoc*/ SourceLoc(), /*range*/ SourceRange(), isImplicit);
         break;
       }
 
@@ -5250,12 +5251,13 @@ public:
         break;
 
       IdentifierID labelID;
+      IdentifierID internalLabelID;
       TypeID typeID;
       bool isVariadic, isAutoClosure, isNonEphemeral, isNoDerivative;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(
-          scratch, labelID, typeID, isVariadic, isAutoClosure, isNonEphemeral,
-          rawOwnership, isNoDerivative);
+          scratch, labelID, internalLabelID, typeID, isVariadic, isAutoClosure,
+          isNonEphemeral, rawOwnership, isNoDerivative);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -5269,7 +5271,8 @@ public:
       params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isNonEphemeral, *ownership,
-                                             isNoDerivative));
+                                             isNoDerivative),
+                          MF.getIdentifier(internalLabelID));
     }
 
     if (!isGeneric) {
@@ -5915,8 +5918,6 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   }
 #endif
 
-  // Invoke the callback on the deserialized type.
-  DeserializedTypeCallback(typeOrOffset.get());
   return typeOrOffset.get();
 }
 
@@ -6390,8 +6391,26 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-    auto second = getType(*rawIDIter++);
-    auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    auto secondOrError = getTypeChecked(*rawIDIter++);
+    Type second;
+    if (secondOrError) {
+      second = *secondOrError;
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
+      second = ErrorType::get(getContext());
+      consumeError(secondOrError.takeError());
+    } else {
+      fatal(secondOrError.takeError());
+    }
+    auto thirdOrError = getDeclChecked(*rawIDIter++);
+    TypeDecl *third;
+    if (thirdOrError) {
+      third = cast_or_null<TypeDecl>(*thirdOrError);
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
+      third = nullptr;
+      consumeError(thirdOrError.takeError());
+    } else {
+      fatal(thirdOrError.takeError());
+    }
     if (third &&
         isa<TypeAliasDecl>(third) &&
         third->getModuleContext() != getAssociatedModule() &&

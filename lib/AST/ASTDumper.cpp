@@ -2546,6 +2546,10 @@ public:
     printClosure(E, "closure_expr");
     if (E->hasSingleExpressionBody())
       PrintWithColorRAII(OS, ClosureModifierColor) << " single-expression";
+    if (E->allowsImplicitSelfCapture())
+      PrintWithColorRAII(OS, ClosureModifierColor) << " implicit-self";
+    if (E->inheritsActorContext())
+      PrintWithColorRAII(OS, ClosureModifierColor) << " inherits-actor-context";
 
     if (E->getParameters()) {
       OS << '\n';
@@ -2617,8 +2621,6 @@ public:
 
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {
     printCommon(E, NodeName);
-    if (E->isSuper())
-      PrintWithColorRAII(OS, ExprModifierColor) << " super";
     if (E->isThrowsSet()) {
       PrintWithColorRAII(OS, ExprModifierColor)
         << (E->throws() ? " throws" : " nothrow");

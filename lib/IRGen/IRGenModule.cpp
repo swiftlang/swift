@@ -616,11 +616,16 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     IntPtrTy              // Task.Status
   });
 
-  SwiftExecutorTy = createStructType(*this, "swift.executor", {});
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+  SwiftAsyncLetPtrTy = Int8PtrTy; // we pass it opaquely (AsyncLet*)
   SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
-  SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
+  ExecutorFirstTy = SizeTy;
+  ExecutorSecondTy = SizeTy;
+  SwiftExecutorTy = createStructType(*this, "swift.executor", {
+    ExecutorFirstTy,      // identity
+    ExecutorSecondTy,     // implementation
+  });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
     Int8PtrTy, Int8PtrTy, // SchedulerPrivate
@@ -651,7 +656,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
        SizeTy,               // await synchronization
        ErrorPtrTy,           // error result pointer
        OpaquePtrTy,          // normal result address
-       SwiftExecutorPtrTy}); // resume to executor
+       SwiftExecutorTy});    // resume to executor
   ContinuationAsyncContextPtrTy =
     ContinuationAsyncContextTy->getPointerTo(DefaultAS);
 
@@ -899,9 +904,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
 }
 
 llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
-  return getAddrOfLLVMVariable(
-      LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError"),
-      ConstantInit(), DebugTypeInfo());
+  return getAddrOfLLVMVariableOrGOTEquivalent(
+      LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError")).getValue();
 }
 
 #define QUOTE(...) __VA_ARGS__

@@ -1323,6 +1323,12 @@ void checkUnknownAttrRestrictions(
 /// it to later stages.
 void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 
+/// If the given function has a global actor that should be reflected in
+/// references to its function type from the given declaration context,
+/// update the given function type to include the global actor.
+AnyFunctionType *applyGlobalActorType(
+    AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc);
+
 } // end namespace swift
 
 #endif

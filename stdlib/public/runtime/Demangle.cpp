@@ -482,6 +482,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         parent->addChild(input, Dem);
         input = parent;
       };
+      if (flags.isNoDerivative()) {
+        wrapInput(Node::Kind::NoDerivative);
+      }
       switch (flags.getValueOwnership()) {
       case ValueOwnership::Default:
         /* nothing */
@@ -561,15 +564,6 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     result->addChild(resultTy, Dem);
     
     auto funcNode = Dem.createNode(kind);
-    if (func->isThrowing())
-      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
-    if (func->isSendable()) {
-      funcNode->addChild(
-          Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
-    }
-    if (func->isAsync())
-      funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
-
     switch (func->getDifferentiabilityKind().Value) {
     case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
       break;
@@ -594,6 +588,14 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
           (Node::IndexType)MangledDifferentiabilityKind::Linear), Dem);
       break;
     }
+    if (func->isThrowing())
+      funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
+    if (func->isSendable()) {
+      funcNode->addChild(
+          Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
+    }
+    if (func->isAsync())
+      funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
 
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);

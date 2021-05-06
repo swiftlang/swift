@@ -59,7 +59,10 @@ func testOverloadedAsync() async {
   let _: String? = await overloadedOptDifference() // no warning
 
   let _ = await overloaded()
-  let _ = overloaded() // expected-error{{call is 'async' but is not marked with 'await'}}{{11-11=await }}
+  let _ = overloaded()
+  // expected-error@-1:11{{expression is 'async' but is not marked with 'await'}}{{11-11=await }}
+  // expected-note@-2:11{{call is 'async'}}
+
 
   let fn = {
     overloaded()
@@ -136,5 +139,7 @@ func incrementAsync(_ x: Int) async -> Int {
 func testAsyncWithConversions() async {
   _ = bar(incrementSync)
   _ = bar { -$0 }
-  _ = bar(incrementAsync) // expected-error{{call is 'async' but is not marked with 'await'}}
+  _ = bar(incrementAsync)
+  // expected-error@-1:7{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@-2:7{{call is 'async'}}
 }

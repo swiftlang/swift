@@ -7,4 +7,4 @@ public func add(_ lhs: LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> Loadabl
 // CHECK: [[COUNTER:%.*]] = function_ref [[NAME:@(_Zpl18LoadableIntWrapperS_|\?\?H@YA\?AULoadableIntWrapper@@U0@0@Z)]] : $@convention(c) (LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
 // CHECK: apply [[COUNTER]](%0, %1) : $@convention(c) (LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
 
-// CHECK: sil [serializable] [clang "+"] [[NAME]] : $@convention(c) (LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper
+// CHECK: sil [clang "+"] [[NAME]] : $@convention(c) (LoadableIntWrapper, LoadableIntWrapper) -> LoadableIntWrapper

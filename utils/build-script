@@ -58,6 +58,8 @@ _SUPPORTED_XCODE_BUILDS = [
     ("12.2", "12B45b"),
     ("12.3", "12C33"),
     ("12.4", "12D4e"),
+    ("12.5 beta 3", "12E5244e"),
+    ("12.5", "12E262")
 ]
 
 # -----------------------------------------------------------------------------
@@ -801,6 +803,17 @@ class BuildScriptInvocation(object):
                 "--skip-clean-llbuild"
             ]
 
+        if args.llvm_ninja_targets:
+            impl_args += [
+                "--llvm-ninja-targets=%s" % ' '.join(args.llvm_ninja_targets)
+            ]
+
+        if args.llvm_ninja_targets_for_cross_compile_hosts:
+            impl_args += [
+                "--llvm-ninja-targets-for-cross-compile-hosts=%s" %
+                ' '.join(args.llvm_ninja_targets_for_cross_compile_hosts)
+            ]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -1366,6 +1379,12 @@ def main_normal():
 
     # Create build directory.
     shell.makedirs(invocation.workspace.build_root)
+
+    # Create .build_script_log
+    if not args.dry_run:
+        build_script_log = os.path.join(invocation.workspace.build_root,
+                                        ".build_script_log")
+        open(build_script_log, 'w').close()
 
     # Build ninja if required, which will update the toolchain.
     if args.build_ninja:

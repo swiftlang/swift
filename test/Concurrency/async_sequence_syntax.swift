@@ -33,9 +33,9 @@ func missingTryInBlock<T : AsyncSequence>(_ seq: T) {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) { 
-  execute { // expected-error{{invalid conversion from 'async' function of type '() async -> Void' to synchronous function type '() -> Void'}}
+  execute { // expected-error{{cannot pass function of type '() async -> Void' to parameter expecting synchronous function type}}
     do { 
-      for try await _ in seq { }
+      for try await _ in seq { } // expected-note {{'async' inferred from asynchronous operation used here}}
     } catch { }
   }
 }
@@ -74,4 +74,11 @@ func forAwaitInsideDoCatch<Source: AsyncSequence>(_ source: Source) async {
       print(item)
     }
   } catch {} // no-warning
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+func forAwaitWithConcreteType(_ seq: ThrowingAsyncSequence) throws { // expected-note {{add 'async' to function 'forAwaitWithConcreteType' to make it asynchronous}}
+  for try await elt in seq { // expected-error {{'async' in a function that does not support concurrency}}
+    _ = elt
+  }
 }

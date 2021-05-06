@@ -91,7 +91,77 @@
 // CHECK: }
 
 
-// Non-reference subscript operators are not currently imported (SR-14351)
-// so just make sure we don't crash.
-// CHECK: struct NonReferenceReadIntArray {
+// CHECK: struct IntArrayByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> Int32
+// CHECK:   subscript(x: Int32) -> Int32 { mutating get }
+// CHECK: }
+
+// CHECK: struct NonTrivialIntArrayByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> Int32
+// CHECK:   subscript(x: Int32) -> Int32 { mutating get }
+// CHECK: }
+
+// CHECK: struct DifferentTypesArrayByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> Int32
+
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Bool) -> Bool
+
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Double) -> Double
+
+// CHECK:   subscript(x: Int32) -> Int32 { mutating get }
+// CHECK:   subscript(x: Bool) -> Bool { mutating get }
+// CHECK:   subscript(x: Double) -> Double { mutating get }
+// CHECK: }
+
+
+// CHECK: struct TemplatedArrayByVal<T> {
+// CHECK: }
+// CHECK: struct __CxxTemplateInst19TemplatedArrayByValIdE {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ i: Int32) -> Double
+// CHECK:   subscript(i: Int32) -> Double { mutating get }
+// CHECK: }
+// CHECK: typealias TemplatedDoubleArrayByVal = __CxxTemplateInst19TemplatedArrayByValIdE
+
+
+// CHECK: struct TemplatedSubscriptArrayByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst<T>(_ i: T) -> T
+// CHECK:   subscript(i: T) -> T { mutating get }
+// CHECK: }
+
+// CHECK: struct NonTrivialArrayByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
+// CHECK:   subscript(x: Int32) -> NonTrivial { mutating get }
+// CHECK: }
+// CHECK: struct PtrByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>!
+// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<Int32>! { mutating get }
+// CHECK: }
+// CHECK: struct RefToPtr {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>
+// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<Int32>? { mutating get set }
+// CHECK: }
+// CHECK: struct PtrToPtr {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>!
+// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>! { mutating get }
+// CHECK: }
+// CHECK: struct ConstOpPtrByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>!
+// CHECK:   subscript(x: Int32) -> UnsafePointer<Int32>! { mutating get }
+// CHECK: }
+// CHECK: struct ConstPtrByVal {
+// CHECK:   @available(*, unavailable, message: "use subscript")
+// CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>!
+// CHECK:   subscript(x: Int32) -> UnsafePointer<Int32>! { mutating get }
 // CHECK: }

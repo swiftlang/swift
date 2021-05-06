@@ -76,7 +76,7 @@ func readDefinedOutOfLineConstMember() -> CInt {
 // CHECK-LABEL: end sil function '$s4main25readConstexprStaticMembers5Int32VyF'
 
 // Make sure we also generate the accessor with a numeric literal.
-// CHECK-LABEL: sil shared [serializable] @$sSo25WithConstexprStaticMemberV13definedInlines5Int32VvgZ : $@convention(method) (@thin WithConstexprStaticMember.Type) -> Int32
+// CHECK-LABEL: sil shared @$sSo25WithConstexprStaticMemberV13definedInlines5Int32VvgZ : $@convention(method) (@thin WithConstexprStaticMember.Type) -> Int32
 // CHECK: [[IL:%.*]] = integer_literal $Builtin.Int32, 139
 // CHECK: [[OUT:%.*]] = struct $Int32 ([[IL]] : $Builtin.Int32)
 // CHECK: return [[OUT]] : $Int32

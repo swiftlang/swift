@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -swift-version 5 -O -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -swift-version 5 -O -enable-copy-propagation -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 //
 // REQUIRES: VENDOR=apple
 // REQUIRES: swift_stdlib_no_asserts

@@ -43,7 +43,7 @@ static NodePointer mangleGenericSignatureAsNode(GenericSignature sig,
 
 static NodePointer mangleAutoDiffFunctionAsNode(
     StringRef originalName, Demangle::AutoDiffFunctionKind kind,
-    AutoDiffConfig config, Demangler &demangler) {
+    const AutoDiffConfig &config, Demangler &demangler) {
   assert(isMangledName(originalName));
   auto demangledOrig = demangler.demangleSymbol(originalName);
   assert(demangledOrig && "Should only be called when the original "
@@ -75,7 +75,7 @@ static NodePointer mangleAutoDiffFunctionAsNode(
 
 std::string DifferentiationMangler::mangleAutoDiffFunction(
     StringRef originalName, Demangle::AutoDiffFunctionKind kind,
-    AutoDiffConfig config) {
+    const AutoDiffConfig &config) {
   // If the original function is mangled, mangle the tree.
   if (isMangledName(originalName)) {
     Demangler demangler;
@@ -94,7 +94,7 @@ std::string DifferentiationMangler::mangleAutoDiffFunction(
 // Returns the mangled name for a derivative function of the given kind.
 std::string DifferentiationMangler::mangleDerivativeFunction(
     StringRef originalName, AutoDiffDerivativeFunctionKind kind,
-    AutoDiffConfig config) {
+    const AutoDiffConfig &config) {
   return mangleAutoDiffFunction(
       originalName, getAutoDiffFunctionKind(kind), config);
 }
@@ -102,7 +102,7 @@ std::string DifferentiationMangler::mangleDerivativeFunction(
 // Returns the mangled name for a derivative function of the given kind.
 std::string DifferentiationMangler::mangleLinearMap(
     StringRef originalName, AutoDiffLinearMapKind kind,
-    AutoDiffConfig config) {
+    const AutoDiffConfig &config) {
   return mangleAutoDiffFunction(
       originalName, getAutoDiffFunctionKind(kind), config);
 }

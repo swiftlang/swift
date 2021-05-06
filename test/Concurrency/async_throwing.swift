@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-// These tests cover various interactions with async functions that are 
+// These tests cover various interactions with async functions that are
 // either throws or rethrows.
 // See rdar://70813762 and rdar://70751405
 
@@ -49,7 +49,7 @@ func syncTest() {
   let _ = invoke(fn: normalTask) // expected-error{{'async' call in a function that does not support concurrency}}
   let _ = invokeAuto(42) // expected-error{{'async' call in a function that does not support concurrency}}
   let _ = invokeAuto("intuitive") // expected-error{{'async' call in a function that does not support concurrency}}
-  
+
   let _ = try! asyncRethrows(fn: throwingTask) // expected-error{{'async' call in a function that does not support concurrency}}
   let _ = try? invoke(fn: throwingTask) // expected-error{{'async' call in a function that does not support concurrency}}
   do {
@@ -64,18 +64,25 @@ func syncTest() {
 func asyncTest() async {
   ///////////
   // tests that also omit await
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}}{{11-11=await }}
+  // expected-note@+1{{call is 'async'}}
+  let _ = invoke(fn: normalTask)
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}}{{11-11=await }}
+  // expected-note@+1{{call is 'async'}}
+  let _ = asyncRethrows(fn: normalTask)
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}}{{11-11=await }}
+  // expected-note@+1{{call is 'async'}}
+  let _ = invokeAuto(42)
 
-  let _ = invoke(fn: normalTask) // expected-error{{call is 'async' but is not marked with 'await'}}
-  let _ = asyncRethrows(fn: normalTask) // expected-error{{call is 'async' but is not marked with 'await'}}
-  let _ = invokeAuto(42) // expected-error{{call is 'async' but is not marked with 'await'}}
-
-  // expected-error@+2 {{call can throw, but it is not marked with 'try' and the error is not handled}}
-  // expected-error@+1 {{call is 'async' but is not marked with 'await'}}
+  // expected-error@+3 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}{{11-11=await }}
+  // expected-note@+1 {{call is 'async'}}
   let _ = asyncThrows()
-  
-  // expected-note@+3{{call is to 'rethrows' function, but argument function can throw}}
-  // expected-error@+2{{call can throw, but it is not marked with 'try' and the error is not handled}}
-  // expected-error@+1{{call is 'async' but is not marked with 'await'}}
+
+  // expected-note@+4{{call is to 'rethrows' function, but argument function can throw}}
+  // expected-error@+3{{call can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}}{{11-11=await }}
+  // expected-note@+1:11{{call is 'async'}}
   let _ = invoke(fn: throwingTask)
 
   ///////////
@@ -89,7 +96,7 @@ func asyncTest() async {
   let _ = await asyncRethrows(fn: normalTask)
   let _ = try! await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
   let _ = try? await asyncRethrows(fn: normalTask) // expected-warning{{no calls to throwing functions occur within 'try' expression}}
-  
+
   let _ = try! await asyncRethrows(fn: throwingTask)
   let _ = try? await asyncRethrows(fn: throwingTask)
   let _ = try! await asyncThrows()
@@ -103,9 +110,10 @@ func asyncTest() async {
   let _ = try? await invokeAuto(await throwingTask())
   let _ = await invokeAuto(try! await throwingTask())
   let _ = await invokeAuto(try? await throwingTask())
-
-  let _ = await invokeAuto(try! throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
-  let _ = await invokeAuto(try? throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{33-33=await }}
+  let _ = await invokeAuto(try! throwingTask()) // expected-note@:33{{call is 'async' in an autoclosure argument}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{33-33=await }}
+  let _ = await invokeAuto(try? throwingTask()) // expected-note@:33{{call is 'async' in an autoclosure argument}}
 
   let _ = await invokeAuto(try! await throwingTask())
   let _ = await invokeAuto(try? await throwingTask())
@@ -118,16 +126,20 @@ func asyncTest() async {
     //////
     // more auto-closure tests
 
-    // expected-note@+6 {{did you mean to disable error propagation?}}
-    // expected-note@+5 {{did you mean to handle error as optional value?}}
-    // expected-note@+4 {{did you mean to use 'try'?}}
-    // expected-note@+3 {{call is to 'rethrows' function, but argument function can throw}}
-    // expected-error@+2 {{call is 'async' in an autoclosure argument that is not marked with 'await'}}
+    // expected-note@+7 {{did you mean to disable error propagation?}}
+    // expected-note@+6 {{did you mean to handle error as optional value?}}
+    // expected-note@+5 {{did you mean to use 'try'?}}
+    // expected-note@+4 {{call is to 'rethrows' function, but argument function can throw}}
+    // expected-note@+3 {{call is 'async' in an autoclosure argument}}
+    // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}{{30-30=await }}
     // expected-error@+1 2 {{call can throw but is not marked with 'try'}}
     let _ = await invokeAuto(throwingTask())
 
-    let _ = try await invokeAuto(throwingTask()) // expected-error{{call is 'async' in an autoclosure argument that is not marked with 'await'}}
-    let _ = try invokeAuto(await throwingTask()) // expected-error{{call is 'async' but is not marked with 'await'}}
+    // expected-error@+1:34{{expression is 'async' but is not marked with 'await'}}{{34-34=await }}
+    let _ = try await invokeAuto("hello" + throwingTask()) // expected-note@:44{{call is 'async' in an autoclosure argument}}
+
+    // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{17-17=await }}
+    let _ = try invokeAuto(await throwingTask())  // expected-note{{call is 'async'}}
     let _ = try await invokeAuto(await throwingTask())
   } catch {
     // ignore

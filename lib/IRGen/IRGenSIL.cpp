@@ -32,7 +32,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
@@ -1329,6 +1329,9 @@ public:
   void visitAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *i);
 
   void visitHopToExecutorInst(HopToExecutorInst *i);
+  void visitExtractExecutorInst(ExtractExecutorInst *i) {
+    llvm_unreachable("extract_executor should never be seen in Lowered SIL");
+  }
 
   void visitKeyPathInst(KeyPathInst *I);
 
@@ -1724,7 +1727,7 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     IGM.emitDynamicReplacementOriginalFunctionThunk(f);
   }
 
-  if (f->isDynamicallyReplaceable()) {
+  if (f->isDynamicallyReplaceable() && !f->isAsync()) {
     IGM.createReplaceableProlog(*this, f);
   }
 
@@ -1952,6 +1955,11 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
         IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
         LinkEntity::forSILFunction(IGF.CurSILFn),
         Signature::forAsyncEntry(IGF.IGM, funcTy).getAsyncContextIndex());
+    if (IGF.CurSILFn->isDynamicallyReplaceable()) {
+      IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
+      // Remap the entry block.
+      IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(IGF.Builder.GetInsertBlock(), {});
+    }
   }
 
   SILFunctionConventions conv(funcTy, IGF.getSILModule());
@@ -2242,7 +2250,7 @@ void IRGenSILFunction::emitSILFunction() {
   // Invariant: for every block in the work queue, we have visited all
   // of its dominators.
   // Start with the entry block, for which the invariant trivially holds.
-  BasicBlockWorklist<32> workQueue(&*CurSILFn->getEntryBlock());
+  BasicBlockWorklist workQueue(&*CurSILFn->getEntryBlock());
 
   while (SILBasicBlock *bb = workQueue.pop()) {
     // Emit the block.
@@ -2505,6 +2513,12 @@ static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
       return SpecialKind::TaskFutureWait;
     if (name.equals("swift_task_future_wait_throwing"))
       return SpecialKind::TaskFutureWaitThrowing;
+
+    if (name.equals("swift_asyncLet_wait"))
+      return SpecialKind::AsyncLetWait;
+    if (name.equals("swift_asyncLet_wait_throwing"))
+      return SpecialKind::AsyncLetWaitThrowing;
+
     if (name.equals("swift_taskGroup_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
   }
@@ -2526,13 +2540,17 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
   llvm::Constant *value;
+  llvm::Constant *secondaryValue;
   if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
+    secondaryValue = IGM.getAddrOfSILFunction(fn, NotForDefinition);
   } else {
     value = fnPtr;
+    secondaryValue = nullptr;
   }
-  FunctionPointer fp = FunctionPointer(fpKind, value, sig);
+  FunctionPointer fp =
+      FunctionPointer::forDirect(fpKind, value, secondaryValue, sig);
 
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
@@ -3211,11 +3229,15 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   // The callee type must use the `method` convention.
   auto calleeTy = i->getCallee()->getType().castTo<SILFunctionType>();
   auto resultTy = i->getFunctionType();
-
-  if (calleeTy->isAsync())
-    return false;
   
   if (calleeTy->getRepresentation() != SILFunctionTypeRepresentation::Method)
+    return false;
+
+  // Partially applying a polymorphic function entails capturing its generic 
+  // arguments (it is not legal to leave any polymorphic arguments unbound)
+  // which means that both self and those generic arguments would need to be
+  // captured.
+  if (calleeTy->isPolymorphic())
     return false;
   
   // There should be one applied argument.
@@ -6134,11 +6156,15 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 }
 
 void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
-  assert(i->getTargetExecutor()->getType().is<BuiltinExecutorType>());
+  assert(i->getTargetExecutor()->getType().getOptionalObjectType()
+           .is<BuiltinExecutorType>());
   llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
           llvm::Intrinsic::coro_async_resume, {});
-          
-  emitSuspensionPoint(getLoweredSingletonExplosion(i->getOperand()), resumeFn);
+
+  Explosion executor;
+  getLoweredExplosion(i->getOperand(), executor);
+
+  emitSuspensionPoint(executor, resumeFn);
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
@@ -6525,8 +6551,10 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   if (IGM.isResilient(conformance.getRequirement(),
                       ResilienceExpansion::Maximal)) {
     llvm::Constant *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
+    llvm::Constant *secondaryValue = nullptr;
 
     if (fnType->isAsync()) {
+      secondaryValue = fnPtr;
       auto *fnPtrType = fnPtr->getType();
       fnPtr = IGM.getAddrOfAsyncFunctionPointer(
           LinkEntity::forDispatchThunk(member));
@@ -6534,7 +6562,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
     }
 
     auto sig = IGM.getSignature(fnType);
-    auto fn = FunctionPointer::forDirect(fnType, fnPtr, sig);
+    auto fn = FunctionPointer::forDirect(fnType, fnPtr, secondaryValue, sig);
 
     setLoweredFunctionPointer(i, fn);
     return;

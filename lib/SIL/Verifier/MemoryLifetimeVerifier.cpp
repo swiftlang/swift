@@ -16,7 +16,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -148,7 +148,7 @@ bool MemoryLifetimeVerifier::isEnumTrivialAt(int locIdx,
   SILBasicBlock *startBlock = atInst->getParent();
   
   // Start at atInst an walk up the control flow.
-  BasicBlockWorklist<32> worklist(startBlock);
+  BasicBlockWorklist worklist(startBlock);
   while (SILBasicBlock *block = worklist.pop()) {
     auto start = (block == atInst->getParent() ? atInst->getReverseIterator()
                                                : block->rbegin());

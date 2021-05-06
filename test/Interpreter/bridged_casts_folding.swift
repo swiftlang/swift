@@ -7,6 +7,7 @@
 
 // FIXME: we should run this test if the OS-provided stdlib is recent enough.
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

@@ -475,12 +475,9 @@ public:
           // For now, just return the unbound generic type.
           return unboundTy;
         },
-        /*placeholderHandler*/
-        [&](auto placeholderRepr) {
-          // FIXME: Don't let placeholder types escape type resolution.
-          // For now, just return the placeholder type.
-          return PlaceholderType::get(Context, placeholderRepr);
-        });
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        PlaceholderType::get);
     const auto ty = resolution.resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -600,12 +597,9 @@ public:
                 // resolution. For now, just return the unbound generic type.
                 return unboundTy;
               },
-              /*placeholderHandler*/
-              [&](auto placeholderRepr) {
-                // FIXME: Don't let placeholder types escape type resolution.
-                // For now, just return the placeholder type.
-                return PlaceholderType::get(Context, placeholderRepr);
-              })
+              // FIXME: Don't let placeholder types escape type resolution.
+              // For now, just return the placeholder type.
+              PlaceholderType::get)
               .resolveType(prefixRepr);
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
@@ -813,11 +807,9 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
         // For now, just return the unbound generic type.
         return unboundTy;
       };
-      placeholderHandler = [&](auto placeholderRepr) {
-        // FIXME: Don't let placeholder types escape type resolution.
-        // For now, just return the placeholder type.
-        return PlaceholderType::get(Context, placeholderRepr);
-      };
+      // FIXME: Don't let placeholder types escape type resolution.
+      // For now, just return the placeholder type.
+      placeholderHandler = PlaceholderType::get;
     }
     return validateTypedPattern(
         cast<TypedPattern>(P),
@@ -883,11 +875,9 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
           // For now, just return the unbound generic type.
           return unboundTy;
         };
-        placeholderHandler = [&](auto placeholderRepr) {
-          // FIXME: Don't let placeholder types escape type resolution.
-          // For now, just return the placeholder type.
-          return PlaceholderType::get(Context, placeholderRepr);
-        };
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        placeholderHandler = PlaceholderType::get;
       }
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
       const auto type = validateTypedPattern(
@@ -1155,8 +1145,8 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           "unknown structurally uninhabited type");
       }
     } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
-      if (BST->getDecl() == Context.getArrayDecl())
-          shouldRequireType = BST->getGenericArgs()[0]->isEqual(Context.TheEmptyTupleType);
+      if (BST->isArray())
+        shouldRequireType = BST->getGenericArgs()[0]->isVoid();
     }
     
     if (shouldRequireType &&
@@ -1265,7 +1255,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
   case PatternKind::Expr: {
     assert(cast<ExprPattern>(P)->isResolved()
            && "coercing unresolved expr pattern!");
-    if (type->getAnyNominal() == Context.getBoolDecl()) {
+    if (type->isBool()) {
       // The type is Bool.
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);
@@ -1328,7 +1318,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       auto extraOpts =
           llvm::drop_begin(inputTypeOptionals, castTypeOptionals.size());
       for (auto extraOptTy : llvm::reverse(extraOpts)) {
-        auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
+        auto some = Context.getOptionalSomeDecl();
         auto *base = TypeExpr::createImplicit(extraOptTy, Context);
         sub = new (Context) EnumElementPattern(
             base, IP->getStartLoc(), DeclNameLoc(IP->getEndLoc()),

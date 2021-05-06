@@ -1,6 +1,8 @@
 // RUN: %scale-test --begin 1 --end 20 --step 1 --select NumLeafScopes %s -Xfrontend=-solver-expression-time-threshold=1
 // REQUIRES: asserts,no_asan
 
+// UNSUPPORTED: linux
+
 enum Val {
   case d([String: Val])
   case f(Double)

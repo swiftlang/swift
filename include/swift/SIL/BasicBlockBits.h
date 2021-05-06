@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_SILBITFIELD_H
-#define SWIFT_SIL_SILBITFIELD_H
+#ifndef SWIFT_SIL_BASICBLOCKBITS_H
+#define SWIFT_SIL_BASICBLOCKBITS_H
 
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/SmallVector.h"
@@ -171,101 +171,6 @@ public:
   bool insert(SILBasicBlock *block) { return !flag.testAndSet(block); }
 
   void erase(SILBasicBlock *block) { flag.reset(block); }
-};
-
-/// An implementation of `llvm::SetVector<SILBasicBlock *,
-///                                       SmallVector<SILBasicBlock *, N>,
-///                                       BasicBlockSet>`.
-///
-/// Unfortunately it's not possible to use `llvm::SetVector` directly because
-/// the BasicBlockSet constructor needs a `SILFunction` argument.
-///
-/// Note: This class does not provide a `remove` method intentinally, because
-/// it would have a O(n) complexity.
-template <unsigned N> class BasicBlockSetVector {
-  using Vector = llvm::SmallVector<SILBasicBlock *, N>;
-
-  Vector vector;
-  BasicBlockSet set;
-  
-public:
-  using iterator = typename Vector::const_iterator;
-
-  BasicBlockSetVector(SILFunction *function) : set(function) {}
-
-  iterator begin() const { return vector.begin(); }
-  iterator end() const { return vector.end(); }
-
-  unsigned size() const { return vector.size(); }
-  bool empty() const { return vector.empty(); }
-
-  bool contains(SILBasicBlock *block) const { return set.contains(block); }
-
-  /// Returns true if \p block was not contained in the set before inserting.
-  bool insert(SILBasicBlock *block) {
-    if (set.insert(block)) {
-      vector.push_back(block);
-      return true;
-    }
-    return false;
-  }
-};
-
-/// A utility for processing basic blocks in a worklist.
-///
-/// It is basically a combination of a block vector and a block set. It can be
-/// used for typical worklist-processing algorithms.
-template <unsigned N> class BasicBlockWorklist {
-  llvm::SmallVector<SILBasicBlock *, N> worklist;
-  BasicBlockSet visited;
-  
-public:
-  /// Construct an empty worklist.
-  BasicBlockWorklist(SILFunction *function) : visited(function) {}
-
-  /// Initialize the worklist with \p initialBlock.
-  BasicBlockWorklist(SILBasicBlock *initialBlock)
-      : visited(initialBlock->getParent()) {
-    push(initialBlock);
-  }
-
-  /// Pops the last added element from the worklist or returns null, if the
-  /// worklist is empty.
-  SILBasicBlock *pop() {
-    if (worklist.empty())
-      return nullptr;
-    return worklist.pop_back_val();
-  }
-
-  /// Pushes \p block onto the worklist if \p block has never been push before.
-  bool pushIfNotVisited(SILBasicBlock *block) {
-    if (visited.insert(block)) {
-      worklist.push_back(block);
-      return true;
-    }
-    return false;
-  }
-
-  /// Like `pushIfNotVisited`, but requires that \p block has never been on the
-  /// worklist before.
-  void push(SILBasicBlock *block) {
-    assert(!visited.contains(block));
-    visited.insert(block);
-    worklist.push_back(block);
-  }
-
-  /// Like `pop`, but marks the returned block as "unvisited". This means, that
-  /// the block can be pushed onto the worklist again.
-  SILBasicBlock *popAndForget() {
-    if (worklist.empty())
-      return nullptr;
-    SILBasicBlock *block = worklist.pop_back_val();
-    visited.erase(block);
-    return block;
-  }
-
-  /// Returns true if \p block was visited, i.e. has been added to the worklist.
-  bool isVisited(SILBasicBlock *block) const { return visited.contains(block); }
 };
 
 } // namespace swift

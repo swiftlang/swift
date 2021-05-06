@@ -988,7 +988,7 @@ private:
       } else {
         // Discriminated union case without argument. Fallback to Int
         // as the element type; there is no storage here.
-        Type IntTy = IGM.Context.getIntDecl()->getDeclaredInterfaceType();
+        Type IntTy = IGM.Context.getIntType();
         ElemDbgTy = DebugTypeInfo(IntTy, DbgTy.getStorageType(), Size(0),
                                   Alignment(1), true, false);
       }
@@ -1340,10 +1340,9 @@ private:
     }
 
     case TypeKind::BuiltinExecutor: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-      return DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                        /* DWARFAddressSpace */ None,
-                                        MangledName);
+      return createDoublePointerSizedStruct(
+          Scope, "Builtin.Executor", nullptr, MainFile, 0,
+          llvm::DINode::FlagArtificial, MangledName);
     }
 
     case TypeKind::DynamicSelf: {

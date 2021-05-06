@@ -39,19 +39,28 @@ class TaskGroup;
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 
 /// A schedulable job.
-class alignas(2 * alignof(void*)) Job : public HeapObject {
+class alignas(2 * alignof(void*)) Job :
+  // For async-let tasks, the refcount bits are initialized as "immortal"
+  // because such a task is allocated with the parent's stack allocator.
+  public HeapObject {
 public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
     /// The next waiting task link, an AsyncTask that is waiting on a future.
     NextWaitingTaskIndex = 0,
 
+    // The Dispatch object header is one pointer and two ints, which is
+    // equivalent to three pointers on 32-bit and two pointers 64-bit. Set the
+    // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
+    // expects.
+    DispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
+
     /// An opaque field used by Dispatch when enqueueing Jobs directly.
-    DispatchLinkageIndex = 0,
+    DispatchLinkageIndex = DispatchHasLongObjectHeader ? 1 : 0,
 
     /// The dispatch queue being used when enqueueing a Job directly with
     /// Dispatch.
-    DispatchQueueIndex = 1,
+    DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
   // Reserved for the use of the scheduler.
@@ -79,6 +88,14 @@ public:
   Job(JobFlags flags, TaskContinuationFunction *invoke,
       const HeapMetadata *metadata = &jobHeapMetadata)
       : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
+    assert(isAsyncTask() && "wrong constructor for a non-task job");
+  }
+
+  /// Create a job with "immortal" reference counts.
+  /// Used for async let tasks.
+  Job(JobFlags flags, TaskContinuationFunction *invoke,
+      const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal)
+      : HeapObject(metadata, immortal), Flags(flags), ResumeTask(invoke) {
     assert(isAsyncTask() && "wrong constructor for a non-task job");
   }
 
@@ -195,6 +212,21 @@ public:
     assert(flags.isAsyncTask());
   }
 
+  /// Create a task with "immortal" reference counts.
+  /// Used for async let tasks.
+  AsyncTask(const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal,
+            JobFlags flags,
+            TaskContinuationFunction *run,
+            AsyncContext *initialContext)
+    : Job(flags, run, metadata, immortal),
+      ResumeContext(initialContext),
+      Status(ActiveTaskStatus()),
+      Local(TaskLocal::Storage()) {
+    assert(flags.isAsyncTask());
+  }
+
+  ~AsyncTask();
+
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
   /// the job context correctly, call swift_job_run or
@@ -211,14 +243,13 @@ public:
 
   // ==== Task Local Values ----------------------------------------------------
 
-  void localValuePush(const Metadata *keyType,
+  void localValuePush(const HeapObject *key,
                       /* +1 */ OpaqueValue *value, const Metadata *valueType) {
-    Local.pushValue(this, keyType, value, valueType);
+    Local.pushValue(this, key, value, valueType);
   }
 
-  OpaqueValue* localValueGet(const Metadata *keyType,
-                             TaskLocal::TaskLocalInheritance inherit) {
-    return Local.getValue(this, keyType, inherit);
+  OpaqueValue* localValueGet(const HeapObject *key) {
+    return Local.getValue(this, key);
   }
 
   void localValuePop() {
@@ -576,13 +607,13 @@ public:
 /// This matches the ABI of a closure `() async throws -> ()`
 using AsyncVoidClosureEntryPoint =
   SWIFT_CC(swiftasync)
-  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
 /// This matches the ABI of a closure `<T>() async throws -> T`
 using AsyncGenericClosureEntryPoint =
     SWIFT_CC(swiftasync)
     void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
 /// This matches the ABI of the resume function of a closure
 ///  `() async throws -> ()`.
@@ -596,7 +627,7 @@ public:
   // passing the closure context instead of via the async context)
   AsyncVoidClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
-   HeapObject *closureContext;
+  void *closureContext;
   SwiftError *errorResult;
 };
 
@@ -609,7 +640,7 @@ public:
   // passing the closure context instead of via the async context)
   AsyncGenericClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
-  HeapObject *closureContext;
+  void *closureContext;
   SwiftError *errorResult;
 };
 

@@ -80,8 +80,7 @@ class NullEditorConsumer : public EditorConsumer {
   void recordFormattedText(StringRef Text) override {}
 
   void handleSourceText(StringRef Text) override {}
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                        std::unordered_set<unsigned> &ReusedNodeIds) override {}
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override {}
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return SyntaxTreeTransferMode::Off;
@@ -97,7 +96,8 @@ struct TestCursorInfo {
   std::string Name;
   std::string Typename;
   std::string Filename;
-  Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
+  unsigned Offset;
+  unsigned Length;
 };
 
 class CursorInfoTest : public ::testing::Test {
@@ -163,8 +163,9 @@ public:
           const CursorSymbolInfo &MainSymbol = Info.Symbols[0];
           TestInfo.Name = std::string(MainSymbol.Name.str());
           TestInfo.Typename = MainSymbol.TypeName.str();
-          TestInfo.Filename = MainSymbol.Filename.str();
-          TestInfo.DeclarationLoc = MainSymbol.DeclarationLoc;
+          TestInfo.Filename = MainSymbol.Location.Filename.str();
+          TestInfo.Offset = MainSymbol.Location.Offset;
+          TestInfo.Length = MainSymbol.Location.Length;
         }
         sema.signal();
       });
@@ -224,9 +225,8 @@ TEST_F(CursorInfoTest, EditAfter) {
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
   EXPECT_STREQ(DocName, Info.Filename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("foo"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("foo"), Info.Length);
 
   StringRef TextToReplace = "0";
   replaceText(DocName, findOffset(TextToReplace, Contents), TextToReplace.size(),
@@ -240,9 +240,8 @@ TEST_F(CursorInfoTest, EditAfter) {
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
   EXPECT_STREQ(DocName, Info.Filename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("foo"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("foo"), Info.Length);
 }
 
 TEST_F(CursorInfoTest, EditBefore) {
@@ -259,9 +258,8 @@ TEST_F(CursorInfoTest, EditBefore) {
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
   EXPECT_STREQ(DocName, Info.Filename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("foo"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("foo"), Info.Length);
 
   StringRef TextToReplace = "0";
   replaceText(DocName, findOffset(TextToReplace, Contents), TextToReplace.size(),
@@ -277,9 +275,8 @@ TEST_F(CursorInfoTest, EditBefore) {
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
   EXPECT_STREQ(DocName, Info.Filename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("foo"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("foo"), Info.Length);
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
@@ -307,9 +304,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueDeclLoc) {
   Info = getCursor(DocName, FooRefOffs, Args);
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("[Int : Int]", Info.Typename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("foo"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("foo"), Info.Length);
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueOffset) {
@@ -337,9 +333,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueOffset) {
   Info = getCursor(DocName, FooRefOffs, Args);
   EXPECT_STREQ("foo", Info.Name.c_str());
   EXPECT_STREQ("[Int : Int]", Info.Typename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("foo"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("foo"), Info.Length);
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
@@ -368,9 +363,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   Info = getCursor(DocName, FooRefOffs, Args);
   EXPECT_STREQ("fog", Info.Name.c_str());
   EXPECT_STREQ("[Int : Int]", Info.Typename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("fog"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
 TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
@@ -397,7 +391,6 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   auto Info = getCursor(DocName, FooRefOffs, Args);
   EXPECT_STREQ("fog", Info.Name.c_str());
   EXPECT_STREQ("Int", Info.Typename.c_str());
-  ASSERT_TRUE(Info.DeclarationLoc.hasValue());
-  EXPECT_EQ(FooOffs, Info.DeclarationLoc->first);
-  EXPECT_EQ(strlen("fog"), Info.DeclarationLoc->second);
+  EXPECT_EQ(FooOffs, Info.Offset);
+  EXPECT_EQ(strlen("fog"), Info.Length);
 }

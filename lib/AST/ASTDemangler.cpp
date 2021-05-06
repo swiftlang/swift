@@ -483,24 +483,11 @@ getResultDifferentiability(ImplResultDifferentiability diffKind) {
 
 Type ASTBuilder::createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,
-    BuiltRequirement *witnessMethodConformanceRequirement,
-    ArrayRef<BuiltType> GenericParameters,
-    ArrayRef<BuiltRequirement> Requirements,
     ArrayRef<Demangle::ImplFunctionParam<Type>> params,
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     Optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
   GenericSignature genericSig;
-  if (GenericParameters.size() > 0) {
-    llvm::SmallVector<GenericTypeParamType *, 4> CastGenericParameters;
-    for (auto Parameter : GenericParameters) {
-      CastGenericParameters.push_back(
-          Parameter->castTo<GenericTypeParamType>());
-    }
-    genericSig = GenericSignature::get(CastGenericParameters, Requirements);
-  } else {
-    assert(Requirements.size() == 0);
-  }
 
   SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
@@ -585,15 +572,11 @@ Type ASTBuilder::createImplFunctionType(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
                    flags.isSendable(), flags.isAsync(), diffKind, clangFnType)
                    .build();
-  auto witnessMethodConformance =
-      witnessMethodConformanceRequirement
-          ? ProtocolConformanceRef(
-                witnessMethodConformanceRequirement->getProtocolDecl())
-          : ProtocolConformanceRef();
-  return SILFunctionType::get(
-      genericSig, einfo, funcCoroutineKind, funcCalleeConvention, funcParams,
-      funcYields, funcResults, funcErrorResult,
-      SubstitutionMap(), SubstitutionMap(), Ctx, witnessMethodConformance);
+
+  return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
+                              funcCalleeConvention, funcParams, funcYields,
+                              funcResults, funcErrorResult,
+                              SubstitutionMap(), SubstitutionMap(), Ctx);
 }
 
 Type ASTBuilder::createProtocolCompositionType(

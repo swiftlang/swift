@@ -64,7 +64,7 @@ def prepare_bit_pattern(bit_pattern, dst_bits, dst_signed):
 //===----------------------------------------------------------------------===//
 
 FixedPoint.test("Integers.Stride") {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
 
 % for self_ty in all_integer_types(32):
 %   Self = self_ty.stdlib_name
@@ -132,7 +132,7 @@ FixedPoint.test("${Dst}(truncatingIfNeeded:) from ${Src}(${bit_pattern})") {
 
 }%
 
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
 
   ${gyb.execute_template(
       truncating_bit_pattern_test_template,
@@ -204,7 +204,7 @@ FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
 
 }%
 
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
 
   ${gyb.execute_template(
       bit_pattern_test_template,
@@ -269,7 +269,7 @@ FixedPoint.test("${Self}.hash(into:)") {
 
 }%
 
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
 
   ${gyb.execute_template(
       hash_value_test_template,

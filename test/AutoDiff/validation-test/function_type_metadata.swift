@@ -26,14 +26,38 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       Swift.Optional<Swift.Float>
       """,
       String(reflecting: (@differentiable(reverse) (Float?) -> Float?).self))
-    // FIXME(rdar://75916833): Mangle '@noDerivative' in function types.
-    // expectEqual(
-    //   """
-    //   @differentiable(reverse) (Swift.Optional<Swift.Float>, \
-    //   @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
-    //   """,
-    //   String(reflecting: (
-    //       @differentiable(reverse) (Float?, @noDerivative Int) -> Float?).self))
+    expectEqual(
+      """
+      @differentiable(reverse) (Swift.Optional<Swift.Float>, \
+      @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
+      """,
+      String(reflecting: (
+          @differentiable(reverse)
+              (Float?, @noDerivative Int) -> Float?).self))
+    expectEqual(
+      """
+      @differentiable(reverse) (Swift.Optional<Swift.Float>, \
+      __owned @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
+      """,
+      String(reflecting: (
+          @differentiable(reverse)
+              (Float?, __owned @noDerivative Int) -> Float?).self))
+    expectEqual(
+      """
+      @differentiable(reverse) (Swift.Optional<Swift.Float>, \
+      inout @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
+      """,
+      String(reflecting: (
+          @differentiable(reverse)
+              (Float?, inout @noDerivative Int) -> Float?).self))
+    expectEqual(
+      """
+      @differentiable(reverse) @Sendable (Swift.Optional<Swift.Float>, \
+      inout @noDerivative Swift.Int) -> Swift.Optional<Swift.Float>
+      """,
+      String(reflecting: (
+          @differentiable(reverse) @Sendable
+              (Float?, inout @noDerivative Int) -> Float?).self))
   }
 }
 

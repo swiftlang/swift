@@ -254,6 +254,7 @@ OPERAND_OWNERSHIP(InteriorPointer, RefTailAddr)
 OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
 // FIXME: HopToExecutorInst should be an instantaneous use.
 OPERAND_OWNERSHIP(InteriorPointer, HopToExecutor)
+OPERAND_OWNERSHIP(InteriorPointer, ExtractExecutor)
 
 // Instructions that propagate a value value within a borrow scope.
 OPERAND_OWNERSHIP(ForwardingBorrow, TupleExtract)
@@ -744,6 +745,10 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
+BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
+BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
@@ -815,7 +820,9 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffProjectTopLevelSubcontext)
 // ownership should be 'TrivialUse'.
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, ConvertTaskToJob)
 
-BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildSerialExecutorRef)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinarySerialExecutorRef)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDefaultActorExecutorRef)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildMainActorExecutorRef)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
 

@@ -66,6 +66,9 @@ class ModuleFileSharedCore {
   /// The Swift compatibility version in use when this module was built.
   version::Version CompatibilityVersion;
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
@@ -323,6 +326,9 @@ private:
     /// Whether this module file is actually a .sib file.
     unsigned IsSIB: 1;
 
+    /// Whether this module is compiled as static library.
+    unsigned IsStaticLibrary: 1;
+
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
 
@@ -518,6 +524,13 @@ public:
   /// Returns \c true if this module file contains a section with incremental
   /// information.
   bool hasIncrementalInfo() const { return HasIncrementalInfo; }
+
+  /// Returns \c true if a corresponding .swiftsourceinfo has been found.
+  bool hasSourceInfoFile() const { return !!ModuleSourceInfoInputBuffer; }
+
+  /// Returns \c true if a corresponding .swiftsourceinfo has been found *and
+  /// read*.
+  bool hasSourceInfo() const;
 };
 
 template <typename T, typename RawData>

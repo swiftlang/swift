@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/empty.swiftmodule %S/../Inputs/empty.swift
-// RUN: %target-swift-frontend -emit-module -o %t/emptyButWithLibraryEvolution.swiftmodule %S/../Inputs/empty.swift -enable-library-evolution
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s %S/Inputs/imports-other.swift -I %S/Inputs/imports-clang-modules/ -I %t -verify -swift-version 5 -enable-library-evolution | %FileCheck -implicit-check-not BAD %s
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -emit-module -o %t/empty.swiftmodule %S/../Inputs/empty.swift
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -emit-module -o %t/emptyButWithLibraryEvolution.swiftmodule %S/../Inputs/empty.swift -enable-library-evolution
+// RUN: %target-swift-frontend -disable-implicit-concurrency-module-import -typecheck -emit-module-interface-path - %s %S/Inputs/imports-other.swift -I %S/Inputs/imports-clang-modules/ -I %t -verify -swift-version 5 -enable-library-evolution | %FileCheck -implicit-check-not BAD %s
 
 
 @_exported import empty // expected-warning {{module 'empty' was not compiled with library evolution support; using it means binary compatibility for 'imports' can't be guaranteed}}

@@ -475,6 +475,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
 
   setAccess(AccessLevel::Public);
 
+  Bits.ModuleDecl.StaticLibrary = 0;
   Bits.ModuleDecl.TestingEnabled = 0;
   Bits.ModuleDecl.FailedToLoad = 0;
   Bits.ModuleDecl.RawResilienceStrategy = 0;
@@ -680,15 +681,6 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
-Optional<Fingerprint>
-ModuleDecl::loadFingerprint(const IterableDeclContext *IDC) const {
-  for (auto file : getFiles()) {
-    if (auto FP = file->loadFingerprint(IDC))
-      return FP;
-  }
-  return None;
-}
-
 void ModuleDecl::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
@@ -864,37 +856,50 @@ TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
   return nullptr;
 }
 
-Optional<BasicDeclLocs>
-SourceFile::getBasicLocsForDecl(const Decl *D) const {
+Optional<ExternalSourceLocs::RawLocs>
+SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   auto *FileCtx = D->getDeclContext()->getModuleScopeContext();
   assert(FileCtx == this && "D doesn't belong to this source file");
   if (FileCtx != this) {
     // D doesn't belong to this file. This shouldn't happen in practice.
     return None;
   }
-  if (D->getLoc().isInvalid())
+
+  SourceLoc Loc = D->getLoc(/*SerializedOK=*/false);
+  if (Loc.isInvalid())
     return None;
+
   SourceManager &SM = getASTContext().SourceMgr;
-  BasicDeclLocs Result;
-  Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
+  auto BufferID = SM.findBufferContainingLoc(Loc);
 
-  for (const auto &SRC : D->getRawComment(/*SerializedOK*/false).Comments) {
-    Result.DocRanges.push_back(std::make_pair(
-      LineColumn { SRC.StartLine, SRC.StartColumn },
-      SRC.Range.getByteLength())
-    );
-  }
+  ExternalSourceLocs::RawLocs Result;
+  auto setLoc = [&](ExternalSourceLocs::RawLoc &RawLoc, SourceLoc Loc) {
+    if (!Loc.isValid())
+      return;
 
-  auto setLineColumn = [&SM](LineColumn &Home, SourceLoc Loc) {
-    if (Loc.isValid()) {
-      std::tie(Home.Line, Home.Column) = SM.getPresumedLineAndColumnForLoc(Loc);
-    }
+    RawLoc.Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
+    std::tie(RawLoc.Line, RawLoc.Column) = SM.getLineAndColumnInBuffer(Loc);
+
+    auto *VF = SM.getVirtualFile(Loc);
+    if (!VF)
+      return;
+
+    RawLoc.Directive.Offset =
+        SM.getLocOffsetInBuffer(VF->Range.getStart(), BufferID);
+    RawLoc.Directive.LineOffset = VF->LineOffset;
+    RawLoc.Directive.Length = VF->Range.getByteLength();
+    RawLoc.Directive.Name = StringRef(VF->Name);
   };
-#define SET(X) setLineColumn(Result.X, D->get##X());
-  SET(Loc)
-  SET(StartLoc)
-  SET(EndLoc)
-#undef SET
+
+  Result.SourceFilePath = SM.getIdentifierForBuffer(BufferID);
+  for (const auto &SRC : D->getRawComment(/*SerializedOK=*/false).Comments) {
+    Result.DocRanges.emplace_back(ExternalSourceLocs::RawLoc(),
+                                  SRC.Range.getByteLength());
+    setLoc(Result.DocRanges.back().first, SRC.Range.getStart());
+  }
+  setLoc(Result.Loc, D->getLoc(/*SerializedOK=*/false));
+  setLoc(Result.StartLoc, D->getStartLoc());
+  setLoc(Result.EndLoc, D->getEndLoc());
   return Result;
 }
 

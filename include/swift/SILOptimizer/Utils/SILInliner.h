@@ -21,7 +21,6 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include <functional>
 
 namespace swift {
@@ -49,16 +48,13 @@ private:
   SILOptFunctionBuilder &FuncBuilder;
   InlineKind IKind;
   SubstitutionMap ApplySubs;
-  SILOpenedArchetypesTracker &OpenedArchetypesTracker;
 
   DeletionFuncTy DeletionCallback;
 
 public:
   SILInliner(SILOptFunctionBuilder &FuncBuilder, InlineKind IKind,
-             SubstitutionMap ApplySubs,
-             SILOpenedArchetypesTracker &OpenedArchetypesTracker)
-      : FuncBuilder(FuncBuilder), IKind(IKind), ApplySubs(ApplySubs),
-        OpenedArchetypesTracker(OpenedArchetypesTracker) {}
+             SubstitutionMap ApplySubs)
+      : FuncBuilder(FuncBuilder), IKind(IKind), ApplySubs(ApplySubs) {}
 
   /// Returns true if we are able to inline \arg AI.
   ///
@@ -121,9 +117,9 @@ public:
                  ArrayRef<SILValue> appliedArgs);
 
   /// Inline the function called by the given full apply site. This creates
-  /// an instance of SILInliner by constructing a substitution map and
-  /// OpenedArchetypesTracker from the given apply site, and invokes
-  /// `inlineFunction` method on the SILInliner instance to inline the callee.
+  /// an instance of SILInliner by constructing a substitution map from the
+  /// given apply site, and invokes `inlineFunction` method on the SILInliner
+  /// instance to inline the callee.
   /// This requires the full apply site to be a direct call i.e., the apply
   /// instruction must have a function ref.
   ///

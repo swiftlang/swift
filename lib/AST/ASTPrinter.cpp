@@ -135,6 +135,7 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   if (printFullConvention)
     result.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::Full;
+  result.AlwaysTryPrintParameterLabels = true;
   result.PrintSPIs = printSPIs;
 
   // We should print __consuming, __owned, etc for the module interface file.
@@ -535,6 +536,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
   Decl *Current = nullptr;
   Type CurrentType;
 
+  void setCurrentType(Type NewCurrentType) {
+    CurrentType = NewCurrentType;
+    assert(CurrentType.isNull() ||
+           !CurrentType->hasArchetype() &&
+               "CurrentType should be an interface type");
+  }
+
   friend DeclVisitor<PrintAST>;
 
   /// RAII object that increases the indentation level.
@@ -633,7 +641,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       Lines.clear();
 
       StringRef RawText = SRC.RawText.rtrim("\n\r");
-      unsigned WhitespaceToTrim = SRC.StartColumn - 1;
+      unsigned WhitespaceToTrim = SRC.ColumnIndent - 1;
       trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
       for (auto Line : Lines) {
@@ -747,13 +755,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printType(Type T) { printTypeWithOptions(T, Options); }
 
   void printTransformedTypeWithOptions(Type T, PrintOptions options) {
-    if (CurrentType && Current) {
-      if (T->hasArchetype()) {
-        // Get the interface type, since TypeLocs still have
-        // contextual types in them.
-        T = T->mapTypeOutOfContext();
-      }
-
+    if (CurrentType && Current && CurrentType->mayHaveMembers()) {
       auto *M = Current->getDeclContext()->getParentModule();
       SubstitutionMap subMap;
 
@@ -913,8 +915,25 @@ private:
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
       : Printer(Printer), Options(Options) {
-    if (Options.TransformContext)
-      CurrentType = Options.TransformContext->getBaseType();
+    if (Options.TransformContext) {
+      Type CurrentType = Options.TransformContext->getBaseType();
+      if (CurrentType && CurrentType->hasArchetype()) {
+        // OpenedArchetypeTypes get replaced by a GenericTypeParamType without a
+        // name in mapTypeOutOfContext. The GenericTypeParamType has no children
+        // so we can't use it for TypeTransformContext.
+        // To work around this, replace the OpenedArchetypeType with the type of
+        // the protocol itself.
+        CurrentType = CurrentType.transform([](Type T) -> Type {
+          if (auto *Opened = T->getAs<OpenedArchetypeType>()) {
+            return Opened->getOpenedExistentialType();
+          } else {
+            return T;
+          }
+        });
+        CurrentType = CurrentType->mapTypeOutOfContext();
+      }
+      setCurrentType(CurrentType);
+    }
   }
 
   using ASTVisitor::visit;
@@ -941,11 +960,11 @@ public:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
         auto Subs = CurrentType->getContextSubstitutionMap(
           Options.CurrentModule, NTD->getDeclContext());
-        CurrentType = NTD->getDeclaredInterfaceType().subst(Subs);
+        setCurrentType(NTD->getDeclaredInterfaceType().subst(Subs));
       }
     }
 
-    SWIFT_DEFER { CurrentType = OldType; };
+    SWIFT_DEFER { setCurrentType(OldType); };
 
     if (Synthesize) {
       Printer.setSynthesizedTarget(Options.TransformContext->getDecl());
@@ -2456,6 +2475,12 @@ static bool usesFeatureStaticAssert(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureEffectfulProp(Decl *decl) {
+  if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
+    return asd->getEffectfulGetAccessor() != nullptr;
+  return false;
+}
+
 static bool usesFeatureAsyncAwait(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (func->hasAsync())
@@ -2692,11 +2717,11 @@ static bool usesFeatureGlobalActors(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinJob(Decl *decl) {
-  auto typeHasBuiltinJob = [](Type type) {
+static bool usesBuiltinType(Decl *decl, BuiltinTypeKind kind) {
+  auto typeMatches = [kind](Type type) {
     return type.findIf([&](Type type) {
       if (auto builtinTy = type->getAs<BuiltinType>())
-        return builtinTy->getBuiltinTypeKind() == BuiltinTypeKind::BuiltinJob;
+        return builtinTy->getBuiltinTypeKind() == kind;
 
       return false;
     });
@@ -2704,7 +2729,7 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
 
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
-      if (typeHasBuiltinJob(type))
+      if (typeMatches(type))
         return true;
     }
   }
@@ -2712,7 +2737,7 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
   if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
     for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
       if (Type type = patternBinding->getPattern(idx)->getType())
-        if (typeHasBuiltinJob(type))
+        if (typeMatches(type))
           return true;
     }
   }
@@ -2720,7 +2745,34 @@ static bool usesFeatureBuiltinJob(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinJob(Decl *decl) {
+  return usesBuiltinType(decl, BuiltinTypeKind::BuiltinJob);
+}
+
+static bool usesFeatureBuiltinExecutor(Decl *decl) {
+  return usesBuiltinType(decl, BuiltinTypeKind::BuiltinExecutor);
+}
+
+static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinContinuation(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinTaskGroup(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureInheritActorContext(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    for (auto param : *func->getParameters()) {
+      if (param->getAttrs().hasAttribute<InheritActorContextAttr>())
+        return true;
+    }
+  }
+
   return false;
 }
 
@@ -2788,6 +2840,12 @@ static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
 
 bool swift::printCompatibilityFeatureChecksPre(
     ASTPrinter &printer, Decl *decl) {
+
+  // A single accessor does not get a feature check,
+  // it should go around the whole decl.
+  if (isa<AccessorDecl>(decl))
+    return false;
+
   auto features = getUniqueFeaturesUsed(decl);
   if (features.empty())
     return false;
@@ -3426,6 +3484,10 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
         }
       });
   }
+
+  // handle effects specifiers before the body
+  if (decl->hasAsync()) Printer << " async";
+  if (decl->hasThrows()) Printer << " throws";
 
   printBodyIfNecessary(decl);
 }
@@ -4488,15 +4550,13 @@ public:
 
   void visitBoundGenericType(BoundGenericType *T) {
     if (Options.SynthesizeSugarOnTypes) {
-      auto *NT = T->getDecl();
-      auto &Ctx = T->getASTContext();
-      if (NT == Ctx.getArrayDecl()) {
+      if (T->isArray()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
         Printer << "]";
         return;
       }
-      if (NT == Ctx.getDictionaryDecl()) {
+      if (T->isDictionary()) {
         Printer << "[";
         visit(T->getGenericArgs()[0]);
         Printer << " : ";
@@ -4504,7 +4564,7 @@ public:
         Printer << "]";
         return;
       }
-      if (NT == Ctx.getOptionalDecl()) {
+      if (T->isOptional()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
         Printer << "?";
         return;
@@ -4809,11 +4869,13 @@ public:
                           PrintNameContext::FunctionParameterExternal);
         Printer << ": ";
       } else if (Options.AlwaysTryPrintParameterLabels &&
-                 Param.hasInternalLabel()) {
+                 Param.hasInternalLabel() &&
+                 !Param.getInternalLabel().hasDollarPrefix()) {
         // We didn't have an external parameter label but were requested to
-        // always try and print parameter labels. Print The internal label.
-        // If we have neither an external nor an internal label, only print the
-        // type.
+        // always try and print parameter labels.
+        // If the internal label is a valid internal parameter label (does not
+        // start with '$'), print the internal label. If we have neither an
+        // external nor a printable internal label, only print the type.
         Printer << "_ ";
         Printer.printName(Param.getInternalLabel(),
                           PrintNameContext::FunctionParameterLocal);
@@ -5743,6 +5805,11 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
   for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
     if (auto *proto = ctx.getProtocol(attr->getProtocolKind())) {
       if (!options.shouldPrint(proto))
+        continue;
+      // The SerialExecutor conformance is only synthesized on the root
+      // actor class, so we can just test resilience immediately.
+      if (proto->isSpecificProtocol(KnownProtocolKind::SerialExecutor) &&
+          cast<ClassDecl>(decl)->isResilient())
         continue;
       if (attr->getProtocolKind() == KnownProtocolKind::RawRepresentable &&
           isa<EnumDecl>(decl) &&

@@ -620,13 +620,17 @@ bool TypeBase::isVoid() {
   return false;
 }
 
-/// Check if this type is equal to Swift.Bool.
-bool TypeBase::isBool() {
-  if (auto NTD = getAnyNominal())
-    if (isa<StructDecl>(NTD))
-      return getASTContext().getBoolDecl() == NTD;
-  return false;
+#define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
+/** Check if this type is equal to Swift.NAME. */ \
+bool TypeBase::is##NAME() { \
+  if (auto generic = getAnyGeneric()) { \
+    if (isa<DECL_CLASS>(generic)) { \
+      return getASTContext().get##NAME##Decl() == generic; \
+    } \
+  } \
+  return false; \
 }
+#include "swift/AST/KnownStdlibTypes.def"
 
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
@@ -656,24 +660,20 @@ CanType CanType::getOptionalObjectTypeImpl(CanType type) {
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   auto &C = getASTContext();
-  if (auto nominalTy = getAs<NominalType>()) {
-    if (nominalTy->getDecl() == C.getUnsafeMutableRawPointerDecl()) {
-      PTK = PTK_UnsafeMutableRawPointer;
-      return C.TheEmptyTupleType;
-    }
-    if (nominalTy->getDecl() == C.getUnsafeRawPointerDecl()) {
-      PTK = PTK_UnsafeRawPointer;
-      return C.TheEmptyTupleType;
-    }
+  if (isUnsafeMutableRawPointer()) {
+    PTK = PTK_UnsafeMutableRawPointer;
+    return C.TheEmptyTupleType;
+  }
+  if (isUnsafeRawPointer()) {
+    PTK = PTK_UnsafeRawPointer;
+    return C.TheEmptyTupleType;
   }
   if (auto boundTy = getAs<BoundGenericType>()) {
-    if (boundTy->getDecl() == C.getUnsafeMutablePointerDecl()) {
+    if (boundTy->isUnsafeMutablePointer()) {
       PTK = PTK_UnsafeMutablePointer;
-    } else if (boundTy->getDecl() == C.getUnsafePointerDecl()) {
+    } else if (boundTy->isUnsafePointer()) {
       PTK = PTK_UnsafePointer;
-    } else if (
-      boundTy->getDecl() == C.getAutoreleasingUnsafeMutablePointerDecl()
-    ) {
+    } else if (boundTy->isAutoreleasingUnsafeMutablePointer()) {
       PTK = PTK_AutoreleasingUnsafeMutablePointer;
     } else {
       return Type();
@@ -689,7 +689,8 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
     switch (kind) {
     case PTK_UnsafeMutableRawPointer:
     case PTK_UnsafeRawPointer:
-      llvm_unreachable("these pointer types don't take arguments");
+      // these pointer types don't take arguments.
+      return (NominalTypeDecl*)nullptr;
     case PTK_UnsafePointer:
       return ctx.getUnsafePointerDecl();
     case PTK_UnsafeMutablePointer:
@@ -701,25 +702,27 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
   }());
 
   assert(pointerDecl);
+  // Don't fail hard on null pointerDecl.
+  if (!pointerDecl) {
+    return Type();
+  }
   return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
 }
 
 Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
   auto &C = getASTContext();
-  if (auto nominalTy = getAs<NominalType>()) {
-    if (nominalTy->getDecl() == C.getUnsafeMutableRawBufferPointerDecl()) {
-      BPTK = BPTK_UnsafeMutableRawBufferPointer;
-    } else if (nominalTy->getDecl() == C.getUnsafeRawBufferPointerDecl()) {
-      BPTK = BPTK_UnsafeRawBufferPointer;
-    } else {
-      return Type();
-    }
+  if (isUnsafeMutableRawBufferPointer()) {
+    BPTK = BPTK_UnsafeMutableRawBufferPointer;
+    return C.TheEmptyTupleType;
+  }
+  if (isUnsafeRawBufferPointer()) {
+    BPTK = BPTK_UnsafeRawBufferPointer;
     return C.TheEmptyTupleType;
   }
   if (auto boundTy = getAs<BoundGenericType>()) {
-    if (boundTy->getDecl() == C.getUnsafeMutableBufferPointerDecl()) {
+    if (boundTy->isUnsafeMutableBufferPointer()) {
       BPTK = BPTK_UnsafeMutableBufferPointer;
-    } else if (boundTy->getDecl() == C.getUnsafeBufferPointerDecl()) {
+    } else if (boundTy->isUnsafeBufferPointer()) {
       BPTK = BPTK_UnsafeBufferPointer;
     } else {
       return Type();
@@ -830,18 +833,11 @@ bool TypeBase::isCGFloatType() {
          NTD->getName().is("CGFloat");
 }
 
-bool TypeBase::isDoubleType() {
-  auto *NTD = getAnyNominal();
-  return NTD ? NTD->getDecl() == getASTContext().getDoubleDecl() : false;
-}
-
 bool TypeBase::isKnownStdlibCollectionType() {
-  if (auto *structType = getAs<BoundGenericStructType>()) {
-    auto &ctx = getASTContext();
-    auto *decl = structType->getDecl();
-    return decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
-           decl == ctx.getSetDecl();
+  if (isArray() || isDictionary() || isSet()) {
+    return true;
   }
+
   return false;
 }
 
@@ -965,6 +961,8 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   unsafeSendable.resize(params.size());
   unsafeMainActor.resize(params.size());
+  implicitSelfCapture.resize(params.size());
+  inheritActorContext.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -1024,6 +1022,14 @@ ParameterListInfo::ParameterListInfo(
     if (param->getAttrs().hasAttribute<UnsafeMainActorAttr>()) {
       unsafeMainActor.set(i);
     }
+
+    if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
+      implicitSelfCapture.set(i);
+    }
+
+    if (param->getAttrs().hasAttribute<InheritActorContextAttr>()) {
+      inheritActorContext.set(i);
+    }
   }
 }
 
@@ -1052,6 +1058,23 @@ bool ParameterListInfo::isUnsafeMainActor(unsigned paramIdx) const {
   return paramIdx < unsafeMainActor.size()
       ? unsafeMainActor[paramIdx]
       : false;
+}
+
+bool ParameterListInfo::isImplicitSelfCapture(unsigned paramIdx) const {
+  return paramIdx < implicitSelfCapture.size()
+      ? implicitSelfCapture[paramIdx]
+      : false;
+}
+
+bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
+  return paramIdx < inheritActorContext.size()
+      ? inheritActorContext[paramIdx]
+      : false;
+}
+
+bool ParameterListInfo::anyContextualInfo() const {
+  return unsafeSendable.any() || unsafeMainActor.any() ||
+      implicitSelfCapture.any() || inheritActorContext.any();
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -1475,12 +1498,11 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
         return arg;
       };
 
-      auto &ctx = boundGeneric->getASTContext();
-      if (boundGeneric->getDecl() == ctx.getArrayDecl())
+      if (boundGeneric->isArray())
         return ArraySliceType::get(getGenericArg(0));
-      if (boundGeneric->getDecl() == ctx.getDictionaryDecl())
+      if (boundGeneric->isDictionary())
         return DictionaryType::get(getGenericArg(0), getGenericArg(1));
-      if (boundGeneric->getDecl() == ctx.getOptionalDecl())
+      if (boundGeneric->isOptional())
         return OptionalType::get(getGenericArg(0));
     }
     return Ty;
@@ -2494,8 +2516,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
 
   // Unmanaged<T> can be trivially represented in Objective-C if T
   // is trivially represented in Objective-C.
-  if (language == ForeignLanguage::ObjectiveC &&
-      nominal == ctx.getUnmanagedDecl()) {
+  if (language == ForeignLanguage::ObjectiveC && type->isUnmanaged()) {
     auto boundGenericType = type->getAs<BoundGenericType>();
 
     // Note: works around a broken Unmanaged<> definition.
@@ -3150,7 +3171,7 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
   case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
     if (dc->getParentModule() == typeDecl->getDeclContext()->getParentModule())
-      return true;
+      return typeDecl->getEffectiveAccess() > AccessLevel::FilePrivate;
 
     return typeDecl->getEffectiveAccess() > AccessLevel::Internal;
   }
@@ -3181,15 +3202,12 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // archetype in question. This will map the inner generic signature of the
   // opaque type to its outer signature.
   auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
-  // Then apply the substitutions from the root opaque archetype, to specialize
-  // for its type arguments.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
   auto isContextWholeModule = this->isContextWholeModule;
-  if (substTy.findIf(
+  if (partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
                                        isContextWholeModule))
@@ -3197,6 +3215,12 @@ operator()(SubstitutableType *maybeOpaqueType) const {
             return false;
           }))
     return maybeOpaqueType;
+
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments. We perform this substitution after checking for
+  // visibility, since we do not want the result of the visibility check to
+  // depend on the substitutions previously applied.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
   // If the type changed, but still contains opaque types, recur.
   if (!substTy->isEqual(maybeOpaqueType) && substTy->hasOpaqueArchetype()) {
@@ -3264,18 +3288,12 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // archetype in question. This will map the inner generic signature of the
   // opaque type to its outer signature.
   auto partialSubstTy = archetype->getInterfaceType().subst(*subs);
-  auto partialSubstRef =
-      abstractRef.subst(archetype->getInterfaceType(), *subs);
-
-  // Then apply the substitutions from the root opaque archetype, to specialize
-  // for its type arguments.
-  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
 
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
   auto isContextWholeModule = this->isContextWholeModule;
-  if (substTy.findIf(
+  if (partialSubstTy.findIf(
           [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
             if (!canSubstituteTypeInto(t, inContext, substitutionKind,
                                        isContextWholeModule))
@@ -3284,6 +3302,14 @@ operator()(CanType maybeOpaqueType, Type replacementType,
           }))
     return abstractRef;
 
+  // Then apply the substitutions from the root opaque archetype, to specialize
+  // for its type arguments. We perform this substitution after checking for
+  // visibility, since we do not want the result of the visibility check to
+  // depend on the substitutions previously applied.
+  auto substTy = partialSubstTy.subst(opaqueRoot->getSubstitutions());
+
+  auto partialSubstRef =
+      abstractRef.subst(archetype->getInterfaceType(), *subs);
   auto substRef =
       partialSubstRef.subst(partialSubstTy, opaqueRoot->getSubstitutions());
 
@@ -4879,6 +4905,17 @@ case TypeKind::Id:
     if (resultTy.getPointer() != function->getResult().getPointer())
       isUnchanged = false;
 
+    // Transform the global actor.
+    Type globalActorType;
+    if (Type origGlobalActorType = function->getGlobalActor()) {
+      globalActorType = origGlobalActorType.transformRec(fn);
+      if (!globalActorType)
+        return Type();
+
+      if (globalActorType.getPointer() != origGlobalActorType.getPointer())
+        isUnchanged = false;
+    }
+
     if (auto genericFnType = dyn_cast<GenericFunctionType>(base)) {
 #ifndef NDEBUG
       // Check that generic parameters won't be trasnformed.
@@ -4895,7 +4932,8 @@ case TypeKind::Id:
       if (!function->hasExtInfo())
         return GenericFunctionType::get(genericSig, substParams, resultTy);
       return GenericFunctionType::get(genericSig, substParams, resultTy,
-                                      function->getExtInfo());
+                                      function->getExtInfo()
+                                          .withGlobalActor(globalActorType));
     }
 
     if (isUnchanged) return *this;
@@ -4903,7 +4941,8 @@ case TypeKind::Id:
     if (!function->hasExtInfo())
       return FunctionType::get(substParams, resultTy);
     return FunctionType::get(substParams, resultTy,
-                             function->getExtInfo());
+                             function->getExtInfo()
+                                 .withGlobalActor(globalActorType));
   }
 
   case TypeKind::ArraySlice: {

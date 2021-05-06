@@ -1745,7 +1745,7 @@ namespace {
       llvm_unreachable("error type should not appear in IRGen");
     }
 
-    // These types are artificial types used for for internal purposes and
+    // These types are artificial types used for internal purposes and
     // should never appear in a metadata request.
 #define INTERNAL_ONLY_TYPE(ID)                                               \
     MetadataResponse visit##ID##Type(Can##ID##Type type,                     \

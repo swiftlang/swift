@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_EXTRAINHABITANTS_H
 #define SWIFT_IRGEN_EXTRAINHABITANTS_H
 
+#include "IRGen.h"
+
 namespace llvm {
 class APInt;
 class ConstantInt;
@@ -30,6 +32,60 @@ class Address;
 class Alignment;
 class IRGenFunction;
 class IRGenModule;
+
+/// Whether the zero pointer is a valid value (i.e. not a valid
+/// extra inhabitant) of a particular pointer type.
+enum IsNullable_t: bool {
+  IsNotNullable = false,
+  IsNullable = true
+};
+
+/// Information about a particular pointer type.
+struct PointerInfo {
+  Alignment PointeeAlign;
+  uint8_t NumReservedLowBits;
+  IsNullable_t Nullable;
+
+  static PointerInfo forHeapObject(const IRGenModule &IGM);
+  static PointerInfo forFunction(const IRGenModule &IGM);
+  static PointerInfo forAligned(Alignment pointeeAlign) {
+    return {pointeeAlign, 0, IsNotNullable};
+  }
+
+  PointerInfo withNullable(IsNullable_t nullable) const {
+    return {PointeeAlign, NumReservedLowBits, nullable};
+  }
+
+  /// Return the number of extra inhabitant representations for
+  /// pointers with these properties: i.e. the number of values
+  /// that do not collide with any valid pointers.
+  unsigned getExtraInhabitantCount(const IRGenModule &IGM) const;
+
+
+  /// Return an indexed extra inhabitant constant for a pointer
+  /// with these properties.
+  ///
+  /// If the pointer appears within a larger aggregate, the
+  /// 'bits' and 'offset' arguments can be used to position
+  /// the inhabitant within the larger integer constant.
+  llvm::APInt getFixedExtraInhabitantValue(const IRGenModule &IGM,
+                                           unsigned bits,
+                                           unsigned index,
+                                           unsigned offset) const;
+
+  /// Given the address of storage for a pointer with these
+  /// properties, return the extra inhabitant index of the
+  /// value, or -1 if the value is a valid pointer.  Always
+  /// produces an i32. 
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address src) const;
+
+  /// Store an extra inhabitant representation for the given
+  /// dynamic extra inhabitant index into the given storage.
+  void storeExtraInhabitant(IRGenFunction &IGF,
+                            llvm::Value *index,
+                            Address dest) const;
+};
 
 /*****************************************************************************/
 
@@ -60,69 +116,6 @@ llvm::Value *getHeapObjectExtraInhabitantIndex(IRGenFunction &IGF,
 void storeHeapObjectExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest);
-
-/*****************************************************************************/
-
-/// \group Extra inhabitants of aligned object pointers.
-
-/// Return the number of extra inhabitant representations for aligned
-/// object pointers.
-unsigned getAlignedPointerExtraInhabitantCount(IRGenModule &IGM,
-                                               Alignment pointeeAlign);
-
-/// Return an indexed extra inhabitant constant for an aligned pointer.
-///
-/// If the pointer appears within a larger aggregate, the 'bits' and 'offset'
-/// arguments can be used to position the inhabitant within the larger integer
-/// constant.
-llvm::APInt getAlignedPointerExtraInhabitantValue(IRGenModule &IGM,
-                                                  Alignment pointeeAlign,
-                                                  unsigned bits,
-                                                  unsigned index,
-                                                  unsigned offset);
-
-/// Calculate the index of an aligned pointer extra inhabitant
-/// representation stored in memory.
-llvm::Value *getAlignedPointerExtraInhabitantIndex(IRGenFunction &IGF,
-                                                   Alignment pointeeAlign,
-                                                   Address src);
-
-/// Calculate an extra inhabitant representation from an index and store it to
-/// memory.
-void storeAlignedPointerExtraInhabitant(IRGenFunction &IGF,
-                                        Alignment pointeeAlign,
-                                        llvm::Value *index,
-                                        Address dest);
-
-/*****************************************************************************/
-
-/// \group Extra inhabitants of function pointers.
-
-/// Return the number of extra inhabitant representations for function pointers,
-/// that is, the number of invalid function pointer values that can be used
-/// to represent enum tags for enums involving a reference type as a payload.
-unsigned getFunctionPointerExtraInhabitantCount(IRGenModule &IGM);
-  
-/// Return an indexed extra inhabitant constant for a function pointer.
-///
-/// If the pointer appears within a larger aggregate, the 'bits' and 'offset'
-/// arguments can be used to position the inhabitant within the larger integer
-/// constant.
-llvm::APInt getFunctionPointerFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                        unsigned bits,
-                                                        unsigned index,
-                                                        unsigned offset);
-  
-/// Calculate the index of a function pointer extra inhabitant
-/// representation stored in memory.
-llvm::Value *getFunctionPointerExtraInhabitantIndex(IRGenFunction &IGF,
-                                                    Address src);
-
-/// Calculate an extra inhabitant representation from an index and
-/// store it to memory.
-void storeFunctionPointerExtraInhabitant(IRGenFunction &IGF,
-                                         llvm::Value *index,
-                                         Address dest);
 
 } // end namespace irgen
 } // end namespace swift

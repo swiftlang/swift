@@ -391,10 +391,6 @@ bb0(%arg : @owned $T):
   return %10 : $()
 }
 
-// A copy within a borrow scope is not handled by CopyPropagation. An
-// earlier pass should have hoisted the copy outside of the borrow
-// scope.
-//
 // CHECK-TRACE-LABEL: *** CopyPropagation: testBorrowCopy
 // CHECK-TRACE:  Outer copy          [[OUTERCOPY:%.*]] = copy_value %0 : $T
 // CHECK-TRACE:  Use of outer copy   destroy_value
@@ -404,8 +400,6 @@ bb0(%arg : @owned $T):
 //
 // CHECK-LABEL: sil [ossa] @testBorrowCopy : $@convention(thin) <T> (@in T) -> () {
 // CHECK-LABEL: bb0(%0 : @owned $T):
-// CHECK-NEXT:   begin_borrow %0 : $T
-// CHECK-NEXT:   end_borrow
 // CHECK-NEXT:   destroy_value %0 : $T
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
@@ -528,4 +522,3 @@ bb2(%14 : @owned $Error):
   destroy_value %6 : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error Error) for <T, T>
   unreachable
 }
-

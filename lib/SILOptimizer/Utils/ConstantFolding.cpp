@@ -1117,9 +1117,7 @@ bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
   // intermediate step. So we conservatively assume that an implicit
   // construction of Double could be a part of an explicit conversion
   // and suppress the warning.
-  auto &astCtx = BI->getModule().getASTContext();
-  auto *typeDecl = callExpr->getType()->getCanonicalType().getAnyNominal();
-  return (typeDecl && typeDecl == astCtx.getDoubleDecl());
+  return callExpr->getType()->isDouble();
 }
 
 static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
@@ -1729,6 +1727,13 @@ ConstantFolder::processWorkList() {
                           I->eraseFromParent();
                         });
 
+  auto callbacks =
+      InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
+        WorkList.remove(instToDelete);
+        InvalidateInstructions = true;
+        instToDelete->eraseFromParent();
+      });
+
   // An out parameter array that we use to return new simplified results from
   // constantFoldInstruction.
   SmallVector<SILValue, 8> ConstantFoldedResults;
@@ -1737,8 +1742,6 @@ ConstantFolder::processWorkList() {
     assert(I->getParent() && "SILInstruction must have parent.");
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *I);
-
-    Callback(I);
 
     // Replace assert_configuration instructions by their constant value. We
     // want them to be replace even if we can't fully propagate the constant.
@@ -1753,9 +1756,7 @@ ConstantFolder::processWorkList() {
           // Schedule users for constant folding.
           WorkList.insert(AssertConfInt);
           // Delete the call.
-          eliminateDeadInstruction(BI);
-
-          InvalidateInstructions = true;
+          eliminateDeadInstruction(BI, callbacks);
           continue;
         }
 
@@ -1763,19 +1764,20 @@ ConstantFolder::processWorkList() {
         // configuration calls.
         if (isApplyOfBuiltin(*BI, BuiltinValueKind::CondUnreachable)) {
           assert(BI->use_empty() && "use of conditionallyUnreachable?!");
-          recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true);
+          recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true,
+                                                     callbacks);
           InvalidateInstructions = true;
           continue;
         }
       }
+
     // Replace a known availability.version semantic call.
     if (isApplyOfKnownAvailability(*I)) {
       if (auto apply = dyn_cast<ApplyInst>(I)) {
         SILBuilderWithScope B(I);
         auto tru = B.createIntegerLiteral(apply->getLoc(), apply->getType(), 1);
         apply->replaceAllUsesWith(tru);
-        eliminateDeadInstruction(
-            I, [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
+        eliminateDeadInstruction(I, callbacks);
         WorkList.insert(tru);
         InvalidateInstructions = true;
       }
@@ -1824,9 +1826,7 @@ ConstantFolder::processWorkList() {
       if (constantFoldGlobalStringTablePointerBuiltin(cast<BuiltinInst>(I),
                                                       EnableDiagnostics)) {
         // Here, the bulitin instruction got folded, so clean it up.
-        eliminateDeadInstruction(
-            I, [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
-        InvalidateInstructions = true;
+        eliminateDeadInstruction(I, callbacks);
       }
       continue;
     }
@@ -1841,10 +1841,8 @@ ConstantFolder::processWorkList() {
           auto *cfi = builder.createCondFail(I->getLoc(), I->getOperand(0),
                                              sli->getValue());
           WorkList.insert(cfi);
-          recursivelyDeleteTriviallyDeadInstructions(
-              I, /*force*/ true,
-              [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
-          InvalidateInstructions = true;
+          recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
+                                                     callbacks);
         }
       }
       continue;
@@ -1853,10 +1851,8 @@ ConstantFolder::processWorkList() {
     if (isApplyOfBuiltin(*I, BuiltinValueKind::IsConcrete)) {
       if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
         // Here, the bulitin instruction got folded, so clean it up.
-        recursivelyDeleteTriviallyDeadInstructions(
-            I, /*force*/ true,
-            [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
-        InvalidateInstructions = true;
+        recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
+                                                   callbacks);
       }
       continue;
     }
@@ -1877,7 +1873,7 @@ ConstantFolder::processWorkList() {
     }
 
     // Go through all users of the constant and try to fold them.
-    InstructionDeleter deleter;
+    InstructionDeleter deleter(callbacks);
     for (auto Result : I->getResults()) {
       for (auto *Use : Result->getUses()) {
         SILInstruction *User = Use->getUser();
@@ -2024,12 +2020,10 @@ ConstantFolder::processWorkList() {
         }
       }
     }
+
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
-    deleter.cleanUpDeadInstructions([&](SILInstruction *DeadI) {
-      WorkList.remove(DeadI);
-      InvalidateInstructions = true;
-    });
+    deleter.cleanUpDeadInstructions();
   }
 
   // TODO: refactor this code outside of the method. Passes should not merge

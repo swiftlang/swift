@@ -610,36 +610,50 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
-  if (CachedSerializedLocs) {
-    return CachedSerializedLocs;
-  }
+const ExternalSourceLocs *Decl::getSerializedLocs() const {
+  auto &Context = getASTContext();
+  if (auto EL = Context.getExternalSourceLocs(this).getValueOr(nullptr))
+    return EL;
+
+  static ExternalSourceLocs NullLocs{};
+
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
-  assert(File->getKind() == FileUnitKind::SerializedAST &&
-         "getSerializedLocs() should only be called on decls in "
-         "a 'SerializedASTFile'");
-  auto Locs = File->getBasicLocsForDecl(this);
-  if (!Locs.hasValue()) {
-    static const Decl::CachedExternalSourceLocs NullLocs{};
+  if (File->getKind() != FileUnitKind::SerializedAST)
+    return &NullLocs;
+
+  auto RawLocs = File->getExternalRawLocsForDecl(this);
+  if (!RawLocs.hasValue()) {
+    // Don't read .swiftsourceinfo again on failure
+    Context.setExternalSourceLocs(this, &NullLocs);
     return &NullLocs;
   }
-  auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
-  auto &SM = getASTContext().SourceMgr;
-#define CASE(X)                                                               \
-Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
-                                       Locs->X.Column);
-  CASE(Loc)
-  CASE(StartLoc)
-  CASE(EndLoc)
-#undef CASE
 
-  for (const auto &LineColumnAndLength : Locs->DocRanges) {
-    auto Start = SM.getLocFromExternalSource(Locs->SourceFilePath,
-      LineColumnAndLength.first.Line,
-      LineColumnAndLength.first.Column);
-    Result->DocRanges.push_back({ Start, LineColumnAndLength.second });
+  auto &SM = getASTContext().SourceMgr;
+  unsigned BufferID = SM.getExternalSourceBufferID(RawLocs->SourceFilePath);
+  if (!BufferID) {
+    // Don't try open the file again on failure
+    Context.setExternalSourceLocs(this, &NullLocs);
+    return &NullLocs;
   }
 
+  auto ResolveLoc = [&](const ExternalSourceLocs::RawLoc &Raw) -> SourceLoc {
+    // If the decl had a presumed loc, create its virtual file so that
+    // getPresumedLineAndColForLoc works from serialized locations as well.
+    if (Raw.Directive.isValid()) {
+      auto &LD = Raw.Directive;
+      SourceLoc Loc = SM.getLocForOffset(BufferID, LD.Offset);
+      SM.createVirtualFile(Loc, LD.Name, LD.LineOffset, LD.Length);
+    }
+    return SM.getLocForOffset(BufferID, Raw.Offset);
+  };
+
+  auto *Result = getASTContext().Allocate<ExternalSourceLocs>();
+  Result->BufferID = BufferID;
+  Result->Loc = ResolveLoc(RawLocs->Loc);
+  for (auto &Range : RawLocs->DocRanges) {
+    Result->DocRanges.emplace_back(ResolveLoc(Range.first), Range.second);
+  }
+  Context.setExternalSourceLocs(this, Result);
   return Result;
 }
 
@@ -1567,9 +1581,9 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-bool PatternBindingDecl::isAsyncLet() const {
+bool PatternBindingDecl::isSpawnLet() const {
   if (auto var = getAnchoringVarDecl(0))
-    return var->isAsyncLet();
+    return var->isSpawnLet();
 
   return false;
 }
@@ -4251,10 +4265,27 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
 }
 
 bool ClassDecl::isDefaultActor() const {
+  return isDefaultActor(getModuleContext(), ResilienceExpansion::Minimal);
+}
+
+bool ClassDecl::isDefaultActor(ModuleDecl *M,
+                               ResilienceExpansion expansion) const {
   auto mutableThis = const_cast<ClassDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
-                           IsDefaultActorRequest{mutableThis},
+                           IsDefaultActorRequest{mutableThis, M,
+                                                 expansion},
                            false);
+}
+
+const ClassDecl *ClassDecl::getRootActorClass() const {
+  if (!isActor()) return nullptr;
+  auto cur = this;
+  while (true) {
+    auto super = cur->getSuperclassDecl();
+    if (!super || !super->isActor())
+      return cur;
+    cur = super;
+  }
 }
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
@@ -4885,12 +4916,11 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   if (auto *const bgt = type->getAs<BoundGenericType>()) {
     auto info = SelfReferenceInfo();
 
-    const auto &ctx = bgt->getDecl()->getASTContext();
-    if (ctx.getArrayDecl() == bgt->getDecl()) {
+    if (bgt->isArray()) {
       // Swift.Array preserves variance in its Value type.
       info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
                                          position);
-    } else if (bgt->getDecl() == ctx.getDictionaryDecl()) {
+    } else if (bgt->isDictionary()) {
       // Swift.Dictionary preserves variance in its Element type.
       info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
                                          SelfReferencePosition::Invariant);
@@ -5123,6 +5153,8 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
+  case KnownProtocolKind::Actor:
+    return KnownDerivableProtocolKind::Actor;
   default: return None;
   }
 }
@@ -5845,8 +5877,8 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
-bool VarDecl::isAsyncLet() const {
-  return getAttrs().hasAttribute<AsyncAttr>();
+bool VarDecl::isSpawnLet() const {
+  return getAttrs().hasAttribute<AsyncAttr>() || getAttrs().hasAttribute<SpawnAttr>();
 }
 
 void ParamDecl::setSpecifier(Specifier specifier) {
@@ -6338,10 +6370,12 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 
 AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   if (!type) {
+    type = getInterfaceType();
+
     if (hasExternalPropertyWrapper()) {
-      type = getPropertyWrapperBackingPropertyType();
-    } else {
-      type = getInterfaceType();
+      if (auto wrapper = getPropertyWrapperBackingPropertyType()) {
+        type = wrapper;
+      }
     }
   }
 
@@ -7362,7 +7396,7 @@ AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
 }
 
 void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
-    AutoDiffConfig config) {
+    const AutoDiffConfig &config) {
   prepareDerivativeFunctionConfigurations();
   DerivativeFunctionConfigs->insert(config);
 }
@@ -7655,13 +7689,13 @@ bool FuncDecl::isMainTypeMainMethod() const {
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
-                                 bool Throws,
-                                 SourceLoc ThrowsLoc,
+                                 bool Async, SourceLoc AsyncLoc,
+                                 bool Throws, SourceLoc ThrowsLoc,
                                  ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
-                         /*Async=*/false, SourceLoc(), Throws, ThrowsLoc,
+                         Async, AsyncLoc, Throws, ThrowsLoc,
                          /*HasImplicitSelfDecl=*/true,
                          GenericParams),
     FailabilityLoc(FailabilityLoc),
@@ -7679,13 +7713,17 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
 ConstructorDecl *ConstructorDecl::createImported(
     ASTContext &ctx, ClangNode clangNode, DeclName name,
     SourceLoc constructorLoc, bool failable, SourceLoc failabilityLoc,
+    bool async, SourceLoc asyncLoc,
     bool throws, SourceLoc throwsLoc, ParameterList *bodyParams,
     GenericParamList *genericParams, DeclContext *parent) {
   void *declPtr = allocateMemoryForDecl<ConstructorDecl>(
       ctx, sizeof(ConstructorDecl), true);
   auto ctor = ::new (declPtr)
-      ConstructorDecl(name, constructorLoc, failable, failabilityLoc, throws,
-                      throwsLoc, bodyParams, genericParams, parent);
+      ConstructorDecl(name, constructorLoc,
+                      failable, failabilityLoc, 
+                      async, asyncLoc,
+                      throws, throwsLoc, 
+                      bodyParams, genericParams, parent);
   ctor->setClangNode(clangNode);
   return ctor;
 }
@@ -8051,12 +8089,48 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
   return {};
 }
 
-bool ClassDecl::hasExplicitCustomActorMethods() const {
-  return false;
+const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
+  auto &ctx = getASTContext();
+
+  auto hasUnownedSerialExecutorType = [&](VarDecl *property) {
+    if (auto type = property->getInterfaceType())
+      if (auto td = type->getAnyNominal())
+        if (td == ctx.getUnownedSerialExecutorDecl())
+          return true;
+    return false;
+  };
+
+  VarDecl *candidate = nullptr;
+  for (auto member: getMembers()) {
+    // Instance properties called unownedExecutor.
+    if (auto property = dyn_cast<VarDecl>(member)) {
+      if (property->getName() == ctx.Id_unownedExecutor &&
+          !property->isStatic()) {
+        if (!candidate) {
+          candidate = property;
+          continue;
+        }
+
+        bool oldHasRightType = hasUnownedSerialExecutorType(candidate);
+        if (oldHasRightType == hasUnownedSerialExecutorType(property)) {
+          // just ignore the new property, we should diagnose this eventually
+        } else if (!oldHasRightType) {
+          candidate = property;
+        }
+      }
+    }
+  }
+
+  return candidate;
 }
 
 bool ClassDecl::isRootDefaultActor() const {
-  if (!isDefaultActor()) return false;
+  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
+}
+
+bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
+                                   ResilienceExpansion expansion) const {
+  if (!isDefaultActor(M, expansion)) return false;
   auto superclass = getSuperclassDecl();
   return (!superclass || superclass->isNSObject());
 }

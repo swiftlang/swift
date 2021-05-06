@@ -101,6 +101,25 @@ getVersionedPrebuiltModulePath(Optional<llvm::VersionTuple> sdkVer,
   } while(true);
 }
 
+std::string CompilerInvocation::computePrebuiltCachePath(
+    StringRef RuntimeResourcePath, llvm::Triple target,
+    Optional<llvm::VersionTuple> sdkVer) {
+  SmallString<64> defaultPrebuiltPath{RuntimeResourcePath};
+  StringRef platform;
+  if (tripleIsMacCatalystEnvironment(target)) {
+    // The prebuilt cache for macCatalyst is the same as the one for macOS, not
+    // iOS or a separate location of its own.
+    platform = "macosx";
+  } else {
+    platform = getPlatformNameForTriple(target);
+  }
+  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
+
+  // If the SDK version is given, we should check if SDK-versioned prebuilt
+  // module cache is available and use it if so.
+  return getVersionedPrebuiltModulePath(sdkVer, defaultPrebuiltPath);
+}
+
 void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
   if (!FrontendOpts.PrebuiltModuleCachePath.empty())
@@ -108,21 +127,8 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
   if (SearchPathOpts.RuntimeResourcePath.empty())
     return;
 
-  SmallString<64> defaultPrebuiltPath{SearchPathOpts.RuntimeResourcePath};
-  StringRef platform;
-  if (tripleIsMacCatalystEnvironment(LangOpts.Target)) {
-    // The prebuilt cache for macCatalyst is the same as the one for macOS, not iOS
-    // or a separate location of its own.
-    platform = "macosx";
-  } else {
-    platform = getPlatformNameForTriple(LangOpts.Target);
-  }
-  llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
-
-  // If the SDK version is given, we should check if SDK-versioned prebuilt
-  // module cache is available and use it if so.
-  FrontendOpts.PrebuiltModuleCachePath =
-    getVersionedPrebuiltModulePath(LangOpts.SDKVersion, defaultPrebuiltPath);
+  FrontendOpts.PrebuiltModuleCachePath = computePrebuiltCachePath(
+      SearchPathOpts.RuntimeResourcePath, LangOpts.Target, LangOpts.SDKVersion);
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -325,6 +331,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_experimental_spi_imports);
   Opts.DebugPrintInvalidSyntax |=
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
+
+  if (const Arg *A = Args.getLastArg(OPT_library_level)) {
+    StringRef contents = A->getValue();
+    if (contents == "spi") {
+      Opts.PrintSPIs = true;
+    }
+  }
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -698,21 +711,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
+  // Configure lexing to parse and remember comments if:
+  //   - Emitting a swiftdoc/swiftsourceinfo
+  //   - Performing index-while-building
+  //   - Emitting a symbol graph file
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
-  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath()) {
-    Opts.AttachCommentsToDecls = true;
-  }
-
-  // If we are doing index-while-building, configure lexing and parsing to
-  // remember comments.
-  if (!FrontendOpts.IndexStorePath.empty()) {
-    Opts.AttachCommentsToDecls = true;
-  }
-
-  // If we are emitting a symbol graph file, configure lexing and parsing to
-  // remember comments.
-  if (FrontendOpts.EmitSymbolGraph) {
+  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath() ||
+      FrontendOpts.InputsAndOutputs.hasModuleSourceInfoOutputPath() ||
+      !FrontendOpts.IndexStorePath.empty() || FrontendOpts.EmitSymbolGraph) {
     Opts.AttachCommentsToDecls = true;
   }
 
@@ -1216,6 +1223,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
+  Opts.EnableActorDataRaceChecks |= Args.hasFlag(
+      OPT_enable_actor_data_race_checks,
+      OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);

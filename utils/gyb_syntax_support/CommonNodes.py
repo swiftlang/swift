@@ -39,7 +39,7 @@ COMMON_NODES = [
 
     # code-block-item-list -> code-block-item code-block-item-list?
     Node('CodeBlockItemList', kind='SyntaxCollection',
-         element='CodeBlockItem'),
+         element='CodeBlockItem', elements_separated_by_newline=True),
 
     # code-block -> '{' stmt-list '}'
     Node('CodeBlock', kind='Syntax',
@@ -47,7 +47,8 @@ COMMON_NODES = [
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Statements', kind='CodeBlockItemList',
-                   collection_element_name='Statement'),
-             Child('RightBrace', kind='RightBraceToken'),
+                   collection_element_name='Statement', is_indented=True),
+             Child('RightBrace', kind='RightBraceToken', 
+                   requires_leading_newline=True),
          ]),
 ]

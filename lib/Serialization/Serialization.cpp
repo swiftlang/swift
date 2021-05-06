@@ -31,7 +31,6 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
@@ -962,10 +961,16 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     size_t compatibilityVersionStringLength =
         versionString.tell() - shortVersionStringLength - 1;
     versionString << ")/" << version::getSwiftFullVersion();
+    auto userModuleMajor = options.UserModuleVersion.getMajor();
+    auto userModuleMinor = 0;
+    if (auto minor = options.UserModuleVersion.getMinor()) {
+      userModuleMinor = *minor;
+    }
     Metadata.emit(ScratchRecord,
                   SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
                   shortVersionStringLength,
                   compatibilityVersionStringLength,
+                  userModuleMajor, userModuleMinor,
                   versionString.str());
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
@@ -975,6 +980,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
 
       options_block::IsSIBLayout IsSIB(Out);
       IsSIB.emit(ScratchRecord, options.IsSIB);
+
+      if (options.StaticLibrary) {
+        options_block::IsStaticLibraryLayout IsStaticLibrary(Out);
+        IsStaticLibrary.emit(ScratchRecord);
+      }
 
       if (M->isTestingEnabled()) {
         options_block::IsTestableLayout IsTestable(Out);
@@ -2237,6 +2247,8 @@ static bool contextDependsOn(const NominalTypeDecl *decl,
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
                                         const DeclContext *excluding) {
+  if (!ty)
+    return;
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
@@ -2632,8 +2644,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto asyncFuncDeclID = S.addDeclRef(attr->AsyncFunctionDecl);
 
       CompletionHandlerAsyncDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->CompletionHandlerIndex,
-          asyncFuncDeclID);
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
+          attr->CompletionHandlerIndex, asyncFuncDeclID);
       return;
     }
     }
@@ -3065,6 +3077,9 @@ public:
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
+      if (extension->getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
+          !inherited.getType())
+        continue;
       assert(!inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
     }
@@ -3885,6 +3900,7 @@ public:
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
+                                  ctor->hasAsync(),
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
@@ -4345,6 +4361,7 @@ public:
       FunctionParamLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
+          S.addDeclBaseNameRef(param.getInternalLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
           paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
           paramFlags.isNoDerivative());
@@ -5633,6 +5650,8 @@ void swift::serialize(ModuleOrSourceFile DC,
         /* PrettyPrint */false,
         AccessLevel::Public,
         /*EmitSynthesizedMembers*/true,
+        /*PrintMessages*/false,
+        /*EmitInheritedDocs*/options.SkipSymbolGraphInheritedDocs,
       };
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }

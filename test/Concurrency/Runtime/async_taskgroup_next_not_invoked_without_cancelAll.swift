@@ -6,6 +6,7 @@
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 
@@ -13,7 +14,7 @@ import Dispatch
 func test_skipCallingNext() async {
   let numbers = [1, 1]
 
-  let result = try! await withTaskGroup(of: Int.self) { (group) async -> Int in
+  let result = await withTaskGroup(of: Int.self) { (group) async -> Int in
     for n in numbers {
       print("group.spawn { \(n) }")
       group.spawn { () async -> Int in

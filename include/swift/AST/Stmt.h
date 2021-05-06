@@ -1110,15 +1110,19 @@ class SwitchStmt final : public LabeledStmt,
   friend TrailingObjects;
 
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
+  /// The location of the last token in the 'switch' statement. For valid
+  /// 'switch' statements this is the same as \c RBraceLoc. If the '}' is
+  /// missing this points to the last token before the '}' was expected.
+  SourceLoc EndLoc;
   Expr *SubjectExpr;
 
   SwitchStmt(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc, Expr *SubjectExpr,
              SourceLoc LBraceLoc, unsigned CaseCount, SourceLoc RBraceLoc,
-             Optional<bool> implicit = None)
+             SourceLoc EndLoc, Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::Switch, getDefaultImplicitFlag(implicit, SwitchLoc),
                   LabelInfo),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
-      SubjectExpr(SubjectExpr) {
+      EndLoc(EndLoc), SubjectExpr(SubjectExpr) {
     Bits.SwitchStmt.CaseCount = CaseCount;
   }
 
@@ -1129,8 +1133,18 @@ public:
                             SourceLoc LBraceLoc,
                             ArrayRef<ASTNode> Cases,
                             SourceLoc RBraceLoc,
+                            SourceLoc EndLoc,
                             ASTContext &C);
-  
+
+  static SwitchStmt *createImplicit(LabeledStmtInfo LabelInfo,
+                                    Expr *SubjectExpr, ArrayRef<ASTNode> Cases,
+                                    ASTContext &C) {
+    return SwitchStmt::create(LabelInfo, /*SwitchLoc=*/SourceLoc(), SubjectExpr,
+                              /*LBraceLoc=*/SourceLoc(), Cases,
+                              /*RBraceLoc=*/SourceLoc(), /*EndLoc=*/SourceLoc(),
+                              C);
+  }
+
   /// Get the source location of the 'switch' keyword.
   SourceLoc getSwitchLoc() const { return SwitchLoc; }
   /// Get the source location of the opening brace.
@@ -1141,8 +1155,8 @@ public:
   SourceLoc getLoc() const { return SwitchLoc; }
 
   SourceLoc getStartLoc() const { return getLabelLocOrKeywordLoc(SwitchLoc); }
-  SourceLoc getEndLoc() const { return RBraceLoc; }
-  
+  SourceLoc getEndLoc() const { return EndLoc; }
+
   /// Get the subject expression of the switch.
   Expr *getSubjectExpr() const { return SubjectExpr; }
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }

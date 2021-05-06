@@ -913,19 +913,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
                    ? PAI->getSubstitutionMap()
                    : InnerAI.getSubstitutionMap());
 
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
-      F->getModule().registerDeleteNotificationHandler(
-          &OpenedArchetypesTracker);
-      // The callee only needs to know about opened archetypes used in
-      // the substitution list.
-      OpenedArchetypesTracker.registerUsedOpenedArchetypes(
-          InnerAI.getInstruction());
-      if (PAI) {
-        OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
-      }
-
       SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
-                         Subs, OpenedArchetypesTracker);
+                         Subs);
       if (!Inliner.canInlineApplySite(InnerAI))
         continue;
 

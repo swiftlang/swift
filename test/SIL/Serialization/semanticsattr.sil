@@ -10,7 +10,7 @@ import Builtin
 @_semantics("123") @_semantics("456")
 func semanticsFunction() -> Builtin.Int64
 
-// CHECK: sil [serialized] [_semantics "789"] [_semantics "ABC"] @foo1 : $@convention(thin) () -> () {
+// CHECK: sil [_semantics "789"] [_semantics "ABC"] @foo1 : $@convention(thin) () -> () {
 sil public [serialized] [_semantics "789"] [_semantics "ABC"] @foo1 : $@convention(thin) () -> () {
 bb0:
   return undef : $()
@@ -18,7 +18,7 @@ bb0:
 
 // Make sure that we can parse with multiple generics that are after the semantic attributes.
 //
-// CHECK: sil [serialized] [_semantics "DEF"] [_semantics "GHI"] @foo2 : $@convention(thin) <T1, T2> () -> () {
+// CHECK: sil [_semantics "DEF"] [_semantics "GHI"] @foo2 : $@convention(thin) <T1, T2> () -> () {
 sil public [serialized] [_semantics "DEF"] [_semantics "GHI"] @foo2 : $@convention(thin) <T1, T2> () -> () {
 bb0:
   return undef : $()

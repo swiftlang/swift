@@ -57,6 +57,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "TaskPrivate.h"
+#include "Error.h"
 
 #include <dispatch/dispatch.h>
 
@@ -190,7 +191,8 @@ void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
 // not complete and should not be used for anything other than these asserts.
 struct MinimalDispatchObjectHeader {
   const void *VTable;
-  void *Opaque;
+  int Opaque0;
+  int Opaque1;
   void *Linkage;
 };
 static_assert(
@@ -266,7 +268,7 @@ static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 static dispatch_queue_t getGlobalQueue(JobPriority priority) {
   size_t numericPriority = static_cast<size_t>(priority);
   if (numericPriority >= globalQueueCacheCount)
-    fatalError(0, "invalid job priority %#zx");
+    swift_Concurrency_fatalError(0, "invalid job priority %#zx");
 
   auto *ptr = &globalQueueCache[numericPriority];
   auto queue = ptr->load(std::memory_order_relaxed);

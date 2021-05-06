@@ -55,7 +55,7 @@ func try_apply_rethrows(_ x: Float) -> Float {
 @differentiable(reverse)
 func noReturn(_ x: Float) -> Float {
   let _ = x
-  // expected-error @+2 {{missing return in a function expected to return 'Float'}}
+  // expected-error @+2 {{missing return in global function expected to return 'Float'}}
   // expected-note @+1 {{missing return for differentiation}}
 }
 

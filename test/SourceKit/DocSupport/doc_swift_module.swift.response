@@ -1643,7 +1643,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Wrapped",
-    key.usr: "s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp",
+    key.usr: "s:4cake2S3V7Wrappedxmfp",
     key.offset: 2041,
     key.length: 7
   },
@@ -2744,7 +2744,7 @@ func shouldPrintAnyAsKeyword(x x: Any)
         key.original_usr: "s:4cake2P6PAAE4null7ElementQzSgvp",
         key.offset: 2031,
         key.length: 34,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>null</decl.name>: <decl.var.type><ref.generic_type_param usr=\"s:4cake2S3VA2A2P6RzrlE7Wrappedxmfp\">Wrapped</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake2P5P7ElementQa\">Element</ref.associatedtype>?</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>null</decl.name>: <decl.var.type><ref.generic_type_param usr=\"s:4cake2S3V7Wrappedxmfp\">Wrapped</ref.generic_type_param>.<ref.associatedtype usr=\"s:4cake2P5P7ElementQa\">Element</ref.associatedtype>?</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       }
     ]
   },

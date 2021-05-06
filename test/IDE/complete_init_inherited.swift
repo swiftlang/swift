@@ -4,6 +4,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D | %FileCheck %s -check-prefix=TEST_D
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D_DOT | %FileCheck %s -check-prefix=TEST_D_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D_PAREN | %FileCheck %s -check-prefix=TEST_D_PAREN
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=METATYPE_CONVERSION | %FileCheck %s -check-prefix=METATYPE_CONVERSION
 
 class A {
   init(int i: Int) {}
@@ -95,4 +96,20 @@ func testD() {
   D#^TEST_D^#
   D.#^TEST_D_DOT^#
   D(#^TEST_D_PAREN^#
+}
+
+class R74233797Base {
+    init() {}
+    convenience init(_ test: Bool) { self.init() }
+}
+class R74233797Derived : R74233797Base {
+    convenience init(sub: Bool) { self.init(sub) }
+}
+func testR74233797() {
+    R74233797Derived(#^METATYPE_CONVERSION^#)
+// METATYPE_CONVERSION: Begin completions
+// METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal: ['(']{#sub: Bool#}[')'][#R74233797Derived#];
+// METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#R74233797Derived#];
+// METATYPE_CONVERSION-DAG: Decl[Constructor]/Super: ['(']{#(test): Bool#}[')'][#R74233797Base#];
+// METATYPE_CONVERSION: End completions
 }

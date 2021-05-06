@@ -175,12 +175,24 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
   swift_continuation_throwingResumeWithError(nullptr, nullptr);
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initialize) {
-  swift_taskGroup_initialize(nullptr);
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_start) {
+  swift_asyncLet_start(nullptr, nullptr, nullptr, nullptr);
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_create) {
-  swift_taskGroup_create();
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_wait) {
+  swift_asyncLet_wait(nullptr, nullptr, nullptr, nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_wait_throwing) {
+  swift_asyncLet_wait(nullptr, nullptr, nullptr, nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_end) {
+  swift_asyncLet_end(nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initialize) {
+  swift_taskGroup_initialize(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_attachChild) {
@@ -212,13 +224,12 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_addPending) {
   swift_taskGroup_addPending(nullptr, true);
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swifttask_localValuePush) {
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValuePush) {
   swift_task_localValuePush(nullptr, nullptr, nullptr, nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValueGet) {
-  swift_task_localValueGet(nullptr, nullptr,
-                           swift::TaskLocal::TaskLocalInheritance());
+  swift_task_localValueGet(nullptr, nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_localValuePop) {
@@ -235,6 +246,10 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_tryAddStatusRecord)
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_removeStatusRecord) {
   swift_task_removeStatusRecord(nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, task_hasTaskGroupStatusRecord) {
+  swift_task_hasTaskGroupStatusRecord();
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_attachChild) {

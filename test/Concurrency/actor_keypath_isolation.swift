@@ -6,10 +6,10 @@ class Box {
 }
 
 actor Door {
-    let immutable : Int = 0
+    nonisolated let immutable : Int = 0
     let letBox : Box? = nil
     let letDict : [Int : Box] = [:]
-    let immutableNeighbor : Door? = nil
+    nonisolated let immutableNeighbor : Door? = nil
 
 
     var mutableNeighbor : Door? = nil
@@ -47,7 +47,7 @@ func tryKeyPathsMisc(d : Door) {
 
     // in combination with other key paths
 
-    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
+    _ = (\Door.letBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'letBox'}}
                                        \Box?.?.size)
 
     _ = (\Door.varBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'varBox'}}
@@ -61,9 +61,9 @@ func tryKeyPathsFromAsync() async {
 }
 
 func tryNonSendable() {
-    _ = \Door.letDict[0] // expected-warning {{cannot form key path that accesses non-sendable type '[Int : Box]'}}
+    _ = \Door.letDict[0] // expected-error {{cannot form key path to actor-isolated property 'letDict'}}
     _ = \Door.varDict[0] // expected-error {{cannot form key path to actor-isolated property 'varDict'}}
-    _ = \Door.letBox!.size // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
+    _ = \Door.letBox!.size // expected-error {{cannot form key path to actor-isolated property 'letBox'}}
 }
 
 func tryKeypaths() {

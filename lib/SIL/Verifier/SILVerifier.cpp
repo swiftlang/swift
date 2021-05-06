@@ -36,7 +36,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILVisitor.h"
@@ -140,7 +139,6 @@ void verifyKeyPathComponent(SILModule &M,
                             SubstitutionMap patternSubs,
                             bool forPropertyDescriptor,
                             bool hasIndices) {
-  auto &C = M.getASTContext();
   auto expansion = typeExpansionContext.getResilienceExpansion();
   auto opaque = AbstractionPattern::getOpaque();
   auto loweredBaseTy =
@@ -171,8 +169,7 @@ void verifyKeyPathComponent(SILModule &M,
           require(param.getConvention()
                     == ParameterConvention::Direct_Unowned,
                   "indices pointer should be trivial");
-          require(param.getInterfaceType()->getAnyNominal()
-                    == C.getUnsafeRawPointerDecl(),
+          require(param.getInterfaceType()->isUnsafeRawPointer(),
                   "indices pointer should be an UnsafeRawPointer");
         }
         
@@ -182,9 +179,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substEqualsType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substEqualsType->getResults()[0].getInterfaceType()
-                               ->getAnyNominal()
-                  == C.getBoolDecl(),
+        require(substEqualsType->getResults()[0].getInterfaceType()->isBool(),
                 "result should be Bool");
       }
       {
@@ -203,8 +198,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(param.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(param.getInterfaceType()->getAnyNominal()
-                  == C.getUnsafeRawPointerDecl(),
+        require(param.getInterfaceType()->isUnsafeRawPointer(),
                 "indices pointer should be an UnsafeRawPointer");
         
         require(substHashType->getResults().size() == 1,
@@ -213,9 +207,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(substHashType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substHashType->getResults()[0].getInterfaceType()
-                             ->getAnyNominal()
-                  == C.getIntDecl(),
+        require(substHashType->getResults()[0].getInterfaceType()->isInt(),
                 "result should be Int");
       }
     } else {
@@ -304,7 +296,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(
             indicesParam
                     .getArgumentType(M, substGetterType, typeExpansionContext)
-                    ->getAnyNominal() == C.getUnsafeRawPointerDecl(),
+                    ->isUnsafeRawPointer(),
             "indices pointer should be an UnsafeRawPointer");
       }
 
@@ -362,7 +354,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(
             indicesParam
                     .getArgumentType(M, substSetterType, typeExpansionContext)
-                    ->getAnyNominal() == C.getUnsafeRawPointerDecl(),
+                    ->isUnsafeRawPointer(),
             "indices pointer should be an UnsafeRawPointer");
       }
 
@@ -668,7 +660,6 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   const SILFunction &F;
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
-  SILOpenedArchetypesTracker OpenedArchetypes;
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
@@ -841,6 +832,15 @@ public:
             valueDescription + " cannot apply to a function type");
   }
 
+  /// Require the operand to be `$Optional<Builtin.Executor>`.
+  void requireOptionalExecutorType(SILValue value, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+    auto objectType = type.getASTType().getOptionalObjectType();
+    require(objectType && objectType == M->getASTContext().TheExecutorType,
+            what + " must be Optional<Builtin.Executor>");
+  }
+
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
@@ -917,7 +917,7 @@ public:
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getConventionsInContext()), TC(F.getModule().Types),
-        OpenedArchetypes(&F), Dominance(nullptr),
+        Dominance(nullptr),
         InstNumbers(numInstsInFunction(F)), DEBlocks(&F),
         loadBorrowImmutabilityAnalysis(DEBlocks, &F),
         SingleFunction(SingleFunction) {
@@ -948,6 +948,8 @@ public:
   // blocks it would result in quadratic behavior.
   bool properlyDominates(SILInstruction *a, SILInstruction *b) {
     auto aBlock = a->getParent(), bBlock = b->getParent();
+    require(aBlock->getParent() == bBlock->getParent(),
+            "instructions are not in the same function");
 
     // If the blocks are different, it's as easy as whether A's block
     // dominates B's block.
@@ -1035,7 +1037,6 @@ public:
 
   void visitSILInstruction(SILInstruction *I) {
     CurInstruction = I;
-    OpenedArchetypes.registerOpenedArchetypes(I);
     checkSILInstruction(I);
 
     // Check the SILLLocation attached to the instruction.
@@ -1111,6 +1112,8 @@ public:
     // Verify some basis structural stuff about an instruction's operands.
     for (auto &operand : I->getAllOperands()) {
       require(operand.get(), "instruction has null operand");
+      require(!isa<PlaceholderValue>(operand.get()),
+              "instruction has placeholder operand");
 
       if (auto *valueI = operand.get()->getDefiningInstruction()) {
         require(valueI->getParent(),
@@ -1279,8 +1282,8 @@ public:
   }
 
   static bool isLegalSILTokenProducer(SILValue value) {
-    if (auto beginApply = dyn_cast<BeginApplyResult>(value))
-      return beginApply->isTokenResult();
+    if (auto *baResult = isaResultOf<BeginApplyInst>(value))
+      return baResult->isBeginApplyToken();
 
     // Add more token cases here as they arise.
 
@@ -1328,10 +1331,9 @@ public:
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
       if (auto OpenedA = getOpenedArchetypeOf(A)) {
-        auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
-        require (Def, "Opened archetype should be registered in SILFunction");
-        require(I == nullptr || Def == I ||
-                properlyDominates(cast<SILInstruction>(Def), I),
+        auto *openingInst = F->getModule().getOpenedArchetypeInst(OpenedA, F);
+        require(I == nullptr || openingInst == I ||
+                properlyDominates(openingInst, I),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -1463,10 +1465,10 @@ public:
         FoundOpenedArchetypes.insert(A);
         // Also check that they are properly tracked inside the current
         // function.
-        auto Def = OpenedArchetypes.getOpenedArchetypeDef(A);
-        require(Def, "Opened archetype should be registered in SILFunction");
-        require(Def == AI ||
-                properlyDominates(cast<SILInstruction>(Def), AI),
+        auto *openingInst = F.getModule().getOpenedArchetypeInst(A,
+                              AI->getFunction());
+        require(openingInst == AI ||
+                properlyDominates(openingInst, AI),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -1498,7 +1500,7 @@ public:
       } else {
         require(isa<SingleValueInstruction>(V),
                 "opened archetype operand should refer to a SIL instruction");
-        auto Archetype = getOpenedArchetypeOf(cast<SingleValueInstruction>(V));
+        auto Archetype = cast<SingleValueInstruction>(V)->getOpenedArchetype();
         require(Archetype,
                 "opened archetype operand should define an opened archetype");
         require(FoundOpenedArchetypes.count(Archetype),
@@ -1631,14 +1633,12 @@ public:
   }
 
   void checkAbortApplyInst(AbortApplyInst *AI) {
-    require(isa<BeginApplyResult>(AI->getOperand()) &&
-            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+    require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of abort_apply must be a begin_apply");
   }
 
   void checkEndApplyInst(EndApplyInst *AI) {
-    require(isa<BeginApplyResult>(AI->getOperand()) &&
-            cast<BeginApplyResult>(AI->getOperand())->isTokenResult(),
+    require(getAsResultOf<BeginApplyInst>(AI->getOperand())->isBeginApplyToken(),
             "operand of end_apply must be a begin_apply");
   }
 
@@ -1831,6 +1831,7 @@ public:
     }
 
     auto builtinKind = BI->getBuiltinKind();
+    auto arguments = BI->getArguments();
 
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
     if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
@@ -1841,25 +1842,43 @@ public:
 
     if (builtinKind == BuiltinValueKind::InitializeDefaultActor ||
         builtinKind == BuiltinValueKind::DestroyDefaultActor) {
-      auto arguments = BI->getArguments();
       require(arguments.size() == 1,
               "default-actor builtin can only operate on a single object");
       auto argType = arguments[0]->getType().getASTType();
       auto argClass = argType.getClassOrBoundGenericClass();
-      require((argClass && argClass->isRootDefaultActor()) ||
+      require((argClass && argClass->isRootDefaultActor(M,
+                                        F.getResilienceExpansion())) ||
               isa<BuiltinNativeObjectType>(argType),
               "default-actor builtin can only operate on default actors");
       return;
     }
 
-    if (builtinKind == BuiltinValueKind::BuildSerialExecutorRef) {
-      requireObjectType(BuiltinExecutorType, BI,
-                        "result of buildSerialExecutorRef");
-      auto arguments = BI->getArguments();
+    // Check that 'getCurrentAsyncTask' only occurs within an async function.
+    if (builtinKind == BuiltinValueKind::GetCurrentExecutor) {
+      require(F.isAsync(),
+              "getCurrentExecutor can only be used in an async function");
+      require(arguments.empty(), "getCurrentExecutor takes no arguments");
+      requireOptionalExecutorType(BI, "result of getCurrentExecutor");
+      return;
+    }
+
+    if (builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
+        builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {
       require(arguments.size() == 1,
-              "buildSerialExecutorRef expects one argument");
+              "builtin expects one argument");
       require(arguments[0]->getType().isObject(),
-              "operand of buildSerialExecutorRef should have object type");
+              "operand of builtin should have object type");
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of build*ExecutorRef");
+      return;
+    }
+
+    if (builtinKind == BuiltinValueKind::BuildMainActorExecutorRef) {
+      require(arguments.size() == 0,
+              "buildMainActorExecutorRef expects no arguments");
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of build*ExecutorRef");
+      return;
     }
   }
   
@@ -3082,7 +3101,7 @@ public:
       // our destructure ownership kind is non-trivial then all non-trivial
       // results must have the same ownership kind as our operand.
       auto parentKind = DSI->getForwardingOwnershipKind();
-      for (const DestructureStructResult &result : DSI->getAllResultsBuffer()) {
+      for (const auto &result : DSI->getAllResultsBuffer()) {
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
                 "parent forwarding ownership kind");
@@ -3414,7 +3433,8 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
 
@@ -3447,7 +3467,8 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_ref result must be an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_ref should be registered in "
             "SILFunction");
   }
@@ -3469,7 +3490,8 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box result must be an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box should be registered in "
             "SILFunction");
   }
@@ -3491,7 +3513,8 @@ public:
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
     require(archetype,
         "open_existential_box_value result not an opened existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential_box_value should be "
             "registered in SILFunction");
   }
@@ -3537,7 +3560,7 @@ public:
     require(archetype, "open_existential_metatype result must be an opened "
                        "existential metatype");
     require(
-        OpenedArchetypes.getOpenedArchetypeDef(archetype) == I,
+        I->getModule().getOpenedArchetypeInst(archetype, I->getFunction()) == I,
         "Archetype opened by open_existential_metatype should be registered in "
         "SILFunction");
   }
@@ -3556,7 +3579,8 @@ public:
     auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype, "open_existential_value result must be an opened "
                        "existential archetype");
-    require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
+    require(OEI->getModule().getOpenedArchetypeInst(archetype,
+                 OEI->getFunction()) == OEI,
             "Archetype opened by open_existential should be registered in "
             "SILFunction");
   }
@@ -3844,8 +3868,8 @@ public:
       SILValue Def;
       if (t->isOpenedExistential()) {
         auto archetypeTy = cast<ArchetypeType>(t);
-        Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
-        require(Def, "Opened archetype should be registered in SILFunction");
+        Def = I->getModule().getOpenedArchetypeInst(archetypeTy, I->getFunction());
+        require(Def, "Opened archetype should be registered in SILModule");
       } else if (t->hasDynamicSelfType()) {
         require(I->getFunction()->hasSelfParam() ||
                 I->getFunction()->hasDynamicSelfMetadata(),
@@ -4786,12 +4810,18 @@ public:
   void checkHopToExecutorInst(HopToExecutorInst *HI) {
     auto executor = HI->getTargetExecutor();
     if (HI->getModule().getStage() == SILStage::Lowered) {
-      requireObjectType(BuiltinExecutorType, executor->getType(),
-                        "hop_to_executor instruction must take a "
-                        "Builtin.Executor in lowered SIL");
+      requireOptionalExecutorType(executor,
+                                  "hop_to_executor operand in lowered SIL");
     }
   }
-  
+
+  void checkExtractExecutorInst(ExtractExecutorInst *EEI) {
+    if (EEI->getModule().getStage() == SILStage::Lowered) {
+      require(false,
+              "extract_executor instruction should have been lowered away");
+    }
+  }
+
   void checkObjCProtocolInst(ObjCProtocolInst *OPI) {
     require(OPI->getProtocol()->isObjC(),
             "objc_protocol must be applied to an @objc protocol");
@@ -4840,10 +4870,9 @@ public:
     
     auto kpBGT = kpTy.getAs<BoundGenericType>();
     require(kpBGT, "keypath result must be a generic type");
-    auto &C = F.getASTContext();
-    require(kpBGT->getDecl() == C.getKeyPathDecl()
-            || kpBGT->getDecl() == C.getWritableKeyPathDecl()
-            || kpBGT->getDecl() == C.getReferenceWritableKeyPathDecl(),
+    require(kpBGT->isKeyPath() ||
+            kpBGT->isWritableKeyPath() ||
+            kpBGT->isReferenceWritableKeyPath(),
             "keypath result must be a key path type");
     
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
@@ -5451,22 +5480,6 @@ public:
     }
   }
 
-  void verifyOpenedArchetypes(SILFunction *F) {
-    require(OpenedArchetypes.getFunction() == F,
-           "Wrong SILFunction provided to verifyOpenedArchetypes");
-    // Check that definitions of all opened archetypes from
-    // OpenedArchetypesDefs are existing instructions
-    // belonging to the function F.
-    for (auto KV: OpenedArchetypes.getOpenedArchetypeDefs()) {
-      require(getOpenedArchetypeOf(CanType(KV.first)),
-              "Only opened archetypes should be registered in SILFunction");
-      auto Def = cast<SILInstruction>(KV.second);
-      require(Def->getFunction() == F, 
-              "Definition of every registered opened archetype should be an"
-              " existing instruction in a current SILFunction");
-    }
-  }
-
   /// This pass verifies that there are no hole in debug scopes at -Onone.
   void verifyDebugScopeHoles(SILBasicBlock *BB) {
     if (!VerifyDIHoles)
@@ -5627,11 +5640,6 @@ public:
     verifyBranches(F);
 
     visitSILBasicBlocks(F);
-
-    // Verify archetypes after all basic blocks are visited,
-    // because we build the map of archetypes as we visit the
-    // instructions.
-    verifyOpenedArchetypes(F);
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !F->getModule().getASTContext().hadError()) {
@@ -5862,6 +5870,7 @@ void SILVTable::verify(const SILModule &M) const {
         assert(!superEntry->isNonOverridden()
                && "vtable entry overrides an entry that claims to have no overrides");
         // TODO: Check the root vtable entry for the method too.
+
         break;
       }
     }

@@ -76,6 +76,57 @@ static bool isValidVersion(const version::Version &Version,
   llvm_unreachable("unsupported unary operator");
 }
 
+static llvm::VersionTuple getCanImportVersion(TupleExpr *te,
+                                              DiagnosticEngine *D,
+                                              bool &underlyingVersion) {
+  llvm::VersionTuple result;
+  if (te->getElements().size() != 2) {
+    if (D) {
+      D->diagnose(te->getLoc(), diag::canimport_two_parameters);
+    }
+    return result;
+  }
+  auto label = te->getElementName(1);
+  auto subE = te->getElement(1);
+  if (label.str() == "_version") {
+    underlyingVersion = false;
+  } else if (label.str() == "_underlyingVersion") {
+    underlyingVersion = true;
+  } else {
+    if (D) {
+      D->diagnose(subE->getLoc(), diag::canimport_label);
+    }
+    return result;
+  }
+  if (auto *nle = dyn_cast<NumberLiteralExpr>(subE)) {
+    auto digits = nle->getDigitsText();
+    if (result.tryParse(digits)) {
+      if (D) {
+        D->diagnose(nle->getLoc(), diag::canimport_version, digits);
+      }
+    }
+  }
+  return result;
+}
+
+static Expr *getSingleSubExp(Expr *exp, StringRef kindName,
+                             DiagnosticEngine *D) {
+  if (auto *pe = dyn_cast<ParenExpr>(exp)) {
+    return pe->getSubExpr();
+  }
+  if (kindName == "canImport") {
+    if (auto *te = dyn_cast<TupleExpr>(exp)) {
+      bool underlyingVersion;
+      if (D) {
+        // Diagnose canImport syntax
+        (void)getCanImportVersion(te, D, underlyingVersion);
+      }
+      return te->getElement(0);
+    }
+  }
+  return nullptr;
+}
+
 /// The condition validator.
 class ValidateIfConfigCondition :
   public ExprVisitor<ValidateIfConfigCondition, Expr*> {
@@ -208,13 +259,11 @@ public:
       return nullptr;
     }
 
-    auto *ArgP = dyn_cast<ParenExpr>(E->getArg());
-    if (!ArgP) {
+    Expr *Arg = getSingleSubExp(E->getArg(), *KindName, &D);
+    if (!Arg) {
       D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
       return nullptr;
     }
-    Expr *Arg = ArgP->getSubExpr();
-
     // '_compiler_version' '(' string-literal ')'
     if (*KindName == "_compiler_version") {
       auto SLE = dyn_cast<StringLiteralExpr>(Arg);
@@ -424,8 +473,7 @@ public:
 
   bool visitCallExpr(CallExpr *E) {
     auto KindName = getDeclRefStr(E->getFn());
-    auto *Arg = cast<ParenExpr>(E->getArg())->getSubExpr();
-
+    auto *Arg = getSingleSubExp(E->getArg(), KindName, nullptr);
     if (KindName == "_compiler_version") {
       auto Str = cast<StringLiteralExpr>(Arg)->getValue();
       auto Val = version::Version::parseCompilerVersionString(
@@ -450,7 +498,13 @@ public:
       }
     } else if (KindName == "canImport") {
       auto Str = extractExprSource(Ctx.SourceMgr, Arg);
-      return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc()  });
+      bool underlyingModule = false;
+      llvm::VersionTuple version;
+      if (auto *te = dyn_cast<TupleExpr>(E->getArg())) {
+        version = getCanImportVersion(te, nullptr, underlyingModule);
+      }
+      return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc() },
+                                 version, underlyingModule);
     }
 
     auto Val = getDeclRefStr(Arg);
@@ -673,6 +727,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     // clause unless we're doing a parse-only pass.
     if (isElse) {
       isActive = !foundActive && shouldEvaluate;
+      if (SyntaxContext->isEnabled())
+        SyntaxContext->addRawSyntax(ParsedRawSyntaxNode());
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,

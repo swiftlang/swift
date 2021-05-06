@@ -582,6 +582,9 @@ public:
         parent->addChild(input, Dem);
         input = parent;
       };
+      if (flags.isNoDerivative()) {
+        wrapInput(Node::Kind::NoDerivative);
+      }
       switch (flags.getValueOwnership()) {
       case ValueOwnership::Default:
         /* nothing */

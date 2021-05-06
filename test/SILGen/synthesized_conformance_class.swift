@@ -55,12 +55,12 @@ class Nonfinal<T> {
 // Make sure that CodingKeys members are actually emitted.
 
 // CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}21__derived_enum_equalsySbAFyx_G_AHtFZ : $@convention(method) <T> (Final<T>.CodingKeys, Final<T>.CodingKeys, @thin Final<T>.CodingKeys.Type) -> Bool {
-// CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}9hashValueSivg : $@convention(method) <T> (Final<T>.CodingKeys) -> Int {
 // CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}4hash4intoys6HasherVz_tF : $@convention(method) <T> (@inout Hasher, Final<T>.CodingKeys) -> () {
-// CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}11stringValueSSvg : $@convention(method) <T> (Final<T>.CodingKeys) -> @owned String {
 // CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}11stringValueAFyx_GSgSS_tcfC : $@convention(method) <T> (@owned String, @thin Final<T>.CodingKeys.Type) -> Optional<Final<T>.CodingKeys> {
-// CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}8intValueSiSgvg : $@convention(method) <T> (Final<T>.CodingKeys) -> Optional<Int> {
 // CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}8intValueAFyx_GSgSi_tcfC : $@convention(method) <T> (Int, @thin Final<T>.CodingKeys.Type) -> Optional<Final<T>.CodingKeys> {
+// CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}9hashValueSivg : $@convention(method) <T> (Final<T>.CodingKeys) -> Int {
+// CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}8intValueSiSgvg : $@convention(method) <T> (Final<T>.CodingKeys) -> Optional<Int> {
+// CHECK-LABEL: sil private [ossa] @$s29synthesized_conformance_class5FinalC10CodingKeys{{.*}}11stringValueSSvg : $@convention(method) <T> (Final<T>.CodingKeys) -> @owned String {
 
 extension Final: Encodable where T: Encodable {}
 // CHECK-LABEL: // Final<A>.encode(to:)

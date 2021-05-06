@@ -1930,11 +1930,17 @@ static void addPropertyWrapperAccessorAvailability(VarDecl *var, AccessorKind ac
                                                    SmallVectorImpl<const Decl *> &asAvailableAs) {
   AccessorDecl *synthesizedFrom = nullptr;
   if (var->hasAttachedPropertyWrapper()) {
+    AbstractStorageDecl *wrappedValueImpl;
+    if (auto access = getEnclosingSelfPropertyWrapperAccess(var, /*forProjected=*/false)) {
+      wrappedValueImpl = access->subscript;
+    } else {
+      wrappedValueImpl = var->getAttachedPropertyWrapperTypeInfo(0).valueVar;
+    }
+
     // The property wrapper info may not actually link back to a wrapper
     // implementation, if there was a semantic error checking the wrapper.
-    auto info = var->getAttachedPropertyWrapperTypeInfo(0);
-    if (info.valueVar) {
-      synthesizedFrom = info.valueVar->getOpaqueAccessor(accessorKind);
+    if (wrappedValueImpl) {
+      synthesizedFrom = wrappedValueImpl->getOpaqueAccessor(accessorKind);
     }
   } else if (auto wrapperSynthesizedKind
                = var->getPropertyWrapperSynthesizedPropertyKind()) {
@@ -1944,11 +1950,17 @@ static void addPropertyWrapperAccessorAvailability(VarDecl *var, AccessorKind ac
 
     case PropertyWrapperSynthesizedPropertyKind::Projection: {
       if (auto origVar = var->getOriginalWrappedProperty(wrapperSynthesizedKind)) {
+        AbstractStorageDecl *projectedValueImpl;
+        if (auto access = getEnclosingSelfPropertyWrapperAccess(origVar, /*forProjected=*/true)) {
+          projectedValueImpl = access->subscript;
+        } else {
+          projectedValueImpl = origVar->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar;
+        }
+
         // The property wrapper info may not actually link back to a wrapper
         // implementation, if there was a semantic error checking the wrapper.
-        auto info = origVar->getAttachedPropertyWrapperTypeInfo(0);
-        if (info.projectedValueVar) {
-          synthesizedFrom = info.projectedValueVar->getOpaqueAccessor(accessorKind);
+        if (projectedValueImpl) {
+          synthesizedFrom = projectedValueImpl->getOpaqueAccessor(accessorKind);
         }
       }
       break;
@@ -2764,8 +2776,9 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     backingVar = ParamDecl::cloneWithoutType(ctx, param);
     backingVar->setName(name);
   } else {
+    auto introducer = isa<ParamDecl>(var) ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
     backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                   VarDecl::Introducer::Var,
+                                   introducer,
                                    var->getLoc(),
                                    name, dc);
     backingVar->setImplicit();

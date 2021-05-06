@@ -1582,7 +1582,7 @@ public:
   DeclNameRef parseDeclNameRef(DeclNameLoc &loc, const Diagnostic &diag,
                                DeclNameOptions flags);
 
-  Expr *parseExprIdentifier();
+  ParserResult<Expr> parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
                                    Identifier PlaceholderId);
 

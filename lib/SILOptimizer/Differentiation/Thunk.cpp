@@ -560,7 +560,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
-    AutoDiffConfig desiredConfig, AutoDiffConfig actualConfig,
+    const AutoDiffConfig &desiredConfig, const AutoDiffConfig &actualConfig,
     ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
@@ -592,8 +592,6 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  // TODO(TF-1206): Enable ownership in all differentiation thunks.
-  thunk->setOwnershipEliminated();
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -602,6 +600,14 @@ getOrCreateSubsetParametersThunkForLinearMap(
   // Get arguments.
   SmallVector<SILValue, 4> arguments;
   SmallVector<AllocStackInst *, 4> localAllocations;
+  SmallVector<SILValue, 4> valuesToCleanup;
+  auto cleanupValues = [&]() {
+    for (auto value : llvm::reverse(valuesToCleanup))
+      builder.emitDestroyOperation(loc, value);
+
+    for (auto *alloc : llvm::reverse(localAllocations))
+      builder.createDeallocStack(loc, alloc);
+  };
 
   // Build a `.zero` argument for the given `Differentiable`-conforming type.
   auto buildZeroArgument = [&](SILType zeroSILType) {
@@ -617,10 +623,12 @@ getOrCreateSubsetParametersThunkForLinearMap(
       localAllocations.push_back(buf);
       builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
+        valuesToCleanup.push_back(buf);
         arguments.push_back(buf);
       } else {
         auto arg = builder.emitLoadValueOperation(loc, buf,
                                                   LoadOwnershipQualifier::Take);
+        valuesToCleanup.push_back(arg);
         arguments.push_back(arg);
       }
       break;
@@ -739,8 +747,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result.
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
-    for (auto *alloc : llvm::reverse(localAllocations))
-      builder.createDeallocStack(loc, alloc);
+    cleanupValues();
     builder.createReturn(loc, ai);
     return {thunk, interfaceSubs};
   }
@@ -787,8 +794,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     }
   }
   // Deallocate local allocations and return final direct result.
-  for (auto *alloc : llvm::reverse(localAllocations))
-    builder.createDeallocStack(loc, alloc);
+  cleanupValues();
   auto result = joinElements(results, builder, loc);
   builder.createReturn(loc, result);
 
@@ -798,8 +804,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
 std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
-    AutoDiffDerivativeFunctionKind kind, AutoDiffConfig desiredConfig,
-    AutoDiffConfig actualConfig, ADContext &adContext) {
+    AutoDiffDerivativeFunctionKind kind, const AutoDiffConfig &desiredConfig,
+    const AutoDiffConfig &actualConfig, ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for derivative function "
              << derivativeFn << " of the original function " << origFnOperand

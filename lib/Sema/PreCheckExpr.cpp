@@ -1061,10 +1061,24 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If this is a call, record the argument expression.
-      if (auto call = dyn_cast<ApplyExpr>(expr)) {
-        if (!isa<SelfApplyExpr>(expr)) {
-          CallArgs.insert(call->getArg());
+      // If this is a call or subscript, record the argument expression.
+      {
+        if (auto call = dyn_cast<ApplyExpr>(expr)) {
+          if (!isa<SelfApplyExpr>(expr)) {
+            CallArgs.insert(call->getArg());
+          }
+        }
+
+        if (auto *subscript = dyn_cast<SubscriptExpr>(expr)) {
+          CallArgs.insert(subscript->getIndex());
+        }
+
+        if (auto *dynamicSubscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
+          CallArgs.insert(dynamicSubscript->getIndex());
+        }
+
+        if (auto *OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
+          CallArgs.insert(OLE->getArg());
         }
       }
 
@@ -1467,12 +1481,9 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
           // For now, just return the unbound generic type.
           return unboundTy;
         },
-        /*placeholderHandler*/
-        [&](auto placeholderRepr) {
-          // FIXME: Don't let placeholder types escape type resolution.
-          // For now, just return the placeholder type.
-          return PlaceholderType::get(getASTContext(), placeholderRepr);
-        });
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        PlaceholderType::get);
     const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
     if (BaseTy->mayHaveMembers()) {
@@ -2004,12 +2015,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
           // For now, just return the unbound generic type.
           return unboundTy;
         },
-        /*placeholderHandler*/
-        [&](auto placeholderRepr) {
-          // FIXME: Don't let placeholder types escape type resolution.
-          // For now, just return the placeholder type.
-          return PlaceholderType::get(getASTContext(), placeholderRepr);
-        });
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        PlaceholderType::get);
     const auto result = resolution.resolveType(typeExpr->getTypeRepr());
     if (result->hasError())
       return nullptr;

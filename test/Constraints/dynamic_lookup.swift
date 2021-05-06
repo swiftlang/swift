@@ -5,9 +5,6 @@
 
 // REQUIRES: objc_interop
 
-// FIXME(rdar://64425653): We should re-enable this test for other platforms.
-// REQUIRES: OS=macosx
-
 import Foundation
 import PrivateObjC
 
@@ -342,8 +339,10 @@ func testOverloadedWithUnavailable(ao: AnyObject) {
 }
 
 func dynamicInitCrash(ao: AnyObject.Type) {
+  // This is going to produce difference results on macOS/iOS due to
+  // different availability of `init(...)` overloads attached to `AnyObject`
   let sdk = ao.init(blahblah: ())
-  // expected-error@-1 {{no exact matches in call to initializer}}
+  // expected-error@-1 {{}}
 }
 
 // Test that we correctly diagnose ambiguity for different typed members available

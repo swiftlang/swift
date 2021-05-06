@@ -79,8 +79,8 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true,
                                   TupleType::get(abTupleElts, C));
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -276,8 +276,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   auto abExpr = TupleExpr::create(C, SourceLoc(), { aRef, bRef }, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
                                   /*implicit*/ true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), abExpr, cases, C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
@@ -396,7 +396,7 @@ deriveEquatable_eq(
     getParamDecl("b")
   });
 
-  auto boolTy = C.getBoolDecl()->getDeclaredInterfaceType();
+  auto boolTy = C.getBoolType();
 
   Identifier generatedIdentifier;
   if (parentDC->getParentModule()->isResilient()) {
@@ -750,8 +750,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   // generate: switch enumVar { }
   auto enumRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), enumRef, cases, C);
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());
@@ -860,7 +860,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
-  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
+  Type intType = C.getIntType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.

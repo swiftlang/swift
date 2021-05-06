@@ -159,6 +159,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// values.
   PointerAuthSchema AsyncSwiftDynamicReplacements;
 
+  /// Like PartialApplyCapture but for use with AsyncFunctionPointer values.
+  PointerAuthSchema AsyncPartialApplyCapture;
+
   /// The parent async context stored within a child async context.
   PointerAuthSchema AsyncContextParent;
 

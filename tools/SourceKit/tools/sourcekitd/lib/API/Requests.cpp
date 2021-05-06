@@ -322,8 +322,6 @@ static SyntaxTreeTransferMode syntaxTransferModeFromUID(sourcekitd_uid_t UID) {
     return SyntaxTreeTransferMode::Off;
   } else if (UID == KindSyntaxTreeOff) {
     return SyntaxTreeTransferMode::Off;
-  } else if (UID == KindSyntaxTreeIncremental) {
-    return SyntaxTreeTransferMode::Incremental;
   } else if (UID == KindSyntaxTreeFull) {
     return SyntaxTreeTransferMode::Full;
   } else {
@@ -464,9 +462,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
 
-    Optional<bool> OptimizeForIDE =
-        Req.getOptionalInt64(KeyOptimizeForIDE)
-            .map([](int64_t v) -> bool { return v; });
     Optional<unsigned> CompletionMaxASTContextReuseCount =
         Req.getOptionalInt64(KeyCompletionMaxASTContextReuseCount)
             .map([](int64_t v) -> unsigned { return v; });
@@ -475,12 +470,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
             .map([](int64_t v) -> unsigned { return v; });
 
     GlobalConfig::Settings UpdatedConfig =
-        Config->update(OptimizeForIDE, CompletionMaxASTContextReuseCount,
+        Config->update(CompletionMaxASTContextReuseCount,
                        CompletionCheckDependencyInterval);
 
     getGlobalContext().getSwiftLangSupport().globalConfigurationUpdated(Config);
 
-    dict.set(KeyOptimizeForIDE, UpdatedConfig.OptimizeForIDE);
     dict.set(KeyCompletionMaxASTContextReuseCount,
              UpdatedConfig.CompletionOpts.MaxASTContextReuseCount);
     dict.set(KeyCompletionCheckDependencyInterval,
@@ -1766,11 +1760,12 @@ static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
     Elem.set(KeyModuleName, Symbol.ModuleName);
   if (!Symbol.ModuleInterfaceName.empty())
     Elem.set(KeyModuleInterfaceName, Symbol.ModuleInterfaceName);
-  if (Symbol.DeclarationLoc.hasValue()) {
-    Elem.set(KeyOffset, Symbol.DeclarationLoc.getValue().first);
-    Elem.set(KeyLength, Symbol.DeclarationLoc.getValue().second);
-    if (!Symbol.Filename.empty())
-      Elem.set(KeyFilePath, Symbol.Filename);
+  if (!Symbol.Location.Filename.empty()) {
+    Elem.set(KeyFilePath, Symbol.Location.Filename);
+    Elem.set(KeyOffset, Symbol.Location.Offset);
+    Elem.set(KeyLength, Symbol.Location.Length);
+    Elem.set(KeyLine, Symbol.Location.Line);
+    Elem.set(KeyColumn, Symbol.Location.Column);
   }
 
   if (!Symbol.OverrideUSRs.empty()) {
@@ -2558,8 +2553,7 @@ public:
 
   void handleSourceText(StringRef Text) override;
 
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
-                        std::unordered_set<unsigned> &ReusedNodeIds) override;
+  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override;
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return Opts.SyntaxTransferMode;
@@ -2887,7 +2881,6 @@ void SKEditorConsumer::handleSourceText(StringRef Text) {
 
 void serializeSyntaxTreeAsJson(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> ReusedNodeIds,
     ResponseBuilder::Dictionary &Dict) {
   auto StartClock = clock();
   // 4096 is a heuristic buffer size that appears to usually be able to fit an
@@ -2899,7 +2892,6 @@ void serializeSyntaxTreeAsJson(
     llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
     SyntaxTreeStream.SetBufferSize(ReserveBufferSize);
     swift::json::Output::UserInfoMap JsonUserInfo;
-    JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
     swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
                                          /*PrettyPrint=*/false);
     SyntaxTreeOutput << *SyntaxTree.getRaw();
@@ -2917,25 +2909,8 @@ void serializeSyntaxTreeAsJson(
 }
 
 void SKEditorConsumer::handleSyntaxTree(
-    const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> &ReusedNodeIds) {
-
-  std::unordered_set<unsigned> OmitNodes;
-  switch (Opts.SyntaxTransferMode) {
-  case SourceKit::SyntaxTreeTransferMode::Off:
-    // Don't serialize the tree at all
-    return;
-  case SourceKit::SyntaxTreeTransferMode::Full:
-    // Serialize the tree without omitting any nodes
-    OmitNodes = {};
-    break;
-  case SourceKit::SyntaxTreeTransferMode::Incremental:
-    // Serialize the tree and omit all nodes that have been reused
-    OmitNodes = ReusedNodeIds;
-    break;
-  }
-
-  serializeSyntaxTreeAsJson(SyntaxTree, OmitNodes, Dict);
+    const swift::syntax::SourceFileSyntax &SyntaxTree) {
+  serializeSyntaxTreeAsJson(SyntaxTree, Dict);
 }
 
 static sourcekitd_response_t

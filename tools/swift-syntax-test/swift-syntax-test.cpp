@@ -150,12 +150,6 @@ OmitNodeIds("omit-node-ids",
             llvm::cl::desc("If specified, the serialized syntax tree will not "
                            "include the IDs of the serialized nodes."));
 
-static llvm::cl::opt<bool>
-IncrementalSerialization("incremental-serialization",
-                         llvm::cl::desc("If specified, the serialized syntax "
-                                        "tree will omit nodes that have not "
-                                        "changed since the last parse."));
-
 static llvm::cl::opt<std::string>
 OutputFilename("output-filename",
                llvm::cl::desc("Path to the output file"));
@@ -702,7 +696,7 @@ int doDumpRawTokenSyntax(const StringRef InputFile) {
     SourceLoc Loc =
         SourceMgr.getLocForOffset(BufferID, TokAndPos.second.getOffset());
     unsigned Line, Column;
-    std::tie(Line, Column) = SourceMgr.getPresumedLineAndColumnForLoc(Loc);
+    std::tie(Line, Column) = SourceMgr.getLineAndColumnInBuffer(Loc);
     llvm::outs() << Line << ":" << Column << "\n";
     TokAndPos.first->dump(llvm::outs());
     llvm::outs() << "\n";
@@ -725,35 +719,20 @@ int doSerializeRawTree(const char *MainExecutablePath,
   return parseFile(MainExecutablePath, InputFile,
     [](ParseInfo info) -> int {
     auto SF = info.SF;
-    auto SyntaxCache = info.SyntaxCache;
     auto Root = SF->getSyntaxRoot().getRaw();
-    std::unordered_set<unsigned> ReusedNodeIds;
-    if (options::IncrementalSerialization && SyntaxCache) {
-      ReusedNodeIds = SyntaxCache->getReusedNodeIds();
-    }
-
-    auto SerializeTree = [&ReusedNodeIds](llvm::raw_ostream &os,
-                                          const RawSyntax *Root,
-                                          SyntaxParsingCache *SyntaxCache) {
-      swift::json::Output::UserInfoMap JsonUserInfo;
-      JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
-      if (options::OmitNodeIds) {
-        JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
-            (void *)true;
-      }
-      swift::json::Output out(os, JsonUserInfo);
-      out << *Root;
-      os << "\n";
-    };
 
     if (!options::OutputFilename.empty()) {
       std::error_code errorCode;
       llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
                               llvm::sys::fs::F_None);
       assert(!errorCode && "Couldn't open output file");
-      SerializeTree(os, Root, SyntaxCache);
+      swift::json::Output out(os);
+      out << *Root;
+      os << "\n";
     } else {
-      SerializeTree(llvm::outs(), Root, SyntaxCache);
+      swift::json::Output out(llvm::outs());
+      out << *Root;
+      llvm::outs() << "\n";
     }
 
     if (!options::DiagsOutputFilename.empty()) {

@@ -84,6 +84,9 @@ public:
   /// For these modules, we should prefer using Swift interface when importing them.
   std::vector<std::string> PreferInterfaceForModules;
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -311,6 +314,9 @@ public:
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
 
+  /// True if the "-static" option is set.
+  bool Static = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.
@@ -394,6 +400,10 @@ public:
   ///
   /// \sa SymbolGraphASTWalker
   std::string SymbolGraphOutputDir;
+  
+  /// Whether to emit doc comment information in symbol graphs for symbols
+  /// which are inherited through classes or default implementations.
+  bool SkipInheritedDocs = false;
 
 private:
   static bool canActionEmitDependencies(ActionType);

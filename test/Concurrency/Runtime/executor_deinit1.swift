@@ -3,9 +3,12 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
-// FIXME: this should pass! from rdar://73266050
-// XFAIL: *
+// https://bugs.swift.org/browse/SR-14461
+// UNSUPPORTED: linux
+
 
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }
@@ -18,7 +21,7 @@ actor FirstActor {
 
     }
 
-    deinit() {
+    deinit {
         // CHECK: called deinit
         print("called deinit")
     }

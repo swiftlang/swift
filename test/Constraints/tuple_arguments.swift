@@ -1361,6 +1361,8 @@ do {
 
   let _: ((Int, Int)) -> () = { _ = ($0, $1) } // expected-error {{closure tuple parameter '(Int, Int)' does not support destructuring}}
   let _: ((Int, Int)) -> () = { t, u in _ = (t, u) } // expected-error {{closure tuple parameter '(Int, Int)' does not support destructuring}} {{33-37=(arg)}} {{41-41=let (t, u) = arg; }}
+  let _: ((Int, Int)) -> () = { x, y in } 
+  // expected-error@-1 {{closure tuple parameter '(Int, Int)' does not support destructuring}} {{33-37=(arg)}} {{40-40= let (x, y) = arg; }}
 
   let _: (Int, Int) -> () = { _ = $0 } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
   let _: (Int, Int) -> () = { _ = ($0.0, $0.1) } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
