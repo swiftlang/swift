@@ -1013,6 +1013,10 @@ namespace swift {
     /// option.
     bool isDiagnosticPointsToFirstBadToken(DiagID id) const;
 
+    /// \returns true if the diagnostic is an API digester API or ABI breakage
+    /// diagnostic.
+    bool isAPIDigesterBreakageDiagnostic(DiagID id) const;
+
     /// \returns true if any diagnostic consumer gave an error while invoking
     //// \c finishProcessing.
     bool finishProcessing();
