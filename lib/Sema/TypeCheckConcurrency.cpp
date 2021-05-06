@@ -1847,7 +1847,6 @@ namespace {
       return result;
     }
 
-    // FIXME: !!!!!! distributed implicit throwing marking
     enum ThrowsMarkingResult {
       FoundThrows,
       NotFound
