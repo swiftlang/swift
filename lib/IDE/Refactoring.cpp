@@ -4865,31 +4865,30 @@ public:
     FuncDecl *FD = cast<FuncDecl>(StartNode.get<Decl *>());
     Identifier CompletionHandlerName = TopHandler.Handler->getParameterName();
 
-    OS << "{\n"; // start function body
-    OS << "async {\n";
+    OS << tok::l_brace << "\n"; // start function body
+    OS << "async " << tok::l_brace << "\n";
     if (TopHandler.HasError) {
-      OS << "do {\n";
+      addDo();
       if (!TopHandler.willAsyncReturnVoid()) {
-        OS << "let result";
+        OS << tok::kw_let << " result";
         addResultTypeAnnotationIfNecessary(FD, TopHandler);
-        OS << " = ";
+        OS << " " << tok::equal << " ";
       }
-      OS << "try await ";
+      OS << tok::kw_try << " await ";
       addCallToAsyncMethod(FD, TopHandler);
       OS << "\n";
       addCallToCompletionHandler(/*HasResult=*/true, CompletionHandlerName, FD,
                                  TopHandler);
       OS << "\n"
-         << "} catch {\n";
+         << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n";
       addCallToCompletionHandler(/*HasResult=*/false, CompletionHandlerName, FD,
                                  TopHandler);
-      OS << "\n"
-         << "}\n"; // end catch
+      OS << "\n" << tok::r_brace << "\n"; // end catch
     } else {
       if (!TopHandler.willAsyncReturnVoid()) {
-        OS << "let result";
+        OS << tok::kw_let << " result";
         addResultTypeAnnotationIfNecessary(FD, TopHandler);
-        OS << " = ";
+        OS << " " << tok::equal << " ";
       }
       OS << "await ";
       addCallToAsyncMethod(FD, TopHandler);
@@ -4898,8 +4897,8 @@ public:
                                  TopHandler);
       OS << "\n";
     }
-    OS << "}\n"; // end 'async'
-    OS << "}\n"; // end function body
+    OS << tok::r_brace << "\n"; // end 'async'
+    OS << tok::r_brace << "\n"; // end function body
     return true;
   }
 
@@ -5518,7 +5517,7 @@ private:
   /// 'await' keyword.
   void addCallToAsyncMethod(const FuncDecl *FD,
                             const AsyncHandlerDesc &HandlerDesc) {
-    OS << FD->getBaseName() << "(";
+    OS << FD->getBaseName() << tok::l_paren;
     bool FirstParam = true;
     for (auto Param : *FD->getParameters()) {
       if (Param == HandlerDesc.Handler) {
@@ -5526,16 +5525,16 @@ private:
         continue;
       }
       if (!FirstParam) {
-        OS << ", ";
+        OS << tok::comma << " ";
       } else {
         FirstParam = false;
       }
       if (!Param->getArgumentName().empty()) {
-        OS << Param->getArgumentName() << ": ";
+        OS << Param->getArgumentName() << tok::colon << " ";
       }
       OS << Param->getParameterName();
     }
-    OS << ")";
+    OS << tok::r_paren;
   }
 
   /// If the error type of \p HandlerDesc is more specialized than \c Error,
@@ -5545,7 +5544,7 @@ private:
                                            const ASTContext &Ctx) {
     auto ErrorType = *HandlerDesc.getErrorType();
     if (ErrorType->getCanonicalType() != Ctx.getExceptionType()) {
-      OS << " as! ";
+      OS << " " << tok::kw_as << tok::exclaim_postfix << " ";
       ErrorType->lookThroughSingleOptionalType()->print(OS);
     }
   }
@@ -5567,18 +5566,18 @@ private:
         OS << "error";
         addCastToCustomErrorTypeIfNecessary(HandlerDesc, FD->getASTContext());
       } else {
-        OS << "nil";
+        OS << tok::kw_nil;
       }
     } else {
       if (!HasResult) {
-        OS << "nil";
+        OS << tok::kw_nil;
       } else if (HandlerDesc
                      .getSuccessParamAsyncReturnType(
                          HandlerDesc.params()[Index].getPlainType())
                      ->isVoid()) {
         // Void return types are not returned by the async function, synthesize
         // a Void instance.
-        OS << "()";
+        OS << tok::l_paren << tok::r_paren;
       } else if (HandlerDesc.getSuccessParams().size() > 1) {
         // If the async method returns a tuple, we need to pass its elements to
         // the completion handler separately. For example:
@@ -5593,7 +5592,7 @@ private:
         //     completion(result.0, result.1)
         //   }
         // }
-        OS << "result." << Index;
+        OS << "result" << tok::period << Index;
       } else {
         OS << "result";
       }
@@ -5609,7 +5608,7 @@ private:
   void addCallToCompletionHandler(bool HasResult, Identifier HandlerName,
                                   const FuncDecl *FD,
                                   const AsyncHandlerDesc &HandlerDesc) {
-    OS << HandlerName << "(";
+    OS << HandlerName << tok::l_paren;
 
     // Construct arguments to pass to the completion handler
     switch (HandlerDesc.Type) {
@@ -5619,7 +5618,7 @@ private:
     case HandlerType::PARAMS: {
       for (size_t I = 0; I < HandlerDesc.params().size(); ++I) {
         if (I > 0) {
-          OS << ", ";
+          OS << tok::comma << " ";
         }
         addCompletionHandlerArgument(I, HasResult, FD, HandlerDesc);
       }
@@ -5627,16 +5626,17 @@ private:
     }
     case HandlerType::RESULT: {
       if (HasResult) {
-        OS << ".success(result)";
+        OS << tok::period_prefix << "success" << tok::l_paren << "result"
+           << tok::r_paren;
       } else {
-        OS << ".failure(error";
+        OS << tok::period_prefix << "failure" << tok::l_paren << "error";
         addCastToCustomErrorTypeIfNecessary(HandlerDesc, FD->getASTContext());
-        OS << ")";
+        OS << tok::r_paren;
       }
       break;
     }
     }
-    OS << ")"; // Close the call to the completion handler
+    OS << tok::r_paren; // Close the call to the completion handler
   }
 
   /// Adds the result type of a refactored async function that previously
@@ -5645,14 +5645,15 @@ private:
     SmallVector<Type, 2> Scratch;
     auto ReturnTypes = HandlerDesc.getAsyncReturnTypes(Scratch);
     if (ReturnTypes.size() > 1) {
-      OS << "(";
+      OS << tok::l_paren;
     }
 
     llvm::interleave(
-        ReturnTypes, [&](Type Ty) { Ty->print(OS); }, [&]() { OS << ", "; });
+        ReturnTypes, [&](Type Ty) { Ty->print(OS); },
+        [&]() { OS << tok::comma << " "; });
 
     if (ReturnTypes.size() > 1) {
-      OS << ")";
+      OS << tok::r_paren;
     }
   }
 
@@ -5677,7 +5678,7 @@ private:
   void addResultTypeAnnotationIfNecessary(const FuncDecl *FD,
                                           const AsyncHandlerDesc &HandlerDesc) {
     if (FD->isGeneric()) {
-      OS << ": ";
+      OS << tok::colon << " ";
       addAsyncFuncReturnType(HandlerDesc);
     }
   }
