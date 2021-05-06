@@ -16,6 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #if defined(_WIN32)
+
+// Notes: swift::fatalError is not shared between libswiftCore and libswift_Concurrency
+// and libswift_Concurrency uses swift_Concurrency_fatalError instead.
+#ifndef SWIFT_FATAL_ERROR
+#define SWIFT_FATAL_ERROR swift::fatalError
+#endif
+
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Debug.h"
 
@@ -26,9 +33,9 @@ void ConditionPlatformHelper::wait(CONDITION_VARIABLE &condition,
   BOOL result = SleepConditionVariableSRW(&condition, &mutex, INFINITE, 0);
   if (!result) {
     DWORD errorcode = GetLastError();
-    fatalError(/* flags = */ 0,
-               "'SleepConditionVariableSRW()' failed with error code %d\n",
-               errorcode);
+    SWIFT_FATAL_ERROR(/* flags = */ 0,
+                      "'SleepConditionVariableSRW()' failed with error code %d\n",
+                      errorcode);
   }
 }
 #endif
