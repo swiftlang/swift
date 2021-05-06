@@ -4150,6 +4150,44 @@ struct AsyncHandlerDesc {
     return Ty->getParams();
   }
 
+  /// Retrieve the parameters relevant to a successful return from the
+  /// completion handler. This drops the Error parameter if present.
+  ArrayRef<AnyFunctionType::Param> getSuccessParams() const {
+    if (HasError && Type == HandlerType::PARAMS)
+      return params().drop_back();
+    return params();
+  }
+
+  /// Get the type of the error that will be thrown by the \c async method or \c
+  /// None if the completion handler doesn't accept an error parameter.
+  /// This may be more specialized than the generic 'Error' type if the
+  /// completion handler of the converted function takes a more specialized
+  /// error type.
+  Optional<swift::Type> getErrorType() const {
+    if (HasError) {
+      switch (Type) {
+      case HandlerType::INVALID:
+        return None;
+      case HandlerType::PARAMS:
+        // The last parameter of the completion handler is the error param
+        return params().back().getPlainType()->lookThroughSingleOptionalType();
+      case HandlerType::RESULT:
+        assert(
+            params().size() == 1 &&
+            "Result handler should have the Result type as the only parameter");
+        auto ResultType =
+            params().back().getPlainType()->getAs<BoundGenericType>();
+        auto GenericArgs = ResultType->getGenericArgs();
+        assert(GenericArgs.size() == 2 && "Result should have two params");
+        // The second (last) generic parameter of the Result type is the error
+        // type.
+        return GenericArgs.back();
+      }
+    } else {
+      return None;
+    }
+  }
+
   /// The `CallExpr` if the given node is a call to the `Handler`
   CallExpr *getAsHandlerCall(ASTNode Node) const {
     if (!isValid())
@@ -4171,13 +4209,16 @@ struct AsyncHandlerDesc {
     auto Args = ArgList.ref();
 
     if (Type == HandlerType::PARAMS) {
-      if (!HasError)
-        return HandlerResult(Args);
-
-      if (!isa<NilLiteralExpr>(Args.back()))
+      // If there's an error parameter and the user isn't passing nil to it,
+      // assume this is the error path.
+      if (HasError && !isa<NilLiteralExpr>(Args.back()))
         return HandlerResult(Args.back(), true);
 
-      return HandlerResult(Args.drop_back());
+      // We can drop the args altogether if they're just Void.
+      if (willAsyncReturnVoid())
+        return HandlerResult();
+
+      return HandlerResult(HasError ? Args.drop_back() : Args);
     } else if (Type == HandlerType::RESULT) {
       if (Args.size() != 1)
         return HandlerResult(Args);
@@ -4196,11 +4237,61 @@ struct AsyncHandlerDesc {
         return HandlerResult(Args);
 
       auto ResultArgList = callArgs(ResultCE);
-      return HandlerResult(ResultArgList.ref()[0],
-                           D->getNameStr() == StringRef("failure"));
+      auto isFailure = D->getNameStr() == StringRef("failure");
+
+      // We can drop the arg altogether if it's just Void.
+      if (!isFailure && willAsyncReturnVoid())
+        return HandlerResult();
+
+      // Otherwise the arg gets the .success() or .failure() call dropped.
+      return HandlerResult(ResultArgList.ref()[0], isFailure);
     }
 
     llvm_unreachable("Unhandled result type");
+  }
+
+  // Convert the type of a success parameter in the completion handler function
+  // to a return type suitable for an async function. If there is an error
+  // parameter present e.g (T?, Error?) -> Void, this unwraps a level of
+  // optionality from T?. If this is a Result<T, U> type, returns the success
+  // type T.
+  swift::Type getSuccessParamAsyncReturnType(swift::Type Ty) const {
+    switch (Type) {
+    case HandlerType::PARAMS: {
+      // If there's an Error parameter in the handler, the success branch can
+      // be unwrapped.
+      if (HasError)
+        Ty = Ty->lookThroughSingleOptionalType();
+
+      return Ty;
+    }
+    case HandlerType::RESULT: {
+      // Result<T, U> maps to T.
+      return Ty->castTo<BoundGenericType>()->getGenericArgs()[0];
+    }
+    case HandlerType::INVALID:
+      llvm_unreachable("Invalid handler type");
+    }
+  }
+
+  /// Gets the return value types for the async equivalent of this handler.
+  ArrayRef<swift::Type>
+  getAsyncReturnTypes(SmallVectorImpl<swift::Type> &Scratch) const {
+    for (auto &Param : getSuccessParams()) {
+      auto Ty = Param.getParameterType();
+      Scratch.push_back(getSuccessParamAsyncReturnType(Ty));
+    }
+    return Scratch;
+  }
+
+  /// Whether the async equivalent of this handler returns Void.
+  bool willAsyncReturnVoid() const {
+    // If all of the success params will be converted to Void return types,
+    // this will be a Void async function.
+    return llvm::all_of(getSuccessParams(), [&](auto &param) {
+      auto Ty = param.getParameterType();
+      return getSuccessParamAsyncReturnType(Ty)->isVoid();
+    });
   }
 };
 
@@ -4464,6 +4555,7 @@ struct CallbackClassifier {
   /// names from `Body`. Errors are added through `DiagEngine`, possibly
   /// resulting in partially filled out blocks.
   static void classifyInto(ClassifiedBlocks &Blocks,
+                           llvm::DenseSet<SwitchStmt *> &HandledSwitches,
                            DiagnosticEngine &DiagEngine,
                            ArrayRef<const ParamDecl *> SuccessParams,
                            const ParamDecl *ErrParam, HandlerType ResultType,
@@ -4475,25 +4567,30 @@ struct CallbackClassifier {
     if (ErrParam)
       ParamsSet.insert(ErrParam);
 
-    CallbackClassifier Classifier(Blocks, DiagEngine, ParamsSet, ErrParam,
+    CallbackClassifier Classifier(Blocks, HandledSwitches, DiagEngine,
+                                  ParamsSet, ErrParam,
                                   ResultType == HandlerType::RESULT);
     Classifier.classifyNodes(Body);
   }
 
 private:
   ClassifiedBlocks &Blocks;
+  llvm::DenseSet<SwitchStmt *> &HandledSwitches;
   DiagnosticEngine &DiagEngine;
   ClassifiedBlock *CurrentBlock;
   llvm::DenseSet<const Decl *> ParamsSet;
   const ParamDecl *ErrParam;
   bool IsResultParam;
 
-  CallbackClassifier(ClassifiedBlocks &Blocks, DiagnosticEngine &DiagEngine,
+  CallbackClassifier(ClassifiedBlocks &Blocks,
+                     llvm::DenseSet<SwitchStmt *> &HandledSwitches,
+                     DiagnosticEngine &DiagEngine,
                      llvm::DenseSet<const Decl *> ParamsSet,
                      const ParamDecl *ErrParam, bool IsResultParam)
-      : Blocks(Blocks), DiagEngine(DiagEngine),
-        CurrentBlock(&Blocks.SuccessBlock), ParamsSet(ParamsSet),
-        ErrParam(ErrParam), IsResultParam(IsResultParam) {}
+      : Blocks(Blocks), HandledSwitches(HandledSwitches),
+        DiagEngine(DiagEngine), CurrentBlock(&Blocks.SuccessBlock),
+        ParamsSet(ParamsSet), ErrParam(ErrParam), IsResultParam(IsResultParam) {
+  }
 
   void classifyNodes(ArrayRef<ASTNode> Nodes) {
     for (auto I = Nodes.begin(), E = Nodes.end(); I < E; ++I) {
@@ -4627,6 +4724,7 @@ private:
   void classifySwitch(SwitchStmt *SS) {
     if (!IsResultParam || singleSwitchSubject(SS) != ErrParam) {
       CurrentBlock->addNode(SS);
+      return;
     }
 
     for (auto *CS : SS->getCases()) {
@@ -4664,6 +4762,8 @@ private:
       if (DiagEngine.hadAnyError())
         return;
     }
+    // Mark this switch statement as having been transformed.
+    HandledSwitches.insert(SS);
   }
 };
 
@@ -4709,8 +4809,9 @@ class AsyncConverter : private SourceEntityWalker {
   SmallString<0> Buffer;
   llvm::raw_svector_ostream OS;
 
-  // Decls where any force-unwrap of that decl should be unwrapped, eg. for a
-  // previously optional closure paramter has become a non-optional local
+  // Decls where any force unwrap or optional chain of that decl should be
+  // elided, e.g for a previously optional closure parameter that has become a
+  // non-optional local.
   llvm::DenseSet<const Decl *> Unwraps;
   // Decls whose references should be replaced with, either because they no
   // longer exist or are a different type. Any replaced code should ideally be
@@ -4720,6 +4821,9 @@ class AsyncConverter : private SourceEntityWalker {
   // declarations of old parameters, as well as the replacement for any
   // references to it
   llvm::DenseMap<const Decl *, std::string> Names;
+
+  /// The switch statements that have been re-written by this transform.
+  llvm::DenseSet<SwitchStmt *> HandledSwitches;
 
   // These are per-node (ie. are saved and restored on each convertNode call)
   SourceLoc LastAddedLoc;
@@ -4791,6 +4895,9 @@ private:
       NestedExprCount++;
       return true;
     }
+    // Note we don't walk into any nested local function decls. If we start
+    // doing so in the future, be sure to update the logic that deals with
+    // converting unhandled returns into placeholders in walkToStmtPre.
     return false;
   }
 
@@ -4808,36 +4915,41 @@ private:
         bool AddPlaceholder = Placeholders.count(D);
         StringRef Name = newNameFor(D, false);
         if (AddPlaceholder || !Name.empty())
-          return addCustom(DRE->getStartLoc(),
-                           Lexer::getLocForEndOfToken(SM, DRE->getEndLoc()),
-                           [&]() {
-                             if (AddPlaceholder)
-                               OS << PLACEHOLDER_START;
-                             if (!Name.empty())
-                               OS << Name;
-                             else
-                               D->getName().print(OS);
-                             if (AddPlaceholder)
-                               OS << PLACEHOLDER_END;
-                           });
+          return addCustom(DRE->getSourceRange(), [&]() {
+            if (AddPlaceholder)
+              OS << PLACEHOLDER_START;
+            if (!Name.empty())
+              OS << Name;
+            else
+              D->getName().print(OS);
+            if (AddPlaceholder)
+              OS << PLACEHOLDER_END;
+          });
       }
-    } else if (auto *FTE = dyn_cast<ForceValueExpr>(E)) {
-      if (auto *D = FTE->getReferencedDecl().getDecl()) {
+    } else if (isa<ForceValueExpr>(E) || isa<BindOptionalExpr>(E)) {
+      // Remove a force unwrap or optional chain of a returned success value,
+      // as it will no longer be optional. For force unwraps, this is always a
+      // valid transform. For optional chains, it is a locally valid transform
+      // within the optional chain e.g foo?.x -> foo.x, but may change the type
+      // of the overall chain, which could cause errors elsewhere in the code.
+      // However this is generally more useful to the user than just leaving
+      // 'foo' as a placeholder. Note this is only the case when no other
+      // optionals are involved in the chain, e.g foo?.x?.y -> foo.x?.y is
+      // completely valid.
+      if (auto *D = E->getReferencedDecl().getDecl()) {
         if (Unwraps.count(D))
-          return addCustom(FTE->getStartLoc(),
-                           FTE->getEndLoc().getAdvancedLoc(1),
+          return addCustom(E->getSourceRange(),
                            [&]() { OS << newNameFor(D, true); });
       }
     } else if (NestedExprCount == 0) {
       if (CallExpr *CE = TopHandler.getAsHandlerCall(E))
-        return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
-                         [&]() { addHandlerCall(CE); });
+        return addCustom(CE->getSourceRange(), [&]() { addHandlerCall(CE); });
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         auto HandlerDesc = AsyncHandlerDesc::find(
             getUnderlyingFunc(CE->getFn()), StartNode.dyn_cast<Expr *>() == CE);
         if (HandlerDesc.isValid())
-          return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
+          return addCustom(CE->getSourceRange(),
                            [&]() { addAsyncAlternativeCall(CE, HandlerDesc); });
       }
     }
@@ -4845,6 +4957,38 @@ private:
     NestedExprCount++;
     return true;
   }
+
+  bool replaceRangeWithPlaceholder(SourceRange range) {
+    return addCustom(range, [&]() {
+      OS << PLACEHOLDER_START;
+      addRange(range, /*toEndOfToken*/ true);
+      OS << PLACEHOLDER_END;
+    });
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    // Some break and return statements need to be turned into placeholders,
+    // as they may no longer perform the control flow that the user is
+    // expecting.
+    if (!S->isImplicit()) {
+      // For a break, if it's jumping out of a switch statement that we've
+      // re-written as a part of the transform, turn it into a placeholder, as
+      // it would have been lifted out of the switch statement.
+      if (auto *BS = dyn_cast<BreakStmt>(S)) {
+        if (auto *SS = dyn_cast<SwitchStmt>(BS->getTarget())) {
+          if (HandledSwitches.contains(SS))
+            replaceRangeWithPlaceholder(S->getSourceRange());
+        }
+      }
+
+      // For a return, if it's not nested inside another closure or function,
+      // turn it into a placeholder, as it will be lifted out of the callback.
+      if (isa<ReturnStmt>(S) && NestedExprCount == 0)
+        replaceRangeWithPlaceholder(S->getSourceRange());
+    }
+    return true;
+  }
+
 #undef PLACEHOLDER_START
 #undef PLACEHOLDER_END
 
@@ -4853,11 +4997,10 @@ private:
     return true;
   }
 
-  bool addCustom(SourceLoc End, SourceLoc NextAddedLoc,
-                 std::function<void()> Custom = {}) {
-    addRange(LastAddedLoc, End);
+  bool addCustom(SourceRange Range, std::function<void()> Custom = {}) {
+    addRange(LastAddedLoc, Range.Start);
     Custom();
-    LastAddedLoc = NextAddedLoc;
+    LastAddedLoc = Lexer::getLocForEndOfToken(SM, Range.End);
     return false;
   }
 
@@ -4919,42 +5062,24 @@ private:
       return;
     }
 
-    auto HandlerParams = TopHandler.params();
-    if (TopHandler.Type == HandlerType::PARAMS && TopHandler.HasError) {
-      HandlerParams = HandlerParams.drop_back();
-    }
-
-    if (HandlerParams.empty()) {
+    SmallVector<Type, 2> Scratch;
+    auto ReturnTypes = TopHandler.getAsyncReturnTypes(Scratch);
+    if (ReturnTypes.empty()) {
       OS << " ";
       return;
     }
 
-    OS << " -> ";
+    // Print the function result type, making sure to omit a '-> Void' return.
+    if (!TopHandler.willAsyncReturnVoid()) {
+      OS << " -> ";
+      if (ReturnTypes.size() > 1)
+        OS << "(";
 
-    if (HandlerParams.size() > 1) {
-      OS << "(";
-    }
-    for (size_t I = 0, E = HandlerParams.size(); I < E; ++I) {
-      if (I > 0) {
-        OS << ", ";
-      }
+      llvm::interleave(
+          ReturnTypes, [&](Type Ty) { Ty->print(OS); }, [&]() { OS << ", "; });
 
-      auto &Param = HandlerParams[I];
-      if (TopHandler.Type == HandlerType::PARAMS) {
-        Type ToPrint = Param.getPlainType();
-        if (TopHandler.HasError)
-          ToPrint = ToPrint->lookThroughSingleOptionalType();
-        ToPrint->print(OS);
-      } else if (TopHandler.Type == HandlerType::RESULT) {
-        auto ResultTy = Param.getPlainType()->getAs<BoundGenericType>();
-        assert(ResultTy && "Result must have generic type");
-        ResultTy->getGenericArgs()[0]->print(OS);
-      } else {
-        llvm_unreachable("Unhandled handler type");
-      }
-    }
-    if (HandlerParams.size() > 1) {
-      OS << ")";
+      if (ReturnTypes.size() > 1)
+        OS << ")";
     }
 
     if (FD->hasBody())
@@ -5066,9 +5191,9 @@ private:
     if (!HandlerDesc.HasError) {
       Blocks.SuccessBlock.addAllNodes(CallbackBody);
     } else if (!CallbackBody.empty()) {
-      CallbackClassifier::classifyInto(Blocks, DiagEngine, SuccessParams,
-                                       ErrParam, HandlerDesc.Type,
-                                       CallbackBody);
+      CallbackClassifier::classifyInto(Blocks, HandledSwitches, DiagEngine,
+                                       SuccessParams, ErrParam,
+                                       HandlerDesc.Type, CallbackBody);
       if (DiagEngine.hadAnyError()) {
         // Can only fallback when the results are params, in which case only
         // the names are used (defaulted to the names of the params if none)
@@ -5081,8 +5206,7 @@ private:
         addFallbackVars(CallbackParams->getArray(), Blocks);
         addDo();
         addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                     /*HasError=*/HandlerDesc.HasError,
-                     /*AddDeclarations=*/!HandlerDesc.HasError);
+                     HandlerDesc, /*AddDeclarations=*/!HandlerDesc.HasError);
         addFallbackCatch(ErrParam);
         OS << "\n";
         convertNodes(CallbackBody);
@@ -5115,10 +5239,9 @@ private:
 
     setNames(Blocks.SuccessBlock, SuccessParams);
     addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                 /*HasError=*/HandlerDesc.HasError,
-                 /*AddDeclarations=*/true);
+                 HandlerDesc, /*AddDeclarations=*/true);
 
-    prepareNamesForBody(HandlerDesc.Type, SuccessParams, ErrParams);
+    prepareNamesForBody(HandlerDesc, SuccessParams, ErrParams);
     convertNodes(Blocks.SuccessBlock.nodes());
 
     if (RequireDo) {
@@ -5128,7 +5251,7 @@ private:
                HandlerDesc.Type != HandlerType::RESULT);
       addCatch(ErrParam);
 
-      prepareNamesForBody(HandlerDesc.Type, ErrParams, SuccessParams);
+      prepareNamesForBody(HandlerDesc, ErrParams, SuccessParams);
       addCatchBody(ErrParam, Blocks.ErrorBlock);
     }
 
@@ -5137,9 +5260,11 @@ private:
 
   void addAwaitCall(const CallExpr *CE, ArrayRef<Expr *> Args,
                     const ClassifiedBlock &SuccessBlock,
-                    ArrayRef<const ParamDecl *> SuccessParams, bool HasError,
-                    bool AddDeclarations) {
-    if (!SuccessParams.empty()) {
+                    ArrayRef<const ParamDecl *> SuccessParams,
+                    const AsyncHandlerDesc &HandlerDesc, bool AddDeclarations) {
+    // Print the bindings to match the completion handler success parameters,
+    // making sure to omit in the case of a Void return.
+    if (!SuccessParams.empty() && !HandlerDesc.willAsyncReturnVoid()) {
       if (AddDeclarations) {
         if (SuccessBlock.allLet()) {
           OS << tok::kw_let;
@@ -5161,7 +5286,7 @@ private:
       OS << " " << tok::equal << " ";
     }
 
-    if (HasError) {
+    if (HandlerDesc.HasError) {
       OS << tok::kw_try << " ";
     }
     OS << "await ";
@@ -5207,16 +5332,21 @@ private:
     OS << "\n" << tok::r_brace;
   }
 
-  void prepareNamesForBody(HandlerType ResultType,
+  void prepareNamesForBody(const AsyncHandlerDesc &HandlerDesc,
                            ArrayRef<const ParamDecl *> CurrentParams,
                            ArrayRef<const ParamDecl *> OtherParams) {
-    switch (ResultType) {
+    switch (HandlerDesc.Type) {
     case HandlerType::PARAMS:
       for (auto *Param : CurrentParams) {
-        if (Param->getType()->getOptionalObjectType()) {
+        auto Ty = Param->getType();
+        if (Ty->getOptionalObjectType()) {
           Unwraps.insert(Param);
           Placeholders.insert(Param);
         }
+        // Void parameters get omitted where possible, so turn any reference
+        // into a placeholder, as its usage is unlikely what the user wants.
+        if (HandlerDesc.getSuccessParamAsyncReturnType(Ty)->isVoid())
+          Placeholders.insert(Param);
       }
       // Use of the other params is invalid within the current body
       Placeholders.insert(OtherParams.begin(), OtherParams.end());
@@ -5270,6 +5400,262 @@ private:
     }
   }
 };
+
+/// When adding an async alternative method for the function declaration \c FD,
+/// this class tries to create a function body for the legacy function (the one
+/// with a completion handler), which calls the newly converted async function.
+/// There are certain situations in which we fail to create such a body, e.g.
+/// if the completion handler has the signature `(String, Error?) -> Void` in
+/// which case we can't synthesize the result of type \c String in the error
+/// case.
+class LegacyAlternativeBodyCreator {
+  /// The old function declaration for which an async alternative has been added
+  /// and whose body shall be rewritten to call the newly added async
+  /// alternative.
+  FuncDecl *FD;
+
+  /// The description of the completion handler in the old function declaration.
+  AsyncHandlerDesc HandlerDesc;
+
+  std::string Buffer;
+  llvm::raw_string_ostream OS;
+
+  /// Adds the call to the refactored 'async' method without the 'await'
+  /// keyword to the output stream.
+  void addCallToAsyncMethod() {
+    OS << FD->getBaseName() << "(";
+    bool FirstParam = true;
+    for (auto Param : *FD->getParameters()) {
+      if (Param == HandlerDesc.Handler) {
+        /// We don't need to pass the completion handler to the async method.
+        continue;
+      }
+      if (!FirstParam) {
+        OS << ", ";
+      } else {
+        FirstParam = false;
+      }
+      if (!Param->getArgumentName().empty()) {
+        OS << Param->getArgumentName() << ": ";
+      }
+      OS << Param->getParameterName();
+    }
+    OS << ")";
+  }
+
+  /// If the returned error type is more specialized than \c Error, adds an
+  /// 'as! CustomError' cast to the more specialized error type to the output
+  /// stream.
+  void addCastToCustomErrorTypeIfNecessary() {
+    auto ErrorType = *HandlerDesc.getErrorType();
+    if (ErrorType->getCanonicalType() !=
+        FD->getASTContext().getExceptionType()) {
+      OS << " as! ";
+      ErrorType->lookThroughSingleOptionalType()->print(OS);
+    }
+  }
+
+  /// Adds the \c Index -th parameter to the completion handler.
+  /// If \p HasResult is \c true, it is assumed that a variable named 'result'
+  /// contains the result returned from the async alternative. If the callback
+  /// also takes an error parameter, \c nil passed to the completion handler for
+  /// the error.
+  /// If \p HasResult is \c false, it is a assumed that a variable named 'error'
+  /// contains the error thrown from the async method and 'nil' will be passed
+  /// to the completion handler for all result parameters.
+  void addCompletionHandlerArgument(size_t Index, bool HasResult) {
+    if (HandlerDesc.HasError && Index == HandlerDesc.params().size() - 1) {
+      // The error parameter is the last argument of the completion handler.
+      if (!HasResult) {
+        OS << "error";
+        addCastToCustomErrorTypeIfNecessary();
+      } else {
+        OS << "nil";
+      }
+    } else {
+      if (!HasResult) {
+        OS << "nil";
+      } else if (HandlerDesc
+                     .getSuccessParamAsyncReturnType(
+                         HandlerDesc.params()[Index].getPlainType())
+                     ->isVoid()) {
+        // Void return types are not returned by the async function, synthesize
+        // a Void instance.
+        OS << "()";
+      } else if (HandlerDesc.getSuccessParams().size() > 1) {
+        // If the async method returns a tuple, we need to pass its elements to
+        // the completion handler separately. For example:
+        //
+        // func foo() async -> (String, Int) {}
+        //
+        // causes the following legacy body to be created:
+        //
+        // func foo(completion: (String, Int) -> Void) {
+        //   async {
+        //     let result = await foo()
+        //     completion(result.0, result.1)
+        //   }
+        // }
+        OS << "result." << Index;
+      } else {
+        OS << "result";
+      }
+    }
+  }
+
+  /// Adds the call to the completion handler. See \c
+  /// getCompletionHandlerArgument for how the arguments are synthesized if the
+  /// completion handler takes arguments, not a \c Result type.
+  void addCallToCompletionHandler(bool HasResult) {
+    OS << HandlerDesc.Handler->getParameterName() << "(";
+
+    // Construct arguments to pass to the completion handler
+    switch (HandlerDesc.Type) {
+    case HandlerType::INVALID:
+      llvm_unreachable("Cannot be rewritten");
+      break;
+    case HandlerType::PARAMS: {
+      for (size_t I = 0; I < HandlerDesc.params().size(); ++I) {
+        if (I > 0) {
+          OS << ", ";
+        }
+        addCompletionHandlerArgument(I, HasResult);
+      }
+      break;
+    }
+    case HandlerType::RESULT: {
+      if (HasResult) {
+        OS << ".success(result)";
+      } else {
+        OS << ".failure(error";
+        addCastToCustomErrorTypeIfNecessary();
+        OS << ")";
+      }
+      break;
+    }
+    }
+    OS << ")"; // Close the call to the completion handler
+  }
+
+  /// Adds the result type of the converted async function.
+  void addAsyncFuncReturnType() {
+    SmallVector<Type, 2> Scratch;
+    auto ReturnTypes = HandlerDesc.getAsyncReturnTypes(Scratch);
+    if (ReturnTypes.size() > 1) {
+      OS << "(";
+    }
+
+    llvm::interleave(
+        ReturnTypes, [&](Type Ty) { Ty->print(OS); }, [&]() { OS << ", "; });
+
+    if (ReturnTypes.size() > 1) {
+      OS << ")";
+    }
+  }
+
+  /// If the async alternative function is generic, adds the type annotation
+  /// to the 'return' variable in the legacy function so that the generic
+  /// parameters of the legacy function are passed to the generic function.
+  /// For example for
+  /// \code
+  /// func foo<GenericParam>() async -> GenericParam {}
+  /// \endcode
+  /// we generate
+  /// \code
+  /// func foo<GenericParam>(completion: (T) -> Void) {
+  ///   async {
+  ///     let result: GenericParam = await foo()
+  ///               <------------>
+  ///     completion(result)
+  ///   }
+  /// }
+  /// \endcode
+  /// This function adds the range marked by \c <----->
+  void addResultTypeAnnotationIfNecessary() {
+    if (FD->isGeneric()) {
+      OS << ": ";
+      addAsyncFuncReturnType();
+    }
+  }
+
+public:
+  LegacyAlternativeBodyCreator(FuncDecl *FD, AsyncHandlerDesc HandlerDesc)
+      : FD(FD), HandlerDesc(HandlerDesc), OS(Buffer) {}
+
+  bool canRewriteLegacyBody() {
+    if (FD == nullptr || FD->getBody() == nullptr) {
+      return false;
+    }
+    if (FD->hasThrows()) {
+      assert(!HandlerDesc.isValid() && "We shouldn't have found a handler desc "
+                                       "if the original function throws");
+      return false;
+    }
+    switch (HandlerDesc.Type) {
+    case HandlerType::INVALID:
+      return false;
+    case HandlerType::PARAMS: {
+      if (HandlerDesc.HasError) {
+        // The non-error parameters must be optional so that we can set them to
+        // nil in the error case.
+        // The error parameter must be optional so we can set it to nil in the
+        // success case.
+        // Otherwise we can't synthesize the values to return for these
+        // parameters.
+        return llvm::all_of(HandlerDesc.params(),
+                            [](AnyFunctionType::Param Param) -> bool {
+                              return Param.getPlainType()->isOptional();
+                            });
+      } else {
+        return true;
+      }
+    }
+    case HandlerType::RESULT:
+      return true;
+    }
+  }
+
+  std::string create() {
+    assert(Buffer.empty() &&
+           "LegacyAlternativeBodyCreator can only be used once");
+    assert(canRewriteLegacyBody() &&
+           "Cannot create a legacy body if the body can't be rewritten");
+    OS << "{\n"; // start function body
+    OS << "async {\n";
+    if (HandlerDesc.HasError) {
+      OS << "do {\n";
+      if (!HandlerDesc.willAsyncReturnVoid()) {
+        OS << "let result";
+        addResultTypeAnnotationIfNecessary();
+        OS << " = ";
+      }
+      OS << "try await ";
+      addCallToAsyncMethod();
+      OS << "\n";
+      addCallToCompletionHandler(/*HasResult=*/true);
+      OS << "\n"
+         << "} catch {\n";
+      addCallToCompletionHandler(/*HasResult=*/false);
+      OS << "\n"
+         << "}\n"; // end catch
+    } else {
+      if (!HandlerDesc.willAsyncReturnVoid()) {
+        OS << "let result";
+        addResultTypeAnnotationIfNecessary();
+        OS << " = ";
+      }
+      OS << "await ";
+      addCallToAsyncMethod();
+      OS << "\n";
+      addCallToCompletionHandler(/*HasResult=*/true);
+      OS << "\n";
+    }
+    OS << "}\n"; // end 'async'
+    OS << "}\n"; // end function body
+    return Buffer;
+  }
+};
+
 } // namespace asyncrefactorings
 
 bool RefactoringActionConvertCallToAsyncAlternative::isApplicable(
@@ -5331,8 +5717,8 @@ bool RefactoringActionConvertToAsync::performChange() {
   assert(FD &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncHandlerDesc TempDesc;
-  AsyncConverter Converter(SM, DiagEngine, FD, TempDesc);
+  auto HandlerDesc = AsyncHandlerDesc::find(FD, /*ignoreName=*/true);
+  AsyncConverter Converter(SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
 
@@ -5376,6 +5762,13 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
+  LegacyAlternativeBodyCreator LegacyBody(FD, HandlerDesc);
+  if (LegacyBody.canRewriteLegacyBody()) {
+    EditConsumer.accept(SM,
+                        Lexer::getCharSourceRangeFromSourceRange(
+                            SM, FD->getBody()->getSourceRange()),
+                        LegacyBody.create());
+  }
   Converter.insertAfter(FD, EditConsumer);
 
   return false;

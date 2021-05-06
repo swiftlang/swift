@@ -1,10 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-module-path %t/a.swiftmodule -module-name a %s
+// RUN: %target-swift-frontend -emit-module-path %t/a.swiftmodule -module-name a %s
 // RUN: %target-swift-ide-test -print-module -module-to-print a -source-filename x -I %t | %FileCheck -check-prefix MODULE-CHECK %s
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-module-path %t/b.swiftmodule -module-name a  %t/a.swiftmodule
+// RUN: %target-swift-frontend -emit-module-path %t/b.swiftmodule -module-name a  %t/a.swiftmodule
 // RUN: cmp -s %t/a.swiftmodule %t/b.swiftmodule
-
-// REQUIRES: concurrency
 
 ///////////
 // This test checks for correct serialization & deserialization of

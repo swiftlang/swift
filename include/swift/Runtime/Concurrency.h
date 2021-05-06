@@ -303,10 +303,19 @@ bool swift_task_tryAddStatusRecord(TaskStatusRecord *record);
 ///
 /// The given record need not be the last record added to
 /// the task, but the operation may be less efficient if not.
-///s
+///
 /// Returns false if the task has been cancelled.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_removeStatusRecord(TaskStatusRecord *record);
+
+/// Signifies whether the current task is in the middle of executing the
+/// operation block of a `with(Throwing)TaskGroup(...) { <operation> }`.
+///
+/// Task local values must use un-structured allocation for values bound in this
+/// scope, as they may be referred to by `group.spawn`-ed tasks and therefore
+/// out-life the scope of a task-local value binding.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_hasTaskGroupStatusRecord();
 
 /// Attach a child task to its parent task and return the newly created
 /// `ChildTaskStatusRecord`.
@@ -339,20 +348,23 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(
     CancellationNotificationStatusRecord *record);
 
+/// Report error about attempting to bind a task-local value from an illegal context.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
+    const unsigned char *file, uintptr_t fileLength,
+    bool fileIsASCII, uintptr_t line);
+
 /// Get a task local value from the passed in task. Its Swift signature is
 ///
 /// \code
 /// func _taskLocalValueGet<Key>(
 ///   _ task: Builtin.NativeObject,
-///   keyType: Any.Type /*Key.Type*/,
-///   inheritance: UInt8/*TaskLocalInheritance*/
+///   keyType: Any.Type /*Key.Type*/
 /// ) -> UnsafeMutableRawPointer? where Key: TaskLocalKey
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
-swift_task_localValueGet(AsyncTask* task,
-                         const Metadata *keyType,
-                         TaskLocal::TaskLocalInheritance inheritance);
+swift_task_localValueGet(AsyncTask* task, const HeapObject *key);
 
 /// Add a task local value to the passed in task.
 ///
@@ -369,7 +381,7 @@ swift_task_localValueGet(AsyncTask* task,
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localValuePush(AsyncTask* task,
-                         const Metadata *keyType,
+                         const HeapObject *key,
                          /* +1 */ OpaqueValue *value,
                          const Metadata *valueType);
 

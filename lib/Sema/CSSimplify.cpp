@@ -125,6 +125,7 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
 
 static bool areConservativelyCompatibleArgumentLabels(
     OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
+    MatchCallArgumentListener &listener,
     Optional<unsigned> unlabeledTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
@@ -163,7 +164,6 @@ static bool areConservativelyCompatibleArgumentLabels(
   auto params = fnType->getParams();
   ParameterListInfo paramInfo(params, decl, hasAppliedSelf);
 
-  MatchCallArgumentListener listener;
   return matchCallArguments(args, params, paramInfo,
                             unlabeledTrailingClosureArgIndex,
                             /*allow fixes*/ false, listener,
@@ -1217,6 +1217,32 @@ public:
   ArrayRef<std::pair<unsigned, AnyFunctionType::Param>>
   getExtraneousArguments() const {
     return ExtraArguments;
+  }
+};
+
+class AllowLabelMismatches : public MatchCallArgumentListener {
+  SmallVector<Identifier, 4> NewLabels;
+  bool HadLabelingIssues = false;
+
+public:
+  bool missingLabel(unsigned paramIndex) override {
+    HadLabelingIssues = true;
+    return false;
+  }
+
+  bool relabelArguments(ArrayRef<Identifier> newLabels) override {
+    NewLabels.append(newLabels.begin(), newLabels.end());
+    HadLabelingIssues = true;
+    return false;
+  }
+
+  bool hadLabelingIssues() const { return HadLabelingIssues; }
+
+  Optional<ArrayRef<Identifier>> getLabelReplacements() const {
+    if (!hadLabelingIssues() || NewLabels.empty())
+      return None;
+
+    return {NewLabels};
   }
 };
 
@@ -9724,11 +9750,57 @@ retry_after_fail:
           argsWithLabels.append(args.begin(), args.end());
           FunctionType::relabelParams(argsWithLabels, argumentInfo->Labels);
 
-          if (!areConservativelyCompatibleArgumentLabels(
-                  choice, argsWithLabels,
-                  argumentInfo->UnlabeledTrailingClosureIndex)) {
+          auto labelsMatch = [&](MatchCallArgumentListener &listener) {
+            if (areConservativelyCompatibleArgumentLabels(
+                    choice, argsWithLabels, listener,
+                    argumentInfo->UnlabeledTrailingClosureIndex))
+              return true;
+
             labelMismatch = true;
             return false;
+          };
+
+          AllowLabelMismatches listener;
+
+          // This overload has more problems than just missing/invalid labels.
+          if (!labelsMatch(listener))
+            return false;
+
+          // If overload did match, let's check if it needs to be disabled
+          // in "performance" mode because it has missing labels.
+          if (listener.hadLabelingIssues()) {
+            // In performance mode, let's just disable the choice,
+            // this decision could be rolled back for diagnostics.
+            if (!shouldAttemptFixes())
+              return false;
+
+            // Match expected vs. actual to see whether the only kind
+            // of problem here is missing label(s).
+            auto onlyMissingLabels =
+                [&argumentInfo](ArrayRef<Identifier> expectedLabels) {
+                  auto actualLabels = argumentInfo->Labels;
+                  if (actualLabels.size() != expectedLabels.size())
+                    return false;
+
+                  for (unsigned i = 0; i != actualLabels.size(); ++i) {
+                    auto actual = actualLabels[i];
+                    auto expected = expectedLabels[i];
+
+                    if (actual.compare(expected) != 0 && !actual.empty())
+                      return false;
+                  }
+
+                  return true;
+                };
+
+            auto replacementLabels = listener.getLabelReplacements();
+            // Either it's just one argument or all issues are missing labels.
+            if (!replacementLabels || onlyMissingLabels(*replacementLabels)) {
+              constraint->setDisabled(/*enableForDiagnostics=*/true);
+              // Don't include this overload in "common result" computation
+              // because it has issues.
+              return true;
+            }
           }
         }
 

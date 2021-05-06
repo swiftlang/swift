@@ -4433,7 +4433,7 @@ public:
   /// Given expression represents computed result of the closure.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
                              bool isDefaultWrappedValue = false,
-                             bool isAsyncLetWrapper = false);
+                             bool isSpawnLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
@@ -5304,7 +5304,20 @@ public:
 
   bool attempt(ConstraintSystem &cs) const;
 
-  bool isDisabled() const { return Choice->isDisabled(); }
+  bool isDisabled() const {
+    if (!Choice->isDisabled())
+      return false;
+
+    // If solver is in a diagnostic mode, let's allow
+    // constraints that have fixes or have been disabled
+    // in attempt to produce a solution faster for
+    // well-formed expressions.
+    if (CS.shouldAttemptFixes()) {
+      return !(hasFix() || Choice->isDisabledInPerformanceMode());
+    }
+
+    return true;
+  }
 
   bool hasFix() const {
     return bool(Choice->getFix());
@@ -5581,6 +5594,11 @@ Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
 /// Determine whether given disjunction constraint represents a set
 /// of operator overload choices.
 bool isOperatorDisjunction(Constraint *disjunction);
+
+/// Find out whether closure body has any `async` or `await` expressions,
+/// declarations, or statements directly in its body (no in other closures
+/// or nested declarations).
+ASTNode findAsyncNode(ClosureExpr *closure);
 
 } // end namespace constraints
 

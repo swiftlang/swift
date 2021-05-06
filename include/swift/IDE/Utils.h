@@ -87,8 +87,8 @@ bool initCompilerInvocation(
     DiagnosticEngine &Diags, StringRef UnresolvedPrimaryFile,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     const std::string &runtimeResourcePath,
-    const std::string &diagnosticDocumentationPath,
-    bool shouldOptimizeForIDE, time_t sessionTimestamp, std::string &Error);
+    const std::string &diagnosticDocumentationPath, time_t sessionTimestamp,
+    std::string &Error);
 
 bool initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                     CompilerInvocation &Invok,
@@ -123,16 +123,6 @@ std::unique_ptr<llvm::MemoryBuffer>
 std::unique_ptr<llvm::MemoryBuffer>
   replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
                       bool *HadPlaceholder = nullptr);
-
-void getLocationInfo(
-    const ValueDecl *VD,
-    llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-    StringRef &Filename);
-
-void getLocationInfoForClangNode(ClangNode ClangNode,
-                                 ClangImporter *Importer,
-       llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
-                                 StringRef &Filename);
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 

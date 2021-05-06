@@ -270,32 +270,8 @@ bool IsActorRequest::evaluate(
   if (!classDecl)
     return false;
 
-  bool isExplicitActor = classDecl->isExplicitActor() ||
-    classDecl->getAttrs().getAttribute<ActorAttr>();
-
-  // If there is a superclass, we can infer actor-ness from it.
-  if (auto superclassDecl = classDecl->getSuperclassDecl()) {
-    // The superclass is an actor, so we are, too.
-    if (superclassDecl->isActor())
-      return true;
-
-    // The superclass is 'NSObject', which is known to have no state and no
-    // superclass.
-    if (superclassDecl->isNSObject() && isExplicitActor)
-      return true;
-
-    // This class cannot be an actor; complain if the 'actor' modifier was
-    // provided.
-    if (isExplicitActor) {
-      classDecl->diagnose(diag::actor_with_nonactor_superclass,
-                          superclassDecl->getName())
-        .highlight(classDecl->getStartLoc());
-    }
-
-    return false;
-  }
-
-  return isExplicitActor;
+  return classDecl->isExplicitActor() ||
+      classDecl->getAttrs().getAttribute<ActorAttr>();
 }
 
 bool IsDefaultActorRequest::evaluate(
@@ -304,21 +280,6 @@ bool IsDefaultActorRequest::evaluate(
   // If the class isn't an actor, it's not a default actor.
   if (!classDecl->isActor())
     return false;
-
-  // If there is a superclass, and it's an actor, we defer
-  // the decision to it.
-  if (auto superclassDecl = classDecl->getSuperclassDecl()) {
-    // If the superclass is an actor, we inherit its default-actor-ness.
-    if (superclassDecl->isActor())
-      return superclassDecl->isDefaultActor();
-
-    // If the superclass is not an actor, it can only be
-    // a default actor if it's NSObject.  (For now, other classes simply
-    // can't be actors at all.)  We don't need to diagnose this; we
-    // should've done that already in isActor().
-    if (!superclassDecl->isNSObject())
-      return false;
-  }
 
   // If the class is resilient from the perspective of the module
   // module, it's not a default actor.
@@ -1761,7 +1722,8 @@ namespace {
       }
 
       // Mark as implicitly async.
-      apply->setImplicitlyAsync(true);
+      if (!fnType->getExtInfo().isAsync())
+        apply->setImplicitlyAsync(true);
 
       // If we don't need to check for sendability, we're done.
       if (!shouldDiagnoseNonSendableViolations(ctx.LangOpts))
@@ -1918,6 +1880,10 @@ namespace {
       // Check whether this is a local variable, in which case we can
       // determine whether it was safe to access concurrently.
       if (auto var = dyn_cast<VarDecl>(value)) {
+        // Ignore interpolation variables.
+        if (var->getBaseName() == ctx.Id_dollarInterpolation)
+          return false;
+
         auto parent = mutableLocalVarParent[declRefExpr];
 
         // If the variable is immutable, it's fine so long as it involves
@@ -2073,7 +2039,7 @@ namespace {
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
         switch (autoclosure->getThunkKind()) {
         case AutoClosureExpr::Kind::AsyncLet:
-          return diag::actor_isolated_from_async_let;
+          return diag::actor_isolated_from_spawn_let;
 
         case AutoClosureExpr::Kind::DoubleCurryThunk:
         case AutoClosureExpr::Kind::SingleCurryThunk:
@@ -2364,6 +2330,10 @@ void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
 }
 
 void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
+  // Disable this check for @LLDBDebuggerFunction functions.
+  if (decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
+    return;
+
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);
@@ -2597,7 +2567,8 @@ static Optional<ActorIsolation> getIsolationFromConformances(
     return None;
 
   Optional<ActorIsolation> foundIsolation;
-  for (auto proto : nominal->getLocalProtocols()) {
+  for (auto proto :
+       nominal->getLocalProtocols(ConformanceLookupKind::NonStructural)) {
     switch (auto protoIsolation = getActorIsolation(proto)) {
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:

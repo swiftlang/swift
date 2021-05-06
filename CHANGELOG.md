@@ -29,6 +29,69 @@ CHANGELOG
 Swift 5.5
 ---------
 
+* [SE-0310][]:
+  
+  Read-only computed properties and subscripts can now define their `get` accessor to be `async` and/or `throws`, by writing one or both of those keywords between the `get` and `{`.  Thus, these members can now make asynchronous calls or throw errors in the process of producing a value:
+  ```swift
+  class BankAccount: FinancialAccount {
+    var manager: AccountManager?
+
+    var lastTransaction: Transaction {
+      get async throws {
+        guard manager != nil else { throw BankError.notInYourFavor }
+        return await manager!.getLastTransaction()
+      }
+    }
+
+    subscript(_ day: Date) -> [Transaction] {
+      get async {
+        return await manager?.getTransactions(onDay: day) ?? []
+      }
+    }
+  }
+
+  protocol FinancialAccount {
+    associatedtype T
+    var lastTransaction: T { get async throws }
+    subscript(_ day: Date) -> [T] { get async }
+  }
+  ```
+  Accesses to such members, like `lastTransaction` above, will require appropriate marking with `await` and/or `try`:
+  ```swift
+  extension BankAccount {
+    func meetsTransactionLimit(_ limit: Amount) async -> Bool {
+      return try! await self.lastTransaction.amount < limit
+      //                    ^~~~~~~~~~~~~~~~ this access is async & throws
+    }                
+  }
+
+    
+  func hadWithdrawlOn(_ day: Date, from acct: BankAccount) async -> Bool {
+    return await !acct[day].allSatisfy { $0.amount >= Amount.zero }
+    //            ^~~~~~~~~ this access is async
+  }
+  ```
+
+
+* [SE-0306][]:
+
+	Swift 5.5 includes support for actors, a new kind of type that isolates its instance data to protect it from concurrent access. Accesses to an actor's instance declarations from outside the must be asynchronous:
+
+	```swift
+  actor Counter {
+    var value = 0
+
+    func increment() {
+      value = value + 1
+    }
+  }
+
+  func useCounter(counter: Counter) async {
+    print(await counter.value) // interaction must be async
+    await counter.increment()  // interaction must be async
+  }
+	```
+
 * The determination of whether a call to a `rethrows` function can throw now considers default arguments of `Optional` type.
 
   In Swift 5.4, such default arguments were ignored entirely by `rethrows` checking. This meant that the following example was accepted:
@@ -8434,6 +8497,8 @@ Swift 1.0
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
+[SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
+[SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

@@ -15,10 +15,6 @@ final actor Actor {
 actor Actor2 {
 }
 
-// CHECK: @_METACLASS_DATA__TtC37actor_class_forbid_objc_assoc_objects6Actor3 = internal constant { {{.*}} } { i32 [[METAFLAGS]],
-// CHECK: @_DATA__TtC37actor_class_forbid_objc_assoc_objects6Actor3 = internal constant { {{.*}} } { i32 [[OBJECTFLAGS]],
-class Actor3 : Actor2 {}
-
 actor GenericActor<T> {
     var state: T
     init(state: T) { self.state = state }

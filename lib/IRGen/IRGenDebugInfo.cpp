@@ -1340,10 +1340,9 @@ private:
     }
 
     case TypeKind::BuiltinExecutor: {
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-      return DBuilder.createPointerType(nullptr, PtrSize, 0,
-                                        /* DWARFAddressSpace */ None,
-                                        MangledName);
+      return createDoublePointerSizedStruct(
+          Scope, "Builtin.Executor", nullptr, MainFile, 0,
+          llvm::DINode::FlagArtificial, MangledName);
     }
 
     case TypeKind::DynamicSelf: {

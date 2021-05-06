@@ -158,7 +158,7 @@ func validAsyncFunction() async throws {
   _ = try await throwingAndAsync()
 }
 
-// Async let checking
+// spawn let checking
 func mightThrow() throws { }
 
 func getIntUnsafely() throws -> Int { 0 }
@@ -169,27 +169,27 @@ extension Error {
 }
 
 func testAsyncLet() async throws {
-  async let x = await getInt()
+  spawn let x = await getInt()
   print(x) // expected-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1:9{{reference to async let 'x' is 'async'}}
+  // expected-note@-1:9{{reference to spawn let 'x' is 'async'}}
 
   print(await x)
 
   do {
     try mightThrow()
-  } catch let e where e.number == x { // expected-error{{async let 'x' cannot be referenced in a catch guard expression}}
+  } catch let e where e.number == x { // expected-error{{spawn let 'x' cannot be referenced in a catch guard expression}}
   } catch {
   }
 
-  async let x1 = getIntUnsafely() // okay, try is implicit here
+  spawn let x1 = getIntUnsafely() // okay, try is implicit here
 
-  async let x2 = getInt() // okay, await is implicit here
+  spawn let x2 = getInt() // okay, await is implicit here
 
-  async let x3 = try getIntUnsafely()
-  async let x4 = try! getIntUnsafely()
-  async let x5 = try? getIntUnsafely()
+  spawn let x3 = try getIntUnsafely()
+  spawn let x4 = try! getIntUnsafely()
+  spawn let x5 = try? getIntUnsafely()
 
-  _ = await x1 // expected-error{{reading 'async let' can throw but is not marked with 'try'}}
+  _ = await x1 // expected-error{{reading 'spawn let' can throw but is not marked with 'try'}}
   _ = await x2
   _ = try await x3
   _ = await x4
@@ -198,9 +198,9 @@ func testAsyncLet() async throws {
 
 // expected-note@+1 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}} {{30-30= async}}
 func testAsyncLetOutOfAsync() {
-  async let x = 1 // expected-error{{'async let' in a function that does not support concurrency}}
+  spawn let x = 1 // expected-error{{'spawn let' in a function that does not support concurrency}}
   // FIXME: expected-error@-1{{'async' call in a function that does not support concurrency}}
 
-  _ = await x  // expected-error{{'async let' in a function that does not support concurrency}}
-  _ = x // expected-error{{'async let' in a function that does not support concurrency}}
+  _ = await x  // expected-error{{'spawn let' in a function that does not support concurrency}}
+  _ = x // expected-error{{'spawn let' in a function that does not support concurrency}}
 }

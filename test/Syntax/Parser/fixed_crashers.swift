@@ -6,3 +6,6 @@ let x: a[i] & b
 
 let x2: a & b[1]
 // CHECK: |x2|
+
+let x3: (A -> B)
+// CHECK: |x3|

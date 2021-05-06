@@ -628,6 +628,16 @@ bool TypeBase::isBool() {
   return false;
 }
 
+/// Check if this type is equal to Swift.Bool.
+bool TypeBase::isOptional() {
+  if (auto generic = getAnyGeneric()) {
+    if (isa<EnumDecl>(generic)) {
+      return getASTContext().getOptionalDecl() == generic;
+    }
+  }
+  return false;
+}
+
 Type TypeBase::getRValueType() {
   // If the type is not an lvalue, this is a no-op.
   if (!hasLValueType())

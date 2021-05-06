@@ -19,16 +19,17 @@ actor A3<T>: Actor {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-actor A4: A1 {
+actor A4: A1 { // expected-error{{actor types do not support inheritance}}
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-actor A5: A2 {
+actor A5: A2 { // expected-error{{actor types do not support inheritance}}
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor A6: A1, Actor { // expected-error{{redundant conformance of 'A6' to protocol 'Actor'}}
   // expected-note@-1{{'A6' inherits conformance to protocol 'Actor' from superclass here}}
+  // expected-error@-2{{actor types do not support inheritance}}
 }
 
 // Explicitly satisfying the requirement.

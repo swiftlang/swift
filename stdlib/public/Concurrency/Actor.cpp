@@ -17,7 +17,16 @@
 
 #include "swift/Runtime/Concurrency.h"
 
+#ifdef _WIN32
+// On Windows, an include below triggers an indirect include of minwindef.h
+// which contains a definition of the `max` macro, generating an error in our
+// use of std::max in this file. This define prevents those macros from being
+// defined.
+#define NOMINMAX
+#endif
+
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
@@ -57,6 +66,11 @@
 #include <io.h>
 #include <handleapi.h>
 #include <processthreadsapi.h>
+#endif
+
+#if SWIFT_OBJC_INTEROP
+extern "C" void *objc_autoreleasePoolPush();
+extern "C" void objc_autoreleasePoolPop(void *);
 #endif
 
 using namespace swift;
@@ -172,6 +186,17 @@ public:
   }
 };
 
+#ifdef SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+class ActiveTask {
+public:
+  static void set(AsyncTask *task) {
+    SWIFT_THREAD_SETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY, task);
+  }
+  static AsyncTask *get() {
+    return (AsyncTask *)SWIFT_THREAD_GETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY);
+  }
+};
+#else
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
@@ -184,16 +209,21 @@ public:
 
 /// Define the thread-locals.
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-  Pointer<ExecutorTrackingInfo>,
-  ExecutorTrackingInfo::ActiveInfoInThread);
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
   Pointer<AsyncTask>,
   ActiveTask::Value);
+#endif
+SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+  Pointer<ExecutorTrackingInfo>,
+  ExecutorTrackingInfo::ActiveInfoInThread);
 
 } // end anonymous namespace
 
 void swift::runJobInEstablishedExecutorContext(Job *job) {
   _swift_tsan_acquire(job);
+
+#if SWIFT_OBJC_INTEROP
+  auto pool = objc_autoreleasePoolPush();
+#endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
     // Update the active task in the current thread.
@@ -212,6 +242,10 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // There's no extra bookkeeping to do for simple jobs.
     job->runSimpleInFullyEstablishedContext();
   }
+
+#if SWIFT_OBJC_INTEROP
+  objc_autoreleasePoolPop(pool);
+#endif
 
   _swift_tsan_release(job);
 }
@@ -261,12 +295,12 @@ static bool isExecutingOnMainThread() {
 }
 
 JobPriority swift::swift_task_getCurrentThreadPriority() {
-  if (isExecutingOnMainThread())
-    return JobPriority::UserInitiated;
-
 #if defined(__APPLE__)
   return static_cast<JobPriority>(qos_class_self());
 #else
+  if (isExecutingOnMainThread())
+    return JobPriority::UserInitiated;
+
   return JobPriority::Unspecified;
 #endif
 }

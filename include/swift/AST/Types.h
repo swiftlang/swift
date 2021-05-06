@@ -795,6 +795,9 @@ public:
   /// Check if this type is equal to Swift.Bool.
   bool isBool();
 
+  /// Check if this type is equal to Swift.Optional.
+  bool isOptional();
+
   /// Check if this type is equal to Builtin.IntN.
   bool isBuiltinIntegerType(unsigned bitWidth);
   

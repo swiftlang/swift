@@ -105,6 +105,7 @@ public:
   void removeCachedAST();
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
+  std::pair<unsigned, unsigned> getLineAndColumnInBuffer(unsigned Offset);
 
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
              bool BuildSyntaxTree,
