@@ -143,9 +143,21 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 /// used by directly calling it or passing it as argument, but not using it as a
 /// partial_apply callee.
 ///
-/// FIXME: This needs to be checked in the SILVerifier.
+/// An error found in DiagnoseInvalidEscapingCaptures can indicate invalid SIL
+/// that is detected here but not in normal SIL verification. When the
+/// source-level closure captures an inout argument, it appears in SIL to be a
+/// non-escaping closure. The following verification then fails because the
+/// "nonescaping" closure actually escapes.
+///
+/// FIXME: This should be checked in the SILVerifier, with consideration for the
+/// caveat above where an inout has been captured be an escaping closure.
 static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   SILInstruction *user = partialApplyUse->getUser();
+
+  // Bypass this verification when a diagnostic error is present. See comments
+  // on DiagnoseInvalidEscapingCaptures above.
+  if (user->getModule().getASTContext().hadError())
+    return true;
 
   // It is fine to call the partial apply
   switch (user->getKind()) {
