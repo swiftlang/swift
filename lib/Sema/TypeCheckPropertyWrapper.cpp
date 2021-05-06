@@ -259,12 +259,6 @@ static bool enclosingInstanceTypeIsNever(ASTContext &ctx, SubscriptDecl *subscri
 
   auto paramTy = param->getType();
   auto neverTy = ctx.getNeverType();
-  paramTy->dump();
-  paramTy->getCanonicalType()->dump();
-  neverTy->dump();
-  neverTy->getCanonicalType()->dump();
-  param->dump();
-  param->getType()->dump();
   return neverTy->isEqual(paramTy);
 }
 
@@ -411,13 +405,6 @@ PropertyWrapperTypeInfoRequest::evaluate(
 
   result.requireNoEnclosingInstance =
       enclosingInstanceTypeIsNever(ctx, result.enclosingInstanceWrappedSubscript);
-//  if (requireNoEnclosingInstance) { //  && !valueVar->isStatic()) {
-//    // this means that the property wrapper must be declared on a static property
-//    valueVar->diagnose(
-//        diag::property_wrapper_var_must_be_static, valueVar->getName());
-//    return PropertyWrapperTypeInfo();
-//    result
-//  }
 
   bool hasInvalidDynamicSelf = false;
   if (result.projectedValueVar &&

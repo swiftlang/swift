@@ -2295,6 +2295,17 @@ ImmutableTextSnapshotRef SwiftEditorDocument::getLatestSnapshot() const {
   return Impl.EditableBuffer->getSnapshot();
 }
 
+std::pair<unsigned, unsigned>
+SwiftEditorDocument::getLineAndColumnInBuffer(unsigned Offset) {
+  llvm::sys::ScopedLock L(Impl.AccessMtx);
+
+  auto SyntaxInfo = Impl.getSyntaxInfo();
+  auto &SM = SyntaxInfo->getSourceManager();
+
+  auto Loc = SM.getLocForOffset(SyntaxInfo->getBufferID(), Offset);
+  return SM.getLineAndColumnInBuffer(Loc);
+}
+
 void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
                                                   EditorConsumer &Consumer) {
   ide::SyntaxModelContext ModelContext(SrcFile);

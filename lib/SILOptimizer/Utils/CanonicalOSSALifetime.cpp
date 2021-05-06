@@ -1104,7 +1104,8 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   // Remove the leftover copy_value and destroy_value instructions.
   if (!instsToDelete.empty()) {
     recursivelyDeleteTriviallyDeadInstructions(instsToDelete.takeVector(),
-                                               /*force=*/true);
+                                               /*force=*/true,
+                                               instModCallbacks);
     setChanged();
   }
 }
@@ -1220,3 +1221,64 @@ SWIFT_ASSERT_ONLY_DECL(
       llvm::dbgs() << "  " << *blockAndInst.getSecond();
     }
   })
+
+//===----------------------------------------------------------------------===//
+//                    MARK: Canonicalize Lifetimes Utility
+//===----------------------------------------------------------------------===//
+
+SILAnalysis::InvalidationKind
+swift::canonicalizeOSSALifetimes(CanonicalizeOSSALifetime &canonicalizer,
+                                 ArrayRef<SILValue> copiedDefs) {
+  auto isCopyDead = [](CopyValueInst *copy, bool pruneDebug) -> bool {
+    for (Operand *use : copy->getUses()) {
+      auto *user = use->getUser();
+      if (isa<DestroyValueInst>(user)) {
+        continue;
+      }
+      if (pruneDebug && isa<DebugValueInst>(user)) {
+        continue;
+      }
+      return false;
+    }
+    return true;
+  };
+
+  // Cleanup dead copies. If getCanonicalCopiedDef returns a copy (because the
+  // copy's source operand is unrecgonized), then the copy is itself treated
+  // like a def and may be dead after canonicalization.
+  SmallVector<SILInstruction *, 4> deadCopies;
+  for (auto def : copiedDefs) {
+    // Canonicalized this def. If we did not perform any canonicalization, just
+    // continue.
+    if (!canonicalizer.canonicalizeValueLifetime(def))
+      continue;
+
+    // Otherwise, see if we have a dead copy.
+    if (auto *copy = dyn_cast<CopyValueInst>(def)) {
+      if (isCopyDead(copy, false /*prune debug*/)) {
+        deadCopies.push_back(copy);
+      }
+    }
+
+    // Canonicalize any new outer copy.
+    if (SILValue outerCopy = canonicalizer.createdOuterCopy()) {
+      SILValue outerDef = canonicalizer.getCanonicalCopiedDef(outerCopy);
+      canonicalizer.canonicalizeValueLifetime(outerDef);
+    }
+
+    // TODO: also canonicalize any lifetime.persistentCopies like separate owned
+    // live ranges.
+  }
+
+  if (!canonicalizer.hasChanged() && deadCopies.empty()) {
+    return SILAnalysis::InvalidationKind::Nothing;
+  }
+
+  // We use our canonicalizers inst mod callbacks.
+  InstructionDeleter deleter(canonicalizer.getInstModCallbacks());
+  for (auto *copy : deadCopies) {
+    deleter.recursivelyDeleteUsersIfDead(copy);
+  }
+
+  return SILAnalysis::InvalidationKind::Instructions;
+}

@@ -1002,6 +1002,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::Actor:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::AsyncIteratorProtocol:
+  case KnownProtocolKind::SerialExecutor:
     M = getLoadedModule(Id_Concurrency);
     break;
   default:
@@ -1954,36 +1955,41 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
-bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
-  // If this module has already been successfully imported, it is importable.
-  if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
-    return true;
-
+bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName,
+                                     llvm::VersionTuple version,
+                                     bool underlyingVersion,
+                                     bool updateFailingList) const {
   // If we've failed loading this module before, don't look for it again.
   if (FailedModuleImportNames.count(ModuleName.Item))
     return false;
-
+  // If no specific version, the module is importable if it has already been imported.
+  if (version.empty()) {
+    // If this module has already been successfully imported, it is importable.
+    if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
+      return true;
+  }
   // Otherwise, ask the module loaders.
   for (auto &importer : getImpl().ModuleLoaders) {
-    if (importer->canImportModule(ModuleName)) {
+    if (importer->canImportModule(ModuleName, version, underlyingVersion)) {
       return true;
     }
   }
-
+  if (updateFailingList && version.empty()) {
+    FailedModuleImportNames.insert(ModuleName.Item);
+  }
   return false;
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
-  if (canImportModuleImpl(ModuleName)) {
-    return true;
-  } else {
-    FailedModuleImportNames.insert(ModuleName.Item);
-    return false;
-  }
+bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+                                 llvm::VersionTuple version,
+                                 bool underlyingVersion) {
+  return canImportModuleImpl(ModuleName, version, underlyingVersion, true);
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName) const {
-  return canImportModuleImpl(ModuleName);
+bool ASTContext::canImportModule(ImportPath::Element ModuleName,
+                                 llvm::VersionTuple version,
+                                 bool underlyingVersion) const {
+  return canImportModuleImpl(ModuleName, version, underlyingVersion, false);
 }
 
 ModuleDecl *

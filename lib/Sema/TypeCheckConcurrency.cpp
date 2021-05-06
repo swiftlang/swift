@@ -16,6 +16,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
+#include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
@@ -286,10 +287,14 @@ bool IsDefaultActorRequest::evaluate(
   if (classDecl->isForeign() || classDecl->isResilient(M, expansion))
     return false;
 
-  // If the class has explicit custom-actor methods, it's not
-  // a default actor.
-  if (classDecl->hasExplicitCustomActorMethods())
-    return false;
+  // Check whether the class has explicit custom-actor methods.
+
+  // If we synthesized the unownedExecutor property, we should've
+  // added a semantics attribute to it (if it was actually a default
+  // actor).
+  if (auto executorProperty = classDecl->getUnownedExecutorProperty())
+    return executorProperty->getAttrs()
+             .hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
 
   return true;
 }
@@ -1722,7 +1727,8 @@ namespace {
       }
 
       // Mark as implicitly async.
-      apply->setImplicitlyAsync(true);
+      if (!fnType->getExtInfo().isAsync())
+        apply->setImplicitlyAsync(true);
 
       // If we don't need to check for sendability, we're done.
       if (!shouldDiagnoseNonSendableViolations(ctx.LangOpts))
@@ -1879,6 +1885,10 @@ namespace {
       // Check whether this is a local variable, in which case we can
       // determine whether it was safe to access concurrently.
       if (auto var = dyn_cast<VarDecl>(value)) {
+        // Ignore interpolation variables.
+        if (var->getBaseName() == ctx.Id_dollarInterpolation)
+          return false;
+
         auto parent = mutableLocalVarParent[declRefExpr];
 
         // If the variable is immutable, it's fine so long as it involves
@@ -2034,7 +2044,7 @@ namespace {
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
         switch (autoclosure->getThunkKind()) {
         case AutoClosureExpr::Kind::AsyncLet:
-          return diag::actor_isolated_from_async_let;
+          return diag::actor_isolated_from_spawn_let;
 
         case AutoClosureExpr::Kind::DoubleCurryThunk:
         case AutoClosureExpr::Kind::SingleCurryThunk:
@@ -2325,6 +2335,10 @@ void swift::checkTopLevelActorIsolation(TopLevelCodeDecl *decl) {
 }
 
 void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
+  // Disable this check for @LLDBDebuggerFunction functions.
+  if (decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
+    return;
+
   ActorIsolationChecker checker(decl);
   if (auto body = decl->getBody()) {
     body->walk(checker);

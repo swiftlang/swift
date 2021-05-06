@@ -116,7 +116,7 @@ With that being said, a validation test on macOS does the following:
 2. Builds the compiler.
 3. Builds the standard library for macOS and the simulators for all platforms.
 4. lldb is /not/ built/tested [[2]](#footnote-2)
-5. The tests, validation-tests are run for all simulators and macOS both with
+5. The tests, validation-tests are run for iOS simulator, watchOS simulator and macOS both with
    and without optimizations enabled.
 
 A validation test on Linux does the following:

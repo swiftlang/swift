@@ -347,7 +347,7 @@ private:
     DelayedPatternContexts;
 
   /// Cache of module names that fail the 'canImport' test in this context.
-  llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
+  mutable llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
   /// Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
@@ -892,7 +892,10 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModuleImpl(ImportPath::Element ModulePath) const;
+  bool canImportModuleImpl(ImportPath::Element ModulePath,
+                           llvm::VersionTuple version,
+                           bool underlyingVersion,
+                           bool updateFailingList) const;
 public:
   namelookup::ImportCache &getImportCache() const;
 
@@ -921,8 +924,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(ImportPath::Element ModulePath);
-  bool canImportModule(ImportPath::Element ModulePath) const;
+  bool canImportModule(ImportPath::Element ModulePath,
+                       llvm::VersionTuple version = llvm::VersionTuple(),
+                       bool underlyingVersion = false);
+  bool canImportModule(ImportPath::Element ModulePath,
+                       llvm::VersionTuple version = llvm::VersionTuple(),
+                       bool underlyingVersion = false) const;
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.

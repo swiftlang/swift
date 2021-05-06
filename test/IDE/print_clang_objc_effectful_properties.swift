@@ -1,10 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -source-filename %s -module-to-print=EffectfulProperties -function-definitions=false -enable-experimental-concurrency > %t/EffectfulProperties.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -print-implicit-attrs -source-filename %s -module-to-print=EffectfulProperties -function-definitions=false > %t/EffectfulProperties.printed.txt
 // RUN: %FileCheck -input-file %t/EffectfulProperties.printed.txt %s
 
 // REQUIRES: objc_interop
-// REQUIRES: concurrency
 
 // CHECK-LABEL: class EffProps : NSObject {
 // CHECK:  func getDogWithCompletion(_ completionHandler: @escaping (NSObject) -> Void)
@@ -26,11 +25,12 @@
 // CHECK:       func nullableHandler(_ completion: ((String) -> Void)? = nil)
 // CHECK-NEXT:  var fromNullableHandler: String { get async }
 
-// CHECK:  func getMainDog(_ completion: @escaping @MainActor (String) -> Void)
+// CHECK:  func getMainDog(_ completion: @escaping (String) -> Void)
 // CHECK-NEXT:  var mainDogProp: String { get async }
 
-// CHECK:  @completionHandlerAsync("regularMainDog()", completionHandleIndex: 0)
-// CHECK-NEXT:  func regularMainDog(_ completion: @escaping @MainActor (String) -> Void)
+// CHECK:  @completionHandlerAsync("regularMainDog()", completionHandlerIndex: 0)
+// CHECK-NEXT:  func regularMainDog(_ completion: @escaping (String) -> Void)
+// CHECK-NEXT:  @discardableResult
 // CHECK-NEXT:  func regularMainDog() async -> String
 // CHECK: }
 

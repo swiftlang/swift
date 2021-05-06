@@ -316,7 +316,8 @@ static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
     return currentTracking->getActiveExecutor() == executor;
   }
 
-  return executor.isMainExecutor() && isExecutingOnMainThread();
+  return executor == _swift_task_getMainExecutor()
+      && isExecutingOnMainThread();
 }
 
 /// Logging level for unexpected executors:
@@ -359,7 +360,7 @@ void swift::swift_task_reportUnexpectedExecutor(
 
   const char *functionIsolation;
   const char *whereExpected;
-  if (executor.isMainExecutor()) {
+  if (executor == _swift_task_getMainExecutor()) {
     functionIsolation = "@MainActor function";
     whereExpected = "the main thread";
   } else {
@@ -1734,18 +1735,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
-namespace swift {
-  Metadata* MainActorMetadata = nullptr;
-}
-
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
-void swift::swift_MainActor_register(HeapObject *actor) {
-  assert(actor);
-  MainActorMetadata = const_cast<Metadata*>(swift_getObjectType(actor));
-  assert(MainActorMetadata);
-}
-
 /*****************************************************************************/
 /****************************** ACTOR SWITCHING ******************************/
 /*****************************************************************************/
@@ -1904,6 +1893,14 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 /************************* GENERIC ACTOR INTERFACES **************************/
 /*****************************************************************************/
 
+// Implemented in Swift to avoid some annoying hard-coding about
+// SerialExecutor's protocol witness table.  We could inline this
+// with effort, though.
+extern "C" SWIFT_CC(swift)
+void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
+                                   const Metadata *selfType,
+                                   const SerialExecutorWitnessTable *wtable);
+
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 #if SWIFT_TASK_PRINTF_DEBUG
@@ -1917,16 +1914,13 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
   if (executor.isGeneric())
     return swift_task_enqueueGlobal(job);
 
-  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-  if (executor.isMainExecutor())
-    return swift_task_enqueueMainExecutor(job);
-
   if (executor.isDefaultActor())
     return asImpl(executor.getDefaultActor())->enqueue(job);
 
-  // Just assume it's actually a default actor that we haven't tagged
-  // properly.
-  swift_unreachable("unexpected or corrupt executor reference");
+  auto wtable = executor.getSerialExecutorWitnessTable();
+  auto executorObject = executor.getIdentity();
+  auto executorType = swift_getObjectType(executorObject);
+  _swift_task_enqueueOnExecutor(job, executorObject, executorType, wtable);
 }
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE

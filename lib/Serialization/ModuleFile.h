@@ -435,6 +435,10 @@ public:
     return Core->ModuleABIName;
   }
 
+  llvm::VersionTuple getUserModuleVersion() const {
+    return Core->UserModuleVersion;
+  }
+
   /// The Swift compatibility version in use when this module was built.
   const version::Version &getCompatibilityVersion() const {
     return Core->CompatibilityVersion;
@@ -457,6 +461,11 @@ public:
     return Core->Bits.IsTestable;
   }
 
+  /// Whether this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Core->Bits.IsStaticLibrary;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
@@ -475,6 +484,13 @@ public:
 
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
+
+  /// \c true if this module has a corresponding .swiftsourceinfo file.
+  bool hasSourceInfoFile() const { return Core->hasSourceInfoFile(); }
+
+  /// \c true if this module has information from a corresponding
+  /// .swiftsourceinfo file (ie. the file exists and has been read).
+  bool hasSourceInfo() const { return Core->hasSourceInfo(); }
 
   /// Associates this module file with the AST node representing it.
   ///

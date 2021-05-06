@@ -184,9 +184,6 @@ actor MyActor {
     // expected-error@+1{{actor-isolated property 'int' cannot be passed 'inout' to 'async' function call}}
     await modifyAsynchronously(&(int))
 
-    // This warning is emitted because this fails to typecheck before the
-    // async-ness is attached.
-    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}
     // expected-error@+1{{cannot pass immutable value of type 'Int' as inout argument}}
     await modifyAsynchronously(&(maybePoint?.z)!)
     // expected-error@+2{{actor-isolated property 'position' can only be used 'inout' from inside the actor}}

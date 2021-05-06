@@ -1958,7 +1958,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     if (IGF.CurSILFn->isDynamicallyReplaceable()) {
       IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
       // Remap the entry block.
-      IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(&IGF.CurFn->back(), {});
+      IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(IGF.Builder.GetInsertBlock(), {});
     }
   }
 
@@ -6157,12 +6157,8 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 }
 
 void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
-  if (!i->getFunction()->isAsync()) {
-    // This should never occur.
-    assert(false && "The hop_to_executor should have been eliminated");
-    return;
-  }
-  assert(i->getTargetExecutor()->getType().is<BuiltinExecutorType>());
+  assert(i->getTargetExecutor()->getType().getOptionalObjectType()
+           .is<BuiltinExecutorType>());
   llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
           llvm::Intrinsic::coro_async_resume, {});
 

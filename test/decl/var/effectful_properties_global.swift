@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
-// REQUIRES: concurrency
+// RUN: %target-typecheck-verify-swift
 
 var intAsyncProp : Int {
   get async { 0 }

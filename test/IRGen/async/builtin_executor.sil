@@ -1,0 +1,64 @@
+// RUN: %target-swift-frontend -enable-experimental-concurrency -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %IRGenFileCheck %s
+
+// REQUIRES: concurrency
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Concurrency
+
+final actor MyDefaultActor {
+  @_semantics("defaultActor")
+  nonisolated var unownedExecutor: UnownedSerialExecutor { get }
+}
+sil_vtable MyDefaultActor {}
+
+actor MyCustomActor : SerialExecutor {
+  final nonisolated var unownedExecutor: UnownedSerialExecutor { get }
+  final nonisolated func enqueue(_ job: UnownedJob)
+  final nonisolated func asUnownedSerialExecutor() -> UnownedSerialExecutor
+}
+sil_vtable MyCustomActor {}
+
+// CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_none()
+sil @test_none : $() -> Optional<Builtin.Executor> {
+bb0:
+  // CHECK: ret { [[INT]], [[INT]] } zeroinitializer
+  %0 = enum $Optional<Builtin.Executor>, #Optional.none
+  return %0 : $Optional<Builtin.Executor>
+}
+
+// CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_some([[INT]] %0, [[INT]] %1)
+sil @test_some : $(Builtin.Executor) -> Optional<Builtin.Executor> {
+bb0(%0 : $Builtin.Executor):
+  // CHECK:      [[ONE:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] %0, 0
+  // CHECK-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] %1, 1
+  // CHECK-NEXT: ret { [[INT]], [[INT]] } [[TWO]]
+  %1 = enum $Optional<Builtin.Executor>, #Optional.some, %0 : $Builtin.Executor
+  return %1 : $Optional<Builtin.Executor>
+}
+
+// CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_build_default_actor(%T4test14MyDefaultActorC* %0)
+sil @test_build_default_actor : $(@guaranteed MyDefaultActor) -> Builtin.Executor {
+bb0(%0 : $MyDefaultActor):
+  // CHECK:      [[T0:%.*]] = ptrtoint %T4test14MyDefaultActorC* %0 to [[INT]]
+  // CHECK-NEXT: [[ONE:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[T0]], 0
+  // CHECK-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] 0, 1
+  // CHECK-NEXT: ret { [[INT]], [[INT]] } [[TWO]]
+  %1 = builtin "buildDefaultActorExecutorRef"<MyDefaultActor>(%0 : $MyDefaultActor) : $Builtin.Executor
+  return %1 : $Builtin.Executor
+}
+
+// CHECK: define{{.*}} swiftcc { [[INT]], [[INT]] } @test_build_custom_actor(%T4test13MyCustomActorC* %0)
+sil @test_build_custom_actor : $(@guaranteed MyCustomActor) -> Builtin.Executor {
+bb0(%0 : $MyCustomActor):
+  // CHECK:      [[T0:%.*]] = ptrtoint %T4test13MyCustomActorC* %0 to [[INT]]
+  // CHECK-NEXT: [[T1:%.*]] = call i8** @"$s4test13MyCustomActorCACs14SerialExecutorAAWl"()
+  // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8** [[T1]] to [[INT]]
+  // CHECK:      [[ONE:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[T0]], 0
+  // CHECK-NEXT: [[TWO:%.*]] = insertvalue { [[INT]], [[INT]] } [[ONE]], [[INT]] [[T2]], 1
+  // CHECK-NEXT: ret { [[INT]], [[INT]] } [[TWO]]
+  %1 = builtin "buildOrdinarySerialExecutorRef"<MyCustomActor>(%0 : $MyCustomActor) : $Builtin.Executor
+  return %1 : $Builtin.Executor
+}

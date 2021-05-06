@@ -5884,6 +5884,27 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 }
 
 bool AsyncFunctionConversionFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+    emitDiagnostic(diag::cannot_pass_async_func_to_sync_parameter,
+                   getFromType());
+
+    if (auto *closure = getAsExpr<ClosureExpr>(getAnchor())) {
+      auto asyncLoc = closure->getAsyncLoc();
+
+      // 'async' effect is inferred from the body of the closure.
+      if (asyncLoc.isInvalid()) {
+        if (auto asyncNode = findAsyncNode(closure)) {
+          emitDiagnosticAt(::getLoc(asyncNode),
+                           diag::async_inferred_from_operation);
+        }
+      }
+    }
+
+    return true;
+  }
+
   emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
                  getToType());
   return true;

@@ -547,13 +547,9 @@ void swift_task_enqueueGlobal(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
 
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+/// Enqueue the given job on the main executor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
-
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_MainActor_register(HeapObject *actor);
 
 /// A hook to take over global enqueuing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
