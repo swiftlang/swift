@@ -425,6 +425,9 @@ ERROR(cannot_convert_argument_value_anyobject,none,
       (Type, Type))
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+NOTE(note_incompatible_argument_value_nil_at_pos,none,
+     "'nil' is not compatible with expected argument type %0 at position #%1",
+     (Type, unsigned))
 
 ERROR(cannot_convert_condition_value,none,
       "cannot convert value of type %0 to expected condition type %1",
