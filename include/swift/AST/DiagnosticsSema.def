@@ -806,6 +806,8 @@ ERROR(serialization_error_type,Fatal,
 ERROR(serialization_allowing_error_type,none,
       "allowing deserialization of error type '%0' in module '%1'",
       (StringRef, StringRef))
+WARNING(serialization_malformed_sourceinfo,none,
+      "unable to use malformed module source info '%0'", (StringRef))
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
