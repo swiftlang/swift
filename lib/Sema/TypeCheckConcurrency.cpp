@@ -148,7 +148,7 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
 
   // --- Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
-    auto paramType = func->mapTypeIntoContext(param->getInterfaceType()); // TODO: getDeclaredInterfaceType instead?
+    auto paramType = func->mapTypeIntoContext(param->getInterfaceType());
     if (TypeChecker::conformsToProtocol(paramType, encodableType, func).isInvalid() ||
         TypeChecker::conformsToProtocol(paramType, decodableType, func).isInvalid()) {
       if (diagnose)
@@ -163,8 +163,7 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
   }
 
   // --- Result type must be either void or a codable type
-  // TODO: In the future we can also support AsyncSequence of Codable values
-  auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType()); // TODO: getDeclaredInterfaceType instead?
+  auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType());
   if (!resultType->isVoid()) {
     if (TypeChecker::conformsToProtocol(resultType, decodableType, func).isInvalid() ||
         TypeChecker::conformsToProtocol(resultType, encodableType, func).isInvalid()) {
