@@ -154,6 +154,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+  serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   
   if (opts.EmitSymbolGraph) {
@@ -180,6 +181,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
 
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
+
+  serializationOpts.StaticLibrary = opts.Static;
 
   return serializationOpts;
 }

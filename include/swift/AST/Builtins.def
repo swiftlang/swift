@@ -736,10 +736,6 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
 
-/// Build a Builtin.Executor value from the given serial executor reference.
-BUILTIN_MISC_OPERATION(BuildSerialExecutorRef,
-                       "buildSerialExecutorRef", "", Special)
-
 /// Create a task group.
 BUILTIN_MISC_OPERATION(CreateTaskGroup,
                        "createTaskGroup", "", Special)
@@ -761,11 +757,11 @@ BUILTIN_MISC_OPERATION(DestroyTaskGroup,
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
-// getCurrentExecutor: () async -> Builtin.Executor
+// getCurrentExecutor: () async -> Builtin.Executor?
 //
 // Retrieve the ExecutorRef on which the current asynchronous
-// function is executing.
-// Does not retain an actor executor.
+// function is executing, or nil if the function isn't running
+// anywhere in particular.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "", Special)
 
 // getCurrentAsyncTask: () -> Builtin.NativeObject
@@ -834,6 +830,19 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffP
 
 // autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
+
+/// Build a Builtin.Executor value from an "ordinary" serial executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
+                                   "buildOrdinarySerialExecutorRef", "n", Special)
+
+/// Build a Builtin.Executor value from a default actor reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
+                                   "buildDefaultActorExecutorRef", "n", Special)
+
+/// Build a Builtin.Executor value for the main actor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
+                                   "buildMainActorExecutorRef", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

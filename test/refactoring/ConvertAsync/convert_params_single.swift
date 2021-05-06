@@ -357,7 +357,7 @@ withError { res, err in
 // NESTEDRET-NEXT: let str = try await withError()
 // NESTEDRET-NEXT: print("before")
 // NESTEDRET-NEXT: if test(str) {
-// NESTEDRET-NEXT: return
+// NESTEDRET-NEXT:   <#return#>
 // NESTEDRET-NEXT: }
 // NESTEDRET-NEXT: print("got result \(str)")
 // NESTEDRET-NEXT: print("after")
@@ -406,3 +406,35 @@ withError { res, err in
   print("got result \(res!)")
   print("after")
 }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNWRAPPING %s
+withError { str, err in
+  print("before")
+  guard err == nil else { return }
+  _ = str!.count
+  _ = str?.count
+  _ = str!.count.bitWidth
+  _ = str?.count.bitWidth
+  _ = (str?.count.bitWidth)!
+  _ = str!.first?.isWhitespace
+  _ = str?.first?.isWhitespace
+  _ = (str?.first?.isWhitespace)!
+  print("after")
+}
+// UNWRAPPING:      let str = try await withError()
+// UNWRAPPING-NEXT: print("before")
+// UNWRAPPING-NEXT: _ = str.count
+// UNWRAPPING-NEXT: _ = str.count
+// UNWRAPPING-NEXT: _ = str.count.bitWidth
+// UNWRAPPING-NEXT: _ = str.count.bitWidth
+
+// Note this transform results in invalid code as str.count.bitWidth is no
+// longer optional, but arguably it's more useful than leaving str as a
+// placeholder. In general, the tranform we perform here is locally valid
+// within the optional chain, but may change the type of the overall chain.
+// UNWRAPPING-NEXT: _ = (str.count.bitWidth)!
+
+// UNWRAPPING-NEXT: _ = str.first?.isWhitespace
+// UNWRAPPING-NEXT: _ = str.first?.isWhitespace
+// UNWRAPPING-NEXT: _ = (str.first?.isWhitespace)!
+// UNWRAPPING-NEXT: print("after")

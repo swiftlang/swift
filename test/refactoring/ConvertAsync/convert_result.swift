@@ -1,6 +1,15 @@
 func simple(_ completion: (Result<String, Error>) -> Void) { }
+func simpleWithArg(_ arg: Int, _ completion: (Result<String, Error>) -> Void) { }
 func noError(_ completion: (Result<String, Never>) -> Void) { }
 func test(_ str: String) -> Bool { return false }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-RESULT %s
+func voidResult(completion: (Result<Void, Never>) -> Void) {}
+// VOID-RESULT: func voidResult() async {}
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-RESULT %s
+func voidAndErrorResult(completion: (Result<Void, Error>) -> Void) {}
+// VOID-AND-ERROR-RESULT: func voidAndErrorResult() async throws {}
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=SIMPLE %s
 simple { res in
@@ -271,7 +280,7 @@ simple { res in
 // NESTEDRET-NEXT: let str = try await simple()
 // NESTEDRET-NEXT: print("before")
 // NESTEDRET-NEXT: if test(str) {
-// NESTEDRET-NEXT: return
+// NESTEDRET-NEXT:   <#return#>
 // NESTEDRET-NEXT: }
 // NESTEDRET-NEXT: print("result \(str)")
 // NESTEDRET-NEXT: print("after")
@@ -295,9 +304,111 @@ simple { res in
 // NESTEDBREAK-NEXT: let str = try await simple()
 // NESTEDBREAK-NEXT: print("before")
 // NESTEDBREAK-NEXT: if test(str) {
-// NESTEDBREAK-NEXT: break
+// NESTEDBREAK-NEXT:   <#break#>
 // NESTEDBREAK-NEXT: }
 // NESTEDBREAK-NEXT: print("result \(str)")
 // NESTEDBREAK-NEXT: print("after")
 // NESTEDBREAK-NOT: }
 
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-RESULT-CALL %s
+voidResult { res in
+  print(res)
+}
+// VOID-RESULT-CALL: {{^}}await voidResult()
+// VOID-RESULT-CALL: {{^}}print(<#res#>)
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-AND-ERROR-RESULT-CALL %s
+voidAndErrorResult { res in
+  print(res)
+}
+// VOID-AND-ERROR-RESULT-CALL: {{^}}try await voidAndErrorResult()
+// VOID-AND-ERROR-RESULT-CALL: {{^}}print(<#res#>)
+
+// Make sure we ignore an unrelated switch.
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=IGNORE-UNRELATED %s
+simple { res in
+  print("before")
+  switch Bool.random() {
+  case true:
+    break
+  case false:
+    break
+  }
+  print("after")
+}
+// IGNORE-UNRELATED:      let res = try await simple()
+// IGNORE-UNRELATED-NEXT: print("before")
+// IGNORE-UNRELATED-NEXT: switch Bool.random() {
+// IGNORE-UNRELATED-NEXT:  case true:
+// IGNORE-UNRELATED-NEXT:  {{^}} break{{$}}
+// IGNORE-UNRELATED-NEXT:  case false:
+// IGNORE-UNRELATED-NEXT:  {{^}} break{{$}}
+// IGNORE-UNRELATED-NEXT:  }
+// IGNORE-UNRELATED-NEXT: print("after")
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=BREAK-RET-PLACEHOLDER %s
+simpleWithArg({ return 0 }()) { res in
+  switch res {
+  case .success:
+    if .random() { break }
+    x: if .random() { break x }
+  case .failure:
+    break
+  }
+
+  func foo<T>(_ x: T) {
+    if .random() { return }
+  }
+  foo(res)
+
+  let fn = {
+    if .random() { return }
+    return
+  }
+  fn()
+
+  _ = { return }()
+
+  switch Bool.random() {
+  case true:
+    break
+  case false:
+    if .random() { break }
+    y: if .random() { break y }
+    return
+  }
+
+  x: if .random() {
+    break x
+  }
+  if .random() { return }
+}
+
+// Make sure we replace lifted break/returns with placeholders, but keep nested
+// break/returns in e.g closures or labelled control flow in place.
+
+// BREAK-RET-PLACEHOLDER:      let res = try await simpleWithArg({ return 0 }())
+// BREAK-RET-PLACEHOLDER-NEXT: if .random() { <#break#> }
+// BREAK-RET-PLACEHOLDER-NEXT: x: if .random() { break x }
+// BREAK-RET-PLACEHOLDER-NEXT: func foo<T>(_ x: T) {
+// BREAK-RET-PLACEHOLDER-NEXT:   if .random() { return }
+// BREAK-RET-PLACEHOLDER-NEXT: }
+// BREAK-RET-PLACEHOLDER-NEXT: foo(<#res#>)
+// BREAK-RET-PLACEHOLDER-NEXT: let fn = {
+// BREAK-RET-PLACEHOLDER-NEXT:   if .random() { return }
+// BREAK-RET-PLACEHOLDER-NEXT:   {{^}} return{{$}}
+// BREAK-RET-PLACEHOLDER-NEXT: }
+// BREAK-RET-PLACEHOLDER-NEXT: fn()
+// BREAK-RET-PLACEHOLDER-NEXT: _ = { return }()
+// BREAK-RET-PLACEHOLDER-NEXT: switch Bool.random() {
+// BREAK-RET-PLACEHOLDER-NEXT: case true:
+// BREAK-RET-PLACEHOLDER-NEXT:   {{^}} break{{$}}
+// BREAK-RET-PLACEHOLDER-NEXT: case false:
+// BREAK-RET-PLACEHOLDER-NEXT:   if .random() { break }
+// BREAK-RET-PLACEHOLDER-NEXT:   y: if .random() { break y }
+// BREAK-RET-PLACEHOLDER-NEXT:   <#return#>
+// BREAK-RET-PLACEHOLDER-NEXT: }
+// BREAK-RET-PLACEHOLDER-NEXT: x: if .random() {
+// BREAK-RET-PLACEHOLDER-NEXT:   {{^}} break x{{$}}
+// BREAK-RET-PLACEHOLDER-NEXT: }
+// BREAK-RET-PLACEHOLDER-NEXT: if .random() { <#return#> }

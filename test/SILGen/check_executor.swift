@@ -10,7 +10,7 @@ import _Concurrency
 // CHECK-RAW: extract_executor [[MAIN_ACTOR:%.*]] : $MainActor
 
 // CHECK-CANONICAL-LABEL: sil [ossa] @$s4test11onMainActoryyF
-// CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor7Builtin15_filenameLength01_E7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+// CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 @MainActor public func onMainActor() { }
 
 func takeClosure(_ fn: @escaping () -> Int) { }
@@ -24,7 +24,7 @@ public actor MyActor {
   // CHECK-RAW: extract_executor [[ACTOR:%.*]] : $MyActor
 
   // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC10getUpdaterSiycyFSiycfU_
-  // CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor7Builtin15_filenameLength01_E7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+  // CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
   public func getUpdater() -> (() -> Int) {
     return {
       self.counter = self.counter + 1

@@ -27,7 +27,7 @@ import Swift
 /// Does not check for cancellation, and always executes the passed `operation`.
 ///
 /// This function returns instantly and will never suspend.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func withTaskCancellationHandler<T>(
   handler: @Sendable () -> (),
   operation: () async throws -> T
@@ -46,7 +46,7 @@ public func withTaskCancellationHandler<T>(
   return try await operation()
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
 
   /// Returns `true` if the task is cancelled, and should stop executing.
@@ -113,11 +113,11 @@ extension Task {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_addCancellationHandler")
 func _taskAddCancellationHandler(handler: @Sendable () -> ()) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_removeCancellationHandler")
 func _taskRemoveCancellationHandler(
   record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/

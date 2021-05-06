@@ -489,10 +489,11 @@ void DocSerializer::writeDocHeader() {
     control_block::TargetLayout Target(Out);
 
     auto& LangOpts = M->getASTContext().LangOpts;
+    auto verText = version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion);
     Metadata.emit(ScratchRecord, SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR,
                   /*short version string length*/0, /*compatibility length*/0,
-                  version::getSwiftFullVersion(
-                    LangOpts.EffectiveLanguageVersion));
+                  /*user module version major*/0,
+                  /*user module version minor*/0, verText);
 
     ModuleName.emit(ScratchRecord, M->getName().str());
     Target.emit(ScratchRecord, LangOpts.Target.str());
@@ -872,10 +873,12 @@ public:
       control_block::TargetLayout Target(Out);
 
       auto& LangOpts = M->getASTContext().LangOpts;
+      auto verText = version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion);
       Metadata.emit(ScratchRecord, SWIFTSOURCEINFO_VERSION_MAJOR,
                     SWIFTSOURCEINFO_VERSION_MINOR,
                     /*short version string length*/0, /*compatibility length*/0,
-              version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion));
+                    /*user module version major*/0,
+                    /*user module version minor*/0, verText);
 
       ModuleName.emit(ScratchRecord, M->getName().str());
       Target.emit(ScratchRecord, LangOpts.Target.str());

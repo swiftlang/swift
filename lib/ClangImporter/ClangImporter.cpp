@@ -65,6 +65,8 @@
 #include "llvm/Support/FileCollector.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/YAMLParser.h"
 #include <algorithm>
 #include <memory>
 
@@ -1774,7 +1776,14 @@ bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
-bool ClangImporter::canImportModule(ImportPath::Element moduleID) {
+static std::string getScalaNodeText(llvm::yaml::Node *N) {
+  SmallString<32> Buffer;
+  return cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer).str();
+}
+
+bool ClangImporter::canImportModule(ImportPath::Element moduleID,
+                                    llvm::VersionTuple version,
+                                    bool underlyingVersion) {
   // Look up the top-level module to see if it exists.
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
@@ -1789,7 +1798,66 @@ bool ClangImporter::canImportModule(ImportPath::Element moduleID) {
   clang::Module::UnresolvedHeaderDirective mh;
   clang::Module *m;
   auto &ctx = Impl.getClangASTContext();
-  return clangModule->isAvailable(ctx.getLangOpts(), getTargetInfo(), r, mh, m);
+  auto available = clangModule->isAvailable(ctx.getLangOpts(), getTargetInfo(),
+                                            r, mh, m);
+  if (!available)
+    return false;
+  if (version.empty())
+    return true;
+  assert(available);
+  assert(!version.empty());
+  llvm::VersionTuple currentVersion;
+  StringRef path = getClangASTContext().getSourceManager()
+    .getFilename(clangModule->DefinitionLoc);
+  // Look for the .tbd file inside .framework dir to get the project version
+  // number.
+  std::string fwName = (llvm::Twine(moduleID.Item.str()) + ".framework").str();
+  auto pos = path.find(fwName);
+  while (pos != StringRef::npos) {
+    llvm::SmallString<256> buffer(path.substr(0, pos + fwName.size()));
+    llvm::sys::path::append(buffer, llvm::Twine(moduleID.Item.str()) + ".tbd");
+    auto tbdPath = buffer.str();
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> tbdBufOrErr =
+      llvm::MemoryBuffer::getFile(tbdPath);
+    // .tbd file doesn't exist, break.
+    if (!tbdBufOrErr) {
+      break;
+    }
+    StringRef tbdBuffer = tbdBufOrErr->get()->getBuffer();
+
+    // Use a new source manager instead of the one from ASTContext because we
+    // don't want the Json file to be persistent.
+    SourceManager SM;
+    llvm::yaml::Stream Stream(llvm::MemoryBufferRef(tbdBuffer, tbdPath),
+                              SM.getLLVMSourceMgr());
+    auto DI = Stream.begin();
+    assert(DI != Stream.end() && "Failed to read a document");
+    llvm::yaml::Node *N = DI->getRoot();
+    assert(N && "Failed to find a root");
+    auto *pairs = dyn_cast_or_null<llvm::yaml::MappingNode>(N);
+    if (!pairs)
+      break;
+    for (auto &keyValue: *pairs) {
+      auto key = getScalaNodeText(keyValue.getKey());
+      // Look for field "current-version" in the .tbd file.
+      if (key == "current-version") {
+        auto ver = getScalaNodeText(keyValue.getValue());
+        currentVersion.tryParse(ver);
+        break;
+      }
+    }
+    break;
+  }
+  // Diagnose unable to checking the current version.
+  if (currentVersion.empty()) {
+    Impl.diagnose(moduleID.Loc, diag::cannot_find_project_version, "Clang",
+                  moduleID.Item.str());
+    return true;
+  }
+  assert(!currentVersion.empty());
+  // Give a green light if the version on disk is greater or equal to the version
+  // specified in the canImport condition.
+  return currentVersion >= version;
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(

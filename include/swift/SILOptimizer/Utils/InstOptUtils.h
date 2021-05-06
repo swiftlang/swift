@@ -104,7 +104,8 @@ public:
   InstModCallbacks(const InstModCallbacks &) = default;
 
   /// Return a copy of self with deleteInstFunc set to \p newDeleteInstFunc.
-  InstModCallbacks onDelete(decltype(deleteInstFunc) newDeleteInstFunc) const {
+  LLVM_ATTRIBUTE_UNUSED InstModCallbacks
+  onDelete(decltype(deleteInstFunc) newDeleteInstFunc) const {
     InstModCallbacks result = *this;
     result.deleteInstFunc = newDeleteInstFunc;
     return result;
@@ -112,7 +113,7 @@ public:
 
   /// Return a copy of self with createdNewInstFunc set to \p
   /// newCreatedNewInstFunc.
-  InstModCallbacks
+  LLVM_ATTRIBUTE_UNUSED InstModCallbacks
   onCreateNewInst(decltype(createdNewInstFunc) newCreatedNewInstFunc) const {
     InstModCallbacks result = *this;
     result.createdNewInstFunc = newCreatedNewInstFunc;
@@ -120,7 +121,7 @@ public:
   }
 
   /// Return a copy of self with setUseValueFunc set to \p newSetUseValueFunc.
-  InstModCallbacks
+  LLVM_ATTRIBUTE_UNUSED InstModCallbacks
   onSetUseValue(decltype(setUseValueFunc) newSetUseValueFunc) const {
     InstModCallbacks result = *this;
     result.setUseValueFunc = newSetUseValueFunc;
@@ -129,6 +130,7 @@ public:
 
   /// Return a copy of self with notifyWillBeDeletedFunc set to \p
   /// newNotifyWillBeDeletedFunc.
+  LLVM_ATTRIBUTE_UNUSED
   InstModCallbacks onNotifyWillBeDeleted(
       decltype(notifyWillBeDeletedFunc) newNotifyWillBeDeletedFunc) const {
     InstModCallbacks result = *this;

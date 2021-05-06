@@ -559,6 +559,13 @@ ERROR(async_functiontype_mismatch,none,
       "invalid conversion from 'async' function of type %0 to "
       "synchronous function type %1", (Type, Type))
 
+ERROR(cannot_pass_async_func_to_sync_parameter,none,
+      "cannot pass function of type %0 "
+      "to parameter expecting synchronous function type", (Type))
+
+NOTE(async_inferred_from_operation,none,
+     "'async' inferred from asynchronous operation used here", ())
+
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
       "'#keyPath' can only be used with the Objective-C runtime", ())
@@ -799,6 +806,8 @@ ERROR(serialization_error_type,Fatal,
 ERROR(serialization_allowing_error_type,none,
       "allowing deserialization of error type '%0' in module '%1'",
       (StringRef, StringRef))
+WARNING(serialization_malformed_sourceinfo,none,
+      "unable to use malformed module source info '%0'", (StringRef))
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -942,6 +951,9 @@ REMARK(cross_import_added,none,
 REMARK(module_loaded,none,
        "loaded module at %0",
        (StringRef))
+
+WARNING(cannot_find_project_version,none,
+        "cannot find user version number for %0 module '%1'; version number ignored", (StringRef, StringRef))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -3465,7 +3477,7 @@ ERROR(cfclass_designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0",
       (DeclName))
 ERROR(enumstruct_convenience_init,none,
-      "delegating initializers in %0 are not marked with 'convenience'",
+      "initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
@@ -4231,8 +4243,8 @@ ERROR(throwing_interpolation_without_try,none,
       "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
-ERROR(throwing_async_let_without_try,none,
-      "reading 'async let' can throw but is not marked with 'try'", ())
+ERROR(throwing_spawn_let_without_try,none,
+      "reading 'spawn let' can throw but is not marked with 'try'", ())
 ERROR(throwing_prop_access_without_try,none,
       "property access can throw but is not marked with 'try'", ())
 ERROR(throwing_subscript_access_without_try,none,
@@ -4261,8 +4273,8 @@ NOTE(async_access_without_await,none,
 
 NOTE(async_call_without_await_in_autoclosure,none,
       "call is 'async' in an autoclosure argument", ())
-NOTE(async_call_without_await_in_async_let,none,
-      "call is 'async' in an 'async let' initializer", ())
+NOTE(async_call_without_await_in_spawn_let,none,
+      "call is 'async' in an 'spawn let' initializer", ())
 
 WARNING(no_async_in_await,none,
         "no 'async' operations occur within 'await' expression", ())
@@ -4275,7 +4287,7 @@ ERROR(await_in_illegal_context,none,
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(async_in_nonasync_function,none,
-      "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
+      "%select{'async'|'async' call|'await'|'spawn let'|'async' property access|'async' subscript access}0 in "
       "%select{a function|an autoclosure}1 that does not support concurrency",
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
@@ -4302,18 +4314,21 @@ NOTE(protocol_witness_async_conflict,none,
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
-ERROR(async_not_let,none,
-      "'async' can only be used with 'let' declarations", ())
-ERROR(async_let_not_local,none,
-      "'async let' can only be used on local declarations", ())
-ERROR(async_let_not_initialized,none,
-      "'async let' binding requires an initializer expression", ())
-ERROR(async_let_no_variables,none,
-      "'async let' requires at least one named variable", ())
-NOTE(async_let_without_await,none,
-      "reference to async let %0 is 'async'", (DeclName))
-ERROR(async_let_in_illegal_context,none,
-      "async let %0 cannot be referenced in "
+WARNING(async_let_is_spawn_let,none,
+      "'async let' is now 'spawn let'", ())
+
+ERROR(spawn_not_let,none,
+      "'spawn' can only be used with 'let' declarations", ())
+ERROR(spawn_let_not_local,none,
+      "'spawn let' can only be used on local declarations", ())
+ERROR(spawn_let_not_initialized,none,
+      "'spawn let' binding requires an initializer expression", ())
+ERROR(spawn_let_no_variables,none,
+      "'spawn let' requires at least one named variable", ())
+NOTE(spawn_let_without_await,none,
+      "reference to spawn let %0 is 'async'", (DeclName))
+ERROR(spawn_let_in_illegal_context,none,
+      "spawn let %0 cannot be referenced in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
       (DeclName, unsigned))
 
@@ -4353,6 +4368,13 @@ ERROR(async_objc_dynamic_self,none,
 
 ERROR(actor_inheritance,none,
       "actor types do not support inheritance", ())
+
+ERROR(unowned_executor_outside_actor,none,
+      "'unownedExecutor' can only be implemented within the main "
+      "definition of an actor", ())
+ERROR(override_implicit_unowned_executor,none,
+      "cannot override an actor's 'unownedExecutor' property that wasn't "
+      "explicitly defined", ())
 
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
@@ -4403,8 +4425,8 @@ ERROR(actor_isolated_from_concurrent_closure,none,
 ERROR(actor_isolated_from_concurrent_function,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent function",
         (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_async_let,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
+ERROR(actor_isolated_from_spawn_let,none,
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'spawn let' initializer",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to actor-isolated %0 %1",

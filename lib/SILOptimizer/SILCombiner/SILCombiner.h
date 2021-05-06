@@ -29,6 +29,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
@@ -46,6 +47,7 @@ class AliasAnalysis;
 /// the worklist.
 class SILCombiner :
     public SILInstructionVisitor<SILCombiner, SILInstruction *> {
+  SILFunctionTransform *parentTransform;
 
   AliasAnalysis *AA;
 
@@ -58,6 +60,10 @@ class SILCombiner :
   /// Class hierarchy analysis needed to confirm no derived classes of a sole
   /// conforming class.
   ClassHierarchyAnalysis *CHA;
+
+  /// Non local access block analysis that we use when canonicalize object
+  /// lifetimes in OSSA.
+  NonLocalAccessBlockAnalysis *NLABA;
 
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
@@ -97,39 +103,47 @@ class SILCombiner :
   OwnershipFixupContext ownershipFixupContext;
 
 public:
-  SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
+  SILCombiner(SILFunctionTransform *parentTransform,
+              SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
-              bool removeCondFails)
-      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist("SC"),
-        deadEndBlocks(&B.getFunction()), MadeChange(false),
-        RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(
-            FuncBuilder, nullptr /*SILBuilderContext*/,
-            /* ReplaceValueUsesAction */
-            [&](SILValue Original, SILValue Replacement) {
-              replaceValueUsesWith(Original, Replacement);
-            },
-            /* ReplaceInstUsesAction */
-            [&](SingleValueInstruction *I, ValueBase *V) {
-              replaceInstUsesWith(*I, V);
-            },
-            /* EraseAction */
-            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
-        instModCallbacks(),
-        deBlocks(&B.getFunction()),
+              NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails)
+      : parentTransform(parentTransform), AA(AA), DA(DA), PCA(PCA), CHA(CHA),
+        NLABA(NLABA), Worklist("SC"), deadEndBlocks(&B.getFunction()),
+        MadeChange(false), RemoveCondFails(removeCondFails), Iteration(0),
+        Builder(B), CastOpt(
+                        FuncBuilder, nullptr /*SILBuilderContext*/,
+                        /* ReplaceValueUsesAction */
+                        [&](SILValue Original, SILValue Replacement) {
+                          replaceValueUsesWith(Original, Replacement);
+                        },
+                        /* ReplaceInstUsesAction */
+                        [&](SingleValueInstruction *I, ValueBase *V) {
+                          replaceInstUsesWith(*I, V);
+                        },
+                        /* EraseAction */
+                        [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+        instModCallbacks(), deBlocks(&B.getFunction()),
         ownershipFixupContext(instModCallbacks, deBlocks) {
-    instModCallbacks = InstModCallbacks()
-      .onDelete([&](SILInstruction *instToDelete) {
-              eraseInstFromFunction(*instToDelete);
-      })
-      .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
-        Worklist.add(newlyCreatedInst);
-      })
-      .onSetUseValue([&](Operand *use, SILValue newValue) {
-        use->set(newValue);
-        Worklist.add(use->getUser());
-      });
+    instModCallbacks =
+        InstModCallbacks()
+            .onDelete([&](SILInstruction *instToDelete) {
+              // We allow for users in SILCombine to perform 2 stage deletion,
+              // so we need to split the erasing of instructions from adding
+              // operands to the worklist.
+              eraseInstFromFunction(
+                  *instToDelete, false /*do not add operands to the worklist*/);
+            })
+            .onNotifyWillBeDeleted([&](SILInstruction *instThatWillBeDeleted) {
+              Worklist.addOperandsToWorklist(*instThatWillBeDeleted);
+            })
+            .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
+              Worklist.add(newlyCreatedInst);
+            })
+            .onSetUseValue([&](Operand *use, SILValue newValue) {
+              use->set(newValue);
+              Worklist.add(use->getUser());
+            });
   }
 
   bool runOnFunction(SILFunction &F);

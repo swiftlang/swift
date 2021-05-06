@@ -3225,7 +3225,8 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
-  void recordPotentialHole(Type type);
+  void recordPotentialHole(TypeVariableType *typeVar);
+  void recordAnyTypeVarAsPotentialHole(Type type);
 
   void recordMatchCallArgumentResult(ConstraintLocator *locator,
                                      MatchCallArgumentResult result);
@@ -4430,7 +4431,7 @@ public:
   /// Given expression represents computed result of the closure.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
                              bool isDefaultWrappedValue = false,
-                             bool isAsyncLetWrapper = false);
+                             bool isSpawnLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
@@ -5591,6 +5592,11 @@ Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
 /// Determine whether given disjunction constraint represents a set
 /// of operator overload choices.
 bool isOperatorDisjunction(Constraint *disjunction);
+
+/// Find out whether closure body has any `async` or `await` expressions,
+/// declarations, or statements directly in its body (no in other closures
+/// or nested declarations).
+ASTNode findAsyncNode(ClosureExpr *closure);
 
 } // end namespace constraints
 

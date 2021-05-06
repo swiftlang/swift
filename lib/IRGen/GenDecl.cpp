@@ -2101,7 +2101,7 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   bool isKnownLocal = entity.isAlwaysSharedLinkage();
   if (const auto *DC = entity.getDeclContextForEmission())
     if (const auto *MD = DC->getParentModule())
-      isKnownLocal = IGM.getSwiftModule() == MD;
+      isKnownLocal = IGM.getSwiftModule() == MD || MD->isStaticLibrary();
 
   auto IRL =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
@@ -2130,7 +2130,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   bool isKnownLocal = entity.isAlwaysSharedLinkage();
   if (const auto *DC = entity.getDeclContextForEmission())
     if (const auto *MD = DC->getParentModule())
-      isKnownLocal = MD == swiftModule;
+      isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
 
   entity.mangle(result.Name);
   bool weakImported = entity.isWeakImported(swiftModule);
@@ -2144,6 +2144,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo, StringRef name,
                        SILLinkage linkage, ForDefinition_t isDefinition,
                        bool isWeakImported) {
   LinkInfo result;
+
+  // TODO(compnerd) handle this properly
 
   result.Name += name;
   result.IRL = getIRLinkage(linkInfo, linkage, isDefinition, isWeakImported);

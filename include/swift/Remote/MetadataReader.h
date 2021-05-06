@@ -1088,6 +1088,9 @@ public:
     
     unsigned size = baseSize + genericsSize + metadataInitSize + vtableSize;
     auto buffer = (uint8_t *)malloc(size);
+    if (buffer == nullptr) {
+      return nullptr;
+    }
     if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
       free(buffer);
       return nullptr;

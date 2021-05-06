@@ -87,6 +87,9 @@ public:
   /// For these modules, we should prefer using Swift interface when importing them.
   std::vector<std::string> PreferInterfaceForModules;
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -313,6 +316,9 @@ public:
   /// are errors. The resulting serialized AST may include errors types and
   /// skip nodes entirely, depending on the errors involved.
   bool AllowModuleWithCompilerErrors = false;
+
+  /// True if the "-static" option is set.
+  bool Static = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

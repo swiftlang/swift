@@ -268,7 +268,7 @@ You can see the status of different proposals at
 - [ErrorHandlingRationale.rst](/docs/ErrorHandlingRationale.rst):
   Surveys error-handling in a variety of languages, and describes the rationale
   behind the design of error handling in Swift.
-- [weak.rst](/docs/weak.rst):
+- [WeakReferences.md](/docs/WeakReferences.md):
   Discusses weak references, including the designs in different languages,
   and proposes changes to Swift (pre-1.0).
   <!-- NOTE: Outdated -->
@@ -279,7 +279,7 @@ These documents are known to be out-of-date and are superseded by other
 documentation, primarily [The Swift Programming Language][] (TSPL).
 They are preserved mostly for historical interest.
 
-- [AccessControl.rst](/docs/AccessControl.rst)
+- [AccessControl.md](/docs/AccessControl.md)
 - [Arrays.rst](/docs/Arrays.rst)
   <!-- Has additional notes on bridging that may be of general interest? -->
 - [Generics.rst](/docs/Generics.rst)

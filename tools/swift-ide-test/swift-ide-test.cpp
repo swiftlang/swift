@@ -2515,6 +2515,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
 
 static void printModuleMetadata(ModuleDecl *MD) {
   auto &OS = llvm::outs();
+  OS << "user module version: " << MD->getUserModuleVersion().getAsString() << "\n";
   OS << "fingerprint=" << MD->getFingerprint().getRawValue() << "\n";
   MD->collectLinkLibraries([&](LinkLibrary lib) {
     OS << "link library: " << lib.getName()
@@ -3846,11 +3847,6 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
   }
 
-  // We disable source location resolutions from .swiftsourceinfo files by
-  // default to match sourcekitd-test's and ide clients' expected behavior
-  // (passing optimize-for-ide in the global configuration request).
-  if (!options::EnableSwiftSourceInfo)
-    InitInvok.getFrontendOptions().IgnoreSwiftSourceInfo = true;
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {

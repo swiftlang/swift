@@ -588,7 +588,10 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1,
+    /// If the module is compiled as static library.
+    StaticLibrary : 1,
+
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -1862,7 +1865,7 @@ public:
   bool isComputingPatternBindingEntry(const VarDecl *vd) const;
 
   /// Is this an "async let" declaration?
-  bool isAsyncLet() const;
+  bool isSpawnLet() const;
 
   /// Gets the text of the initializer expression for the pattern entry at the
   /// given index, stripping out inactive branches of any #ifs inside the
@@ -3778,9 +3781,8 @@ public:
   /// Get the closest-to-root superclass that's an actor class.
   const ClassDecl *getRootActorClass() const;
 
-  /// Does this class explicitly declare any of the methods that
-  /// would prevent it from being a default actor?
-  bool hasExplicitCustomActorMethods() const;
+  /// Fetch this class's unownedExecutor property, if it has one.
+  const VarDecl *getUnownedExecutorProperty() const;
 
   /// Is this the NSObject class type?
   bool isNSObject() const;
@@ -4006,6 +4008,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
+  Actor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -4942,7 +4945,7 @@ public:
   bool isLet() const { return getIntroducer() == Introducer::Let; }
 
   /// Is this an "async let" property?
-  bool isAsyncLet() const;
+  bool isSpawnLet() const;
 
   Introducer getIntroducer() const {
     return Introducer(Bits.VarDecl.Introducer);
