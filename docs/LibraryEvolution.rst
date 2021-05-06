@@ -146,15 +146,9 @@ The following changes are permitted:
 - Reordering generic requirements (but not the generic parameters themselves).
 - Adding a default argument expression to a parameter.
 - Adding, changing, reordering, or removing property wrappers that either are 
-  implementation-detail (``@ImplementationDetail``) or in a composition where
-  the outermost wrapper is implementation-detail
-  (``@ImplementationDetail @MyWrapper``).
+  implementation-detail or in a composition where the outermost wrapper is
+  implementation-detail (``@ImplementationDetail @MyWrapper``).
 - Changing or removing a default argument is a `binary-compatible source-breaking change`.
-- Changing arguments in the property-wrapper custom attribute of an 
-  implementation-detail wrapper (``@MyWrapper(argument: 5)``) or 
-  in the custom attributes of compositions where the outermost wrapper is 
-  implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
-  is a `binary-compatible source-breaking change`.
 - Adding or removing the ``@discardableResult`` and ``@warn_unqualified_access``
   attributes.
 
@@ -164,11 +158,9 @@ No other changes are permitted; the following are particularly of note:
 - An ABI-public function may not, in any way, change API-level property 
   wrappers (``@API``) or compositions where the outermost wrapper is 
   API-level (``@API @MyWrapper``).
-- An ABI-public function may neither add nor remove arguments from the 
-  property-wrapper custom attribute of a wrapper supporting projected-value
-  initialization (``@ValueProjecting(argument: 5)``) or in the custom 
-  attributes of compositions where the outermost wrapper is projected-value
-  initializable (``@ValueProjecting @MyWrapper(argument: 5)``).
+- An ABI-public function may not change an API-level property-wrapper attribute
+  to an implementation-detail one and vice versa, if it is the only wrapper
+  applied to a given parameter or the outermost wrapper in a composition.
 - An ABI-public function may not change its generic requirements.
 - An ABI-public function may not change its external parameter names (labels).
 - An ABI-public function may not add, remove, or reorder parameters, whether or
@@ -430,16 +422,10 @@ stored subscripts. This means that the following changes are permitted:
 - Reordering generic requirements (but not the generic parameters themselves).
 - Adding a default argument expression to an index parameter.
 - Adding, changing, reordering, or removing property wrappers that either are 
-  implementation-detail (``@ImplementationDetail``) or in a composition where
-  the outermost wrapper is implementation-detail
-  (``@ImplementationDetail @MyWrapper``).
+  implementation-detail or in a composition where the outermost wrapper is
+  implementation-detail (``@ImplementationDetail @MyWrapper``).
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- Changing arguments in the property-wrapper custom attribute of an 
-  implementation-detail wrapper (``@MyWrapper(argument: 5)``) or 
-  in the custom attributes of compositions where the outermost wrapper is 
-  implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
-  is a `binary-compatible source-breaking change`.
 
 Like properties, subscripts can be marked ``@inlinable``, which makes
 changing the body of an accessor a `binary-compatible source-breaking change`.
@@ -804,17 +790,11 @@ counterparts with a few small changes:
 - Reordering generic requirements (but not the generic parameters themselves)
   is permitted.
 - Adding, changing, reordering, or removing property wrappers that either are 
-  implementation-detail (``@ImplementationDetail``) or in a composition where
-  the outermost wrapper is implementation-detail
-  (``@ImplementationDetail @MyWrapper``).
+  implementation-detail or in a composition where the outermost wrapper is
+  implementation-detail (``@ImplementationDetail @MyWrapper``).
 - Adding a default argument expression to an index parameter is permitted.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
-- Changing arguments in the property-wrapper custom attribute of an 
-  implementation-detail wrapper (``@MyWrapper(argument: 5)``) or 
-  in the custom attributes of compositions where the outermost wrapper is 
-  implementation-detail  (``@ImplementationDetail @MyWrapper(argument: 5)``) 
-  is a `binary-compatible source-breaking change`.
 
 Adding a public setter to an ``open`` subscript is a
 `binary-compatible source-breaking change`; any existing overrides will not
