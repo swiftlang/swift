@@ -306,6 +306,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           continue;
 
         if (!BaseType->isExistentialType()) {
+          // Apply any substitutions we need to map the requirements from a
+          // a protocol extension to an extension on the conforming type.
           First = First.subst(subMap);
           Second = Second.subst(subMap);
 
@@ -317,11 +319,12 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           }
         }
 
+        assert(!First->hasArchetype() && !Second->hasArchetype());
         switch (Kind) {
         case RequirementKind::Conformance: {
           auto *M = DC->getParentModule();
           auto *Proto = Second->castTo<ProtocolType>()->getDecl();
-          if (!First->isTypeParameter() && !First->is<ArchetypeType>() &&
+          if (!First->isTypeParameter() &&
               M->conformsToProtocol(First, Proto).isInvalid())
             return true;
           if (M->conformsToProtocol(First, Proto).isInvalid())
@@ -330,11 +333,27 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
 
         case RequirementKind::Superclass:
-          if (!Second->isBindableToSuperclassOf(First)) {
-            return true;
-          } else if (!Second->isExactSuperclassOf(Second)) {
+          // If the subject type of the requirement is still a type parameter,
+          // we need to check if the contextual type could possibly be bound to
+          // the superclass. If not, this extension isn't applicable.
+          if (First->isTypeParameter()) {
+            if (!Target->mapTypeIntoContext(First)->isBindableTo(
+                    Target->mapTypeIntoContext(Second))) {
+              return true;
+            }
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
+            break;
           }
+
+          // If we've substituted in a concrete type for the subject, we can
+          // check for an exact superclass match, and disregard the extension if
+          // it missed.
+          // FIXME: What if it ends being something like `C<U> : C<Int>`?
+          // Arguably we should allow that to be mirrored with a U == Int
+          // constraint.
+          if (!Second->isExactSuperclassOf(First))
+            return true;
+
           break;
 
         case RequirementKind::SameType:
