@@ -4836,8 +4836,7 @@ public:
   }
 
   bool convert() {
-    if (!Buffer.empty())
-      return !DiagEngine.hadAnyError();
+    assert(Buffer.empty() && "AsyncConverter can only be used once");
 
     if (auto *FD = dyn_cast_or_null<FuncDecl>(StartNode.dyn_cast<Decl *>())) {
       addFuncDecl(FD);
@@ -4848,6 +4847,60 @@ public:
       convertNode(StartNode);
     }
     return !DiagEngine.hadAnyError();
+  }
+
+  /// When adding an async alternative method for the function declaration \c
+  /// FD, this function tries to create a function body for the legacy function
+  /// (the one with a completion handler), which calls the newly converted async
+  /// function. There are certain situations in which we fail to create such a
+  /// body, e.g. if the completion handler has the signature `(String, Error?)
+  /// -> Void` in which case we can't synthesize the result of type \c String in
+  /// the error case.
+  bool createLegacyBody() {
+    assert(Buffer.empty() &&
+           "AsyncConverter can only be used once");
+    if (!canCreateLegacyBody()) {
+      return false;
+    }
+    FuncDecl *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+    Identifier CompletionHandlerName = TopHandler.Handler->getParameterName();
+
+    OS << "{\n"; // start function body
+    OS << "async {\n";
+    if (TopHandler.HasError) {
+      OS << "do {\n";
+      if (!TopHandler.willAsyncReturnVoid()) {
+        OS << "let result";
+        addResultTypeAnnotationIfNecessary(FD, TopHandler);
+        OS << " = ";
+      }
+      OS << "try await ";
+      addCallToAsyncMethod(FD, TopHandler);
+      OS << "\n";
+      addCallToCompletionHandler(/*HasResult=*/true, CompletionHandlerName, FD,
+                                 TopHandler);
+      OS << "\n"
+         << "} catch {\n";
+      addCallToCompletionHandler(/*HasResult=*/false, CompletionHandlerName, FD,
+                                 TopHandler);
+      OS << "\n"
+         << "}\n"; // end catch
+    } else {
+      if (!TopHandler.willAsyncReturnVoid()) {
+        OS << "let result";
+        addResultTypeAnnotationIfNecessary(FD, TopHandler);
+        OS << " = ";
+      }
+      OS << "await ";
+      addCallToAsyncMethod(FD, TopHandler);
+      OS << "\n";
+      addCallToCompletionHandler(/*HasResult=*/true, CompletionHandlerName, FD,
+                                 TopHandler);
+      OS << "\n";
+    }
+    OS << "}\n"; // end 'async'
+    OS << "}\n"; // end function body
+    return true;
   }
 
   void replace(ASTNode Node, SourceEditConsumer &EditConsumer,
@@ -4869,6 +4922,44 @@ public:
   }
 
 private:
+  bool canCreateLegacyBody() {
+    FuncDecl *FD = dyn_cast<FuncDecl>(StartNode.dyn_cast<Decl *>());
+    if (!FD) {
+      return false;
+    }
+    if (FD == nullptr || FD->getBody() == nullptr) {
+      return false;
+    }
+    if (FD->hasThrows()) {
+      assert(!TopHandler.isValid() && "We shouldn't have found a handler desc "
+                                       "if the original function throws");
+      return false;
+    }
+    switch (TopHandler.Type) {
+    case HandlerType::INVALID:
+      return false;
+    case HandlerType::PARAMS: {
+      if (TopHandler.HasError) {
+        // The non-error parameters must be optional so that we can set them to
+        // nil in the error case.
+        // The error parameter must be optional so we can set it to nil in the
+        // success case.
+        // Otherwise we can't synthesize the values to return for these
+        // parameters.
+        return llvm::all_of(TopHandler.params(),
+                            [](AnyFunctionType::Param Param) -> bool {
+                              return Param.getPlainType()->isOptional();
+                            });
+      } else {
+        return true;
+      }
+    }
+    case HandlerType::RESULT:
+      return true;
+    }
+  }
+
+
   void convertNodes(ArrayRef<ASTNode> Nodes) {
     for (auto Node : Nodes) {
       OS << "\n";
@@ -5421,30 +5512,12 @@ private:
       Names.erase(Param);
     }
   }
-};
 
-/// When adding an async alternative method for the function declaration \c FD,
-/// this class tries to create a function body for the legacy function (the one
-/// with a completion handler), which calls the newly converted async function.
-/// There are certain situations in which we fail to create such a body, e.g.
-/// if the completion handler has the signature `(String, Error?) -> Void` in
-/// which case we can't synthesize the result of type \c String in the error
-/// case.
-class LegacyAlternativeBodyCreator {
-  /// The old function declaration for which an async alternative has been added
-  /// and whose body shall be rewritten to call the newly added async
-  /// alternative.
-  FuncDecl *FD;
-
-  /// The description of the completion handler in the old function declaration.
-  AsyncHandlerDesc HandlerDesc;
-
-  std::string Buffer;
-  llvm::raw_string_ostream OS;
-
-  /// Adds the call to the refactored 'async' method without the 'await'
-  /// keyword to the output stream.
-  void addCallToAsyncMethod() {
+  /// Adds the call to an 'async' version of \p FD, where \p HanderDesc
+  /// describes the async completion handler of \p FD. This does not add an
+  /// 'await' keyword.
+  void addCallToAsyncMethod(const FuncDecl *FD,
+                            const AsyncHandlerDesc &HandlerDesc) {
     OS << FD->getBaseName() << "(";
     bool FirstParam = true;
     for (auto Param : *FD->getParameters()) {
@@ -5465,32 +5538,34 @@ class LegacyAlternativeBodyCreator {
     OS << ")";
   }
 
-  /// If the returned error type is more specialized than \c Error, adds an
-  /// 'as! CustomError' cast to the more specialized error type to the output
-  /// stream.
-  void addCastToCustomErrorTypeIfNecessary() {
+  /// If the error type of \p HandlerDesc is more specialized than \c Error,
+  /// adds an 'as! CustomError' cast to the more specialized error type to the
+  /// output stream.
+  void addCastToCustomErrorTypeIfNecessary(const AsyncHandlerDesc &HandlerDesc,
+                                           const ASTContext &Ctx) {
     auto ErrorType = *HandlerDesc.getErrorType();
-    if (ErrorType->getCanonicalType() !=
-        FD->getASTContext().getExceptionType()) {
+    if (ErrorType->getCanonicalType() != Ctx.getExceptionType()) {
       OS << " as! ";
       ErrorType->lookThroughSingleOptionalType()->print(OS);
     }
   }
 
-  /// Adds the \c Index -th parameter to the completion handler.
-  /// If \p HasResult is \c true, it is assumed that a variable named 'result'
-  /// contains the result returned from the async alternative. If the callback
-  /// also takes an error parameter, \c nil passed to the completion handler for
-  /// the error.
-  /// If \p HasResult is \c false, it is a assumed that a variable named 'error'
-  /// contains the error thrown from the async method and 'nil' will be passed
-  /// to the completion handler for all result parameters.
-  void addCompletionHandlerArgument(size_t Index, bool HasResult) {
+  /// Adds the \c Index -th parameter to the completion handler of \p FD.
+  /// \p HanderDesc describes which of \p FD's parameters is the completion
+  /// handler. If \p HasResult is \c true, it is assumed that a variable named
+  /// 'result' contains the result returned from the async alternative. If the
+  /// callback also takes an error parameter, \c nil passed to the completion
+  /// handler for the error. If \p HasResult is \c false, it is a assumed that a
+  /// variable named 'error' contains the error thrown from the async method and
+  /// 'nil' will be passed to the completion handler for all result parameters.
+  void addCompletionHandlerArgument(size_t Index, bool HasResult,
+                                    const FuncDecl *FD,
+                                    const AsyncHandlerDesc &HandlerDesc) {
     if (HandlerDesc.HasError && Index == HandlerDesc.params().size() - 1) {
       // The error parameter is the last argument of the completion handler.
       if (!HasResult) {
         OS << "error";
-        addCastToCustomErrorTypeIfNecessary();
+        addCastToCustomErrorTypeIfNecessary(HandlerDesc, FD->getASTContext());
       } else {
         OS << "nil";
       }
@@ -5525,11 +5600,16 @@ class LegacyAlternativeBodyCreator {
     }
   }
 
-  /// Adds the call to the completion handler. See \c
-  /// getCompletionHandlerArgument for how the arguments are synthesized if the
-  /// completion handler takes arguments, not a \c Result type.
-  void addCallToCompletionHandler(bool HasResult) {
-    OS << HandlerDesc.Handler->getParameterName() << "(";
+  /// If the completion handler of a call to \p FD is named \p HandlerName,
+  /// add a call to \p HandlerName passing all the required arguments. \p
+  /// HandlerDesc describes which of \p FD's parameters is the completion
+  /// handler hat is being called. See \c getCompletionHandlerArgument for how
+  /// the arguments are synthesized if the completion handler takes arguments,
+  /// not a \c Result type.
+  void addCallToCompletionHandler(bool HasResult, Identifier HandlerName,
+                                  const FuncDecl *FD,
+                                  const AsyncHandlerDesc &HandlerDesc) {
+    OS << HandlerName << "(";
 
     // Construct arguments to pass to the completion handler
     switch (HandlerDesc.Type) {
@@ -5541,7 +5621,7 @@ class LegacyAlternativeBodyCreator {
         if (I > 0) {
           OS << ", ";
         }
-        addCompletionHandlerArgument(I, HasResult);
+        addCompletionHandlerArgument(I, HasResult, FD, HandlerDesc);
       }
       break;
     }
@@ -5550,7 +5630,7 @@ class LegacyAlternativeBodyCreator {
         OS << ".success(result)";
       } else {
         OS << ".failure(error";
-        addCastToCustomErrorTypeIfNecessary();
+        addCastToCustomErrorTypeIfNecessary(HandlerDesc, FD->getASTContext());
         OS << ")";
       }
       break;
@@ -5559,8 +5639,9 @@ class LegacyAlternativeBodyCreator {
     OS << ")"; // Close the call to the completion handler
   }
 
-  /// Adds the result type of the converted async function.
-  void addAsyncFuncReturnType() {
+  /// Adds the result type of a refactored async function that previously
+  /// returned results via a completion handler described by \p HandlerDesc.
+  void addAsyncFuncReturnType(const AsyncHandlerDesc &HandlerDesc) {
     SmallVector<Type, 2> Scratch;
     auto ReturnTypes = HandlerDesc.getAsyncReturnTypes(Scratch);
     if (ReturnTypes.size() > 1) {
@@ -5575,16 +5656,16 @@ class LegacyAlternativeBodyCreator {
     }
   }
 
-  /// If the async alternative function is generic, adds the type annotation
-  /// to the 'return' variable in the legacy function so that the generic
-  /// parameters of the legacy function are passed to the generic function.
-  /// For example for
+  /// If \p FD is generic, adds a type annotation with the return type of the
+  /// converted async function. This is used when creating a legacy function,
+  /// calling the converted 'async' function so that the generic parameters of
+  /// the legacy function are passed to the generic function. For example for
   /// \code
   /// func foo<GenericParam>() async -> GenericParam {}
   /// \endcode
   /// we generate
   /// \code
-  /// func foo<GenericParam>(completion: (T) -> Void) {
+  /// func foo<GenericParam>(completion: (GenericParam) -> Void) {
   ///   async {
   ///     let result: GenericParam = await foo()
   ///               <------------>
@@ -5593,88 +5674,12 @@ class LegacyAlternativeBodyCreator {
   /// }
   /// \endcode
   /// This function adds the range marked by \c <----->
-  void addResultTypeAnnotationIfNecessary() {
+  void addResultTypeAnnotationIfNecessary(const FuncDecl *FD,
+                                          const AsyncHandlerDesc &HandlerDesc) {
     if (FD->isGeneric()) {
       OS << ": ";
-      addAsyncFuncReturnType();
+      addAsyncFuncReturnType(HandlerDesc);
     }
-  }
-
-public:
-  LegacyAlternativeBodyCreator(FuncDecl *FD, AsyncHandlerDesc HandlerDesc)
-      : FD(FD), HandlerDesc(HandlerDesc), OS(Buffer) {}
-
-  bool canRewriteLegacyBody() {
-    if (FD == nullptr || FD->getBody() == nullptr) {
-      return false;
-    }
-    if (FD->hasThrows()) {
-      assert(!HandlerDesc.isValid() && "We shouldn't have found a handler desc "
-                                       "if the original function throws");
-      return false;
-    }
-    switch (HandlerDesc.Type) {
-    case HandlerType::INVALID:
-      return false;
-    case HandlerType::PARAMS: {
-      if (HandlerDesc.HasError) {
-        // The non-error parameters must be optional so that we can set them to
-        // nil in the error case.
-        // The error parameter must be optional so we can set it to nil in the
-        // success case.
-        // Otherwise we can't synthesize the values to return for these
-        // parameters.
-        return llvm::all_of(HandlerDesc.params(),
-                            [](AnyFunctionType::Param Param) -> bool {
-                              return Param.getPlainType()->isOptional();
-                            });
-      } else {
-        return true;
-      }
-    }
-    case HandlerType::RESULT:
-      return true;
-    }
-  }
-
-  std::string create() {
-    assert(Buffer.empty() &&
-           "LegacyAlternativeBodyCreator can only be used once");
-    assert(canRewriteLegacyBody() &&
-           "Cannot create a legacy body if the body can't be rewritten");
-    OS << "{\n"; // start function body
-    OS << "async {\n";
-    if (HandlerDesc.HasError) {
-      OS << "do {\n";
-      if (!HandlerDesc.willAsyncReturnVoid()) {
-        OS << "let result";
-        addResultTypeAnnotationIfNecessary();
-        OS << " = ";
-      }
-      OS << "try await ";
-      addCallToAsyncMethod();
-      OS << "\n";
-      addCallToCompletionHandler(/*HasResult=*/true);
-      OS << "\n"
-         << "} catch {\n";
-      addCallToCompletionHandler(/*HasResult=*/false);
-      OS << "\n"
-         << "}\n"; // end catch
-    } else {
-      if (!HandlerDesc.willAsyncReturnVoid()) {
-        OS << "let result";
-        addResultTypeAnnotationIfNecessary();
-        OS << " = ";
-      }
-      OS << "await ";
-      addCallToAsyncMethod();
-      OS << "\n";
-      addCallToCompletionHandler(/*HasResult=*/true);
-      OS << "\n";
-    }
-    OS << "}\n"; // end 'async'
-    OS << "}\n"; // end function body
-    return Buffer;
   }
 };
 
@@ -5784,12 +5789,9 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
-  LegacyAlternativeBodyCreator LegacyBody(FD, HandlerDesc);
-  if (LegacyBody.canRewriteLegacyBody()) {
-    EditConsumer.accept(SM,
-                        Lexer::getCharSourceRangeFromSourceRange(
-                            SM, FD->getBody()->getSourceRange()),
-                        LegacyBody.create());
+  AsyncConverter LegacyBodyCreator(SM, DiagEngine, FD, HandlerDesc);
+  if (LegacyBodyCreator.createLegacyBody()) {
+    LegacyBodyCreator.replace(FD->getBody(), EditConsumer);
   }
   Converter.insertAfter(FD, EditConsumer);
 
