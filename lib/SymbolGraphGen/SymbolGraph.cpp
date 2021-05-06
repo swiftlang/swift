@@ -430,7 +430,7 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
           // If P is from a different module, and it's being added to a type
           // from the current module, add a `memberOf` relation to the extended
           // protocol.
-          if (MemberVD->getModuleContext() != &M && VD->getDeclContext()) {
+          if (MemberVD->getModuleContext()->getNameStr() != M.getNameStr() && VD->getDeclContext()) {
             if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
               recordEdge(Symbol(this, VD, nullptr),
                          Symbol(this, ExP, nullptr),
