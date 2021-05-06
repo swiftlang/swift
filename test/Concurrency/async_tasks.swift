@@ -47,8 +47,8 @@ func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
 func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
-  let _: String = withUnsafeContinuation { continuation in // expected-error{{invalid conversion from 'async' function of type '(UnsafeContinuation<String, Never>) async -> Void' to synchronous function type '(UnsafeContinuation<String, Never>) -> Void'}}
-    let s = await someAsyncFunc() // rdar://70610141 for getting a better error message here
+  let _: String = withUnsafeContinuation { continuation in // expected-error{{cannot pass function of type '(UnsafeContinuation<String, Never>) async -> Void' to parameter expecting synchronous function type}}
+    let s = await someAsyncFunc() // expected-note {{'async' inferred from asynchronous operation used here}}
     continuation.resume(returning: s)
   }
 
