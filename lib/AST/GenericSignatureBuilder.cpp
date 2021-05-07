@@ -4145,7 +4145,25 @@ GenericSignatureBuilder::getConformanceAccessPath(Type type,
     return found->second;
   }
 
-  FrontendStatsTracer(Context.Stats, "get-conformance-access-path");
+  auto *Stats = Context.Stats;
+
+  FrontendStatsTracer(Stats, "get-conformance-access-path");
+
+  auto recordPath = [&](CanType type, ProtocolDecl *proto,
+                        ConformanceAccessPath path) {
+    // Add the path to the buffer.
+    Impl->CurrentConformanceAccessPaths.emplace_back(type, path);
+
+    // Add the path to the map.
+    auto key = std::make_pair(type, proto);
+    auto inserted = Impl->ConformanceAccessPaths.insert(
+        std::make_pair(key, path));
+    assert(inserted.second);
+    (void) inserted;
+
+    if (Stats)
+      ++Stats->getFrontendCounters().NumConformanceAccessPathsRecorded;
+  };
 
   // If this is the first time we're asked to look up a conformance access path,
   // visit all of the root conformance requirements in our generic signature and
@@ -4163,19 +4181,12 @@ GenericSignatureBuilder::getConformanceAccessPath(Type type,
       ArrayRef<ConformanceAccessPath::Entry> path(root);
       ConformanceAccessPath result(Context.AllocateCopy(path));
 
-      // Add the path to the buffer.
-      Impl->CurrentConformanceAccessPaths.emplace_back(rootType, result);
-
-      // Add the path to the map.
-      auto key = std::make_pair(rootType, rootProto);
-      auto inserted = Impl->ConformanceAccessPaths.insert(
-          std::make_pair(key, result));
-      assert(inserted.second);
-      (void) inserted;
+      recordPath(rootType, rootProto, result);
     }
   }
 
-  // We keep going until we find the path we are looking for.
+  // We enumerate conformance access paths in lexshort order until we find the
+  // path whose corresponding type canonicalizes to the one we are looking for.
   while (true) {
     auto found = Impl->ConformanceAccessPaths.find(
         std::make_pair(canType, protocol));
@@ -4185,11 +4196,13 @@ GenericSignatureBuilder::getConformanceAccessPath(Type type,
 
     assert(Impl->CurrentConformanceAccessPaths.size() > 0);
 
-    // Refill the buffer.
-    std::vector<std::pair<CanType, ConformanceAccessPath>> morePaths;
+    // The buffer consists of all conformance access paths of length N.
+    // Swap it out with an empty buffer, and fill it with all paths of
+    // length N+1.
+    std::vector<std::pair<CanType, ConformanceAccessPath>> oldPaths;
+    std::swap(Impl->CurrentConformanceAccessPaths, oldPaths);
 
-    // From each path in the buffer, compute all paths of length plus one.
-    for (const auto &pair : Impl->CurrentConformanceAccessPaths) {
+    for (const auto &pair : oldPaths) {
       const auto &lastElt = pair.second.back();
       auto *lastProto = lastElt.second;
 
@@ -4213,12 +4226,12 @@ GenericSignatureBuilder::getConformanceAccessPath(Type type,
         if (!nextCanType->isTypeParameter())
           continue;
 
-        // Check if we already have a conformance access path for this anchor.
-        auto key = std::make_pair(nextCanType, nextProto);
-
         // If we've already seen a path for this conformance, skip it and
-        // don't add it to the buffer.
-        if (Impl->ConformanceAccessPaths.count(key))
+        // don't add it to the buffer. Note that because we iterate over
+        // conformance access paths in lexshort order, the existing
+        // conformance access path is shorter than the one we found just now.
+        if (Impl->ConformanceAccessPaths.count(
+                std::make_pair(nextCanType, nextProto)))
           continue;
 
         if (entries.empty()) {
@@ -4233,18 +4246,9 @@ GenericSignatureBuilder::getConformanceAccessPath(Type type,
         ConformanceAccessPath result = Context.AllocateCopy(entries);
         entries.pop_back();
 
-        // Add the path to the buffer.
-        morePaths.emplace_back(nextCanType, result);
-
-        // Add the path to the map.
-        auto inserted = Impl->ConformanceAccessPaths.insert(
-            std::make_pair(key, result));
-        assert(inserted.second);
-        (void) inserted;
+        recordPath(nextCanType, nextProto, result);
       }
     }
-
-    std::swap(morePaths, Impl->CurrentConformanceAccessPaths);
   }
 }
 

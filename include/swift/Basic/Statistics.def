@@ -224,6 +224,9 @@ FRONTEND_STATISTIC(Sema, NumAccessorBodiesSynthesized)
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
 
+/// Number of conformance access paths we had to compute.
+FRONTEND_STATISTIC(Sema, NumConformanceAccessPathsRecorded)
+
 /// Number of lazy requirement signatures registered.
 FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
 
