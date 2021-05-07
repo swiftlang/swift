@@ -72,6 +72,9 @@ class DIMemoryObjectInfo {
   /// non-empty.
   bool HasDummyElement = false;
 
+  /// True if this object has a single user of type ProjectBoxInst.
+  bool IsBox = false;
+
 public:
   DIMemoryObjectInfo(MarkUninitializedInst *MemoryInst);
 
@@ -98,10 +101,11 @@ public:
   /// instruction. For alloc_box though it returns the project_box associated
   /// with the memory info.
   SingleValueInstruction *getUninitializedValue() const {
-    if (auto *mui = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
-      if (auto *pbi = mui->getSingleUserOfType<ProjectBoxInst>()) {
-        return pbi;
-      }
+    if (IsBox) {
+      // TODO: consider just storing the ProjectBoxInst in this case.
+      auto *pbi = MemoryInst->getSingleUserOfType<ProjectBoxInst>();
+      assert(pbi);
+      return pbi;
     }
     return MemoryInst;
   }

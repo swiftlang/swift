@@ -93,13 +93,8 @@ static unsigned getElementCountRec(TypeExpansionContext context,
 }
 
 static std::pair<SILType, bool>
-computeMemorySILType(MarkUninitializedInst *MemoryInst) {
+computeMemorySILType(MarkUninitializedInst *MUI, SILValue Address) {
   // Compute the type of the memory object.
-  auto *MUI = MemoryInst;
-  SILValue Address = MUI;
-  if (auto *PBI = Address->getSingleUserOfType<ProjectBoxInst>()) {
-    Address = PBI;
-  }
   SILType MemorySILType = Address->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
@@ -118,7 +113,13 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
     : MemoryInst(MI) {
   auto &Module = MI->getModule();
 
-  std::tie(MemorySILType, IsLet) = computeMemorySILType(MemoryInst);
+  SILValue Address = MemoryInst;
+  if (auto PBI = MemoryInst->getSingleUserOfType<ProjectBoxInst>()) {
+    IsBox = true;
+    Address = PBI;
+  }
+
+  std::tie(MemorySILType, IsLet) = computeMemorySILType(MI, Address);
 
   // Compute the number of elements to track in this memory object.
   // If this is a 'self' in a delegating initializer, we only track one bit:
