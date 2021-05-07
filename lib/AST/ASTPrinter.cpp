@@ -4869,11 +4869,13 @@ public:
                           PrintNameContext::FunctionParameterExternal);
         Printer << ": ";
       } else if (Options.AlwaysTryPrintParameterLabels &&
-                 Param.hasInternalLabel()) {
+                 Param.hasInternalLabel() &&
+                 !Param.getInternalLabel().hasDollarPrefix()) {
         // We didn't have an external parameter label but were requested to
-        // always try and print parameter labels. Print The internal label.
-        // If we have neither an external nor an internal label, only print the
-        // type.
+        // always try and print parameter labels.
+        // If the internal label is a valid internal parameter label (does not
+        // start with '$'), print the internal label. If we have neither an
+        // external nor a printable internal label, only print the type.
         Printer << "_ ";
         Printer.printName(Param.getInternalLabel(),
                           PrintNameContext::FunctionParameterLocal);

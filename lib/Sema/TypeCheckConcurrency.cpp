@@ -1949,7 +1949,8 @@ namespace {
       }
 
       // Mark as implicitly async.
-      apply->setImplicitlyAsync(true);
+      if (!fnType->getExtInfo().isAsync())
+        apply->setImplicitlyAsync(true);
 
       // If we don't need to check for sendability, we're done.
       if (!shouldDiagnoseNonSendableViolations(ctx.LangOpts))

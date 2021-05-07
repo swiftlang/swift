@@ -425,6 +425,9 @@ ERROR(cannot_convert_argument_value_anyobject,none,
       (Type, Type))
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+NOTE(note_incompatible_argument_value_nil_at_pos,none,
+     "'nil' is not compatible with expected argument type %0 at position #%1",
+     (Type, unsigned))
 
 ERROR(cannot_convert_condition_value,none,
       "cannot convert value of type %0 to expected condition type %1",
@@ -558,6 +561,13 @@ ERROR(throws_functiontype_mismatch,none,
 ERROR(async_functiontype_mismatch,none,
       "invalid conversion from 'async' function of type %0 to "
       "synchronous function type %1", (Type, Type))
+
+ERROR(cannot_pass_async_func_to_sync_parameter,none,
+      "cannot pass function of type %0 "
+      "to parameter expecting synchronous function type", (Type))
+
+NOTE(async_inferred_from_operation,none,
+     "'async' inferred from asynchronous operation used here", ())
 
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
@@ -3470,7 +3480,7 @@ ERROR(cfclass_designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0",
       (DeclName))
 ERROR(enumstruct_convenience_init,none,
-      "delegating initializers in %0 are not marked with 'convenience'",
+      "initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",

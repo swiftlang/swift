@@ -88,9 +88,9 @@ static llvm::VersionTuple getCanImportVersion(TupleExpr *te,
   }
   auto label = te->getElementName(1);
   auto subE = te->getElement(1);
-  if (label.str() == "version") {
+  if (label.str() == "_version") {
     underlyingVersion = false;
-  } else if (label.str() == "underlyingVersion") {
+  } else if (label.str() == "_underlyingVersion") {
     underlyingVersion = true;
   } else {
     if (D) {

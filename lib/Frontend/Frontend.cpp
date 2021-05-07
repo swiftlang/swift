@@ -182,6 +182,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.DisableCrossModuleIncrementalInfo =
       opts.DisableCrossModuleIncrementalBuild;
 
+  serializationOpts.StaticLibrary = opts.Static;
+
   return serializationOpts;
 }
 
