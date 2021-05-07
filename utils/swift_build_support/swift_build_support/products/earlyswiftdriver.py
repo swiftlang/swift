@@ -12,26 +12,22 @@
 
 import os
 
-from . import cmark
-from . import foundation
-from . import libcxx
-from . import libdispatch
-from . import libicu
-from . import llbuild
-from . import llvm
 from . import product
-from . import swift
-from . import swiftpm
-from . import xctest
 from .. import shell
-from .. import targets
+from .. import toolchain
 
 
 # SwiftDriver is a standalone compiler-driver application written in
-# Swift. This build product is *the* driver product that is
-# installed into a resulting toolchain. It is built-with and depends-on
-# other build products of this build (compiler, package-manager, etc).
-class SwiftDriver(product.Product):
+# Swift. This build product is a "Special" SwiftDriver that gets built
+# with the host toolchain to act as *the* compiler driver for the
+# `swift` build directory compiler, hence it does not depend on any other
+# build product of `build-script`.
+#
+# Today, if the host toolchain is not equipped with Swift, or the user
+# explicitly opts out of using SwiftDriver (`-skip-early-swiftdriver`)
+# (relying on a fallback to the legacy driver), a warning is emitted.
+# In the future, a Swift-equipped host toolchain may become mandatory.
+class EarlySwiftDriver(product.Product):
     @classmethod
     def product_source_name(cls):
         return "swift-driver"
@@ -42,25 +38,26 @@ class SwiftDriver(product.Product):
 
     @classmethod
     def is_before_build_script_impl_product(cls):
-        return False
+        return True
 
     def should_build(self, host_target):
-        return self.args.build_swift_driver
+        if self.args.build_early_swift_driver:
+            if toolchain.host_toolchain().find_tool("swift") is None:
+                warn_msg = 'Host toolchain could not locate a '\
+                           'compiler to build swift-drver. '\
+                           '(Try `--skip-early-swift-driver`)'
+                print('-- Warning: {}', warn_msg)
+                return False
+            else:
+                return True
+        return False
 
     @classmethod
     def get_dependencies(cls):
-        return [cmark.CMark,
-                llvm.LLVM,
-                libcxx.LibCXX,
-                libicu.LibICU,
-                swift.Swift,
-                libdispatch.LibDispatch,
-                foundation.Foundation,
-                xctest.XCTest,
-                llbuild.LLBuild]
+        return []
 
     def should_clean(self, host_target):
-        return self.args.clean_swift_driver
+        return self.args.clean_early_swift_driver
 
     def clean(self, host_target):
         run_build_script_helper('clean', host_target, self, self.args)
@@ -69,13 +66,19 @@ class SwiftDriver(product.Product):
         run_build_script_helper('build', host_target, self, self.args)
 
     def should_test(self, host_target):
-        return self.args.test_swift_driver
+        # EarlySwiftDriver is tested against the compiler's lit test
+        # suite driver subset, as a standalone test CMake target when
+        # `swift` is built. We do not run the driver's own tests here.
+        return False
 
     def test(self, host_target):
         run_build_script_helper('test', host_target, self, self.args)
 
     def should_install(self, host_target):
-        return self.args.install_swift_driver
+        # This product is for the swift-driver used with the build-directory compiler.
+        # If a toolchain install is required, please use the SwiftDriver (no 'Early')
+        # product with `--swift-driver --install-swift-driver`.
+        return False
 
     def install(self, host_target):
         run_build_script_helper('install', host_target, self, self.args)
@@ -86,13 +89,10 @@ def run_build_script_helper(action, host_target, product, args):
     script_path = os.path.join(
         product.source_dir, 'Utilities', 'build-script-helper.py')
 
-    install_destdir = args.install_destdir
-    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
-        install_destdir = swiftpm.SwiftPM.get_install_destdir(args,
-                                                              host_target,
-                                                              product.build_dir)
-    toolchain_path = targets.toolchain_path(install_destdir,
-                                            args.install_prefix)
+    # Building with the host toolchain for use with a local compiler build,
+    # use the toolchain which is supplying the `swiftc`.
+    swiftc_path = os.path.abspath(product.toolchain.swiftc)
+    toolchain_path = os.path.dirname(os.path.dirname(swiftc_path))
 
     # Pass Dispatch directory down if we built it
     dispatch_build_dir = os.path.join(
@@ -119,7 +119,9 @@ def run_build_script_helper(action, host_target, product, args):
         '--toolchain', toolchain_path,
         '--ninja-bin', product.toolchain.ninja,
         '--cmake-bin', product.toolchain.cmake,
+        '--local_compiler_build'
     ]
+
     if os.path.exists(dispatch_build_dir):
         helper_cmd += [
             '--dispatch-build-dir', dispatch_build_dir
