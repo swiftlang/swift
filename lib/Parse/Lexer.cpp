@@ -2349,7 +2349,7 @@ void Lexer::lexImpl() {
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
   
-  switch ((signed char)*CurPtr++) {
+  switch (*CurPtr++) {
   default: {
     char const *Tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(Tmp, BufferEnd))
@@ -2377,8 +2377,8 @@ void Lexer::lexImpl() {
     llvm_unreachable(
         "Whitespaces should be eaten by lexTrivia as LeadingTrivia");
 
-  case -1:
-  case -2:
+  case (char)-1:
+  case (char)-2:
     diagnose(CurPtr-1, diag::lex_utf16_bom_marker);
     CurPtr = BufferEnd;
     return formToken(tok::unknown, TokStart);
@@ -2529,7 +2529,7 @@ StringRef Lexer::lexTrivia(bool IsForTrailingTrivia,
 Restart:
   const char *TriviaStart = CurPtr;
 
-  switch ((signed char)*CurPtr++) {
+  switch (*CurPtr++) {
   case '\n':
     if (IsForTrailingTrivia)
       break;
@@ -2598,7 +2598,7 @@ Restart:
     }
     break;
   // Start character of tokens.
-  case -1: case -2:
+  case (char)-1: case (char)-2:
   case '@': case '{': case '[': case '(': case '}': case ']': case ')':
   case ',': case ';': case ':': case '\\': case '$':
   case '0': case '1': case '2': case '3': case '4':
@@ -2865,10 +2865,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
 
     const char *TriviaStart = CurPtr;
 
-    signed char CurChar = (signed char)*CurPtr;
-    CurPtr++;
-
-    switch (CurChar) {
+    switch (*CurPtr++) {
     case '\n':
       Pieces.appendOrSquash(TriviaKind::Newline, 1);
       continue;
