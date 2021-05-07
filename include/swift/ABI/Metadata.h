@@ -2906,8 +2906,13 @@ class TargetGenericEnvironment
        uint16_t, GenericParamDescriptor, GenericRequirementDescriptor>;
   friend TrailingObjects;
 
+#if !defined(_MSC_VER) || _MSC_VER >= 1920
   template<typename T>
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+#else
+// MSVC 2017 trips parsing an using of an using, of a variadic template
+#define OverloadToken typename TrailingObjects::template OverloadToken
+#endif
 
   size_t numTrailingObjects(OverloadToken<uint16_t>) const {
     return Flags.getNumGenericParameterLevels();
@@ -2920,6 +2925,10 @@ class TargetGenericEnvironment
   size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
     return Flags.getNumGenericRequirements();
   }
+
+#if defined(_MSC_VER) && _MSC_VER < 1920
+#undef OverloadToken
+#endif
 
   GenericEnvironmentFlags Flags;
 
@@ -2982,8 +2991,13 @@ protected:
     FollowingTrailingObjects...>;
   friend TrailingObjects;
 
+#if !defined(_MSC_VER) || _MSC_VER >= 1920
   template<typename T>
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+#else
+// MSVC 2017 trips parsing an using of an using, of a variadic template
+#define OverloadToken typename TrailingObjects::template OverloadToken
+#endif
   
   const Self *asSelf() const {
     return static_cast<const Self *>(this);
@@ -3047,6 +3061,11 @@ protected:
   size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
     return asSelf()->isGeneric() ? getGenericContextHeader().NumRequirements : 0;
   }
+
+#if defined(_MSC_VER) && _MSC_VER < 1920
+#undef OverloadToken
+#endif
+
 };
 
 /// Reference to a generic context.

@@ -54,6 +54,7 @@ namespace {
   DiagnosticInfo testDiagnosticInfo(SourceLoc Loc, const char *Message,
                                     DiagnosticKind Kind) {
     return DiagnosticInfo(DiagID(0), Loc, Kind, Message, /*args*/ {},
+                          /*category*/ StringRef(),
                           /*indirectBuffer*/ SourceLoc(), /*childInfo*/ {},
                           /*ranges*/ {}, /*fixIts*/ {}, /*isChild*/ false);
   }

@@ -20,73 +20,73 @@
 #define DEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
 
-ERROR(generic_sig_change,none,"%0 has generic signature change from %1 to %2", (StringRef, StringRef, StringRef))
+ERROR(generic_sig_change,APIDigesterBreakage,"%0 has generic signature change from %1 to %2", (StringRef, StringRef, StringRef))
 
-ERROR(raw_type_change,none,"%0(%1) is now %2 representable", (StringRef, StringRef, StringRef))
+ERROR(raw_type_change,APIDigesterBreakage,"%0(%1) is now %2 representable", (StringRef, StringRef, StringRef))
 
-ERROR(removed_decl,none,"%0 has been removed%select{| (deprecated)}1", (StringRef, bool))
+ERROR(removed_decl,APIDigesterBreakage,"%0 has been removed%select{| (deprecated)}1", (StringRef, bool))
 
-ERROR(moved_decl,none,"%0 has been moved to %1", (StringRef, StringRef))
+ERROR(moved_decl,APIDigesterBreakage,"%0 has been moved to %1", (StringRef, StringRef))
 
-ERROR(renamed_decl,none,"%0 has been renamed to %1", (StringRef, StringRef))
+ERROR(renamed_decl,APIDigesterBreakage,"%0 has been renamed to %1", (StringRef, StringRef))
 
-ERROR(decl_type_change,none,"%0 has %1 type change from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
+ERROR(decl_type_change,APIDigesterBreakage,"%0 has %1 type change from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
 
-ERROR(decl_attr_change,none,"%0 changes from %1 to %2", (StringRef, StringRef, StringRef))
+ERROR(decl_attr_change,APIDigesterBreakage,"%0 changes from %1 to %2", (StringRef, StringRef, StringRef))
 
-ERROR(decl_new_attr,none,"%0 is now %1", (StringRef, StringRef))
+ERROR(decl_new_attr,APIDigesterBreakage,"%0 is now %1", (StringRef, StringRef))
 
-ERROR(decl_reorder,none,"%0 in a non-resilient type changes position from %1 to %2", (StringRef, unsigned, unsigned))
+ERROR(decl_reorder,APIDigesterBreakage,"%0 in a non-resilient type changes position from %1 to %2", (StringRef, unsigned, unsigned))
 
-ERROR(decl_added,none,"%0 is added to a non-resilient type", (StringRef))
+ERROR(decl_added,APIDigesterBreakage,"%0 is added to a non-resilient type", (StringRef))
 
-ERROR(var_has_fixed_order_change,none,"%0 is %select{now|no longer}1 a stored property", (StringRef, bool))
+ERROR(var_has_fixed_order_change,APIDigesterBreakage,"%0 is %select{now|no longer}1 a stored property", (StringRef, bool))
 
-ERROR(func_has_fixed_order_change,none,"%0 is %select{now|no longer}1 a non-final instance function", (StringRef, bool))
+ERROR(func_has_fixed_order_change,APIDigesterBreakage,"%0 is %select{now|no longer}1 a non-final instance function", (StringRef, bool))
 
-ERROR(default_arg_removed,none,"%0 has removed default argument from %1", (StringRef, StringRef))
+ERROR(default_arg_removed,APIDigesterBreakage,"%0 has removed default argument from %1", (StringRef, StringRef))
 
-ERROR(conformance_removed,none,"%0 has removed %select{conformance to|inherited protocol}2 %1", (StringRef, StringRef, bool))
+ERROR(conformance_removed,APIDigesterBreakage,"%0 has removed %select{conformance to|inherited protocol}2 %1", (StringRef, StringRef, bool))
 
-ERROR(conformance_added,none,"%0 has added inherited protocol %1", (StringRef, StringRef))
+ERROR(conformance_added,APIDigesterBreakage,"%0 has added inherited protocol %1", (StringRef, StringRef))
 
-ERROR(existing_conformance_added,none,"%0 has added a conformance to an existing protocol %1", (StringRef, StringRef))
+ERROR(existing_conformance_added,APIDigesterBreakage,"%0 has added a conformance to an existing protocol %1", (StringRef, StringRef))
 
-ERROR(default_associated_type_removed,none,"%0 has removed default type %1", (StringRef, StringRef))
+ERROR(default_associated_type_removed,APIDigesterBreakage,"%0 has removed default type %1", (StringRef, StringRef))
 
-ERROR(protocol_req_added,none,"%0 has been added as a protocol requirement", (StringRef))
+ERROR(protocol_req_added,APIDigesterBreakage,"%0 has been added as a protocol requirement", (StringRef))
 
-ERROR(super_class_removed,none,"%0 has removed its super class %1", (StringRef, StringRef))
+ERROR(super_class_removed,APIDigesterBreakage,"%0 has removed its super class %1", (StringRef, StringRef))
 
-ERROR(super_class_changed,none,"%0 has changed its super class from %1 to %2", (StringRef, StringRef, StringRef))
+ERROR(super_class_changed,APIDigesterBreakage,"%0 has changed its super class from %1 to %2", (StringRef, StringRef, StringRef))
 
-ERROR(decl_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRef))
+ERROR(decl_kind_changed,APIDigesterBreakage,"%0 has been changed to a %1", (StringRef, StringRef))
 
-ERROR(optional_req_changed,none,"%0 is %select{now|no longer}1 an optional requirement", (StringRef, bool))
+ERROR(optional_req_changed,APIDigesterBreakage,"%0 is %select{now|no longer}1 an optional requirement", (StringRef, bool))
 
-ERROR(no_longer_open,none,"%0 is no longer open for subclassing", (StringRef))
+ERROR(no_longer_open,APIDigesterBreakage,"%0 is no longer open for subclassing", (StringRef))
 
-ERROR(func_type_escaping_changed,none,"%0 has %select{removed|added}2 @escaping in %1", (StringRef, StringRef, bool))
+ERROR(func_type_escaping_changed,APIDigesterBreakage,"%0 has %select{removed|added}2 @escaping in %1", (StringRef, StringRef, bool))
 
-ERROR(func_self_access_change,none,"%0 has self access kind changing from %1 to %2", (StringRef, StringRef, StringRef))
+ERROR(func_self_access_change,APIDigesterBreakage,"%0 has self access kind changing from %1 to %2", (StringRef, StringRef, StringRef))
 
-ERROR(param_ownership_change,none,"%0 has %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
+ERROR(param_ownership_change,APIDigesterBreakage,"%0 has %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
 
-ERROR(type_witness_change,none,"%0 has type witness type for %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
+ERROR(type_witness_change,APIDigesterBreakage,"%0 has type witness type for %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
 
-ERROR(decl_new_witness_table_entry,none,"%0 now requires%select{| no}1 new witness table entry", (StringRef, bool))
+ERROR(decl_new_witness_table_entry,APIDigesterBreakage,"%0 now requires%select{| no}1 new witness table entry", (StringRef, bool))
 
-ERROR(new_decl_without_intro,none,"%0 is a new API without @available attribute", (StringRef))
+ERROR(new_decl_without_intro,APIDigesterBreakage,"%0 is a new API without @available attribute", (StringRef))
 
-ERROR(objc_name_change,none,"%0 has ObjC name change from %1 to %2", (StringRef, StringRef, StringRef))
+ERROR(objc_name_change,APIDigesterBreakage,"%0 has ObjC name change from %1 to %2", (StringRef, StringRef, StringRef))
 
-ERROR(desig_init_added,none,"%0 has been added as a designated initializer to an open class", (StringRef))
+ERROR(desig_init_added,APIDigesterBreakage,"%0 has been added as a designated initializer to an open class", (StringRef))
 
-ERROR(added_invisible_designated_init,none,"%0 has new designated initializers that are not visible to clients", (StringRef))
+ERROR(added_invisible_designated_init,APIDigesterBreakage,"%0 has new designated initializers that are not visible to clients", (StringRef))
 
-ERROR(not_inheriting_convenience_inits,none,"%0 no longer inherits convenience inits from its superclass", (StringRef))
+ERROR(not_inheriting_convenience_inits,APIDigesterBreakage,"%0 no longer inherits convenience inits from its superclass", (StringRef))
 
-ERROR(enum_case_added,none,"%0 has been added as a new enum case", (StringRef))
+ERROR(enum_case_added,APIDigesterBreakage,"%0 has been added as a new enum case", (StringRef))
 
 WARNING(cannot_read_allowlist,none,"cannot read breakage allowlist at '%0'", (StringRef))
 

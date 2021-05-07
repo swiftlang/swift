@@ -45,6 +45,7 @@ struct DiagnosticInfo {
   DiagnosticKind Kind;
   StringRef FormatString;
   ArrayRef<DiagnosticArgument> FormatArgs;
+  StringRef Category;
 
   /// Only used when directing diagnostics to different outputs.
   /// In batch mode a diagnostic may be
@@ -85,13 +86,13 @@ struct DiagnosticInfo {
 
   DiagnosticInfo(DiagID ID, SourceLoc Loc, DiagnosticKind Kind,
                  StringRef FormatString,
-                 ArrayRef<DiagnosticArgument> FormatArgs,
+                 ArrayRef<DiagnosticArgument> FormatArgs, StringRef Category,
                  SourceLoc BufferIndirectlyCausingDiagnostic,
                  ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo,
                  ArrayRef<CharSourceRange> Ranges, ArrayRef<FixIt> FixIts,
                  bool IsChildNote)
       : ID(ID), Loc(Loc), Kind(Kind), FormatString(FormatString),
-        FormatArgs(FormatArgs),
+        FormatArgs(FormatArgs), Category(Category),
         BufferIndirectlyCausingDiagnostic(BufferIndirectlyCausingDiagnostic),
         ChildDiagnosticInfo(ChildDiagnosticInfo), Ranges(Ranges),
         FixIts(FixIts), IsChildNote(IsChildNote) {}

@@ -184,8 +184,12 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
-  let q = dict[nil]  // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
+  // notes attached to the partially matching declarations for both following subscripts:
+  // - override subscript(_: Any) -> Any? -> 'nil' is not compatible with expected argument type 'Any' at position #1
+  // - open subscript(key: NSCopying) -> Any? { get set } -> 'nil' is not compatible with expected argument type 'NSCopying' at position #1
+
+  dict[nil] = a // expected-error {{no exact matches in call to subscript}}
+  let q = dict[nil]  // expected-error {{no exact matches in call to subscript}}
   _ = q
 }
 

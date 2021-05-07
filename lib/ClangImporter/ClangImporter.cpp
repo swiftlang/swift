@@ -1038,8 +1038,38 @@ ClangImporter::createClangInvocation(ClangImporter *importer,
                                                  &tempDiagClient,
                                                  /*owned*/false);
 
-  return clang::createInvocationFromCommandLine(invocationArgs, tempClangDiags,
-                                                nullptr, false, CC1Args);
+  auto CI = clang::createInvocationFromCommandLine(
+      invocationArgs, tempClangDiags, nullptr, false, CC1Args);
+
+  if (!CI) {
+    return CI;
+  }
+
+  // FIXME: clang fails to generate a module if there is a `-fmodule-map-file`
+  // argument pointing to a missing file.
+  // Such missing module files occur frequently in SourceKit. If the files are
+  // missing, SourceKit fails to build SwiftShims (which wouldn't have required
+  // the missing module file), thus fails to load the stdlib and hence looses
+  // all semantic functionality.
+  // To work around this issue, drop all `-fmodule-map-file` arguments pointing
+  // to missing files and report the error that clang would throw manually.
+  // rdar://77516546 is tracking that the clang importer should be more
+  // resilient and provide a module even if there were building it.
+  auto VFS = clang::createVFSFromCompilerInvocation(
+      *CI, *tempClangDiags,
+      importer->Impl.SwiftContext.SourceMgr.getFileSystem());
+  std::vector<std::string> FilteredModuleMapFiles;
+  for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
+    if (VFS->exists(ModuleMapFile)) {
+      FilteredModuleMapFiles.push_back(ModuleMapFile);
+    } else {
+      importer->Impl.diagnose(SourceLoc(), diag::module_map_not_found,
+                              ModuleMapFile);
+    }
+  }
+  CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
+
+  return CI;
 }
 
 std::unique_ptr<ClangImporter>
