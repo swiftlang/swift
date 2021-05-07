@@ -8316,7 +8316,7 @@ static Expr *wrapAsyncLetInitializer(
   ASTContext &ctx = dc->getASTContext();
   Expr *autoclosureExpr = cs.buildAutoClosureExpr(
       initializer, closureType, /*isDefaultWrappedValue=*/false,
-      /*isSpawnLetWrapper=*/true);
+      /*isAsyncLetWrapper=*/true);
 
   // Call the autoclosure so that the AST types line up. SILGen will ignore the
   // actual calls and translate them into a different mechanism.
@@ -8417,7 +8417,7 @@ static Optional<SolutionApplicationTarget> applySolutionToInitialization(
   // For an async let, wrap the initializer appropriately to make it a child
   // task.
   if (auto patternBinding = target.getInitializationPatternBindingDecl()) {
-    if (patternBinding->isSpawnLet()) {
+    if (patternBinding->isAsyncLet()) {
       resultTarget.setExpr(
           wrapAsyncLetInitializer(
             cs, resultTarget.getAsExpr(), resultTarget.getDeclContext()));

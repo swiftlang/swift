@@ -230,6 +230,14 @@ public struct TaskGroup<ChildTaskResult> {
     spawn(priority: optPriority, operation: operation)
   }
 
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    spawn(priority: priority, operation: operation)
+  }
+
   /// Add a child task to the group.
   ///
   /// ### Error handling
@@ -278,6 +286,14 @@ public struct TaskGroup<ChildTaskResult> {
   ) -> Bool {
     let optPriority: Task.Priority? = priority
     return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    spawnUnlessCancelled(priority: priority, operation: operation)
   }
 
   /// Add a child task to the group.
@@ -502,6 +518,14 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     return spawn(priority: optPriority, operation: operation)
   }
 
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    spawn(priority: priority, operation: operation)
+  }
+
   /// Spawn, unconditionally, a child task in the group.
   ///
   /// ### Error handling
@@ -551,6 +575,14 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ) -> Bool {
     let optPriority: Task.Priority? = priority
     return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    spawnUnlessCancelled(priority: priority, operation: operation)
   }
 
   /// Add a child task to the group.

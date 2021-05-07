@@ -4945,7 +4945,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
                                              bool isDefaultWrappedValue,
-                                             bool isSpawnLetWrapper) {
+                                             bool isAsyncLetWrapper) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC)) {
@@ -4967,7 +4967,7 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
-  if (isSpawnLetWrapper)
+  if (isAsyncLetWrapper)
     closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
 
   Expr *result = closure;
@@ -5709,7 +5709,7 @@ ASTNode constraints::findAsyncNode(ClosureExpr *closure) {
     bool walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        if (patternBinding->isSpawnLet())
+        if (patternBinding->isAsyncLet())
           AsyncNode = patternBinding;
 
         return true;
