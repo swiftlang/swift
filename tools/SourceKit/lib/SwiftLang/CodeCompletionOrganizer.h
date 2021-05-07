@@ -43,6 +43,7 @@ struct Options {
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
   bool annotatedDescription = false;
+  bool includeObjectLiterals = true;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 
