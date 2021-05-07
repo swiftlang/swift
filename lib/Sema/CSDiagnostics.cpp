@@ -2370,11 +2370,26 @@ bool ContextualFailure::diagnoseAsError() {
 }
 
 bool ContextualFailure::diagnoseAsNote() {
-  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  auto *locator = getLocator();
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(locator);
   if (!(overload && overload->choice.isDecl()))
     return false;
 
   auto *decl = overload->choice.getDecl();
+
+  if (auto *anchor = getAsExpr(getAnchor())) {
+    anchor = anchor->getSemanticsProvidingExpr();
+
+    if (isa<NilLiteralExpr>(anchor)) {
+      auto argLoc =
+          locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+      emitDiagnosticAt(decl, diag::note_incompatible_argument_value_nil_at_pos,
+                       getToType(), argLoc.getArgIdx() + 1);
+      return true;
+    }
+  }
+
   emitDiagnosticAt(decl, diag::found_candidate_type, getFromType());
   return true;
 }
