@@ -561,6 +561,7 @@ enum class CompletionKind {
   GenericRequirement,
   PrecedenceGroup,
   StmtLabel,
+  ForEachPatternBeginning,
 };
 
 /// A single code completion result.
