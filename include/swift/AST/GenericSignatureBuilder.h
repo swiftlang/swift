@@ -277,10 +277,6 @@ public:
     /// Cached nested-type information, which contains the best declaration
     /// for a given name.
     llvm::SmallDenseMap<Identifier, CachedNestedType> nestedTypeNameCache;
-
-    /// Cached access paths.
-    llvm::SmallDenseMap<const ProtocolDecl *, ConformanceAccessPath, 8>
-        conformanceAccessPathCache;
   };
 
   friend class RequirementSource;
@@ -785,6 +781,22 @@ public:
   /// method combines this with a subsequent getCanonicalType() call.
   Type getCanonicalTypeInContext(Type type,
                             TypeArrayView<GenericTypeParamType> genericParams);
+
+  /// Retrieve the conformance access path used to extract the conformance of
+  /// interface \c type to the given \c protocol.
+  ///
+  /// \param type The interface type whose conformance access path is to be
+  /// queried.
+  /// \param protocol A protocol to which \c type conforms.
+  ///
+  /// \returns the conformance access path that starts at a requirement of
+  /// this generic signature and ends at the conformance that makes \c type
+  /// conform to \c protocol.
+  ///
+  /// \seealso ConformanceAccessPath
+  ConformanceAccessPath getConformanceAccessPath(Type type,
+                                                 ProtocolDecl *protocol,
+                                                 GenericSignature sig);
 
   /// Verify the correctness of the given generic signature.
   ///
