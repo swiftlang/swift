@@ -744,6 +744,12 @@ struct GenericSignatureBuilder::Implementation {
 
   llvm::DenseSet<ExplicitRequirement> ExplicitConformancesImpliedByConcrete;
 
+  llvm::DenseMap<std::pair<CanType, ProtocolDecl *>,
+                 ConformanceAccessPath> ConformanceAccessPaths;
+
+  std::vector<std::pair<CanType, ConformanceAccessPath>>
+      CurrentConformanceAccessPaths;
+
 #ifndef NDEBUG
   /// Whether we've already computed redundant requiremnts.
   bool computedRedundantRequirements = false;
@@ -4123,6 +4129,123 @@ Type GenericSignatureBuilder::getCanonicalTypeInContext(Type type,
 
     return equivClass->getAnchor(*this, genericParams);
   });
+}
+
+ConformanceAccessPath
+GenericSignatureBuilder::getConformanceAccessPath(Type type,
+                                                  ProtocolDecl *protocol,
+                                                  GenericSignature sig) {
+  auto canType = getCanonicalTypeInContext(type, { })->getCanonicalType();
+  assert(canType->isTypeParameter());
+
+  // Check if we've already cached the result before doing anything else.
+  auto found = Impl->ConformanceAccessPaths.find(
+      std::make_pair(canType, protocol));
+  if (found != Impl->ConformanceAccessPaths.end()) {
+    return found->second;
+  }
+
+  FrontendStatsTracer(Context.Stats, "get-conformance-access-path");
+
+  // If this is the first time we're asked to look up a conformance access path,
+  // visit all of the root conformance requirements in our generic signature and
+  // add them to the buffer.
+  if (Impl->ConformanceAccessPaths.empty()) {
+    for (const auto &req : sig->getRequirements()) {
+      // We only care about conformance requirements.
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      auto rootType = req.getFirstType()->getCanonicalType();
+      auto *rootProto = req.getProtocolDecl();
+
+      ConformanceAccessPath::Entry root(rootType, rootProto);
+      ArrayRef<ConformanceAccessPath::Entry> path(root);
+      ConformanceAccessPath result(Context.AllocateCopy(path));
+
+      // Add the path to the buffer.
+      Impl->CurrentConformanceAccessPaths.emplace_back(rootType, result);
+
+      // Add the path to the map.
+      auto key = std::make_pair(rootType, rootProto);
+      auto inserted = Impl->ConformanceAccessPaths.insert(
+          std::make_pair(key, result));
+      assert(inserted.second);
+      (void) inserted;
+    }
+  }
+
+  // We keep going until we find the path we are looking for.
+  while (true) {
+    auto found = Impl->ConformanceAccessPaths.find(
+        std::make_pair(canType, protocol));
+    if (found != Impl->ConformanceAccessPaths.end()) {
+      return found->second;
+    }
+
+    assert(Impl->CurrentConformanceAccessPaths.size() > 0);
+
+    // Refill the buffer.
+    std::vector<std::pair<CanType, ConformanceAccessPath>> morePaths;
+
+    // From each path in the buffer, compute all paths of length plus one.
+    for (const auto &pair : Impl->CurrentConformanceAccessPaths) {
+      const auto &lastElt = pair.second.back();
+      auto *lastProto = lastElt.second;
+
+      // A copy of the current path, populated as needed.
+      SmallVector<ConformanceAccessPath::Entry, 4> entries;
+
+      for (const auto &req : lastProto->getRequirementSignature()) {
+        // We only care about conformance requirements.
+        if (req.getKind() != RequirementKind::Conformance)
+          continue;
+
+        auto nextSubjectType = req.getFirstType()->getCanonicalType();
+        auto *nextProto = req.getProtocolDecl();
+
+        // Compute the canonical anchor for this conformance requirement.
+        auto nextType = replaceSelfWithType(pair.first, nextSubjectType);
+        auto nextCanType = getCanonicalTypeInContext(nextType, { })
+            ->getCanonicalType();
+
+        // Skip "derived via concrete" sources.
+        if (!nextCanType->isTypeParameter())
+          continue;
+
+        // Check if we already have a conformance access path for this anchor.
+        auto key = std::make_pair(nextCanType, nextProto);
+
+        // If we've already seen a path for this conformance, skip it and
+        // don't add it to the buffer.
+        if (Impl->ConformanceAccessPaths.count(key))
+          continue;
+
+        if (entries.empty()) {
+          // Fill our temporary vector.
+          entries.insert(entries.begin(),
+                         pair.second.begin(),
+                         pair.second.end());
+        }
+
+        // Add the next entry.
+        entries.emplace_back(nextSubjectType, nextProto);
+        ConformanceAccessPath result = Context.AllocateCopy(entries);
+        entries.pop_back();
+
+        // Add the path to the buffer.
+        morePaths.emplace_back(nextCanType, result);
+
+        // Add the path to the map.
+        auto inserted = Impl->ConformanceAccessPaths.insert(
+            std::make_pair(key, result));
+        assert(inserted.second);
+        (void) inserted;
+      }
+    }
+
+    std::swap(morePaths, Impl->CurrentConformanceAccessPaths);
+  }
 }
 
 TypeArrayView<GenericTypeParamType>

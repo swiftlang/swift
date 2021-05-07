@@ -80,6 +80,7 @@ private:
   ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
 
   friend class GenericSignatureImpl;
+  friend class GenericSignatureBuilder;
 
 public:
   typedef const Entry *const_iterator;
@@ -87,6 +88,8 @@ public:
 
   const_iterator begin() const { return path.begin(); }
   const_iterator end() const { return path.end(); }
+
+  const Entry &back() const { return path.back(); }
 
   void print(raw_ostream &OS) const;
 
