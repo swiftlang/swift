@@ -49,7 +49,7 @@ class Point {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 actor MyActor: MySuperActor { // expected-error{{actor types do not support inheritance}}
-  nonisolated let immutable: Int = 17
+  let immutable: Int = 17
   // expected-note@+2 2{{property declared here}}
   // expected-note@+1 6{{mutation of this property is only permitted within the actor}}
   var mutable: Int = 71
@@ -58,8 +58,7 @@ actor MyActor: MySuperActor { // expected-error{{actor types do not support inhe
   // expected-note@+1 4{{property declared here}}
   var text: [String] = []
 
-  nonisolated let point : Point = Point() // expected-error{{non-isolated let property 'point' has non-Sendable type 'Point'}}
-  let otherPoint = Point()
+  let point : Point = Point()
 
   @MainActor
   var name : String = "koala" // expected-note{{property declared here}}
@@ -103,12 +102,7 @@ func checkAsyncPropertyAccess() async {
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can only be mutated from inside the actor}}
 
-  _ = act.point
-  _ = act.otherPoint
-  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
-  // expected-note@-2{{property access is 'async'}}
-  // expected-warning@-3{{cannot use property 'otherPoint' with a non-sendable type 'Point' across actors}}
-  _ = await act.otherPoint // expected-warning{{cannot use property 'otherPoint' with a non-sendable type 'Point' across actors}}
+  _ = act.point  // expected-warning{{cannot use property 'point' with a non-sendable type 'Point' across actors}}
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -652,7 +646,7 @@ actor LazyActor {
     var v: Int = 0
     // expected-note@-1 6 {{property declared here}}
 
-    nonisolated let l: Int = 0
+    let l: Int = 0
 
     lazy var l11: Int = { v }()
     lazy var l12: Int = v
