@@ -5253,7 +5253,7 @@ RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
 RValue RValueEmitter::visitAppliedPropertyWrapperExpr(
     AppliedPropertyWrapperExpr *E, SGFContext C) {
   auto *param = const_cast<ParamDecl *>(E->getParamDecl());
-  auto argument = visit(E->getValue(), C);
+  auto argument = visit(E->getValue());
   SILDeclRef::Kind initKind;
   switch (E->getValueKind()) {
   case swift::AppliedPropertyWrapperExpr::ValueKind::WrappedValue:
