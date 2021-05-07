@@ -9,6 +9,10 @@
 // https://bugs.swift.org/browse/SR-14461
 // UNSUPPORTED: linux
 
+// rdar://77658743
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
+
 
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }
