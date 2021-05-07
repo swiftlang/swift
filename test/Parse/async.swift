@@ -75,7 +75,7 @@ func testAwaitExpr() async {
 func getIntSomeday() async -> Int { 5 }
 
 func testAsyncLet() async {
-  spawn let x = await getIntSomeday()
+  async let x = await getIntSomeday()
   _ = await x
 }
 
