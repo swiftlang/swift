@@ -38,7 +38,6 @@ class EnumElementDecl;
 class Expr;
 class FuncDecl;
 class Initializer;
-class LangOptions;
 class PatternBindingDecl;
 class ProtocolConformance;
 class TopLevelCodeDecl;
@@ -213,10 +212,6 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind,
     DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
-
-/// Whether we should diagnose cases where Sendable conformances are
-/// missing.
-bool shouldDiagnoseNonSendableViolations(const LangOptions &langOpts);
 
 /// How the concurrent value check should be performed.
 enum class SendableCheck {
