@@ -861,24 +861,14 @@ class BuildScriptInvocation(object):
         return options
 
     def compute_product_classes(self):
-        """compute_product_classes() -> (list, list, list)
+        """compute_product_classes() -> (list, list)
 
-        Compute the list first of all pre-build-script-impl products, then all
-        build-script-impl products and then all non-build-script-impl products.
-        It is assumed that concatenating the three lists together will result in a
-        valid dependency graph for the compilation.
+        Compute the list first of all build-script-impl products and then all
+        non-build-script-impl products. It is assumed that concatenating the two
+        lists together will result in a valid dependency graph for the
+        compilation.
+
         """
-        before_impl_product_classes = []
-        # If --skip-early-swift-driver is passed in, swift will be built
-        # as usual, but relying on its own C++-based (Legacy) driver.
-        # Otherwise, we build an "early" swift-driver using the host
-        # toolchain, which the later-built compiler will forward
-        # `swiftc` invocations to. That is, if we find a Swift compiler
-        # in the host toolchain. If the host toolchain is not equpipped with
-        # a Swift compiler, a warning is emitted. In the future, it may become
-        # mandatory that the host toolchain come with its own `swiftc`.
-        if self.args.build_early_swift_driver:
-            before_impl_product_classes.append(products.EarlySwiftDriver)
 
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
@@ -963,7 +953,6 @@ class BuildScriptInvocation(object):
             # non-build-script-impl products. Otherwise, it would be unsafe to
             # re-order build-script-impl products in front of non
             # build-script-impl products.
-            before_impl_product_classes = []
             impl_product_classes = []
             product_classes = []
             is_darwin = platform.system() == 'Darwin'
@@ -974,19 +963,15 @@ class BuildScriptInvocation(object):
 
                 if p.is_build_script_impl_product():
                     impl_product_classes.append(p)
-                elif p.is_before_build_script_impl_product():
-                    before_impl_product_classes.append(p)
                 else:
                     product_classes.append(p)
             if self.args.verbose_build:
                 print("Final Build Order:")
-                for p in before_impl_product_classes:
-                    print("    {}".format(p.product_name()))
                 for p in impl_product_classes:
                     print("    {}".format(p.product_name()))
                 for p in product_classes:
                     print("    {}".format(p.product_name()))
-        return (before_impl_product_classes, impl_product_classes, product_classes)
+        return (impl_product_classes, product_classes)
 
     def execute(self):
         """Execute the invocation with the configured arguments."""
@@ -1003,6 +988,7 @@ class BuildScriptInvocation(object):
             return
 
         # Otherwise, we compute and execute the individual actions ourselves.
+
         # Compute the list of hosts to operate on.
         all_host_names = [
             self.args.host_target] + self.args.cross_compile_hosts
@@ -1013,21 +999,9 @@ class BuildScriptInvocation(object):
         #
         # FIXME: This should really be per-host, but the current structure
         # matches that of `build-script-impl`.
-        (before_impl_product_classes, impl_product_classes, product_classes) =\
-            self.compute_product_classes()
+        (impl_product_classes, product_classes) = self.compute_product_classes()
 
         # Execute each "pass".
-
-        # Pre-build-script-impl products...
-        # Note: currently only supports building for the host.
-        for host_target in [self.args.host_target]:
-            for product_class in before_impl_product_classes:
-                if product_class.is_build_script_impl_product():
-                    continue
-                if not product_class.is_before_build_script_impl_product():
-                    continue
-                # Execute clean, build, test, install
-                self.execute_product_build_steps(product_class, host_target)
 
         # Build...
         for host_target in all_hosts:
@@ -1068,8 +1042,33 @@ class BuildScriptInvocation(object):
             for product_class in product_classes:
                 if product_class.is_build_script_impl_product():
                     continue
-                # Execute clean, build, test, install
-                self.execute_product_build_steps(product_class, host_target)
+                product_source = product_class.product_source_name()
+                product_name = product_class.product_name()
+                if product_class.is_swiftpm_unified_build_product():
+                    build_dir = self.workspace.swiftpm_unified_build_dir(
+                        host_target)
+                else:
+                    build_dir = self.workspace.build_dir(
+                        host_target, product_name)
+                product = product_class(
+                    args=self.args,
+                    toolchain=self.toolchain,
+                    source_dir=self.workspace.source_dir(product_source),
+                    build_dir=build_dir)
+                if product.should_clean(host_target):
+                    print("--- Cleaning %s ---" % product_name)
+                    product.clean(host_target)
+                if product.should_build(host_target):
+                    print("--- Building %s ---" % product_name)
+                    product.build(host_target)
+                if product.should_test(host_target):
+                    print("--- Running tests for %s ---" % product_name)
+                    product.test(host_target)
+                    print("--- Finished tests for %s ---" % product_name)
+                if product.should_install(host_target) or \
+                   (self.install_all and product.should_build(host_target)):
+                    print("--- Installing %s ---" % product_name)
+                    product.install(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:
@@ -1116,35 +1115,6 @@ class BuildScriptInvocation(object):
             [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
             ["--only-execute", action_name],
             env=self.impl_env, echo=self.args.verbose_build)
-
-    def execute_product_build_steps(self, product_class, host_target):
-        product_source = product_class.product_source_name()
-        product_name = product_class.product_name()
-        if product_class.is_swiftpm_unified_build_product():
-            build_dir = self.workspace.swiftpm_unified_build_dir(
-                host_target)
-        else:
-            build_dir = self.workspace.build_dir(
-                host_target, product_name)
-        product = product_class(
-            args=self.args,
-            toolchain=self.toolchain,
-            source_dir=self.workspace.source_dir(product_source),
-            build_dir=build_dir)
-        if product.should_clean(host_target):
-            print("--- Cleaning %s ---" % product_name)
-            product.clean(host_target)
-        if product.should_build(host_target):
-            print("--- Building %s ---" % product_name)
-            product.build(host_target)
-        if product.should_test(host_target):
-            print("--- Running tests for %s ---" % product_name)
-            product.test(host_target)
-            print("--- Finished tests for %s ---" % product_name)
-        if product.should_install(host_target) or \
-           (self.install_all and product.should_build(host_target)):
-            print("--- Installing %s ---" % product_name)
-            product.install(host_target)
 
 
 # -----------------------------------------------------------------------------
