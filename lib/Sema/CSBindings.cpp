@@ -1646,6 +1646,15 @@ bool TypeVarBindingProducer::computeNext() {
     newBindings.push_back(std::move(binding));
   };
 
+  // Let's attempt only directly inferrable bindings for
+  // a type variable representing a closure type because
+  // such type variables are handled specially and only
+  // bound to a type inferred from their expression, having
+  // contextual bindings is just a trigger for that to
+  // happen.
+  if (TypeVar->getImpl().isClosureType())
+    return false;
+
   for (auto &binding : Bindings) {
     const auto type = binding.BindingType;
     assert(!type->hasError());
