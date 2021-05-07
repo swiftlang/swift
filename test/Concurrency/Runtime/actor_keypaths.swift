@@ -7,7 +7,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 actor Page {
-    nonisolated let initialNumWords : Int
+    let initialNumWords : Int
 
     @actorIndependent(unsafe)
     var numWords : Int
@@ -19,7 +19,7 @@ actor Page {
 }
 
 actor Book {
-    nonisolated let pages : [Page]
+    let pages : [Page]
 
     init(_ numPages : Int) {
         var stack : [Page] = []

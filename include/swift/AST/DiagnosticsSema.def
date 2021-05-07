@@ -4448,9 +4448,6 @@ NOTE(actor_isolated_sync_func,none,
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
-NOTE(actor_isolated_let,none,
-     "use `nonisolated` to allow synchronous access to 'let' from outside "
-     "the actor", ())
 WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
@@ -4483,12 +4480,13 @@ WARNING(non_concurrent_property_type,none,
 WARNING(non_concurrent_keypath_capture,none,
         "cannot form key path that captures non-sendable type %0",
         (Type))
+WARNING(non_concurrent_keypath_access,none,
+        "cannot form key path that accesses non-sendable type %0",
+        (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
       "'Sendable'-conforming %2 %3 has non-sendable type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
-ERROR(non_sendable_nonisolated_let,none,
-      "non-isolated let property %0 has non-Sendable type %1", (DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
@@ -4504,6 +4502,10 @@ ERROR(concurrent_value_inherit,none,
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
 
+ERROR(actorindependent_let,none,
+      "'@actorIndependent' is meaningless on 'let' declarations because "
+      "they are immutable",
+      ())
 ERROR(actorindependent_mutable_storage,none,
       "'@actorIndependent' can not be applied to stored properties",
       ())
@@ -4511,6 +4513,10 @@ ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
 
+ERROR(nonisolated_let,none,
+      "'nonisolated' is meaningless on 'let' declarations because "
+      "they are immutable",
+      ())
 ERROR(nonisolated_mutable_storage,none,
       "nonisolated' can not be applied to stored properties",
       ())
