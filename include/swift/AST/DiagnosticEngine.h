@@ -1055,6 +1055,8 @@ namespace swift {
     llvm::StringRef diagnosticStringFor(const DiagID id,
                                         bool printDiagnosticNames);
 
+    static llvm::StringRef diagnosticIDStringFor(const DiagID id);
+
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
     /// In particular, in batch mode when a diagnostic is located in

@@ -110,6 +110,12 @@ static constexpr const char *const debugDiagnosticStrings[] = {
     "<not a diagnostic>",
 };
 
+static constexpr const char *const diagnosticIDStrings[] = {
+#define DIAG(KIND, ID, Options, Text, Signature) #ID,
+#include "swift/AST/DiagnosticsAll.def"
+    "",
+};
+
 static constexpr const char *const fixItStrings[] = {
 #define DIAG(KIND, ID, Options, Text, Signature)
 #define FIXIT(ID, Text, Signature) Text,
@@ -1166,6 +1172,11 @@ DiagnosticEngine::diagnosticStringFor(const DiagID id,
     return localizedMessage;
   }
   return defaultMessage;
+}
+
+llvm::StringRef
+DiagnosticEngine::diagnosticIDStringFor(const DiagID id) {
+  return diagnosticIDStrings[(unsigned)id];
 }
 
 const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {
