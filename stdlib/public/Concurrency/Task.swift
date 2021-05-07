@@ -55,12 +55,6 @@ import Swift
 /// like the reason for cancellation.
 /// This reflects the fact that a task can be canceled for many reasons,
 /// and additional reasons can accrue during the cancellation process.
-/// For example,
-/// if it takes the task too long to exit after being canceled,
-/// it could also miss a deadline.
-/// ◊FIXME: Replace above example -- deadlines aren't part of the API yet
-/// Cancellation is a lightweight way to stop a task before it completes,
-/// not a general mechanism for inter-task communication.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct Task {
   internal let _task: Builtin.NativeObject
@@ -418,9 +412,8 @@ extension Task {
       }
     }
 
-    /// Whether this is a task created by the 'async' operation, which
-    /// conceptually continues the work of the synchronous code that invokes
-    /// it.
+    /// Whether this is a task created by an asynchronous operation,
+    /// continuing the work of the synchronous code that invokes it.
     var isContinuingAsyncTask: Bool {
       get {
         (bits & (1 << 27)) != 0
@@ -453,7 +446,8 @@ extension Task {
 
 }
 
-/// Run the given non-throwing operation as part of a new top-level task.
+/// Runs the given nonthrowing operation asynchronously
+/// as part of a new top-level task.
 ///
 /// Avoid using a detached task unless it isn't possible
 /// to model the operation using structured concurrency features like child tasks.
@@ -493,7 +487,8 @@ public func detach<T>(
   return Task.Handle<T, Never>(task)
 }
 
-/// Run given throwing `operation` as part of a new top-level task.
+/// Runs the given throwing operation asynchronously
+/// as part of a new top-level task.
 ///
 /// If the operation throws an error, this method propogates that error.
 ///
@@ -535,6 +530,26 @@ public func detach<T>(
   return Task.Handle<T, Error>(task)
 }
 
+/// Runs the given nonthrowing operation asynchronously
+/// as part of a new top-level task.
+///
+/// Avoid using a detached task unless it isn't possible
+/// to model the operation using structured concurrency features like child tasks.
+/// Child tasks inherit the parent task's priority and task-local storage,
+/// and canceling a parent task automatically cancels all of its child tasks.
+/// You need to handle these considerations manually with a detached task.
+///
+/// A detached task runs to completion
+/// unless it is explicitly canceled by calling the `Task.Handle.cancel()` method.
+/// Specifically, dropping a detached task's handle
+/// doesn't cancel that task.
+///
+/// - Parameters:
+///   - priority: The priority of the task.
+///   - executor: The executor that the detached closure should start executing on.
+///   - operation: The operation to perform.
+///
+/// - Returns: A handle to the task.
 @discardableResult
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func asyncDetached<T>(
@@ -544,6 +559,28 @@ public func asyncDetached<T>(
   return detach(priority: priority ?? .unspecified, operation: operation)
 }
 
+/// Runs the given throwing operation asynchronously
+/// as part of a new top-level task.
+///
+/// If the operation throws an error, this method propogates that error.
+///
+/// Avoid using a detached task unless it isn't possible
+/// to model the operation using structured concurrency features like child tasks.
+/// Child tasks inherit the parent task's priority and task-local storage,
+/// and canceling a parent task automatically cancels all of its child tasks.
+/// You need to handle these considerations manually with a detached task.
+///
+/// A detached task runs to completion
+/// unless it is explicitly canceled by calling the `Task.Handle.cancel()` method.
+/// Specifically, dropping a detached task's handle
+/// doesn't cancel that task.
+///
+/// - Parameters:
+///   - priority: The priority of the task.
+///   - executor: The executor that the detached closure should start executing on.
+///   - operation: The operation to perform.
+///
+/// - Returns: A handle to the task.
 @discardableResult
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func asyncDetached<T>(
@@ -553,7 +590,27 @@ public func asyncDetached<T>(
   return detach(priority: priority ?? .unspecified, operation: operation)
 }
 
-/// ABI stub while we stage in the new signatures
+
+// ABI stub while we stage in the new signatures
+/// Runs the given nonthrowing operation asynchronously
+/// as part of a new top-level task on behalf of the current actor.
+///
+/// Use this function when creating asynchronous work
+/// that operates on behalf of the synchronous function that calls it.
+/// Like `detach(priority:operation:)`,
+/// this function creates a separate, top-level task.
+/// Unlike `detach(priority:operation:)`,
+/// the task creating by `async(priority:operation:)`
+/// inherits the priority and actor context of the caller,
+/// so the operation is treated more like an asynchronous extension
+/// to the synchronous operation.
+///
+/// - Parameters:
+///   - priority: The priority of the task.
+///     Pass `nil` to use the priority from `Task.currentPriority`.
+///   - operation: The operation to perform.
+///
+/// - Returns: A handle to the task.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @usableFromInline
 func async(
@@ -569,20 +626,25 @@ func async(
   let _: Task.Handle = async(priority: adjustedPriority, operation: operation)
 }
 
-/// Run given `operation` as asynchronously in its own top-level task.
+/// Runs the given nonthrowing operation asynchronously
+/// as part of a new top-level task on behalf of the current actor.
 ///
-/// The `async` function should be used when creating asynchronous work
+/// Use this function when creating asynchronous work
 /// that operates on behalf of the synchronous function that calls it.
-/// Like `detach`, the async function creates a separate, top-level task.
-/// Unlike `detach`, the task creating by `async` inherits the priority and
-/// actor context of the caller, so the `operation` is treated more like an
-/// asynchronous extension to the synchronous operation. Additionally, `async`
-/// does not return a handle to refer to the task.
+/// Like `detach(priority:operation:)`,
+/// this function creates a separate, top-level task.
+/// Unlike `detach(priority:operation:)`,
+/// the task creating by `async(priority:operation:)`
+/// inherits the priority and actor context of the caller,
+/// so the operation is treated more like an asynchronous extension
+/// to the synchronous operation.
 ///
 /// - Parameters:
-///   - priority: priority of the task. If nil, the priority will come from
-///     Task.currentPriority.
-///   - operation: the operation to execute
+///   - priority: The priority of the task.
+///     Pass `nil` to use the priority from `Task.currentPriority`.
+///   - operation: The operation to perform.
+///
+/// - Returns: A handle to the task.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
 public func async<T>(
@@ -605,20 +667,25 @@ public func async<T>(
   return Task.Handle(task)
 }
 
-/// Run given `operation` as asynchronously in its own top-level task.
+/// Runs the given throwing operation asynchronously
+/// as part of a new top-level task on behalf of the current actor.
 ///
-/// The `async` function should be used when creating asynchronous work
+/// Use this function when creating asynchronous work
 /// that operates on behalf of the synchronous function that calls it.
-/// Like `detach`, the async function creates a separate, top-level task.
-/// Unlike `detach`, the task creating by `async` inherits the priority and
-/// actor context of the caller, so the `operation` is treated more like an
-/// asynchronous extension to the synchronous operation. Additionally, `async`
-/// does not return a handle to refer to the task.
+/// Like `detach(priority:operation:)`,
+/// this function creates a separate, top-level task.
+/// Unlike `detach(priority:operation:)`,
+/// the task creating by `async(priority:operation:)`
+/// inherits the priority and actor context of the caller,
+/// so the operation is treated more like an asynchronous extension
+/// to the synchronous operation.
 ///
 /// - Parameters:
-///   - priority: priority of the task. If nil, the priority will come from
-///     Task.currentPriority.
-///   - operation: the operation to execute
+///   - priority: The priority of the task.
+///     Pass `nil` to use the priority from `Task.currentPriority`.
+///   - operation: The operation to perform.
+///
+/// - Returns: A handle to the task.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
 public func async<T>(
