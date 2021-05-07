@@ -6151,6 +6151,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                     getContextualTypePurpose(Nil)))
               : locator);
 
+      // Only requirement placed directly on `nil` literal is
+      // `ExpressibleByNilLiteral`, so if `nil` is an argument
+      // to an application, let's update locator accordingly to
+      // diagnose possible ambiguities with multiple mismatched
+      // overload choices.
+      if (fixLocator->directlyAt<NilLiteralExpr>()) {
+        if (auto argInfo =
+                isArgumentExpr(castToExpr(fixLocator->getAnchor()))) {
+          Expr *application;
+          unsigned argIdx;
+
+          std::tie(application, argIdx) = *argInfo;
+
+          fixLocator = getConstraintLocator(
+              application,
+              {LocatorPathElt::ApplyArgument(),
+               LocatorPathElt::ApplyArgToParam(argIdx, argIdx, /*flags=*/{})});
+        }
+      }
+
       // Here the roles are reversed - `nil` is something we are trying to
       // convert to `type` by making sure that it conforms to a specific
       // protocol.

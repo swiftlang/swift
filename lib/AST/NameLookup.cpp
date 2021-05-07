@@ -2755,7 +2755,35 @@ void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     return;
   }
 }
-  
+void FindLocalVal::checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
+  if (!D)
+    return;
+  if (auto var = dyn_cast<VarDecl>(D)) {
+    auto dc = var->getDeclContext();
+    if ((isa<AbstractFunctionDecl>(dc) || isa<ClosureExpr>(dc)) &&
+        var->hasAttachedPropertyWrapper()) {
+      // FIXME: This is currently required to set the interface type of the
+      // auxiliary variables (unless 'var' is a closure param).
+      (void)var->getPropertyWrapperBackingPropertyType();
+
+      auto vars = var->getPropertyWrapperAuxiliaryVariables();
+      if (vars.backingVar) {
+        Consumer.foundDecl(vars.backingVar, Reason);
+      }
+      if (vars.projectionVar) {
+        Consumer.foundDecl(vars.projectionVar, Reason);
+      }
+      if (vars.localWrappedValueVar) {
+        Consumer.foundDecl(vars.localWrappedValueVar, Reason);
+
+        // If 'localWrappedValueVar' exists, the original var is shadowed.
+        return;
+      }
+    }
+  }
+  Consumer.foundDecl(D, Reason);
+}
+
 void FindLocalVal::checkParameterList(const ParameterList *params) {
   for (auto param : *params) {
     checkValueDecl(param, DeclVisibilityKind::FunctionParameter);
