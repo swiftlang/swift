@@ -59,6 +59,17 @@ class Product(object):
         raise NotImplementedError
 
     @classmethod
+    def is_before_build_script_impl_product(cls):
+        """is_before_build_script_impl_product -> bool
+
+        Whether this product is build before any build-script-impl products.
+        Such products must be non-build_script_impl products.
+        Because such products are built ahead of the compiler, they are
+        built using the host toolchain.
+        """
+        raise NotImplementedError
+
+    @classmethod
     def is_swiftpm_unified_build_product(cls):
         """is_swiftpm_unified_build_product -> bool
 
