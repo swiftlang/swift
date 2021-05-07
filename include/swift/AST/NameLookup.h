@@ -555,9 +555,7 @@ public:
                VisibleDeclConsumer &Consumer)
       : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
-  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
-    Consumer.foundDecl(D, Reason);
-  }
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason);
 
   void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
   
