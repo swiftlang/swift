@@ -97,7 +97,7 @@ OVERRIDE_ACTOR(task_switch, void,
                (resumeToContext, resumeFunction, newExecutor))
 
 OVERRIDE_TASK(task_create_group_future_common, AsyncTaskAndContext, , , ,
-              (JobFlags flags, TaskGroup *group,
+              (size_t flags, TaskGroup *group,
                const Metadata *futureResultType,
                FutureAsyncSignature::FunctionType *function,
                void *closureContext, bool isAsyncLetTask,

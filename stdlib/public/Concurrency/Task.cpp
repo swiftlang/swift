@@ -381,11 +381,12 @@ static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *
 /// Also, async-let tasks are not heap allcoated, but allcoated with the parent
 /// task's stack allocator.
 static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
-    JobFlags flags, TaskGroup *group,
+    size_t rawFlags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     void *closureContext, bool isAsyncLetTask,
     size_t initialContextSize) {
+  JobFlags flags(rawFlags);
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
@@ -563,13 +564,13 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 }
 
 static AsyncTaskAndContext swift_task_create_group_future_common(
-    JobFlags flags, TaskGroup *group, const Metadata *futureResultType,
+    size_t flags, TaskGroup *group, const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     void *closureContext, bool isAsyncLetTask,
     size_t initialContextSize);
 
 AsyncTaskAndContext
-swift::swift_task_create_f(JobFlags flags,
+swift::swift_task_create_f(size_t flags,
                 ThinNullaryAsyncSignature::FunctionType *function,
                            size_t initialContextSize) {
   return swift_task_create_future_f(
@@ -577,10 +578,10 @@ swift::swift_task_create_f(JobFlags flags,
 }
 
 AsyncTaskAndContext swift::swift_task_create_future_f(
-    JobFlags flags,
+    size_t flags,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
-  assert(!flags.task_isGroupChildTask() &&
+  assert(!JobFlags(flags).task_isGroupChildTask() &&
   "use swift_task_create_group_future_f to initialize task group child tasks");
   return swift_task_create_group_future_f(
       flags, /*group=*/nullptr, futureResultType,
@@ -588,7 +589,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
 }
 
 AsyncTaskAndContext swift::swift_task_create_group_future_f(
-    JobFlags flags, TaskGroup *group,
+    size_t flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize) {
@@ -616,7 +617,7 @@ getAsyncClosureEntryPointAndContextSize(void *function,
           fnPtr->ExpectedContextSize};
 }
 
-AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
+AsyncTaskAndContext swift::swift_task_create_future(size_t flags,
                      const Metadata *futureResultType,
                      void *closureEntry,
                      HeapObject * /* +1 */ closureContext) {
@@ -635,7 +636,7 @@ AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
       initialContextSize);
 }
 
-AsyncTaskAndContext swift::swift_task_create_async_let_future(JobFlags flags,
+AsyncTaskAndContext swift::swift_task_create_async_let_future(size_t flags,
                      const Metadata *futureResultType,
                      void *closureEntry,
                      void *closureContext) {
@@ -656,7 +657,7 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(JobFlags flags,
 
 AsyncTaskAndContext
 swift::swift_task_create_group_future(
-                        JobFlags flags, TaskGroup *group,
+                        size_t flags, TaskGroup *group,
                         const Metadata *futureResultType,
                         void *closureEntry,
                         HeapObject * /*+1*/closureContext) {
@@ -848,7 +849,7 @@ void swift::swift_task_runAndBlockThread(const void *function,
   // Set up a task that runs the runAndBlock async function above.
   auto flags = JobFlags(JobKind::Task, JobPriority::Default);
   auto pair = swift_task_create_f(
-      flags,
+      flags.getOpaqueValue(),
       reinterpret_cast<ThinNullaryAsyncSignature::FunctionType *>(
           &runAndBlock_start),
       sizeof(RunAndBlockContext));

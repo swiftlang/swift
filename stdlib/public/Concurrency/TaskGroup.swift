@@ -269,7 +269,7 @@ public struct TaskGroup<ChildTaskResult> {
     
     // Create the asynchronous task future.
     let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      flags.bits, _group, operation)
+      Int(flags.bits), _group, operation)
     
     // Attach it to the group's task record in the current task.
     _taskGroupAttachChild(group: _group, child: childTask)
@@ -332,7 +332,7 @@ public struct TaskGroup<ChildTaskResult> {
 
     // Create the asynchronous task future.
     let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      flags.bits, _group, operation)
+      Int(flags.bits), _group, operation)
 
     // Attach it to the group's task record in the current task.
     _taskGroupAttachChild(group: _group, child: childTask)
@@ -558,7 +558,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 
     // Create the asynchronous task future.
     let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      flags.bits, _group, operation)
+      Int(flags.bits), _group, operation)
 
     // Attach it to the group's task record in the current task.
     _taskGroupAttachChild(group: _group, child: childTask)
@@ -621,7 +621,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 
     // Create the asynchronous task future.
     let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      flags.bits, _group, operation)
+      Int(flags.bits), _group, operation)
 
     // Attach it to the group's task record in the current task.
     _taskGroupAttachChild(group: _group, child: childTask)

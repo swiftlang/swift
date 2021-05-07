@@ -143,12 +143,12 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_create_f) {
-  swift_task_create_f(swift::JobFlags(), nullptr, 0);
+  swift_task_create_f(0, nullptr, 0);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_task_create_group_future_f) {
-  swift_task_create_group_future_f(swift::JobFlags(), nullptr, nullptr, nullptr,
+  swift_task_create_group_future_f(0, nullptr, nullptr, nullptr,
                                    0);
 }
 

@@ -63,7 +63,7 @@ bb0(%0 : $Int, %1: @guaranteed $@async @callee_owned @substituted <τ_0_0> () ->
 sil hidden [ossa] @resume_nonthrowing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
   // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
-  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 5
+  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 6
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
   // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
   // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3
@@ -82,7 +82,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
 sil hidden [ossa] @resume_throwing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
   // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
-  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 5
+  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 6
   // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
   // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
   // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3

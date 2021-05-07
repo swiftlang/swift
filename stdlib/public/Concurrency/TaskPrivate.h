@@ -59,7 +59,7 @@ void runJobInEstablishedExecutorContext(Job *job);
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
 
-AsyncTaskAndContext swift_task_create_async_let_future(JobFlags flags,
+AsyncTaskAndContext swift_task_create_async_let_future(size_t flags,
                      const Metadata *futureResultType,
                      void *closureEntry,
                      void *closureContext);
