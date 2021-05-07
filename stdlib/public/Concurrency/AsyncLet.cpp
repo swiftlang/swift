@@ -106,7 +106,7 @@ static void swift_asyncLet_startImpl(AsyncLet *alet,
   flags.task_setIsChildTask(true);
 
   auto childTaskAndContext = swift_task_create_async_let_future(
-      flags,
+      flags.getOpaqueValue(),
       futureResultType,
       closureEntryPoint,
       closureContext);

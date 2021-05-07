@@ -527,8 +527,8 @@ static llvm::Value *unsafeContinuationFromTask(IRGenFunction &IGF,
 static llvm::Value *emitLoadOfResumeContextFromTask(IRGenFunction &IGF,
                                                     llvm::Value *task) {
   auto addr = Address(task, IGF.IGM.getPointerAlignment());
-  auto resumeContextAddr =
-    IGF.Builder.CreateStructGEP(addr, 5, 6 * IGF.IGM.getPointerSize());
+  auto resumeContextAddr = IGF.Builder.CreateStructGEP(
+    addr, 6, (5 * IGF.IGM.getPointerSize()) + Size(8));
   llvm::Value *resumeContext = IGF.Builder.CreateLoad(resumeContextAddr);
   if (auto &schema = IGF.getOptions().PointerAuth.TaskResumeContext) {
     auto info = PointerAuthInfo::emit(IGF, schema,
