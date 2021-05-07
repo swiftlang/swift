@@ -1224,4 +1224,10 @@ def minimum_access_level : Separate<["-"], "minimum-access-level">,
   HelpText<"Include symbols with this access level or more">,
   MetaVarName<"<level>">;
 
+def skip_inherited_docs : Flag<["-"], "skip-inherited-docs">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Skip emitting doc comments for members inherited through classes or "
+           "default implementations">;
+
 include "FrontendOptions.td"
