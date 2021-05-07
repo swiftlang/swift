@@ -4243,8 +4243,8 @@ ERROR(throwing_interpolation_without_try,none,
       "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
-ERROR(throwing_spawn_let_without_try,none,
-      "reading 'spawn let' can throw but is not marked with 'try'", ())
+ERROR(throwing_async_let_without_try,none,
+      "reading 'async let' can throw but is not marked with 'try'", ())
 ERROR(throwing_prop_access_without_try,none,
       "property access can throw but is not marked with 'try'", ())
 ERROR(throwing_subscript_access_without_try,none,
@@ -4273,8 +4273,8 @@ NOTE(async_access_without_await,none,
 
 NOTE(async_call_without_await_in_autoclosure,none,
       "call is 'async' in an autoclosure argument", ())
-NOTE(async_call_without_await_in_spawn_let,none,
-      "call is 'async' in an 'spawn let' initializer", ())
+NOTE(async_call_without_await_in_async_let,none,
+      "call is 'async' in an 'async let' initializer", ())
 
 WARNING(no_async_in_await,none,
         "no 'async' operations occur within 'await' expression", ())
@@ -4287,7 +4287,7 @@ ERROR(await_in_illegal_context,none,
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(async_in_nonasync_function,none,
-      "%select{'async'|'async' call|'await'|'spawn let'|'async' property access|'async' subscript access}0 in "
+      "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
       "%select{a function|an autoclosure}1 that does not support concurrency",
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
@@ -4418,8 +4418,8 @@ ERROR(actor_isolated_from_concurrent_closure,none,
 ERROR(actor_isolated_from_concurrent_function,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent function",
         (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_spawn_let,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'spawn let' initializer",
+ERROR(actor_isolated_from_async_let,none,
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to actor-isolated %0 %1",

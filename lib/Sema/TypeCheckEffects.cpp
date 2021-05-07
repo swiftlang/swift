@@ -1689,7 +1689,7 @@ public:
     bool suggestTryFixIt = reasonKind == PotentialEffectReason::Kind::Apply;
 
     if (reasonKind == PotentialEffectReason::Kind::AsyncLet) {
-      message = diag::throwing_spawn_let_without_try;
+      message = diag::throwing_async_let_without_try;
 
     } else if (reasonKind == PotentialEffectReason::Kind::PropertyAccess) {
       message = diag::throwing_prop_access_without_try;
@@ -1924,7 +1924,7 @@ public:
         if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
           if (var->isSpawnLet()) {
             Diags.diagnose(
-                e->getLoc(), diag::spawn_let_in_illegal_context,
+                e->getLoc(), diag::async_let_in_illegal_context,
                 var->getName(), static_cast<unsigned>(getKind()));
             return;
           }
@@ -1935,7 +1935,7 @@ public:
       if (patternBinding->isSpawnLet()) {
         auto var = patternBinding->getAnchoringVarDecl(0);
         Diags.diagnose(
-            e->getLoc(), diag::spawn_let_in_illegal_context,
+            e->getLoc(), diag::async_let_in_illegal_context,
             var->getName(), static_cast<unsigned>(getKind()));
         return;
       }
@@ -2833,7 +2833,7 @@ private:
             if (auto var = dyn_cast<VarDecl>(declR->getDecl())) {
               if (var->isSpawnLet()) {
                 Ctx.Diags.diagnose(declR->getLoc(),
-                                   diag::spawn_let_without_await,
+                                   diag::async_let_without_await,
                                    var->getName());
                 continue;
               }
@@ -2862,7 +2862,7 @@ private:
                break;
              case AutoClosureExpr::Kind::AsyncLet:
                Ctx.Diags.diagnose(diag.expr.getStartLoc(),
-                                  diag::async_call_without_await_in_spawn_let);
+                                  diag::async_call_without_await_in_async_let);
                break;
              case AutoClosureExpr::Kind::SingleCurryThunk:
              case AutoClosureExpr::Kind::DoubleCurryThunk:
