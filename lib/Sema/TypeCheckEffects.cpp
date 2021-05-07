@@ -418,7 +418,7 @@ public:
     if (auto ic = dyn_cast<IfConfigDecl>(D)) {
       recurse = asImpl().checkIfConfig(ic);
     } else if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
-      if (patternBinding->isSpawnLet())
+      if (patternBinding->isAsyncLet())
         recurse = asImpl().checkAsyncLet(patternBinding);
     } else {
       recurse = ShouldNotRecurse;
@@ -1689,7 +1689,7 @@ public:
     bool suggestTryFixIt = reasonKind == PotentialEffectReason::Kind::Apply;
 
     if (reasonKind == PotentialEffectReason::Kind::AsyncLet) {
-      message = diag::throwing_spawn_let_without_try;
+      message = diag::throwing_async_let_without_try;
 
     } else if (reasonKind == PotentialEffectReason::Kind::PropertyAccess) {
       message = diag::throwing_prop_access_without_try;
@@ -1922,9 +1922,9 @@ public:
 
       if (auto declRef = dyn_cast<DeclRefExpr>(e)) {
         if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-          if (var->isSpawnLet()) {
+          if (var->isAsyncLet()) {
             Diags.diagnose(
-                e->getLoc(), diag::spawn_let_in_illegal_context,
+                e->getLoc(), diag::async_let_in_illegal_context,
                 var->getName(), static_cast<unsigned>(getKind()));
             return;
           }
@@ -1932,10 +1932,10 @@ public:
       }
     } else if (auto patternBinding = dyn_cast_or_null<PatternBindingDecl>(
                    node.dyn_cast<Decl *>())) {
-      if (patternBinding->isSpawnLet()) {
+      if (patternBinding->isAsyncLet()) {
         auto var = patternBinding->getAnchoringVarDecl(0);
         Diags.diagnose(
-            e->getLoc(), diag::spawn_let_in_illegal_context,
+            e->getLoc(), diag::async_let_in_illegal_context,
             var->getName(), static_cast<unsigned>(getKind()));
         return;
       }
@@ -2529,7 +2529,7 @@ private:
         // "Async let" declarations are treated as an asynchronous call
         // (to the underlying task's "get"). If the initializer was throwing,
         // then the access is also treated as throwing.
-        if (var->isSpawnLet()) {
+        if (var->isAsyncLet()) {
           // If the initializer could throw, we will have a 'try' in the
           // application of its autoclosure.
           bool throws = false;
@@ -2831,9 +2831,9 @@ private:
         case PotentialEffectReason::Kind::AsyncLet:
           if (auto declR = dyn_cast<DeclRefExpr>(&diag.expr)) {
             if (auto var = dyn_cast<VarDecl>(declR->getDecl())) {
-              if (var->isSpawnLet()) {
+              if (var->isAsyncLet()) {
                 Ctx.Diags.diagnose(declR->getLoc(),
-                                   diag::spawn_let_without_await,
+                                   diag::async_let_without_await,
                                    var->getName());
                 continue;
               }
@@ -2862,7 +2862,7 @@ private:
                break;
              case AutoClosureExpr::Kind::AsyncLet:
                Ctx.Diags.diagnose(diag.expr.getStartLoc(),
-                                  diag::async_call_without_await_in_spawn_let);
+                                  diag::async_call_without_await_in_async_let);
                break;
              case AutoClosureExpr::Kind::SingleCurryThunk:
              case AutoClosureExpr::Kind::DoubleCurryThunk:
