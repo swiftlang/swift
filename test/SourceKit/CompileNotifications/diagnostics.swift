@@ -80,7 +80,7 @@
 // INVALID_ARG-NEXT:     key.filepath: "<unknown>"
 // INVALID_ARG-NEXT:     key.severity: source.diagnostic.severity.error,
 // INVALID_ARG-NEXT:     key.offset: 0
-// INVALID_ARG-NEXT:     key.id: "error_from_clang"
+// INVALID_ARG-NEXT:     key.id: "{{error_from_clang|error_unknown_arg}}"
 // INVALID_ARG-NEXT:     key.description: "unknown argument
 
 // Ignore the spurious -wmo + -enable-batch-mode warning.
