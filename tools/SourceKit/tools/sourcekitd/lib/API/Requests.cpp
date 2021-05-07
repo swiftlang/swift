@@ -2824,6 +2824,9 @@ static void fillDictionaryForDiagnosticInfo(
 static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
+  if (!Info.ID.empty())
+    Elem.set(KeyID, Info.ID);
+
   Elem.set(KeyDescription, Info.Description);
   if (Info.Line != 0) {
     Elem.set(KeyLine, Info.Line);

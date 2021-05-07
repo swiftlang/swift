@@ -310,6 +310,7 @@ entity ::=
 ```
 diagnostic ::=
 {
+    <key.id>:          (string) // The internal ID of the diagnostic.
     <key.line>:        (int64)  // The line upon which the diagnostic was emitted.
     <key.column>:      (int64)  // The column upon which the diagnostic was emitted.
     <key.filepath>:    (string) // The absolute path to the file that was being parsed

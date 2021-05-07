@@ -54,6 +54,7 @@ UID_KEYS = [
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('SyntaxTreeTransferMode', 'key.syntaxtreetransfermode'),
     KEY('EnableStructure', 'key.enablesubstructure'),
+    KEY('ID', 'key.id'),
     KEY('Description', 'key.description'),
     KEY('TypeName', 'key.typename'),
     KEY('RuntimeName', 'key.runtime_name'),
