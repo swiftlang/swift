@@ -4317,21 +4317,18 @@ NOTE(protocol_witness_async_conflict,none,
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
-WARNING(async_let_is_spawn_let,none,
-      "'async let' is now 'spawn let'", ())
-
-ERROR(spawn_not_let,none,
-      "'spawn' can only be used with 'let' declarations", ())
-ERROR(spawn_let_not_local,none,
-      "'spawn let' can only be used on local declarations", ())
-ERROR(spawn_let_not_initialized,none,
-      "'spawn let' binding requires an initializer expression", ())
-ERROR(spawn_let_no_variables,none,
-      "'spawn let' requires at least one named variable", ())
-NOTE(spawn_let_without_await,none,
-      "reference to spawn let %0 is 'async'", (DeclName))
-ERROR(spawn_let_in_illegal_context,none,
-      "spawn let %0 cannot be referenced in "
+ERROR(async_not_let,none,
+      "'async' can only be used with 'let' declarations", ())
+ERROR(async_let_not_local,none,
+      "'async let' can only be used on local declarations", ())
+ERROR(async_let_not_initialized,none,
+      "'async let' binding requires an initializer expression", ())
+ERROR(async_let_no_variables,none,
+      "'async let' requires at least one named variable", ())
+NOTE(async_let_without_await,none,
+      "reference to async let %0 is 'async'", (DeclName))
+ERROR(async_let_in_illegal_context,none,
+      "async let %0 cannot be referenced in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
       (DeclName, unsigned))
 

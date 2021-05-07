@@ -5503,10 +5503,6 @@ void AttributeChecker::visitGlobalActorAttr(GlobalActorAttr *attr) {
 
 void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
   if (isa<VarDecl>(D)) {
-    D->getASTContext().Diags.diagnose(
-        attr->getLocation(), diag::async_let_is_spawn_let)
-      .fixItReplace(attr->getRange(), "spawn");
-
     visitAsyncOrSpawnAttr(attr);
   }
 }
@@ -5526,7 +5522,7 @@ void AttributeChecker::visitAsyncOrSpawnAttr(DeclAttribute *attr) {
 
   // "Async" modifier can only be applied to local declarations.
   if (!patternBinding->getDeclContext()->isLocalContext()) {
-    diagnoseAndRemoveAttr(attr, diag::spawn_let_not_local);
+    diagnoseAndRemoveAttr(attr, diag::async_let_not_local);
     return;
   }
 
@@ -5547,21 +5543,21 @@ void AttributeChecker::visitAsyncOrSpawnAttr(DeclAttribute *attr) {
     // Each entry must bind at least one named variable, so that there is
     // something to "await".
     if (!foundAnyVariable) {
-      diagnose(pattern->getLoc(), diag::spawn_let_no_variables);
+      diagnose(pattern->getLoc(), diag::async_let_no_variables);
       attr->setInvalid();
       return;
     }
 
     // Async can only be used on an "async let".
     if (!isLet && !diagnosedVar) {
-      diagnose(patternBinding->getLoc(), diag::spawn_not_let)
+      diagnose(patternBinding->getLoc(), diag::async_not_let)
         .fixItReplace(patternBinding->getLoc(), "let");
       diagnosedVar = true;
     }
 
     // Each pattern entry must have an initializer expression.
     if (patternBinding->getEqualLoc(index).isInvalid()) {
-      diagnose(pattern->getLoc(), diag::spawn_let_not_initialized);
+      diagnose(pattern->getLoc(), diag::async_let_not_initialized);
       attr->setInvalid();
       return;
     }
