@@ -1,6 +1,8 @@
 // Ensure that the LLVMIR hash of the 2nd compilation in batch mode
 // is consistent no matter if the first one generates code or not.
 
+// REQUIRES: rdar_77654695
+
 // RUN: %empty-directory(%t)
 // RUN: echo 'public enum E: Error {}' >%t/main.swift
 // RUN: echo >%t/other.swift
