@@ -572,12 +572,12 @@ NOTE(async_inferred_from_operation,none,
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
       "'#keyPath' can only be used with the Objective-C runtime", ())
-ERROR(expression_unused_keypath_result,none,
+ERROR(expression_unused_keypath_result,NoUsage,
       "result of key path is unused", ())
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (Identifier))
-WARNING(expr_keypath_swift3_objc_inference,none,
+WARNING(expr_keypath_swift3_objc_inference,Deprecation,
         "argument of '#keyPath' refers to property %0 in %1 that depends on "
         "'@objc' inference deprecated in Swift 4",
         (Identifier, Identifier))
@@ -637,7 +637,7 @@ ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
-WARNING(expr_deprecated_writable_keypath,none,
+WARNING(expr_deprecated_writable_keypath,Deprecation,
         "forming a writable keypath to property %0 that is read-only in this context "
         "is deprecated and will be removed in a future release",(DeclName))
 
@@ -680,7 +680,7 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
-WARNING(expr_selector_swift3_objc_inference,none,
+WARNING(expr_selector_swift3_objc_inference,Deprecation,
         "argument of '#selector' refers to %0 %1 in %2 that depends on "
         "'@objc' inference deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Identifier))
@@ -690,10 +690,10 @@ WARNING(selector_literal_invalid,none,
         "string literal is not a valid Objective-C selector", ())
 WARNING(selector_literal_undeclared,none,
         "no method declared with Objective-C selector %0", (ObjCSelector))
-WARNING(selector_literal_deprecated,none,
+WARNING(selector_literal_deprecated,Deprecation,
         "use of string literal for Objective-C selectors is deprecated; "
         "use '#selector' or explicitly construct a 'Selector'", ())
-WARNING(selector_literal_deprecated_suggest,none,
+WARNING(selector_literal_deprecated_suggest,Deprecation,
         "use of string literal for Objective-C selectors is deprecated; "
         "use '#selector' instead", ())
 WARNING(selector_construction_suggest,none,
@@ -828,7 +828,7 @@ ERROR(invalid_redecl_implicit,none,
       "invalid redeclaration of synthesized "
       "%select{%0|implementation for protocol requirement}1 %2",
       (DescriptiveDeclKind, bool, DeclName))
-WARNING(invalid_redecl_swift5_warning,none,
+WARNING(invalid_redecl_swift5_warning,Deprecation,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
 
@@ -1271,7 +1271,7 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
-WARNING(unlabeled_trailing_closure_deprecated,none,
+WARNING(unlabeled_trailing_closure_deprecated,Deprecation,
         "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
         (Identifier))
 NOTE(decl_multiple_defaulted_closure_parameters,none,
@@ -1551,7 +1551,7 @@ ERROR(missing_unimplemented_init_runtime,none,
 ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
 
-WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
+WARNING(expr_dynamic_lookup_swift3_objc_inference,Deprecation,
         "reference to %0 %1 of %2 depends on '@objc' inference "
         "deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Identifier))
@@ -2676,7 +2676,7 @@ WARNING(implicitly_final_cannot_be_open_swift4,none,
         "static declarations}0 are implicitly 'final'; use 'public' instead of "
         "'open'", (unsigned))
 
-WARNING(override_swift3_objc_inference,none,
+WARNING(override_swift3_objc_inference,Deprecation,
         "override of %0 %1 from extension of %2 depends on deprecated "
         "inference of '@objc'",
         (DescriptiveDeclKind, DeclName, Identifier))
@@ -2692,7 +2692,7 @@ WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
-WARNING(anyobject_class_inheritance_deprecated,none,
+WARNING(anyobject_class_inheritance_deprecated,Deprecation,
   "using 'class' keyword to define a class-constrained protocol is deprecated; "
   "use 'AnyObject' instead", ())
 ERROR(multiple_inheritance,none,
@@ -3756,12 +3756,12 @@ NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
      (StringRef, DescriptiveDeclKind, Identifier))
 
-WARNING(warn_deprecated_conditional_conformance_outer_access,none,
+WARNING(warn_deprecated_conditional_conformance_outer_access,Deprecation,
         "use of %0 as reference to %1 in %2 %3 will change in future versions of Swift to reference %4 in %5 %6 "
         "which comes via a conditional conformance",
         (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName,
         DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
-NOTE(fix_deprecated_conditional_conformance_outer_access,none,
+NOTE(fix_deprecated_conditional_conformance_outer_access,Deprecation,
      "use '%0' to continue to reference the %1",
      (StringRef, DescriptiveDeclKind, Identifier))
 
@@ -3816,7 +3816,7 @@ WARNING(bitcasting_to_change_from_unsized_to_sized_int, none,
         "initializer",
         (Type, Type))
 
-WARNING(use_of_qq_on_non_optional_value,none,
+WARNING(use_of_qq_on_non_optional_value,NoUsage,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
         "so the right side is never used", (Type))
 WARNING(nonoptional_compare_to_nil,none,
@@ -3932,32 +3932,32 @@ WARNING(guard_always_succeeds,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
-ERROR(expression_unused_closure,none,
+ERROR(expression_unused_closure,NoUsage,
       "closure expression is unused", ())
-ERROR(expression_unused_function,none,
+ERROR(expression_unused_function,NoUsage,
       "function is unused", ())
-WARNING(expression_unused_lvalue,none,
+WARNING(expression_unused_lvalue,NoUsage,
       "%select{"
         "variable|"
         "property is accessed but result|"
         "subscript is accessed but result"
       "}0 is unused",
       (unsigned))
-WARNING(expression_unused_result_call,none,
+WARNING(expression_unused_result_call,NoUsage,
         "result of call to %0 is unused", (DeclName))
-WARNING(expression_unused_result_operator,none,
+WARNING(expression_unused_result_operator,NoUsage,
         "result of operator %0 is unused", (DeclName))
-WARNING(expression_unused_result_unknown, none,
+WARNING(expression_unused_result_unknown, NoUsage,
         "result of call to %select{function|closure}0 returning %1 is unused", (bool, Type))
-WARNING(expression_unused_result, none,
+WARNING(expression_unused_result, NoUsage,
         "expression of type %0 is unused", (Type))
-WARNING(expression_unused_init_result,none,
+WARNING(expression_unused_init_result,NoUsage,
         "result of %0 initializer is unused", (Type))
-WARNING(expression_unused_optional_try,none,
+WARNING(expression_unused_optional_try,NoUsage,
         "result of 'try?' is unused", ())
-WARNING(expression_unused_selector_result, none,
+WARNING(expression_unused_selector_result, NoUsage,
         "result of '#selector' is unused", ())
-WARNING(expression_unused_literal,none,
+WARNING(expression_unused_literal,NoUsage,
         "%0 literal is unused", (StringRef))
 
 ERROR(assignment_lhs_not_lvalue,none,
@@ -4101,7 +4101,7 @@ ERROR(pattern_type_mismatch_context,none,
 
 ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
-WARNING(found_one_pattern_for_several_associated_values,none,
+WARNING(found_one_pattern_for_several_associated_values,Deprecation,
         "enum case '%0' has %1 associated values; matching them as a tuple "
         "is deprecated", (StringRef, unsigned))
 WARNING(converting_tuple_into_several_associated_values,none,
@@ -4646,7 +4646,7 @@ ERROR(enum_element_ellipsis,none,
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
 
-WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,none,
+WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,Deprecation,
         "using '!' here is deprecated and will be removed in a future release", ())
 
 ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
@@ -4710,7 +4710,7 @@ ERROR(attribute_requires_function_type,none,
       "@%0 attribute only applies to function types", (StringRef))
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
-ERROR(unreferenced_generic_parameter,none,
+ERROR(unreferenced_generic_parameter,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(unexpected_ctype_for_non_c_convention,none,
       "convention '%0' does not support the 'cType' argument label, did you "
@@ -4825,9 +4825,9 @@ ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
       "@objc protocols must not have operator requirements", ())
-WARNING(objc_inference_swift3_dynamic,none,
+WARNING(objc_inference_swift3_dynamic,Deprecation,
         "inference of '@objc' for 'dynamic' members is deprecated", ())
-WARNING(objc_inference_swift3_objc_derived,none,
+WARNING(objc_inference_swift3_objc_derived,Deprecation,
         "inference of '@objc' for members of Objective-C-derived classes is "
         "deprecated", ())
 
@@ -4852,7 +4852,7 @@ ERROR(objc_setter_for_nonobjc_property,none,
       "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
-WARNING(accessor_swift3_objc_inference,none,
+WARNING(accessor_swift3_objc_inference,Deprecation,
         "%select{%0 %1|%1}2 with '@objc' %select{getter|setter}3 depends on "
         "deprecated inference of '@objc'",
         (DescriptiveDeclKind, DeclName, bool, bool))
@@ -4947,7 +4947,7 @@ NOTE(objc_overriding_objc_decl,none,
 NOTE(objc_witness_objc_requirement,none,
      "satisfying requirement for %0 %1 in protocol %2",
      (DescriptiveDeclKind, DeclName, Identifier))
-WARNING(witness_swift3_objc_inference,none,
+WARNING(witness_swift3_objc_inference,Deprecation,
         "use of %0 %1 to satisfy a requirement of protocol %2 depends on "
         "'@objc' inference deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Type))
@@ -5229,13 +5229,13 @@ NOTE(availability_obsoleted, none,
      "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",
      (unsigned, DeclName, StringRef, llvm::VersionTuple))
 
-WARNING(availability_deprecated, none,
+WARNING(availability_deprecated, Deprecation,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
-WARNING(availability_deprecated_rename, none,
+WARNING(availability_deprecated_rename, Deprecation,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| in %3%select{| %5}4}2: "
         "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
@@ -5244,7 +5244,7 @@ WARNING(availability_deprecated_rename, none,
          unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
-NOTE(note_deprecated_rename, none,
+NOTE(note_deprecated_rename, Deprecation,
      "use '%0' instead", (StringRef))
 
 ERROR(availability_decl_more_than_enclosing, none,
@@ -5347,7 +5347,7 @@ NOTE(conformance_availability_obsoleted, none,
      "conformance of %0 to %1 was obsoleted in %2 %3",
      (Type, Type, StringRef, llvm::VersionTuple))
 
-WARNING(conformance_availability_deprecated, none,
+WARNING(conformance_availability_deprecated, Deprecation,
         "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
         (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
@@ -5493,31 +5493,31 @@ NOTE(specialize_found_function_of_type, none,
 // MARK: Variable usage diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(pbd_never_used_stmtcond, none,
+WARNING(pbd_never_used_stmtcond, NoUsage,
         "value %0 was defined but never used; consider replacing "
         "with boolean test",
         (Identifier))
-WARNING(unused_setter_parameter, none,
+WARNING(unused_setter_parameter, NoUsage,
         "setter argument %0 was never used, but the property was accessed",
         (Identifier))
 NOTE(fixit_for_unused_setter_parameter, none,
      "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
 
-WARNING(pbd_never_used, none,
+WARNING(pbd_never_used, NoUsage,
         "initialization of %select{variable|immutable value}1 %0 was never used"
         "; consider replacing with assignment to '_' or removing it",
         (Identifier, unsigned))
 
 
-WARNING(capture_never_used, none,
+WARNING(capture_never_used, NoUsage,
         "capture %0 was never used",
         (Identifier))
 
-WARNING(variable_never_used, none,
+WARNING(variable_never_used, NoUsage,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
-WARNING(immutable_value_never_used_but_assigned, none,
+WARNING(immutable_value_never_used_but_assigned, NoUsage,
         "immutable value %0 was never used; consider removing it",
         (Identifier))
 WARNING(variable_never_mutated, none,
@@ -5602,7 +5602,7 @@ ERROR(override_nsobject_hash_error,none,
       "'NSObject.hash(into:)' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())
 
-WARNING(hashvalue_implementation,none,
+WARNING(hashvalue_implementation,Deprecation,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
@@ -5722,10 +5722,10 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
-WARNING(property_wrapper_wrapperValue,none,
+WARNING(property_wrapper_wrapperValue,Deprecation,
         "property wrapper's 'wrapperValue' property should be renamed to "
         "'projectedValue'; use of 'wrapperValue' is deprecated", ())
-WARNING(property_wrapper_init_initialValue,none,
+WARNING(property_wrapper_init_initialValue,Deprecation,
         "property wrapper's 'init(initialValue:)' should be renamed "
         "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
         ())
@@ -5822,7 +5822,7 @@ NOTE(result_builder_missing_build_limited_availability, none,
 // MARK: Tuple Shuffle Diagnostics
 //------------------------------------------------------------------------------
 
- WARNING(warn_reordering_tuple_shuffle_deprecated,none,
+ WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
         "expression shuffles the elements of this tuple; "
         "this behavior is deprecated", ())
 
