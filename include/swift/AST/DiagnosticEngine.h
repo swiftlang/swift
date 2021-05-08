@@ -1017,6 +1017,12 @@ namespace swift {
     /// diagnostic.
     bool isAPIDigesterBreakageDiagnostic(DiagID id) const;
 
+    /// \returns true if the diagnostic is marking a deprecation.
+    bool isDeprecationDiagnostic(DiagID id) const;
+
+    /// \returns true if the diagnostic is marking an unused element.
+    bool isNoUsageDiagnostic(DiagID id) const;
+
     /// \returns true if any diagnostic consumer gave an error while invoking
     //// \c finishProcessing.
     bool finishProcessing();
