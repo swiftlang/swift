@@ -113,7 +113,7 @@ static constexpr const char *const debugDiagnosticStrings[] = {
 static constexpr const char *const diagnosticIDStrings[] = {
 #define DIAG(KIND, ID, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
-    "",
+    "<not a diagnostic>",
 };
 
 static constexpr const char *const fixItStrings[] = {
