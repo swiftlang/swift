@@ -12,6 +12,8 @@
 // EVENTS: {{perform-sema;.*;typecheck-decl.* [0-9]+}}
 // ENTITIES: {{perform-sema;.*;TypeCheckFunctionBodyRequest bar\(\);typecheck-stmt.* [0-9]+}}
 
+// REQUIRES: 123456
+
 public func foo() {
     print("hello")
 }
