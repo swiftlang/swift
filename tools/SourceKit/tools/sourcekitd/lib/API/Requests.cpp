@@ -2827,6 +2827,9 @@ static void fillDictionaryForDiagnosticInfoBase(
   if (!Info.ID.empty())
     Elem.set(KeyID, Info.ID);
 
+  if (!Info.Category.empty())
+    Elem.set(KeyCategory, Info.Category);
+
   Elem.set(KeyDescription, Info.Description);
   if (Info.Line != 0) {
     Elem.set(KeyLine, Info.Line);

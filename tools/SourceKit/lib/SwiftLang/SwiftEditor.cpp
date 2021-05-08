@@ -101,6 +101,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   DiagnosticEntryInfo SKInfo;
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
+  SKInfo.Category = Info.Category.str();
 
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;

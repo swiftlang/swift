@@ -201,6 +201,7 @@ struct DiagnosticEntryInfoBase {
   };
 
   std::string ID;
+  std::string Category;
   std::string Description;
   unsigned Offset = 0;
   unsigned Line = 0;

@@ -1131,9 +1131,9 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   StringRef Category;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
-  if (isDeprecationDiagnostic(diagnostic.getID()))
+  else if (isDeprecationDiagnostic(diagnostic.getID()))
     Category = "deprecation";
-  if (isNoUsageDiagnostic(diagnostic.getID()))
+  else if (isNoUsageDiagnostic(diagnostic.getID()))
     Category = "no-usage";
 
   return DiagnosticInfo(
