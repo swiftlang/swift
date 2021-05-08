@@ -31,6 +31,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -654,11 +655,44 @@ public:
   bool isRedundantExplicitRequirement(const ExplicitRequirement &req) const;
 
 private:
-  void computeRedundantRequirements(const ProtocolDecl *requirementSignatureSelfProto);
+  using GetKindAndRHS = llvm::function_ref<std::pair<RequirementKind, RequirementRHS>()>;
+  void getBaseRequirements(
+      GetKindAndRHS getKindAndRHS,
+      const RequirementSource *source,
+      const ProtocolDecl *requirementSignatureSelfProto,
+      SmallVectorImpl<ExplicitRequirement> &result);
+
+  /// Determine if an explicit requirement can be derived from the
+  /// requirement given by \p otherSource and \p otherRHS, using the
+  /// knowledge of any existing redundant requirements discovered so far.
+  Optional<ExplicitRequirement>
+  isValidRequirementDerivationPath(
+    llvm::SmallDenseSet<ExplicitRequirement, 4> &visited,
+    RequirementKind otherKind,
+    const RequirementSource *otherSource,
+    RequirementRHS otherRHS,
+    const ProtocolDecl *requirementSignatureSelfProto);
+
+  /// Determine if the explicit requirement \p req can be derived from any
+  /// of the constraints in \p constraints, using the knowledge of any
+  /// existing redundant requirements discovered so far.
+  ///
+  /// Use \p filter to screen out less-specific and conflicting constraints
+  /// if the requirement is a superclass, concrete type or layout requirement.
+  template<typename T, typename Filter>
+  void checkIfRequirementCanBeDerived(
+      const ExplicitRequirement &req,
+      const std::vector<Constraint<T>> &constraints,
+      const ProtocolDecl *requirementSignatureSelfProto,
+      Filter filter);
+
+  void computeRedundantRequirements(
+      const ProtocolDecl *requirementSignatureSelfProto);
 
   void diagnoseRedundantRequirements() const;
 
-  void diagnoseConflictingConcreteTypeRequirements() const;
+  void diagnoseConflictingConcreteTypeRequirements(
+      const ProtocolDecl *requirementSignatureSelfProto);
 
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
@@ -706,23 +740,6 @@ private:
   void checkConcreteTypeConstraints(
                             TypeArrayView<GenericTypeParamType> genericParams,
                             EquivalenceClass *equivClass);
-
-  /// Check the superclass constraints within the equivalence
-  /// class of the given potential archetype.
-  void checkSuperclassConstraints(
-                            TypeArrayView<GenericTypeParamType> genericParams,
-                            EquivalenceClass *equivClass);
-
-  /// Check conformance constraints within the equivalence class of the
-  /// given potential archetype.
-  void checkConformanceConstraints(
-                            TypeArrayView<GenericTypeParamType> genericParams,
-                            EquivalenceClass *equivClass);
-
-  /// Check layout constraints within the equivalence class of the given
-  /// potential archetype.
-  void checkLayoutConstraints(TypeArrayView<GenericTypeParamType> genericParams,
-                              EquivalenceClass *equivClass);
 
   /// Check same-type constraints within the equivalence class of the
   /// given potential archetype.
@@ -1242,8 +1259,7 @@ public:
   /// requirement redundant, because without said original requirement, the
   /// derived requirement ceases to hold.
   bool isSelfDerivedSource(GenericSignatureBuilder &builder,
-                           Type type,
-                           bool &derivedViaConcrete) const;
+                           Type type) const;
 
   /// For a requirement source that describes the requirement \c type:proto,
   /// retrieve the minimal subpath of this requirement source that will
@@ -1255,8 +1271,7 @@ public:
   const RequirementSource *getMinimalConformanceSource(
                                             GenericSignatureBuilder &builder,
                                             Type type,
-                                            ProtocolDecl *proto,
-                                            bool &derivedViaConcrete) const;
+                                            ProtocolDecl *proto) const;
 
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;
