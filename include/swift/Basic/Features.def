@@ -48,6 +48,7 @@ LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type", true)
 LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins", true)
 LANGUAGE_FEATURE(BuiltinTaskGroup, 0, "TaskGroup builtins", true)
 LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
+LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true)
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
 
 #undef LANGUAGE_FEATURE
