@@ -1,5 +1,6 @@
 {
   "Version":"10.15",
+  "CanonicalName": "macosx10.15",
   "VersionMap" : {
       "macOS_iOSMac" : {
           "10.15" : "13.1",
