@@ -36,6 +36,7 @@ jobs:
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
           DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
+          DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID }}
         if: github.ref == 'refs/heads/swiftwasm'
 
       - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.3 5.3
@@ -45,6 +46,7 @@ jobs:
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
           DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
+          DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID }}
 
       - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.4 5.4
         env:
@@ -53,6 +55,7 @@ jobs:
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
           DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
+          DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID }}
 
       - run: ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.5 5.5
         env:
@@ -61,3 +64,4 @@ jobs:
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
           DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD }}
+          DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID }}
