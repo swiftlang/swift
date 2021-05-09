@@ -737,6 +737,14 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
 
     auto isolation = getActorIsolation(cast<ValueDecl>(decl));
 
+    // 'let' declarations are immutable, so they can be accessed across
+    // actors.
+    bool isAccessibleAcrossActors = false;
+    if (auto var = dyn_cast<VarDecl>(decl)) {
+      if (var->isLet())
+        isAccessibleAcrossActors = true;
+    }
+
     // A function that provides an asynchronous context has no restrictions
     // on its access.
     //
@@ -744,7 +752,6 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     // The call-sites are just conditionally async based on where they appear
     // (outside or inside the actor). This suggests that the implicitly-async
     // concept could be merged into the CrossActorSelf concept.
-    bool isAccessibleAcrossActors = false;
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
       if (func->isAsyncContext())
         isAccessibleAcrossActors = true;
@@ -1077,7 +1084,8 @@ static bool diagnoseNonConcurrentProperty(
 
 /// Whether we should diagnose cases where Sendable conformances are
 /// missing.
-bool swift::shouldDiagnoseNonSendableViolations(const LangOptions &langOpts) {
+static bool shouldDiagnoseNonSendableViolations(
+    const LangOptions &langOpts) {
   return langOpts.WarnConcurrency;
 }
 
@@ -1593,17 +1601,11 @@ namespace {
         // was it an attempt to mutate an actor instance's isolated state?
       } else if (auto environment = kindOfUsage(decl, context)) {
 
-        if (isa<VarDecl>(decl) && cast<VarDecl>(decl)->isLet()) {
-          auto diag = decl->diagnose(diag::actor_isolated_let);
-          SourceLoc fixItLoc =
-              decl->getAttributeInsertionLoc(/*forModifier=*/true);
-          if (fixItLoc.isValid())
-            diag.fixItInsert(fixItLoc, "nonisolated ");
-        } else if (environment.getValue() == VarRefUseEnv::Read) {
+        if (environment.getValue() == VarRefUseEnv::Read)
           decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
-        } else {
+        else
           decl->diagnose(diag::actor_mutable_state, decl->getDescriptiveKind());
-        }
+
       } else {
         decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
       }
@@ -1780,6 +1782,11 @@ namespace {
 
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
+        // we assume let-bound properties are taken care of elsewhere,
+        // since they are never implicitly async.
+        assert(!isa<VarDecl>(decl) || cast<VarDecl>(decl)->isLet() == false
+               && "unexpected let-bound property; never implicitly async!");
+
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
 
@@ -2170,6 +2177,27 @@ namespace {
     bool checkKeyPathExpr(KeyPathExpr *keyPath) {
       bool diagnosed = false;
 
+      // returns None if it is not a 'let'-bound var decl. Otherwise,
+      // the bool indicates whether a diagnostic was emitted.
+      auto checkLetBoundVarDecl = [&](KeyPathExpr::Component const& component)
+                                                            -> Optional<bool> {
+        auto decl = component.getDeclRef().getDecl();
+        if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+          if (varDecl->isLet()) {
+            auto type = component.getComponentType();
+            if (shouldDiagnoseNonSendableViolations(ctx.LangOpts)
+                && !isSendableType(getDeclContext(), type)) {
+              ctx.Diags.diagnose(
+                  component.getLoc(), diag::non_concurrent_keypath_access,
+                  type);
+              return true;
+            }
+            return false;
+          }
+        }
+        return None;
+      };
+
       // check the components of the keypath.
       for (const auto &component : keyPath->getComponents()) {
         // The decl referred to by the path component cannot be within an actor.
@@ -2197,6 +2225,13 @@ namespace {
             LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
 
           case ActorIsolationRestriction::CrossActorSelf:
+            // 'let'-bound decls with this isolation are OK, just check them.
+            if (auto wasLetBound = checkLetBoundVarDecl(component)) {
+              diagnosed = wasLetBound.getValue();
+              break;
+            }
+            LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
+
           case ActorIsolationRestriction::ActorSelf:
           case ActorIsolationRestriction::DistributedActorSelf: {
             auto decl = concDecl.getDecl();
@@ -2275,7 +2310,7 @@ namespace {
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
         switch (autoclosure->getThunkKind()) {
         case AutoClosureExpr::Kind::AsyncLet:
-          return diag::actor_isolated_from_spawn_let;
+          return diag::actor_isolated_from_async_let;
 
         case AutoClosureExpr::Kind::DoubleCurryThunk:
         case AutoClosureExpr::Kind::SingleCurryThunk:
@@ -2424,7 +2459,6 @@ namespace {
           noteIsolatedActorMember(member, context, isDistributedActor);
           return true;
         }
-
 
         // Check whether the current context is differently-isolated.
         auto curDC = const_cast<DeclContext *>(getDeclContext());

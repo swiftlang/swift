@@ -4,5 +4,7 @@
 let a = "a"
 let b = "b"
 let c = 42
-_ = "a=" + a + ";b=" + b + ";c=" + c
+let d = 0.0
+
+_ = "a=" + a + ";b=" + b + ";c=" + c + ";d=" + d
 // expected-error@-1 {{reasonable time}}

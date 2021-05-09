@@ -1669,6 +1669,7 @@ public:
   void completeGenericRequirement() override;
   void completeAfterIfStmt(bool hasElse) override;
   void completeStmtLabel(StmtKind ParentKind) override;
+  void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
 
   void doneParsing() override;
 
@@ -5831,6 +5832,17 @@ void CodeCompletionCallbacksImpl::completeStmtLabel(StmtKind ParentKind) {
   ParentStmtKind = ParentKind;
 }
 
+void CodeCompletionCallbacksImpl::completeForEachPatternBeginning(
+    bool hasTry, bool hasAwait) {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::ForEachPatternBeginning;
+  ParsedKeywords.clear();
+  if (hasTry)
+    ParsedKeywords.emplace_back("try");
+  if (hasAwait)
+    ParsedKeywords.emplace_back("await");
+}
+
 static bool isDynamicLookup(Type T) {
   return T->getRValueType()->isAnyObject();
 }
@@ -6072,6 +6084,13 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AfterIfStmtElse:
     addKeyword(Sink, "if", CodeCompletionKeywordKind::kw_if);
     break;
+  case CompletionKind::ForEachPatternBeginning:
+    if (!llvm::is_contained(ParsedKeywords, "try"))
+      addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try);
+    if (!llvm::is_contained(ParsedKeywords, "await"))
+      addKeyword(Sink, "await", CodeCompletionKeywordKind::None);
+    addKeyword(Sink, "var", CodeCompletionKeywordKind::kw_var);
+    addKeyword(Sink, "case", CodeCompletionKeywordKind::kw_case);
   }
 }
 
@@ -6610,6 +6629,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
+    /// We set the type of ParsedExpr explicitly above. But we don't want an
+    /// unresolved type in our AST when we type check again for operator
+    /// completions. Remove the type of the ParsedExpr and see if we can come up
+    /// with something more useful based on the the full sequence expression.
+    if (ParsedExpr->getType()->is<UnresolvedType>()) {
+      ParsedExpr->setType(nullptr);
+    }
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
     Lookup.getPostfixKeywordCompletions(*ExprType, ParsedExpr);
     break;
@@ -6962,6 +6988,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
   case CompletionKind::EffectsSpecifier:
+  case CompletionKind::ForEachPatternBeginning:
     // Handled earlier by keyword completions.
     break;
   }

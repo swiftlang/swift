@@ -12,6 +12,7 @@
 
 from .benchmarks import Benchmarks
 from .cmark import CMark
+from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
@@ -51,6 +52,7 @@ __all__ = [
     'SwiftInspect',
     'SwiftPM',
     'SwiftDriver',
+    'EarlySwiftDriver',
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',

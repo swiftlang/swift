@@ -16,6 +16,10 @@ target_link_libraries(swift-frontend
                         swiftSymbolGraphGen
                         LLVMBitstreamReader)
 
+# Create a `swift-driver` symlinks adjacent to the `swift-frontend` executable
+# to ensure that `swiftc` forwards to the standalone driver when invoked.
+swift_create_early_driver_symlinks(swift-frontend)
+
 swift_create_post_build_symlink(swift-frontend
   SOURCE "swift-frontend${CMAKE_EXECUTABLE_SUFFIX}"
   DESTINATION "swift${CMAKE_EXECUTABLE_SUFFIX}"

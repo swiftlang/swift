@@ -63,6 +63,9 @@ void Edge::serialize(llvm::json::OStream &OS) const {
       if (Target.getSymbolDecl() == ID || Source.getSynthesizedBaseTypeDecl())
         InheritingDecl = ID;
     }
+
+    if (!InheritingDecl && Source.getSynthesizedBaseTypeDecl())
+      InheritingDecl = Source.getSymbolDecl();
     
     // If our source symbol is a inheriting decl, write in information about
     // where it's inheriting docs from.

@@ -2776,6 +2776,17 @@ static bool usesFeatureInheritActorContext(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureImplicitSelfCapture(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    for (auto param : *func->getParameters()) {
+      if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>())
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll

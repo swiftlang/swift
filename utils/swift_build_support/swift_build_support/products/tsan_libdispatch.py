@@ -39,6 +39,10 @@ class TSanLibDispatch(product.Product):
     def is_build_script_impl_product(cls):
         return False
 
+    @classmethod
+    def is_before_build_script_impl_product(cls):
+        return False
+
     def should_build(self, host_target):
         return True
 

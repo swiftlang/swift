@@ -142,22 +142,43 @@ func testRepeatWhile2(_ fooObject: FooStruct) {
   } while localFooObject.#^COND_DO_WHILE_2?check=COND-WITH-RELATION1^#
 }
 
-func testCStyleForInit1(_ fooObject: FooStruct) {
+func testForeachPattern1(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  for #^C_STYLE_FOR_INIT_1?check=COND_NONE^#
+  for #^FOREACH_PATTERN_1^#
+// FOREACH_PATTERN_1: Begin completions, 4 items
+// FOREACH_PATTERN_1-DAG: Keyword[try]/None:                  try; name=try
+// FOREACH_PATTERN_1-DAG: Keyword/None:                       await; name=await
+// FOREACH_PATTERN_1-DAG: Keyword[var]/None:                  var; name=var
+// FOREACH_PATTERN_1-DAG: Keyword[case]/None:                 case; name=case
+// FOREACH_PATTERN_1: End completions
 }
 
-func testCStyleForInit2(_ fooObject: FooStruct) {
+func testForeachPattern2(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  for #^C_STYLE_FOR_INIT_2?check=COND_COMMON^#;
+  for try #^FOREACH_PATTERN_2^#
+// FOREACH_PATTERN_2: Begin completions, 3 items
+// FOREACH_PATTERN_2-DAG: Keyword/None:                       await; name=await
+// FOREACH_PATTERN_2-DAG: Keyword[var]/None:                  var; name=var
+// FOREACH_PATTERN_2-DAG: Keyword[case]/None:                 case; name=case
+// FOREACH_PATTERN_2: End completions
 }
 
-func testCStyleForInit3(_ fooObject: FooStruct) {
+func testForeachPattern3(_ fooObject: FooStruct) {
   var localInt = 42
   var localFooObject = FooStruct(localInt)
-  for #^C_STYLE_FOR_INIT_3?check=COND_COMMON^# ;
+  for try await #^FOREACH_PATTERN_3^#
+// FOREACH_PATTERN_3: Begin completions, 2 items
+// FOREACH_PATTERN_3-DAG: Keyword[var]/None:                  var; name=var
+// FOREACH_PATTERN_3-DAG: Keyword[case]/None:                 case; name=case
+// FOREACH_PATTERN_3: End completions
+}
+
+func testForeachPattern4(_ fooObject: FooStruct) {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  for var #^FOREACH_PATTERN_4?check=COND_NONE^#
 }
 
 func testCStyleForCond1(_ fooObject: FooStruct) {

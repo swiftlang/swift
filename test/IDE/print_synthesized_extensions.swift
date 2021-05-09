@@ -15,6 +15,8 @@
 // RUN: %FileCheck %s -check-prefix=CHECK12 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK13 < %t.syn.txt
 // RUN: %FileCheck %s -check-prefix=CHECK14 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK15 < %t.syn.txt
+// RUN: %FileCheck %s -check-prefix=CHECK16 < %t.syn.txt
 
 public protocol P1 {
   associatedtype T1
@@ -339,3 +341,60 @@ extension S13 : P5 {
 // CHECK14-NEXT: <decl:Func>/// This should not crash
 // CHECK14-NEXT:     public func <loc>foo5()</loc></decl>
 // CHECK14-NEXT: }</synthesized>
+
+// rdar://76868074: Make sure we print the extensions for C.
+public class C<T> {}
+public class D {}
+public class E {}
+
+extension C where T : D {
+  public func foo() {}
+}
+
+public protocol P8 {
+  associatedtype T
+}
+
+extension P8 where T : D {
+  public func bar() {}
+}
+
+extension P8 where T : E {
+  public func baz() {}
+}
+
+extension C : P8 {}
+
+// CHECK15:      <decl:Class>public class <loc>C<<decl:GenericTypeParam>T</decl>></loc> {
+// CHECK15-NEXT: }</decl>
+
+// CHECK15:      <decl:Extension>extension <loc><ref:Class>C</ref></loc> : <ref:module>print_synthesized_extensions</ref>.<ref:Protocol>P8</ref> {
+// CHECK15-NEXT: }</decl>
+
+// CHECK15:      <decl:Extension>extension <loc><ref:Class>C</ref></loc> where <ref:GenericTypeParam>T</ref> : <ref:module>print_synthesized_extensions</ref>.<ref:Class>D</ref> {
+// CHECK15-NEXT:   <decl:Func>public func <loc>foo()</loc></decl></decl>
+// CHECK15-NEXT:   <decl:Func>public func <loc>bar()</loc></decl>
+// CHECK15-NEXT: }</synthesized>
+
+// CHECK15:      <synthesized>extension <ref:Class>C</ref> where <ref:GenericTypeParam>T</ref> : <ref:Class>E</ref> {
+// CHECK15-NEXT:   <decl:Func>public func <loc>baz()</loc></decl>
+// CHECK15-NEXT: }</synthesized>
+
+// CHECK15:      <decl:Extension>extension <loc><ref:Protocol>P8</ref></loc> where <ref:GenericTypeParam>Self</ref>.<ref:AssociatedType>T</ref> : <ref:module>print_synthesized_extensions</ref>.<ref:Class>D</ref> {
+// CHECK15-NEXT:   <decl:Func>public func <loc>bar()</loc></decl>
+// CHECK15-NEXT: }</decl>
+
+// CHECK15:      <decl:Extension>extension <loc><ref:Protocol>P8</ref></loc> where <ref:GenericTypeParam>Self</ref>.<ref:AssociatedType>T</ref> : <ref:module>print_synthesized_extensions</ref>.<ref:Class>E</ref> {
+// CHECK15-NEXT:   <decl:Func>public func <loc>baz()</loc></decl>
+// CHECK15-NEXT: }</decl>
+
+// For this class, make sure we mirror the extension P8 where T : D, but not
+// the extension P8 where T : E.
+public class F<T : D> {}
+extension F : P8 {}
+
+// CHECK16:      <synthesized>extension <ref:Class>F</ref> where <ref:GenericTypeParam>T</ref> : <ref:Class>D</ref> {
+// CHECK16-NEXT:   <decl:Func>public func <loc>bar()</loc></decl>
+// CHECK16-NEXT: }</synthesized>
+
+// CHECK16-NOT: <synthesized>extension <ref:Class>F</ref> where <ref:GenericTypeParam>T</ref> : <ref:Class>E</ref> {
