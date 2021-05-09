@@ -4971,8 +4971,9 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  // Accept mutable pointers in the place of immutables
-  if (toImmutablePossible(lhs, rhs))
+  // Accept mutable pointers in the place of immutables.
+  if ((lhs->isUnsafeMutableRawPointer() ||
+       lhs->isUnsafeMutablePointer()) && toImmutablePossible(lhs, rhs))
     conversionsOrFixes.push_back(
         ConversionRestrictionKind::PointerToPointer);
 
