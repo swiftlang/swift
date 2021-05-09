@@ -152,11 +152,18 @@ create_installer() {
     "${darwin_toolchain_version}" "${swift_source_dir}/utils/darwin-installer-scripts"
 
   # Notarize the toolchain installer
-  local request_output=$(xcrun altool --notarize-app --type osx \
-      --file "${darwin_toolchain_installer_package}" \
-      --primary-bundle-id "${darwin_toolchain_bundle_identifier}" \
-      -u "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
-      -p "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
+  local notarize_command=("xcrun" "altool" "--notarize-app" "--type" "osx" \
+      "--file" "${darwin_toolchain_installer_package}" \
+      "--primary-bundle-id" "${darwin_toolchain_bundle_identifier}" \
+      "-u" "${DARWIN_TOOLCHAIN_NOTARIZE_EMAIL}" \
+      "-p" "@env:DARWIN_TOOLCHAIN_NOTARIZE_PASSWORD")
+
+  if [ -n "${DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID}" ]; then
+    notarize_command=("${notarize_command[@]}" "--asc-provider" "${DARWIN_TOOLCHAIN_NOTARIZE_TEAM_ID}")
+  fi
+
+  local request_output=$(${notarize_command[@]})
+
   local request_uuid=$(echo "$request_output" | grep "RequestUUID = " | awk '{print $3}')
 
   local request_status=$(xcrun altool --notarization-info "$request_uuid" \
