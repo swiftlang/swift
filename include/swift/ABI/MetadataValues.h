@@ -1983,7 +1983,8 @@ enum class JobKind : size_t {
 
   DefaultActorInline = First_Reserved,
   DefaultActorSeparate,
-  DefaultActorOverride
+  DefaultActorOverride,
+  NullaryContinuation
 };
 
 /// The priority of a job.  Higher priorities are larger values.
