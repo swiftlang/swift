@@ -591,6 +591,15 @@ public func async<T>(
   // Create the asynchronous task future.
   let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
+  // Copy all task locals to the newly created task.
+  // We must copy them rather than point to the current task since the new task
+  // is not structured and may out-live the current task.
+  //
+  // WARNING: This MUST be done BEFORE we enqueue the task,
+  // because it acts as-if it was running inside the task and thus does not
+  // take any extra steps to synchronize the task-local operations.
+  _taskLocalsCopy(to: task)
+
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 

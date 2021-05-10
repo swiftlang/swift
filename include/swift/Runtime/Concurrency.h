@@ -467,6 +467,16 @@ void swift_task_localValuePush(const HeapObject *key,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localValuePop();
 
+/// Copy all task locals from the current context to the target task.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func _taskLocalValueGet<Key>(AsyncTask* task)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_localsCopyTo(AsyncTask* target);
+
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {
 ///      case none

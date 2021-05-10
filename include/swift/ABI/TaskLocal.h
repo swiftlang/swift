@@ -118,6 +118,8 @@ public:
         reinterpret_cast<char *>(this) + storageOffset(valueType));
     }
 
+    void copyTo(AsyncTask *task);
+
     /// Compute the offset of the storage from the base of the item.
     static size_t storageOffset(const Metadata *valueType) {
       size_t offset = sizeof(Item);
@@ -188,6 +190,18 @@ public:
     /// and `false` if the just popped value was the last one and the storage
     /// can be safely disposed of.
     bool popValue(AsyncTask *task);
+
+    /// Copy all task-local bindings to the target task.
+    ///
+    /// The new bindings allocate their own items and can out-live the current task.
+    ///
+    /// ### Optimizations
+    /// Only the most recent binding of a value is copied over, i.e. given
+    /// a key bound to `A` and then `B`, only the `B` binding will be copied.
+    /// This is safe and correct because the new task would never have a chance
+    /// to observe the `A` value, because it semantically will never observe a
+    /// "pop" of the `B` value - it was spawned from a scope where only B was observable.
+    void copyTo(AsyncTask *target);
 
     /// Destroy and deallocate all items stored by this specific task.
     ///

@@ -194,6 +194,10 @@ AsyncTask::~AsyncTask() {
   }
 
   // Release any objects potentially held as task local values.
+  //
+  // This must be called last when destroying a task - to keep stack discipline of the allocator.
+  // because it may have created some task-locals immediately upon creation,
+  // e.g. if the task is spawned with async{} and inherited some task-locals.
   Local.destroy(this);
 }
 
