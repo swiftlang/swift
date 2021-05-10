@@ -17,7 +17,7 @@ final class StringLike: Sendable, CustomStringConvertible {
   var description: String { value }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 enum TL {
 
   @TaskLocal
@@ -33,7 +33,7 @@ enum TL {
   static var clazz: ClassTaskLocal?
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 final class ClassTaskLocal: Sendable {
   init() {
     print("clazz init \(ObjectIdentifier(self))")
@@ -44,7 +44,7 @@ final class ClassTaskLocal: Sendable {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -62,7 +62,7 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func simple() async {
   printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
   await TL.$number.withValue(1) {
@@ -70,7 +70,7 @@ func simple() async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func simple_deinit() async {
   await TL.$clazz.withValue(ClassTaskLocal()) {
     // CHECK: clazz init [[C:.*]]
@@ -83,7 +83,7 @@ func simple_deinit() async {
 struct Boom: Error {
   let value: String
 }
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func simple_throw() async {
   do {
     try await TL.$clazz.withValue(ClassTaskLocal()) {
@@ -95,7 +95,7 @@ func simple_throw() async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested() async {
   printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   await TL.$string.withValue("hello") {
@@ -112,7 +112,7 @@ func nested() async {
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested_allContribute() async {
   printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   await TL.$string.withValue("one") {
@@ -129,7 +129,7 @@ func nested_allContribute() async {
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested_3_onlyTopContributes() async {
   printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   await TL.$string.withValue("one") {
@@ -146,7 +146,7 @@ func nested_3_onlyTopContributes() async {
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func withLocal_body_mustNotEscape() async {
   var something = "Nice"
   await TL.$string.withValue("xxx") {
@@ -155,7 +155,7 @@ func withLocal_body_mustNotEscape() async {
   _ = something // silence not used warning
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await simple()

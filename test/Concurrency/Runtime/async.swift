@@ -19,7 +19,7 @@ import StdlibUnittest
 
 var asyncTests = TestSuite("Async")
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 actor MyActor {
   func synchronous() { }
 
@@ -31,7 +31,7 @@ actor MyActor {
   }
 }
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(SwiftStdlib 5.5, *) {
   let actor = MyActor()
 
   asyncTests.test("Detach") {

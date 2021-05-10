@@ -19,7 +19,7 @@ actor Custom {
   var count = 0
   let simple = Simple()
 
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.5, *)
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("custom unownedExecutor")
     return simple.unownedExecutor
@@ -33,7 +33,7 @@ actor Custom {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     print("begin")
