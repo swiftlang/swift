@@ -11,13 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/ABI/TaskLocal.h"
-#include "swift/ABI/Actor.h"
-#include "swift/ABI/Task.h"
-#include "swift/ABI/Metadata.h"
+#include "../runtime/ThreadLocalStorage.h"
+#include "swift/Runtime/Atomic.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/ThreadLocal.h"
+#include "swift/ABI/TaskLocal.h"
+#include "swift/ABI/Task.h"
+#include "swift/ABI/Actor.h"
+#include "swift/ABI/Metadata.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 
 #if defined(__APPLE__)
@@ -26,32 +31,107 @@
 #include <android/log.h>
 #endif
 
+#if HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
+
 #if defined(_WIN32)
 #include <io.h>
+#include <handleapi.h>
+#include <processthreadsapi.h>
 #endif
 
 using namespace swift;
 
 // =============================================================================
+
+/// An extremely silly class which exists to make pointer
+/// default-initialization constexpr.
+template <class T> struct Pointer {
+  T *Value;
+  constexpr Pointer() : Value(nullptr) {}
+  constexpr Pointer(T *value) : Value(value) {}
+  operator T *() const { return Value; }
+  T *operator->() const { return Value; }
+};
+
+/// THIS IS RUNTIME INTERNAL AND NOT ABI.
+class FallbackTaskLocalStorage {
+  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+      Pointer<TaskLocal::Storage>,
+      Value);
+
+public:
+  static void set(TaskLocal::Storage *task) { Value.set(task); }
+  static TaskLocal::Storage *get() { return Value.get(); }
+};
+
+/// Define the thread-locals.
+SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+    Pointer<TaskLocal::Storage>,
+    FallbackTaskLocalStorage::Value);
+
 // ==== ABI --------------------------------------------------------------------
 
 SWIFT_CC(swift)
-static void swift_task_localValuePushImpl(AsyncTask *task,
-                                          const HeapObject *key,
-                                          /* +1 */ OpaqueValue *value,
-                                          const Metadata *valueType) {
-  task->localValuePush(key, value, valueType);
+static void swift_task_localValuePushImpl(const HeapObject *key,
+                                              /* +1 */ OpaqueValue *value,
+                                              const Metadata *valueType) {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    task->localValuePush(key, value, valueType);
+    return;
+  }
+
+  // no AsyncTask available so we must check the fallback
+  TaskLocal::Storage *Local = nullptr;
+  if (auto storage = FallbackTaskLocalStorage::get()) {
+    Local = storage;
+  } else {
+    void *allocation = malloc(sizeof(TaskLocal::Storage));
+    auto *freshStorage = new(allocation) TaskLocal::Storage();
+
+    FallbackTaskLocalStorage::set(freshStorage);
+    Local = freshStorage;
+  }
+
+  Local->pushValue(/*task=*/nullptr, key, value, valueType);
 }
 
 SWIFT_CC(swift)
-static OpaqueValue* swift_task_localValueGetImpl(AsyncTask *task,
-                                                 const HeapObject *key) {
-  return task->localValueGet(key);
+static OpaqueValue* swift_task_localValueGetImpl(const HeapObject *key) {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    // we're in the context of a task and can use the task's storage
+    return task->localValueGet(key);
+  }
+
+  // no AsyncTask available so we must check the fallback
+  if (auto Local = FallbackTaskLocalStorage::get()) {
+    return Local->getValue(/*task*/nullptr, key);
+  }
+
+  // no value found in task-local or fallback thread-local storage.
+  return nullptr;
 }
 
 SWIFT_CC(swift)
-static void swift_task_localValuePopImpl(AsyncTask *task) {
-  task->localValuePop();
+static void swift_task_localValuePopImpl() {
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    task->localValuePop();
+    return;
+  }
+
+  if (TaskLocal::Storage *Local = FallbackTaskLocalStorage::get()) {
+    bool hasRemainingBindings = Local->popValue(nullptr);
+    if (!hasRemainingBindings) {
+      // We clean up eagerly, it may be that this non-swift-concurrency thread
+      // never again will use task-locals, and as such we better remove the storage.
+      FallbackTaskLocalStorage::set(nullptr);
+      free(Local);
+    }
+    return;
+  }
+
+  assert(false && "Attempted to pop value but no task or thread-local storage available!");
 }
 
 // =============================================================================
@@ -179,17 +259,14 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
 
 TaskLocal::Item*
 TaskLocal::Item::createLink(AsyncTask *task,
-                        const HeapObject *key,
-                        const Metadata *valueType) {
-  assert(task);
-
+                            const HeapObject *key,
+                            const Metadata *valueType) {
   size_t amountToAllocate = Item::itemSize(valueType);
-  // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
+  void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
+                          : malloc(amountToAllocate);
+  Item *item = new (allocation) Item(key, valueType);
 
-  void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
-  Item *item = new(allocation) Item(key, valueType);
-
-  auto next = task->Local.head;
+  auto next = task ? task->Local.head : FallbackTaskLocalStorage::get()->head;
   item->next = reinterpret_cast<uintptr_t>(next) |
       static_cast<uintptr_t>(NextLinkType::IsNext);
 
@@ -205,7 +282,10 @@ void TaskLocal::Item::destroy(AsyncTask *task) {
     valueType->vw_destroy(getStoragePtr());
   }
 
-  _swift_task_dealloc_specific(task, this);
+  // if task is available, we must have used the task allocator to allocate this item,
+  // so we must deallocate it using the same. Otherwise, we must have used malloc.
+  if (task) _swift_task_dealloc_specific(task, this);
+  else free(this);
 }
 
 void TaskLocal::Storage::destroy(AsyncTask *task) {
@@ -244,11 +324,14 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
   head = item;
 }
 
-void TaskLocal::Storage::popValue(AsyncTask *task) {
+bool TaskLocal::Storage::popValue(AsyncTask *task) {
   assert(head && "attempted to pop value off empty task-local stack");
   auto old = head;
   head = head->getNext();
   old->destroy(task);
+
+  /// if pointing at not-null next item, there are remaining bindings.
+  return head != nullptr;
 }
 
 OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
