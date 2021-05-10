@@ -1240,10 +1240,11 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   auto &FEOpts = instance.getInvocation().getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   InterfaceSubContextDelegateImpl ASTDelegate(
-      ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+      ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
       ctx.ClangImporterOpts, LoaderOpts,
       /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
       FEOpts.PrebuiltModuleCachePath,
+      FEOpts.BackupModuleInterfaceDir,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(),
       RequireOSSAModules_t(instance.getSILOptions()));
@@ -1332,10 +1333,11 @@ swift::dependencies::performBatchModuleScan(
                         std::set<ModuleDependencyID>>
             allModules;
         InterfaceSubContextDelegateImpl ASTDelegate(
-            ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+            ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
             ctx.ClangImporterOpts, LoaderOpts,
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
+            FEOpts.BackupModuleInterfaceDir,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
             FEOpts.shouldTrackSystemDependencies(),
             RequireOSSAModules_t(instance.getSILOptions()));
@@ -1400,10 +1402,11 @@ swift::dependencies::performBatchModulePrescan(
                         std::set<ModuleDependencyID>>
             allModules;
         InterfaceSubContextDelegateImpl ASTDelegate(
-            ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+            ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
             ctx.ClangImporterOpts, LoaderOpts,
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
+            FEOpts.BackupModuleInterfaceDir,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
             FEOpts.shouldTrackSystemDependencies(),
             RequireOSSAModules_t(instance.getSILOptions()));

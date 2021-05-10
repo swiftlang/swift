@@ -418,6 +418,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangImporterOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
+      FEOpts.BackupModuleInterfaceDir,
       Invocation.getModuleName(), InputPath, Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
       FEOpts.shouldTrackSystemDependencies(), LoaderOpts,

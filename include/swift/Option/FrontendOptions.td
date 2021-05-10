@@ -695,6 +695,13 @@ def prebuilt_module_cache_path_EQ :
   Joined<["-"], "prebuilt-module-cache-path=">,
   Alias<prebuilt_module_cache_path>;
 
+def backup_module_interface_path :
+  Separate<["-"], "backup-module-interface-path">,
+  HelpText<"Directory of module interfaces as backups to those from SDKs">;
+def backup_module_interface_path_EQ :
+  Joined<["-"], "backup-module-interface-path=">,
+  Alias<backup_module_interface_path>;
+
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
    HelpText<"Force public linkage for private symbols. Used by LLDB.">;
 
