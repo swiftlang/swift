@@ -65,7 +65,7 @@ namespace swift {
 //   itself thread-local, and no internal support is required.
 //
 //   Note that this includes platforms that set
-//   SWIFT_STDLIB_SINGLE_THREADED_RUNTIME, for whhch
+//   SWIFT_STDLIB_SINGLE_THREADED_RUNTIME, for which
 //   SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL is empty;
 //   thread-local declarations then create an ordinary global.
 //

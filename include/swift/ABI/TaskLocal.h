@@ -184,7 +184,10 @@ public:
 
     OpaqueValue* getValue(AsyncTask *task, const HeapObject *key);
 
-    void popValue(AsyncTask *task);
+    /// Returns `true` of more bindings remain in this storage,
+    /// and `false` if the just popped value was the last one and the storage
+    /// can be safely disposed of.
+    bool popValue(AsyncTask *task);
 
     /// Destroy and deallocate all items stored by this specific task.
     ///
