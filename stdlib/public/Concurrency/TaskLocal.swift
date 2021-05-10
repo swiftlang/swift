@@ -212,20 +212,26 @@ public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValuePush")
-public func _taskLocalValuePush<Value>(
+func _taskLocalValuePush<Value>(
   key: Builtin.RawPointer/*: Key*/,
   value: __owned Value
 ) // where Key: TaskLocal
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValuePop")
-public func _taskLocalValuePop()
+func _taskLocalValuePop()
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValueGet")
-public func _taskLocalValueGet(
+func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/
 ) -> UnsafeMutableRawPointer? // where Key: TaskLocal
+
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_task_localsCopyTo")
+func _taskLocalsCopy(
+  to target: Builtin.NativeObject
+)
 
 // ==== Checks -----------------------------------------------------------------
 

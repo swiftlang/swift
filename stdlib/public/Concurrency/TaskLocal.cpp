@@ -24,6 +24,7 @@
 #include "swift/ABI/Metadata.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
+#include <set>
 
 #if defined(__APPLE__)
 #include <asl.h>
@@ -134,6 +135,22 @@ static void swift_task_localValuePopImpl() {
   assert(false && "Attempted to pop value but no task or thread-local storage available!");
 }
 
+SWIFT_CC(swift)
+static void swift_task_localsCopyToImpl(AsyncTask *task) {
+  TaskLocal::Storage *Local = nullptr;
+
+  if (AsyncTask *task = swift_task_getCurrent()) {
+    Local = &task->Local;
+  } else if (auto *storage = FallbackTaskLocalStorage::get()) {
+    Local = storage;
+  } else {
+    // bail out, there are no values to copy
+    return;
+  }
+
+  Local->copyTo(task);
+}
+
 // =============================================================================
 // ==== Initialization ---------------------------------------------------------
 
@@ -184,6 +201,38 @@ TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
 
   return item;
 }
+
+TaskLocal::Item*
+TaskLocal::Item::createLink(AsyncTask *task,
+                            const HeapObject *key,
+                            const Metadata *valueType) {
+  size_t amountToAllocate = Item::itemSize(valueType);
+  void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
+                          : malloc(amountToAllocate);
+  Item *item = new (allocation) Item(key, valueType);
+
+  auto next = task ? task->Local.head : FallbackTaskLocalStorage::get()->head;
+  item->next = reinterpret_cast<uintptr_t>(next) |
+      static_cast<uintptr_t>(NextLinkType::IsNext);
+
+  return item;
+}
+
+
+void TaskLocal::Item::copyTo(AsyncTask *target) {
+  assert(target && "TaskLocal item attempt to copy to null target task!");
+
+  auto item = Item::createLink(target, this->key, this->valueType);
+  valueType->vw_initializeWithTake(item->getStoragePtr(), this->getStoragePtr());
+
+  /// A `copyTo` may ONLY be invoked BEFORE the task is actually scheduled,
+  /// so right now we can safely copy the value into the task without additional
+  /// synchronization.
+  target->Local.head = item;
+}
+
+// =============================================================================
+// ==== checks -----------------------------------------------------------------
 
 SWIFT_CC(swift)
 static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
@@ -257,22 +306,6 @@ static void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroupImpl(
   abort();
 }
 
-TaskLocal::Item*
-TaskLocal::Item::createLink(AsyncTask *task,
-                            const HeapObject *key,
-                            const Metadata *valueType) {
-  size_t amountToAllocate = Item::itemSize(valueType);
-  void *allocation = task ? _swift_task_alloc_specific(task, amountToAllocate)
-                          : malloc(amountToAllocate);
-  Item *item = new (allocation) Item(key, valueType);
-
-  auto next = task ? task->Local.head : FallbackTaskLocalStorage::get()->head;
-  item->next = reinterpret_cast<uintptr_t>(next) |
-      static_cast<uintptr_t>(NextLinkType::IsNext);
-
-  return item;
-}
-
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
 
@@ -311,7 +344,7 @@ void TaskLocal::Storage::destroy(AsyncTask *task) {
 }
 
 // =============================================================================
-// ==== push / pop / get -------------------------------------------------------
+// ==== Task Local Storage: operations -----------------------------------------
 
 void TaskLocal::Storage::pushValue(AsyncTask *task,
                                    const HeapObject *key,
@@ -348,6 +381,33 @@ OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
   }
 
   return nullptr;
+}
+
+
+void TaskLocal::Storage::copyTo(AsyncTask *target) {
+  assert(target && "task must not be null when copying values into it");
+  assert(!(target->Local.head) &&
+      "Task must not have any task-local values bound before copying into it");
+
+  AsyncTask *task = swift_task_getCurrent();
+
+  // Set of keys for which we already have copied to the new task.
+  // We only ever need to copy the *first* encounter of any given key,
+  // because it is the most "specific"/"recent" binding and any other binding
+  // of a key does not matter for the target task as it will never be able to
+  // observe it.
+  std::set<const HeapObject*> copied = {};
+
+  auto item = head;
+  while (item) {
+    // we only have to copy an item if it is the most recent binding of a key.
+    // i.e. if we've already seen an item for this key, we can skip it.
+    if (copied.emplace(item->key).second) {
+      item->copyTo(target);
+    }
+
+    item = item->getNext();
+  }
 }
 
 #define OVERRIDE_TASK_LOCAL COMPATIBILITY_OVERRIDE
