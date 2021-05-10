@@ -2203,17 +2203,9 @@ public:
 
 class IgnoreInvalidResultBuilderBody : public ConstraintFix {
 protected:
-  enum class ErrorInPhase {
-    PreCheck,
-    ConstraintGeneration,
-  };
-
-  ErrorInPhase Phase;
-
-  IgnoreInvalidResultBuilderBody(ConstraintSystem &cs, ErrorInPhase phase,
-                                   ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::IgnoreInvalidResultBuilderBody, locator),
-        Phase(phase) {}
+  IgnoreInvalidResultBuilderBody(ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreInvalidResultBuilderBody, locator) {}
 
 public:
   std::string getName() const override {
@@ -2226,19 +2218,8 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static IgnoreInvalidResultBuilderBody *
-  duringPreCheck(ConstraintSystem &cs, ConstraintLocator *locator) {
-    return create(cs, ErrorInPhase::PreCheck, locator);
-  }
-
-  static IgnoreInvalidResultBuilderBody *
-  duringConstraintGeneration(ConstraintSystem &cs, ConstraintLocator *locator) {
-    return create(cs, ErrorInPhase::ConstraintGeneration, locator);
-  }
-
-private:
-  static IgnoreInvalidResultBuilderBody *
-  create(ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator);
+  static IgnoreInvalidResultBuilderBody *create(ConstraintSystem &cs,
+                                                ConstraintLocator *locator);
 };
 
 class IgnoreResultBuilderWithReturnStmts final
@@ -2247,8 +2228,7 @@ class IgnoreResultBuilderWithReturnStmts final
 
   IgnoreResultBuilderWithReturnStmts(ConstraintSystem &cs, Type builderTy,
                                      ConstraintLocator *locator)
-      : IgnoreInvalidResultBuilderBody(cs, ErrorInPhase::PreCheck, locator),
-        BuilderType(builderTy) {}
+      : IgnoreInvalidResultBuilderBody(cs, locator), BuilderType(builderTy) {}
 
 public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
