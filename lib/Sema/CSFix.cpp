@@ -1896,6 +1896,26 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
           if (memberDecl->isInstanceMember())
             continue;
 
+          // Disable this warning for ambiguities related to a
+          // static member lookup in generic context because it's
+          // possible to declare a member with the same name on
+          // a concrete type and in an extension of a protocol
+          // that type conforms to e.g.:
+          //
+          // struct S : P { static var test: S { ... }
+          //
+          // extension P where Self == S { static var test: { ... } }
+          //
+          // And use that in an optional context e.g. passing `.test`
+          // to a parameter of expecting `S?`.
+          if (auto *extension =
+                  dyn_cast<ExtensionDecl>(memberDecl->getDeclContext())) {
+            if (extension->getSelfProtocolDecl()) {
+              allOptionalBase = false;
+              break;
+            }
+          }
+
           allOptionalBase &= bool(choice.getBaseType()
                                       ->getMetatypeInstanceType()
                                       ->getOptionalObjectType());
