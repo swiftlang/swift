@@ -4346,28 +4346,31 @@ public:
       builder.addRightBracket();
     });
 
-    auto floatType = context.getFloatType();
-    addFromProto(LK::ColorLiteral, [&](Builder &builder) {
-      builder.addBaseName("#colorLiteral");
-      builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("red"), floatType);
-      builder.addComma();
-      builder.addCallParameter(context.getIdentifier("green"), floatType);
-      builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType);
-      builder.addComma();
-      builder.addCallParameter(context.getIdentifier("alpha"), floatType);
-      builder.addRightParen();
-    });
+    // Optionally add object literals.
+    if (CompletionContext->includeObjectLiterals()) {
+      auto floatType = context.getFloatType();
+      addFromProto(LK::ColorLiteral, [&](Builder &builder) {
+        builder.addBaseName("#colorLiteral");
+        builder.addLeftParen();
+        builder.addCallParameter(context.getIdentifier("red"), floatType);
+        builder.addComma();
+        builder.addCallParameter(context.getIdentifier("green"), floatType);
+        builder.addComma();
+        builder.addCallParameter(context.getIdentifier("blue"), floatType);
+        builder.addComma();
+        builder.addCallParameter(context.getIdentifier("alpha"), floatType);
+        builder.addRightParen();
+      });
 
-    auto stringType = context.getStringType();
-    addFromProto(LK::ImageLiteral, [&](Builder &builder) {
-      builder.addBaseName("#imageLiteral");
-      builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType);
-      builder.addRightParen();
-    });
+      auto stringType = context.getStringType();
+      addFromProto(LK::ImageLiteral, [&](Builder &builder) {
+        builder.addBaseName("#imageLiteral");
+        builder.addLeftParen();
+        builder.addCallParameter(context.getIdentifier("resourceName"),
+                                 stringType);
+        builder.addRightParen();
+      });
+    }
 
     // Add tuple completion (item, item).
     {

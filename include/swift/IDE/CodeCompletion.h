@@ -867,6 +867,9 @@ struct CodeCompletionResultSink {
   /// Whether to annotate the results with XML.
   bool annotateResult = false;
 
+  /// Whether to emit object literals if desired.
+  bool includeObjectLiterals = true;
+
   std::vector<CodeCompletionResult *> Results;
 
   /// A single-element cache for module names stored in Allocator, keyed by a
@@ -937,6 +940,11 @@ public:
 
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
   bool getAnnotateResult() { return CurrentResults.annotateResult; }
+
+  void setIncludeObjectLiterals(bool flag) {
+    CurrentResults.includeObjectLiterals = flag;
+  }
+  bool includeObjectLiterals() { return CurrentResults.includeObjectLiterals; }
 
   /// Allocate a string owned by the code completion context.
   StringRef copyString(StringRef Str);
