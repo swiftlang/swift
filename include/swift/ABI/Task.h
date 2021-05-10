@@ -166,6 +166,25 @@ public:
   }
 };
 
+class NullaryContinuationJob : public Job {
+
+private:
+  AsyncTask* Task;
+  AsyncTask* Continuation;
+
+public:
+  NullaryContinuationJob(AsyncTask *task, JobPriority priority, AsyncTask *continuation)
+    : Job({JobKind::NullaryContinuation, priority}, &process),
+      Task(task), Continuation(continuation) {}
+
+  SWIFT_CC(swiftasync)
+  static void process(Job *job);
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::NullaryContinuation;
+  }
+};
+
 /// An asynchronous task.  Tasks are the analogue of threads for
 /// asynchronous functions: that is, they are a persistent identity
 /// for the overall async computation.
@@ -587,6 +606,10 @@ public:
 
   /// The executor that should be resumed to.
   ExecutorRef ResumeToExecutor;
+
+  void setErrorResult(SwiftError *error) {
+    ErrorResult = error;
+  }
 
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::Continuation;

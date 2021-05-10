@@ -146,6 +146,11 @@ OVERRIDE_TASK(task_removeCancellationHandler, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (CancellationNotificationStatusRecord *record), (record))
 
+OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (size_t priority,
+               AsyncTask *continuation), (priority, continuation))
+
 OVERRIDE_TASK(task_asyncMainDrainQueue, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               , )
