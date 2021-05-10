@@ -3,7 +3,7 @@
 
 import MeowActor
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @MeowActor func doMeow() {}
 
 // RUN: %target-swift-frontend -enable-experimental-concurrency -enable-library-evolution -emit-module -o %t/MeowActor.swiftmodule %S/Inputs/MeowActor.swift
@@ -14,7 +14,7 @@ import MeowActor
 // RUN: %target-swift-frontend -enable-experimental-concurrency -emit-silgen %s -I %t | %FileCheck --check-prefix CHECK-FRAGILE %s
 // CHECK-FRAGILE: metatype $@thin MeowActor.Type
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func someFunc() async {
   await doMeow()
 }

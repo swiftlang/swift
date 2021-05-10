@@ -7,7 +7,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func printWaitPrint(_ int: Int) async -> Int {
   print("start, cancelled:\(Task.isCancelled), id:\(int)")
   while !Task.isCancelled {
@@ -17,7 +17,7 @@ func printWaitPrint(_ int: Int) async -> Int {
   return int
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test() async {
   let h = detach {
     await printWaitPrint(0)
@@ -68,7 +68,7 @@ func test() async {
   print("exit")
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test()

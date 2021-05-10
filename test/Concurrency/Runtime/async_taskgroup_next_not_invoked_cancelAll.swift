@@ -10,7 +10,7 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_skipCallingNext_butInvokeCancelAll() async {
   let numbers = [1, 1]
 
@@ -47,7 +47,7 @@ func test_skipCallingNext_butInvokeCancelAll() async {
   assert(result == 0)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_skipCallingNext_butInvokeCancelAll()
