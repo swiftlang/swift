@@ -2828,7 +2828,11 @@ static void fillDictionaryForDiagnosticInfoBase(
     Elem.set(KeyID, Info.ID);
 
   if (!Info.Categories.empty()) {
-    SmallVector<sourcekitd_uid_t, 1> CategoryUIDs;
+    SmallVector<SourceKit::UIdent, 1> CategoryUIDs;
+
+    static UIdent UIDKindDiagDeprecation(KindDiagDeprecation.str());
+    static UIdent UIDKindDiagNoUsage(KindDiagNoUsage.str());
+
     for (auto C : Info.Categories) {
       switch (C) {
       case DiagnosticCategory::Deprecation:
