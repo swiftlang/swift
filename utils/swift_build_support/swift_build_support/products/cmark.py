@@ -13,6 +13,7 @@
 from build_swift.build_swift.wrappers import xcrun
 
 from . import cmake_product
+from . import earlyswiftdriver
 
 
 class CMark(cmake_product.CMakeProduct):
@@ -32,10 +33,11 @@ class CMark(cmake_product.CMakeProduct):
         """
         return True
 
-    # This is the root of the build-graph, so it doesn't have any dependencies.
+    # EarlySwiftDriver is the root of the graph, and is the only dependency of
+    # this product.
     @classmethod
     def get_dependencies(cls):
-        return []
+        return [earlyswiftdriver.EarlySwiftDriver]
 
     def should_build(self, host_target):
         """should_build() -> Bool

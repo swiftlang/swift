@@ -8,12 +8,18 @@
 #
 # CHECK: -- Build Graph Inference --
 # CHECK: Initial Product List:
+# CHECK:     earlyswiftdriver
 # CHECK:     llvm
 # CHECK:     swift
 # CHECK: Final Build Order:
+# CHECK:     earlyswiftdriver
 # CHECK:     cmark
 # CHECK:     llvm
 # CHECK:     swift
+
+# Ensure early SwiftDriver is built first
+#
+# CHECK: --- Building earlyswiftdriver ---
 
 # Build and install the SwiftPM dependencies first.
 #
