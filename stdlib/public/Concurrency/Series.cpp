@@ -1,4 +1,4 @@
-//===--- YieldingContinuation.cpp - Multi-resume locking interface --------===//
+//===--- series.cpp - Multi-resume locking interface ----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,24 +15,25 @@
 namespace swift {
 // return the size in words for the given mutex primitive
 extern "C"
-size_t swift_yielding_continuation_lock_size() {
+size_t _swift_series_lock_size() {
   size_t words = sizeof(MutexHandle) / sizeof(void *);
   if (words < 1) { return 1; }
   return words;
 }
 
 extern "C"
-void swift_yielding_continuation_lock_init(MutexHandle &lock) {
-  lock = MutexPlatformHelper::staticInit();
+void _swift_series_lock_init(MutexHandle &lock) {
+  MutexPlatformHelper::init(lock);
 }
 
 extern "C"
-void swift_yielding_continuation_lock_lock(MutexHandle &lock) {
+void _swift_series_lock_lock(MutexHandle &lock) {
   MutexPlatformHelper::lock(lock);
 }
 
 extern "C"
-void swift_yielding_continuation_lock_unlock(MutexHandle &lock) {
+void _swift_series_lock_unlock(MutexHandle &lock) {
   MutexPlatformHelper::unlock(lock);
 }
+
 };
