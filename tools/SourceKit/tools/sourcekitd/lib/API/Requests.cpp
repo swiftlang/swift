@@ -2827,8 +2827,20 @@ static void fillDictionaryForDiagnosticInfoBase(
   if (!Info.ID.empty())
     Elem.set(KeyID, Info.ID);
 
-  if (!Info.Category.empty())
-    Elem.set(KeyCategory, Info.Category);
+  if (!Info.Categories.empty()) {
+    SmallVector<sourcekitd_uid_t, 1> CategoryUIDs;
+    for (auto C : Info.Categories) {
+      switch (C) {
+      case DiagnosticCategory::Deprecation:
+        CategoryUIDs.push_back(UIDKindDiagDeprecation);
+        break;
+      case DiagnosticCategory::NoUsage:
+        CategoryUIDs.push_back(UIDKindDiagNoUsage);
+        break;
+      }
+    }
+    Elem.set(KeyCategories, CategoryUIDs);
+  }
 
   Elem.set(KeyDescription, Info.Description);
   if (Info.Line != 0) {

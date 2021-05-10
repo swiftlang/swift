@@ -101,7 +101,12 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
   DiagnosticEntryInfo SKInfo;
 
   SKInfo.ID = DiagnosticEngine::diagnosticIDStringFor(Info.ID).str();
-  SKInfo.Category = Info.Category.str();
+
+  if (Info.Category == "deprecation") {
+    SKInfo.Categories.push_back(DiagnosticCategory::Deprecation);
+  } else if (Info.Category == "no-usage") {
+    SKInfo.Categories.push_back(DiagnosticCategory::NoUsage);
+  }
 
   // Actually substitute the diagnostic arguments into the diagnostic text.
   llvm::SmallString<256> Text;

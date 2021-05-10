@@ -193,6 +193,11 @@ enum class DiagnosticSeverityKind {
   Error
 };
 
+enum class DiagnosticCategory {
+  Deprecation,
+  NoUsage
+};
+
 struct DiagnosticEntryInfoBase {
   struct Fixit {
     unsigned Offset;
@@ -201,12 +206,12 @@ struct DiagnosticEntryInfoBase {
   };
 
   std::string ID;
-  std::string Category;
   std::string Description;
   unsigned Offset = 0;
   unsigned Line = 0;
   unsigned Column = 0;
   std::string Filename;
+  SmallVector<DiagnosticCategory, 1> Categories;
   SmallVector<std::pair<unsigned, unsigned>, 2> Ranges;
   SmallVector<Fixit, 2> Fixits;
   SmallVector<std::string, 1> EducationalNotePaths;
