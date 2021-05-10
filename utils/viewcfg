@@ -140,7 +140,7 @@ def main():
             if adj_name not in block_map:
                 new_blocks[adj_name] = Block(adj_name, None)
 
-    block_map = dict(block_map.items() + new_blocks.items())
+    block_map.update(new_blocks.items())
 
     # Add missing edges if we didn't see a successor in the terminator
     # but the block is mentioned in the pred list of the successor.
