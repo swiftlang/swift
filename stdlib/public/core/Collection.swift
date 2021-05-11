@@ -689,13 +689,6 @@ public protocol Collection: Sequence {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
-
-  /// A Boolean value indicating whether the collection has a fast `count`
-  /// operation.
-  ///
-  /// - Complexity: O(1)
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  var _hasFastCount: Bool { get }
 }
 
 /// Default implementation for forward collections.
@@ -970,22 +963,6 @@ extension Collection {
   public func randomElement() -> Element? {
     var g = SystemRandomNumberGenerator()
     return randomElement(using: &g)
-  }
-
-  /// A Boolean value indicating whether the collection has a fast `count`
-  /// operation.
-  ///
-  /// - Complexity: O(1)
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  @inlinable
-  public var _hasFastCount: Bool { 
-    return false
-  }
-
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  @inlinable
-  internal var _fastCount: Int? {
-    return _hasFastCount ? count : nil
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.

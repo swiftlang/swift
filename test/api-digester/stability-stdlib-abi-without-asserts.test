@@ -56,8 +56,6 @@ Struct EnumeratedSequence has added a conformance to an existing protocol LazySe
 Struct EnumeratedSequence has added a conformance to an existing protocol RandomAccessCollection
 Struct Zip2Sequence has added a conformance to an existing protocol BidirectionalCollection
 Struct Zip2Sequence has added a conformance to an existing protocol Collection
-Struct Zip2Sequence has added a conformance to an existing protocol RandomAccessCollection
-Var Collection._hasFastCount has been added as a protocol requirement
 Struct DiscontiguousSlice has been removed
 Struct RangeSet has been removed
 Subscript Collection.subscript(_:) has been removed

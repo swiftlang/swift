@@ -1183,7 +1183,7 @@ SequenceTypeTests.test("zip/RandomAccessCollection") {
       elements: test.other.map(OpaqueValue.init))
     var result = zip(s, other)
     expectType(
-      Zip2Sequence<
+      Zip2RandomAccessCollection<
         MinimalRandomAccessCollection<OpaqueValue<Int>>,
         MinimalRandomAccessCollection<OpaqueValue<Int32>>
       >.self,

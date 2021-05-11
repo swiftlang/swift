@@ -264,16 +264,6 @@ extension RandomAccessCollection {
     }
     return index(i, offsetBy: distance)
   }
-
-  /// A Boolean value indicating whether the collection has a fast `count`
-  /// operation.
-  ///
-  /// - Complexity: O(1)
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-  @inlinable
-  public var _hasFastCount: Bool { 
-    return true
-  }
 }
 
 // Provides an alternative default associated type witness for Indices
