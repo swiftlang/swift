@@ -4367,6 +4367,11 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
     return AsyncHandlerParamDesc(AsyncHandlerDesc::get(Param, ignoreName),
                                  Index);
   }
+
+  bool operator==(const AsyncHandlerParamDesc &Other) const {
+    return Handler == Other.Handler && Type == Other.Type &&
+           HasError == Other.HasError && Index == Other.Index;
+  }
 };
 
 enum class ConditionType { INVALID, NIL, NOT_NIL };
@@ -4944,6 +4949,7 @@ public:
       OS << "await ";
       addCallToAsyncMethod(FD, TopHandler);
     });
+    OS << "\n";
     OS << tok::r_brace << "\n"; // end 'async'
     OS << tok::r_brace << "\n"; // end function body
     return true;
@@ -5292,6 +5298,22 @@ private:
       return;
     }
     if (auto CallbackDecl = getReferencedDecl(CallbackArg)) {
+      if (CallbackDecl == TopHandler.getHandler()) {
+        // We are refactoring the function that declared the completion handler
+        // that would be called here. We can't call the completion handler
+        // anymore because it will be removed. But since the function that
+        // declared it is being refactored to async, we can just return the
+        // values.
+        if (!HandlerDesc.willAsyncReturnVoid()) {
+          OS << tok::kw_return << " ";
+        }
+        addAwaitCall(CE, ArgList.ref(), ClassifiedBlock(), {}, HandlerDesc,
+                     /*AddDeclarations=*/false);
+        return;
+      }
+      // We are not removing the completion handler, so we can call it once the
+      // async function returns.
+
       // The completion handler that is called as part of the \p CE call.
       // This will be called once the async function returns.
       auto CompletionHandler = AsyncHandlerDesc::get(CallbackDecl,
@@ -5448,7 +5470,7 @@ private:
       OS << "\n";
       OS << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n";
       addCallToCompletionHandler(/*HasResult=*/false, HandlerDesc, HandlerName);
-      OS << "\n" << tok::r_brace << "\n"; // end catch
+      OS << "\n" << tok::r_brace; // end catch
     } else {
       if (!HandlerDesc.willAsyncReturnVoid()) {
         OS << tok::kw_let << " result";
@@ -5458,7 +5480,6 @@ private:
       AddAwaitCall();
       OS << "\n";
       addCallToCompletionHandler(/*HasResult=*/true, HandlerDesc, HandlerName);
-      OS << "\n";
     }
   }
 
