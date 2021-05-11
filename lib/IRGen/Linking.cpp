@@ -50,6 +50,12 @@ const IRLinkage IRLinkage::Internal = {
   llvm::GlobalValue::DefaultStorageClass,
 };
 
+const IRLinkage IRLinkage::ExternalCommon = {
+  llvm::GlobalValue::CommonLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLExportStorageClass,
+};
+
 const IRLinkage IRLinkage::ExternalImport = {
   llvm::GlobalValue::ExternalLinkage,
   llvm::GlobalValue::DefaultVisibility,

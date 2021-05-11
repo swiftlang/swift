@@ -40,12 +40,8 @@ import someModule
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
 // NO-FORCE-LOAD-NOT -lmodule
 // NO-FORCE-LOAD-NOT -lmagic
-// FORCE-LOAD: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$_module"() {{(#[0-9]+)?( comdat)?}} {
-// FORCE-LOAD:   ret void
-// FORCE-LOAD: }
-// FORCE-LOAD-HEX: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$306d6f64756c65"() {{(#[0-9]+)?( comdat)?}} {
-// FORCE-LOAD-HEX:   ret void
-// FORCE-LOAD-HEX: }
+// FORCE-LOAD: @"_swift_FORCE_LOAD_$_module"
+// FORCE-LOAD-HEX: @"_swift_FORCE_LOAD_$306d6f64756c65"
 
 // NO-FORCE-LOAD-CLIENT-NOT: FORCE_LOAD
 // FORCE-LOAD-CLIENT: @"_swift_FORCE_LOAD_$_module_$_autolinking" = weak_odr hidden constant void ()* @"_swift_FORCE_LOAD_$_module"
