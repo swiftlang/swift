@@ -30,6 +30,7 @@ import Swift
 /// be used as if it were asynchronous:
 ///
 ///     struct Counter : AsyncSequence {
+///       typealias Element = Int
 ///       let howHigh: Int
 ///
 ///       struct AsyncIterator : AsyncIteratorProtocol {

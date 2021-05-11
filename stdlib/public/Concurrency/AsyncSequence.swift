@@ -36,9 +36,10 @@ import Swift
 /// how you access them. Along with defining the type of values as an associated
 /// type called `Element`, the `AsyncSequence` defines a `makeAsyncIterator()`
 /// method. This returns an instance of type `AsyncIterator`. Like the standard
-/// `IteratorProtocol`, the `AsyncIterator` defines a single `next()` method
-/// to produce elements. The difference is that the `AsyncIterator` defines its
-/// `next()` method as `async`, which a caller to `await` the next value.
+/// `IteratorProtocol`, the `AsyncIteratorProtocol` defines a single `next()`
+/// method to produce elements. The difference is that the `AsyncIterator`
+/// defines its `next()` method as `async`, which a caller to `await` the next
+/// value.
 ///
 /// `AsyncSequence` also defines functions that allow you to perform common
 /// processing of the elements you receive, modeled on the operations provided
@@ -80,6 +81,38 @@ public protocol AsyncSequence {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Returns the result of combining the elements of the asynchronous sequence
+  /// using the given closure.
+  ///
+  /// Use the reduce(_:_:) method to produce a single value from the elements of
+  /// an entire sequence. For example, you can use this method on an sequence of
+  /// numbers to find their sum or product.
+  ///
+  /// The nextPartialResult closure executes sequentially with an accumulating
+  /// value initialized to `initialResult` and each element of the sequence.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `4`. The `reduce(_:_:)` method sums the values
+  /// received from the asynchronous sequence.
+  ///
+  ///     let sum = await Counter(howHigh: 4)
+  ///         .reduce(0) {
+  ///             $0 + $1
+  ///         }
+  ///     print (sum)
+  ///     // Prints: 10
+  ///
+  ///
+  /// - Parameters:
+  ///   - initialResult: The value to use as the initial accumulating value.
+  ///     The `nextPartialResult` closure receives `initialResult` the first
+  ///     time the closure executes.
+  ///   - nextPartialResult: A closure that combines an accumulating value and
+  ///     an element of the asynchronous sequence into a new accumulating value,
+  ///     for use in the next call of the `nextPartialResult` closure or
+  ///     returned to the caller.
+  /// - Returns: The final accumulated value. If the sequence has no elements,
+  ///   the result is `initialResult`.
   @inlinable
   public func reduce<Result>(
     _ initialResult: Result,
@@ -94,6 +127,29 @@ extension AsyncSequence {
     return accumulator
   }
 
+  /// Returns the result of combining the elements of the asynchronous sequence
+  /// using the given closure, given a mutable initial value.
+  ///
+  /// Use the reduce(into:_:) method to produce a single value from the elements
+  /// of an entire sequence. For example, you can use this method on an sequence
+  /// of numbers to find their sum or product.
+  ///
+  /// The nextPartialResult closure executes sequentially with an accumulating
+  /// value initialized to `initialResult` and each element of the sequence.
+  ///
+  /// Prever this method over `reduce(_:_:)` for efficiency when the result is
+  /// a copy-on-write type, for example an Array or a Dictionary.
+  ///
+  /// - Parameters:
+  ///   - initialResult: The value to use as the initial accumulating value.
+  ///     The `nextPartialResult` closure receives `initialResult` the first
+  ///     time the closure executes.
+  ///   - nextPartialResult: A closure that combines an accumulating value and
+  ///     an element of the asynchronous sequence into a new accumulating value,
+  ///     for use in the next call of the `nextPartialResult` closure or
+  ///     returned to the caller.
+  /// - Returns: The final accumulated value. If the sequence has no elements,
+  ///   the result is `initialResult`.
   @inlinable
   public func reduce<Result>(
     into initialResult: __owned Result,
@@ -126,6 +182,30 @@ func _contains<Source: AsyncSequence>(
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Returns a Boolean value indicating whether the asynchronous sequence
+  /// contains an element that satisfies the given predicate.
+  ///
+  /// You can use the predicate to check for an element of a type that doesn’t
+  /// conform to the `Equatable` protocol, or to find an element that satisfies
+  /// a general condition.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `contains(_:)` method checks to see whether
+  /// the sequence produces a value divisible by `3`:
+  ///
+  ///     let containsDivisibleByThree = await Counter(howHigh: 10)
+  ///         .contains(where: { $0 % 3 == 0 } )
+  ///     print (containsDivisibleByThree)
+  ///     // Prints: true
+  ///
+  /// The predicate executes each time the asynchronous sequence produces an
+  /// element, until either the predicate finds a match or the sequence ends.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the asynchronous
+  ///   sequence as its argument and returns a Boolean value that indicates
+  ///   whether the passed element represents a match.
+  /// - Returns: `true` if the sequence contains an element that satisfies
+  ///   predicate; otherwise, `false`.
   @inlinable
   public func contains(
     where predicate: (Element) async throws -> Bool
@@ -143,6 +223,20 @@ extension AsyncSequence {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence where Element: Equatable {
+  /// Returns a Boolean value indicating whether the asynchronous sequence
+  /// contains the given element.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `contains(_:)` method checks to see whether
+  /// the sequence produces the value `5`:
+  ///
+  ///     let containsFive = await Counter(howHigh: 10)
+  ///         .contains(5)
+  ///     print (containsFive)
+  ///
+  /// - Parameter search: The element to find in the asynchronous sequence.
+  /// - Returns: `true` if the method found the element in the asynchronous
+  ///   sequence; otherwise, `false`.
   @inlinable
   public func contains(_ search: Element) async rethrows -> Bool {
     for try await element in self {
