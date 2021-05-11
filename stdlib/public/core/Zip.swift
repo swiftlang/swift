@@ -450,14 +450,15 @@ extension Zip2RandomAccessCollection: RandomAccessCollection {
     limitedBy limit: Index
   ) -> Index? {
     let (base1, base2) = distance >= 0 ? (i.base1, i.base2) : _unpack(i)
-    guard let newBase1 = _base1.index(
-            base1,
-            offsetBy: distance,
-            limitedBy: limit.base1),
-          let newBase2 = _base2.index(
-            base2,
-            offsetBy: distance,
-            limitedBy: limit.base2)
+    guard 
+      let newBase1 = _base1.index(
+        base1,
+        offsetBy: distance,
+        limitedBy: limit.base1),
+      let newBase2 = _base2.index(
+        base2,
+        offsetBy: distance,
+        limitedBy: limit.base2)
     else { return nil }
     return _pack(newBase1, newBase2)
   }
