@@ -138,7 +138,7 @@ extension AsyncThrowingStream.Continuation {
   }
 
   /// Resume the task awaiting the next iteration point by having it return
-  /// nomally from its suspension point or buffer the value if no awaiting
+  /// normally from its suspension point or buffer the value if no awaiting
   /// next iteration is active where the `Element` is `Void`.
   ///
   /// This can be called more than once and returns to the caller immediately
