@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingStream<Element> {
   public struct Continuation: Sendable {
     public enum Termination {
@@ -20,7 +20,7 @@ public struct AsyncThrowingStream<Element> {
       case cancelled
     }
 
-    let storage: _AsyncStreamBufferedStorage<Element, Error>
+    let storage: _Storage
 
     /// Resume the task awaiting the next iteration point by having it return
     /// nomally from its suspension point or buffer the value if no awaiting
@@ -44,11 +44,7 @@ public struct AsyncThrowingStream<Element> {
     /// AsyncSequence; which claims that all values past a terminal state are
     /// nil.
     public func finish(throwing error: __owned Error? = nil) {
-      if let failure = error {
-        storage.yield(throwing: failure)
-      } else {
-        storage.yield(nil)
-      }
+      storage.finish(throwing: error)
     }
 
     /// A callback to invoke when iteration of a AsyncThrowingStream is cancelled.
@@ -92,13 +88,13 @@ public struct AsyncThrowingStream<Element> {
     maxBufferedElements limit: Int = .max,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _AsyncStreamBufferedStorage<Element, Error> = .create(limit: limit)
+    let storage: _Storage = .create(limit: limit)
     produce = storage.next
     build(Continuation(storage: storage))
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating a AsyncThrowingStream.
   ///
@@ -120,7 +116,7 @@ extension AsyncThrowingStream: AsyncSequence {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncThrowingStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// nomally from its suspension point or buffer the value if no awaiting
@@ -137,7 +133,7 @@ extension AsyncThrowingStream.Continuation {
       case .success(let val):
         storage.yield(val)
       case .failure(let err):
-        storage.yield(throwing: err)
+        storage.finish(throwing: err)
     }
   }
 
@@ -151,5 +147,3 @@ extension AsyncThrowingStream.Continuation {
     storage.yield(())
   }
 }
-
-

@@ -76,6 +76,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncStream.swift
   AsyncThrowingStream.swift
   AsyncStream.cpp
+  Deque.swift
   ${swift_concurrency_objc_sources}
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc

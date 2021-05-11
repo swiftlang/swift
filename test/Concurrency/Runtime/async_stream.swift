@@ -335,7 +335,7 @@ var tests = TestSuite("AsyncStream")
 
         func scopedLifetime(_ expectation: Expectation) {
           let series = AsyncStream(String.self) { continuation in
-            continuation.onTermination = { _ in expectation.fulfilled = true }
+            continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
           }
         }
         
@@ -349,7 +349,7 @@ var tests = TestSuite("AsyncStream")
 
         func scopedLifetime(_ expectation: Expectation) {
           let series = AsyncStream(String.self) { continuation in
-            continuation.onTermination = { _ in expectation.fulfilled = true }
+            continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
             continuation.finish()
           }
         }
@@ -364,8 +364,8 @@ var tests = TestSuite("AsyncStream")
 
         func scopedLifetime(_ expectation: Expectation) {
           let series = AsyncStream(String.self) { continuation in
-            continuation.onTermination = {
-              switch $0 {
+            continuation.onTermination = { @Sendable terminal in
+              switch terminal {
               case .cancelled:
                 expectation.fulfilled = true
               default: break
@@ -384,8 +384,8 @@ var tests = TestSuite("AsyncStream")
 
         func scopedLifetime(_ expectation: Expectation) {
           let series = AsyncThrowingStream(String.self) { continuation in
-            continuation.onTermination = { 
-              switch $0 {
+            continuation.onTermination = { @Sendable terminal in
+              switch terminal {
               case .cancelled:
                 expectation.fulfilled = true
               default: break
@@ -404,7 +404,7 @@ var tests = TestSuite("AsyncStream")
         let done = DispatchSemaphore(value: 0)
         let task = detach {
           let series = AsyncStream(String.self) { continuation in
-            continuation.onTermination = { _ in continuation.yield("Hit cancel") }
+            continuation.onTermination = { @Sendable _ in continuation.yield("Hit cancel") }
           }
           ready.signal()
           var iterator = series.makeAsyncIterator()
@@ -429,7 +429,7 @@ var tests = TestSuite("AsyncStream")
         let done = DispatchSemaphore(value: 0)
         let task = detach {
           let series = AsyncThrowingStream(String.self) { continuation in
-            continuation.onTermination = { _ in continuation.yield("Hit cancel") }
+            continuation.onTermination = { @Sendable _ in continuation.yield("Hit cancel") }
           }
           ready.signal()
           var iterator = series.makeAsyncIterator()

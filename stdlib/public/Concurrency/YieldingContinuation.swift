@@ -16,7 +16,7 @@ internal final class _YieldingContinuationStorage: UnsafeSendable {
   var continuation: Builtin.RawUnsafeContinuation?
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @available(*, deprecated, message: "`YieldingContinuation` was replaced by `Series` and will be removed shortly.")
 public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   let storage = _YieldingContinuationStorage()
@@ -88,7 +88,7 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension YieldingContinuation where Failure == Error {
   /// Await a resume from a call to a yielding function.
   ///
@@ -113,7 +113,7 @@ extension YieldingContinuation where Failure == Error {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension YieldingContinuation where Failure == Never {
   /// Construct a YieldingContinuation with a specific Element type.
   ///
@@ -139,7 +139,7 @@ extension YieldingContinuation where Failure == Never {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension YieldingContinuation {
   /// Resume the task awaiting the continuation by having it either
   /// return normally or throw an error based on the state of the given

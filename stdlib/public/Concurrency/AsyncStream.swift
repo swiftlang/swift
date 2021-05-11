@@ -46,7 +46,7 @@ import Swift
 ///       print(digit)
 ///     }
 ///
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct AsyncStream<Element> {
   public struct Continuation: Sendable {
     public enum Termination {
@@ -54,7 +54,7 @@ public struct AsyncStream<Element> {
       case cancelled
     }
 
-    let storage: _AsyncStreamBufferedStorage<Element, Never>
+    let storage: _Storage
 
     /// Resume the task awaiting the next iteration point by having it return
     /// nomally from its suspension point or buffer the value if no awaiting
@@ -76,7 +76,7 @@ public struct AsyncStream<Element> {
     /// AsyncSequence; which claims that all values past a terminal state are
     /// nil.
     public func finish() {
-      storage.yield(nil)
+      storage.finish()
     }
 
     /// A callback to invoke when iteration of a AsyncStream is cancelled.
@@ -120,13 +120,13 @@ public struct AsyncStream<Element> {
     maxBufferedElements limit: Int = .max,
     _ build: (Continuation) -> Void
   ) {
-    let storage: _AsyncStreamBufferedStorage<Element, Never> = .create(limit: limit)
+    let storage: _Storage = .create(limit: limit)
     produce = storage.next
     build(Continuation(storage: storage))
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncStream: AsyncSequence {
   /// The asynchronous iterator for iterating a AsyncStream.
   ///
@@ -157,7 +157,7 @@ extension AsyncStream: AsyncSequence {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// nomally from its suspension point or buffer the value if no awaiting
