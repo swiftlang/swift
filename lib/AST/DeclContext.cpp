@@ -1038,11 +1038,22 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 }
 
 Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
-  auto mutableThis = const_cast<IterableDeclContext *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           ParseMembersRequest{mutableThis},
-                           FingerprintAndMembers())
-      .fingerprint;
+  auto fileUnit = dyn_cast<FileUnit>(getAsGenericContext()->getModuleScopeContext());
+  if (!fileUnit)
+    return None;
+
+  if (isa<SourceFile>(fileUnit)) {
+    auto mutableThis = const_cast<IterableDeclContext *>(this);
+    return evaluateOrDefault(getASTContext().evaluator,
+                             ParseMembersRequest{mutableThis},
+                             FingerprintAndMembers())
+        .fingerprint;
+  }
+
+  if (getDecl()->isImplicit())
+    return None;
+
+  return fileUnit->loadFingerprint(this);
 }
 
 /// Return the DeclContext to compare when checking private access in
