@@ -67,6 +67,9 @@ using ArrayAccessDesc = llvm::PointerIntPair<ValueBase *, 1, bool>;
 using IndexedArraySet = llvm::DenseSet<std::pair<ValueBase *, ArrayAccessDesc>>;
 using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 16>;
 
+// Should be more than enough to cover "usual" functions.
+static constexpr int maxRecursionDepth = 500;
+
 /// The effect an instruction can have on array bounds.
 enum class ArrayBoundsEffect {
   kNone = 0,
@@ -378,11 +381,16 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
 static bool removeRedundantChecks(DominanceInfoNode *CurBB,
                                   ABCAnalysis &ABC,
                                   IndexedArraySet &DominatingSafeChecks,
-                                  SILLoop *Loop) {
+                                  SILLoop *Loop,
+                                  int recursionDepth) {
   auto *BB = CurBB->getBlock();
   if (!Loop->contains(BB))
     return false;
   bool Changed = false;
+
+  // Avoid a stack overflow for very deep dominator trees.
+  if (recursionDepth >= maxRecursionDepth)
+    return false;
 
   // When we come back from the dominator tree recursion we need to remove
   // checks that we have seen for the first time.
@@ -436,7 +444,8 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
   // Traverse the children in the dominator tree inside the loop.
   for (auto Child: *CurBB)
     Changed |=
-        removeRedundantChecks(Child, ABC, DominatingSafeChecks, Loop);
+        removeRedundantChecks(Child, ABC, DominatingSafeChecks, Loop,
+                              recursionDepth + 1);
 
   // Remove checks we have seen for the first time.
   std::for_each(SafeChecksToPop.begin(), SafeChecksToPop.end(),
@@ -930,7 +939,12 @@ static bool hasArrayType(SILValue Value, SILModule &M) {
 static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
                               ABCAnalysis &ABC, InductionAnalysis &IndVars,
                               SILBasicBlock *Preheader, SILBasicBlock *Header,
-                              SILBasicBlock *SingleExitingBlk) {
+                              SILBasicBlock *SingleExitingBlk,
+                              int recursionDepth) {
+
+  // Avoid a stack overflow for very deep dominator trees.
+  if (recursionDepth >= maxRecursionDepth)
+    return false;
 
   bool Changed = false;
   auto *CurBB = DTNode->getBlock();
@@ -1029,7 +1043,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
   // Traverse the children in the dominator tree.
   for (auto Child: *DTNode)
     Changed |= hoistChecksInLoop(DT, Child, ABC, IndVars, Preheader,
-                                 Header, SingleExitingBlk);
+                                 Header, SingleExitingBlk, recursionDepth + 1);
 
   return Changed;
 }
@@ -1127,7 +1141,8 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
   // check for safety outside the loop (with ABCAnalysis).
   IndexedArraySet DominatingSafeChecks;
   bool Changed = removeRedundantChecks(DT->getNode(Header), ABC,
-                                       DominatingSafeChecks, Loop);
+                                       DominatingSafeChecks, Loop,
+                                       /*recursionDepth*/ 0);
 
   if (!EnableABCHoisting)
     return Changed;
@@ -1233,7 +1248,8 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   // Hoist bounds checks.
   Changed |= hoistChecksInLoop(DT, DT->getNode(Header), ABC, IndVars,
-                               Preheader, Header, SingleExitingBlk);
+                               Preheader, Header, SingleExitingBlk,
+                               /*recursionDepth*/ 0);
   if (Changed) {
     Preheader->getParent()->verify();
   }
