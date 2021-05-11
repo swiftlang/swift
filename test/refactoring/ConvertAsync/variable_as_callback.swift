@@ -89,10 +89,16 @@ func testErrorOnlyWithVariableCompletionHandler(completionHandler: (Error?) -> V
 // ERROR-ONLY-VARIABLE-COMPLETION-HANDLER-NEXT:   completionHandler(error)
 // ERROR-ONLY-VARIABLE-COMPLETION-HANDLER-NEXT: }
 
-// FIXME: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3  | %FileCheck -check-prefix=ERROR-NON-OPTIONAL-RESULT %s
 func testErrorNonOptionalResultWithVariableCompletionHandler(completionHandler: (String, Error?) -> Void) {
   errorNonOptionalResult(completion: completionHandler)
 }
+// ERROR-NON-OPTIONAL-RESULT: do {
+// ERROR-NON-OPTIONAL-RESULT-NEXT: let result = try await errorNonOptionalResult()
+// ERROR-NON-OPTIONAL-RESULT-NEXT: completionHandler(result, nil)
+// ERROR-NON-OPTIONAL-RESULT-NEXT: } catch {
+// ERROR-NON-OPTIONAL-RESULT-NEXT: completionHandler(<#String#>, error)
+// ERROR-NON-OPTIONAL-RESULT-NEXT: }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ALIAS-VARIABLE-COMPLETION-HANDLER %s
 func testAliasWithVariableCompletionHandler(completionHandler: SomeCallback) {
