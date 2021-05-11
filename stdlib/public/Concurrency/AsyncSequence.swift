@@ -190,8 +190,8 @@ extension AsyncSequence {
   /// a general condition.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `10`. The `contains(_:)` method checks to see whether
-  /// the sequence produces a value divisible by `3`:
+  /// values from `1` to `10`. The `contains(where:)` method checks to see
+  /// whether the sequence produces a value divisible by `3`:
   ///
   ///     let containsDivisibleByThree = await Counter(howHigh: 10)
   ///         .contains(where: { $0 % 3 == 0 } )
@@ -212,7 +212,27 @@ extension AsyncSequence {
   ) async rethrows -> Bool {
     return try await _contains(self, where: predicate)
   }
-
+  
+  /// Returns a Boolean value indicating whether all elements produced by the
+  /// asynchronous sequence satisfies the given predicate.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `allSatisfy(_:)` method checks to see whether
+  /// all elements produced by the sequence are less than `10`.
+  ///
+  ///     let allLessThanTen = await Counter(howHigh: 10)
+  ///         .allSatisfy( { $0 < 10 } )
+  ///     print (allLessThanTen)
+  ///     // Prints: false
+  ///
+  /// The predicate executes each time the asynchronous sequence produces an
+  /// element, until either the predicate returns `false` or the sequence ends.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the asynchronous
+  ///   sequence as its argument and returns a Boolean value that indicates
+  ///   whether the passed element satisfies a condition.
+  /// - Returns: `true` if the sequence contains only elements that satisfy
+  ///   `predicate`; otherwise, `false`.
   @inlinable
   public func allSatisfy(
     _ predicate: (Element) async throws -> Bool
@@ -265,6 +285,26 @@ func _first<Source: AsyncSequence>(
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Returns the first element of the sequence that satisfies the given
+  /// predicate.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `first(where:)` method returns the first
+  /// member of the sequence that's evenly divisible by both `2` and `3`.
+  ///
+  ///     let divisibleBy2And3 = await Counter(howHigh: 10)
+  ///         .first (where: { $0 % 2 == 0 && $0 % 3 == 0 } )
+  ///     print (divisibleBy2And3 ?? "none")
+  ///     // Prints: 6
+  ///
+  /// The predicate executes each time the asynchronous sequence produces an
+  /// element, until either the predicate finds a match or the sequence ends.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the asynchronous
+  ///  sequence as its argument and returns a Boolean value indicating whether
+  ///  the element is a match.
+  /// - Returns: The first element of the sequence that satisfies `predicate`,
+  ///   or `nil` if there is no element that satisfies `predicate`.
   @inlinable
   public func first(
     where predicate: (Element) async throws -> Bool
@@ -275,6 +315,44 @@ extension AsyncSequence {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Returns the minimum element in the asynchronous sequence, using the given
+  /// predicate as the comparison between elements.
+  ///
+  /// Use this method when the asynchronous sequence's values don't conform
+  /// to `Comparable`, or when you want to apply a custom ordering to the
+  /// sequence.
+  ///
+  /// The predicate must be a *strict weak ordering* over the elements. That is,
+  /// for any elements a, b, and c, the following conditions must hold:
+  ///
+  ///   - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  ///   - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///     both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
+  ///     (Transitive comparability)
+  ///   - Two elements are incomparable if neither is ordered before the other
+  ///     according to the predicate. If a and b are incomparable, and b and c
+  ///     are incomparable, then a and c are also incomparable.
+  ///     (Transitive incomparability)
+  ///
+  /// The following example uses an enumeration of playing cards ranks, `Rank`,
+  /// which ranges from `ace` (low) to `king` (high). An asynchronous sequence
+  /// called `RankCounter` produces all elements of the array. The predicate
+  /// provided to the `min(by:)` method sorts ranks based on their `rawValue`:
+  ///
+  ///     enum Rank: Int {
+  ///         case ace = 1, two, three, four, five, six, seven, eight, nine, ten, jack, queen, king
+  ///     }
+  ///
+  ///     let min = await RankCounter()
+  ///         .min(by: { $0.rawValue < $1.rawValue } )
+  ///     print(min ?? "none")
+  ///     // Prints: ace
+  ///
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
+  ///   first argument should be ordered before its second argument; otherwise,
+  ///   `false`.
+  /// - Returns: The sequence’s minimum element, according to
+  ///   `areInIncreasingOrder`. If the sequence has no elements, returns `nil`.
   @inlinable
   @warn_unqualified_access
   public func min(
@@ -292,6 +370,44 @@ extension AsyncSequence {
     return result
   }
   
+  /// Returns the maximum element in the asynchronous sequence, using the given
+  /// predicate as the comparison between elements.
+  ///
+  /// Use this method when the asynchronous sequence's values don't conform
+  /// to `Comparable`, or when you want to apply a custom ordering to the
+  /// sequence.
+  ///
+  /// The predicate must be a *strict weak ordering* over the elements. That is,
+  /// for any elements a, b, and c, the following conditions must hold:
+  ///
+  ///   - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  ///   - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///     both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
+  ///     (Transitive comparability)
+  ///   - Two elements are incomparable if neither is ordered before the other
+  ///     according to the predicate. If a and b are incomparable, and b and c
+  ///     are incomparable, then a and c are also incomparable.
+  ///     (Transitive incomparability)
+  ///
+  /// The following example uses an enumeration of playing cards ranks, `Rank`,
+  /// which ranges from `ace` (low) to `king` (high). An asynchronous sequence
+  /// called `RankCounter` produces all elements of the array. The predicate
+  /// provided to the `max(by:)` method sorts ranks based on their `rawValue`:
+  ///
+  ///     enum Rank: Int {
+  ///         case ace = 1, two, three, four, five, six, seven, eight, nine, ten, jack, queen, king
+  ///     }
+  ///
+  ///     let max = await RankCounter()
+  ///         .max(by: { $0.rawValue < $1.rawValue } )
+  ///     print(max ?? "none")
+  ///     // Prints: king
+  ///
+  /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
+  ///   first argument should be ordered before its second argument; otherwise,
+  ///   `false`.
+  /// - Returns: The sequence’s minimum element, according to
+  ///   `areInIncreasingOrder`. If the sequence has no elements, returns `nil`.
   @inlinable
   @warn_unqualified_access
   public func max(
@@ -312,12 +428,40 @@ extension AsyncSequence {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence where Element: Comparable {
+  /// Returns the minimum element in an asynchronous sequence of comparable
+  /// elements.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `min()` method returns the minimum value
+  /// of the sequence.
+  ///
+  ///     let min = await Counter(howHigh: 10)
+  ///         .min()
+  ///     print (min ?? "none")
+  ///     // Prints: 1
+  ///
+  /// - Returns: The sequence’s minimum element. If the sequence has no
+  ///   elements, returns nil.
   @inlinable
   @warn_unqualified_access
   public func min() async rethrows -> Element? {
     return try await self.min(by: <)
   }
 
+  /// Returns the maximum element in an asynchronous sequence of comparable
+  /// elements.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `max()` method returns the max value
+  /// of the sequence.
+  ///
+  ///     let max = await Counter(howHigh: 10)
+  ///         .max()
+  ///     print (max ?? "none")
+  ///     // Prints: 10
+  ///
+  /// - Returns: The sequence’s maximum element. If the sequence has no
+  ///   elements, returns nil.
   @inlinable
   @warn_unqualified_access
   public func max() async rethrows -> Element? {

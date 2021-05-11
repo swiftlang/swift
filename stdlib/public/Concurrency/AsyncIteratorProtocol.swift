@@ -57,8 +57,9 @@ import Swift
 /// At the call site, this looks like:
 ///
 ///     for await i in Counter(howHigh: 3) {
-///       print(i)
+///       print(i, terminator: " ")
 ///     }
+///     // Prints: 1 2 3 4 5 6 7 8 9 10
 ///
 /// ### End of Iteration
 ///
