@@ -54,7 +54,7 @@ func printTaskLocalAsync<V>(
   printTaskLocal(key, expected, file: file, line: line)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -156,7 +156,7 @@ func nested_3_onlyTopContributes() async {
   printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested_3_onlyTopContributesAsync() async {
   await printTaskLocalAsync(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   await TL.$string.withValue("one") {
@@ -173,7 +173,7 @@ func nested_3_onlyTopContributesAsync() async {
   await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested_3_onlyTopContributesMixed() async {
   await printTaskLocalAsync(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
   await TL.$string.withValue("one") {
