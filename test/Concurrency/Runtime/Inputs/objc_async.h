@@ -8,6 +8,12 @@
 
 @end
 
+@interface MutableButt: Butt
+@end
+
+@interface MutableButt_2Fast2Furious: MutableButt
+@end
+
 @interface Farm: NSObject
 
 -(void)getDogWithCompletion:(void (^ _Nonnull)(NSInteger))completionHandler
