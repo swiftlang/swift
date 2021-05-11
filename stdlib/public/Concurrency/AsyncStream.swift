@@ -160,7 +160,7 @@ extension AsyncStream: AsyncSequence {
 @available(SwiftStdlib 5.5, *)
 extension AsyncStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
-  /// nomally from its suspension point or buffer the value if no awaiting
+  /// normally from its suspension point or buffer the value if no awaiting
   /// next iteration is active.
   ///
   /// - Parameter result: A result to yield from the continuation.
