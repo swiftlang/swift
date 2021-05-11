@@ -4,6 +4,13 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
+// rdar://77798215
+// UNSUPPORTED: OS=windows-msvc
+
 import _Distributed
 import _Concurrency
 
