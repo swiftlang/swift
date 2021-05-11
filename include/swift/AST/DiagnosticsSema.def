@@ -3761,7 +3761,7 @@ WARNING(warn_deprecated_conditional_conformance_outer_access,Deprecation,
         "which comes via a conditional conformance",
         (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName,
         DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
-NOTE(fix_deprecated_conditional_conformance_outer_access,Deprecation,
+NOTE(fix_deprecated_conditional_conformance_outer_access,none,
      "use '%0' to continue to reference the %1",
      (StringRef, DescriptiveDeclKind, Identifier))
 
@@ -5244,7 +5244,7 @@ WARNING(availability_deprecated_rename, Deprecation,
          unsigned, StringRef))
 #undef REPLACEMENT_DECL_KIND_SELECT
 
-NOTE(note_deprecated_rename, Deprecation,
+NOTE(note_deprecated_rename, none,
      "use '%0' instead", (StringRef))
 
 ERROR(availability_decl_more_than_enclosing, none,
