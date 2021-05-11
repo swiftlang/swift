@@ -89,8 +89,8 @@ internal final class CheckedContinuationCanary {
 ///
 /// A *continuation* is an opaque representation of program state.
 /// To create a continuation in asynchronous code,
-/// call the `withUnsafeContinuation(_:)` or
-/// `withUnsafeThrowingContinuation(_:)` function.
+/// call the `withUnsafeContinuation(function:_:)` or
+/// `withUnsafeThrowingContinuation(function:_:)` function.
 /// To resume the asynchronous task,
 /// call the `resume(returning:)`,
 /// `resume(throwing:)`,
@@ -122,19 +122,21 @@ internal final class CheckedContinuationCanary {
 public struct CheckedContinuation<T, E: Error> {
   private let canary: CheckedContinuationCanary
   
-  /// Initialize a `CheckedContinuation` wrapper around an
-  /// `UnsafeContinuation`.
+  /// Creates a checked continuation from an unsafe continuation.
   ///
-  /// In most cases, you should use `withCheckedContinuation` or
-  /// `withCheckedThrowingContinuation` instead. You only need to initialize
+  /// Instead of calling this initializer,
+  /// most code calls the `withCheckedContinuation(function:_:)` or
+  /// `withCheckedThrowingContinuation(function:_:)` function instead.
+  /// You only need to initialize
   /// your own `CheckedContinuation<T, E>` if you already have an
   /// `UnsafeContinuation` you want to impose checking on.
   ///
   /// - Parameters:
-  ///   - continuation: a fresh `UnsafeContinuation` that has not yet
-  ///     been resumed. The `UnsafeContinuation` must not be used outside of
-  ///     this object once it's been given to the new object.
-  ///   - function: a string identifying the declaration that is the notional
+  ///   - continuation: An instance of `UnsafeContinuation`
+  ///     that has not yet been resumed.
+  ///     After passing the unsafe continuation to this initializer,
+  ///     do not use it outside of this object.
+  ///   - function: A string identifying the declaration that is the notional
   ///     source for the continuation, used to identify the continuation in
   ///     runtime diagnostics related to misuse of this continuation.
   public init(continuation: UnsafeContinuation<T, E>, function: String = #function) {
@@ -250,7 +252,14 @@ extension CheckedContinuation {
   }
 }
 
-/// XXX FIXME - abstract
+/// Calls the given closure with a checked continuation.
+///
+/// - Parameters:
+///   - function: a string identifying the declaration that is the notional
+///     source for the continuation, used to identify the continuation in
+///     runtime diagnostics related to misuse of this continuation.
+///   - body: A closure that takes an `UnsafeContinuation` parameter.
+///     The closure must resume the continuation *exactly once*.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func withCheckedContinuation<T>(
     function: String = #function,
@@ -261,7 +270,17 @@ public func withCheckedContinuation<T>(
   }
 }
 
-/// XXX FIXME - abstract
+/// Calls the given throwing closure with a checked continuation.
+///
+/// - Parameters:
+///   - function: a string identifying the declaration that is the notional
+///     source for the continuation, used to identify the continuation in
+///     runtime diagnostics related to misuse of this continuation.
+///   - body: A closure that takes an `UnsafeContinuation` parameter.
+///     The closure must resume the continuation *exactly once*.
+///
+/// If the closure throws an error,
+/// this function rethrows that error.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
