@@ -1,4 +1,3 @@
-#if false
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -282,4 +281,3 @@ extension DispatchQueue: Scheduler {
 }
 
 #endif /* !(os(iOS) && (arch(i386) || arch(arm))) */
-#endif
