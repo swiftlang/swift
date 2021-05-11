@@ -10,7 +10,7 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_taskGroup_cancel_from_inside_child() async {
   let one = try! await withTaskGroup(of: Int.self, returning: Int.self) { group in
     await group.next()
@@ -45,7 +45,7 @@ func test_taskGroup_cancel_from_inside_child() async {
 
 
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_from_inside_child()

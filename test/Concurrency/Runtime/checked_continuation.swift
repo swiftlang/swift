@@ -16,7 +16,7 @@ struct TestError: Error {}
   static func main() async {
     var tests = TestSuite("CheckedContinuation")
 
-    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    if #available(SwiftStdlib 5.5, *) {
       tests.test("trap on double resume non-throwing continuation") {
         expectCrashLater()
 

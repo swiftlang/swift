@@ -2477,6 +2477,9 @@ private:
     // Use private declaration names for anonymous context references.
     if (parentDemangling->getKind() == Node::Kind::AnonymousContext
         && nameNode->getKind() == Node::Kind::Identifier) {
+      if (parentDemangling->getNumChildren() < 2)
+        return nullptr;
+
       auto privateDeclName =
         dem.createNode(Node::Kind::PrivateDeclName);
       privateDeclName->addChild(parentDemangling->getChild(0), dem);

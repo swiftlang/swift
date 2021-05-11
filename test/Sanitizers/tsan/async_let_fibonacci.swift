@@ -14,7 +14,7 @@ import Darwin
 import Glibc
 #endif
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func fib(_ n: Int) -> Int {
   var first = 0
   var second = 1
@@ -26,7 +26,7 @@ func fib(_ n: Int) -> Int {
   return first
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func asyncFib(_ n: Int) async -> Int {
   if n == 0 || n == 1 {
     return n
@@ -46,7 +46,7 @@ func asyncFib(_ n: Int) async -> Int {
   return result
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func runFibonacci(_ n: Int) async {
   let result = await asyncFib(n)
 
@@ -55,7 +55,7 @@ func runFibonacci(_ n: Int) async {
   assert(result == fib(n))
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await runFibonacci(10)
