@@ -44,7 +44,7 @@ func groups() async {
     group.spawn {
       printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
       // inside the child task, set a value
-      _ = await TL.$number.withValue(1) {
+      _ = TL.$number.withValue(1) {
         printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1)
       }
       printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)

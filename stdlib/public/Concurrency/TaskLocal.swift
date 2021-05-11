@@ -87,7 +87,6 @@ import Swift
 ///       }
 ///     }
 ///
-///
 ///     func call() {
 ///       print("traceID: \(traceID)") // 1234
 ///     }
@@ -114,25 +113,17 @@ public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
   /// or if the task-local has no value bound, this will return the `defaultValue`
   /// of the task local.
   public func get() -> Value {
-    withUnsafeCurrentTask { task in
-      guard let task = task else {
-        return self.defaultValue
-      }
-
-      let value = _taskLocalValueGet(task._task, key: key)
-
-      guard let rawValue = value else {
-        return self.defaultValue
-      }
-
-      // Take the value; The type should be correct by construction
-      let storagePtr =
-          rawValue.bindMemory(to: Value.self, capacity: 1)
-      return UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
+    guard let rawValue = _taskLocalValueGet(key: key) else {
+      return self.defaultValue
     }
+
+    // Take the value; The type should be correct by construction
+    let storagePtr =
+        rawValue.bindMemory(to: Value.self, capacity: 1)
+    return UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
   }
 
-  /// Binds the task-local to the specific value for the duration of the operation.
+  /// Binds the task-local to the specific value for the duration of the asynchronous operation.
   ///
   /// The value is available throughout the execution of the operation closure,
   /// including any `get` operations performed by child-tasks created during the
@@ -150,16 +141,34 @@ public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
     // check if we're not trying to bind a value from an illegal context; this may crash
     _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
 
-    // we need to escape the `_task` since the withUnsafeCurrentTask closure is not `async`.
-    // this is safe, since we know the task will remain alive because we are running inside of it.
-    let _task = withUnsafeCurrentTask { task in
-      task!._task // !-safe, guaranteed to have task available inside async function
-    }
-
-    _taskLocalValuePush(_task, key: key, value: valueDuringOperation)
-    defer { _taskLocalValuePop(_task) }
+    _taskLocalValuePush(key: key, value: valueDuringOperation)
+    defer { _taskLocalValuePop() }
 
     return try await operation()
+  }
+
+  /// Binds the task-local to the specific value for the duration of the synchronous operation.
+  ///
+  /// The value is available throughout the execution of the operation closure,
+  /// including any `get` operations performed by child-tasks created during the
+  /// execution of the operation closure.
+  ///
+  /// If the same task-local is bound multiple times, be it in the same task, or
+  /// in specific child tasks, the more specific (i.e. "deeper") binding is
+  /// returned when the value is read.
+  ///
+  /// If the value is a reference type, it will be retained for the duration of
+  /// the operation closure.
+  @discardableResult
+  public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
+                           file: String = #file, line: UInt = #line) rethrows -> R {
+    // check if we're not trying to bind a value from an illegal context; this may crash
+    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
+
+    _taskLocalValuePush(key: key, value: valueDuringOperation)
+    defer { _taskLocalValuePop() }
+
+    return try operation()
   }
 
   public var projectedValue: TaskLocal<Value> {
@@ -199,52 +208,30 @@ public final class TaskLocal<Value>: UnsafeSendable, CustomStringConvertible {
 
 }
 
-@available(SwiftStdlib 5.5, *)
-extension UnsafeCurrentTask {
-
-  /// Allows for executing a synchronous `operation` while binding a task-local value
-  /// in the current task.
-  ///
-  /// This function MUST NOT be invoked by any other task than the current task
-  /// represented by this object.
-  @discardableResult
-  public func withTaskLocal<Value, R>(
-      _ taskLocal: TaskLocal<Value>,
-      boundTo valueDuringOperation: Value,
-      operation: () throws -> R,
-      file: String = #file, line: UInt = #line) rethrows -> R {
-    // check if we're not trying to bind a value from an illegal context; this may crash
-    _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: file, line: line)
-
-    _taskLocalValuePush(self._task, key: taskLocal.key, value: valueDuringOperation)
-    defer { _taskLocalValuePop(_task) }
-
-    return try operation()
-  }
-}
-
 // ==== ------------------------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValuePush")
-public func _taskLocalValuePush<Value>(
-  _ task: Builtin.NativeObject,
+func _taskLocalValuePush<Value>(
   key: Builtin.RawPointer/*: Key*/,
   value: __owned Value
 ) // where Key: TaskLocal
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValuePop")
-public func _taskLocalValuePop(
-  _ task: Builtin.NativeObject
-)
+func _taskLocalValuePop()
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_localValueGet")
-public func _taskLocalValueGet(
-  _ task: Builtin.NativeObject,
+func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/
 ) -> UnsafeMutableRawPointer? // where Key: TaskLocal
+
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_task_localsCopyTo")
+func _taskLocalsCopy(
+  to target: Builtin.NativeObject
+)
 
 // ==== Checks -----------------------------------------------------------------
 

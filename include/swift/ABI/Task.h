@@ -271,8 +271,9 @@ public:
     return Local.getValue(this, key);
   }
 
-  void localValuePop() {
-    Local.popValue(this);
+  /// Returns true if storage has still more bindings.
+  bool localValuePop() {
+    return Local.popValue(this);
   }
 
   // ==== Child Fragment -------------------------------------------------------
