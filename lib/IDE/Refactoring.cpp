@@ -4981,28 +4981,7 @@ private:
                                        "if the original function throws");
       return false;
     }
-    switch (TopHandler.Type) {
-    case HandlerType::INVALID:
-      return false;
-    case HandlerType::PARAMS: {
-      if (TopHandler.HasError) {
-        // The non-error parameters must be optional so that we can set them to
-        // nil in the error case.
-        // The error parameter must be optional so we can set it to nil in the
-        // success case.
-        // Otherwise we can't synthesize the values to return for these
-        // parameters.
-        return llvm::all_of(TopHandler.params(),
-                            [](AnyFunctionType::Param Param) -> bool {
-                              return Param.getPlainType()->isOptional();
-                            });
-      } else {
-        return true;
-      }
-    }
-    case HandlerType::RESULT:
-      return true;
-    }
+    return TopHandler.isValid();
   }
 
 
@@ -5675,6 +5654,21 @@ private:
     }
   }
 
+  /// If \p T has a natural default value like \c nil for \c Optional or \c ()
+  /// for \c Void, add that default value to the output. Otherwise, add a
+  /// placeholder that contains \p T's name as the hint.
+  void addDefaultValueOrPlaceholder(Type T) {
+    if (T->isOptional()) {
+      OS << tok::kw_nil;
+    } else if (T->isVoid()) {
+      OS << "()";
+    } else {
+      OS << "<#";
+      T.print(OS);
+      OS << "#>";
+    }
+  }
+
   /// Adds the \c Index -th parameter to the completion handler described by \p
   /// HanderDesc.
   /// If \p HasResult is \c true, it is assumed that a variable named
@@ -5691,11 +5685,11 @@ private:
         OS << "error";
         addCastToCustomErrorTypeIfNecessary(HandlerDesc);
       } else {
-        OS << tok::kw_nil;
+        addDefaultValueOrPlaceholder(HandlerDesc.params()[Index].getPlainType());
       }
     } else {
       if (!HasResult) {
-        OS << tok::kw_nil;
+        addDefaultValueOrPlaceholder(HandlerDesc.params()[Index].getPlainType());
       } else if (HandlerDesc
                      .getSuccessParamAsyncReturnType(
                          HandlerDesc.params()[Index].getPlainType())
