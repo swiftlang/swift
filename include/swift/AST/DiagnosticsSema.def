@@ -2972,7 +2972,8 @@ NOTE(codable_enum_duplicate_case_name_here,none,
 NOTE(codable_enum_duplicate_parameter_name_here,none,
      "cannot automatically synthesize %0 for %1 because "
      "user defined parameter name %2 in %3 conflicts with "
-     "automatically generated parameter name", (Type, Type, Identifier, Identifier))
+     "automatically generated parameter name",
+     (Type, Type, Identifier, Identifier))
 
 WARNING(decodable_property_will_not_be_decoded, none,
         "immutable property will not be decoded because it is declared with "
