@@ -7,6 +7,8 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
+// REQUIRES: rdar_77671328
+
 @available(SwiftStdlib 5.5, *)
 func printWaitPrint(_ int: Int) async -> Int {
   print("start, cancelled:\(Task.isCancelled), id:\(int)")
