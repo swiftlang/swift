@@ -33,7 +33,7 @@ import Swift
 ///
 /// A trivial use case producing values from a detached task would work as such:
 ///
-///     let digits = AsyncStream(buffering: Int.self) { continuation in
+///     let digits = AsyncStream(Int.self) { continuation in
 ///       detach {
 ///         for digit in 0..<10 {
 ///           continuation.yield(digit)
