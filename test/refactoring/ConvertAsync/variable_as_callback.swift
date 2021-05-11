@@ -1,3 +1,5 @@
+// RUN: %empty-directory(%t)
+
 enum CustomError: Error {
   case invalid
   case insecure
@@ -6,25 +8,61 @@ enum CustomError: Error {
 typealias SomeCallback = (String) -> Void
 
 func simple(completion: (String) -> Void) { }
-func simpleWithArg(a: Int, completion: (String) -> Void) { }
-func multipleResults(completion: (String, Int) -> Void) { }
-func nonOptionalError(completion: (String, Error) -> Void) { }
-func noParams(completion: () -> Void) { }
-func error(completion: (String?, Error?) -> Void) { }
-func errorOnly(completion: (Error?) -> Void) { }
-func errorNonOptionalResult(completion: (String, Error?) -> Void) { }
-func alias(completion: SomeCallback) { }
-func simpleResult(completion: (Result<String, Never>) -> Void) { }
-func errorResult(completion: (Result<String, Error>) -> Void) { }
-func customErrorResult(completion: (Result<String, CustomError>) -> Void) { }
-func optionalSingle(completion: (String?) -> Void) { }
-func manyOptional(_ completion: (String?, Int?) -> Void) { }
-func generic<T, R>(completion: (T, R) -> Void) { }
-func genericResult<T>(completion: (T?, Error?) -> Void) where T: Numeric { }
-func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
-func defaultArgs(a: Int, b: Int = 10, completion: (String) -> Void) { }
+func simple() async -> String { }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-FUNC %s
+func simpleWithArg(a: Int, completion: (String) -> Void) { }
+func simpleWithArg(a: Int) async -> String { }
+
+func multipleResults(completion: (String, Int) -> Void) { }
+func multipleResults() async -> (String, Int) { }
+
+func nonOptionalError(completion: (String, Error) -> Void) { }
+func nonOptionalError() async -> (String, Error) { }
+
+func noParams(completion: () -> Void) { }
+func noParams() async { }
+
+func error(completion: (String?, Error?) -> Void) { }
+func error() async throws -> String { }
+
+func errorOnly(completion: (Error?) -> Void) { }
+func errorOnly() async throws { }
+
+func errorNonOptionalResult(completion: (String, Error?) -> Void) { }
+func errorNonOptionalResult() async throws -> String { }
+
+func alias(completion: SomeCallback) { }
+func alias() async -> String { }
+
+func simpleResult(completion: (Result<String, Never>) -> Void) { }
+func simpleResult() async -> String { }
+
+func errorResult(completion: (Result<String, Error>) -> Void) { }
+func errorResult() async throws -> String { }
+
+func customErrorResult(completion: (Result<String, CustomError>) -> Void) { }
+func customErrorResult() async throws -> String { }
+
+func optionalSingle(completion: (String?) -> Void) { }
+func optionalSingle() async -> String? { }
+
+func manyOptional(_ completion: (String?, Int?) -> Void) { }
+func manyOptional() async -> (String?, Int?) { }
+
+func generic<T, R>(completion: (T, R) -> Void) { }
+func generic<T, R>() async -> (T, R) { }
+
+func genericResult<T>(completion: (T?, Error?) -> Void) where T: Numeric { }
+func genericResult<T>() async throws -> T where T: Numeric { }
+
+func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
+func genericError() async throws -> String { }
+
+func defaultArgs(a: Int, b: Int = 10, completion: (String) -> Void) { }
+func defaultArgs(a: Int, b: Int = 10) async -> String { }
+
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-WITH %s
 func testSimpleWithVariableCompletionHandler(completionHandler: (String) -> Void) {
   simple(completion: completionHandler)
@@ -36,7 +74,7 @@ func testSimpleWithVariableCompletionHandler(completionHandler: (String) -> Void
 // SIMPLE-WITH: let result = await simple()
 // SIMPLE-WITH-NEXT: completionHandler(result)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-ARG-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-ARG-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-WITH-ARG %s
 func testSimpleWithArgVariableCompletionHandler(b: Int, completionHandler: (String) -> Void) {
   simpleWithArg(a: b, completion: completionHandler)
@@ -48,7 +86,7 @@ func testSimpleWithArgVariableCompletionHandler(b: Int, completionHandler: (Stri
 // SIMPLE-WITH-ARG: let result = await simpleWithArg(a: b)
 // SIMPLE-WITH-ARG-NEXT: completionHandler(result)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-CONSTANT-ARG-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-WITH-CONSTANT-ARG-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-WITH-CONSTANT-ARG %s
 func testSimpleWithConstantArgVariableCompletionHandler(completionHandler: (String) -> Void) {
   simpleWithArg(a: 1, completion: completionHandler)
@@ -60,7 +98,7 @@ func testSimpleWithConstantArgVariableCompletionHandler(completionHandler: (Stri
 // SIMPLE-WITH-CONSTANT-ARG: let result = await simpleWithArg(a: 1)
 // SIMPLE-WITH-CONSTANT-ARG-NEXT: completionHandler(result)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=MULTIPLE-RESULTS-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=MULTIPLE-RESULTS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MULTIPLE-RESULTS %s
 func testMultipleResultsVariableCompletionHandler(completionHandler: (String, Int) -> Void) {
   multipleResults(completion: completionHandler)
@@ -72,7 +110,7 @@ func testMultipleResultsVariableCompletionHandler(completionHandler: (String, In
 // MULTIPLE-RESULTS: let result = await multipleResults()
 // MULTIPLE-RESULTS-NEXT: completionHandler(result.0, result.1)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NON-OPTIONAL-ERROR-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NON-OPTIONAL-ERROR-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=NON-OPTIONAL-ERROR %s
 func testNonOptionalErrorVariableCompletionHandler(completionHandler: (String, Error) -> Void) {
   nonOptionalError(completion: completionHandler)
@@ -84,7 +122,7 @@ func testNonOptionalErrorVariableCompletionHandler(completionHandler: (String, E
 // NON-OPTIONAL-ERROR: let result = await nonOptionalError()
 // NON-OPTIONAL-ERROR-NEXT: completionHandler(result.0, result.1)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NO-PARAMS-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NO-PARAMS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=NO-PARAMS %s
 func testNoParamsVariableCompletionHandler(completionHandler: () -> Void) {
   noParams(completion: completionHandler)
@@ -97,7 +135,7 @@ func testNoParamsVariableCompletionHandler(completionHandler: () -> Void) {
 // NO-PARAMS: await noParams()
 // NO-PARAMS-NEXT: completionHandler()
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ERROR %s
 func testErrorWithVariableCompletionHandler(completionHandler: (String?, Error?) -> Void) {
   error(completion: completionHandler)
@@ -113,7 +151,7 @@ func testErrorWithVariableCompletionHandler(completionHandler: (String?, Error?)
 // ERROR-NEXT:   completionHandler(nil, error)
 // ERROR-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-ONLY-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-ONLY-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ERROR-ONLY %s
 func testErrorOnlyWithVariableCompletionHandler(completionHandler: (Error?) -> Void) {
   errorOnly(completion: completionHandler)
@@ -130,7 +168,7 @@ func testErrorOnlyWithVariableCompletionHandler(completionHandler: (Error?) -> V
 // ERROR-ONLY-NEXT:   completionHandler(error)
 // ERROR-ONLY-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1  | %FileCheck -check-prefix=ERROR-NON-OPTIONAL-RESULT-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1  | %FileCheck -check-prefix=ERROR-NON-OPTIONAL-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3  | %FileCheck -check-prefix=ERROR-NON-OPTIONAL-RESULT %s
 func testErrorNonOptionalResultWithVariableCompletionHandler(completionHandler: (String, Error?) -> Void) {
   errorNonOptionalResult(completion: completionHandler)
@@ -146,7 +184,7 @@ func testErrorNonOptionalResultWithVariableCompletionHandler(completionHandler: 
 // ERROR-NON-OPTIONAL-RESULT-NEXT: completionHandler(<#String#>, error)
 // ERROR-NON-OPTIONAL-RESULT-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ALIAS-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ALIAS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ALIAS %s
 func testAliasWithVariableCompletionHandler(completionHandler: SomeCallback) {
   alias(completion: completionHandler)
@@ -158,7 +196,7 @@ func testAliasWithVariableCompletionHandler(completionHandler: SomeCallback) {
 // ALIAS: let result = await alias()
 // ALIAS-NEXT: completionHandler(result)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-RESULT-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SIMPLE-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SIMPLE-RESULT %s
 func testSimpleResultVariableCompletionHandler(completionHandler: (Result<String, Never>) -> Void) {
   simpleResult(completion: completionHandler)
@@ -170,7 +208,7 @@ func testSimpleResultVariableCompletionHandler(completionHandler: (Result<String
 // SIMPLE-RESULT: let result = await simpleResult()
 // SIMPLE-RESULT-NEXT: completionHandler(.success(result))
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-RESULT-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ERROR-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=ERROR-RESULT %s
 func testErrorResultVariableCompletionHandler(completionHandler: (Result<String, Error>) -> Void) {
   errorResult(completion: completionHandler)
@@ -186,7 +224,7 @@ func testErrorResultVariableCompletionHandler(completionHandler: (Result<String,
 // ERROR-RESULT-NEXT:   completionHandler(.failure(error))
 // ERROR-RESULT-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=CUSTOM-ERROR-RESULT-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=CUSTOM-ERROR-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=CUSTOM-ERROR-RESULT %s
 func testErrorResultVariableCompletionHandler(completionHandler: (Result<String, CustomError>) -> Void) {
   customErrorResult(completion: completionHandler)
@@ -202,7 +240,7 @@ func testErrorResultVariableCompletionHandler(completionHandler: (Result<String,
 // CUSTOM-ERROR-RESULT-NEXT:   completionHandler(.failure(error as! CustomError))
 // CUSTOM-ERROR-RESULT-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=OPTIONAL-SINGLE-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=OPTIONAL-SINGLE-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=OPTIONAL-SINGLE %s
 func testOptionalSingleVariableCompletionHandler(completionHandler: (String?) -> Void) {
   optionalSingle(completion: completionHandler)
@@ -214,7 +252,7 @@ func testOptionalSingleVariableCompletionHandler(completionHandler: (String?) ->
 // OPTIONAL-SINGLE: let result = await optionalSingle()
 // OPTIONAL-SINGLE-NEXT: completionHandler(result)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=MANY-OPTIONAL-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=MANY-OPTIONAL-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MANY-OPTIONAL %s
 func testManyOptionalVariableCompletionHandler(completionHandler: (String?, Int?) -> Void) {
   manyOptional(completionHandler)
@@ -226,7 +264,7 @@ func testManyOptionalVariableCompletionHandler(completionHandler: (String?, Int?
 // MANY-OPTIONAL: let result = await manyOptional()
 // MANY-OPTIONAL-NEXT: completionHandler(result.0, result.1)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GENERIC-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GENERIC-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=GENERIC %s
 func testGenericVariableCompletionHandler<T, R>(completionHandler: (T, R) -> Void) {
   generic(completion: completionHandler)
@@ -238,7 +276,7 @@ func testGenericVariableCompletionHandler<T, R>(completionHandler: (T, R) -> Voi
 // GENERIC: let result: (T, R) = await generic()
 // GENERIC-NEXT: completionHandler(result.0, result.1)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SPECIALIZE-GENERIC-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=SPECIALIZE-GENERIC-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=SPECIALIZE-GENERIC %s
 func testSpecializeGenericsVariableCompletionHandler(completionHandler: (String, Int) -> Void) {
   generic(completion: completionHandler)
@@ -250,7 +288,7 @@ func testSpecializeGenericsVariableCompletionHandler(completionHandler: (String,
 // SPECIALIZE-GENERIC: let result: (String, Int) = await generic()
 // SPECIALIZE-GENERIC-NEXT: completionHandler(result.0, result.1)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GENERIC-RESULT-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GENERIC-RESULT-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=GENERIC-RESULT %s
 func testGenericResultVariableCompletionHandler<T>(completionHandler: (T?, Error?) -> Void) where T: Numeric {
   genericResult(completion: completionHandler)
@@ -282,7 +320,7 @@ func testGenericErrorVariableCompletionHandler<MyGenericError>(completionHandler
 // GENERIC-ERROR-NEXT:   completionHandler(nil, error as! MyGenericError)
 // GENERIC-ERROR-NEXT: }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=DEFAULT-ARGS-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=DEFAULT-ARGS-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=DEFAULT-ARGS %s
 func testDefaultArgsVariableCompletionHandler(completionHandler: (String) -> Void) {
   defaultArgs(a: 5, completion: completionHandler)
@@ -298,7 +336,7 @@ func myPrint(_ message: String) {
   print(message)
 }
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GLOBAL-FUNC-AS-COMPLETION-HANDLER-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=GLOBAL-FUNC-AS-COMPLETION-HANDLER-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=GLOBAL-FUNC-AS-COMPLETION-HANDLER %s
 func testGlobalFuncAsCompletionHandler() {
   simple(completion: myPrint)
@@ -311,7 +349,7 @@ func testGlobalFuncAsCompletionHandler() {
 // GLOBAL-FUNC-AS-COMPLETION-HANDLER: let result = await simple()
 // GLOBAL-FUNC-AS-COMPLETION-HANDLER-NEXT: myPrint(result)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=VARIABLE-AS-COMPLETION-HANDLER-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=VARIABLE-AS-COMPLETION-HANDLER-FUNC %s
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+3):3 | %FileCheck -check-prefix=VARIABLE-AS-COMPLETION-HANDLER %s
 func testVariableAsCompletionHandler() {
   let complete: (String) -> Void = { print($0) }
@@ -326,7 +364,7 @@ func testVariableAsCompletionHandler() {
 // VARIABLE-AS-COMPLETION-HANDLER: let result = await simple()
 // VARIABLE-AS-COMPLETION-HANDLER-NEXT: complete(result)
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=PRINTING-WRAPPER-FUNC %s
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=PRINTING-WRAPPER-FUNC %s
 func testPrintingWrapper(completionHandler: (String) -> Void) {
   print("Starting")
   simple(completion: completionHandler)
@@ -349,7 +387,7 @@ class Foo {
     print("FOO: \(message)")
   }
 
-  // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MEMBER-FUNC-AS-COMPLETION-HANDLER-FUNC %s
+  // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MEMBER-FUNC-AS-COMPLETION-HANDLER-FUNC %s
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):5 | %FileCheck -check-prefix=MEMBER-FUNC-AS-COMPLETION-HANDLER %s
   func testMethodAsCompletionHandler() {
     simple(completion: myFooPrint)
@@ -362,7 +400,7 @@ class Foo {
   // MEMBER-FUNC-AS-COMPLETION-HANDLER: let result = await simple()
   // MEMBER-FUNC-AS-COMPLETION-HANDLER-NEXT: myFooPrint(result)
 
-  // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MEMBER-FUNC-ON-OTHER-OBJECT-AS-COMPLETION-HANDLER-FUNC %s
+  // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MEMBER-FUNC-ON-OTHER-OBJECT-AS-COMPLETION-HANDLER-FUNC %s
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):5 | %FileCheck -check-prefix=MEMBER-FUNC-ON-OTHER-OBJECT-AS-COMPLETION-HANDLER %s
   func testMethodOnOtherObjectAsCompletionHandler(foo: Foo) {
     simple(completion: foo.myFooPrint)
@@ -375,7 +413,7 @@ class Foo {
   // MEMBER-FUNC-ON-OTHER-OBJECT-AS-COMPLETION-HANDLER: let result = await simple()
   // MEMBER-FUNC-ON-OTHER-OBJECT-AS-COMPLETION-HANDLER-NEXT: foo.myFooPrint(result)
 
-  // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MEMBER-FUNC-ON-NESTED-OTHER-OBJECT-AS-COMPLETION-HANDLER-FUNC %s
+  // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=MEMBER-FUNC-ON-NESTED-OTHER-OBJECT-AS-COMPLETION-HANDLER-FUNC %s
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):5 | %FileCheck -check-prefix=MEMBER-FUNC-ON-NESTED-OTHER-OBJECT-AS-COMPLETION-HANDLER %s
   func testMethodOnNestedOtherObjectAsCompletionHandler(foo: Foo) {
     simple(completion: foo.foo.myFooPrint)
