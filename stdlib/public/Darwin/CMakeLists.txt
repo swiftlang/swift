@@ -14,7 +14,12 @@ if(SWIFT_BUILD_STATIC_SDK_OVERLAY)
 endif()
 
 set(all_overlays
-  
+  CoreFoundation
+  CoreGraphics
+  Dispatch
+  Foundation
+  ObjectiveC
+  XCTest
 )
 
 if(DEFINED SWIFT_OVERLAY_TARGETS)
