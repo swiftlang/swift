@@ -239,10 +239,8 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
 
 void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
                                       ArrayRef<SourceKit::UIdent> UIDs) {
-  llvm::SmallString<128> Buf;
   xpc_object_t arr = xpc_array_create(nullptr, 0);
   for (auto UID : UIDs) {
-    Buf = Str;
     xpc_array_set_uint64(arr, XPC_ARRAY_APPEND, uintptr_t(SKDUIDFromUIdent(UID)));
   }
   xpc_dictionary_set_value(Impl, Key.c_str(), arr);
@@ -251,10 +249,8 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
 
 void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
                                       ArrayRef<sourcekitd_uid_t> UIDs) {
-  llvm::SmallString<128> Buf;
   xpc_object_t arr = xpc_array_create(nullptr, 0);
   for (auto UID : UIDs) {
-    Buf = Str;
     xpc_array_set_uint64(arr, XPC_ARRAY_APPEND, uintptr_t(UID));
   }
   xpc_dictionary_set_value(Impl, Key.c_str(), arr);
