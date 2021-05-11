@@ -29,7 +29,7 @@ public struct AsyncThrowingStream<Element> {
     /// - Parameter value: The value to yield from the continuation.
     ///
     /// This can be called more than once and returns to the caller immediately
-    /// without blocking for any awaiting consuption from the iteration.
+    /// without blocking for any awaiting consumption from the iteration.
     public func yield(_ value: __owned Element) {
       storage.yield(value)
     }
