@@ -77,7 +77,7 @@ def main():
         '-dump-text',
         '-source-filename', args.source_filename,
         '-pos', args.pos
-    ] + unknown_args, desc='producing edit')
+    ] + unknown_args, desc='producing edit').decode("utf-8")
 
     dump_rewritten_output = run_cmd([
         args.swift_refactor,
