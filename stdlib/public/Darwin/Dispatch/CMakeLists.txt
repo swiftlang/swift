@@ -18,10 +18,10 @@ add_swift_target_library(swiftDispatch ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} 
 
   SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  SWIFT_MODULE_DEPENDS_OSX Darwin ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_OSX _Concurrency Darwin ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS _Concurrency Darwin ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS _Concurrency Darwin ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS _Concurrency Darwin ObjectiveC # auto-updated
   FRAMEWORK_DEPENDS_WEAK Combine
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_DISPATCH_OSX}
