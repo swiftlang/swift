@@ -7,3 +7,8 @@ public protocol P {
 
     func bonusFunc()
 }
+
+public extension P {
+    /// Extra default docs!
+    func extraFunc() {}
+}
