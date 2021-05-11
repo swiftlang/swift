@@ -80,7 +80,7 @@ public struct AsyncThrowingStream<Element> {
   /// placed upon it. By default this limit is unlimited.
   ///
   /// The build closure passes in a Continuation which can be used in
-  /// concurrent contexts. It is thread safe to send and finish; all calls are
+  /// concurrent contexts. It is thread safe to send and finish; all calls
   /// to the continuation are serialized, however calling this from multiple
   /// concurrent contexts could result in out of order delivery.
   public init(
