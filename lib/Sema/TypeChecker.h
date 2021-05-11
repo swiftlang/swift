@@ -122,22 +122,15 @@ enum class TypeCheckExprFlags {
   /// disables constraints forcing an lvalue result to be loadable.
   IsDiscarded = 0x01,
 
-  /// If set, the client wants a best-effort solution to the constraint system,
-  /// but can tolerate a solution where all of the constraints are solved, but
-  /// not all type variables have been determined.  In this case, the constraint
-  /// system is not applied to the expression AST, but the ConstraintSystem is
-  /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x02,
-
   /// If set, this expression isn't embedded in a larger expression or
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
-  IsExprStmt = 0x04,
+  IsExprStmt = 0x02,
 
   /// Don't try to type check closure expression bodies, and leave them
   /// unchecked. This is used by source tooling functionalities such as code
   /// completion.
-  LeaveClosureBodyUnchecked = 0x08,
+  LeaveClosureBodyUnchecked = 0x04,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;

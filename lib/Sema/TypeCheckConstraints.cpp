@@ -350,9 +350,6 @@ TypeChecker::typeCheckExpression(
   if (DiagnosticSuppression::isEnabled(Context.Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
 
-  if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
-    csOptions |= ConstraintSystemFlags::AllowUnresolvedTypeVariables;
-
   if (options.contains(TypeCheckExprFlags::LeaveClosureBodyUnchecked))
     csOptions |= ConstraintSystemFlags::LeaveClosureBodyUnchecked;
 
@@ -374,24 +371,12 @@ TypeChecker::typeCheckExpression(
   // If the client can handle unresolved type variables, leave them in the
   // system.
   auto allowFreeTypeVariables = FreeTypeVariableBinding::Disallow;
-  if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
-    allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
   // Attempt to solve the constraint system.
   auto viable = cs.solve(target, allowFreeTypeVariables);
   if (!viable) {
     target.setExpr(expr);
     return None;
-  }
-
-  // If the client allows the solution to have unresolved type expressions,
-  // check for them now. We cannot apply the solution with unresolved TypeVars,
-  // because they will leak out into arbitrary places in the resultant AST.
-  if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
-       (viable->size() != 1 ||
-        (target.getExprConversionType() &&
-         target.getExprConversionType()->hasUnresolvedType()))) {
-    return target;
   }
 
   // Apply this solution to the constraint system.
