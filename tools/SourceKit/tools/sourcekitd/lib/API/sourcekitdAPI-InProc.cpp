@@ -669,15 +669,6 @@ void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), ArrayObject);
 }
 
-void ResponseBuilder::Dictionary::set(SourceKit::UIdent Key,
-                                      ArrayRef<sourcekitd_uid_t> UIDs) {
-  auto ArrayObject = new SKDArray();
-  for (auto UID : UIDs) {
-    ArrayObject->set(SOURCEKITD_ARRAY_APPEND, new SKDUID(UID));
-  }
-  static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), ArrayObject);
-}
-
 void ResponseBuilder::Dictionary::setBool(UIdent Key, bool Val) {
   static_cast<SKDObject *>(Impl)->set(SKDUIDFromUIdent(Key), new SKDBool(Val));
 }
