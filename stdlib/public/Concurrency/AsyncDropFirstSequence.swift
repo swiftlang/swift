@@ -18,7 +18,7 @@ extension AsyncSequence {
   /// then passes through all remaining elements.
   ///
   /// Use `dropFirst(_:)` when you want to drop the first n elements from the
-  /// upstream publisher, and republish the remaining elements.
+  /// base sequence, and pass through the remaining elements.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The `dropFirst(_:)` function causes the modified
@@ -29,8 +29,7 @@ extension AsyncSequence {
   ///         print("\(number) ")
   ///     }
   ///     // prints "4, 5, 6, 7, 8, 9, 10"
-
-
+  ///
   /// If the number of elements to drop exceeds the number of elements in the
   /// sequence, the result is an empty sequence.
   ///
