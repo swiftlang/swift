@@ -111,11 +111,18 @@ func errorOnly(completion: (Error?) -> Void) { }
 // ASYNC-ERRORONLY-NEXT: }
 // ASYNC-ERRORONLY: func errorOnly() async throws { }
 
-// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERRORNONOPTIONALRESULT %s
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERRORNONOPTIONALRESULT %s
 func errorNonOptionalResult(completion: (String, Error?) -> Void) { }
-// We cannot convert the deprecated non-async method to call the async method because we can't synthesize the non-optional completion param. Smoke check for some keywords that would indicate we rewrote the body.
-// ASYNC-ERRORNONOPTIONALRESULT-NOT: detach
-// ASYNC-ERRORNONOPTIONALRESULT-NOT: await
+// ASYNC-ERRORNONOPTIONALRESULT: {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: async {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: do {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: let result = try await errorNonOptionalResult()
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: completion(result, nil)
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: } catch {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: completion(<#String#>, error)
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: }
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: }
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: }
 // ASYNC-ERRORNONOPTIONALRESULT: func errorNonOptionalResult() async throws -> String { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-CUSTOMERROR %s
@@ -244,9 +251,18 @@ func mixed(_ completion: (String?, Int) -> Void) { }
 // MIXED-NEXT: }
 // MIXED: func mixed() async -> (String?, Int) { }
 
-// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-OPTIONAL-ERROR %s
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 func mixedOptionalError(_ completion: (String?, Int, Error?) -> Void) { }
-// MIXED-OPTIONAL-ERROR-NOT: async {
+// MIXED-OPTIONAL-ERROR: {
+// MIXED-OPTIONAL-ERROR-NEXT: async {
+// MIXED-OPTIONAL-ERROR-NEXT: do {
+// MIXED-OPTIONAL-ERROR-NEXT: let result = try await mixedOptionalError()
+// MIXED-OPTIONAL-ERROR-NEXT: completion(result.0, result.1, nil)
+// MIXED-OPTIONAL-ERROR-NEXT: } catch {
+// MIXED-OPTIONAL-ERROR-NEXT: completion(nil, <#Int#>, error)
+// MIXED-OPTIONAL-ERROR-NEXT: }
+// MIXED-OPTIONAL-ERROR-NEXT: }
+// MIXED-OPTIONAL-ERROR-NEXT: }
 // MIXED-OPTIONAL-ERROR: func mixedOptionalError() async throws -> (String, Int) { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-ERROR %s
@@ -450,9 +466,18 @@ func tooVoidProperAndErrorCompletion(completion: (Void?, String?, Error?) -> Voi
 // VOID-PROPER-AND-ERROR-HANDLER-NEXT: }
 // VOID-PROPER-AND-ERROR-HANDLER: func tooVoidProperAndErrorCompletion() async throws -> (Void, String) {}
 
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
+// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 func voidAndErrorCompletion(completion: (Void, Error?) -> Void) {}
-// VOID-AND-ERROR-HANDLER-NOT: async {
+// VOID-AND-ERROR-HANDLER: {
+// VOID-AND-ERROR-HANDLER-NEXT: async {
+// VOID-AND-ERROR-HANDLER-NEXT: do {
+// VOID-AND-ERROR-HANDLER-NEXT: try await voidAndErrorCompletion()
+// VOID-AND-ERROR-HANDLER-NEXT: completion((), nil)
+// VOID-AND-ERROR-HANDLER-NEXT: } catch {
+// VOID-AND-ERROR-HANDLER-NEXT: completion((), error)
+// VOID-AND-ERROR-HANDLER-NEXT: }
+// VOID-AND-ERROR-HANDLER-NEXT: }
+// VOID-AND-ERROR-HANDLER-NEXT: }
 // VOID-AND-ERROR-HANDLER: func voidAndErrorCompletion() async throws {}
 
 // 2. Check that the various ways to call a function (and the positions the
