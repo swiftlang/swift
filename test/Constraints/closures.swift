@@ -1114,3 +1114,21 @@ func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
     // expected-error@-3 {{expected expression in conditional}}
   } // expected-error {{expected '{' after 'if' condition}}
 }
+
+// rdar://76058892 - spurious ambiguity diagnostic
+func rdar76058892() {
+  struct S {
+    var test: Int = 0
+  }
+
+  func test(_: Int) {}
+  func test(_: () -> String) {}
+
+  func experiment(arr: [S]?) {
+    test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
+      if let arr = arr {
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
+      }
+    }
+  }
+}
