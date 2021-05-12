@@ -4436,7 +4436,7 @@ ERROR(actor_isolated_from_async_let,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
-      "cannot form key path to %select{|distributed}0 actor-isolated %1 %2",
+      "cannot form key path to%select{| distributed}0 actor-isolated %1 %2",
       (bool, DescriptiveDeclKind, DeclName))
 ERROR(effectful_keypath_component,none,
       "cannot form key path to %0 with 'throws' or 'async'",
