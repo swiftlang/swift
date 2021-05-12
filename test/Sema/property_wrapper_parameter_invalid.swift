@@ -205,3 +205,32 @@ struct OptionalWrapper<Value> { // expected-note {{'Value' declared as parameter
 // expected-error@+2 {{generic parameter 'Value' could not be inferred}} expected-note@+2 {{}}
 // expected-error@+1 {{property type 'Int' does not match 'wrappedValue' type 'Value?'}}
 func testWrappedValueMismatch(@OptionalWrapper value: Int) {}
+
+@propertyWrapper
+struct ProjectionWrapper<Value> {
+  var wrappedValue: Value
+  var projectedValue: Self { self }
+  init(projectedValue: Self) { self = projectedValue }
+}
+
+func testInvalidWrapperInference() {
+  struct S<V> {
+    static func test(_ keyPath: KeyPath<V, String>) {} // expected-note {{'test' declared here}}
+  }
+
+  // expected-error@+1 {{trailing closure passed to parameter of type 'KeyPath<Int, String>' that does not accept a closure}}
+  S<Int>.test { $value in }
+  // expected-error@+1 {{cannot convert value of type '(_) -> ()' to expected argument type 'KeyPath<Int, String>'}}
+  S<Int>.test({ $value in })
+
+  func testGenericClosure<T>(_ closure: T) {}
+  // FIXME: the following error should use the name of the closure parameter.
+  // It's not anonymous, even though it starts with $
+  // expected-error@+1 {{unable to infer type of a closure parameter $0 in the current context}}
+  testGenericClosure { $value in }
+  testGenericClosure { ($value: ProjectionWrapper<Int>) in } // okay
+
+  func testExtraParameter(_ closure: () -> Void) {}
+  // expected-error@+1 {{contextual closure type '() -> Void' expects 0 arguments, but 1 was used in closure body}}
+  testExtraParameter { $value in }
+}
