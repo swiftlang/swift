@@ -112,6 +112,34 @@
                 "swift-format": "main"
             }
         },
+        "concurrency-5.5-abi-2": {
+            "aliases": ["concurrency-5.5-abi-2"],
+            "repos": {
+                "llvm-project": "swift/release/5.5",
+                "swift": "concurrency-5.5-abi-2",
+                "cmark": "release/5.5",
+                "llbuild": "release/5.5",
+                "swift-tools-support-core": "release/5.5",
+                "swiftpm": "release/5.5",
+                "swift-argument-parser": "0.4.1",
+                "swift-crypto": "1.1.5",
+                "swift-driver": "release/5.5",
+                "swift-syntax": "release/5.5",
+                "swift-stress-tester": "release/5.5",
+                "swift-corelibs-xctest": "release/5.5",
+                "swift-corelibs-foundation": "release/5.5",
+                "swift-corelibs-libdispatch": "release/5.5",
+                "swift-integration-tests": "release/5.5",
+                "swift-xcode-playground-support": "release/5.5",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "yams": "4.0.2",
+                "cmake": "v3.16.5",
+                "indexstore-db": "release/5.5",
+                "sourcekit-lsp": "release/5.5",
+                "swift-format": "main"
+            }
+        },
         "rebranch": {
             "aliases": ["rebranch", "swift/rebranch"],
             "repos": {
