@@ -154,13 +154,21 @@ private:
 
   SourceRange SrcRange;
 
+  /// A canonical availiability info for this context, computed top-down from the root
+  /// context (compilation deployment target).
   AvailabilityContext AvailabilityInfo;
+
+  /// If this context was annotated with an availability attribute, this property captures that.
+  /// It differs from the above `AvailabilityInfo` by being independent of the deployment target,
+  /// and is used for providing availability attribute redundancy warning diagnostics.
+  AvailabilityContext ExplicitAvailabilityInfo;
 
   std::vector<TypeRefinementContext *> Children;
 
   TypeRefinementContext(ASTContext &Ctx, IntroNode Node,
                         TypeRefinementContext *Parent, SourceRange SrcRange,
-                        const AvailabilityContext &Info);
+                        const AvailabilityContext &Info,
+                        const AvailabilityContext &ExplicitInfo);
 
 public:
   
@@ -172,6 +180,7 @@ public:
   static TypeRefinementContext *createForDecl(ASTContext &Ctx, Decl *D,
                                               TypeRefinementContext *Parent,
                                               const AvailabilityContext &Info,
+                                              const AvailabilityContext &ExplicitInfo,
                                               SourceRange SrcRange);
   
   /// Create a refinement context for the Then branch of the given IfStmt.
@@ -243,6 +252,12 @@ public:
   /// running code contained in this context.
   const AvailabilityContext &getAvailabilityInfo() const {
     return AvailabilityInfo;
+  }
+
+  /// Returns the information on what availability was specified by the programmer
+  /// on this context (if any).
+  const AvailabilityContext &getExplicitAvailabilityInfo() const {
+    return ExplicitAvailabilityInfo;
   }
 
   /// Adds a child refinement context.
