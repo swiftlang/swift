@@ -1827,10 +1827,6 @@ ERROR(attr_requires_concurrency, none,
       "concurrency is enabled",
       (StringRef, bool))
 
-ERROR(attr_requires_distributed, none,
-      "'distributed' modifier is only valid when experimental distributed "
-      "is enabled. Enable it with -enable-experimental-distributed", ())
-
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------

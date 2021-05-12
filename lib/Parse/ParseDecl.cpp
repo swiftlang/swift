@@ -3651,15 +3651,6 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
         continue;
       }
 
-      if (Kind == DAK_DistributedActor &&
-          !shouldParseExperimentalDistributed()) {
-        // 'distributed' requires the experimental distributed flag to be set
-        SourceLoc distributedLoc = Tok.getLoc();
-        diagnose(distributedLoc, diag::attr_requires_distributed);
-        consumeToken();
-        continue;
-      }
-
       SyntaxParsingContext ModContext(SyntaxContext,
                                       SyntaxKind::DeclModifier);
       isError |= parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, Kind);
