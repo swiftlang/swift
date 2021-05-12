@@ -38,7 +38,7 @@ struct AsyncTaskAndContext {
 /// Create a task object with no future which will run the given
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_f(JobFlags flags,
+AsyncTaskAndContext swift_task_create_f(size_t flags,
                              ThinNullaryAsyncSignature::FunctionType *function,
                                         size_t initialContextSize);
 
@@ -51,7 +51,7 @@ using FutureAsyncSignature =
 /// closure.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future(
-    JobFlags flags,
+    size_t flags,
     const Metadata *futureResultType,
     void *closureEntryPoint,
     HeapObject * /* +1 */ closureContext);
@@ -60,7 +60,7 @@ AsyncTaskAndContext swift_task_create_future(
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future_f(
-    JobFlags flags,
+    size_t flags,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize);
@@ -69,7 +69,7 @@ AsyncTaskAndContext swift_task_create_future_f(
 /// closure, and offer its result to the task group
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_group_future(
-    JobFlags flags, TaskGroup *group,
+    size_t flags, TaskGroup *group,
     const Metadata *futureResultType,
     void *closureEntryPoint,
     HeapObject * /* +1 */ closureContext);
@@ -78,7 +78,7 @@ AsyncTaskAndContext swift_task_create_group_future(
 /// function, and offer its result to the task group
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_group_future_f(
-    JobFlags flags,
+    size_t flags,
     TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
