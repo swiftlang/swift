@@ -8693,8 +8693,18 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       Type wrappedValueType;
 
       if (paramDecl->hasImplicitPropertyWrapper()) {
-        backingType = getContextualParamAt(i)->getPlainType();
-        wrappedValueType = createTypeVariable(getConstraintLocator(locator),
+        if (auto contextualType = getContextualParamAt(i)) {
+          backingType = contextualType->getPlainType();
+        } else {
+          // There may not be a contextual parameter type if the contextual
+          // type is not a function type or if closure body declares too many
+          // parameters.
+          auto *paramLoc =
+              getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+          backingType = createTypeVariable(paramLoc, TVO_CanBindToHole);
+        }
+
+        wrappedValueType = createTypeVariable(getConstraintLocator(paramDecl),
                                               TVO_CanBindToHole | TVO_CanBindToLValue);
       } else {
         auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
