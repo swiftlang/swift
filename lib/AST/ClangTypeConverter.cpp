@@ -361,13 +361,13 @@ ClangTypeConverter::reverseBuiltinTypeMapping(StructType *type) {
         // Handle Int and UInt specially. On Apple platforms, these map to
         // the NSInteger and NSUInteger typedefs. So try that if the typedefs
         // are available, to ensure we get consistent ObjC @encode strings.
-        if (swiftType->getAnyNominal() == Context.getIntDecl()) {
+        if (swiftType->isInt()) {
           auto NSIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSInteger");
           if (!NSIntegerTy.isNull()) {
             Cache.insert({swiftType->getCanonicalType(), NSIntegerTy});
             return;
           }
-        } else if (swiftType->getAnyNominal() == Context.getUIntDecl()) {
+        } else if (swiftType->isUInt()) {
           auto NSUIntegerTy = getClangBuiltinTypeFromTypedef(sema, "NSUInteger");
           if (!NSUIntegerTy.isNull()) {
             Cache.insert({swiftType->getCanonicalType(), NSUIntegerTy});

@@ -17,7 +17,16 @@
 
 #include "swift/Runtime/Concurrency.h"
 
+#ifdef _WIN32
+// On Windows, an include below triggers an indirect include of minwindef.h
+// which contains a definition of the `max` macro, generating an error in our
+// use of std::max in this file. This define prevents those macros from being
+// defined.
+#define NOMINMAX
+#endif
+
 #include "../CompatibilityOverride/CompatibilityOverride.h"
+#include "../runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
@@ -27,6 +36,10 @@
 #include "swift/ABI/Actor.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
+
+#if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+#include <dispatch/dispatch.h>
+#endif
 
 #if defined(__APPLE__)
 #include <asl.h>
@@ -56,6 +69,11 @@
 #include <io.h>
 #include <handleapi.h>
 #include <processthreadsapi.h>
+#endif
+
+#if SWIFT_OBJC_INTEROP
+extern "C" void *objc_autoreleasePoolPush();
+extern "C" void objc_autoreleasePoolPop(void *);
 #endif
 
 using namespace swift;
@@ -171,6 +189,17 @@ public:
   }
 };
 
+#ifdef SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+class ActiveTask {
+public:
+  static void set(AsyncTask *task) {
+    SWIFT_THREAD_SETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY, task);
+  }
+  static AsyncTask *get() {
+    return (AsyncTask *)SWIFT_THREAD_GETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY);
+  }
+};
+#else
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
@@ -183,16 +212,21 @@ public:
 
 /// Define the thread-locals.
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-  Pointer<ExecutorTrackingInfo>,
-  ExecutorTrackingInfo::ActiveInfoInThread);
-SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
   Pointer<AsyncTask>,
   ActiveTask::Value);
+#endif
+SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+  Pointer<ExecutorTrackingInfo>,
+  ExecutorTrackingInfo::ActiveInfoInThread);
 
 } // end anonymous namespace
 
 void swift::runJobInEstablishedExecutorContext(Job *job) {
   _swift_tsan_acquire(job);
+
+#if SWIFT_OBJC_INTEROP
+  auto pool = objc_autoreleasePoolPush();
+#endif
 
   if (auto task = dyn_cast<AsyncTask>(job)) {
     // Update the active task in the current thread.
@@ -211,6 +245,10 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // There's no extra bookkeeping to do for simple jobs.
     job->runSimpleInFullyEstablishedContext();
   }
+
+#if SWIFT_OBJC_INTEROP
+  objc_autoreleasePoolPop(pool);
+#endif
 
   _swift_tsan_release(job);
 }
@@ -259,13 +297,25 @@ static bool isExecutingOnMainThread() {
 #endif
 }
 
+JobPriority swift::swift_task_getCurrentThreadPriority() {
+#if defined(__APPLE__)
+  return static_cast<JobPriority>(qos_class_self());
+#else
+  if (isExecutingOnMainThread())
+    return JobPriority::UserInitiated;
+
+  return JobPriority::Unspecified;
+#endif
+}
+
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
   if (auto currentTracking = ExecutorTrackingInfo::current()) {
     return currentTracking->getActiveExecutor() == executor;
   }
 
-  return executor.isMainExecutor() && isExecutingOnMainThread();
+  return executor == _swift_task_getMainExecutor()
+      && isExecutingOnMainThread();
 }
 
 /// Logging level for unexpected executors:
@@ -308,7 +358,7 @@ void swift::swift_task_reportUnexpectedExecutor(
 
   const char *functionIsolation;
   const char *whereExpected;
-  if (executor.isMainExecutor()) {
+  if (executor == _swift_task_getMainExecutor()) {
     functionIsolation = "@MainActor function";
     whereExpected = "the main thread";
   } else {
@@ -1683,18 +1733,6 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
-namespace swift {
-  Metadata* MainActorMetadata = nullptr;
-}
-
-/// FIXME: only exists for the quick-and-dirty MainActor implementation.
-void swift::swift_MainActor_register(HeapObject *actor) {
-  assert(actor);
-  MainActorMetadata = const_cast<Metadata*>(swift_getObjectType(actor));
-  assert(MainActorMetadata);
-}
-
 /*****************************************************************************/
 /****************************** ACTOR SWITCHING ******************************/
 /*****************************************************************************/
@@ -1853,6 +1891,14 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 /************************* GENERIC ACTOR INTERFACES **************************/
 /*****************************************************************************/
 
+// Implemented in Swift to avoid some annoying hard-coding about
+// SerialExecutor's protocol witness table.  We could inline this
+// with effort, though.
+extern "C" SWIFT_CC(swift)
+void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
+                                   const Metadata *selfType,
+                                   const SerialExecutorWitnessTable *wtable);
+
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 #if SWIFT_TASK_PRINTF_DEBUG
@@ -1866,16 +1912,13 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
   if (executor.isGeneric())
     return swift_task_enqueueGlobal(job);
 
-  /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-  if (executor.isMainExecutor())
-    return swift_task_enqueueMainExecutor(job);
-
   if (executor.isDefaultActor())
     return asImpl(executor.getDefaultActor())->enqueue(job);
 
-  // Just assume it's actually a default actor that we haven't tagged
-  // properly.
-  swift_unreachable("unexpected or corrupt executor reference");
+  auto wtable = executor.getSerialExecutorWitnessTable();
+  auto executorObject = executor.getIdentity();
+  auto executorType = swift_getObjectType(executorObject);
+  _swift_task_enqueueOnExecutor(job, executorObject, executorType, wtable);
 }
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE

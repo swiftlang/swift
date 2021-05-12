@@ -1216,7 +1216,7 @@ public:
   ///
   ///   Original: y = apply f(x0, x1, ...)
   ///    Tangent: tan[y] = apply diff_f(tan[x0], tan[x1], ...)
-  void emitTangentForApplyInst(ApplyInst *ai, AutoDiffConfig applyConfig,
+  void emitTangentForApplyInst(ApplyInst *ai, const AutoDiffConfig &applyConfig,
                                CanSILFunctionType originalDifferentialType) {
     assert(differentialInfo.shouldDifferentiateApplySite(ai));
     auto *bb = ai->getParent();
@@ -1393,7 +1393,7 @@ static SubstitutionMap getSubstitutionMap(SILFunction *original,
 /// and JVP generic signature.
 static const DifferentiableActivityInfo &
 getActivityInfo(ADContext &context, SILFunction *original,
-                AutoDiffConfig config, SILFunction *jvp) {
+                const AutoDiffConfig &config, SILFunction *jvp) {
   // Get activity info of the original function.
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =

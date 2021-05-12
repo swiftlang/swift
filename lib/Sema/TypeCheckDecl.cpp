@@ -929,7 +929,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
     proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
   auto requirement =
     Requirement(RequirementKind::Conformance, selfType,
-              proto->getDeclaredInterfaceType());
+                proto->getDeclaredInterfaceType());
 
   builder.addRequirement(
           requirement,
@@ -939,7 +939,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
   auto reqSignature = std::move(builder).computeGenericSignature(
                         /*allowConcreteGenericParams=*/false,
-                        /*buildingRequirementSignature=*/true);
+                        /*requirementSignatureSelfProto=*/proto);
   return reqSignature->getRequirements();
 }
 
@@ -2184,11 +2184,9 @@ static Type validateParameterType(ParamDecl *decl) {
       // For now, just return the unbound generic type.
       return unboundTy;
     };
-    placeholderHandler = [&](auto placeholderRepr) {
-      // FIXME: Don't let placeholder types escape type resolution.
-      // For now, just return the placeholder type.
-      return PlaceholderType::get(ctx, placeholderRepr);
-    };
+    // FIXME: Don't let placeholder types escape type resolution.
+    // For now, just return the placeholder type.
+    placeholderHandler = PlaceholderType::get;
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
   } else if (isa<SubscriptDecl>(dc)) {
@@ -2818,12 +2816,9 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
         // For now, just return the unbound generic type.
         return unboundTy;
       },
-      /*placeholderHandler*/
-      [&](auto placeholderRepr) {
-        // FIXME: Don't let placeholder types escape type resolution.
-        // For now, just return the placeholder type.
-        return PlaceholderType::get(ext->getASTContext(), placeholderRepr);
-      });
+      // FIXME: Don't let placeholder types escape type resolution.
+      // For now, just return the placeholder type.
+      PlaceholderType::get);
 
   const auto extendedType = resolution.resolveType(extendedRepr);
 

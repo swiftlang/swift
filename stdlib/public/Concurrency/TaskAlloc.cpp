@@ -20,6 +20,9 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
+#include "Error.h"
+
+#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
 #include <stdlib.h>
 
@@ -49,6 +52,12 @@ static_assert(alignof(TaskAllocator) <= alignof(decltype(AsyncTask::AllocatorPri
 
 void swift::_swift_task_alloc_initialize(AsyncTask *task) {
   new (task->AllocatorPrivate) TaskAllocator();
+}
+
+void swift::_swift_task_alloc_initialize_with_slab(AsyncTask *task,
+                                                   void *firstSlabBuffer,
+                                                   size_t bufferCapacity) {
+  new (task->AllocatorPrivate) TaskAllocator(firstSlabBuffer, bufferCapacity);
 }
 
 static TaskAllocator &allocator(AsyncTask *task) {

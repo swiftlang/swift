@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
-// RUN: %target-sil-opt -mandatory-copy-propagation -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+// RUN: %target-sil-opt -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
 
 // REQUIRES: asserts
 
@@ -24,7 +24,7 @@ import Swift
 class B { }
 
 class C {
-  var a: Int64
+  var a: Builtin.Int64
 }
 
 sil [ossa] @dummy : $@convention(thin) () -> ()
@@ -32,11 +32,6 @@ sil [ossa] @getOwnedC : $@convention(thin) () -> (@owned C)
 sil [ossa] @takeOwnedC : $@convention(thin) (@owned C) -> ()
 sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
-
-struct NativeObjectPair {
-  var obj1 : Builtin.NativeObject
-  var obj2 : Builtin.NativeObject
-}
 
 // -O ignores this because there's no copy_value
 // -Onone hoists the destroy and adds a poison flag.

@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/OwnedString.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParsingCache.h"

@@ -295,8 +295,6 @@ public:
   /// the notion of the current block being emitted into.
   SILGenBuilder B;
 
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
-
   struct BreakContinueDest {
     LabeledStmt *Target;
     JumpDest BreakDest;
@@ -378,9 +376,9 @@ public:
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
 
-  /// Mapping from each async let clause to the child task that will produce
-  /// the initializer value for that clause and a Boolean value indicating
-  /// whether the task can throw.
+  /// Mapping from each async let clause to the AsyncLet repr that contains the
+  /// AsyncTask that will produce the initializer value for that clause and a
+  /// Boolean value indicating whether the task can throw.
   llvm::SmallDenseMap<std::pair<PatternBindingDecl *, unsigned>,
                       std::pair<SILValue, bool /*isThrowing*/> >
       AsyncLetChildTasks;
@@ -841,6 +839,17 @@ public:
                             Optional<ActorIsolation> actorIso,
                             Optional<ManagedValue> actorSelf);
 
+  /// A version of `emitHopToTargetActor` that is specialized to the needs
+  /// of various types of ConstructorDecls, like class or value initializers,
+  /// because their prolog emission is not the same as for regular functions.
+  ///
+  /// This function emits the appropriate hop_to_executor for a constructor's
+  /// prologue.
+  ///
+  /// NOTE: this does not support actor initializers!
+  void emitConstructorPrologActorHop(SILLocation loc,
+                                     Optional<ActorIsolation> actorIso);
+
   /// Emit the executor for the given actor isolation.
   Optional<SILValue> emitExecutor(SILLocation loc,
                                   ActorIsolation isolation,
@@ -878,10 +887,11 @@ public:
                   ParameterList *paramList, ParamDecl *selfParam,
                   DeclContext *DC, Type resultType,
                   bool throws, SourceLoc throwsLoc);
-  /// returns the number of variables in paramPatterns.
-  uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
-                      Type resultType, DeclContext *DC,
-                      bool throws, SourceLoc throwsLoc);
+  /// A simpler version of emitProlog
+  /// \returns the number of variables in paramPatterns.
+  uint16_t emitBasicProlog(ParameterList *paramList, ParamDecl *selfParam,
+                           Type resultType, DeclContext *DC,
+                           bool throws, SourceLoc throwsLoc);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1359,8 +1369,12 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
-  ManagedValue emitRunChildTask(
+  ManagedValue emitAsyncLetStart(
       SILLocation loc, Type functionType, ManagedValue taskFunction);
+
+  ManagedValue emitAsyncLetGet(SILLocation loc, SILValue asyncLet);
+
+  ManagedValue emitEndAsyncLet(SILLocation loc, SILValue asyncLet);
 
   ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
 
@@ -1574,7 +1588,7 @@ public:
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext, 
-                   Optional<ValueDecl *> implicitlyAsyncApply);
+                   Optional<ActorIsolation> implicitAsyncIsolation);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,
@@ -2085,6 +2099,9 @@ public:
 
   /// Enter a cleanup to cancel the given task.
   CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
+
+  // Enter a cleanup to cancel and destroy an AsyncLet as it leaves the scope.
+  CleanupHandle enterAsyncLetCleanup(SILValue alet);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, SGFAccessKind accessKind,

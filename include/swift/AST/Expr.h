@@ -292,10 +292,18 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
-    HasAnonymousClosureVars : 1
+    HasAnonymousClosureVars : 1,
+
+    /// True if "self" can be captured implicitly without requiring "self."
+    /// on each member reference.
+    ImplicitSelfCapture : 1,
+
+    /// True if this @Sendable async closure parameter should implicitly
+    /// inherit the actor context from where it was formed.
+    InheritActorContext : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -3871,6 +3879,8 @@ public:
       Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
+    Bits.ClosureExpr.ImplicitSelfCapture = false;
+    Bits.ClosureExpr.InheritActorContext = false;
   }
 
   SourceRange getSourceRange() const;
@@ -3898,7 +3908,27 @@ public:
   void setHasAnonymousClosureVars() {
     Bits.ClosureExpr.HasAnonymousClosureVars = true;
   }
-  
+
+  /// Whether this closure allows "self" to be implicitly captured without
+  /// required "self." on each reference.
+  bool allowsImplicitSelfCapture() const {
+    return Bits.ClosureExpr.ImplicitSelfCapture;
+  }
+
+  void setAllowsImplicitSelfCapture(bool value = true) {
+    Bits.ClosureExpr.ImplicitSelfCapture = value;
+  }
+
+  /// Whether this closure should implicitly inherit the actor context from
+  /// where it was formed. This only affects @Sendable async closures.
+  bool inheritsActorContext() const {
+    return Bits.ClosureExpr.InheritActorContext;
+  }
+
+  void setInheritsActorContext(bool value = true) {
+    Bits.ClosureExpr.InheritActorContext = value;
+  }
+
   /// Determine whether this closure expression has an
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
@@ -4414,8 +4444,8 @@ class ApplyExpr : public Expr {
   /// The function being called.
   Expr *Fn;
 
-  /// The argument being passed to it, and whether it's a 'super' argument.
-  llvm::PointerIntPair<Expr *, 1, bool> ArgAndIsSuper;
+  /// The argument being passed to it.
+  Expr *Arg;
   
   /// Returns true if \c e could be used as the call's argument. For most \c ApplyExpr
   /// subclasses, this means it is a \c ParenExpr or \c TupleExpr.
@@ -4423,7 +4453,7 @@ class ApplyExpr : public Expr {
 
 protected:
   ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, bool Implicit, Type Ty = Type())
-    : Expr(Kind, Implicit, Ty), Fn(Fn), ArgAndIsSuper(Arg, false) {
+    : Expr(Kind, Implicit, Ty), Fn(Fn), Arg(Arg) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
     assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
@@ -4436,15 +4466,10 @@ public:
   void setFn(Expr *e) { Fn = e; }
   Expr *getSemanticFn() const { return Fn->getSemanticsProvidingExpr(); }
   
-  Expr *getArg() const { return ArgAndIsSuper.getPointer(); }
+  Expr *getArg() const { return Arg; }
   void setArg(Expr *e) {
     assert(validateArg(e) && "Arg is not a permitted expr kind");
-    ArgAndIsSuper = {e, ArgAndIsSuper.getInt()};
-  }
-  
-  bool isSuper() const { return ArgAndIsSuper.getInt(); }
-  void setIsSuper(bool super) {
-    ArgAndIsSuper = {ArgAndIsSuper.getPointer(), super};
+    Arg = e;
   }
 
   /// Has the type-checker set the 'throws' bit yet?

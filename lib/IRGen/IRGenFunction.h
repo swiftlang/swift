@@ -137,12 +137,15 @@ public:
 
   llvm::Value *getAsyncTask();
   llvm::Value *getAsyncContext();
+  void storeCurrentAsyncContext(llvm::Value *context);
 
   llvm::CallInst *emitSuspendAsyncCall(unsigned swiftAsyncContextIndex,
                                        llvm::StructType *resultTy,
-                                       ArrayRef<llvm::Value *> args);
+                                       ArrayRef<llvm::Value *> args,
+                                       bool restoreCurrentContext = true);
 
-  llvm::Function *getOrCreateResumePrjFn();
+  llvm::Value *emitAsyncResumeProjectContext(llvm::Value *callerContextAddr);
+  llvm::Function *getOrCreateResumePrjFn(bool forPrologue = false);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
                                         ArrayRef<llvm::Value *> args);
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,

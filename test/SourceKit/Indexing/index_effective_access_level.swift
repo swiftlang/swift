@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %swift -emit-module -o %t/Exported.swiftmodule %S/Inputs/explicit-access/Exported.swift
-// RUN: %swift -emit-module -o %t/Module.swiftmodule %S/Inputs/explicit-access/Module.swift -I %t
+// RUN: %swift -emit-module -o %t/Exported.swiftmodule %S/Inputs/explicit-access/Exported.swift -disable-implicit-concurrency-module-import
+// RUN: %swift -emit-module -o %t/Module.swiftmodule %S/Inputs/explicit-access/Module.swift -I %t -disable-implicit-concurrency-module-import
 
-// RUN: %sourcekitd-test -req=index %s -- -I %t %s | %sed_clean > %t.response
+// RUN: %sourcekitd-test -req=index %s -- -I %t %s -Xfrontend -disable-implicit-concurrency-module-import | %sed_clean > %t.response
 // RUN: %diff -u %s.response %t.response
 
 public enum PublicEnum {

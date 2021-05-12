@@ -158,18 +158,18 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
     llvm::sys::path::append(buffer, *driverNameOp);
     return true;
   }
-#ifdef __APPLE__
-  // FIXME: use swift-driver as the default driver for all platforms.
+
   llvm::sys::path::append(buffer, "swift-driver");
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
   llvm::sys::path::remove_filename(buffer);
   llvm::sys::path::append(buffer, "swift-driver-new");
-  return true;
-#else
+  if (llvm::sys::fs::exists(buffer)) {
+    return true;
+  }
+
   return false;
-#endif
 }
 
 static int run_driver(StringRef ExecName,
@@ -275,6 +275,13 @@ static int run_driver(StringRef ExecName,
   std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
   if (Diags.hadAnyError())
     return 1;
+
+  for (auto arg: ArgList->getArgs()) {
+    if (arg->getOption().hasFlag(options::NewDriverOnlyOption)) {
+      Diags.diagnose(SourceLoc(), diag::warning_unsupported_driver_option,
+                     arg->getSpelling());
+    }
+  }
 
   std::unique_ptr<Compilation> C =
       TheDriver.buildCompilation(*TC, std::move(ArgList));

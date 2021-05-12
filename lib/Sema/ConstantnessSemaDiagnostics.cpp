@@ -201,47 +201,17 @@ static Expr *checkConstantness(Expr *expr) {
   return nullptr;
 }
 
-/// Return true iff the norminal type decl \c numberDecl is a known stdlib
-/// integer decl.
-static bool isStdlibInteger(NominalTypeDecl *numberDecl) {
-  ASTContext &astCtx = numberDecl->getASTContext();
-  return (numberDecl == astCtx.getIntDecl() ||
-          numberDecl == astCtx.getInt8Decl() ||
-          numberDecl == astCtx.getInt16Decl() ||
-          numberDecl == astCtx.getInt32Decl() ||
-          numberDecl == astCtx.getInt64Decl() ||
-          numberDecl == astCtx.getUIntDecl() ||
-          numberDecl == astCtx.getUInt8Decl() ||
-          numberDecl == astCtx.getUInt16Decl() ||
-          numberDecl == astCtx.getUInt32Decl() ||
-          numberDecl == astCtx.getUInt64Decl());
-}
-
 /// Return true iff the given \p type is a Stdlib integer type.
 static bool isIntegerType(Type type) {
-  NominalTypeDecl *nominalDecl = type->getNominalOrBoundGenericNominal();
-  return nominalDecl && isStdlibInteger(nominalDecl);
+  return type->isInt() || type->isInt8() || type->isInt16() ||
+         type->isInt32() || type->isInt64() || type->isUInt() ||
+         type->isUInt8() || type->isUInt16() || type->isUInt32() ||
+         type->isUInt64();
 }
 
-/// Return true iff the norminal type decl \c numberDecl is a known stdlib float
-/// decl.
-static bool isStdlibFloat(NominalTypeDecl *numberDecl) {
-  ASTContext &astCtx = numberDecl->getASTContext();
-  return (numberDecl == astCtx.getFloatDecl() ||
-          numberDecl == astCtx.getFloat80Decl() ||
-          numberDecl == astCtx.getDoubleDecl());
-}
-
-/// Return true iff the given \p type is a Bool type.
+/// Return true iff the given \p type is a Float type.
 static bool isFloatType(Type type) {
-  NominalTypeDecl *nominalDecl = type->getNominalOrBoundGenericNominal();
-  return nominalDecl && isStdlibFloat(nominalDecl);
-}
-
-/// Return true iff the given \p type is a String type.
-static bool isStringType(Type type) {
-  NominalTypeDecl *nominalDecl = type->getNominalOrBoundGenericNominal();
-  return nominalDecl && nominalDecl == type->getASTContext().getStringDecl();
+  return type->isFloat() || type->isDouble() || type->isFloat80();
 }
 
 /// Given an error expression \p errorExpr, diagnose the error based on the type
@@ -276,7 +246,7 @@ static void diagnoseError(Expr *errorExpr, const ASTContext &astContext,
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_bool_literal);
     return;
   }
-  if (isStringType(exprType)) {
+  if (exprType->isString()) {
     diags.diagnose(errorLoc, diag::oslog_arg_must_be_string_literal);
     return;
   }

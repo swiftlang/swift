@@ -20,10 +20,10 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
-#include "swift/Serialization/Validation.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/Validation.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -76,9 +76,6 @@ class ModuleFile
   llvm::BitstreamCursor DeclMemberTablesCursor;
 
   friend StringRef getNameOfModule(const ModuleFile *);
-
-  /// A callback to be invoked every time a type was deserialized.
-  std::function<void(Type)> DeserializedTypeCallback;
 
 public:
   static std::unique_ptr<llvm::MemoryBuffer> getModuleName(ASTContext &Ctx,
@@ -438,6 +435,10 @@ public:
     return Core->ModuleABIName;
   }
 
+  llvm::VersionTuple getUserModuleVersion() const {
+    return Core->UserModuleVersion;
+  }
+
   /// The Swift compatibility version in use when this module was built.
   const version::Version &getCompatibilityVersion() const {
     return Core->CompatibilityVersion;
@@ -460,6 +461,11 @@ public:
     return Core->Bits.IsTestable;
   }
 
+  /// Whether this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Core->Bits.IsStaticLibrary;
+  }
+
   /// Whether the module is resilient. ('-enable-library-evolution')
   ResilienceStrategy getResilienceStrategy() const {
     return ResilienceStrategy(Core->Bits.ResilienceStrategy);
@@ -478,6 +484,13 @@ public:
 
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }
+
+  /// \c true if this module has a corresponding .swiftsourceinfo file.
+  bool hasSourceInfoFile() const { return Core->hasSourceInfoFile(); }
+
+  /// \c true if this module has information from a corresponding
+  /// .swiftsourceinfo file (ie. the file exists and has been read).
+  bool hasSourceInfo() const { return Core->hasSourceInfo(); }
 
   /// Associates this module file with the AST node representing it.
   ///
@@ -700,7 +713,8 @@ public:
   Optional<CommentInfo> getCommentForDecl(const Decl *D) const;
   Optional<CommentInfo> getCommentForDeclByUSR(StringRef USR) const;
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const;
-  Optional<BasicDeclLocs> getBasicDeclLocsForDecl(const Decl *D) const;
+  Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const;
   Identifier getDiscriminatorForPrivateValue(const ValueDecl *D);
   Optional<Fingerprint> loadFingerprint(const IterableDeclContext *IDC) const;
   void collectBasicSourceFileInfo(

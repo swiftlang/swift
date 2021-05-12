@@ -1439,7 +1439,6 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
   SILBuilderWithScope builder(pai);
-  builder.addOpenedArchetypeOperands(pai);
   SILValue fnVal = builder.createFunctionRef(pai->getLoc(), clonedFn);
 
   // Populate the argument list for a new partial_apply instruction, taking into

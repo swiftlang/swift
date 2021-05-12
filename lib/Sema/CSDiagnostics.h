@@ -594,8 +594,11 @@ public:
                     ConstraintLocator *locator)
       : ContextualFailure(
             solution,
-            solution.getConstraintSystem().getContextualTypePurpose(
-                locator->getAnchor()),
+            locator->isForContextualType()
+                ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
+                      .getPurpose()
+                : solution.getConstraintSystem().getContextualTypePurpose(
+                      locator->getAnchor()),
             lhs, rhs, locator) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
@@ -767,6 +770,16 @@ private:
   void offerDefaultValueUnwrapFixIt(DeclContext *DC, const Expr *expr) const;
   /// Suggest a force optional unwrap via `!`
   void offerForceUnwrapFixIt(const Expr *expr) const;
+};
+
+class WrappedValueMismatch final : public ContextualFailure {
+public:
+  WrappedValueMismatch(const Solution &solution, Type fromType,
+                       Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {
+  }
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnostics for mismatched generic arguments e.g

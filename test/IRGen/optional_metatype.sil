@@ -22,6 +22,9 @@ import gizmo
 // armv7s:          icmp eq i32 %0, 0
 // armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
 // armv7k:          icmp eq i32 %0, 0
+// arm64_32-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
+// arm64_32:          icmp eq i32 %0, 0
+
 
 sil @optional_objc_metatype : $@convention(thin) (Optional<@objc_metatype Gizmo.Type>) -> () {
 bb0(%0 : $Optional<@objc_metatype Gizmo.Type>):
@@ -48,6 +51,8 @@ cont:
 // armv7s:           icmp eq i32 %0, 0
 // armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
 // armv7k:           icmp eq i32 %0, 0
+// arm64_32-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
+// arm64_32:           icmp eq i32 %0, 0
 
 sil @optional_swift_metatype : $@convention(thin) (Optional<@thick Gizmo.Type>) -> () {
 bb0(%0 : $Optional<@thick Gizmo.Type>):

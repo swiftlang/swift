@@ -14,12 +14,12 @@ enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func formGreeting(name: String) async -> String {
   return "Hello \(name) from async world"
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func testSimple(
   name: String, dogName: String, shouldThrow: Bool, doSuspend: Bool
 ) async {
@@ -72,7 +72,7 @@ func testSimple(
 }
 
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await testSimple(name: "Ted", dogName: "Hazel", shouldThrow: false, doSuspend: false)

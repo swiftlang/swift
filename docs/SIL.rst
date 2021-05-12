@@ -1862,7 +1862,7 @@ derived from the ARC object. As an example, consider the following Swift/SIL::
   bb0(%0 : @guaranteed Klass):
     // Definition of '%1'
     %1 = copy_value %0 : $Klass
-    
+
     // Consume '%1'. This means '%1' can no longer be used after this point. We
     // rebind '%1' in the destination blocks (bbYes, bbNo).
     checked_cast_br %1 : $Klass to $OtherKlass, bbYes, bbNo
@@ -3320,7 +3320,7 @@ lowered by the SIL pipeline, so that IR generation only operands of type
 The operand is a guaranteed operand, i.e. not consumed.
 
 extract_executor
-```````````````
+````````````````
 
 ::
 
@@ -4540,7 +4540,7 @@ prev_dynamic_function_ref
   // $@convention(thin) T -> U must be a thin function type
   // %1 has type $T -> U
 
-Creates a reference to a previous implemenation of a `dynamic_replacement` SIL
+Creates a reference to a previous implementation of a `dynamic_replacement` SIL
 function.
 
 For the following Swift code::

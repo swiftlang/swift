@@ -41,29 +41,29 @@ extension Enum: Equatable where T: Equatable {}
 // CHECK-RESILIENT-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 
 extension Enum: Hashable where T: Hashable {}
-// CHECK-LABEL: // Enum<A>.hashValue.getter
-// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
-
 // CHECK-LABEL: // Enum<A>.hash(into:)
 // CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
 
-extension Enum: Codable where T: Codable {}
-// CHECK-LABEL: // Enum<A>.init(from:)
-// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASeRzSERzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable, T : Encodable> (@in Decoder, @thin Enum<T>.Type) -> (@out Enum<T>, @error Error)
+// CHECK-LABEL: // Enum<A>.hashValue.getter
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASHRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
 
+extension Enum: Codable where T: Codable {}
 // CHECK-LABEL: // Enum<A>.encode(to:)
 // CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASeRzSERzlE6encode2toys7Encoder_p_tKF : $@convention(method) <T where T : Decodable, T : Encodable> (@in_guaranteed Encoder, @in_guaranteed Enum<T>) -> @error Error {
+
+// CHECK-LABEL: // Enum<A>.init(from:)
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASeRzSERzlE4fromACyxGs7Decoder_p_tKcfC : $@convention(method) <T where T : Decodable, T : Encodable> (@in Decoder, @thin Enum<T>.Type) -> (@out Enum<T>, @error Error)
 
 extension NoValues: CaseIterable {}
 // CHECK-LABEL: // static NoValues.allCases.getter
 // CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO8allCasesSayACGvgZ : $@convention(method) (@thin NoValues.Type) -> @owned Array<NoValues> {
 
 extension NoValues: Codable {}
-// CHECK-LABEL: // NoValues.init(from:)
-// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO4fromACs7Decoder_p_tKcfC : $@convention(method) (@in Decoder, @thin NoValues.Type) -> (NoValues, @error Error)
-
 // CHECK-LABEL: // NoValues.encode(to:)
 // CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO6encode2toys7Encoder_p_tKF : $@convention(method) (@in_guaranteed Encoder, NoValues) -> @error Error {
+
+// CHECK-LABEL: // NoValues.init(from:)
+// CHECK-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum8NoValuesO4fromACs7Decoder_p_tKcfC : $@convention(method) (@in Decoder, @thin NoValues.Type) -> (NoValues, @error Error)
 
 // Witness tables for Enum
 

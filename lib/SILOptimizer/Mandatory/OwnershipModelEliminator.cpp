@@ -67,14 +67,10 @@ struct OwnershipModelEliminatorVisitor
   /// builderCtxStorage.
   SILBuilderContext builderCtx;
 
-  SILOpenedArchetypesTracker openedArchetypesTracker;
-
   /// Construct an OME visitor for eliminating ownership from \p fn.
   OwnershipModelEliminatorVisitor(SILFunction &fn)
       : trackingList(), instructionsToSimplify(),
-        builderCtx(fn.getModule(), &trackingList),
-        openedArchetypesTracker(&fn) {
-    builderCtx.setOpenedArchetypesTracker(&openedArchetypesTracker);
+        builderCtx(fn.getModule(), &trackingList) {
   }
 
   /// A "syntactic" high level function that combines our insertPt with a
@@ -531,7 +527,7 @@ static bool stripOwnership(SILFunction &func) {
     auto value = visitor.instructionsToSimplify.pop_back_val();
     if (!value.hasValue())
       continue;
-    InstModCallbacks callbacks([&](SILInstruction *instToErase) {
+    auto callbacks = InstModCallbacks().onDelete([&](SILInstruction *instToErase) {
       visitor.eraseInstruction(instToErase);
     });
     // We are no longer in OSSA, so we don't need to pass in a deBlocks.

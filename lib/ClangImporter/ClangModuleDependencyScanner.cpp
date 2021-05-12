@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "ImporterImpl.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"

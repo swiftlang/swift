@@ -289,9 +289,10 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 /// by a high-level SIL optimization. Values of that type must not be split
 /// so that those high-level optimizations can analyze the code.
 static bool isSemanticType(ASTContext &ctxt, SILType ty) {
-  NominalTypeDecl *stringDecl = ctxt.getStringDecl();
-  if (ty.getStructOrBoundGenericStruct() == stringDecl)
+  if (ty.getASTType()->isString()) {
     return true;
+  }
+
   return false;
 }
 

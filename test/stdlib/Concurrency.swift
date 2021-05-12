@@ -4,7 +4,11 @@
 // Make sure the import succeeds
 import _Concurrency
 
-// Make sure the type shows up
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+// Make sure the type shows up (including under its old name, for
+// short-term source compatibility)
+@available(SwiftStdlib 5.5, *)
 extension PartialAsyncTask {
+}
+@available(SwiftStdlib 5.5, *)
+extension UnownedJob {
 }

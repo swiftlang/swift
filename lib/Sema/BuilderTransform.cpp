@@ -767,7 +767,7 @@ protected:
     // If needed, generate constraints for everything in the case statement.
     if (cs) {
       auto locator = cs->getConstraintLocator(
-          subjectExpr, LocatorPathElt::ContextualType());
+          subjectExpr, LocatorPathElt::ContextualType(CTP_Initialization));
       Type subjectType = cs->getType(subjectExpr);
 
       if (cs->generateConstraints(caseStmt, dc, subjectType, locator)) {
@@ -851,7 +851,7 @@ protected:
     cs->addConstraint(
         ConstraintKind::Equal, cs->getType(arrayInitExpr), arrayType,
         cs->getConstraintLocator(
-          arrayInitExpr, LocatorPathElt::ContextualType()));
+            arrayInitExpr, LocatorPathElt::ContextualType(CTP_Initialization)));
 
     // Form a call to Array.append(_:) to add the result of executing each
     // iteration of the loop body to the array formed above.
@@ -1691,16 +1691,15 @@ ConstraintSystem::matchResultBuilder(
   assert(builder->getAttrs().hasAttribute<ResultBuilderAttr>());
 
   if (InvalidResultBuilderBodies.count(fn)) {
-    (void)recordFix(
-        IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
-            *this, getConstraintLocator(fn.getAbstractClosureExpr())));
+    (void)recordFix(IgnoreInvalidResultBuilderBody::create(
+        *this, getConstraintLocator(fn.getAbstractClosureExpr())));
     return getTypeMatchSuccess();
   }
 
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request =
-      PreCheckResultBuilderRequest{{fn, /*SuppressDiagnostics=*/true}};
+      PreCheckResultBuilderRequest{{fn, /*SuppressDiagnostics=*/false}};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
                             ResultBuilderBodyPreCheck::Error)) {
   case ResultBuilderBodyPreCheck::Okay:
@@ -1708,10 +1707,12 @@ ConstraintSystem::matchResultBuilder(
     break;
 
   case ResultBuilderBodyPreCheck::Error: {
+    InvalidResultBuilderBodies.insert(fn);
+
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    if (recordFix(IgnoreInvalidResultBuilderBody::duringPreCheck(
+    if (recordFix(IgnoreInvalidResultBuilderBody::create(
             *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
       return getTypeMatchFailure(locator);
 
@@ -1776,9 +1777,8 @@ ConstraintSystem::matchResultBuilder(
     if (transaction.hasErrors()) {
       InvalidResultBuilderBodies.insert(fn);
 
-      if (recordFix(
-              IgnoreInvalidResultBuilderBody::duringConstraintGeneration(
-                  *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
+      if (recordFix(IgnoreInvalidResultBuilderBody::create(
+              *this, getConstraintLocator(fn.getAbstractClosureExpr()))))
         return getTypeMatchFailure(locator);
 
       return getTypeMatchSuccess();
@@ -1869,7 +1869,7 @@ public:
       DiagnosticTransaction transaction(diagEngine);
 
       HasError |= ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/false);
+          E, DC, /*replaceInvalidRefsWithErrors=*/true);
       HasError |= transaction.hasErrors();
 
       if (!HasError) {

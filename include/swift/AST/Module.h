@@ -23,8 +23,8 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/LookupKinds.h"
-#include "swift/AST/RawComment.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/BasicSourceInfo.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
@@ -356,6 +356,14 @@ public:
     ModuleABIName = name;
   }
 
+  /// User-defined module version number.
+  llvm::VersionTuple UserModuleVersion;
+  void setUserModuleVersion(llvm::VersionTuple UserVer) {
+    UserModuleVersion = UserVer;
+  }
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
 private:
   /// A cache of this module's underlying module and required bystander if it's
   /// an underscored cross-import overlay.
@@ -414,6 +422,14 @@ public:
   void setDebugClient(DebuggerClient *R) {
     assert(!DebugClient && "Debugger client already set");
     DebugClient = R;
+  }
+
+  /// Returns true if this module is compiled as static library.
+  bool isStaticLibrary() const {
+    return Bits.ModuleDecl.StaticLibrary;
+  }
+  void setStaticLibrary(bool isStatic = true) {
+    Bits.ModuleDecl.StaticLibrary = isStatic;
   }
 
   /// Returns true if this module was or is being compiled for testing.
@@ -593,9 +609,6 @@ public:
   void lookupObjCMethods(
          ObjCSelector selector,
          SmallVectorImpl<AbstractFunctionDecl *> &results) const;
-
-  Optional<Fingerprint>
-  loadFingerprint(const IterableDeclContext *IDC) const;
 
   /// Find all SPI names imported from \p importedModule by this module,
   /// collecting the identifiers in \p spiGroups.

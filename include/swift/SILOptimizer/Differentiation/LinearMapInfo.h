@@ -149,7 +149,7 @@ public:
 
   explicit LinearMapInfo(ADContext &context, AutoDiffLinearMapKind kind,
                          SILFunction *original, SILFunction *derivative,
-                         AutoDiffConfig config,
+                         const AutoDiffConfig &config,
                          const DifferentiableActivityInfo &activityInfo,
                          SILLoopInfo *loopInfo);
 

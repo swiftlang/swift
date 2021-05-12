@@ -2742,7 +2742,7 @@ public:
                                           StringRef blobData) {
     DeclContextID contextID;
     bool isIUO, isFailable;
-    bool isImplicit, isObjC, hasStubImplementation, throws;
+    bool isImplicit, isObjC, hasStubImplementation, throws, async;
     GenericSignatureID genericSigID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
@@ -2753,7 +2753,7 @@ public:
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                isFailable, isIUO, isImplicit,
                                                isObjC, hasStubImplementation,
-                                               throws, storedInitKind,
+                                               async, throws, storedInitKind,
                                                genericSigID,
                                                overriddenID,
                                                rawAccessLevel,
@@ -2808,6 +2808,8 @@ public:
 
     auto ctor = MF.createDecl<ConstructorDecl>(name, SourceLoc(), isFailable,
                                                /*FailabilityLoc=*/SourceLoc(),
+                                               /*Async=*/async,
+                                               /*AsyncLoc=*/SourceLoc(),
                                                /*Throws=*/throws,
                                                /*ThrowsLoc=*/SourceLoc(),
                                                /*BodyParams=*/nullptr,
@@ -4637,16 +4639,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::CompletionHandlerAsync_DECL_ATTR: {
+        bool isImplicit;
         uint64_t handlerIndex;
         uint64_t asyncFunctionDeclID;
         serialization::decls_block::CompletionHandlerAsyncDeclAttrLayout::
-            readRecord(scratch, handlerIndex, asyncFunctionDeclID);
+            readRecord(scratch, isImplicit, handlerIndex, asyncFunctionDeclID);
 
         auto mappedFunctionDecl =
             cast<AbstractFunctionDecl>(MF.getDecl(asyncFunctionDeclID));
         Attr = new (ctx) CompletionHandlerAsyncAttr(
             *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
-            /*atLoc*/ SourceLoc(), /*range*/ SourceRange());
+            /*atLoc*/ SourceLoc(), /*range*/ SourceRange(), isImplicit);
         break;
       }
 
@@ -5915,8 +5918,6 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   }
 #endif
 
-  // Invoke the callback on the deserialized type.
-  DeserializedTypeCallback(typeOrOffset.get());
   return typeOrOffset.get();
 }
 
@@ -6390,8 +6391,26 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-    auto second = getType(*rawIDIter++);
-    auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    auto secondOrError = getTypeChecked(*rawIDIter++);
+    Type second;
+    if (secondOrError) {
+      second = *secondOrError;
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
+      second = ErrorType::get(getContext());
+      consumeError(secondOrError.takeError());
+    } else {
+      fatal(secondOrError.takeError());
+    }
+    auto thirdOrError = getDeclChecked(*rawIDIter++);
+    TypeDecl *third;
+    if (thirdOrError) {
+      third = cast_or_null<TypeDecl>(*thirdOrError);
+    } else if (getContext().LangOpts.EnableDeserializationRecovery) {
+      third = nullptr;
+      consumeError(thirdOrError.takeError());
+    } else {
+      fatal(thirdOrError.takeError());
+    }
     if (third &&
         isa<TypeAliasDecl>(third) &&
         third->getModuleContext() != getAssociatedModule() &&

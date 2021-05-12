@@ -29,7 +29,7 @@ import UnbuildableCurrent
 // CURRENT: unbuildable.swift:[[@LINE-1]]:8: error: failed to build module 'UnbuildableCurrent' for importation due to the errors above; the textual interface may be broken by project issues or a compiler bug
 #else
 import UnbuildableFuture
-// FUTURE: unbuildable.swift:[[@LINE-1]]:8: error: failed to build module 'UnbuildableFuture' for importation due to the errors above; the textual interface may be broken by project issues, differences between compilers (the producer 'NeoTokyoSwift 2000.42' and this compiler '{{.*Swift version.*}}') or a compiler bug
+// FUTURE: unbuildable.swift:[[@LINE-1]]:8: error: failed to build module 'UnbuildableFuture'; this SDK is not supported by the compiler (the SDK is built with 'NeoTokyoSwift 2000.42', while this compiler is '{{.*Swift version.*}}'). Please select a toolchain which matches the SDK.
 #endif
 
 // CURRENT-VERIFY: UnbuildableCurrent.swiftinterface:1:1: error: failed to verify module interface of 'UnbuildableCurrent' due to the errors above; the textual interface may be broken by project issues or a compiler bug

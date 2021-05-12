@@ -43,6 +43,7 @@
 #ifdef OVERRIDE
 #  define OVERRIDE_ACTOR OVERRIDE
 #  define OVERRIDE_TASK OVERRIDE
+#  define OVERRIDE_ASYNC_LET OVERRIDE
 #  define OVERRIDE_TASK_GROUP OVERRIDE
 #  define OVERRIDE_TASK_LOCAL OVERRIDE
 #  define OVERRIDE_TASK_STATUS OVERRIDE
@@ -52,6 +53,9 @@
 #  endif
 #  ifndef OVERRIDE_TASK
 #    define OVERRIDE_TASK(...)
+#  endif
+#  ifndef OVERRIDE_ASYNC_LET
+#    define OVERRIDE_ASYNC_LET(...)
 #  endif
 #  ifndef OVERRIDE_TASK_GROUP
 #    define OVERRIDE_TASK_GROUP(...)
@@ -93,12 +97,13 @@ OVERRIDE_ACTOR(task_switch, void,
                (resumeToContext, resumeFunction, newExecutor))
 
 OVERRIDE_TASK(task_create_group_future_common, AsyncTaskAndContext, , , ,
-              (JobFlags flags, TaskGroup *group,
+              (size_t flags, TaskGroup *group,
                const Metadata *futureResultType,
                FutureAsyncSignature::FunctionType *function,
-               HeapObject */* +1 */ closureContext, size_t initialContextSize),
+               void *closureContext, bool isAsyncLetTask,
+               size_t initialContextSize),
               (flags, group, futureResultType, function, closureContext,
-               initialContextSize))
+               isAsyncLetTask, initialContextSize))
 
 OVERRIDE_TASK(task_future_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
               SWIFT_CC(swiftasync), swift::,
@@ -141,9 +146,44 @@ OVERRIDE_TASK(task_removeCancellationHandler, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (CancellationNotificationStatusRecord *record), (record))
 
+OVERRIDE_TASK(task_createNullaryContinuationJob, NullaryContinuationJob *,
+              SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+              (size_t priority,
+               AsyncTask *continuation), (priority, continuation))
+
 OVERRIDE_TASK(task_asyncMainDrainQueue, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               , )
+
+OVERRIDE_ASYNC_LET(asyncLet_start, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::,
+                   (AsyncLet *alet,
+                    const Metadata *futureResultType,
+                    void *closureEntryPoint,
+                    void *closureContext
+                   ),
+                   (alet, futureResultType,
+                    closureEntryPoint, closureContext))
+
+OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
+                   SWIFT_CC(swiftasync), swift::,
+                   (OpaqueValue *result,
+                       SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+                       AsyncLet *alet, Metadata *T),
+                   (result, rawContext, alet, T))
+
+OVERRIDE_ASYNC_LET(asyncLet_wait_throwing, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (OpaqueValue *result,
+                       SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+                       AsyncLet *alet, Metadata *T),
+                   (result, rawContext, alet, T))
+
+OVERRIDE_ASYNC_LET(asyncLet_end, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (AsyncLet *alet), (alet))
 
 OVERRIDE_TASK_GROUP(taskGroup_initialize, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -183,23 +223,35 @@ OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     swift::, (TaskGroup *group, bool unconditionally),
                     (group, unconditionally))
 
+
+OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
+                    (const unsigned char *file, uintptr_t fileLength,
+                        bool fileIsASCII, uintptr_t line),
+                    (file, fileLength, fileIsASCII, line))
+
 OVERRIDE_TASK_LOCAL(task_localValuePush, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
-                    (AsyncTask *task, const Metadata *keyType,
-                     OpaqueValue *value, const Metadata *valueType),
-                    (task, keyType, value, valueType))
+                    (const HeapObject *key, OpaqueValue *value,
+                     const Metadata *valueType),
+                    (key, value, valueType))
 
 OVERRIDE_TASK_LOCAL(task_localValueGet, OpaqueValue *,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
-                    (AsyncTask *task, const Metadata *keyType,
-                     TaskLocal::TaskLocalInheritance inheritance),
-                    (task, keyType, inheritance))
+                    (const HeapObject *key),
+                    (key))
 
 OVERRIDE_TASK_LOCAL(task_localValuePop, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                    swift::, (AsyncTask *task), (task))
+                    swift::, ,)
+
+OVERRIDE_TASK_LOCAL(task_localsCopyTo, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::,
+                    (AsyncTask *target),
+                    (target))
 
 OVERRIDE_TASK_STATUS(task_addStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -212,6 +264,10 @@ OVERRIDE_TASK_STATUS(task_tryAddStatusRecord, bool,
 OVERRIDE_TASK_STATUS(task_removeStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, (TaskStatusRecord *record), (record))
+
+OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, , )
 
 OVERRIDE_TASK_STATUS(task_attachChild, ChildTaskStatusRecord *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -240,6 +296,7 @@ OVERRIDE_TASK_STATUS(task_getNearestDeadline, NearestTaskDeadline,
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR
 #undef OVERRIDE_TASK
+#undef OVERRIDE_ASYNC_LET
 #undef OVERRIDE_TASK_GROUP
 #undef OVERRIDE_TASK_LOCAL
 #undef OVERRIDE_TASK_STATUS

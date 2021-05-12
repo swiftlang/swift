@@ -1,4 +1,3 @@
-// REQUIRES: rdar76544904
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.A -always-argument-labels > %t.printed.A.txt
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.B -always-argument-labels > %t.printed.B.txt
 
@@ -9,6 +8,9 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.APINotes -swift-version 5 -always-argument-labels | %FileCheck %s -check-prefix=PRINT-APINOTES-4 -strict-whitespace
 
 // RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
+
+// rdar://77558075
+// UNSUPPORTED: OS=tvos && CPU=x86_64
 
 // PRINT: struct Struct1 {
 // PRINT-NEXT:   var x: Double

@@ -431,7 +431,7 @@ def disable_swift3_objc_inference :
 
 def library_level : Separate<["-"], "library-level">,
   MetaVarName<"<level>">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Library distribution level 'api', 'spi' or 'other' (the default)">;
 
 def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,

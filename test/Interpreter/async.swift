@@ -7,7 +7,6 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: CPU=arm64e
 
 
 func sayHello() async {

@@ -279,6 +279,9 @@ FIXIT(insert_closure_return_type_placeholder,
       "%select{| () }0-> <#Result#> %select{|in }0",
       (bool))
 
+NOTE(use_of_anon_closure_param,none,
+     "anonymous closure parameter %0 is used here", (Identifier))
+
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
@@ -425,6 +428,9 @@ ERROR(cannot_convert_argument_value_anyobject,none,
       (Type, Type))
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+NOTE(note_incompatible_argument_value_nil_at_pos,none,
+     "'nil' is not compatible with expected argument type %0 at position #%1",
+     (Type, unsigned))
 
 ERROR(cannot_convert_condition_value,none,
       "cannot convert value of type %0 to expected condition type %1",
@@ -558,6 +564,13 @@ ERROR(throws_functiontype_mismatch,none,
 ERROR(async_functiontype_mismatch,none,
       "invalid conversion from 'async' function of type %0 to "
       "synchronous function type %1", (Type, Type))
+
+ERROR(cannot_pass_async_func_to_sync_parameter,none,
+      "cannot pass function of type %0 "
+      "to parameter expecting synchronous function type", (Type))
+
+NOTE(async_inferred_from_operation,none,
+     "'async' inferred from asynchronous operation used here", ())
 
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
@@ -704,7 +717,7 @@ ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
 ERROR(sema_no_import_target,Fatal,
       "could not find module '%0' for target '%1'; "
-      "found: %2", (StringRef, StringRef, StringRef))
+      "found: %2, at: %3", (StringRef, StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
 NOTE(sema_no_import_no_sdk,none,
@@ -728,6 +741,10 @@ ERROR(module_interface_build_failed,Fatal,
       "the textual interface may be broken by project issues"
       "%select{, differences between compilers (the producer '%3' and this compiler '%4')|}2 or a compiler bug",
       (bool, StringRef, bool, StringRef, StringRef))
+ERROR(module_interface_build_failed_mismatching_compiler,Fatal,
+      "failed to build module '%0'; this SDK is not supported by the compiler "
+      "(the SDK is built with '%1', while this compiler is '%2'). Please select a toolchain which matches the SDK.",
+      (StringRef, StringRef, StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -795,6 +812,8 @@ ERROR(serialization_error_type,Fatal,
 ERROR(serialization_allowing_error_type,none,
       "allowing deserialization of error type '%0' in module '%1'",
       (StringRef, StringRef))
+WARNING(serialization_malformed_sourceinfo,none,
+      "unable to use malformed module source info '%0'", (StringRef))
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -938,6 +957,9 @@ REMARK(cross_import_added,none,
 REMARK(module_loaded,none,
        "loaded module at %0",
        (StringRef))
+
+WARNING(cannot_find_project_version,none,
+        "cannot find user version number for %0 module '%1'; version number ignored", (StringRef, StringRef))
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
@@ -2605,12 +2627,8 @@ ERROR(override_dynamic_self_mismatch,none,
 ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
-ERROR(override_throws,none,
-      "cannot override non-throwing %select{method|initializer}0 with "
-      "throwing %select{method|initializer}0", (bool))
-// TODO: this really could be merged with the above.
 ERROR(override_with_more_effects,none,
-      "cannot override non-'%1' %0 with '%1' %0",
+      "cannot override non-%1 %0 with %1 %0",
       (DescriptiveDeclKind, StringRef))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
@@ -2957,7 +2975,8 @@ NOTE(codable_enum_duplicate_case_name_here,none,
 NOTE(codable_enum_duplicate_parameter_name_here,none,
      "cannot automatically synthesize %0 for %1 because "
      "user defined parameter name %2 in %3 conflicts with "
-     "automatically generated parameter name", (Type, Type, Identifier, Identifier))
+     "automatically generated parameter name",
+     (Type, Type, Identifier, Identifier))
 
 WARNING(decodable_property_will_not_be_decoded, none,
         "immutable property will not be decoded because it is declared with "
@@ -3465,7 +3484,7 @@ ERROR(cfclass_designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0",
       (DeclName))
 ERROR(enumstruct_convenience_init,none,
-      "delegating initializers in %0 are not marked with 'convenience'",
+      "initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
@@ -3903,6 +3922,11 @@ ERROR(return_init_non_nil,none,
       "'nil' is the only return value permitted in an initializer",
       ())
 
+ERROR(implicit_async_super_init,none,
+      "missing call to superclass's initializer; "
+      "'super.init' is 'async' and requires an explicit call",
+      ())
+
 WARNING(if_always_true,none,
         "'if' condition is always true", ())
 WARNING(while_always_true,none,
@@ -4248,17 +4272,17 @@ WARNING(no_throw_in_do_with_catch,none,
 //------------------------------------------------------------------------------
 // MARK: Concurrency
 //------------------------------------------------------------------------------
-ERROR(async_call_without_await,none,
-      "call is 'async' but is not marked with 'await'", ())
-ERROR(async_call_without_await_in_autoclosure,none,
-      "call is 'async' in an autoclosure argument that is not marked with 'await'", ())
-ERROR(async_call_without_await_in_async_let,none,
-      "call is 'async' in an 'async let' initializer that is not marked "
-      "with 'await'", ())
-ERROR(async_prop_access_without_await,none,
-      "property access is 'async' but is not marked with 'await'", ())
-ERROR(async_subscript_access_without_await,none,
-      "subscript access is 'async' but is not marked with 'await'", ())
+ERROR(async_expr_without_await,none,
+      "expression is 'async' but is not marked with 'await'", ())
+
+NOTE(async_access_without_await,none,
+    "%select{call|property access|subscript access|}0 is 'async'", (unsigned))
+
+NOTE(async_call_without_await_in_autoclosure,none,
+      "call is 'async' in an autoclosure argument", ())
+NOTE(async_call_without_await_in_async_let,none,
+      "call is 'async' in an 'async let' initializer", ())
+
 WARNING(no_async_in_await,none,
         "no 'async' operations occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
@@ -4285,7 +4309,7 @@ NOTE(note_add_globalactor_to_function,none,
      (StringRef, DescriptiveDeclKind, DeclName, Type))
 FIXIT(insert_globalactor_attr, "@%0 ", (Type))
 ERROR(not_objc_function_async,none,
-      "'async' function cannot be represented in Objective-C", ())
+      "'async' %0 cannot be represented in Objective-C", (DescriptiveDeclKind))
 NOTE(not_objc_function_type_async,none,
       "'async' function types cannot be represented in Objective-C", ())
 ERROR(actor_isolated_objc,none,
@@ -4305,8 +4329,8 @@ ERROR(async_let_not_initialized,none,
       "'async let' binding requires an initializer expression", ())
 ERROR(async_let_no_variables,none,
       "'async let' requires at least one named variable", ())
-ERROR(async_let_without_await,none,
-      "reference to async let %0 is not marked with 'await'", (DeclName))
+NOTE(async_let_without_await,none,
+      "reference to async let %0 is 'async'", (DeclName))
 ERROR(async_let_in_illegal_context,none,
       "async let %0 cannot be referenced in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
@@ -4346,8 +4370,15 @@ NOTE(objc_ambiguous_async_convention_candidate,none,
 ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
-ERROR(actor_with_nonactor_superclass,none,
-      "actor cannot inherit from non-actor class %0", (DeclName))
+ERROR(actor_inheritance,none,
+      "actor types do not support inheritance", ())
+
+ERROR(unowned_executor_outside_actor,none,
+      "'unownedExecutor' can only be implemented within the main "
+      "definition of an actor", ())
+ERROR(override_implicit_unowned_executor,none,
+      "cannot override an actor's 'unownedExecutor' property that wasn't "
+      "explicitly defined", ())
 
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
@@ -4380,6 +4411,12 @@ ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from %select{this|a non-isolated}3%select{| synchronous}5 context",
       (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
+ERROR(actor_isolated_call,none,
+      "call to %0 function in a synchronous %1 context",
+      (ActorIsolation, ActorIsolation))
+ERROR(actor_isolated_call_decl,none,
+      "call to %0 %1 %2 in a synchronous %3 context",
+      (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
@@ -5601,6 +5638,11 @@ ERROR(property_wrapper_dynamic_self_type, none,
       "property wrapper %select{wrapped value|projected value}0 cannot have "
       "dynamic Self type", (bool))
 
+ERROR(property_wrapper_var_must_be_static, none,
+      "property %0, must be static because property wrapper %1 can only "
+      "be applied to static properties",
+      (Identifier, Type))
+
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
       (Identifier))
@@ -5667,8 +5709,8 @@ ERROR(wrapped_value_mismatch, none,
       "property type %0 does not match 'wrappedValue' type %1",
       (Type, Type))
 ERROR(composed_property_wrapper_mismatch, none,
-      "composed wrapper type %0 does not match former 'wrappedValue' type %1",
-      (Type, Type))
+      "composed wrapper type %0 does not match type of '%1.wrappedValue', which is %2",
+      (Type, StringRef, Type))
 
 ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "

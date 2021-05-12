@@ -1728,7 +1728,7 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     IGM.emitDynamicReplacementOriginalFunctionThunk(f);
   }
 
-  if (f->isDynamicallyReplaceable()) {
+  if (f->isDynamicallyReplaceable() && !f->isAsync()) {
     IGM.createReplaceableProlog(*this, f);
   }
 
@@ -1956,6 +1956,11 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
         IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
         LinkEntity::forSILFunction(IGF.CurSILFn),
         Signature::forAsyncEntry(IGF.IGM, funcTy).getAsyncContextIndex());
+    if (IGF.CurSILFn->isDynamicallyReplaceable()) {
+      IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
+      // Remap the entry block.
+      IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(IGF.Builder.GetInsertBlock(), {});
+    }
   }
 
   SILFunctionConventions conv(funcTy, IGF.getSILModule());
@@ -2509,6 +2514,12 @@ static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
       return SpecialKind::TaskFutureWait;
     if (name.equals("swift_task_future_wait_throwing"))
       return SpecialKind::TaskFutureWaitThrowing;
+
+    if (name.equals("swift_asyncLet_wait"))
+      return SpecialKind::AsyncLetWait;
+    if (name.equals("swift_asyncLet_wait_throwing"))
+      return SpecialKind::AsyncLetWaitThrowing;
+
     if (name.equals("swift_taskGroup_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
   }
@@ -6146,12 +6157,8 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 }
 
 void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
-  if (!i->getFunction()->isAsync()) {
-    // This should never occur.
-    assert(false && "The hop_to_executor should have been eliminated");
-    return;
-  }
-  assert(i->getTargetExecutor()->getType().is<BuiltinExecutorType>());
+  assert(i->getTargetExecutor()->getType().getOptionalObjectType()
+           .is<BuiltinExecutorType>());
   llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
           llvm::Intrinsic::coro_async_resume, {});
 

@@ -764,7 +764,6 @@ public:
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
       options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
     ContextualTypePurpose ctp = CTP_ReturnStmt;
@@ -1506,7 +1505,6 @@ void StmtChecker::typeCheckASTNode(ASTNode &node) {
       options |= TypeCheckExprFlags::IsDiscarded;
     if (LeaveBraceStmtBodyUnchecked) {
       options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
     auto resultTy =
@@ -1597,6 +1595,9 @@ static Type getResultBuilderType(FuncDecl *FD) {
   return builderType;
 }
 
+/// Attempts to build an implicit call within the provided constructor
+/// to the provided class's zero-argument super initializer.
+/// @returns nullptr if there was an error and a diagnostic was emitted.
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
                                       ClassDecl *ClDecl) {
   ASTContext &Context = ctor->getASTContext();
@@ -1643,7 +1644,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     }
     return true;
   }
-  
+
   // For an implicitly generated super.init() call, make sure there's
   // only one designated initializer.
   if (implicitlyGenerated) {
@@ -1680,6 +1681,13 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       fromCtor->diagnose(diag::availability_unavailable_implicit_init,
                          ctor->getDescriptiveKind(), ctor->getName(),
                          superclassDecl->getName());
+    }
+
+    // Not allowed to implicitly generate a super.init() call if the init
+    // is async; that would hide the 'await' from the programmer.
+    if (ctor->hasAsync()) {
+      fromCtor->diagnose(diag::implicit_async_super_init);
+      return true; // considered an error
     }
   }
 

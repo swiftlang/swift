@@ -8,7 +8,7 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-class StringLike: CustomStringConvertible {
+final class StringLike: Sendable, CustomStringConvertible {
   let value: String
   init(_ value: String) {
     self.value = value
@@ -17,34 +17,24 @@ class StringLike: CustomStringConvertible {
   var description: String { value }
 }
 
+@available(SwiftStdlib 5.5, *)
+enum TL {
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension TaskLocalValues {
+  @TaskLocal
+  static var string: String = "<undefined>"
 
-  struct StringKey: TaskLocalKey {
-    static var defaultValue: String { .init("<undefined>") }
-  }
-  var string: StringKey { .init() }
+  @TaskLocal
+  static var number: Int = 0
 
-  struct NumberKey: TaskLocalKey {
-    static var defaultValue: Int { 0 }
-  }
-  var number: NumberKey { .init() }
+  @TaskLocal
+  static var never: StringLike = StringLike("<never>")
 
-  struct NeverKey: TaskLocalKey {
-    static var defaultValue: StringLike { .init("<never>") }
-  }
-  var never: NeverKey { .init() }
-
-  struct ClazzKey: TaskLocalKey {
-    static var defaultValue: ClassTaskLocal? { nil }
-  }
-  var clazz: ClazzKey { .init() }
-
+  @TaskLocal
+  static var clazz: ClassTaskLocal?
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-final class ClassTaskLocal {
+@available(SwiftStdlib 5.5, *)
+final class ClassTaskLocal: Sendable {
   init() {
     print("clazz init \(ObjectIdentifier(self))")
   }
@@ -54,47 +44,59 @@ final class ClassTaskLocal {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-func printTaskLocal<Key>(
-  _ key: KeyPath<TaskLocalValues, Key>,
-  _ expected: Key.Value? = nil,
-  file: String = #file, line: UInt = #line, function: String = #function
-) where Key: TaskLocalKey {
-  let value = Task.local(key)
-  print("\(Key.self): \(value) at \(file):\(line)")
+@available(SwiftStdlib 5.5, *)
+@discardableResult
+func printTaskLocalAsync<V>(
+    _ key: TaskLocal<V>,
+    _ expected: V? = nil,
+    file: String = #file, line: UInt = #line
+) async -> V? {
+  printTaskLocal(key, expected, file: file, line: line)
+}
+
+@available(SwiftStdlib 5.5, *)
+@discardableResult
+func printTaskLocal<V>(
+    _ key: TaskLocal<V>,
+    _ expected: V? = nil,
+    file: String = #file, line: UInt = #line
+) -> V? {
+  let value = key.get()
+  print("\(key) (\(value)) at \(file):\(line)")
   if let expected = expected {
     assert("\(expected)" == "\(value)",
-      "Expected [\(expected)] but found: \(value), at \(file):\(line)")
+        "Expected [\(expected)] but found: \(value), at \(file):\(line)")
   }
+  return expected
 }
 
 // ==== ------------------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func simple() async {
-  printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
-  await Task.withLocal(\.number, boundTo: 1) {
-    printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 1 {{.*}}
+  printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
+  TL.$number.withValue(1) {
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (1)
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func simple_deinit() async {
-  await Task.withLocal(\.clazz, boundTo: ClassTaskLocal()) {
+  TL.$clazz.withValue(ClassTaskLocal()) {
     // CHECK: clazz init [[C:.*]]
-    printTaskLocal(\.clazz) // CHECK: ClazzKey: Optional(main.ClassTaskLocal) {{.*}}
+    printTaskLocal(TL.$clazz) // CHECK: TaskLocal<Optional<ClassTaskLocal>>(defaultValue: nil) (Optional(main.ClassTaskLocal))
   }
   // CHECK: clazz deinit [[C]]
-  printTaskLocal(\.clazz) // CHECK: ClazzKey: nil {{.*}}
+  printTaskLocal(TL.$clazz) // CHECK: TaskLocal<Optional<ClassTaskLocal>>(defaultValue: nil) (nil)
 }
 
 struct Boom: Error {
   let value: String
 }
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func simple_throw() async {
   do {
-    try await Task.withLocal(\.clazz, boundTo: ClassTaskLocal()) {
+    try TL.$clazz.withValue(ClassTaskLocal()) {
       throw Boom(value: "oh no!")
     }
   } catch {
@@ -103,67 +105,101 @@ func simple_throw() async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested() async {
-  printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
-  await Task.withLocal(\.string, boundTo: "hello") {
-    printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 0 {{.*}}
-    printTaskLocal(\.string)// CHECK-NEXT: StringKey: hello {{.*}}
-    await Task.withLocal(\.number, boundTo: 2) {
-      printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 2 {{.*}}
-      printTaskLocal(\.string, "hello") // CHECK: StringKey: hello {{.*}}
+  printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  TL.$string.withValue("hello") {
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
+    printTaskLocal(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (hello)
+    TL.$number.withValue(2) {
+      printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (2)
+      printTaskLocal(TL.$string, "hello") // CHECK: TaskLocal<String>(defaultValue: <undefined>) (hello)
     }
-    printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 0 {{.*}}
-    printTaskLocal(\.string) // CHECK-NEXT: StringKey: hello {{.*}}
+    printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
+    printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (hello)
   }
-  printTaskLocal(\.number) // CHECK-NEXT: NumberKey: 0 {{.*}}
-  printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
+  printTaskLocal(TL.$number) // CHECK-NEXT: TaskLocal<Int>(defaultValue: 0) (0)
+  printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested_allContribute() async {
-  printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
-  await Task.withLocal(\.string, boundTo: "one") {
-    printTaskLocal(\.string, "one")// CHECK-NEXT: StringKey: one {{.*}}
-    await Task.withLocal(\.string, boundTo: "two") {
-      printTaskLocal(\.string, "two") // CHECK-NEXT: StringKey: two {{.*}}
-      await Task.withLocal(\.string, boundTo: "three") {
-        printTaskLocal(\.string, "three") // CHECK-NEXT: StringKey: three {{.*}}
+  printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  TL.$string.withValue("one") {
+    printTaskLocal(TL.$string, "one")// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    TL.$string.withValue("two") {
+      printTaskLocal(TL.$string, "two") // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (two)
+      TL.$string.withValue("three") {
+        printTaskLocal(TL.$string, "three") // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (three)
       }
-      printTaskLocal(\.string, "two") // CHECK-NEXT: StringKey: two {{.*}}
+      printTaskLocal(TL.$string, "two") // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (two)
     }
-    printTaskLocal(\.string, "one")// CHECK-NEXT: StringKey: one {{.*}}
+    printTaskLocal(TL.$string, "one")// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
   }
-  printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
+  printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func nested_3_onlyTopContributes() async {
-  printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
-  await Task.withLocal(\.string, boundTo: "one") {
-    printTaskLocal(\.string)// CHECK-NEXT: StringKey: one {{.*}}
-    await Task.withLocal(\.number, boundTo: 2) {
-      printTaskLocal(\.string) // CHECK-NEXT: StringKey: one {{.*}}
-      await Task.withLocal(\.number, boundTo: 3) {
-        printTaskLocal(\.string) // CHECK-NEXT: StringKey: one {{.*}}
+  printTaskLocal(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  TL.$string.withValue("one") {
+    printTaskLocal(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    TL.$number.withValue(2) {
+      printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+      TL.$number.withValue(3) {
+        printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
       }
-      printTaskLocal(\.string) // CHECK-NEXT: StringKey: one {{.*}}
+      printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
     }
-    printTaskLocal(\.string)// CHECK-NEXT: StringKey: one {{.*}}
+    printTaskLocal(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
   }
-  printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
+  printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
+func nested_3_onlyTopContributesAsync() async {
+  await printTaskLocalAsync(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  await TL.$string.withValue("one") {
+    await printTaskLocalAsync(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    await TL.$number.withValue(2) {
+      await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+      await TL.$number.withValue(3) {
+        await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+      }
+      await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    }
+    await printTaskLocalAsync(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+  }
+  await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+}
+
+@available(SwiftStdlib 5.5, *)
+func nested_3_onlyTopContributesMixed() async {
+  await printTaskLocalAsync(TL.$string) // CHECK: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+  await TL.$string.withValue("one") {
+    await printTaskLocalAsync(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    await TL.$number.withValue(2) {
+      printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+      TL.$number.withValue(3) {
+        printTaskLocal(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+      }
+      await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+    }
+    await printTaskLocalAsync(TL.$string)// CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (one)
+  }
+  await printTaskLocalAsync(TL.$string) // CHECK-NEXT: TaskLocal<String>(defaultValue: <undefined>) (<undefined>)
+}
+
+@available(SwiftStdlib 5.5, *)
 func withLocal_body_mustNotEscape() async {
   var something = "Nice"
-  await Task.withLocal(\.string, boundTo: "xxx") {
+  TL.$string.withValue("xxx") {
     something = "very nice"
   }
   _ = something // silence not used warning
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await simple()
@@ -172,5 +208,7 @@ func withLocal_body_mustNotEscape() async {
     await nested()
     await nested_allContribute()
     await nested_3_onlyTopContributes()
+    await nested_3_onlyTopContributesAsync()
+    await nested_3_onlyTopContributesMixed()
   }
 }

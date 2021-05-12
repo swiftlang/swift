@@ -167,6 +167,14 @@ class HostSpecificConfiguration(object):
                 else:
                     subset_suffix = ""
 
+                # If the compiler is being tested after being built to use the
+                # standalone swift-driver, we build a test-target to
+                # run a reduced set of lit-tests that verify the early swift-driver.
+                if getattr(args, 'test_early_swift_driver', False) and\
+                   not test_host_only:
+                    self.swift_test_run_targets.append(
+                        "check-swift-only_early_swiftdriver-{}".format(name))
+
                 # Support for running the macCatalyst tests with
                 # the iOS-like target triple.
                 macosx_platform_match = re.search("macosx-(.*)", name)
@@ -180,6 +188,7 @@ class HostSpecificConfiguration(object):
                     (self.swift_test_run_targets
                      .append("check-swift{}{}-{}".format(
                          subset_suffix, suffix, name)))
+
                 if args.test_optimized and not test_host_only:
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize-{}".format(
@@ -267,6 +276,9 @@ class HostSpecificConfiguration(object):
         if not args.test_ios_32bit_simulator:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.i386)
+        if not args.test_watchos_32bit_simulator:
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator.i386)
         if host_target == StdlibDeploymentTarget.OSX.x86_64.name:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.arm64)
@@ -283,6 +295,8 @@ class HostSpecificConfiguration(object):
                 StdlibDeploymentTarget.AppleTVSimulator.x86_64)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.i386)
+            platforms_archs_to_skip_test.add(
+                StdlibDeploymentTarget.AppleWatchSimulator.x86_64)
 
         return platforms_archs_to_skip_test
 

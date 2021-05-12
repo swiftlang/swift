@@ -493,6 +493,10 @@ bool CompletionInstance::performCachedOperationIfPossible(
   {
     PrettyStackTraceDeclContext trace("performing cached completion", traceDC);
 
+    // The diagnostic engine is keeping track of state which might modify
+    // parsing and type checking behaviour. Clear the flags.
+    CI.getDiags().resetHadAnyError();
+
     if (DiagC)
       CI.addDiagnosticConsumer(DiagC);
 

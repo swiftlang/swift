@@ -550,11 +550,11 @@ void BindingSet::addBinding(PotentialBinding binding) {
 
     if (type->isCGFloatType() &&
         llvm::any_of(Bindings, [](const PotentialBinding &binding) {
-          return binding.BindingType->isDoubleType();
+          return binding.BindingType->isDouble();
         }))
       return;
 
-    if (type->isDoubleType()) {
+    if (type->isDouble()) {
       auto inferredCGFloat =
           llvm::find_if(Bindings, [](const PotentialBinding &binding) {
             return binding.BindingType->isCGFloatType();
@@ -1114,7 +1114,7 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     if (locator->isKeyPathType()) {
       auto *BGT =
           type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
-      if (!BGT || !isKnownKeyPathDecl(CS.getASTContext(), BGT->getDecl()))
+      if (!BGT || !isKnownKeyPathType(BGT))
         return None;
     }
 
@@ -1645,6 +1645,15 @@ bool TypeVarBindingProducer::computeNext() {
 
     newBindings.push_back(std::move(binding));
   };
+
+  // Let's attempt only directly inferrable bindings for
+  // a type variable representing a closure type because
+  // such type variables are handled specially and only
+  // bound to a type inferred from their expression, having
+  // contextual bindings is just a trigger for that to
+  // happen.
+  if (TypeVar->getImpl().isClosureType())
+    return false;
 
   for (auto &binding : Bindings) {
     const auto type = binding.BindingType;

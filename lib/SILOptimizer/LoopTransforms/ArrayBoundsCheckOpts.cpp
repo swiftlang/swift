@@ -783,12 +783,6 @@ public:
   }
 };
 
-static bool hasArrayType(SILValue Value, SILModule &M) {
-  return Value->getType().getNominalOrBoundGenericNominal() ==
-           M.getASTContext().getArrayDecl();
-}
-
-
 /// A dominating cond_fail on the same value ensures that this value is false.
 static bool isValueKnownFalseAt(SILValue Val, SILInstruction *At,
                                 DominanceInfo *DT) {
@@ -870,6 +864,10 @@ static void reportBoundsChecks(SILFunction *F) {
 #endif
 
 namespace {
+
+// Should be more than enough to cover "usual" functions.
+static constexpr int maxRecursionDepth = 500;
+
 /// Remove redundant checks in basic blocks and hoist redundant checks out of
 /// loops.
 class ABCOpt : public SILFunctionTransform {
@@ -891,13 +889,15 @@ private:
   /// Walk down the dominator tree inside the loop, removing redundant checks.
   bool removeRedundantChecksInLoop(DominanceInfoNode *CurBB, ABCAnalysis &ABC,
                                    IndexedArraySet &DominatingSafeChecks,
-                                   SILLoop *Loop);
+                                   SILLoop *Loop,
+                                   int recursionDepth);
   /// Analyze the loop for arrays that are not modified and perform dominator
   /// tree based redundant bounds check removal.
   bool hoistChecksInLoop(DominanceInfoNode *DTNode, ABCAnalysis &ABC,
                          InductionAnalysis &IndVars, SILBasicBlock *Preheader,
                          SILBasicBlock *Header,
-                         SILBasicBlock *SingleExitingBlk);
+                         SILBasicBlock *SingleExitingBlk,
+                         int recursionDepth);
 
 public:
   void run() override {
@@ -1055,10 +1055,16 @@ bool ABCOpt::removeRedundantChecksInBlock(SILBasicBlock &BB) {
 bool ABCOpt::removeRedundantChecksInLoop(DominanceInfoNode *CurBB,
                                          ABCAnalysis &ABC,
                                          IndexedArraySet &DominatingSafeChecks,
-                                         SILLoop *Loop) {
+                                         SILLoop *Loop,
+                                         int recursionDepth) {
   auto *BB = CurBB->getBlock();
   if (!Loop->contains(BB))
     return false;
+
+  // Avoid a stack overflow for very deep dominator trees.
+  if (recursionDepth >= maxRecursionDepth)
+    return false;
+
   bool Changed = false;
 
   // When we come back from the dominator tree recursion we need to remove
@@ -1112,7 +1118,8 @@ bool ABCOpt::removeRedundantChecksInLoop(DominanceInfoNode *CurBB,
   // Traverse the children in the dominator tree inside the loop.
   for (auto Child : *CurBB)
     Changed |=
-        removeRedundantChecksInLoop(Child, ABC, DominatingSafeChecks, Loop);
+        removeRedundantChecksInLoop(Child, ABC, DominatingSafeChecks, Loop,
+        recursionDepth + 1);
 
   // Remove checks we have seen for the first time.
   std::for_each(SafeChecksToPop.begin(), SafeChecksToPop.end(),
@@ -1155,7 +1162,8 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
   // check for safety outside the loop (with ABCAnalysis).
   IndexedArraySet DominatingSafeChecks;
   bool Changed = removeRedundantChecksInLoop(DT->getNode(Header), ABC,
-                                             DominatingSafeChecks, Loop);
+                                             DominatingSafeChecks, Loop,
+                                             /*recursionDepth*/ 0);
 
   if (!EnableABCHoisting)
     return Changed;
@@ -1261,7 +1269,7 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
 
   // Hoist bounds checks.
   Changed |= hoistChecksInLoop(DT->getNode(Header), ABC, IndVars, Preheader,
-                               Header, SingleExitingBlk);
+                               Header, SingleExitingBlk, /*recursionDepth*/ 0);
   if (Changed) {
     Preheader->getParent()->verify();
   }
@@ -1271,7 +1279,12 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
 bool ABCOpt::hoistChecksInLoop(DominanceInfoNode *DTNode, ABCAnalysis &ABC,
                                InductionAnalysis &IndVars,
                                SILBasicBlock *Preheader, SILBasicBlock *Header,
-                               SILBasicBlock *SingleExitingBlk) {
+                               SILBasicBlock *SingleExitingBlk,
+                               int recursionDepth) {
+  // Avoid a stack overflow for very deep dominator trees.
+  if (recursionDepth >= maxRecursionDepth)
+    return false;
+
   bool Changed = false;
   auto *CurBB = DTNode->getBlock();
   bool blockAlwaysExecutes =
@@ -1339,7 +1352,7 @@ bool ABCOpt::hoistChecksInLoop(DominanceInfoNode *DTNode, ABCAnalysis &ABC,
     // Check if the loop iterates from 0 to the count of this array.
     if (F.isZeroToCount(ArrayVal) &&
         // This works only for Arrays but not e.g. for ArraySlice.
-        hasArrayType(ArrayVal, Header->getModule())) {
+        ArrayVal->getType().getASTType()->isArray()) {
       // We can remove the check. This is even possible if the block does not
       // dominate the loop exit block.
       Changed = true;
@@ -1370,7 +1383,7 @@ bool ABCOpt::hoistChecksInLoop(DominanceInfoNode *DTNode, ABCAnalysis &ABC,
   // Traverse the children in the dominator tree.
   for (auto Child : *DTNode)
     Changed |= hoistChecksInLoop(Child, ABC, IndVars, Preheader, Header,
-                                 SingleExitingBlk);
+                                 SingleExitingBlk, recursionDepth + 1);
 
   return Changed;
 }

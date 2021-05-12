@@ -36,7 +36,6 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/TypeLowering.h"

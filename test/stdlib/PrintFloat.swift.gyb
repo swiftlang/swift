@@ -6,6 +6,9 @@
 // RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out --locale ru_RU.UTF-8
 // REQUIRES: executable_test
 
+// rdar://77087867
+// UNSUPPORTED: CPU=arm64_32 && OS=watchos
+
 import StdlibUnittest
 #if canImport(Darwin)
   import Darwin

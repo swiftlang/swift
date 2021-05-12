@@ -29,7 +29,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   // still async version...
   let _: Int = slowServer.doSomethingConflicted("thinking")
-  // expected-error@-1{{call is 'async' but is not marked with 'await'}}{{16-16=await }}
+  // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{16-16=await }}
+  // expected-note@-2{{call is 'async'}}
 
   let _: String? = try await slowServer.fortune()
   let _: Int = try await slowServer.magicNumber(withSeed: 42)
@@ -152,7 +153,7 @@ class MyButton : NXButton {
   }
 
   @SomeGlobalActor func testOther() {
-    onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
+    onButtonPress() // expected-error{{call to main actor-isolated instance method 'onButtonPress()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
   }
 
   func test() {
@@ -162,4 +163,11 @@ class MyButton : NXButton {
 
 func testButtons(mb: MyButton) {
   mb.onButtonPress()
+}
+
+
+func testMirrored(instance: ClassWithAsync) async {
+  await instance.instanceAsync()
+  await instance.protocolMethod()
+  await instance.customAsyncName()
 }

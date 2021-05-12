@@ -296,7 +296,7 @@ internal enum _KnownCocoaString {
   case storage
   case shared
   case cocoa
-#if !(arch(i386) || arch(arm) || arch(wasm32))
+#if !(arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32))
   case tagged
 #endif
 #if arch(arm64)
@@ -306,7 +306,7 @@ internal enum _KnownCocoaString {
   @inline(__always)
   init(_ str: _CocoaString) {
 
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
     if _isObjCTaggedPointer(str) {
 #if arch(arm64)
       if let _ = getConstantTaggedCocoaContents(str) {
@@ -332,7 +332,7 @@ internal enum _KnownCocoaString {
   }
 }
 
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
 
 // Resiliently write a tagged _CocoaString's contents into a buffer.
 // TODO: move this to the Foundation overlay and reimplement it with
@@ -362,7 +362,7 @@ private func _withCocoaASCIIPointer<R>(
   requireStableAddress: Bool,
   work: (UnsafePointer<UInt8>) -> R?
 ) -> R? {
-  #if !(arch(i386) || arch(arm))
+  #if !(arch(i386) || arch(arm) || arch(arm64_32))
   if _isObjCTaggedPointer(str) {
     if let ptr = getConstantTaggedCocoaContents(str)?.asciiContentsPointer {
       return work(ptr)
@@ -502,7 +502,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   case .shared:
     return _unsafeUncheckedDowncast(
       cocoaString, to: __SharedStringStorage.self).asString._guts
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
   case .tagged:
     return _StringGuts(_SmallString(taggedCocoa: cocoaString))
 #if arch(arm64)
@@ -529,7 +529,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     let immutableCopy
       = _stdlib_binary_CFStringCreateCopy(cocoaString)
 
-#if !(arch(i386) || arch(arm))
+#if !(arch(i386) || arch(arm) || arch(arm64_32))
     if _isObjCTaggedPointer(immutableCopy) {
       return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
     }

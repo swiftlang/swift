@@ -388,3 +388,19 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
                                      const OperandOwnership &operandOwnership) {
   return os << operandOwnership.asString();
 }
+
+//===----------------------------------------------------------------------===//
+//                              PlaceholderValue
+//===----------------------------------------------------------------------===//
+
+int PlaceholderValue::numPlaceholderValuesAlive = 0;
+
+PlaceholderValue::PlaceholderValue(SILType type)
+      : ValueBase(ValueKind::PlaceholderValue, type) {
+  numPlaceholderValuesAlive++;
+}
+
+PlaceholderValue::~PlaceholderValue() {
+  numPlaceholderValuesAlive--;
+}
+

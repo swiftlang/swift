@@ -8,88 +8,77 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-class StringLike: CustomStringConvertible {
-  let value: String
-  init(_ value: String) {
-    self.value = value
-  }
-
-  var description: String { value }
+@available(SwiftStdlib 5.5, *)
+enum TL {
+  @TaskLocal
+  static var number = 0
 }
 
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension TaskLocalValues {
-  struct NumberKey: TaskLocalKey {
-    static var defaultValue: Int { 0 }
-  }
-  var number: NumberKey { .init() }
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-func printTaskLocal<Key>(
-  _ key: KeyPath<TaskLocalValues, Key>,
-  _ expected: Key.Value? = nil,
-  file: String = #file, line: UInt = #line
-) where Key: TaskLocalKey {
-  let value = Task.local(key)
-  print("\(Key.self): \(value) at \(file):\(line)")
+@available(SwiftStdlib 5.5, *)
+@discardableResult
+func printTaskLocal<V>(
+    _ key: TaskLocal<V>,
+    _ expected: V? = nil,
+    file: String = #file, line: UInt = #line
+) -> V? {
+  let value = key.get()
+  print("\(key) (\(value)) at \(file):\(line)")
   if let expected = expected {
     assert("\(expected)" == "\(value)",
-      "Expected [\(expected)] but found: \(value), at \(file):\(line)")
+        "Expected [\(expected)] but found: \(value), at \(file):\(line)")
   }
+  return expected
 }
 
 // ==== ------------------------------------------------------------------------
 
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func groups() async {
   // no value
-  try! await withTaskGroup(of: Int.self) { group in
-    printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
+  _ = await withTaskGroup(of: Int.self) { group in
+    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
   }
 
   // no value in parent, value in child
-  let x1: Int = try! await withTaskGroup(of: Int.self) { group in
+  let x1: Int = await withTaskGroup(of: Int.self) { group in
     group.spawn {
-      printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
       // inside the child task, set a value
-      await Task.withLocal(\.number, boundTo: 1) {
-        printTaskLocal(\.number) // CHECK: NumberKey: 1 {{.*}}
+      _ = TL.$number.withValue(1) {
+        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1)
       }
-      printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
-      return Task.local(\.number) // 0
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
+      return TL.$number.get() // 0
     }
 
-    return try! await group.next()!
+    return await group.next()!
   }
   assert(x1 == 0)
 
   // value in parent and in groups
-  await Task.withLocal(\.number, boundTo: 2) {
-    printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+  await TL.$number.withValue(2) {
+    printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2)
 
-    let x2: Int = try! await withTaskGroup(of: Int.self) { group in
-      printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+    let x2: Int = await withTaskGroup(of: Int.self) { group in
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2)
       group.spawn {
-        printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2)
 
-        async let childInsideGroupChild: () = printTaskLocal(\.number)
-        await childInsideGroupChild // CHECK: NumberKey: 2 {{.*}}
+        async let childInsideGroupChild = printTaskLocal(TL.$number)
+        _ = await childInsideGroupChild // CHECK: TaskLocal<Int>(defaultValue: 0) (2)
 
-        return Task.local(\.number)
+        return TL.$number.get()
       }
-      printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2)
 
-      return try! await group.next()!
+      return await group.next()!
     }
 
     assert(x2 == 2)
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await groups()

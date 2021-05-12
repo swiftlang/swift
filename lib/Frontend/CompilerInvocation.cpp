@@ -331,6 +331,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_experimental_spi_imports);
   Opts.DebugPrintInvalidSyntax |=
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
+
+  if (const Arg *A = Args.getLastArg(OPT_library_level)) {
+    StringRef contents = A->getValue();
+    if (contents == "spi") {
+      Opts.PrintSPIs = true;
+    }
+  }
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -704,21 +711,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
 
+  // Configure lexing to parse and remember comments if:
+  //   - Emitting a swiftdoc/swiftsourceinfo
+  //   - Performing index-while-building
+  //   - Emitting a symbol graph file
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
-  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath()) {
-    Opts.AttachCommentsToDecls = true;
-  }
-
-  // If we are doing index-while-building, configure lexing and parsing to
-  // remember comments.
-  if (!FrontendOpts.IndexStorePath.empty()) {
-    Opts.AttachCommentsToDecls = true;
-  }
-
-  // If we are emitting a symbol graph file, configure lexing and parsing to
-  // remember comments.
-  if (FrontendOpts.EmitSymbolGraph) {
+  if (FrontendOpts.InputsAndOutputs.hasModuleDocOutputPath() ||
+      FrontendOpts.InputsAndOutputs.hasModuleSourceInfoOutputPath() ||
+      !FrontendOpts.IndexStorePath.empty() || FrontendOpts.EmitSymbolGraph) {
     Opts.AttachCommentsToDecls = true;
   }
 
@@ -1222,6 +1223,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
+  Opts.EnableActorDataRaceChecks |= Args.hasFlag(
+      OPT_enable_actor_data_race_checks,
+      OPT_disable_actor_data_race_checks, /*default=*/false);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);

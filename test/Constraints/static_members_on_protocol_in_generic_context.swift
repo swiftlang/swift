@@ -299,3 +299,20 @@ func test_fixit_with_where_clause() {
   func test_assoc<T: TestWithAssoc>(_: T) {}
   test_assoc(.intVar) // expected-error {{contextual member reference to static property 'intVar' requires 'Self' constraint in the protocol extension}}
 }
+
+// rdar://77700261 - incorrect warning about assuming non-optional base for unresolved member lookup
+struct WithShadowedMember : P {}
+
+extension WithShadowedMember {
+  static var warnTest: WithShadowedMember { get { WithShadowedMember() } }
+}
+
+extension P where Self == WithShadowedMember {
+  static var warnTest: WithShadowedMember { get { fatalError() } }
+}
+
+func test_no_warning_about_optional_base() {
+  func test(_: WithShadowedMember?) {}
+
+  test(.warnTest) // Ok and no warning even though the `warnTest` name is shadowed
+}

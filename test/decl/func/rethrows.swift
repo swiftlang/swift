@@ -71,10 +71,10 @@ class C1 : Super {
 
 class C2 : Super {
   override func tf() throws {}
-  override func nf() throws {} // expected-error {{cannot override non-throwing method with throwing method}}
+  override func nf() throws {} // expected-error {{cannot override non-throwing instance method with throwing instance method}}
 
   override func thf(_ f: () throws -> ()) throws {}
-  override func nhf(_ f: () throws -> ()) throws {} // expected-error {{cannot override non-throwing method with throwing method}}
+  override func nhf(_ f: () throws -> ()) throws {} // expected-error {{cannot override non-throwing instance method with throwing instance method}}
   override func rhf(_ f: () throws -> ()) throws {} // expected-error {{override of 'rethrows' method should also be 'rethrows'}}
 }
 
@@ -83,7 +83,7 @@ class C3 : Super {
   override func nf() {}
 
   override func thf(_ f: () throws -> ()) rethrows {}
-  override func nhf(_ f: () throws -> ()) rethrows {} // expected-error {{cannot override non-throwing method with throwing method}}
+  override func nhf(_ f: () throws -> ()) rethrows {} // expected-error {{cannot override non-throwing instance method with throwing instance method}}
   override func rhf(_ f: () throws -> ()) rethrows {}
 }
 

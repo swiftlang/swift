@@ -77,7 +77,7 @@ internal struct _StringObject {
     internal init(zero: ()) { self._storage = 0 }
   }
 
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   @usableFromInline @frozen
   internal enum Variant {
     case immortal(UInt)
@@ -169,7 +169,7 @@ extension _StringObject {
   @usableFromInline
   internal typealias RawBitPattern = (UInt64, UInt64)
 
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   // On 32-bit platforms, raw bit conversion is one-way only and uses the same
   // layout as on 64-bit platforms.
   @usableFromInline
@@ -246,7 +246,7 @@ extension _StringObject {
 
   @inlinable @_transparent
   internal var discriminatedObjectRawBits: UInt64 {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     let low32: UInt
     switch _variant {
     case .immortal(let bitPattern):
@@ -388,7 +388,7 @@ extension _StringObject.Nibbles {
 extension _StringObject {
   @inlinable @inline(__always)
   internal static var nativeBias: UInt {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     return 20
 #else
     return 32
@@ -513,7 +513,7 @@ extension _StringObject {
     // spare bits (the most significant nibble) in a pointer.
     let word1 = small.rawBits.0.littleEndian
     let word2 = small.rawBits.1.littleEndian
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     // On 32-bit, we need to unpack the small string.
     let smallStringDiscriminatorAndCount: UInt64 = 0xFF00_0000_0000_0000
 
@@ -557,7 +557,7 @@ extension _StringObject {
   @inlinable @inline(__always)
   internal init(empty:()) {
     // Canonical empty pattern: small zero-length string
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self.init(
       count: 0,
       variant: .immortal(0),
@@ -820,7 +820,7 @@ extension _StringObject {
 
   @inline(__always)
   internal var nativeStorage: __StringStorage {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
     }
@@ -833,7 +833,7 @@ extension _StringObject {
 
   @inline(__always)
   internal var sharedStorage: __SharedStringStorage {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
     }
@@ -847,7 +847,7 @@ extension _StringObject {
 
   @inline(__always)
   internal var cocoaObject: AnyObject {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     guard case .bridged(let object) = _variant else {
       _internalInvariantFailure()
     }
@@ -944,7 +944,7 @@ extension _StringObject {
   internal init(immortal bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
     let countAndFlags = CountAndFlags(
       immortalCount: bufPtr.count, isASCII: isASCII)
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self.init(
       variant: .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
       discriminator: Nibbles.largeImmortal(),
@@ -964,7 +964,7 @@ extension _StringObject {
 
   @inline(__always)
   internal init(_ storage: __StringStorage) {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self.init(
       variant: .native(storage),
       discriminator: Nibbles.largeMortal(),
@@ -978,7 +978,7 @@ extension _StringObject {
   }
 
   internal init(_ storage: __SharedStringStorage) {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self.init(
       variant: .native(storage),
       discriminator: Nibbles.largeMortal(),
@@ -996,7 +996,7 @@ extension _StringObject {
   ) {
     let countAndFlags = CountAndFlags(sharedCount: length, isASCII: isASCII)
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     self.init(
       variant: .bridged(cocoa),
       discriminator: discriminator,
@@ -1018,7 +1018,7 @@ extension _StringObject {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if arch(i386) || arch(arm) || arch(wasm32)
+    #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     _internalInvariant(MemoryLayout<_StringObject>.size == 12)
     _internalInvariant(MemoryLayout<_StringObject>.stride == 12)
     _internalInvariant(MemoryLayout<_StringObject>.alignment == 4)
@@ -1088,7 +1088,7 @@ extension _StringObject {
       }
     }
 
-    #if arch(i386) || arch(arm) || arch(wasm32)
+    #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     switch _variant {
     case .immortal:
       _internalInvariant(isImmortal)
@@ -1108,7 +1108,7 @@ extension _StringObject {
     let raw = self.rawBits
     let word0 = ("0000000000000000" + String(raw.0, radix: 16)).suffix(16)
     let word1 = ("0000000000000000" + String(raw.1, radix: 16)).suffix(16)
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     print("""
       StringObject(\
       <\(word0) \(word1)> \

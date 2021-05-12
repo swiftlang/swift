@@ -187,6 +187,13 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     InputInfo.getPrimarySpecificPaths().SupplementaryOutputs;
     StringRef OutPath = OutputInfo.ModuleOutputPath;
 
+    // Bail out if we're going to use the standard library but can't load it. If
+    // we don't do this before we try to build the interface, we could end up
+    // trying to rebuild a broken standard library dozens of times due to
+    // multiple calls to `ASTContext::getStdlibModule()`.
+    if (SubInstance.loadStdlibIfNeeded())
+      return std::make_error_code(std::errc::not_supported);
+
     // Build the .swiftmodule; this is a _very_ abridged version of the logic
     // in performCompile in libFrontendTool, specialized, to just the one
     // module-serialization task we're trying to do here.
@@ -203,9 +210,14 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
             getSwiftInterfaceCompilerVersionForCurrentCompiler(
                 SubInstance.getASTContext());
         StringRef emittedByCompiler = info.CompilerVersion;
-        diagnose(diag::module_interface_build_failed, isTypeChecking,
-                 moduleName, emittedByCompiler == builtByCompiler,
-                 emittedByCompiler, builtByCompiler);
+        if (!isTypeChecking && emittedByCompiler != builtByCompiler) {
+          diagnose(diag::module_interface_build_failed_mismatching_compiler,
+                   moduleName, emittedByCompiler, builtByCompiler);
+        } else {
+          diagnose(diag::module_interface_build_failed, isTypeChecking,
+                   moduleName, emittedByCompiler == builtByCompiler,
+                   emittedByCompiler, builtByCompiler);
+        }
       }
     };
 
@@ -233,6 +245,7 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
     SerializationOpts.AutolinkForceLoad =
       !subInvocation.getIRGenOptions().ForceLoadSymbolName.empty();
+    SerializationOpts.UserModuleVersion = FEOpts.UserModuleVersion;
 
     // Record any non-SDK module interface files for the debug info.
     StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;

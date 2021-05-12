@@ -725,3 +725,13 @@ func rdar66891544() {
 
   foo(.bar) // expected-error {{cannot infer contextual base in reference to member 'bar'}}
 }
+
+// rdar://55369704 - extraneous diagnostics produced in combination with missing/misspelled members
+func rdar55369704() {
+  struct S {
+  }
+
+  func test(x: Int, s: S) {
+    _ = x - Int(s.value) // expected-error {{value of type 'S' has no member 'value'}}
+  }
+}

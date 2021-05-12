@@ -49,6 +49,9 @@ enum {
 
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
+
+  /// The number of words in an AsyncLet (flags + task pointer)
+  NumWords_AsyncLet = 8, // TODO: not sure how much is enough, these likely could be pretty small
 };
 
 struct InProcess;
@@ -126,6 +129,9 @@ const size_t Alignment_DefaultActor = MaximumAlignment;
 
 /// The alignment of a TaskGroup.
 const size_t Alignment_TaskGroup = MaximumAlignment;
+
+/// The alignment of an AsyncLet.
+const size_t Alignment_AsyncLet = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -1389,6 +1395,11 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
 
     // Type-specific flags:
 
+    /// Set if the class is an actor.
+    ///
+    /// Only meaningful for class descriptors.
+    Class_IsActor = 7,
+
     /// Set if the class is a default actor class.  Note that this is
     /// based on the best knowledge available to the class; actor
     /// classes with resilient superclassess might be default actors
@@ -1479,6 +1490,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsDefaultActor,
                                 class_isDefaultActor,
                                 class_setIsDefaultActor)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_IsActor,
+                                class_isActor,
+                                class_setIsActor)
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
                                  Class_ResilientSuperclassReferenceKind_width,
@@ -1969,7 +1983,8 @@ enum class JobKind : size_t {
 
   DefaultActorInline = First_Reserved,
   DefaultActorSeparate,
-  DefaultActorOverride
+  DefaultActorOverride,
+  NullaryContinuation
 };
 
 /// The priority of a job.  Higher priorities are larger values.
@@ -1985,7 +2000,7 @@ enum class JobPriority : size_t {
 };
 
 /// Flags for schedulable jobs.
-class JobFlags : public FlagSet<size_t> {
+class JobFlags : public FlagSet<uint32_t> {
 public:
   enum {
     Kind           = 0,
@@ -2001,9 +2016,10 @@ public:
     Task_IsChildTask      = 24,
     Task_IsFuture         = 25,
     Task_IsGroupChildTask = 26,
+    Task_IsContinuingAsyncTask      = 27,
   };
 
-  explicit JobFlags(size_t bits) : FlagSet(bits) {}
+  explicit JobFlags(uint32_t bits) : FlagSet(bits) {}
   JobFlags(JobKind kind) { setKind(kind); }
   JobFlags(JobKind kind, JobPriority priority) {
     setKind(kind);
@@ -2030,6 +2046,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsGroupChildTask,
                                 task_isGroupChildTask,
                                 task_setIsGroupChildTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsContinuingAsyncTask,
+                                task_isContinuingAsyncTask,
+                                task_setIsContinuingAsyncTask)
 };
 
 /// Kinds of task status record.
@@ -2179,20 +2198,6 @@ enum class ContinuationStatus : size_t {
 
   /// The continuation has already been resumed, but not yet awaited.
   Resumed = 2
-};
-
-/// Flags describing the executor implementation that are stored
-/// in the ExecutorRef.
-enum class ExecutorRefFlags : size_t {
-  // The number of bits available here is very limited because it's
-  // potentially just the alignment bits of a protocol witness table
-  // pointer
-
-  /// The executor is a default actor.
-  DefaultActor = 0x1,
-
-  /// TODO: remove this
-  MainActorIdentity = 0x2,
 };
 
 } // end namespace swift

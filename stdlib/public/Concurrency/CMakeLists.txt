@@ -37,9 +37,12 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
   Actor.swift
+  AsyncLet.cpp
+  AsyncLet.swift
   CheckedContinuation.swift
   GlobalExecutor.cpp
   Errors.swift
+  Error.cpp
   Executor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -69,7 +72,11 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.swift
   ThreadSanitizer.cpp
   Mutex.cpp
-  YieldingContinuation.swift
+  AsyncStreamBuffer.swift
+  AsyncStream.swift
+  AsyncThrowingStream.swift
+  AsyncStream.cpp
+  Deque.swift
   ${swift_concurrency_objc_sources}
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
@@ -87,6 +94,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
+    -Xfrontend -define-availability
+    -Xfrontend \"SwiftStdlib 5.5:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999\"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )

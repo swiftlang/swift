@@ -30,3 +30,13 @@ extension G2 where U == C, U : AnyObject {}
 extension G2 where U : C, U : AnyObject {}
 // expected-warning@-1 {{redundant constraint 'U' : 'AnyObject'}}
 // expected-note@-2 {{constraint 'U' : 'AnyObject' implied here}}
+
+// Explicit AnyObject conformance vs derived same-type
+protocol P {
+  associatedtype A where A == C
+}
+
+// CHECK-LABEL: Generic signature: <T where T : P>
+func explicitAnyObjectIsRedundant<T : P>(_: T) where T.A : AnyObject {}
+// expected-warning@-1 {{redundant constraint 'T.A' : 'AnyObject'}}
+// expected-note@-2 {{constraint 'T.A' : 'AnyObject' implied here}}

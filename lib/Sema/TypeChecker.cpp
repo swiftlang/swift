@@ -247,28 +247,13 @@ void swift::bindExtensions(ModuleDecl &mod) {
 
 static void typeCheckDelayedFunctions(SourceFile &SF) {
   unsigned currentFunctionIdx = 0;
-  unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
-  do {
-    // Type check the body of each of the function in turn.  Note that outside
-    // functions must be visited before nested functions for type-checking to
-    // work correctly.
-    for (unsigned n = SF.DelayedFunctions.size(); currentFunctionIdx != n;
-         ++currentFunctionIdx) {
-      auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
-      assert(!AFD->getDeclContext()->isLocalContext());
-      (void)AFD->getTypecheckedBody();
-    }
 
-    // Type check synthesized functions and their bodies.
-    for (unsigned n = SF.SynthesizedDecls.size();
-         currentSynthesizedDecl != n;
-         ++currentSynthesizedDecl) {
-      auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
-      TypeChecker::typeCheckDecl(decl);
-    }
-
-  } while (currentFunctionIdx < SF.DelayedFunctions.size() ||
-           currentSynthesizedDecl < SF.SynthesizedDecls.size());
+  while (currentFunctionIdx < SF.DelayedFunctions.size()) {
+    auto *AFD = SF.DelayedFunctions[currentFunctionIdx];
+    assert(!AFD->getDeclContext()->isLocalContext());
+    (void) AFD->getTypecheckedBody();
+    ++currentFunctionIdx;
+  }
 
   SF.DelayedFunctions.clear();
 }
@@ -389,12 +374,9 @@ Type swift::performTypeResolution(TypeRepr *TyR, ASTContext &Ctx,
         // For now, just return the unbound generic type.
         return unboundTy;
       },
-      /*placeholderHandler*/
-      [&](auto placeholderRepr) {
-        // FIXME: Don't let placeholder types escape type resolution.
-        // For now, just return the placeholder type.
-        return PlaceholderType::get(Ctx, placeholderRepr);
-      });
+      // FIXME: Don't let placeholder types escape type resolution.
+      // For now, just return the placeholder type.
+      PlaceholderType::get);
 
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
@@ -476,13 +458,6 @@ bool swift::typeCheckASTNodeAtLoc(DeclContext *DC, SourceLoc TargetLoc) {
   return !evaluateOrDefault(Ctx.evaluator,
                             TypeCheckASTNodeAtLocRequest{DC, TargetLoc},
                             true);
-}
-
-bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
-  auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
-  DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
-  return true;
 }
 
 void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {

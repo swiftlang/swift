@@ -1096,8 +1096,10 @@ struct TestComposition {
   @WrapperD<WrapperE, Int, String> @WrapperE var p3: Int?
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
   @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{generic parameter 'Value' could not be inferred}}
-  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
-  // expected-error@-2 {{composed wrapper type 'WrapperE<Int>' does not match former 'wrappedValue' type 'WrapperC<Value>'}}
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+    // expected-error@-2 {{composed wrapper type 'WrapperE<Int>' does not match type of 'WrapperD<WrapperC<Value>, Int, String>.wrappedValue', which is 'WrapperC<Value>'}}
+
+  @Wrapper<String> @Wrapper var value: Int // expected-error{{composed wrapper type 'Wrapper<Int>' does not match type of 'Wrapper<String>.wrappedValue', which is 'String'}}
 
 	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
 		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}} {{8-8=Int(}} {{9-9=)}}

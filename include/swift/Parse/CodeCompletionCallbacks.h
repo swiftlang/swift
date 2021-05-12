@@ -231,6 +231,9 @@ public:
 
   virtual void completeStmtLabel(StmtKind ParentKind) {};
 
+  virtual
+  void completeForEachPatternBeginning(bool hasTry, bool hasAwait) {};
+
   /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;

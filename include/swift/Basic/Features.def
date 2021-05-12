@@ -36,14 +36,19 @@
 
 LANGUAGE_FEATURE(StaticAssert, 0, "#assert", langOpts.EnableExperimentalStaticAssert)
 LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
+LANGUAGE_FEATURE(EffectfulProp, 310, "Effectful properties", true)
 LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
-LANGUAGE_FEATURE(Actors, 0, "actors", langOpts.EnableExperimentalConcurrency)
+LANGUAGE_FEATURE(Actors, 0, "actors", true)
 LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions", true)
 LANGUAGE_FEATURE(RethrowsProtocol, 0, "@rethrows protocol", true)
 LANGUAGE_FEATURE(GlobalActors, 0, "Global actors", langOpts.EnableExperimentalConcurrency)
 LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
 LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
+LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type", true)
 LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins", true)
 LANGUAGE_FEATURE(BuiltinTaskGroup, 0, "TaskGroup builtins", true)
+LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
+LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true)
+LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
 
 #undef LANGUAGE_FEATURE

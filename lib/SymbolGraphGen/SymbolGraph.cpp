@@ -17,9 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Version.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 
 #include "DeclarationFragmentPrinter.h"
 #include "FormatVersion.h"
@@ -240,6 +238,12 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
       if (isRequirementOrDefaultImplementation(S.getSymbolDecl())) {
         return;
       }
+      if (DC->getSelfNominalTypeDecl() == nullptr) {
+        // If we couldn't look up the type the member is declared on (e.g.
+        // because the member is declared in an extension whose extended type
+        // doesn't exist), don't record a memberOf relationship.
+        return;
+      }
       return recordEdge(S,
                         Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
                         RelationshipKind::MemberOf());
@@ -426,6 +430,17 @@ void SymbolGraph::recordDefaultImplementationRelationships(Symbol S) {
           recordEdge(Symbol(this, VD, nullptr),
                      Symbol(this, MemberVD, nullptr),
                      RelationshipKind::DefaultImplementationOf());
+
+          // If P is from a different module, and it's being added to a type
+          // from the current module, add a `memberOf` relation to the extended
+          // protocol.
+          if (MemberVD->getModuleContext()->getNameStr() != M.getNameStr() && VD->getDeclContext()) {
+            if (auto *ExP = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+              recordEdge(Symbol(this, VD, nullptr),
+                         Symbol(this, ExP, nullptr),
+                         RelationshipKind::MemberOf());
+            }
+          }
         }
       }
     }
@@ -524,38 +539,7 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
       }
       AttributeRAII Platform("platform", OS);
 
-      auto *MainFile = M.getFiles().front();
-      switch (MainFile->getKind()) {
-          case FileUnitKind::Builtin:
-            llvm_unreachable("Unexpected module kind: Builtin");
-          case FileUnitKind::DWARFModule:
-            llvm_unreachable("Unexpected module kind: DWARFModule");
-          case FileUnitKind::Synthesized:
-            llvm_unreachable("Unexpected module kind: Synthesized");
-            break;
-          case FileUnitKind::Source:
-            symbolgraphgen::serialize(M.getASTContext().LangOpts.Target, OS);
-            break;
-          case FileUnitKind::SerializedAST: {
-            auto SerializedAST = cast<SerializedASTFile>(MainFile);
-            auto Target = llvm::Triple(SerializedAST->getTargetTriple());
-            symbolgraphgen::serialize(Target, OS);
-            break;
-          }
-          case FileUnitKind::ClangModule: {
-            auto ClangModule = cast<ClangModuleUnit>(MainFile);
-            if (const auto *Overlay = ClangModule->getOverlayModule()) {
-              auto &OverlayMainFile =
-                  Overlay->getMainFile(FileUnitKind::SerializedAST);
-              auto SerializedAST = cast<SerializedASTFile>(OverlayMainFile);
-              auto Target = llvm::Triple(SerializedAST.getTargetTriple());
-              symbolgraphgen::serialize(Target, OS);
-            } else {
-              symbolgraphgen::serialize(Walker.Options.Target, OS);
-            }
-            break;
-        }
-      }
+      symbolgraphgen::serialize(M, OS, Walker.Options.Target);
     });
 
     if (ModuleVersion) {

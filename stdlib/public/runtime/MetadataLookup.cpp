@@ -2309,30 +2309,33 @@ void DynamicReplacementDescriptor::enableReplacement() const {
     auto *previous = chainRoot->next;
     chainRoot->next = previous->next;
     //chainRoot->implementationFunction = previous->implementationFunction;
-    swift_ptrauth_copy(
-      reinterpret_cast<void **>(&chainRoot->implementationFunction),
-      reinterpret_cast<void *const *>(&previous->implementationFunction),
-      replacedFunctionKey->getExtraDiscriminator());
+    swift_ptrauth_copy_code_or_data(
+        reinterpret_cast<void **>(&chainRoot->implementationFunction),
+        reinterpret_cast<void *const *>(&previous->implementationFunction),
+        replacedFunctionKey->getExtraDiscriminator(),
+        !replacedFunctionKey->isAsync());
   }
 
   // First populate the current replacement's chain entry.
   auto *currentEntry =
       const_cast<DynamicReplacementChainEntry *>(chainEntry.get());
   // currentEntry->implementationFunction = chainRoot->implementationFunction;
-  swift_ptrauth_copy(
+  swift_ptrauth_copy_code_or_data(
       reinterpret_cast<void **>(&currentEntry->implementationFunction),
       reinterpret_cast<void *const *>(&chainRoot->implementationFunction),
-      replacedFunctionKey->getExtraDiscriminator());
+      replacedFunctionKey->getExtraDiscriminator(),
+      !replacedFunctionKey->isAsync());
 
   currentEntry->next = chainRoot->next;
 
   // Link the replacement entry.
   chainRoot->next = chainEntry.get();
   // chainRoot->implementationFunction = replacementFunction.get();
-  swift_ptrauth_init(
+  swift_ptrauth_init_code_or_data(
       reinterpret_cast<void **>(&chainRoot->implementationFunction),
       reinterpret_cast<void *>(replacementFunction.get()),
-      replacedFunctionKey->getExtraDiscriminator());
+      replacedFunctionKey->getExtraDiscriminator(),
+      !replacedFunctionKey->isAsync());
 }
 
 void DynamicReplacementDescriptor::disableReplacement() const {
@@ -2353,10 +2356,11 @@ void DynamicReplacementDescriptor::disableReplacement() const {
   auto *previous = const_cast<DynamicReplacementChainEntry *>(prev);
   previous->next = thisEntry->next;
   // previous->implementationFunction = thisEntry->implementationFunction;
-  swift_ptrauth_copy(
+  swift_ptrauth_copy_code_or_data(
       reinterpret_cast<void **>(&previous->implementationFunction),
       reinterpret_cast<void *const *>(&thisEntry->implementationFunction),
-      replacedFunctionKey->getExtraDiscriminator());
+      replacedFunctionKey->getExtraDiscriminator(),
+      !replacedFunctionKey->isAsync());
 }
 
 /// An automatic dymamic replacement entry.

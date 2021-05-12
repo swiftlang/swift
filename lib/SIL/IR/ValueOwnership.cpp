@@ -288,6 +288,11 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *arg) {
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::
+visitPlaceholderValue(PlaceholderValue *v) {
+  return OwnershipKind::None;
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::
 visitMultipleValueInstructionResult(MultipleValueInstructionResult *Result) {
   return Result->getOwnershipKind();
 }
@@ -539,7 +544,11 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
-CONSTANT_OWNERSHIP_BUILTIN(None, BuildSerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildDefaultActorExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildMainActorExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
+CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 

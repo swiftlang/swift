@@ -1,11 +1,11 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func someAsyncFunc() async -> String { "" }
 
 struct MyError: Error {}
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func someThrowingAsyncFunc() async throws -> String { throw MyError() }
 
 // ==== Unsafe Continuations ---------------------------------------------------
@@ -27,7 +27,7 @@ func buyVegetables(
 ) {}
 
 // returns 1 or more vegetables or throws an error
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
   try await withUnsafeThrowingContinuation { continuation in
     var veggies: [Vegetable] = []
@@ -43,21 +43,28 @@ func buyVegetables(shoppingList: [String]) async throws -> [Vegetable] {
 }
 
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_unsafeContinuations() async {
   // the closure should not allow async operations;
   // after all: if you have async code, just call it directly, without the unsafe continuation
-  let _: String = withUnsafeContinuation { continuation in // expected-error{{invalid conversion from 'async' function of type '(UnsafeContinuation<String, Never>) async -> Void' to synchronous function type '(UnsafeContinuation<String, Never>) -> Void'}}
-    let s = await someAsyncFunc() // rdar://70610141 for getting a better error message here
+  let _: String = withUnsafeContinuation { continuation in // expected-error{{cannot pass function of type '(UnsafeContinuation<String, Never>) async -> Void' to parameter expecting synchronous function type}}
+    let s = await someAsyncFunc() // expected-note {{'async' inferred from asynchronous operation used here}}
     continuation.resume(returning: s)
   }
 
   let _: String = await withUnsafeContinuation { continuation in
     continuation.resume(returning: "")
   }
+
+  // rdar://76475495 - suppress warnings for invalid expressions
+  func test_invalid_async_no_warnings() async -> Int {
+	  return await withUnsafeContinuation {
+		  $0.resume(throwing: 1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Never'}}
+	  }
+  }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_unsafeThrowingContinuations() async throws {
   let _: String = try await withUnsafeThrowingContinuation { continuation in
     continuation.resume(returning: "")
@@ -82,7 +89,7 @@ func test_unsafeThrowingContinuations() async throws {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_detached() async throws {
   let handle = detach() {
     await someAsyncFunc() // able to call async functions
@@ -92,7 +99,7 @@ func test_detached() async throws {
   _ = result
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_detached_throwing() async -> String {
   let handle: Task.Handle<String, Error> = detach() {
     try await someThrowingAsyncFunc() // able to call async functions

@@ -745,6 +745,8 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, PoundAssert)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GlobalStringTablePointer)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TypePtrAuthDiscriminator)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
+BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, StartAsyncLet)
+BUILTIN_OPERAND_OWNERSHIP(DestroyingConsume, EndAsyncLet)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
 
@@ -818,7 +820,9 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffProjectTopLevelSubcontext)
 // ownership should be 'TrivialUse'.
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, ConvertTaskToJob)
 
-BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildSerialExecutorRef)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildOrdinarySerialExecutorRef)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildDefaultActorExecutorRef)
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, BuildMainActorExecutorRef)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
 

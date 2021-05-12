@@ -482,6 +482,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                SourceLoc LBraceLoc,
                                ArrayRef<ASTNode> Cases,
                                SourceLoc RBraceLoc,
+                               SourceLoc EndLoc,
                                ASTContext &C) {
 #ifndef NDEBUG
   for (auto N : Cases)
@@ -494,7 +495,8 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                        alignof(SwitchStmt));
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
-                                               Cases.size(), RBraceLoc);
+                                               Cases.size(), RBraceLoc,
+                                               EndLoc);
 
   std::uninitialized_copy(Cases.begin(), Cases.end(),
                           theSwitch->getTrailingObjects<ASTNode>());

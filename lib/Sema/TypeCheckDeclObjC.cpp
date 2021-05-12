@@ -403,7 +403,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   auto behavior = behaviorLimitForObjCReason(Reason, VD->getASTContext());
 
   switch (auto restriction = ActorIsolationRestriction::forDeclaration(
-              const_cast<ValueDecl *>(VD))) {
+              const_cast<ValueDecl *>(VD), /*fromExpression=*/false)) {
   case ActorIsolationRestriction::CrossActorSelf:
     // FIXME: Substitution map?
     diagnoseNonConcurrentTypesInReference(
@@ -535,7 +535,7 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
     // Special case: If the type is Unmanaged<T>, then return true, because
     // Unmanaged<T> can be represented in Objective-C (if T can be).
     if (auto BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->getDecl() == dc->getASTContext().getUnmanagedDecl()) {
+      if (BGT->isUnmanaged()) {
         return true;
       }
     }
@@ -682,7 +682,7 @@ bool swift::isRepresentableInObjC(
     // information into a completion handler.
     auto FD = dyn_cast<FuncDecl>(AFD);
     if (!FD) {
-      AFD->diagnose(diag::not_objc_function_async)
+      AFD->diagnose(diag::not_objc_function_async, AFD->getDescriptiveKind())
         .highlight(AFD->getAsyncLoc())
         .limitBehavior(behavior);
       describeObjCReason(AFD, Reason);

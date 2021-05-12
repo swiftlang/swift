@@ -46,7 +46,7 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(dummy: Void) {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
       self.init(native: _NativeDictionary())
 #else
       self.object = _BridgeStorage(taggedPayload: 0)

@@ -1,0 +1,2 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target x86_64-unknown-linux-android -disable-objc-interop -swift-version 5 -O -module-name _Concurrency

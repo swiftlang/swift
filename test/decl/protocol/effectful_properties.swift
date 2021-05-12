@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
-
-// REQUIRES: concurrency
+// RUN: %target-typecheck-verify-swift
 
 /////
 // This test is focused on checking protocol conformance and constraint checking
@@ -108,7 +106,8 @@ func asNone<U : None>(u : U) async throws {
 }
 
 func asAsync<U : A>(u : U) async {
-  _ = u.someProp // expected-error {{property access is 'async' but is not marked with 'await'}}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  _ = u.someProp // expected-note@:7{{property access is 'async'}}
 
   _ = await u.someProp
 }
@@ -123,10 +122,11 @@ func asThrows<U : T>(u : U) throws {
 }
 
 func asAsyncThrows<U : AT>(u : U) async throws {
-  // expected-note@+5 {{did you mean to handle error as optional value?}}
-  // expected-note@+4 {{did you mean to disable error propagation?}}
-  // expected-note@+3 {{did you mean to use 'try'?}}
-  // expected-error@+2 {{property access is 'async' but is not marked with 'await'}}
+  // expected-note@+6 {{did you mean to handle error as optional value?}}
+  // expected-note@+5 {{did you mean to disable error propagation?}}
+  // expected-note@+4 {{did you mean to use 'try'?}}
+  // expected-error@+3 {{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+  // expected-note@+2 {{property access is 'async'}}
   // expected-error@+1 {{property access can throw but is not marked with 'try'}}
     _ = u.someProp
 
@@ -314,12 +314,12 @@ protocol HammeredDulcimer {
 }
 
 protocol Santur : HammeredDulcimer {
-  override subscript(_ note : Int) -> Int { get throws } // expected-error{{cannot override non-'throws' subscript with 'throws' subscript}}
+  override subscript(_ note : Int) -> Int { get throws } // expected-error{{cannot override non-throwing subscript with throwing subscript}}
   override var bridges : Int { get throws }
 }
 
 protocol Santoor : Santur {
-  override var bridges : Int { get async throws } // expected-error{{cannot override non-'async' property with 'async' property}}
+  override var bridges : Int { get async throws } // expected-error{{cannot override non-async property with async property}}
 }
 
 protocol Yangqin : HammeredDulcimer {
@@ -328,5 +328,5 @@ protocol Yangqin : HammeredDulcimer {
 
 protocol Hackbrett : HammeredDulcimer {
  override var bridges : Int { get } // no effects are OK
- override subscript(_ note : Int) -> Int { get async throws } // expected-error {{cannot override non-'async' subscript with 'async' subscript}}
+ override subscript(_ note : Int) -> Int { get async throws } // expected-error {{cannot override non-async subscript with async subscript}}
 }

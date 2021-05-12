@@ -1678,11 +1678,11 @@ bool swift::isExternalGlobalAddressor(ApplyInst *AI) {
 bool swift::isUnsafePointerExtraction(StructExtractInst *SEI) {
   if (!isa<BuiltinRawPointerType>(SEI->getType().getASTType()))
     return false;
-  
+
   auto &C = SEI->getModule().getASTContext();
   auto *decl = SEI->getStructDecl();
-  return decl == C.getUnsafeMutablePointerDecl()
-         || decl == C.getUnsafePointerDecl();
+  return decl == C.getUnsafeMutablePointerDecl() ||
+         decl == C.getUnsafePointerDecl();
 }
 
 // Given a block argument address base, check if it is actually a box projected
@@ -1859,6 +1859,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::GetCurrentExecutor:
+    case BuiltinValueKind::StartAsyncLet:
+    case BuiltinValueKind::EndAsyncLet:
     case BuiltinValueKind::CreateTaskGroup:
     case BuiltinValueKind::DestroyTaskGroup:
       return;

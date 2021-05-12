@@ -65,7 +65,7 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
   desired: Int) -> Bool {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int32(
     target._rawValue, expected.pointee._value, desired._value)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
@@ -82,7 +82,7 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
 public // Existing uses outside stdlib
 func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>) -> Int {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   let value = Builtin.atomicload_seqcst_Int32(target._rawValue)
   return Int(value)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
@@ -95,7 +95,7 @@ func _swift_stdlib_atomicLoadInt(
 internal func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int) {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   Builtin.atomicstore_seqcst_Int32(target._rawValue, desired._value)
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
@@ -111,7 +111,7 @@ func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
   let rawTarget = UnsafeMutableRawPointer(target)
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
   let value = _swift_stdlib_atomicFetch${operation}Int32(
     object: rawTarget.assumingMemoryBound(to: Int32.self),
     operand: Int32(operand))

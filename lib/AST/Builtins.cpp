@@ -1364,7 +1364,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
 static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
                                               Identifier Id) {
   // String -> Builtin.RawPointer
-  auto stringType = NominalType::get(Context.getStringDecl(), Type(), Context);
+  auto stringType = Context.getStringType();
   return getBuiltinFunction(Id, {stringType}, Context.TheRawPointerType);
 }
 
@@ -1407,7 +1407,7 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
 static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _async(_thin),
                             _parameters(),
-                            _executor);
+                            _optional(_executor));
 }
 
 static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
@@ -1427,8 +1427,7 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(
-      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
+  builder.addParameter(makeConcrete(ctx.getIntType()));
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -1439,8 +1438,7 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
 static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(
-      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
+  builder.addParameter(makeConcrete(ctx.getIntType())); // flags
   builder.addParameter(
       makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
@@ -1481,6 +1479,38 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
+//  return getBuiltinFunction(ctx, id, _thin,
+//                            _generics(_unrestricted),
+//                            _parameters(_rawPointer, <function>), TODO: seems we can't express function here?
+//                            _rawPointer)
+
+  ModuleDecl *M = ctx.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+  SynthesisContext SC(ctx, DC);
+
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder); // <T>
+
+  // AsyncLet*
+  builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
+
+  // operation async function pointer: () async throws -> T
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().withNoEscape().build();
+  builder.addParameter(
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+
+  // -> Builtin.RawPointer
+  builder.setResult(makeConcrete(synthesizeType(SC, _rawPointer)));
+  return builder.build(id);
+}
+
+static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
 static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(),
@@ -1493,11 +1523,25 @@ static ValueDecl *getDestroyTaskGroup(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
-static ValueDecl *getBuildSerialExecutorRef(ASTContext &ctx, Identifier id) {
-  // TODO: restrict the generic parameter to the SerialExecutor protocol
+static ValueDecl *getBuildMainActorExecutorRef(ASTContext &ctx,
+                                               Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _executor);
+}
+
+static ValueDecl *getBuildDefaultActorExecutorRef(ASTContext &ctx,
+                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _generics(_unrestricted,
                                       _layout(_typeparam(0), _classLayout())),
+                            _parameters(_typeparam(0)),
+                            _executor);
+}
+
+static ValueDecl *getBuildOrdinarySerialExecutorRef(ASTContext &ctx,
+                                                    Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                              _conformsTo(_typeparam(0), _serialExecutor)),
                             _parameters(_typeparam(0)),
                             _executor);
 }
@@ -2704,8 +2748,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
 
-  case BuiltinValueKind::BuildSerialExecutorRef:
-    return getBuildSerialExecutorRef(Context, Id);
+  case BuiltinValueKind::BuildMainActorExecutorRef:
+    return getBuildMainActorExecutorRef(Context, Id);
+
+  case BuiltinValueKind::BuildDefaultActorExecutorRef:
+    return getBuildDefaultActorExecutorRef(Context, Id);
+
+  case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    return getBuildOrdinarySerialExecutorRef(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);
@@ -2739,6 +2789,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDefaultActor:
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
+
+  case BuiltinValueKind::StartAsyncLet:
+    return getStartAsyncLet(Context, Id);
+
+  case BuiltinValueKind::EndAsyncLet:
+    return getEndAsyncLet(Context, Id);
 
   case BuiltinValueKind::CreateTaskGroup:
     return getCreateTaskGroup(Context, Id);

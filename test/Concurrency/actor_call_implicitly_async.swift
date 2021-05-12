@@ -169,7 +169,8 @@ func someAsyncFunc() async {
 
   _ = await a.deposit(b.withdraw(a.deposit(b.withdraw(b.balance()))))
 
-  a.testSelfBalance() // expected-error {{call is 'async' but is not marked with 'await'}}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{3-3=await }} expected-note@+1 {{call is 'async'}}
+  a.testSelfBalance()
 
   await a.testThrowing() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
 
@@ -177,16 +178,16 @@ func someAsyncFunc() async {
   // effectful properties from outside the actor instance
 
   // expected-warning@+2 {{cannot use property 'effPropA' with a non-sendable type 'Box' across actors}}
-  // expected-error@+1{{property access is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropA
 
   // expected-warning@+3 {{cannot use property 'effPropT' with a non-sendable type 'Box' across actors}}
   // expected-error@+2{{property access can throw, but it is not marked with 'try' and the error is not handled}}
-  // expected-error@+1{{property access is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropT
 
   // expected-error@+2{{property access can throw, but it is not marked with 'try' and the error is not handled}}
-    // expected-error@+1{{property access is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = a.effPropAT
 
   // (mostly) corrected ones
@@ -204,16 +205,18 @@ func someAsyncFunc() async {
 
 extension BankAccount {
   func totalBalance(including other: BankAccount) async -> Int {
-    return balance() 
-          + other.balance()  // expected-error{{call is 'async' but is not marked with 'await'}}
+    //expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{12-12=await }}
+    return balance()
+          + other.balance()  // expected-note{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   }
 
   func breakAccounts(other: BankAccount) async {
-    _ = other.deposit(  // expected-error{{call is 'async' but is not marked with 'await'}}
-          other.withdraw( // expected-error{{call is 'async' but is not marked with 'await'}}
+    // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
+    _ = other.deposit( // expected-note{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
+          other.withdraw( // expected-note{{calls to instance method 'withdraw' from outside of its actor context are implicitly asynchronous}}
             self.deposit(
-              other.withdraw( // expected-error{{call is 'async' but is not marked with 'await'}}
-                other.balance())))) // expected-error{{call is 'async' but is not marked with 'await'}}
+              other.withdraw( // expected-note{{calls to instance method 'withdraw' from outside of its actor context are implicitly asynchronous}}
+                other.balance())))) // expected-note{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   }
 }
 
@@ -221,13 +224,18 @@ func anotherAsyncFunc() async {
   let a = BankAccount(initialDeposit: 34)
   let b = BankAccount(initialDeposit: 35)
 
-  _ = a.deposit(1)  // expected-error{{call is 'async' but is not marked with 'await'}}
-  _ = b.balance()   // expected-error{{call is 'async' but is not marked with 'await'}}
-  
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-note@+1{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
+  _ = a.deposit(1)
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-note@+1{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
+  _ = b.balance()
+
   _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can only be referenced from inside the actor}}
 
   a.owner = "cat" // expected-error{{actor-isolated property 'owner' can only be mutated from inside the actor}}
-  _ = b.owner // expected-error{{property access is 'async' but is not marked with 'await'}}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
+  _ = b.owner
   _ = await b.owner == "cat"
 
 
@@ -262,9 +270,9 @@ func blender(_ peeler : () -> Void) {
 // expected-note@+1 2 {{mutation of this var is only permitted within the actor}}
 @BananaActor var dollarsInBananaStand : Int = 250000
 
-@BananaActor func wisk(_ something : Any) { } // expected-note 5 {{calls to global function 'wisk' from outside of its actor context are implicitly asynchronous}}
+@BananaActor func wisk(_ something : Any) { }
 
-@BananaActor func peelBanana() { } // expected-note 2 {{calls to global function 'peelBanana()' from outside of its actor context are implicitly asynchronous}}
+@BananaActor func peelBanana() { }
 
 @BananaActor func takeInout(_ x : inout Int) {}
 
@@ -279,7 +287,7 @@ func blender(_ peeler : () -> Void) {
   // expected-error@+1 {{var 'dollarsInBananaStand' isolated to global actor 'BananaActor' can not be used 'inout' from different global actor 'OrangeActor'}}
   await takeInout(&dollarsInBananaStand)
 
-  _ = wisk // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  _ = wisk
 
 
   await wisk({})
@@ -291,21 +299,20 @@ func blender(_ peeler : () -> Void) {
   await (((wisk)))((wisk)((wisk)(1)))
   // expected-warning@-1 3{{cannot pass argument of non-sendable type 'Any' across actors}}
 
-  blender((peelBanana)) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
-  await wisk(peelBanana) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  blender((peelBanana))
+  // expected-error@-1{{converting function value of type '@BananaActor () -> ()' to '() -> Void' loses global actor 'BananaActor'}}
+  await wisk(peelBanana)
   // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
 
-  await wisk(wisk)  // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  await wisk(wisk)
   // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
-  await (((wisk)))(((wisk))) // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  await (((wisk)))(((wisk)))
   // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
 
-  // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-  // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
   await {wisk}()(1)
 
-  // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-  // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+  // expected-warning@+1 {{cannot pass argument of non-sendable type 'Any' across actors}}
   await (true ? wisk : {n in return})(1)
 }
 
@@ -314,9 +321,14 @@ actor Chain {
 }
 
 func walkChain(chain : Chain) async {
-  _ = chain.next?.next?.next?.next // expected-error 4 {{property access is 'async' but is not marked with 'await'}}
-  _ = (await chain.next)?.next?.next?.next // expected-error 3 {{property access is 'async' but is not marked with 'await'}}
-  _ = (await chain.next?.next)?.next?.next // expected-error 2 {{property access is 'async' but is not marked with 'await'}}
+
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 4 {{property access is 'async'}}
+  _ = chain.next?.next?.next?.next
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 3 {{property access is 'async'}}
+  _ = (await chain.next)?.next?.next?.next
+
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 2 {{property access is 'async'}}
+  _ = (await chain.next?.next)?.next?.next
 }
 
 
@@ -324,7 +336,9 @@ func walkChain(chain : Chain) async {
 @BananaActor func rice() async {}
 
 @OrangeActor func quinoa() async {
-  rice() // expected-error {{call is 'async' but is not marked with 'await'}}
+
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }} expected-note@+1 {{call is 'async'}}
+  rice()
 }
 
 ///////////
@@ -450,21 +464,21 @@ func tryEffPropsFromSync() {
 }
 
 @OrangeActor func tryEffPropertiesFromGlobalActor() async throws {
-  // expected-error@+1{{property access is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 {{property access is 'async'}}
   _ = effPropA
 
   // expected-note@+5{{did you mean to handle error as optional value?}}
   // expected-note@+4{{did you mean to use 'try'?}}
   // expected-note@+3{{did you mean to disable error propagation?}}
   // expected-error@+2{{property access can throw but is not marked with 'try'}}
-  // expected-error@+1{{property access is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 {{property access is 'async'}}
   _ = effPropT
 
   // expected-note@+5{{did you mean to handle error as optional value?}}
   // expected-note@+4{{did you mean to use 'try'?}}
   // expected-note@+3{{did you mean to disable error propagation?}}
   // expected-error@+2{{property access can throw but is not marked with 'try'}}
-  // expected-error@+1{{property access is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 {{property access is 'async'}}
   _ = effPropAT
 
   _ = await effPropA
@@ -485,7 +499,9 @@ actor SubscriptA {
   }
 
   func f() async {
-    _ = self[0] // expected-error{{subscript access is 'async' but is not marked with 'await'}}
+
+    // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{9-9=await }} expected-note@+1{{subscript access is 'async'}}
+    _ = self[0]
   }
 }
 
@@ -533,7 +549,8 @@ actor SubscriptAT {
 }
 
 func tryTheActorSubscripts(a : SubscriptA, t : SubscriptT, at : SubscriptAT) async throws {
-  _ = a[0] // expected-error{{subscript access is 'async' but is not marked with 'await'}}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 {{subscript access is 'async'}}
+  _ = a[0]
 
   _ = await a[0]
 
@@ -541,7 +558,7 @@ func tryTheActorSubscripts(a : SubscriptA, t : SubscriptT, at : SubscriptAT) asy
   // expected-note@+4{{did you mean to use 'try'?}}
   // expected-note@+3{{did you mean to disable error propagation?}}
   // expected-error@+2{{subscript access can throw but is not marked with 'try'}}
-  // expected-error@+1 {{subscript access is 'async' but is not marked with 'await'}}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 {{subscript access is 'async'}}
   _ = t[0]
 
   _ = try await t[0]
@@ -552,7 +569,7 @@ func tryTheActorSubscripts(a : SubscriptA, t : SubscriptT, at : SubscriptAT) asy
   // expected-note@+4{{did you mean to use 'try'?}}
   // expected-note@+3{{did you mean to disable error propagation?}}
   // expected-error@+2{{subscript access can throw but is not marked with 'try'}}
-  // expected-error@+1 {{subscript access is 'async' but is not marked with 'await'}}
+  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }} expected-note@+1 {{subscript access is 'async'}}
   _ = at[0]
 
   _ = try await at[0]

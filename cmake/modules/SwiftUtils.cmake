@@ -152,6 +152,35 @@ function(swift_create_post_build_symlink target)
     COMMENT "${CS_COMMENT}")
 endfunction()
 
+# Once swift-frontend is built, if the standalone (early) swift-driver has been built,
+# we create a `swift-driver` symlink adjacent to the `swift` and `swiftc` executables
+# to ensure that `swiftc` forwards to the standalone driver when invoked.
+function(swift_create_early_driver_symlinks target)
+  # Early swift-driver is built adjacent to the compiler (swift build dir)
+  set(driver_bin_dir "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/release/bin")
+  set(swift_bin_dir "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
+  # If early swift-driver wasn't built, nothing to do here.
+  if(NOT EXISTS "${driver_bin_dir}/swift-driver" OR NOT EXISTS "${driver_bin_dir}/swift-help")
+      message(STATUS "Skipping creating early SwiftDriver symlinks - no early SwiftDriver build found.")
+      return()
+  endif()
+
+  message(STATUS "Creating early SwiftDriver symlinks.")
+  message(STATUS "From: ${driver_bin_dir}/swift-driver")
+  message(STATUS "To: ${swift_bin_dir}/swift-driver")
+  swift_create_post_build_symlink(swift-frontend
+    SOURCE "${driver_bin_dir}/swift-driver"
+    DESTINATION "${swift_bin_dir}/swift-driver"
+    COMMENT "Creating early SwiftDriver symlinks: swift-driver")
+
+  message(STATUS "From: ${driver_bin_dir}/swift-help")
+  message(STATUS "To: ${swift_bin_dir}/swift-help")
+  swift_create_post_build_symlink(swift-frontend
+    SOURCE "${driver_bin_dir}/swift-help"
+    DESTINATION "${swift_bin_dir}/swift-help"
+    COMMENT "Creating early SwiftDriver symlinks: swift-help")
+endfunction()
+
 function(dump_swift_vars)
   set(SWIFT_STDLIB_GLOBAL_CMAKE_CACHE)
   get_cmake_property(variableNames VARIABLES)

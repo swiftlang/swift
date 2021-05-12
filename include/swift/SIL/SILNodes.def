@@ -150,7 +150,7 @@
 ///
 ///   A concrete subclass of MultipleValueInstruction. ID is a member of
 ///   SILInstructionKind. The Node's class name is ID and the name of the base
-///   class in the heirarchy is PARENT.
+///   class in the hierarchy is PARENT.
 #ifndef MULTIPLE_VALUE_INST
 #define MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
@@ -190,7 +190,7 @@
 ///
 ///   A concrete subclass of MultipleValueInstructionResult. ID is a member of
 ///   ValueKind. The Node's class name is ID and the name of the base class in
-///   the heirarchy is PARENT.
+///   the hierarchy is PARENT.
 #ifndef MULTIPLE_VALUE_INST_RESULT
 #define MULTIPLE_VALUE_INST_RESULT(ID, PARENT) VALUE(ID, PARENT)
 #endif
@@ -414,6 +414,10 @@ ABSTRACT_VALUE(SILArgument, ValueBase)
 VALUE(MultipleValueInstructionResult, ValueBase)
 
 VALUE(SILUndef, ValueBase)
+
+/// Used internally in e.g. the SIL parser and deserializer.
+/// A PlaceholderValue must not appear in valid SIL.
+VALUE(PlaceholderValue, ValueBase)
 
 ABSTRACT_NODE(SILInstruction, SILNode)
 
@@ -721,6 +725,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       GetAsyncContinuationInstBase, MayHaveSideEffects, MayRelease)
     SINGLE_VALUE_INST_RANGE(GetAsyncContinuationInstBase, GetAsyncContinuationInst, GetAsyncContinuationAddrInst)
 
+  SINGLE_VALUE_INST(ExtractExecutorInst, extract_executor,
+                    SingleValueInstruction, MayRead, DoesNotRelease)
+
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path
   // object; is there a more specific effect?
@@ -831,8 +838,6 @@ NON_VALUE_INST(FixLifetimeInst, fix_lifetime,
 
 NON_VALUE_INST(HopToExecutorInst, hop_to_executor,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-SINGLE_VALUE_INST(ExtractExecutorInst, extract_executor,
-                  SILInstruction, MayRead, DoesNotRelease)
 
 NON_VALUE_INST(DestroyValueInst, destroy_value,
                SILInstruction, MayHaveSideEffects, MayRelease)

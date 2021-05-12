@@ -43,12 +43,8 @@ DeclContext *DerivedConformance::getConformanceContext() const {
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
-  auto *SF = ConformanceDecl->getDeclContext()->getParentSourceFile();
-  for (auto child : children) {
+  for (auto child : children)
     IDC->addMember(child);
-    if (SF)
-      SF->SynthesizedDecls.push_back(child);
-  }
 }
 
 Type DerivedConformance::getProtocolType() const {
@@ -74,6 +70,9 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     // Hashable components.
     return canDeriveHashable(Nominal);
   }
+
+  if (*derivableKind == KnownDerivableProtocolKind::Actor)
+    return canDeriveActor(DC, Nominal);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
@@ -126,11 +125,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
       case KnownDerivableProtocolKind::CodingKey: {
         Type rawType = enumDecl->getRawType();
         if (rawType) {
-          auto parentDC = enumDecl->getDeclContext();
-          ASTContext &C = parentDC->getASTContext();
-
-          auto nominal = rawType->getAnyNominal();
-          return nominal == C.getStringDecl() || nominal == C.getIntDecl();
+          return rawType->isString() || rawType->isInt();
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
@@ -307,6 +302,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
+    // Actor.unownedExecutor
+    if (name.isSimpleName(ctx.Id_unownedExecutor))
+      return getRequirement(KnownProtocolKind::Actor);
+
     return nullptr;
   }
 
@@ -397,6 +396,41 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 
   auto selfDecl = fn->getImplicitSelfDecl();
   return new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+}
+
+CallExpr *
+DerivedConformance::createBuiltinCall(ASTContext &ctx,
+                                      BuiltinValueKind builtin,
+                                      ArrayRef<Type> typeArgs,
+                                      ArrayRef<ProtocolConformanceRef>
+                                        conformances,
+                                      ArrayRef<Expr *> args) {
+  auto name = ctx.getIdentifier(getBuiltinName(builtin));
+  auto decl = getBuiltinValueDecl(ctx, name);
+  assert(decl);
+
+  ConcreteDeclRef declRef = decl;
+  auto fnType = decl->getInterfaceType();
+  if (auto genericFnType = fnType->getAs<GenericFunctionType>()) {
+    auto generics = genericFnType->getGenericSignature();
+    auto subs = SubstitutionMap::get(generics, typeArgs, conformances);
+    declRef = ConcreteDeclRef(decl, subs);
+    fnType = genericFnType->substGenericArgs(subs);
+  } else {
+    assert(typeArgs.empty());
+  }
+
+  auto resultType = fnType->castTo<FunctionType>()->getResult();
+
+  Expr *ref = new (ctx) DeclRefExpr(declRef, DeclNameLoc(),
+                                    /*Implicit=*/true,
+                                    AccessSemantics::Ordinary, fnType);
+  CallExpr *call =
+    CallExpr::createImplicit(ctx, ref, args, /*labels*/ {});
+  call->setType(resultType);
+  call->setThrows(false);
+
+  return call;
 }
 
 AccessorDecl *DerivedConformance::
@@ -590,7 +624,7 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
 
 /// Build a type-checked integer literal.
 static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
-  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
+  Type intType = C.getIntType();
 
   auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
   literal->setType(intType);
@@ -615,7 +649,7 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                        const char *indexName) {
   ASTContext &C = enumDecl->getASTContext();
   Type enumType = enumVarDecl->getType();
-  Type intType = C.getIntDecl()->getDeclaredInterfaceType();
+  Type intType = C.getIntType();
 
   auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                   SourceLoc(), C.getIdentifier(indexName),
@@ -665,8 +699,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
                                      /*implicit*/true,
                                      AccessSemantics::Ordinary,
                                      enumVarDecl->getType());
-  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
-                                       SourceLoc(), cases, SourceLoc(), C);
+  auto switchStmt =
+      SwitchStmt::createImplicit(LabeledStmtInfo(), enumRef, cases, C);
 
   stmts.push_back(indexBind);
   stmts.push_back(switchStmt);

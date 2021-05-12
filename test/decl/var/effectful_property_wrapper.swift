@@ -1,5 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
-// REQUIRES: concurrency
+// RUN: %target-typecheck-verify-swift
 
 // Currently, we don't support having property wrappers that are effectful.
 // Eventually we'd like to add this.

@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
-
-// REQUIRES: concurrency
+// RUN: %target-typecheck-verify-swift
 
 enum E : Error {
   case NotAvailable
@@ -36,7 +34,7 @@ class Presidio : GolfCourse {
     set { yardsFromBackTees = newValue }
   }
 
-  override var holes : Int {  // expected-error {{cannot override non-'async' property with 'async' property}}
+  override var holes : Int {  // expected-error {{cannot override non-async property with async property}}
     get async { 18 }
   }
 
@@ -50,11 +48,11 @@ class Presidio : GolfCourse {
 }
 
 class PresidioBackNine : Presidio {
-  override var par : Int { // expected-error{{cannot override non-'throws' property with 'throws' property}}
+  override var par : Int { // expected-error{{cannot override non-throwing property with throwing property}}
     get throws { 36 } // attempts to put the 'throws' effect back
   }
 
-  override subscript(_ i : Int) -> Int { // expected-error{{cannot override non-'async' subscript with 'async' subscript}}
+  override subscript(_ i : Int) -> Int { // expected-error{{cannot override non-async subscript with async subscript}}
     get async throws { 0 }
   }
 }
@@ -64,8 +62,9 @@ func timeToPlay(gc : Presidio) async {
   _ = (gc as GolfCourse).yards // expected-error{{property access can throw, but it is not marked with 'try' and the error is not handled}}
   _ = try? (gc as GolfCourse).yards
 
-  // expected-error@+2 {{property access can throw, but it is not marked with 'try' and the error is not handled}}
-  // expected-error@+1 {{property access is 'async' but is not marked with 'await'}}
+  // expected-error@+3 {{property access can throw, but it is not marked with 'try' and the error is not handled}}
+  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
+  // expected-note@+1:7{{property access is 'async'}}
   _ = (gc as GolfCourse).par
   _ = try? await (gc as GolfCourse).par
 

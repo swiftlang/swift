@@ -272,6 +272,7 @@ cmake^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -DSWIFT_LIT_ARGS="--time-tests"^
     -S "%source_root%\swift" %exitOnError%
 
 cmake --build "%build_root%\swift" %exitOnError%

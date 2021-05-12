@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library %s
+// RUN: %target-typecheck-verify-swift -parse-as-library -disable-implicit-concurrency-module-import %s
 // RUN: %target-typecheck-verify-swift -parse-as-library -enable-experimental-concurrency -parse-stdlib %s
 
 @main struct Main {

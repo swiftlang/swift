@@ -19,5 +19,6 @@ import SubE
 // CHECK-NEXT:  "G",
 // CHECK-NEXT:  "SubE",
 // CHECK-NEXT:  "Swift",
-// CHECK-NEXT:  "SwiftOnoneSupport"
+// CHECK-NEXT:  "SwiftOnoneSupport",
+// CHECK-NEXT:  "_Concurrency"
 // CHECK-NEXT: ]

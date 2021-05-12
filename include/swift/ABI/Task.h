@@ -39,25 +39,37 @@ class TaskGroup;
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 
 /// A schedulable job.
-class alignas(2 * alignof(void*)) Job : public HeapObject {
+class alignas(2 * alignof(void*)) Job :
+  // For async-let tasks, the refcount bits are initialized as "immortal"
+  // because such a task is allocated with the parent's stack allocator.
+  public HeapObject {
 public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
     /// The next waiting task link, an AsyncTask that is waiting on a future.
     NextWaitingTaskIndex = 0,
 
+    // The Dispatch object header is one pointer and two ints, which is
+    // equivalent to three pointers on 32-bit and two pointers 64-bit. Set the
+    // indexes accordingly so that DispatchLinkageIndex points to where Dispatch
+    // expects.
+    DispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
+
     /// An opaque field used by Dispatch when enqueueing Jobs directly.
-    DispatchLinkageIndex = 0,
+    DispatchLinkageIndex = DispatchHasLongObjectHeader ? 1 : 0,
 
     /// The dispatch queue being used when enqueueing a Job directly with
     /// Dispatch.
-    DispatchQueueIndex = 1,
+    DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
   // Reserved for the use of the scheduler.
   void *SchedulerPrivate[2];
 
   JobFlags Flags;
+
+  // Derived classes can use this to store a Job Id.
+  uint32_t Id = 0;
 
   // We use this union to avoid having to do a second indirect branch
   // when resuming an asynchronous task, which we expect will be the
@@ -79,6 +91,14 @@ public:
   Job(JobFlags flags, TaskContinuationFunction *invoke,
       const HeapMetadata *metadata = &jobHeapMetadata)
       : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
+    assert(isAsyncTask() && "wrong constructor for a non-task job");
+  }
+
+  /// Create a job with "immortal" reference counts.
+  /// Used for async let tasks.
+  Job(JobFlags flags, TaskContinuationFunction *invoke,
+      const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal)
+      : HeapObject(metadata, immortal), Flags(flags), ResumeTask(invoke) {
     assert(isAsyncTask() && "wrong constructor for a non-task job");
   }
 
@@ -104,8 +124,13 @@ public:
 };
 
 // The compiler will eventually assume these.
+#if defined(__LP64__) || defined(_WIN64)
 static_assert(sizeof(Job) == 6 * sizeof(void*),
               "Job size is wrong");
+#else
+static_assert(sizeof(Job) == 8 * sizeof(void*),
+              "Job size is wrong");
+#endif
 static_assert(alignof(Job) == 2 * alignof(void*),
               "Job alignment is wrong");
 
@@ -146,6 +171,25 @@ public:
     LinkedListIterator<TaskStatusRecord, getStatusRecordParent>;
   llvm::iterator_range<record_iterator> records() const {
     return record_iterator::rangeBeginning(getInnermostRecord());
+  }
+};
+
+class NullaryContinuationJob : public Job {
+
+private:
+  AsyncTask* Task;
+  AsyncTask* Continuation;
+
+public:
+  NullaryContinuationJob(AsyncTask *task, JobPriority priority, AsyncTask *continuation)
+    : Job({JobKind::NullaryContinuation, priority}, &process),
+      Task(task), Continuation(continuation) {}
+
+  SWIFT_CC(swiftasync)
+  static void process(Job *job);
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::NullaryContinuation;
   }
 };
 
@@ -193,7 +237,24 @@ public:
       Status(ActiveTaskStatus()),
       Local(TaskLocal::Storage()) {
     assert(flags.isAsyncTask());
+    Id = getNextTaskId();
   }
+
+  /// Create a task with "immortal" reference counts.
+  /// Used for async let tasks.
+  AsyncTask(const HeapMetadata *metadata, InlineRefCounts::Immortal_t immortal,
+            JobFlags flags,
+            TaskContinuationFunction *run,
+            AsyncContext *initialContext)
+    : Job(flags, run, metadata, immortal),
+      ResumeContext(initialContext),
+      Status(ActiveTaskStatus()),
+      Local(TaskLocal::Storage()) {
+    assert(flags.isAsyncTask());
+    Id = getNextTaskId();
+  }
+
+  ~AsyncTask();
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
@@ -211,18 +272,18 @@ public:
 
   // ==== Task Local Values ----------------------------------------------------
 
-  void localValuePush(const Metadata *keyType,
+  void localValuePush(const HeapObject *key,
                       /* +1 */ OpaqueValue *value, const Metadata *valueType) {
-    Local.pushValue(this, keyType, value, valueType);
+    Local.pushValue(this, key, value, valueType);
   }
 
-  OpaqueValue* localValueGet(const Metadata *keyType,
-                             TaskLocal::TaskLocalInheritance inherit) {
-    return Local.getValue(this, keyType, inherit);
+  OpaqueValue* localValueGet(const HeapObject *key) {
+    return Local.getValue(this, key);
   }
 
-  void localValuePop() {
-    Local.popValue(this);
+  /// Returns true if storage has still more bindings.
+  bool localValuePop() {
+    return Local.popValue(this);
   }
 
   // ==== Child Fragment -------------------------------------------------------
@@ -454,6 +515,14 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
+
+  /// Get the next non-zero Task ID.
+  uint32_t getNextTaskId() {
+    static std::atomic<uint32_t> Id(1);
+    uint32_t Next = Id.fetch_add(1, std::memory_order_relaxed);
+    if (Next == 0) Next = Id.fetch_add(1, std::memory_order_relaxed);
+    return Next;
+  }
 };
 
 // The compiler will eventually assume these.
@@ -461,6 +530,9 @@ static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
+// Libc hardcodes this offset to extract the TaskID
+static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
+              "AsyncTask::Id offset is wrong");
 
 inline void Job::runInFullyEstablishedContext() {
   if (auto task = dyn_cast<AsyncTask>(this))
@@ -557,6 +629,10 @@ public:
   /// The executor that should be resumed to.
   ExecutorRef ResumeToExecutor;
 
+  void setErrorResult(SwiftError *error) {
+    ErrorResult = error;
+  }
+
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::Continuation;
   }
@@ -576,13 +652,13 @@ public:
 /// This matches the ABI of a closure `() async throws -> ()`
 using AsyncVoidClosureEntryPoint =
   SWIFT_CC(swiftasync)
-  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
 /// This matches the ABI of a closure `<T>() async throws -> T`
 using AsyncGenericClosureEntryPoint =
     SWIFT_CC(swiftasync)
     void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
 /// This matches the ABI of the resume function of a closure
 ///  `() async throws -> ()`.
@@ -596,7 +672,7 @@ public:
   // passing the closure context instead of via the async context)
   AsyncVoidClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
-   HeapObject *closureContext;
+  void *closureContext;
   SwiftError *errorResult;
 };
 
@@ -609,7 +685,7 @@ public:
   // passing the closure context instead of via the async context)
   AsyncGenericClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
-  HeapObject *closureContext;
+  void *closureContext;
   SwiftError *errorResult;
 };
 

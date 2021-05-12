@@ -348,6 +348,16 @@ bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
   return decl->isStatic();
 }
 
+bool WrappedValueMismatch::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto elt = locator->castLastElementTo<LocatorPathElt::WrappedValue>();
+
+  emitDiagnostic(diag::composed_property_wrapper_mismatch, getFromType(),
+                 resolveType(elt.getType())->getString(), getToType());
+
+  return true;
+}
+
 bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
@@ -639,11 +649,10 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_condition_value;
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
-  case CTP_ComposedPropertyWrapper:
-    return diag::composed_property_wrapper_mismatch;
 
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
+  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
@@ -1978,15 +1987,11 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
 
         auto indexType = resolveType(argType->getElementType(0));
 
-        if (auto bgt = indexType->getAs<BoundGenericType>()) {
-          // In Swift versions lower than 5, this check will fail as read only
-          // key paths can masquerade as writable for compatibilty reasons.
-          // This is fine as in this case we just fall back on old diagnostics.
-          auto &ctx = getASTContext();
-          if (bgt->getDecl() == ctx.getKeyPathDecl() ||
-              bgt->getDecl() == ctx.getPartialKeyPathDecl()) {
-            return {expr, member};
-          }
+        // In Swift versions lower than 5, this check will fail as read only
+        // key paths can masquerade as writable for compatibilty reasons.
+        // This is fine as in this case we just fall back on old diagnostics.
+        if (indexType->isKeyPath() || indexType->isPartialKeyPath()) {
+          return {expr, member};
         }
       }
     }
@@ -2370,11 +2375,26 @@ bool ContextualFailure::diagnoseAsError() {
 }
 
 bool ContextualFailure::diagnoseAsNote() {
-  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  auto *locator = getLocator();
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(locator);
   if (!(overload && overload->choice.isDecl()))
     return false;
 
   auto *decl = overload->choice.getDecl();
+
+  if (auto *anchor = getAsExpr(getAnchor())) {
+    anchor = anchor->getSemanticsProvidingExpr();
+
+    if (isa<NilLiteralExpr>(anchor)) {
+      auto argLoc =
+          locator->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
+      emitDiagnosticAt(decl, diag::note_incompatible_argument_value_nil_at_pos,
+                       getToType(), argLoc.getArgIdx() + 1);
+      return true;
+    }
+  }
+
   emitDiagnosticAt(decl, diag::found_candidate_type, getFromType());
   return true;
 }
@@ -2442,8 +2462,9 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 
   Optional<ContextualTypePurpose> CTP;
   // Easy case were failure has been identified as contextual already.
-  if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
-    CTP = getContextualTypePurpose();
+  if (auto contextualTy =
+          locator->getLastElementAs<LocatorPathElt::ContextualType>()) {
+    CTP = contextualTy->getPurpose();
   } else {
     // Here we need to figure out where where `nil` is located.
     // It could be e.g. an argument to a subscript/call, assignment
@@ -2837,13 +2858,10 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (!getASTContext().getStdlibModule())
     return false;
 
-  auto String = getASTContext().getStringDecl()->getDeclaredInterfaceType();
-  auto Substring = getASTContext().getSubstringDecl()->getDeclaredInterfaceType();
-
   // Substring -> String conversion
   // Wrap in String.init
-  if (getFromType()->isEqual(Substring)) {
-    if (getToType()->isEqual(String)) {
+  if (getFromType()->isSubstring()) {
+    if (getToType()->isString()) {
       auto *anchor = castToExpr(getAnchor())->getSemanticsProvidingExpr();
       if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
         anchor = CE->getSubExpr();
@@ -3139,11 +3157,10 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
   case CTP_WrappedProperty:
     return diag::wrapped_value_mismatch;
-  case CTP_ComposedPropertyWrapper:
-    return diag::composed_property_wrapper_mismatch;
 
   case CTP_ThrowStmt:
   case CTP_ForEachStmt:
+  case CTP_ComposedPropertyWrapper:
   case CTP_Unused:
   case CTP_CannotFail:
   case CTP_YieldByReference:
@@ -4793,6 +4810,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
 
   if (isMultiLineClosure)
     OS << '\n' << indent;
+  else if (closure->getBody()->empty())
+    OS << ' ';
 
   // Let's form 'let <name> : [<type>]? = arg' expression.
   OS << "let " << parameterOS.str() << " = arg"
@@ -4965,20 +4984,69 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
         params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
         fnType->getNumParams(), params->size(), (params->size() == 1));
 
-    bool onlyAnonymousParams =
+    // Unsed parameter is represented by `_` before `in`.
+    bool onlyUnusedParams =
         std::all_of(params->begin(), params->end(),
                     [](ParamDecl *param) { return !param->hasName(); });
 
     // If closure expects no parameters but N was given,
-    // and all of them are anonymous let's suggest removing them.
-    if (fnType->getNumParams() == 0 && onlyAnonymousParams) {
+    // and all of them are unused, let's suggest removing them.
+    if (fnType->getNumParams() == 0 && onlyUnusedParams) {
       auto inLoc = closure->getInLoc();
       auto &sourceMgr = getASTContext().SourceMgr;
 
-      if (inLoc.isValid())
+      if (inLoc.isValid()) {
         diag.fixItRemoveChars(params->getStartLoc(),
                               Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+        return true;
+      }
     }
+
+    diag.flush();
+
+    // If all of the parameters are anonymous, let's point out references
+    // to make it explicit where parameters are used in complex closure body,
+    // which helps in situations where braces are missing for potential inner
+    // closures e.g.
+    //
+    // func a(_: () -> Void) {}
+    // func b(_: (Int) -> Void) {}
+    //
+    // a {
+    //   ...
+    //   b($0.member)
+    // }
+    //
+    // Here `$0` is associated with `a` since braces around `member` reference
+    // are missing.
+    if (!closure->hasSingleExpressionBody() &&
+        llvm::all_of(params->getArray(),
+                     [](ParamDecl *P) { return P->isAnonClosureParam(); })) {
+      if (auto *body = closure->getBody()) {
+        struct ParamRefFinder : public ASTWalker {
+          DiagnosticEngine &D;
+          ParameterList *Params;
+
+          ParamRefFinder(DiagnosticEngine &diags, ParameterList *params)
+              : D(diags), Params(params) {}
+
+          std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+            if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+              if (llvm::is_contained(Params->getArray(), DRE->getDecl())) {
+                auto *P = cast<ParamDecl>(DRE->getDecl());
+                D.diagnose(DRE->getLoc(), diag::use_of_anon_closure_param,
+                           P->getName());
+              }
+            }
+            return {true, E};
+          }
+        };
+
+        ParamRefFinder finder(getASTContext().Diags, params);
+        body->walk(finder);
+      }
+    }
+
     return true;
   }
 
@@ -5880,6 +5948,27 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 }
 
 bool AsyncFunctionConversionFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+    emitDiagnostic(diag::cannot_pass_async_func_to_sync_parameter,
+                   getFromType());
+
+    if (auto *closure = getAsExpr<ClosureExpr>(getAnchor())) {
+      auto asyncLoc = closure->getAsyncLoc();
+
+      // 'async' effect is inferred from the body of the closure.
+      if (asyncLoc.isInvalid()) {
+        if (auto asyncNode = findAsyncNode(closure)) {
+          emitDiagnosticAt(::getLoc(asyncNode),
+                           diag::async_inferred_from_operation);
+        }
+      }
+    }
+
+    return true;
+  }
+
   emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
                  getToType());
   return true;
@@ -6689,8 +6778,9 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
 
     // If there is a contextual mismatch associated with this
     // closure, let's not diagnose any parameter type issues.
-    if (hasFixFor(solution, getConstraintLocator(
-                                closure, LocatorPathElt::ContextualType())))
+    if (hasFixFor(solution,
+                  getConstraintLocator(closure, LocatorPathElt::ContextualType(
+                                                    CTP_Initialization))))
       return false;
 
     if (auto *parentExpr = findParentExpr(closure)) {
@@ -6729,13 +6819,9 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
   llvm::SmallString<16> id;
   llvm::raw_svector_ostream OS(id);
 
-  if (PD->isAnonClosureParam()) {
-    OS << "$" << paramIdx;
-  } else {
-    OS << "'" << PD->getParameterName() << "'";
-  }
+  OS << "'" << PD->getParameterName() << "'";
 
-  auto loc = PD->isAnonClosureParam() ? getLoc() : PD->getLoc();
+  auto loc = PD->isImplicit() ? getLoc() : PD->getLoc();
   emitDiagnosticAt(loc, diag::cannot_infer_closure_parameter_type, OS.str());
   return true;
 }
@@ -6889,13 +6975,11 @@ bool MultiArgFuncKeyPathFailure::diagnoseAsError() {
 
 bool UnableToInferKeyPathRootFailure::diagnoseAsError() {
   assert(isExpr<KeyPathExpr>(getAnchor()) && "Expected key path expression");
-  auto &ctx = getASTContext();
   auto contextualType = getContextualType(getAnchor());
   auto *keyPathExpr = castToExpr<KeyPathExpr>(getAnchor());
 
   auto emitKeyPathDiagnostic = [&]() {
-    if (contextualType &&
-        contextualType->getAnyNominal() == ctx.getAnyKeyPathDecl()) {
+    if (contextualType && contextualType->isAnyKeyPath()) {
       return emitDiagnostic(
           diag::cannot_infer_keypath_root_anykeypath_context);
     }

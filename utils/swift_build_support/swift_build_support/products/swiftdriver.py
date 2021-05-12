@@ -27,6 +27,10 @@ from .. import shell
 from .. import targets
 
 
+# SwiftDriver is a standalone compiler-driver application written in
+# Swift. This build product is *the* driver product that is
+# installed into a resulting toolchain. It is built-with and depends-on
+# other build products of this build (compiler, package-manager, etc).
 class SwiftDriver(product.Product):
     @classmethod
     def product_source_name(cls):
@@ -34,6 +38,10 @@ class SwiftDriver(product.Product):
 
     @classmethod
     def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def is_before_build_script_impl_product(cls):
         return False
 
     def should_build(self, host_target):

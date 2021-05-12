@@ -211,12 +211,35 @@ func test7() {
   #^CASE_0,caseSensitiveCheck,CaseSensitiveCheck^#
 }
 // CASE_0: Results for filterText: caseSensitiveCheck [
-// CASE_0: CaseSensitiveCheck
 // CASE_0: caseSensitiveCheck
+// CASE_0: CaseSensitiveCheck
 // CASE_0: caseSensitiveCheck.
 // CASE_0: ]
 // CASE_0: Results for filterText: CaseSensitiveCheck [
-// CASE_0: caseSensitiveCheck
 // CASE_0: CaseSensitiveCheck
+// CASE_0: caseSensitiveCheck
 // CASE_0: CaseSensitiveCheck(
 // CASE_0: ]
+
+// RUN: %complete-test -tok=CALLARG_1 %s | %FileCheck %s -check-prefix=CALLARG
+// RUN: %complete-test -tok=CALLARG_2 %s | %FileCheck %s -check-prefix=CALLARG
+func test8() {
+    struct CallArgumentTest {
+        init(_ arg: String) {}
+        init(label arg: Int) {}
+        func argTest(_ arg: String) {}
+        func argTest(label arg: Int) {}
+    }
+    var stringVal: String = "";
+    var intVal: Int = 1
+
+    _ = CallArgumentTest(#^CALLARG_1^#)
+    func methodTest(obj: CallArgumentTest) {
+      obj.argTest(#^CALLARG_2^#)
+    }
+// CALLARG: (arg: String)
+// CALLARG: (label: Int)
+// CALLARG: stringVal
+// CALLARG: String
+// CALLARG: intVal
+}

@@ -113,8 +113,7 @@ struct TestOptions {
   bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool timeRequest = false;
-  llvm::Optional<bool> OptimizeForIde;
-  bool SuppressDefaultConfigRequest = false;
+  bool DisableImplicitConcurrencyModuleImport = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
   struct VFSFile {

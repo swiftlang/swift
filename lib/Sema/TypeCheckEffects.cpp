@@ -427,6 +427,7 @@ public:
   }
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
+    visitExprPre(E);
     ShouldRecurse_t recurse = ShouldRecurse;
     if (isa<ErrorExpr>(E)) {
       asImpl().flagInvalidCode();
@@ -486,6 +487,8 @@ public:
   ShouldRecurse_t checkForEach(ForEachStmt *S) {
     return ShouldRecurse;
   }
+
+  void visitExprPre(Expr *expr) { asImpl().visitExprPre(expr); }
 };
 
 /// A potential reason why something might have an effect.
@@ -908,7 +911,11 @@ private:
     assert(param->getInterfaceType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
-               ->hasEffect(kind));
+               ->hasEffect(kind) ||
+           !param->getInterfaceType()
+               ->lookThroughAllOptionalTypes()
+               ->castTo<AnyFunctionType>()
+               ->getGlobalActor().isNull());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
@@ -1094,6 +1101,8 @@ private:
         // guaranteed to give back None, which leaves our ThrowKind unchanged.
       }
     }
+
+    void visitExprPre(Expr *expr) { return; }
   };
 
   class FunctionAsyncClassifier
@@ -1178,6 +1187,8 @@ private:
 
       return ShouldRecurse;
     }
+
+    void visitExprPre(Expr *expr) { return; }
   };
 
   Optional<ConditionalEffectKind>
@@ -1423,6 +1434,11 @@ public:
   }
   void setDiagnoseErrorOnTry(bool b) {
     DiagnoseErrorOnTry = b;
+  }
+
+  /// Return true when the current context is under an interpolated string
+  bool isWithinInterpolatedString() const {
+    return InterpolatedString != nullptr;
   }
 
   /// Stores the location of the innermost await
@@ -1896,67 +1912,6 @@ public:
     }
   }
 
-  void diagnoseUncoveredAsyncSite(ASTContext &ctx, ASTNode node,
-                                  PotentialEffectReason reason) {
-    SourceRange highlight = node.getSourceRange();
-    auto diag = diag::async_call_without_await;
-
-    switch (reason.getKind()) {
-    case PotentialEffectReason::Kind::AsyncLet:
-      // Reference to an 'async let' missing an 'await'.
-      if (auto declR = dyn_cast_or_null<DeclRefExpr>(node.dyn_cast<Expr*>())) {
-        if (auto var = dyn_cast<VarDecl>(declR->getDecl())) {
-          if (var->isAsyncLet()) {
-            ctx.Diags.diagnose(declR->getLoc(), diag::async_let_without_await,
-                               var->getName());
-            return;
-          }
-        }
-      }
-      LLVM_FALLTHROUGH; // fallthrough to a message about property access
-
-    case PotentialEffectReason::Kind::PropertyAccess:
-      diag = diag::async_prop_access_without_await;
-      break;
-
-    case PotentialEffectReason::Kind::SubscriptAccess:
-      diag = diag::async_subscript_access_without_await;
-      break;
-
-    case PotentialEffectReason::Kind::ByClosure:
-    case PotentialEffectReason::Kind::ByDefaultClosure:
-    case PotentialEffectReason::Kind::ByConformance:
-    case PotentialEffectReason::Kind::Apply: {
-      if (Function) {
-        // To produce a better error message, check if it is an autoclosure.
-        // We do not use 'Context::isAutoClosure' b/c it gives conservative
-        // answers.
-        if (auto autoclosure = dyn_cast_or_null<AutoClosureExpr>(
-                Function->getAbstractClosureExpr())) {
-          switch (autoclosure->getThunkKind()) {
-          case AutoClosureExpr::Kind::None:
-            diag = diag::async_call_without_await_in_autoclosure;
-            break;
-
-          case AutoClosureExpr::Kind::AsyncLet:
-            diag = diag::async_call_without_await_in_async_let;
-            break;
-
-          case AutoClosureExpr::Kind::SingleCurryThunk:
-          case AutoClosureExpr::Kind::DoubleCurryThunk:
-            break;
-          }
-        }
-      }
-      break;
-    }
-    };
-
-    ctx.Diags.diagnose(node.getStartLoc(), diag)
-        .fixItInsert(node.getStartLoc(), "await ")
-        .highlight(highlight);
-  }
-
   void diagnoseAsyncInIllegalContext(DiagnosticEngine &Diags, ASTNode node) {
     if (auto *e = node.dyn_cast<Expr*>()) {
       if (isa<ApplyExpr>(e)) {
@@ -2107,6 +2062,66 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// The maximum combined value of all throwing expressions in the current
   /// context.
   ConditionalEffectKind MaxThrowingKind;
+
+  struct DiagnosticInfo {
+    DiagnosticInfo(Expr &failingExpr,
+                   PotentialEffectReason reason) :
+      reason(reason),
+      expr(failingExpr) {}
+
+    /// Reason for throwing
+    PotentialEffectReason reason;
+
+    /// Failing expression
+    Expr &expr;
+  };
+
+  SmallVector<Expr *, 4> errorOrder;
+  llvm::DenseMap<Expr *, std::vector<DiagnosticInfo>> uncoveredAsync;
+  llvm::DenseMap<Expr *, Expr *> parentMap;
+
+  static bool isEffectAnchor(Expr *e) {
+    return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) || isa<AssignExpr>(e);
+  }
+
+  static bool isAnchorTooEarly(Expr *e) {
+    return isa<AssignExpr>(e) || isa<DiscardAssignmentExpr>(e);
+  }
+
+  /// Find the top location where we should put the await
+  static Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
+                            bool isInterpolatedString) {
+    Expr *parent = e;
+    Expr *lastParent = e;
+    while (parent && !isEffectAnchor(parent)) {
+      lastParent = parent;
+      parent = parentMap[parent];
+    }
+
+    if (parent && !isAnchorTooEarly(parent)) {
+      return parent;
+    }
+
+    if (isInterpolatedString) {
+      // TODO: I'm being gentle with the casts to avoid breaking things
+      //       If we see incorrect fix-it locations in string interpolations
+      //       we need to change how this behaves
+      //       Assert builds will crash giving us a bug to fix, non-asserts will
+      //       quietly "just work".
+      assert(parent == nullptr && "Expected to be at top of expression");
+      assert(isa<CallExpr>(lastParent) &&
+             "Expected top of string interpolation to be CalExpr");
+      assert(isa<ParenExpr>(dyn_cast<CallExpr>(lastParent)->getArg()) &&
+             "Expected paren expr in string interpolation call");
+      if (CallExpr *callExpr = dyn_cast<CallExpr>(lastParent)) {
+        if (ParenExpr *body = dyn_cast<ParenExpr>(callExpr->getArg())) {
+          return body->getSubExpr();
+        }
+      }
+    }
+
+    return lastParent;
+  }
 
   void flagInvalidCode() {
     // Suppress warnings about useless try or catch.
@@ -2269,6 +2284,13 @@ public:
     }
   }
 
+  ~CheckEffectsCoverage() {
+    for (Expr *anchor: errorOrder) {
+      diagnoseUncoveredAsyncSite(anchor);
+    }
+  }
+
+
   /// Mark that the current context is top-level code with
   /// throw-without-try enabled.
   void setTopLevelThrowWithoutTry() {
@@ -2286,6 +2308,12 @@ public:
   }
 
 private:
+  void visitExprPre(Expr *expr) {
+    if (parentMap.count(expr) == 0)
+      parentMap = expr->getParentMap();
+    return;
+  }
+
   ShouldRecurse_t checkClosure(ClosureExpr *E) {
     ContextScope scope(*this, Context::forClosure(E));
     scope.enterSubFunction();
@@ -2592,9 +2620,10 @@ private:
 
   void checkThrowAsyncSite(ASTNode E, bool requiresTry,
                            const Classification &classification) {
-    // Suppress all diagnostics when there's an un-analyzable throw site.
+    // Suppress all diagnostics when there's an un-analyzable throw/async site.
     if (classification.isInvalid()) {
       Flags.set(ContextFlags::HasAnyThrowSite);
+      Flags.set(ContextFlags::HasAnyAsyncSite);
       if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
       return;
     }
@@ -2619,8 +2648,18 @@ private:
       }
       // Diagnose async calls that are outside of an await context.
       else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
-        CurContext.diagnoseUncoveredAsyncSite(Ctx, E,
-                                              classification.getAsyncReason());
+        Expr *expr = E.dyn_cast<Expr*>();
+        Expr *anchor = walkToAnchor(expr, parentMap,
+                                    CurContext.isWithinInterpolatedString());
+
+        auto key = uncoveredAsync.find(anchor);
+        if (key == uncoveredAsync.end()) {
+          uncoveredAsync.insert({anchor, {}});
+          errorOrder.push_back(anchor);
+        }
+        uncoveredAsync[anchor].emplace_back(
+            *expr,
+            classification.getAsyncReason());
       }
     }
 
@@ -2768,6 +2807,88 @@ private:
     }
 
     return ShouldRecurse;
+  }
+
+  void diagnoseUncoveredAsyncSite(const Expr *anchor) const {
+    auto asyncPointIter = uncoveredAsync.find(anchor);
+    if (asyncPointIter == uncoveredAsync.end())
+      return;
+    const std::vector<DiagnosticInfo> &errors = asyncPointIter->getSecond();
+    SourceLoc awaitInsertLoc = anchor->getStartLoc();
+    if (const AnyTryExpr *tryExpr = dyn_cast<AnyTryExpr>(anchor))
+      awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
+    else if (const AutoClosureExpr *autoClosure = dyn_cast<AutoClosureExpr>(anchor)) {
+      if (const AnyTryExpr *tryExpr = dyn_cast<AnyTryExpr>(autoClosure->getSingleExpressionBody()))
+        awaitInsertLoc = tryExpr->getSubExpr()->getStartLoc();
+    }
+
+    Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
+      .fixItInsert(awaitInsertLoc, "await ")
+      .highlight(anchor->getSourceRange());
+
+    for (const DiagnosticInfo &diag: errors) {
+      switch (diag.reason.getKind()) {
+        case PotentialEffectReason::Kind::AsyncLet:
+          if (auto declR = dyn_cast<DeclRefExpr>(&diag.expr)) {
+            if (auto var = dyn_cast<VarDecl>(declR->getDecl())) {
+              if (var->isAsyncLet()) {
+                Ctx.Diags.diagnose(declR->getLoc(),
+                                   diag::async_let_without_await,
+                                   var->getName());
+                continue;
+              }
+            }
+          }
+          LLVM_FALLTHROUGH; // fallthrough to a message about PropertyAccess
+        case PotentialEffectReason::Kind::PropertyAccess:
+          Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                             diag::async_access_without_await, 1);
+          continue;
+
+        case PotentialEffectReason::Kind::SubscriptAccess:
+          Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                             diag::async_access_without_await, 2);
+          continue;
+
+        case PotentialEffectReason::Kind::ByClosure:
+        case PotentialEffectReason::Kind::ByDefaultClosure:
+        case PotentialEffectReason::Kind::ByConformance:
+        case PotentialEffectReason::Kind::Apply: {
+         if (auto autoclosure = dyn_cast<AutoClosureExpr>(anchor)) {
+           switch(autoclosure->getThunkKind()) {
+             case AutoClosureExpr::Kind::None:
+               Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                                  diag::async_call_without_await_in_autoclosure);
+               break;
+             case AutoClosureExpr::Kind::AsyncLet:
+               Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                                  diag::async_call_without_await_in_async_let);
+               break;
+             case AutoClosureExpr::Kind::SingleCurryThunk:
+             case AutoClosureExpr::Kind::DoubleCurryThunk:
+               Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                                  diag::async_access_without_await, 0);
+               break;
+           }
+          continue;
+         }
+
+         auto *call = dyn_cast<ApplyExpr>(&diag.expr);
+         if (call && call->implicitlyAsync()) {
+           // Emit a tailored note if the call is implicitly async, meaning the
+           // callee is isolated to an actor.
+           auto callee = call->getCalledValue();
+           Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
+                              callee->getDescriptiveKind(), callee->getName());
+         } else {
+           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                              diag::async_access_without_await, 0);
+         }
+
+         continue;
+        }
+      }
+    }
   }
 };
 

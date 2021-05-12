@@ -6,9 +6,10 @@
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     -swift-version 5 \
+// RUN:     -disable-implicit-concurrency-module-import \
 // RUN:     %s
 
-// RUN: %sourcekitd-test -req=interface-gen -module SomeModule -- -sdk %t/SDK -Fsystem %t/SDK/Frameworks -target %target-triple > %t.response
+// RUN: %sourcekitd-test -req=interface-gen -module SomeModule -- -Xfrontend -disable-implicit-concurrency-module-import  -sdk %t/SDK -Fsystem %t/SDK/Frameworks -target %target-triple > %t.response
 // RUN: %diff -u %s.response %t.response
 
 public struct SomeValue {

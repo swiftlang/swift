@@ -3604,7 +3604,7 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
       if (Kind == DAK_Count)
         break;
 
-      if (Kind == DAK_Actor && shouldParseExperimentalConcurrency()) {
+      if (Kind == DAK_Actor) {
         // If the next token is a startOfSwiftDecl, we are part of the modifier
         // list and should consume the actor token (e.g, actor public class Foo)
         // otherwise, it's the decl keyword (e.g. actor Foo) and shouldn't be.
@@ -4075,8 +4075,7 @@ bool Parser::isStartOfSwiftDecl() {
     return isStartOfSwiftDecl();
   }
 
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("actor")) {
+  if (Tok.isContextualKeyword("actor")) {
     if (Tok2.is(tok::identifier)) // actor Foo {}
       return true;
     BacktrackingScope Scope(*this);
@@ -4428,8 +4427,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
   // Obvious nonsense.
   default:
 
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
+    if (Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
       Tok.setKind(tok::contextual_keyword);
       DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
       DeclResult = parseDeclClass(Flags, Attributes);
@@ -6069,9 +6067,6 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
                                              SourceLoc const& currentLoc) {
   ParserStatus Status;
 
-  if (!shouldParseExperimentalConcurrency())
-    return Status;
-
   if (isEffectsSpecifier(Tok)) {
     if (currentKind == AccessorKind::Get) {
       Status |=
@@ -7080,8 +7075,10 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
     return nullptr;
 
   BraceStmt *BS = Body.get();
+  // Reset the single expression body status.
+  AFD->setHasSingleExpressionBody(false);
   AFD->setBodyParsed(BS);
-  
+
   if (Parser::shouldReturnSingleExpressionElement(BS->getElements())) {
     auto Element = BS->getLastElement();
     if (auto *stmt = Element.dyn_cast<Stmt *>()) {
@@ -8005,19 +8002,12 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Attributes.add(new (Context) RethrowsAttr(throwsLoc));
   }
 
-  // Initializers cannot be 'async'.
-  // FIXME: We should be able to lift this restriction.
-  if (asyncLoc.isValid()) {
-    diagnose(asyncLoc, diag::async_init)
-      .fixItRemove(asyncLoc);
-    asyncLoc = SourceLoc();
-  }
-
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failable, FailabilityLoc,
+                                           asyncLoc.isValid(), asyncLoc,
                                            throwsLoc.isValid(), throwsLoc,
                                            Params.get(), GenericParams,
                                            CurDeclContext);

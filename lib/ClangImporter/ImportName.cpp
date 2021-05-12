@@ -1286,6 +1286,7 @@ NameImporter::considerAsyncImport(
 
   // Initializers cannot be 'async'.
   // FIXME: We might eventually allow this.
+  // TODO: should the restriction be lifted in ClangImporter?
   if (isInitializer)
     return notAsync("initializers cannot be async");
 
@@ -1619,8 +1620,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         result.info.accessorKind = ImportedAccessorKind::PropertySetter;
 
       // only allow effectful property imports if through `swift_async_name`
-      const bool effectfulProperty = parsedName.IsGetter && nameAttr->isAsync
-                      && swiftCtx.LangOpts.EnableExperimentalConcurrency;
+      const bool effectfulProperty = parsedName.IsGetter && nameAttr->isAsync;
 
       // Consider throws and async imports.
       if (method && (parsedName.IsFunctionName || effectfulProperty)) {

@@ -88,6 +88,7 @@ std::string toolchains::GenericUnix::getDefaultLinker() const {
   switch (getTriple().getArch()) {
   case llvm::Triple::arm:
   case llvm::Triple::aarch64:
+  case llvm::Triple::aarch64_32:
   case llvm::Triple::armeb:
   case llvm::Triple::thumb:
   case llvm::Triple::thumbeb:

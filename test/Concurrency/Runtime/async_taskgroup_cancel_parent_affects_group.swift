@@ -10,12 +10,12 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_taskGroup_cancel_parent_affects_group() async {
 
   let x = detach {
@@ -47,7 +47,7 @@ func test_taskGroup_cancel_parent_affects_group() async {
 
 
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_parent_affects_group()

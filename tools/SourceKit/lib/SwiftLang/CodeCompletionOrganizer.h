@@ -43,12 +43,13 @@ struct Options {
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
   bool annotatedDescription = false;
+  bool includeObjectLiterals = true;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 
   // Options for combining priorities.
-  unsigned semanticContextWeight = 15;
-  unsigned fuzzyMatchWeight = 10;
+  unsigned semanticContextWeight = 7;
+  unsigned fuzzyMatchWeight = 13;
   unsigned popularityBonus = 2;
 };
 

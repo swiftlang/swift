@@ -160,7 +160,7 @@ extension Hasher {
 
     @inline(__always)
     internal mutating func combine(_ value: UInt) {
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
       combine(UInt32(truncatingIfNeeded: value))
 #else
       combine(UInt64(truncatingIfNeeded: value))
@@ -423,7 +423,7 @@ public struct Hasher {
   @usableFromInline
   internal static func _hash(seed: Int, _ value: UInt) -> Int {
     var state = _State(seed: seed)
-#if arch(i386) || arch(arm) || arch(wasm32)
+#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
     _internalInvariant(UInt.bitWidth < UInt64.bitWidth)
     let tbc = _TailBuffer(
       tail: UInt64(truncatingIfNeeded: value),

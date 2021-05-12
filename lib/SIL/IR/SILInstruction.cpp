@@ -1526,6 +1526,28 @@ const ValueBase *SILInstructionResultArray::back() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                           SingleValueInstruction
+//===----------------------------------------------------------------------===//
+
+CanArchetypeType SingleValueInstruction::getOpenedArchetype() const {
+  switch (getKind()) {
+  case SILInstructionKind::OpenExistentialAddrInst:
+  case SILInstructionKind::OpenExistentialRefInst:
+  case SILInstructionKind::OpenExistentialBoxInst:
+  case SILInstructionKind::OpenExistentialBoxValueInst:
+  case SILInstructionKind::OpenExistentialMetatypeInst:
+  case SILInstructionKind::OpenExistentialValueInst: {
+    auto Ty = getOpenedArchetypeOf(getType().getASTType());
+    assert(Ty && Ty->isOpenedExistential() &&
+           "Type should be an opened archetype");
+    return Ty;
+  }
+  default:
+    return CanArchetypeType();
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                         Multiple Value Instruction
 //===----------------------------------------------------------------------===//
 

@@ -99,6 +99,13 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BadFileDescriptorRetryCount = limit;
   }
 
+  if (auto A = Args.getLastArg(OPT_user_module_version)) {
+    if (Opts.UserModuleVersion.tryParse(StringRef(A->getValue()))) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+    }
+  }
+
   Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
@@ -248,6 +255,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
     Opts.SymbolGraphOutputDir = A->getValue();
   }
+  
+  Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
+
+  Opts.Static = Args.hasArg(OPT_static);
 
   return false;
 }

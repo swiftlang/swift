@@ -783,7 +783,7 @@ void TempRValueOptPass::run() {
     }
   }
 
-  InstModCallbacks callbacks(
+  auto callbacks = InstModCallbacks().onDelete(
     [](SILInstruction *instToKill) {
       // SimplifyInstruction is not in the business of removing
       // copy_addr. If it were, then we would need to update deadCopies.

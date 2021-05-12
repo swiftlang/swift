@@ -43,6 +43,43 @@ inline void deleteAllDebugUses(SILInstruction *inst,
   }
 }
 
+/// Erases the instruction \p I from it's parent block and deletes it, including
+/// all debug instructions which use \p I.
+/// Precondition: The instruction may only have debug instructions as uses.
+/// If the iterator \p InstIter references any deleted instruction, it is
+/// incremented.
+///
+/// \p callbacks InstModCallback to use.
+///
+/// Returns an iterator to the next non-deleted instruction after \p I.
+inline SILBasicBlock::iterator
+eraseFromParentWithDebugInsts(SILInstruction *inst,
+                              InstModCallbacks callbacks = InstModCallbacks()) {
+  auto nextII = std::next(inst->getIterator());
+
+  auto results = inst->getResults();
+  bool foundAny;
+  do {
+    foundAny = false;
+    for (auto result : results) {
+      while (!result->use_empty()) {
+        foundAny = true;
+        auto *user = result->use_begin()->getUser();
+        assert(user->isDebugInstruction());
+        if (nextII == user->getIterator())
+          ++nextII;
+        callbacks.deleteInst(user);
+      }
+    }
+  } while (foundAny);
+
+  // Just matching what eraseFromParentWithDebugInsts is today.
+  if (nextII == inst->getIterator())
+    ++nextII;
+  callbacks.deleteInst(inst, false /*do not notify*/);
+  return nextII;
+}
+
 } // namespace swift
 
 #endif

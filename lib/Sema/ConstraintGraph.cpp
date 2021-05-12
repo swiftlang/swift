@@ -946,7 +946,7 @@ namespace {
       // since components are going to be executed in LIFO order, we'd
       // want to have smaller/faster components at the back of the list.
       // When there are one-way constraints, we can't reorder them, so only
-      // sort the orphaned constraints at the back. In the absense of
+      // sort the orphaned constraints at the back. In the absence of
       // one-way constraints, sort everything.
       if (components.size() > 1) {
         auto sortStart = oneWayDigraph.empty()

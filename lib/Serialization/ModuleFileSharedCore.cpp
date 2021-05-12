@@ -131,6 +131,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
       options_block::IsSIBLayout::readRecord(scratch, IsSIB);
       extendedInfo.setIsSIB(IsSIB);
       break;
+    case options_block::IS_STATIC_LIBRARY:
+      extendedInfo.setIsStaticLibrary(true);
+      break;
     case options_block::IS_TESTABLE:
       extendedInfo.setIsTestable(true);
       break;
@@ -251,7 +254,12 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       // These fields were added later; be resilient against their absence.
       switch (scratch.size()) {
       default:
-        // Add new cases here, in descending order.
+      // Add new cases here, in descending order.
+      case 6:
+      case 5: {
+        result.userModuleVersion = llvm::VersionTuple(scratch[4], scratch[5]);
+        LLVM_FALLTHROUGH;
+      }
       case 4:
         if (scratch[3] != 0) {
           result.compatibilityVersion =
@@ -1172,8 +1180,10 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Name = info.name;
       TargetTriple = info.targetTriple;
       CompatibilityVersion = info.compatibilityVersion;
+      UserModuleVersion = info.userModuleVersion;
       Bits.ArePrivateImportsEnabled = extInfo.arePrivateImportsEnabled();
       Bits.IsSIB = extInfo.isSIB();
+      Bits.IsStaticLibrary = extInfo.isStaticLibrary();
       Bits.IsTestable = extInfo.isTestable();
       Bits.ResilienceStrategy = unsigned(extInfo.getResilienceStrategy());
       Bits.IsImplicitDynamicEnabled = extInfo.isImplicitDynamicEnabled();
@@ -1489,4 +1499,8 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     info.status = error(Status::MalformedDocumentation);
     return;
   }
+}
+
+bool ModuleFileSharedCore::hasSourceInfo() const {
+  return !!DeclUSRsTable;
 }

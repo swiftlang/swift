@@ -64,6 +64,15 @@ public protocol RandomNumberGenerator {
 }
 
 extension RandomNumberGenerator {
+  
+  // An unavailable default implementation of next() prevents types that do
+  // not implement the RandomNumberGenerator interface from conforming to the
+  // protocol; without this, the default next() method returning a generic
+  // unsigned integer will be used, recursing infinitely and probably blowing
+  // the stack.
+  @available(*, unavailable)
+  public mutating func next() -> UInt64 { fatalError() }
+  
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// Use this method when you need random binary data to generate another
@@ -94,7 +103,7 @@ extension RandomNumberGenerator {
     upperBound: T
   ) -> T {
     _precondition(upperBound != 0, "upperBound cannot be zero.")
-#if arch(i386) || arch(arm) // TODO(FIXME) SR-10912
+#if arch(i386) || arch(arm) || arch(arm64_32) // TODO(FIXME) SR-10912
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0

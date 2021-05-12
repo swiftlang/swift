@@ -186,7 +186,7 @@ public:
   std::string
   mangleAutoDiffDerivativeFunction(const AbstractFunctionDecl *originalAFD,
                                    AutoDiffDerivativeFunctionKind kind,
-                                   AutoDiffConfig config,
+                                   const AutoDiffConfig &config,
                                    bool isVTableThunk = false);
 
   /// Mangle the linear map (differential/pullback) for the given:
@@ -196,7 +196,7 @@ public:
   ///   derivative generic signature.
   std::string mangleAutoDiffLinearMap(const AbstractFunctionDecl *originalAFD,
                                       AutoDiffLinearMapKind kind,
-                                      AutoDiffConfig config);
+                                      const AutoDiffConfig &config);
 
   /// Mangle the linear map self parameter reordering thunk the given:
   /// - Mangled original function declaration.
@@ -210,7 +210,7 @@ public:
   /// Mangle a SIL differentiability witness.
   std::string mangleSILDifferentiabilityWitness(StringRef originalName,
                                                 DifferentiabilityKind kind,
-                                                AutoDiffConfig config);
+                                                const AutoDiffConfig &config);
 
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
@@ -223,7 +223,7 @@ public:
   mangleAutoDiffGeneratedDeclaration(AutoDiffGeneratedDeclarationKind declKind,
                                      StringRef origFnName, unsigned bbId,
                                      AutoDiffLinearMapKind linearMapKind,
-                                     AutoDiffConfig config);
+                                     const AutoDiffConfig &config);
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
@@ -453,7 +453,7 @@ protected:
       const AbstractFunctionDecl *afd);
   void appendAutoDiffFunctionParts(StringRef op, 
                                    Demangle::AutoDiffFunctionKind kind,
-                                   AutoDiffConfig config);
+                                   const AutoDiffConfig &config);
   void appendIndexSubset(IndexSubset *indexSubset);
 };
 

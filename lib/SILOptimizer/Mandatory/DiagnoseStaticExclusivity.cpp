@@ -1054,25 +1054,39 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
 
 namespace {
 
-class DiagnoseStaticExclusivity : public SILFunctionTransform {
+/// TODO: This is currently a module transform to ensure that source-level
+/// diagnostics, like DiagnoseInvalidCaptures run on closures (in addition to
+/// other callees) before this pass processes their parent functions. Otherwise,
+/// AccessSummaryAnalysis may crash on invalid SIL. Fix the pass manager to
+/// ensure that closures are always diagnosed before their parent. Then add an
+/// SCC transform to ensure that the previous diagnostic pass runs on all
+/// functions in the SCC before the next diagnostic pass. This will handle
+/// closures that call back into their parent. Then this can be converted to an
+/// SCC transform.
+class DiagnoseStaticExclusivity : public SILModuleTransform {
 public:
   DiagnoseStaticExclusivity() {}
 
 private:
   void run() override {
-    // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
-      return;
+    for (auto &function : *getModule()) {
+      if (!function.isDefinition())
+        continue;
 
-    SILFunction *Fn = getFunction();
-    // This is a staging flag. Eventually the ability to turn off static
-    // enforcement will be removed.
-    if (!Fn->getModule().getOptions().EnforceExclusivityStatic)
-      return;
+      // Don't rerun diagnostics on deserialized functions.
+      if (function.wasDeserializedCanonical())
+        continue;
 
-    PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(Fn);
-    auto *ASA = getAnalysis<AccessSummaryAnalysis>();
-    checkStaticExclusivity(*Fn, PO, ASA);
+      // This is a staging flag. Eventually the ability to turn off static
+      // enforcement will be removed.
+      if (!function.getModule().getOptions().EnforceExclusivityStatic)
+        continue;
+
+      PostOrderFunctionInfo *PO =
+        getAnalysis<PostOrderAnalysis>()->get(&function);
+      auto *ASA = getAnalysis<AccessSummaryAnalysis>();
+      checkStaticExclusivity(function, PO, ASA);
+    }
   }
 };
 

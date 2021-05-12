@@ -173,5 +173,7 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
     "SDK settings were ignored because 'SDKSettings.json' could not be parsed",
     ())
 
+WARNING(warning_unsupported_driver_option,none,
+        "option '%0' is ony supported in swift-driver", (StringRef))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

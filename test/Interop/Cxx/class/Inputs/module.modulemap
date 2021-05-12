@@ -23,6 +23,11 @@ module Destructors {
   requires cplusplus
 }
 
+module Extensions {
+  header "extensions.h"
+  requires cplusplus
+}
+
 module LoadableTypes {
   header "loadable-types.h"
   requires cplusplus

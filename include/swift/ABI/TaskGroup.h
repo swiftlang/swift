@@ -29,8 +29,8 @@ namespace swift {
 /// The task group is responsible for maintaining dynamically created child tasks.
 class alignas(Alignment_TaskGroup) TaskGroup {
 public:
-  // These constructors do not initialize the actor instance, and the
-  // destructor does not destroy the actor instance; you must call
+  // These constructors do not initialize the group instance, and the
+  // destructor does not destroy the group instance; you must call
   // swift_taskGroup_{initialize,destroy} yourself.
   constexpr TaskGroup()
     : PrivateData{} {}
@@ -43,4 +43,4 @@ public:
 
 } // end namespace swift
 
-#endif
+#endif // SWIFT_ABI_TASK_GROUP_H

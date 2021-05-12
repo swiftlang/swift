@@ -23,6 +23,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
@@ -1040,6 +1041,12 @@ public:
 
     case SILNodeKind::SILUndef:
       printSILUndef(cast<SILUndef>(node));
+      return;
+
+    case SILNodeKind::PlaceholderValue:
+      // This should really only happen during debugging.
+      *this << "placeholder<" << cast<PlaceholderValue>(node)->getType()
+            << ">\n";
       return;
 
     case SILNodeKind::MultipleValueInstructionResult:

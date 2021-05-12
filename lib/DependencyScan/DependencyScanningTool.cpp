@@ -101,6 +101,12 @@ DependencyScanningTool::initCompilerInstanceForScan(
   SmallString<128> WorkingDirectory;
   llvm::sys::fs::current_path(WorkingDirectory);
 
+  // We must reset option occurences because we are handling an unrelated
+  // command-line to those possibly parsed parsed before using the same tool.
+  // We must do so because LLVM options parsing is done using a managed
+  // static `GlobalParser`.
+  llvm::cl::ResetAllOptionOccurrences();
+
   // Parse arguments.
   std::string CommandString;
   for (const auto *c : Command) {

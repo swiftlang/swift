@@ -64,22 +64,37 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
     auto element = BS->getLastElement();
     if (auto expr = element.dyn_cast<Expr *>()) {
       if (expr->getType()->getRValueType()->isEqual(ResTy)) {
-        Context.Diags.diagnose(
-          expr->getStartLoc(),
-          diag::missing_return_last_expr, ResTy,
-          FLoc.isASTNode<ClosureExpr>() ? 1 : 0)
-        .fixItInsert(expr->getStartLoc(), "return ");
+        if (FLoc.isASTNode<ClosureExpr>()) {
+          Context.Diags.diagnose(expr->getStartLoc(),
+                                 diag::missing_return_closure, ResTy);
+        } else {
+          auto *DC = FLoc.getAsDeclContext();
+          assert(DC && DC->getAsDecl() && "not a declaration?");
+          Context.Diags.diagnose(expr->getStartLoc(), diag::missing_return_decl,
+                                 ResTy, DC->getAsDecl()->getDescriptiveKind());
+        }
+        Context.Diags
+            .diagnose(expr->getStartLoc(), diag::missing_return_last_expr_note)
+            .fixItInsert(expr->getStartLoc(), "return ");
+
         return;
       }
     }
   }
-  auto diagID = F->isNoReturnFunction(F->getTypeExpansionContext())
-                    ? diag::missing_never_call
-                    : diag::missing_return;
-  diagnose(Context,
-           L.getEndSourceLoc(),
-           diagID, ResTy,
-           FLoc.isASTNode<ClosureExpr>() ? 1 : 0);
+
+  bool isNoReturnFn = F->isNoReturnFunction(F->getTypeExpansionContext());
+  if (FLoc.isASTNode<ClosureExpr>()) {
+    auto diagID = isNoReturnFn ? diag::missing_never_call_closure
+                               : diag::missing_return_closure;
+    diagnose(Context, L.getEndSourceLoc(), diagID, ResTy);
+  } else {
+    auto *DC = FLoc.getAsDeclContext();
+    assert(DC && DC->getAsDecl() && "not a declaration?");
+    auto diagID = isNoReturnFn ? diag::missing_never_call_decl
+                               : diag::missing_return_decl;
+    diagnose(Context, L.getEndSourceLoc(), diagID, ResTy,
+             DC->getAsDecl()->getDescriptiveKind());
+  }
 }
 
 static void diagnoseUnreachable(const SILInstruction *I,

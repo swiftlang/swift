@@ -45,9 +45,9 @@ struct S5_P2: P2 {
 }
 
 @actorIndependent func testP2(x: S5_P2, p2: P2) {
-  p2.f() // expected-error{{instance method 'f()' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+  p2.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // OKAY
-  x.f() // expected-error{{'f()' isolated to global actor 'MainActor' can not be referenced from a non-isolated synchronous context}}
+  x.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   x.g() // OKAY
 }
 
@@ -73,30 +73,30 @@ class C2: C1 {
 
 class C3: C1 {
   @actorIndependent override func method() {
-    globalSome() // expected-error{{global function 'globalSome()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
+    globalSome() // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous nonisolated context}}
   }
 }
 
 class C4: C1 {
   @MainActor override func method() {
-    globalSome() // expected-error{{global function 'globalSome()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'MainActor'}}
+    globalSome() // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous main actor-isolated context}}
   }
 }
 
 class C5: C1 {
-  @SomeGlobalActor override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from global actor 'MainActor'-isolated overridden declaration}}
+  @SomeGlobalActor override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from main actor-isolated overridden declaration}}
   }
 }
 
 class C6: C2 {
   // We didn't infer any actor isolation for C2.method().
-  @SomeGlobalActor override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from global actor 'MainActor'-isolated overridden declaration}}
+  @SomeGlobalActor override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from main actor-isolated overridden declaration}}
   }
 }
 
 class C7: C2 {
-  @SomeGlobalActor(unsafe) override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from global actor 'MainActor'-isolated overridden declaration}}
-    globalMain() // expected-error{{global function 'globalMain()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
+  @SomeGlobalActor(unsafe) override func method() { // expected-error{{global actor 'SomeGlobalActor'-isolated instance method 'method()' has different actor isolation from main actor-isolated overridden declaration}}
+    globalMain() // expected-error{{call to main actor-isolated global function 'globalMain()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     globalSome() // okay
   }
 }

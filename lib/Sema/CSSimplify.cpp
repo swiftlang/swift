@@ -125,6 +125,7 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
 
 static bool areConservativelyCompatibleArgumentLabels(
     OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
+    MatchCallArgumentListener &listener,
     Optional<unsigned> unlabeledTrailingClosureArgIndex) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
@@ -163,7 +164,6 @@ static bool areConservativelyCompatibleArgumentLabels(
   auto params = fnType->getParams();
   ParameterListInfo paramInfo(params, decl, hasAppliedSelf);
 
-  MatchCallArgumentListener listener;
   return matchCallArguments(args, params, paramInfo,
                             unlabeledTrailingClosureArgIndex,
                             /*allow fixes*/ false, listener,
@@ -1220,6 +1220,32 @@ public:
   }
 };
 
+class AllowLabelMismatches : public MatchCallArgumentListener {
+  SmallVector<Identifier, 4> NewLabels;
+  bool HadLabelingIssues = false;
+
+public:
+  bool missingLabel(unsigned paramIndex) override {
+    HadLabelingIssues = true;
+    return false;
+  }
+
+  bool relabelArguments(ArrayRef<Identifier> newLabels) override {
+    NewLabels.append(newLabels.begin(), newLabels.end());
+    HadLabelingIssues = true;
+    return false;
+  }
+
+  bool hadLabelingIssues() const { return HadLabelingIssues; }
+
+  Optional<ArrayRef<Identifier>> getLabelReplacements() const {
+    if (!hadLabelingIssues() || NewLabels.empty())
+      return None;
+
+    return {NewLabels};
+  }
+};
+
 // Match the argument of a call to the parameter.
 ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintSystem &cs, FunctionType *contextualType,
@@ -1310,9 +1336,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     }
 
     selectedTrailingMatching = callArgumentMatch->trailingClosureMatching;
-    // Record the direction of matching used for this call.
-    cs.recordTrailingClosureMatch(cs.getConstraintLocator(locator),
-                                  selectedTrailingMatching);
+    // Record the matching direction and parameter bindings used for this call.
+    cs.recordMatchCallArgumentResult(cs.getConstraintLocator(locator),
+                                     *callArgumentMatch);
 
     // If there was a disjunction because both forward and backward were
     // possible, increase the score for forward matches to bias toward the
@@ -2876,11 +2902,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static bool isStringCompatiblePointerBaseType(ASTContext &ctx,
                                               Type baseType) {
   // Allow strings to be passed to pointer-to-byte or pointer-to-void types.
-  if (baseType->isEqual(ctx.getInt8Decl()->getDeclaredInterfaceType()))
+  if (baseType->isInt8())
     return true;
-  if (baseType->isEqual(ctx.getUInt8Decl()->getDeclaredInterfaceType()))
+  if (baseType->isUInt8())
     return true;
-  if (baseType->isEqual(ctx.TheEmptyTupleType))
+  if (baseType->isVoid())
     return true;
   
   return false;
@@ -3745,13 +3771,6 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
-  auto markAnyTypeVarsAsPotentialHoles = [&](Type type) {
-    type.visit([&](Type subType) {
-      if (auto *typeVar = subType->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
-  };
-
   if (repairArrayLiteralUsedAsDictionary(*this, lhs, rhs, matchKind,
                                          conversionsOrFixes,
                                          getConstraintLocator(locator)))
@@ -4312,6 +4331,12 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::WrappedValue: {
+    conversionsOrFixes.push_back(AllowWrappedValueMismatch::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
@@ -4340,8 +4365,33 @@ bool ConstraintSystem::repairFailures(
     // as a narrow exception to SE-0110, see `matchFunctionTypes`.
     //
     // But if `T.Element` didn't get resolved to `Void` we'd like
-    // to diagnose this as a missing argument which can't be ignored.
+    // to diagnose this as a missing argument which can't be ignored or
+    // a tuple is trying to be inferred as a tuple for destructuring but
+    // contextual argument does not match(in this case we remove the extra
+    // closure arguments).
     if (arg != getTypeVariables().end()) {
+      if (auto argToParamElt =
+              path.back().getAs<LocatorPathElt::ApplyArgToParam>()) {
+        auto loc = getConstraintLocator(anchor, path);
+        auto closureAnchor =
+            getAsExpr<ClosureExpr>(simplifyLocatorToAnchor(loc));
+        if (rhs->is<TupleType>() && closureAnchor &&
+            closureAnchor->getParameters()->size() > 1) {
+          auto callee = getCalleeLocator(loc);
+          if (auto overload = findSelectedOverloadFor(callee)) {
+            auto fnType =
+                simplifyType(overload->openedType)->castTo<FunctionType>();
+            auto paramIdx = argToParamElt->getParamIdx();
+            auto paramType = fnType->getParams()[paramIdx].getParameterType();
+            if (auto paramFnType = paramType->getAs<FunctionType>()) {
+              conversionsOrFixes.push_back(RemoveExtraneousArguments::create(
+                  *this, paramFnType, {}, loc));
+              break;
+            }
+          }
+        }
+      }
+
       conversionsOrFixes.push_back(AddMissingArguments::create(
           *this, {SynthesizedArg{0, AnyFunctionType::Param(*arg)}},
           getConstraintLocator(anchor, path)));
@@ -4664,10 +4714,7 @@ bool ConstraintSystem::repairFailures(
     // of the conversion (or pattern match) to have holes. This
     // helps when conversion if between a type and a tuple e.g.
     // `Int` vs. `(_, _)`.
-    rhs.visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordAnyTypeVarAsPotentialHole(rhs);
 
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
@@ -4746,21 +4793,21 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::TernaryBranch: {
-    markAnyTypeVarsAsPotentialHoles(lhs);
-    markAnyTypeVarsAsPotentialHoles(rhs);
+    recordAnyTypeVarAsPotentialHole(lhs);
+    recordAnyTypeVarAsPotentialHole(rhs);
 
     // If `if` expression has a contextual type, let's consider it a source of
     // truth and produce a contextual mismatch instead of  per-branch failure,
     // because it's a better pointer than potential then-to-else type mismatch.
     if (auto contextualType = getContextualType(anchor)) {
+      auto purpose = getContextualTypePurpose(anchor);
       if (contextualType->isEqual(rhs)) {
-        auto *loc =
-            getConstraintLocator(anchor, LocatorPathElt::ContextualType());
+        auto *loc = getConstraintLocator(
+            anchor, LocatorPathElt::ContextualType(purpose));
         if (hasFixFor(loc, FixKind::ContextualMismatch))
           return true;
 
-        if (contextualType->isVoid() &&
-            getContextualTypePurpose(anchor) == CTP_ReturnStmt) {
+        if (contextualType->isVoid() && purpose == CTP_ReturnStmt) {
           conversionsOrFixes.push_back(RemoveReturn::create(*this, lhs, loc));
           break;
         }
@@ -4787,8 +4834,8 @@ bool ConstraintSystem::repairFailures(
     // element pattern, call it a contextual mismatch.
     auto pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
     if (lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern)) {
-      markAnyTypeVarsAsPotentialHoles(lhs);
-      markAnyTypeVarsAsPotentialHoles(rhs);
+      recordAnyTypeVarAsPotentialHole(lhs);
+      recordAnyTypeVarAsPotentialHole(rhs);
 
       conversionsOrFixes.push_back(ContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
@@ -5169,7 +5216,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (kind >= ConstraintKind::Subtype &&
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
-           (nominal1->isDoubleType() || nominal2->isDoubleType()))) {
+           (nominal1->isDouble() || nominal2->isDouble()))) {
         ConstraintLocatorBuilder location{locator};
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
@@ -5465,7 +5512,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     // T -> AnyHashable.
-    if (isAnyHashableType(desugar2)) {
+    if (desugar2->isAnyHashable()) {
       // Don't allow this in operator contexts or we'll end up allowing
       // 'T() == U()' for unrelated T and U that just happen to be Hashable.
       // We can remove this special case when we implement operator hiding.
@@ -5648,8 +5695,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
                 auto &ctx = getASTContext();
-                if (type1->isEqual(
-                        ctx.getStringDecl()->getDeclaredInterfaceType())) {
+                if (type1->isString()) {
                   auto baseTy = getFixedTypeRecursive(pointeeTy, false);
 
                   if (baseTy->isTypeVariableOrMember() ||
@@ -5724,12 +5770,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
 
       // Single expression function with implicit `return`.
-      if (elt->is<LocatorPathElt::ContextualType>()) {
-        auto anchor = locator.getAnchor();
-        auto contextualInfo = getContextualTypeInfo(anchor);
-        assert(contextualInfo &&
-               "Found contextual type locator without additional information");
-        if (contextualInfo->purpose == CTP_ReturnSingleExpr) {
+      if (auto contextualType = elt->getAs<LocatorPathElt::ContextualType>()) {
+        if (contextualType->isFor(CTP_ReturnSingleExpr)) {
           increaseScore(SK_FunctionConversion);
           return getTypeMatchSuccess();
         }
@@ -6105,8 +6147,29 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (auto *Nil = getAsExpr<NilLiteralExpr>(anchor)) {
       auto *fixLocator = getConstraintLocator(
           getContextualType(Nil)
-              ? locator.withPathElement(LocatorPathElt::ContextualType())
+              ? locator.withPathElement(LocatorPathElt::ContextualType(
+                    getContextualTypePurpose(Nil)))
               : locator);
+
+      // Only requirement placed directly on `nil` literal is
+      // `ExpressibleByNilLiteral`, so if `nil` is an argument
+      // to an application, let's update locator accordingly to
+      // diagnose possible ambiguities with multiple mismatched
+      // overload choices.
+      if (fixLocator->directlyAt<NilLiteralExpr>()) {
+        if (auto argInfo =
+                isArgumentExpr(castToExpr(fixLocator->getAnchor()))) {
+          Expr *application;
+          unsigned argIdx;
+
+          std::tie(application, argIdx) = *argInfo;
+
+          fixLocator = getConstraintLocator(
+              application,
+              {LocatorPathElt::ApplyArgument(),
+               LocatorPathElt::ApplyArgToParam(argIdx, argIdx, /*flags=*/{})});
+        }
+      }
 
       // Here the roles are reversed - `nil` is something we are trying to
       // convert to `type` by making sure that it conforms to a specific
@@ -6418,7 +6481,8 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
     return nullptr;
 
   // Both types have to be fixed.
-  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable() ||
+      fromType->hasPlaceholder() || toType->hasPlaceholder())
     return nullptr;
 
   SmallVector<LocatorPathElt, 4> path;
@@ -7073,7 +7137,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
   Type bridgedType;
-  if (baseObjTy->getAnyNominal() == ctx.getStringDecl()) {
+  if (baseObjTy->isString()) {
     if (Type classType = ctx.getBridgedToObjC(DC, instanceTy)) {
       bridgedType = classType;
     }
@@ -8290,10 +8354,7 @@ ConstraintSystem::simplifyValueWitnessConstraint(
     if (!shouldAttemptFixes())
       return SolutionKind::Error;
 
-    memberType.visit([&](Type type) {
-      if (auto *typeVar = type->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
+    recordAnyTypeVarAsPotentialHole(memberType);
 
     return SolutionKind::Solved;
   }
@@ -8369,32 +8430,41 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
     return SolutionKind::Unsolved;
   }
 
-  ConstraintFix *fix = nullptr;
+  // If the wrapper type is a hole or a dependent member with no type variables,
+  // don't record a fix, because this indicates that there was an error
+  // elsewhere in the constraint system.
+  if (wrapperType->isPlaceholder() || wrapperType->is<DependentMemberType>())
+    return SolutionKind::Solved;
+
   auto *wrappedVar = getAsDecl<VarDecl>(locator.getAnchor());
   assert(wrappedVar && wrappedVar->hasAttachedPropertyWrapper());
 
   // The wrapper type must be a property wrapper.
   auto *nominal = wrapperType->getDesugaredType()->getAnyNominal();
   if (!(nominal && nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())) {
-    fix = AllowInvalidPropertyWrapperType::create(*this, wrapperType,
-                                                  getConstraintLocator(locator));
+    if (shouldAttemptFixes()) {
+      auto *fix = AllowInvalidPropertyWrapperType::create(
+          *this, wrapperType, getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Error;
   }
 
   auto typeInfo = nominal->getPropertyWrapperTypeInfo();
 
   // Implicit property wrappers must support projected-value initialization.
-  if (!fix && wrappedVar->hasImplicitPropertyWrapper()) {
-    if (!(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
-      fix = RemoveProjectedValueArgument::create(*this, wrapperType, cast<ParamDecl>(wrappedVar),
-                                                 getConstraintLocator(locator));
+  if (wrappedVar->hasImplicitPropertyWrapper() &&
+      !(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
+    if (shouldAttemptFixes()) {
+      auto *fix = RemoveProjectedValueArgument::create(
+          *this, wrapperType, cast<ParamDecl>(wrappedVar), getConstraintLocator(locator));
+      if (!recordFix(fix))
+        return SolutionKind::Solved;
     }
-  }
 
-  if (fix) {
-    if (!shouldAttemptFixes() || recordFix(fix))
-      return SolutionKind::Error;
-
-    return SolutionKind::Solved;
+    return SolutionKind::Error;
   }
 
   auto resolvedType = wrapperType->getTypeOfMember(DC->getParentModule(), typeInfo.valueVar);
@@ -8429,11 +8499,7 @@ ConstraintSystem::simplifyOneWayConstraint(
 
   // Propagate holes through one-way constraints.
   if (secondSimplified->isPlaceholder()) {
-    first.visit([&](Type subType) {
-      if (auto *typeVar = subType->getAs<TypeVariableType>())
-        recordPotentialHole(typeVar);
-    });
-
+    recordAnyTypeVarAsPotentialHole(first);
     return SolutionKind::Solved;
   }
 
@@ -8616,8 +8682,18 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       Type wrappedValueType;
 
       if (paramDecl->hasImplicitPropertyWrapper()) {
-        backingType = getContextualParamAt(i)->getPlainType();
-        wrappedValueType = createTypeVariable(getConstraintLocator(locator),
+        if (auto contextualType = getContextualParamAt(i)) {
+          backingType = contextualType->getPlainType();
+        } else {
+          // There may not be a contextual parameter type if the contextual
+          // type is not a function type or if closure body declares too many
+          // parameters.
+          auto *paramLoc =
+              getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+          backingType = createTypeVariable(paramLoc, TVO_CanBindToHole);
+        }
+
+        wrappedValueType = createTypeVariable(getConstraintLocator(paramDecl),
                                               TVO_CanBindToHole | TVO_CanBindToLValue);
       } else {
         auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
@@ -9037,13 +9113,13 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
       // FIXME: This should be an associated type of the protocol.
       auto &ctx = getASTContext();
       if (auto fromBGT = unwrappedToType->getAs<BoundGenericType>()) {
-        if (fromBGT->getDecl() == ctx.getArrayDecl()) {
+        if (fromBGT->isArray()) {
           // [AnyObject]
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
                         ctx.getAnyObjectType(),
                         getConstraintLocator(locator.withPathElement(
                             LocatorPathElt::GenericArgument(0))));
-        } else if (fromBGT->getDecl() == ctx.getDictionaryDecl()) {
+        } else if (fromBGT->isDictionary()) {
           // [NSObject : AnyObject]
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
@@ -9062,7 +9138,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::GenericArgument(1))));
-        } else if (fromBGT->getDecl() == ctx.getSetDecl()) {
+        } else if (fromBGT->isSet()) {
           auto nsObjectType = ctx.getNSObjectType();
           if (!nsObjectType) {
             // Not a bridging case. Should we detect this earlier?
@@ -9205,12 +9281,12 @@ ConstraintSystem::simplifyKeyPathConstraint(
       definitelyKeyPathType = true;
 
       // We can get root and value from a concrete key path type.
-      if (bgt->getDecl() == getASTContext().getKeyPathDecl() ||
-          bgt->getDecl() == getASTContext().getWritableKeyPathDecl() ||
-          bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+      if (bgt->isKeyPath() ||
+          bgt->isWritableKeyPath() ||
+          bgt->isReferenceWritableKeyPath()) {
         boundRoot = bgt->getGenericArgs()[0];
         boundValue = bgt->getGenericArgs()[1];
-      } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
+      } else if (bgt->isPartialKeyPath()) {
         if (!allowPartial)
           return false;
 
@@ -9446,11 +9522,9 @@ ConstraintSystem::simplifyKeyPathConstraint(
   // FIXME: Allow the type to be upcast if the type system has a concrete
   // KeyPath type assigned to the expression already.
   if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
-    if (keyPathBGT->getDecl() == getASTContext().getKeyPathDecl())
+    if (keyPathBGT->isKeyPath())
       kpDecl = getASTContext().getKeyPathDecl();
-    else if (keyPathBGT->getDecl() ==
-                 getASTContext().getWritableKeyPathDecl() &&
-             capability >= Writable)
+    else if (keyPathBGT->isWritableKeyPath() && capability >= Writable)
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
 
@@ -9500,16 +9574,14 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return SolutionKind::Error;
   }
   
-  if (auto clas = keyPathTy->getAs<NominalType>()) {
-    if (clas->getDecl() == getASTContext().getAnyKeyPathDecl()) {
-      // Read-only keypath, whose projected value is upcast to `Any?`.
-      // The root type can be anything.
-      Type resultTy = ProtocolCompositionType::get(getASTContext(), {},
-                                                  /*explicit AnyObject*/ false);
-      resultTy = OptionalType::get(resultTy);
-      return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
-                        subflags, locator);
-    }
+  if (keyPathTy->isAnyKeyPath()) {
+    // Read-only keypath, whose projected value is upcast to `Any?`.
+    // The root type can be anything.
+    Type resultTy = ProtocolCompositionType::get(getASTContext(), {},
+                                                /*explicit AnyObject*/ false);
+    resultTy = OptionalType::get(resultTy);
+    return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
+                      subflags, locator);
   }
   
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
@@ -9534,7 +9606,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
       llvm_unreachable("unhandled match");
     };
 
-    if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
+    if (bgt->isPartialKeyPath()) {
       // Read-only keypath, whose projected value is upcast to `Any`.
       auto resultTy = ProtocolCompositionType::get(getASTContext(), {},
                                                   /*explicit AnyObject*/ false);
@@ -9569,14 +9641,14 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
                         ConstraintKind::Bind, subflags, locator);
     };
   
-    if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
+    if (bgt->isKeyPath()) {
       // Read-only keypath.
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
 
       return solveRValue();
     }
-    if (bgt->getDecl() == getASTContext().getWritableKeyPathDecl()) {
+    if (bgt->isWritableKeyPath()) {
       // Writable keypath. The result can be an lvalue if the root was.
       // We can't convert the base without giving up lvalue-ness, though.
       if (!matchRoot(ConstraintKind::Equal))
@@ -9589,7 +9661,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
         return solveUnknown();
       return solveRValue();
     }
-    if (bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+    if (bgt->isReferenceWritableKeyPath()) {
       if (!matchRoot(ConstraintKind::Conversion))
         return SolutionKind::Error;
 
@@ -9630,10 +9702,13 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
           return false;
         });
 
-    // If all of the arguments are holes, let's disable all but one
-    // overload to make sure holes don't cause performance problems
-    // because hole could be bound to any type.
-    if (allHoles) {
+    // If this is an operator application and all of the arguments are holes,
+    // let's disable all but one overload to make sure holes don't cause
+    // performance problems because hole could be bound to any type.
+    //
+    // Non-operator calls are exempted because they have fewer overloads,
+    // and it's possible to filter them based on labels.
+    if (allHoles && isOperatorDisjunction(disjunction)) {
       auto choices = disjunction->getNestedConstraints();
       for (auto *choice : choices.slice(1))
         choice->setDisabled();
@@ -9690,11 +9765,57 @@ retry_after_fail:
           argsWithLabels.append(args.begin(), args.end());
           FunctionType::relabelParams(argsWithLabels, argumentInfo->Labels);
 
-          if (!areConservativelyCompatibleArgumentLabels(
-                  choice, argsWithLabels,
-                  argumentInfo->UnlabeledTrailingClosureIndex)) {
+          auto labelsMatch = [&](MatchCallArgumentListener &listener) {
+            if (areConservativelyCompatibleArgumentLabels(
+                    choice, argsWithLabels, listener,
+                    argumentInfo->UnlabeledTrailingClosureIndex))
+              return true;
+
             labelMismatch = true;
             return false;
+          };
+
+          AllowLabelMismatches listener;
+
+          // This overload has more problems than just missing/invalid labels.
+          if (!labelsMatch(listener))
+            return false;
+
+          // If overload did match, let's check if it needs to be disabled
+          // in "performance" mode because it has missing labels.
+          if (listener.hadLabelingIssues()) {
+            // In performance mode, let's just disable the choice,
+            // this decision could be rolled back for diagnostics.
+            if (!shouldAttemptFixes())
+              return false;
+
+            // Match expected vs. actual to see whether the only kind
+            // of problem here is missing label(s).
+            auto onlyMissingLabels =
+                [&argumentInfo](ArrayRef<Identifier> expectedLabels) {
+                  auto actualLabels = argumentInfo->Labels;
+                  if (actualLabels.size() != expectedLabels.size())
+                    return false;
+
+                  for (unsigned i = 0; i != actualLabels.size(); ++i) {
+                    auto actual = actualLabels[i];
+                    auto expected = expectedLabels[i];
+
+                    if (actual.compare(expected) != 0 && !actual.empty())
+                      return false;
+                  }
+
+                  return true;
+                };
+
+            auto replacementLabels = listener.getLabelReplacements();
+            // Either it's just one argument or all issues are missing labels.
+            if (!replacementLabels || onlyMissingLabels(*replacementLabels)) {
+              constraint->setDisabled(/*enableForDiagnostics=*/true);
+              // Don't include this overload in "common result" computation
+              // because it has issues.
+              return true;
+            }
           }
         }
 
@@ -9836,7 +9957,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (auto *typeVar = type2->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
       if (typeVar->isPlaceholder() || hasFixFor(locator))
-        recordPotentialHole(func1);
+        recordAnyTypeVarAsPotentialHole(func1);
     }
   }
 
@@ -9902,10 +10023,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // have an explicit inout argument.
   if (type1.getPointer() == desugar2) {
     if (!isOperator || !hasInOut()) {
-      recordTrailingClosureMatch(
+      recordMatchCallArgumentResult(
           getConstraintLocator(
               outerLocator.withPathElement(ConstraintLocator::ApplyArgument)),
-          TrailingClosureMatching::Forward);
+          MatchCallArgumentResult::forArity(func1->getNumParams()));
       return SolutionKind::Solved;
     }
   }
@@ -10068,7 +10189,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     // If there are any type variables associated with arguments/result
     // they have to be marked as "holes".
-    recordPotentialHole(func1);
+    recordAnyTypeVarAsPotentialHole(func1);
 
     if (desugar2->isPlaceholder())
       return SolutionKind::Solved;
@@ -10342,7 +10463,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
       return SolutionKind::Error;
 
     recordPotentialHole(tv);
-    recordPotentialHole(func1);
+    recordAnyTypeVarAsPotentialHole(func1);
 
     return SolutionKind::Solved;
   }
@@ -10703,11 +10824,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         auto &ctx = getASTContext();
         auto int8Con = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2,
-                                          ctx.getInt8Decl()->getDeclaredInterfaceType(),
+                                          ctx.getInt8Type(),
                                           getConstraintLocator(locator));
         auto uint8Con = Constraint::create(*this, ConstraintKind::Bind,
                                            baseType2,
-                                           ctx.getUInt8Decl()->getDeclaredInterfaceType(),
+                                           ctx.getUInt8Type(),
                                            getConstraintLocator(locator));
         auto voidCon = Constraint::create(*this, ConstraintKind::Bind,
                                           baseType2, ctx.TheEmptyTupleType,
@@ -10820,8 +10941,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::HashableToAnyHashable: {
     // We never want to do this if the LHS is already AnyHashable.
     type1 = simplifyType(type1);
-    if (isAnyHashableType(
-            type1->getRValueType()->lookThroughAllOptionalTypes())) {
+    if (type1->getRValueType()->lookThroughAllOptionalTypes()->isAnyHashable()) {
       return SolutionKind::Error;
     }
 
@@ -11042,12 +11162,24 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   return false;
 }
 
-void ConstraintSystem::recordPotentialHole(Type type) {
-  assert(type->hasTypeVariable());
+void ConstraintSystem::recordPotentialHole(TypeVariableType *typeVar) {
+  typeVar->getImpl().enableCanBindToHole(getSavedBindings());
+}
+
+void ConstraintSystem::recordAnyTypeVarAsPotentialHole(Type type) {
+  if (!type->hasTypeVariable())
+    return;
+
   type.visit([&](Type type) {
     if (auto *typeVar = type->getAs<TypeVariableType>())
       typeVar->getImpl().enableCanBindToHole(getSavedBindings());
   });
+}
+
+void ConstraintSystem::recordMatchCallArgumentResult(
+    ConstraintLocator *locator, MatchCallArgumentResult result) {
+  assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
+  argumentMatchingChoices.push_back({locator, result});
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
@@ -11148,7 +11280,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
           newTupleTypes.push_back(smallerElt);
       } else {
         if (largerElt.getType()->isTypeVariableOrMember())
-          recordPotentialHole(largerElt.getType());
+          recordAnyTypeVarAsPotentialHole(largerElt.getType());
       }
     }
     auto matchingType =
@@ -11216,7 +11348,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowCheckedCastCoercibleOptionalType:
   case FixKind::AllowUnsupportedRuntimeCheckedCast:
   case FixKind::AllowAlwaysSucceedCheckedCast:
-  case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype: {
+  case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype:
+  case FixKind::AllowWrappedValueMismatch:
+  case FixKind::RemoveExtraneousArguments: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -11268,6 +11402,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                      : false;
         }))
       impact += 3;
+
+    // Passing a closure to a parameter that doesn't expect one should
+    // be scored lower because there might be an overload that expects
+    // a closure but has other issues e.g. wrong number of parameters.
+    if (!type2->lookThroughAllOptionalTypes()->is<FunctionType>()) {
+      auto argument = simplifyLocatorToAnchor(fix->getLocator());
+      if (isExpr<ClosureExpr>(argument)) {
+        impact += 2;
+      }
+    }
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -11365,7 +11509,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
-  case FixKind::RemoveExtraneousArguments:
   case FixKind::AllowClosureParameterDestructuring:
   case FixKind::AllowInaccessibleMember:
   case FixKind::AllowAnyObjectKeyPathRoot:
@@ -11743,7 +11886,7 @@ void ConstraintSystem::addContextualConversionConstraint(
 
   // Add the constraint.
   auto *convertTypeLocator =
-      getConstraintLocator(expr, LocatorPathElt::ContextualType());
+      getConstraintLocator(expr, LocatorPathElt::ContextualType(purpose));
   addConstraint(constraintKind, getType(expr), conversionType,
                 convertTypeLocator, /*isFavored*/ true);
 }

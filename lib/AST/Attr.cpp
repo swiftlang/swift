@@ -530,17 +530,9 @@ static std::string getDifferentiationParametersClauseString(
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer,
     const PrintOptions &Options, const Decl *D, bool omitWrtClause = false) {
-  assert(D);
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
-
-  // Get original function.
-  auto *original = dyn_cast<AbstractFunctionDecl>(D);
-  // Handle stored/computed properties and subscript methods.
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(D))
-    original = asd->getAccessor(AccessorKind::Get);
-  assert(original && "Must resolve original declaration");
 
   // Print comma if not leading clause.
   bool isLeadingClause = false;
@@ -569,6 +561,23 @@ static void printDifferentiableAttrArguments(
   case DifferentiabilityKind::NonDifferentiable:
     llvm_unreachable("Impossible case `NonDifferentiable`");
   }
+
+  // If the declaration is not available, there is not enough context to print
+  // the differentiability parameters or the 'where' clause, so just print the
+  // differentiability kind if applicable (when not `Normal`).
+  if (!D) {
+    if (attr->getDifferentiabilityKind() != DifferentiabilityKind::Normal) {
+      printer << '(' << stream.str() << ')';
+    }
+    return;
+  }
+
+  // Get original function.
+  auto *original = dyn_cast<AbstractFunctionDecl>(D);
+  // Handle stored/computed properties and subscript methods.
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D))
+    original = asd->getAccessor(AccessorKind::Get);
+  assert(original && "Must resolve original declaration");
 
   // Print differentiation parameters clause, unless it is to be omitted.
   if (!omitWrtClause) {
@@ -616,9 +625,7 @@ static void printDifferentiableAttrArguments(
     return;
 
   // Otherwise, print the attribute argument text enclosed in parentheses.
-  printer << '(';
-  printer << stream.str();
-  printer << ')';
+  printer << '(' << stream.str() << ')';
 }
 
 void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
@@ -1090,7 +1097,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else {
       Printer << attr->AsyncFunctionName;
     }
-    Printer << "\", completionHandleIndex: " <<
+    Printer << "\", completionHandlerIndex: " <<
         attr->CompletionHandlerIndex << ')';
     break;
   }
@@ -1471,6 +1478,20 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
+}
+
+AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
+  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
+                               implicit ? SourceRange() : getRange(),
+                               Platform, Message, Rename,
+                               Introduced ? *Introduced : llvm::VersionTuple(),
+                               implicit ? SourceRange() : IntroducedRange,
+                               Deprecated ? *Deprecated : llvm::VersionTuple(),
+                               implicit ? SourceRange() : DeprecatedRange,
+                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+                               implicit ? SourceRange() : ObsoletedRange,
+                               PlatformAgnostic,
+                               implicit);
 }
 
 Optional<OriginallyDefinedInAttr::ActiveVersion>

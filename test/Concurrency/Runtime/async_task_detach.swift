@@ -19,24 +19,42 @@ class X {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+struct Boom: Error {}
+
+@available(SwiftStdlib 5.5, *)
 func test_detach() async {
-  for _ in 1...3 {
-    let x = X()
-    let h = detach {
-      print("inside: \(x)")
-    }
-    await h.get()
+  let x = X()
+  let h = detach {
+    print("inside: \(x)")
   }
+  await h.get()
   // CHECK: X: init
   // CHECK: inside: main.X
   // CHECK: X: deinit
 }
 
+@available(SwiftStdlib 5.5, *)
+func test_detach_throw() async {
+  let x = X()
+  let h = detach {
+    print("inside: \(x)")
+    throw Boom()
+  }
+  do {
+    try await h.get()
+  } catch {
+    print("error: \(error)")
+  }
+  // CHECK: X: init
+  // CHECK: inside: main.X
+  // CHECK: error: Boom()
+}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_detach()
+    await test_detach_throw()
   }
 }

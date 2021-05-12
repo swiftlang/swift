@@ -784,19 +784,34 @@ static bool isAllocatingApply(SILInstruction *Inst) {
 namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
-  llvm::SmallVector<SILInstruction*, 16> Allocations;
 
-  void collectAllocations(SILFunction &Fn) {
-    for (auto &BB : Fn) {
-      for (auto &II : BB) {
-        if (isa<AllocationInst>(&II) ||
-            isAllocatingApply(&II) ||
-            isa<KeyPathInst>(&II)) {
-          Allocations.push_back(&II);
-        }
-      }
+  // This is not a SILBasicBlock::iterator because we need a null value and we
+  // don't have a specific block whose end() we could use.
+  SILInstruction *nextInstToProcess = nullptr;
+
+  /// Advance nextInstToProcess to the next instruction in its block.
+  /// If nextInstToProcess is the last instruction in its block, it is set to
+  /// null.
+  void advance() {
+    if (!nextInstToProcess)
+      return;
+    SILBasicBlock *block = nextInstToProcess->getParent();
+    auto nextIter = std::next(nextInstToProcess->getIterator());
+    if (nextIter == block->end()) {
+      nextInstToProcess = nullptr;
+    } else {
+      nextInstToProcess = &*nextIter;
     }
   }
+
+  void handleDeleteNotification(SILNode *node) override {
+    if (auto *inst = dyn_cast<SILInstruction>(node)) {
+      if (inst == nextInstToProcess)
+        advance();
+    }
+  }
+
+  bool needsNotifications() override { return true; }
 
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
@@ -806,21 +821,30 @@ class DeadObjectElimination : public SILFunctionTransform {
 
   bool processFunction(SILFunction &Fn) {
     DeadEndBlocks DEBlocks(&Fn);
-    Allocations.clear();
     DestructorAnalysisCache.clear();
+
     bool Changed = false;
-    collectAllocations(Fn);
-    for (auto *II : Allocations) {
-      if (auto *A = dyn_cast<AllocRefInst>(II))
-        Changed |= processAllocRef(A);
-      else if (auto *A = dyn_cast<AllocStackInst>(II))
-        Changed |= processAllocStack(A);
-      else if (auto *KPI = dyn_cast<KeyPathInst>(II))
-        Changed |= processKeyPath(KPI);
-      else if (auto *A = dyn_cast<AllocBoxInst>(II))
-        Changed |= processAllocBox(A);
-      else if (auto *A = dyn_cast<ApplyInst>(II))
-        Changed |= processAllocApply(A, DEBlocks);
+
+    for (auto &BB : Fn) {
+      nextInstToProcess = &BB.front();
+      
+      // We cannot just iterate over the instructions, because the processing
+      // functions might deleted instruction before or after the current
+      // instruction - and also inst itself.
+      while (SILInstruction *inst = nextInstToProcess) {
+        advance();
+
+        if (auto *A = dyn_cast<AllocRefInst>(inst))
+          Changed |= processAllocRef(A);
+        else if (auto *A = dyn_cast<AllocStackInst>(inst))
+          Changed |= processAllocStack(A);
+        else if (auto *KPI = dyn_cast<KeyPathInst>(inst))
+          Changed |= processKeyPath(KPI);
+        else if (auto *A = dyn_cast<AllocBoxInst>(inst))
+          Changed |= processAllocBox(A);
+        else if (auto *A = dyn_cast<ApplyInst>(inst))
+          Changed |= processAllocApply(A, DEBlocks);
+      }
     }
     return Changed;
   }

@@ -10,11 +10,11 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_skipCallingNext() async {
   let numbers = [1, 1]
 
-  let result = try! await withTaskGroup(of: Int.self) { (group) async -> Int in
+  let result = await withTaskGroup(of: Int.self) { (group) async -> Int in
     for n in numbers {
       print("group.spawn { \(n) }")
       group.spawn { () async -> Int in
@@ -43,7 +43,7 @@ func test_skipCallingNext() async {
   assert(result == 0)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_skipCallingNext()

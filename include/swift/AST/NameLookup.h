@@ -25,6 +25,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
 
 namespace swift {
 class ASTContext;
@@ -554,9 +555,7 @@ public:
                VisibleDeclConsumer &Consumer)
       : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
-  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
-    Consumer.foundDecl(D, Reason);
-  }
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason);
 
   void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason);
   

@@ -474,7 +474,7 @@ static auto const unTaggedNonNativeBridgeObjectBits
 
 #if defined(__x86_64__)
 static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
-#elif defined(__arm64__) || defined(__arch64__) || defined(_M_ARM64)
+#elif defined(__LP64__)
 static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
 #else
 static uintptr_t const objectPointerIsObjCBit = 0x00000002U;

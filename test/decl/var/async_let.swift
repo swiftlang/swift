@@ -38,3 +38,11 @@ func cook() async throws {
   _ = try await veggies
   _ = await meat
 }
+
+func testInterpolation() async {
+  spawn let x = "\(12345)"
+  _ = await x
+
+  async let y = "\(12345)"
+  _ = await y
+}

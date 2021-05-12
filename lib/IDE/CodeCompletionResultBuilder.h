@@ -87,11 +87,11 @@ class CodeCompletionResultBuilder {
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unknown;
+  bool IsArgumentLabels = false;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
-  bool IsNotRecommended = false;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
-    CodeCompletionResult::NotRecommendedReason::NoReason;
+      CodeCompletionResult::NotRecommendedReason::None;
   StringRef BriefDocComment = StringRef();
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -148,12 +148,15 @@ public:
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
   void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
   void setNotRecommended(CodeCompletionResult::NotRecommendedReason Reason) {
-    IsNotRecommended = true;
     NotRecReason = Reason;
   }
 
   void setSemanticContext(SemanticContextKind Kind) {
     SemanticContext = Kind;
+  }
+
+  void setIsArgumentLabels(bool Flag = true) {
+    IsArgumentLabels = Flag;
   }
 
   void

@@ -24,7 +24,7 @@ import Darwin
 
 @frozen
 public struct CGFloat {
-#if arch(i386) || arch(arm)
+#if arch(i386) || arch(arm) || arch(arm64_32)
   /// The native type used to store the CGFloat, which is Float on
   /// 32-bit architectures and Double on 64-bit architectures.
   public typealias NativeType = Float

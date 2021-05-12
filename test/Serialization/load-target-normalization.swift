@@ -68,11 +68,12 @@ import ForeignModule
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target arm64-apple-ios40.0 2>&1 | %FileCheck -DNORM=arm64-apple-ios %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target aarch64-apple-ios40.0 2>&1 | %FileCheck -DNORM=arm64-apple-ios %s
 
-// armv7s, armv7k, armv7, arm64e should be accepted.
+// armv7s, armv7k, armv7, arm64_32, arm64e should be accepted.
 
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target armv7s-apple-ios40.0 2>&1 | %FileCheck -DNORM=armv7s-apple-ios %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target armv7k-apple-ios40.0 2>&1 | %FileCheck -DNORM=armv7k-apple-ios %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target armv7-apple-ios40.0 2>&1 | %FileCheck -DNORM=armv7-apple-ios %s
+// RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target arm64_32-apple-ios40.0 2>&1 | %FileCheck -DNORM=arm64_32-apple-ios %s
 // RUN: not %target-swift-frontend %s -typecheck -I %t -parse-stdlib -Xcc -arch -Xcc i386 -target arm64e-apple-ios40.0 2>&1 | %FileCheck -DNORM=arm64e-apple-ios %s
 
 // x86_64h should be accepted.

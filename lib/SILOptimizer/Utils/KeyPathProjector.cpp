@@ -230,7 +230,7 @@ public:
       auto addr = builder.createAllocStack(loc, type);
       
       assertHasNoContext();
-      assert(getter->getArguments().size() == 2);
+      assert(getter->getConventions().getNumSILArguments());
       
       auto ref = builder.createFunctionRef(loc, getter);
       builder.createApply(loc, ref, subs, {addr, parentValue});
@@ -308,8 +308,8 @@ public:
           auto addr = builder.createAllocStack(loc, type);
 
           assertHasNoContext();
-          assert(getter->getArguments().size() == 2);
-          assert(setter->getArguments().size() == 2);
+          assert(getter->getConventions().getNumSILArguments());
+          assert(setter->getConventions().getNumSILArguments());
           
           // If this is a modify, we need to call the getter and
           // store the result in the writeback buffer.
@@ -468,10 +468,11 @@ class OptionalChainProjector : public ComponentProjector {
 public:
   OptionalChainProjector(const KeyPathPatternComponent &component,
                          std::unique_ptr<KeyPathProjector> parent,
+                         BeginAccessInst *&beginAccess,
                          SILValue optionalChainResult,
                          SILLocation loc, SILBuilder &builder)
         : ComponentProjector(component, std::move(parent), loc, builder),
-          optionalChainResult(optionalChainResult) {}
+          optionalChainResult(optionalChainResult), beginAccess(beginAccess) {}
   
   void project(AccessType accessType,
                std::function<void(SILValue addr)> callback) override {
@@ -506,6 +507,7 @@ public:
       
       // Unwrap the optional.
       auto objAddr = builder.createUncheckedTakeEnumDataAddr(loc, tempAddr, someDecl, objType);
+      BeginAccessInst *origBeginAccess = beginAccess;
       
       // at the end of the projection, callback will store a value in optionalChainResult
       callback(objAddr);
@@ -516,6 +518,12 @@ public:
       builder.createBranch(loc, continuation);
       // else, store nil in the result
       builder.setInsertionPoint(ifNone);
+
+      // If the sub-projection ended the access in the some-branch, we also
+      // have to end the access in the none-branch.
+      if (origBeginAccess && origBeginAccess != beginAccess)
+        builder.createEndAccess(loc, origBeginAccess, /*aborted*/ false);
+
       builder.createInjectEnumAddr(loc, optionalChainResult, noneDecl);
       
       builder.createBranch(loc, continuation);
@@ -526,6 +534,7 @@ public:
   
 private:
   SILValue optionalChainResult;
+  BeginAccessInst *&beginAccess;
 };
 
 /// A projector to handle a complete key path.
@@ -646,7 +655,8 @@ private:
         break;
       case KeyPathPatternComponent::Kind::OptionalChain:
         projector = std::make_unique<OptionalChainProjector>
-            (comp, std::move(parent), optionalChainResult, loc, builder);
+            (comp, std::move(parent), beginAccess, optionalChainResult, loc,
+             builder);
         break;
     }
     
