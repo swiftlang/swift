@@ -5,6 +5,7 @@
 // RUN: %target-run %t/extern-var
 //
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import ExternVar
 import StdlibUnittest

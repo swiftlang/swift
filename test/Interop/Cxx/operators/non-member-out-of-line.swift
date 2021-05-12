@@ -5,6 +5,7 @@
 // RUN: %target-run %t/non-member-out-of-line
 //
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import NonMemberOutOfLine
 import StdlibUnittest

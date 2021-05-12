@@ -5,6 +5,7 @@
 // RUN: %target-run %t/statics 2&>1
 //
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import InlineStaticMemberVar
 import StdlibUnittest

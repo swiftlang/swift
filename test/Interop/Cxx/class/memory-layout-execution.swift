@@ -4,6 +4,7 @@
 // RUN: %target-run %t/class_layout 2&>1
 //
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import MemoryLayout
 import StdlibUnittest

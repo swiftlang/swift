@@ -4,6 +4,7 @@
 // RUN: %target-run %t/address_only 2&>1
 
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import TypeClassification
 import StdlibUnittest

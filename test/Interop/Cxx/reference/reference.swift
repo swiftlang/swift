@@ -5,6 +5,7 @@
 // RUN: %target-run %t/reference
 //
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import Reference
 import StdlibUnittest

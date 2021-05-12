@@ -5,6 +5,7 @@
 // RUN: %target-run %t/statics
 //
 // REQUIRES: executable_test
+// XFAIL: OS=windows-msvc
 
 import StaticMemberFunc
 import StdlibUnittest
