@@ -23,14 +23,13 @@ import Swift
 /// by invoking the appropriate context-sensitive static functions which operate
 /// on the current task.
 ///
-/// A task's execution can be seen as a series of periods where the task was
-/// running. Each such period ends at a suspension point or the
+/// A task's execution can be seen as a series of periods where the task ran.
+/// Each such period ends at a suspension point or the
 /// completion of the task.
 ///
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with partial tasks directly.
-/// ◊TODO: partial tasks might get replaced with jobs (see PR 36878)
 ///
 /// Task Cancellation
 /// =================
@@ -41,10 +40,10 @@ import Swift
 /// the correct way to stop that work varies.
 /// Likewise,
 /// it's the responsibility of the code running as part of the task
-/// to check for cancellation at the appropriate points when stopping is possible.
-/// In a long-running task, you might need to check for cancellation repeatedly,
-/// and cancellation at different times
-/// might require stopping different aspects of that work.
+/// to check for cancellation whenever stopping is appropriate.
+/// In a long-task that includes multiple pieces,
+/// you might need to check for cancellation at several points,
+/// and handle cancellation differently at each point.
 /// If you only need to throw an error to stop the work,
 /// call the `Task.checkCancellation()` function to check for cancellation.
 /// Other responses to cancellation include
@@ -70,14 +69,14 @@ public struct Task {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
-  /// Returns the task that this code is being run on,
-  /// or `nil` if this property is accessed outside of any task.
+  /// Returns the task that this code runs on,
+  /// or `nil` when you access this property outside of any task.
   ///
   /// If you read this property from the context of an asynchronous function or closure,
-  /// the current task is guaranteed to be non-nil.
+  /// the current task is non-nil.
   /// In a synchronous context,
   /// this property's value depends on whether the synchronous operation was
-  /// itself called from an asynchronous context.
+  /// called from an asynchronous context.
   /// For example:
   ///
   ///     func hello() {
@@ -116,8 +115,9 @@ extension Task {
   ///
   /// If you access this property outside of any task,
   /// this queries the system to determine the
-  /// priority at which the current function is running. If the system cannot
-  /// provide an appropriate priority, returns `Priority.default`.
+  /// priority at which the current function is running.
+  /// If the system can't provide a priority,
+  /// this property's value is `Priority.default`.
   ///
   /// - SeeAlso: `Task.priority`
   public static var currentPriority: Priority {
@@ -142,11 +142,11 @@ extension Task {
 
   /// The priority of a task.
   ///
-  /// The executor determines how priority information impacts the way tasks are scheduled.
+  /// The executor determines how priority information affects the way tasks are scheduled.
   /// The behavior varies depending on the executor currently being used.
   /// Typically, executors attempt to run tasks with a higher priority
   /// before tasks with a lower priority.
-  /// However, the exact semantics of how priority is treated are left up to each
+  /// However, the semantics of how priority is treated are left up to each
   /// platform and `Executor` implementation.
   ///
   /// Child tasks automatically inherit their parent task's priority.
@@ -158,7 +158,7 @@ extension Task {
   /// that is, the task is treated as it if had a higher priority,
   /// without actually changing the priority of the task:
   ///
-  /// - If a task running on behalf of an actor,
+  /// - If a task runs on behalf of an actor,
   ///   and a new higher-priority task is enqueued to the actor,
   ///   then the actor's current task is temporarily elevated
   ///   to the priority of the enqueued task.
@@ -166,7 +166,7 @@ extension Task {
   ///   to be processed at (effectively) the priority it was enqueued with.
   /// - If a task is created with a `Task.Handle`
   ///   and a higher-priority task calls the `await handle.get()` method,
-  ///   then the priority of this task is increased until the task completes.
+  ///   then the priority of this task increases until the task completes.
   ///
   /// In both cases, priority elevation helps you prevent a low-priority task
   /// blocking the execution of a high priority task,
@@ -209,8 +209,8 @@ extension Task {
   ///
   /// You can use a task's handle to wait for its result or cancel the task.
   ///
-  /// It's not a programming error to discard a task's handle without awaiting or canceling the task.
-  /// A task runs whether or not you still have its handle stored somewhere.
+  /// It isn't a programming error to discard a task's handle without awaiting or canceling the task.
+  /// A task runs regardless of whether you still have its handle stored somewhere.
   /// However, if you discard a task's handle, you give up the ability
   /// to wait for that task's result or cancel the task.
   public struct Handle<Success, Failure: Error>: Sendable {
@@ -228,9 +228,9 @@ extension Task {
 
     /// Wait for the task to complete, returning its result or throw an error.
     ///
-    /// If the task hasn't completed yet, its priority is elevated to the
-    /// priority of the current task. Note that this may not be as effective as
-    /// creating the task with the right priority to in the first place.
+    /// If the task hasn't completed, its priority increases to the
+    /// priority of the current task. Note that this isn't as effective as
+    /// creating the task with the correct priority.
     ///
     /// If the task throws an error, this method propogates that error.
     /// Tasks that respond to cancellation by throwing `Task.CancellationError`
@@ -243,15 +243,15 @@ extension Task {
 
     /// Wait for the task to complete, returning its result or its error.
     ///
-    /// If the task hasn't completed yet, its priority is elevated to the
-    /// priority of the current task. Note that this may not be as effective as
-    /// creating the task with the right priority to in the first place.
+    /// If the task hasn't completed, its priority increases to the
+    /// priority of the current task. Note that this isn't as effective as
+    /// creating the task with the correct priority.
     ///
     /// If the task throws an error, this method propogates that error.
     /// Tasks that respond to cancellation by throwing `Task.CancellationError`
     /// have that error propogated here upon cancellation.
     ///
-    /// - Returns: If the task suceeded, `.success`
+    /// - Returns: If the task succeeded, `.success`
     /// with the task's result as the associated value;
     /// otherwise, `.failure` with the error as the associated value.
     public func getResult() async -> Result<Success, Failure> {
@@ -267,9 +267,9 @@ extension Task {
     /// Whether this function has any effect is task-dependent.
     ///
     /// For a task to respect cancellation it must cooperatively check for it
-    /// while running. Many tasks will check for cancellation before beginning
-    /// their "actual work", however this is not a requirement nor is it guaranteed
-    /// how and when tasks check for cancellation in general.
+    /// while running. Many tasks check for cancellation before beginning
+    /// their "actual work"; however, this isn't a requirement nor is it guaranteed
+    /// how and when tasks check for cancellation.
     public func cancel() {
       Builtin.cancelAsyncTask(_task)
     }
@@ -279,17 +279,18 @@ extension Task {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task.Handle where Failure == Never {
 
-  /// Wait for the task to complete, returning its result.
+  /// Wait for the task to complete and return its result.
   ///
   /// If the task hasn't completed,
-  /// its priority is elevated to the priority of the current task.
-  /// Note that this may not be as effective as
-  /// creating the task with the right priority in the first place.
+  /// its priority increases to that of the current task.
+  /// Note that this might not be as effective as
+  /// creating the task with the correct priority,
+  /// depending on the executor's scheduling details.
   ///
-  /// The task that this handle refers to might check for cancellation ---
-  /// however, since this method is nonthrowing,
-  /// the task can't throw `CancellationError` and needs to use another method
-  /// like returning `nil` instead.
+  /// The task that this handle refers to might check for cancellation.
+  /// However, because this method is nonthrowing,
+  /// the task needs to handle cancellation using an approach like returning `nil`
+  /// instead of throwing an error.
   public func get() async -> Success {
     return await _taskFutureGet(_task)
   }
@@ -449,7 +450,7 @@ extension Task {
 /// Runs the given nonthrowing operation asynchronously
 /// as part of a new top-level task.
 ///
-/// Avoid using a detached task unless it isn't possible
+/// Don't use a detached task unless it isn't possible
 /// to model the operation using structured concurrency features like child tasks.
 /// Child tasks inherit the parent task's priority and task-local storage,
 /// and canceling a parent task automatically cancels all of its child tasks.
@@ -462,7 +463,6 @@ extension Task {
 ///
 /// - Parameters:
 ///   - priority: The priority of the task.
-///   - executor: The executor that the detached closure should start executing on.
 ///   - operation: The operation to perform.
 ///
 /// - Returns: A handle to the task.
@@ -505,7 +505,6 @@ public func detach<T>(
 ///
 /// - Parameters:
 ///   - priority: The priority of the task.
-///   - executor: The executor that the detached closure should start executing on.
 ///   - operation: The operation to perform.
 ///
 /// - Returns: A handle to the task.
@@ -546,7 +545,6 @@ public func detach<T>(
 ///
 /// - Parameters:
 ///   - priority: The priority of the task.
-///   - executor: The executor that the detached closure should start executing on.
 ///   - operation: The operation to perform.
 ///
 /// - Returns: A handle to the task.
@@ -564,7 +562,7 @@ public func asyncDetached<T>(
 ///
 /// If the operation throws an error, this method propogates that error.
 ///
-/// Avoid using a detached task unless it isn't possible
+/// Don't use a detached task unless it isn't possible
 /// to model the operation using structured concurrency features like child tasks.
 /// Child tasks inherit the parent task's priority and task-local storage,
 /// and canceling a parent task automatically cancels all of its child tasks.
@@ -577,7 +575,6 @@ public func asyncDetached<T>(
 ///
 /// - Parameters:
 ///   - priority: The priority of the task.
-///   - executor: The executor that the detached closure should start executing on.
 ///   - operation: The operation to perform.
 ///
 /// - Returns: A handle to the task.
@@ -600,7 +597,7 @@ public func asyncDetached<T>(
 /// Like `detach(priority:operation:)`,
 /// this function creates a separate, top-level task.
 /// Unlike `detach(priority:operation:)`,
-/// the task creating by `async(priority:operation:)`
+/// the task created by `async(priority:operation:)`
 /// inherits the priority and actor context of the caller,
 /// so the operation is treated more like an asynchronous extension
 /// to the synchronous operation.
@@ -634,7 +631,7 @@ func async(
 /// Like `detach(priority:operation:)`,
 /// this function creates a separate, top-level task.
 /// Unlike `detach(priority:operation:)`,
-/// the task creating by `async(priority:operation:)`
+/// the task created by `async(priority:operation:)`
 /// inherits the priority and actor context of the caller,
 /// so the operation is treated more like an asynchronous extension
 /// to the synchronous operation.
@@ -675,7 +672,7 @@ public func async<T>(
 /// Like `detach(priority:operation:)`,
 /// this function creates a separate, top-level task.
 /// Unlike `detach(priority:operation:)`,
-/// the task creating by `async(priority:operation:)`
+/// the task created by `async(priority:operation:)`
 /// inherits the priority and actor context of the caller,
 /// so the operation is treated more like an asynchronous extension
 /// to the synchronous operation.
@@ -723,13 +720,13 @@ func _runAsyncHandler(operation: @escaping () async -> ()) {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
-  /// Suspends the current task,
-  /// and waits for at least the given duration before resuming it.
+  /// Suspends the current task
+  /// and waits for at least the given duration before resuming.
   ///
-  /// This method doesn't make guarantee how long the task is suspended.
+  /// This method doesn't guarantee how long the task is suspended.
   /// Depending on a variety of factors,
   /// it could be suspended for exactly the given duration,
-  /// or for a much longer duration.
+  /// or for a longer duration.
   ///
   /// Calling this method doesn't block the underlying thread.
   ///
@@ -765,7 +762,7 @@ extension Task {
   /// to let other tasks run for a while
   /// before execution returns back to this task.
   ///
-  /// Note that if this task is the highest-priority task in the system,
+  /// If this task is the highest-priority task in the system,
   /// the executor immediately resumes execution of the same task.
   /// As such,
   /// this method isn't necessarily a way to avoid resource starvation.
@@ -810,7 +807,7 @@ extension Task {
 /// Calls a closure with an unsafe handle to current task.
 ///
 /// If you call this function from the body of an asynchronous function,
-/// the unsafe task handle passed to the closure is always be non-nil
+/// the unsafe task handle passed to the closure is always non-nil
 /// because an asynchronous function always runs in the context of a task.
 /// However if you call this function from the body of a synchronous function,
 /// and that function isn't executing in the context of any task,
@@ -818,7 +815,7 @@ extension Task {
 ///
 /// Don't try to store an unsafe task handle
 /// for use outside this method's closure.
-/// Storing an unsafe task handle has no impact on the task's actual lifecycle,
+/// Storing an unsafe task handle doesn't have an impact on the task's actual life cycle,
 /// and the behavior of accessing an unsafe task handle
 /// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
 /// Instead, use the `task` property of `UnsafeCurrentTask`
@@ -852,7 +849,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 /// call the `withUnsafeCurrentTask(body:)` method.
 /// Don't try to store an unsafe task handle
 /// for use outside that method's closure.
-/// Storing an unsafe task handle has no impact on the task's actual lifecycle,
+/// Storing an unsafe task handle doesn't have an impact on the task's actual life cycle,
 /// and the behavior of accessing an unsafe task handle
 /// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
 /// Instead, use the `task` property of `UnsafeCurrentTask`
@@ -886,8 +883,8 @@ public struct UnsafeCurrentTask {
 
   /// A Boolean value that indicates whether the current task was canceled.
   ///
-  /// After the value of this property is true, it will remain true indefinitely.
-  /// There is no uncancellation operation.
+  /// After the value of this property is `true`, it remains `true` indefinitely.
+  /// There is no way to uncancel the operation.
   ///
   /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
