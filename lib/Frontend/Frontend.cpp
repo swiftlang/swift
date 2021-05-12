@@ -168,6 +168,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     llvm::sys::fs::make_absolute(OutputDir);
     serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
   }
+  serializationOpts.SkipSymbolGraphInheritedDocs = opts.SkipInheritedDocs;
   
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;

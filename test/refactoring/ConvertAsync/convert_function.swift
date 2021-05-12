@@ -71,6 +71,7 @@ func manyNested() {
 // MANY-NESTED-NEXT: print("after")
 // MANY-NESTED-NEXT: }
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-SIMPLE %s
 func asyncParams(arg: String, _ completion: (String?, Error?) -> Void) {
   simpleErr(arg: arg) { str, err in
@@ -86,7 +87,7 @@ func asyncParams(arg: String, _ completion: (String?, Error?) -> Void) {
 // ASYNC-SIMPLE: func {{[a-zA-Z_]+}}(arg: String) async throws -> String {
 // ASYNC-SIMPLE-NEXT: let str = try await simpleErr(arg: arg)
 // ASYNC-SIMPLE-NEXT: print("simpleErr")
-// ASYNC-SIMPLE-NEXT: return str
+// ASYNC-SIMPLE-NEXT: {{^}}return str{{$}}
 // ASYNC-SIMPLE-NEXT: print("after")
 // ASYNC-SIMPLE-NEXT: }
 
@@ -119,7 +120,7 @@ func asyncResNewErr(arg: String, _ completion: (Result<String, Error>) -> Void) 
 // ASYNC-ERR-NEXT: do {
 // ASYNC-ERR-NEXT: let str = try await simpleErr(arg: arg)
 // ASYNC-ERR-NEXT: print("simpleErr")
-// ASYNC-ERR-NEXT: return str
+// ASYNC-ERR-NEXT: {{^}}return str{{$}}
 // ASYNC-ERR-NEXT: print("after")
 // ASYNC-ERR-NEXT: } catch let err {
 // ASYNC-ERR-NEXT: throw CustomError.Bad
@@ -141,11 +142,11 @@ func asyncUnhandledCompletion(_ completion: (String) -> Void) {
 // ASYNC-UNHANDLED: func asyncUnhandledCompletion() async -> String {
 // ASYNC-UNHANDLED-NEXT: let str = await simple()
 // ASYNC-UNHANDLED-NEXT: let success = run {
-// ASYNC-UNHANDLED-NEXT: <#completion#>(str)
-// ASYNC-UNHANDLED-NEXT: return true
+// ASYNC-UNHANDLED-NEXT:   <#completion#>(str)
+// ASYNC-UNHANDLED-NEXT:   {{^}} return true{{$}}
 // ASYNC-UNHANDLED-NEXT: }
 // ASYNC-UNHANDLED-NEXT: if !success {
-// ASYNC-UNHANDLED-NEXT: return "bad"
+// ASYNC-UNHANDLED-NEXT: {{^}} return "bad"{{$}}
 // ASYNC-UNHANDLED-NEXT: }
 // ASYNC-UNHANDLED-NEXT: }
 
@@ -196,3 +197,8 @@ func voidResultCompletion(completion: (Result<Void, Error>) -> Void) {
 // VOID-RESULT-HANDLER-NEXT:     throw CustomError.Bad
 // VOID-RESULT-HANDLER-NEXT:   }
 // VOID-RESULT-HANDLER-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
+func functionWithSomeHandler(handler: (String) -> Void) {}
+// NON-COMPLETION-HANDLER: func functionWithSomeHandler() async -> String {}

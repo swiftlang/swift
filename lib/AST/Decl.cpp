@@ -610,36 +610,50 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
-  if (CachedSerializedLocs) {
-    return CachedSerializedLocs;
-  }
+const ExternalSourceLocs *Decl::getSerializedLocs() const {
+  auto &Context = getASTContext();
+  if (auto EL = Context.getExternalSourceLocs(this).getValueOr(nullptr))
+    return EL;
+
+  static ExternalSourceLocs NullLocs{};
+
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
-  assert(File->getKind() == FileUnitKind::SerializedAST &&
-         "getSerializedLocs() should only be called on decls in "
-         "a 'SerializedASTFile'");
-  auto Locs = File->getBasicLocsForDecl(this);
-  if (!Locs.hasValue()) {
-    static const Decl::CachedExternalSourceLocs NullLocs{};
+  if (File->getKind() != FileUnitKind::SerializedAST)
+    return &NullLocs;
+
+  auto RawLocs = File->getExternalRawLocsForDecl(this);
+  if (!RawLocs.hasValue()) {
+    // Don't read .swiftsourceinfo again on failure
+    Context.setExternalSourceLocs(this, &NullLocs);
     return &NullLocs;
   }
-  auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
-  auto &SM = getASTContext().SourceMgr;
-#define CASE(X)                                                               \
-Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
-                                       Locs->X.Column);
-  CASE(Loc)
-  CASE(StartLoc)
-  CASE(EndLoc)
-#undef CASE
 
-  for (const auto &LineColumnAndLength : Locs->DocRanges) {
-    auto Start = SM.getLocFromExternalSource(Locs->SourceFilePath,
-      LineColumnAndLength.first.Line,
-      LineColumnAndLength.first.Column);
-    Result->DocRanges.push_back({ Start, LineColumnAndLength.second });
+  auto &SM = getASTContext().SourceMgr;
+  unsigned BufferID = SM.getExternalSourceBufferID(RawLocs->SourceFilePath);
+  if (!BufferID) {
+    // Don't try open the file again on failure
+    Context.setExternalSourceLocs(this, &NullLocs);
+    return &NullLocs;
   }
 
+  auto ResolveLoc = [&](const ExternalSourceLocs::RawLoc &Raw) -> SourceLoc {
+    // If the decl had a presumed loc, create its virtual file so that
+    // getPresumedLineAndColForLoc works from serialized locations as well.
+    if (Raw.Directive.isValid()) {
+      auto &LD = Raw.Directive;
+      SourceLoc Loc = SM.getLocForOffset(BufferID, LD.Offset);
+      SM.createVirtualFile(Loc, LD.Name, LD.LineOffset, LD.Length);
+    }
+    return SM.getLocForOffset(BufferID, Raw.Offset);
+  };
+
+  auto *Result = getASTContext().Allocate<ExternalSourceLocs>();
+  Result->BufferID = BufferID;
+  Result->Loc = ResolveLoc(RawLocs->Loc);
+  for (auto &Range : RawLocs->DocRanges) {
+    Result->DocRanges.emplace_back(ResolveLoc(Range.first), Range.second);
+  }
+  Context.setExternalSourceLocs(this, Result);
   return Result;
 }
 
@@ -1567,9 +1581,9 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-bool PatternBindingDecl::isSpawnLet() const {
+bool PatternBindingDecl::isAsyncLet() const {
   if (auto var = getAnchoringVarDecl(0))
-    return var->isSpawnLet();
+    return var->isAsyncLet();
 
   return false;
 }
@@ -5864,7 +5878,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
-bool VarDecl::isSpawnLet() const {
+bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>() || getAttrs().hasAttribute<SpawnAttr>();
 }
 

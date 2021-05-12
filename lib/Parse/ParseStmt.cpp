@@ -2136,6 +2136,17 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
     }
   }
 
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion) {
+      CodeCompletion->completeForEachPatternBeginning(TryLoc.isValid(),
+                                                      AwaitLoc.isValid());
+    }
+    consumeToken(tok::code_complete);
+    // Since 'completeForeachPatternBeginning' is a keyword only completion,
+    // we don't need to parse the rest of 'for' statement.
+    return makeParserCodeCompletionStatus();
+  }
+
   // Parse the pattern.  This is either 'case <refutable pattern>' or just a
   // normal pattern.
   if (consumeIf(tok::kw_case)) {

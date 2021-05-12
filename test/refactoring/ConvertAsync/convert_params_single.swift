@@ -1,4 +1,6 @@
 func withError(_ completion: (String?, Error?) -> Void) { }
+func notOptional(_ completion: (String, Error?) -> Void) { }
+func errorOnly(_ completion: (Error?) -> Void) { }
 func test(_ str: String) -> Bool { return false }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNRELATED %s
@@ -357,7 +359,7 @@ withError { res, err in
 // NESTEDRET-NEXT: let str = try await withError()
 // NESTEDRET-NEXT: print("before")
 // NESTEDRET-NEXT: if test(str) {
-// NESTEDRET-NEXT: return
+// NESTEDRET-NEXT:   <#return#>
 // NESTEDRET-NEXT: }
 // NESTEDRET-NEXT: print("got result \(str)")
 // NESTEDRET-NEXT: print("after")
@@ -406,3 +408,73 @@ withError { res, err in
   print("got result \(res!)")
   print("after")
 }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNWRAPPING %s
+withError { str, err in
+  print("before")
+  guard err == nil else { return }
+  _ = str!.count
+  _ = str?.count
+  _ = str!.count.bitWidth
+  _ = str?.count.bitWidth
+  _ = (str?.count.bitWidth)!
+  _ = str!.first?.isWhitespace
+  _ = str?.first?.isWhitespace
+  _ = (str?.first?.isWhitespace)!
+  print("after")
+}
+// UNWRAPPING:      let str = try await withError()
+// UNWRAPPING-NEXT: print("before")
+// UNWRAPPING-NEXT: _ = str.count
+// UNWRAPPING-NEXT: _ = str.count
+// UNWRAPPING-NEXT: _ = str.count.bitWidth
+// UNWRAPPING-NEXT: _ = str.count.bitWidth
+
+// Note this transform results in invalid code as str.count.bitWidth is no
+// longer optional, but arguably it's more useful than leaving str as a
+// placeholder. In general, the tranform we perform here is locally valid
+// within the optional chain, but may change the type of the overall chain.
+// UNWRAPPING-NEXT: _ = (str.count.bitWidth)!
+
+// UNWRAPPING-NEXT: _ = str.first?.isWhitespace
+// UNWRAPPING-NEXT: _ = str.first?.isWhitespace
+// UNWRAPPING-NEXT: _ = (str.first?.isWhitespace)!
+// UNWRAPPING-NEXT: print("after")
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NOT-OPTIONAL %s
+notOptional { str, err in
+  print("before")
+  if let err2 = err {
+    print("got error \(err2)")
+    return
+  }
+  print("got result \(str)")
+  print("after")
+}
+// NOT-OPTIONAL: do {
+// NOT-OPTIONAL-NEXT: let str = try await notOptional()
+// NOT-OPTIONAL-NEXT: print("before")
+// NOT-OPTIONAL-NEXT: print("got result \(str)")
+// NOT-OPTIONAL-NEXT: print("after")
+// NOT-OPTIONAL-NEXT: } catch let err2 {
+// NOT-OPTIONAL-NEXT: print("got error \(err2)")
+// NOT-OPTIONAL-NEXT: }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ERROR-ONLY %s
+errorOnly { err in
+  print("before")
+  if let err2 = err {
+    print("got error \(err2)")
+    return
+  }
+  print("after")
+}
+// ERROR-ONLY: convert_params_single.swift
+// ERROR-ONLY-NEXT: do {
+// ERROR-ONLY-NEXT: try await errorOnly()
+// ERROR-ONLY-NEXT: print("before")
+// ERROR-ONLY-NEXT: print("after")
+// ERROR-ONLY-NEXT: } catch let err2 {
+// ERROR-ONLY-NEXT: print("got error \(err2)")
+// ERROR-ONLY-NEXT: }
+// ERROR-ONLY-NOT: }

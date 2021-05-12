@@ -242,6 +242,9 @@ public:
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         if (!shouldTypeCheckInEnclosingExpression(closure))
           return { false, expr };
+        for (auto &Param : *closure->getParameters()) {
+          Param->setSpecifier(swift::ParamSpecifier::Default);
+        }
       }
 
       // Now, we're ready to walk into sub expressions.

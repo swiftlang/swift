@@ -1490,3 +1490,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     return;
   }
 }
+
+bool ModuleFileSharedCore::hasSourceInfo() const {
+  return !!DeclUSRsTable;
+}

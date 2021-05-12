@@ -686,10 +686,16 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework) {
   assert(moduleInputBuffer);
+
+  // The buffers are moved into the shared core, so grab their IDs now in case
+  // they're needed for diagnostics later.
   StringRef moduleBufferID = moduleInputBuffer->getBufferIdentifier();
   StringRef moduleDocBufferID;
   if (moduleDocInputBuffer)
     moduleDocBufferID = moduleDocInputBuffer->getBufferIdentifier();
+  StringRef moduleSourceInfoID;
+  if (moduleSourceInfoInputBuffer)
+    moduleSourceInfoID = moduleSourceInfoInputBuffer->getBufferIdentifier();
 
   if (moduleInputBuffer->getBufferSize() % 4 != 0) {
     if (diagLoc)
@@ -742,6 +748,12 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
         (Ctx.LangOpts.AllowModuleWithCompilerErrors &&
          (loadInfo.status == serialization::Status::TargetTooNew ||
           loadInfo.status == serialization::Status::TargetIncompatible))) {
+      if (loadedModuleFile->hasSourceInfoFile() &&
+          !loadedModuleFile->hasSourceInfo())
+        Ctx.Diags.diagnose(diagLocOrInvalid,
+                           diag::serialization_malformed_sourceinfo,
+                           moduleSourceInfoID);
+
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
@@ -1243,9 +1255,9 @@ SerializedASTFile::getCommentForDecl(const Decl *D) const {
   return File.getCommentForDecl(D);
 }
 
-Optional<BasicDeclLocs>
-SerializedASTFile::getBasicLocsForDecl(const Decl *D) const {
-  return File.getBasicDeclLocsForDecl(D);
+Optional<ExternalSourceLocs::RawLocs>
+SerializedASTFile::getExternalRawLocsForDecl(const Decl *D) const {
+  return File.getExternalRawLocsForDecl(D);
 }
 
 Optional<StringRef>

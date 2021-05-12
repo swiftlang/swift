@@ -17,6 +17,7 @@
 #ifndef SWIFT_RUNTIME_CONCURRENCY_H
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
+#include "swift/ABI/Task.h"
 #include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/TaskStatus.h"
@@ -405,6 +406,13 @@ swift_task_addCancellationHandler(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(
     CancellationNotificationStatusRecord *record);
+
+/// Create a NullaryContinuationJob from a continuation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+NullaryContinuationJob*
+swift_task_createNullaryContinuationJob(
+    size_t priority,
+    AsyncTask *continuation);
 
 /// Report error about attempting to bind a task-local value from an illegal context.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

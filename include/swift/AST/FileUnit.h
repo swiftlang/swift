@@ -164,7 +164,8 @@ public:
     return None;
   }
 
-  virtual Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const {
+  virtual Optional<ExternalSourceLocs::RawLocs>
+  getExternalRawLocsForDecl(const Decl *D) const {
     return None;
   }
 

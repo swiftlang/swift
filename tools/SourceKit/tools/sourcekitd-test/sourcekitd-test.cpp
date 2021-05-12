@@ -54,7 +54,6 @@ int STDOUT_FILENO = _fileno(stdout);
 }
 #endif
 
-static bool sendGlobalConfigRequest();
 static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts,
                                 bool IsFirstInvocation);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
@@ -475,16 +474,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
 
-  if (firstInvocation && Opts.Request != SourceKitRequest::GlobalConfiguration &&
-      !Opts.SuppressDefaultConfigRequest) {
-    // We don't fail if this request fails for now so that sourcekitd-test is
-    // still usable with older versions of sourcekitd that don't have the
-    // global-configuration request.
-    if (sendGlobalConfigRequest()) {
-      llvm::outs() << "warning: global configuration request failed\n";
-    }
-  }
-
   if (Opts.ShellExecution)
     return performShellExecution(Opts.CompilerArgs);
 
@@ -498,28 +487,6 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     printBufferedNotifications(/*syncWithService=*/false);
   }
   return 0;
-}
-
-static bool sendGlobalConfigRequest() {
-  TestOptions Opts;
-  sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
-                                                                 nullptr, 0);
-  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
-
-  // For test invocations we default to setting OptimizeForIDE to true. This
-  // matches the use case of the most popular clients of sourcekitd (editors)
-  // and also disables loading locations from .swiftsourceinfo files. This is
-  // desirable for testing because the .swiftsourceinfo for the stdlib is
-  // available when sourcekitd is tested, and can make some stdlib-dependent
-  // sourcekitd tests unstable due to changing source locations from the stdlib
-  // module.
-  sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(true));
-  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
-  bool IsError = sourcekitd_response_is_error(Resp);
-  if (IsError)
-    sourcekitd_response_description_dump(Resp);
-  sourcekitd_request_release(Req);
-  return IsError;
 }
 
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
@@ -867,11 +834,24 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
 
   case SourceKitRequest::ExpandPlaceholder:
-    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    if (Opts.Length) {
+      // Single placeholder by location.
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorExpandPlaceholder);
+      sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+      sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    } else {
+      if (ByteOffset) {
+        llvm::errs() << "Missing '-length <number>'\n";
+        return 1;
+      }
+      // Expand all placeholders.
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
+      sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+      sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
+      sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+      sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    }
     break;
 
   case SourceKitRequest::SyntaxTree:
@@ -1374,7 +1354,13 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       break;
 
       case SourceKitRequest::ExpandPlaceholder:
-        expandPlaceholders(SourceBuf.get(), llvm::outs());
+        if (Opts.Length) {
+          // Single placeholder by location.
+          sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+        } else {
+          // Expand all placeholders.
+          expandPlaceholders(SourceBuf.get(), llvm::outs());
+        }
         break;
       case SourceKitRequest::ModuleGroups:
         printModuleGroupNames(Info, llvm::outs());
@@ -1609,9 +1595,11 @@ struct ResponseSymbolInfo {
   const char *SymbolGraph = nullptr;
   const char *ModuleName = nullptr;
   const char *ModuleInterfaceName = nullptr;
-  llvm::Optional<int64_t> Offset;
-  unsigned Length = 0;
   const char *FilePath = nullptr;
+  unsigned Offset = 0;
+  unsigned Length = 0;
+  unsigned Line = 0;
+  unsigned Column = 0;
   std::vector<const char *> OverrideUSRs;
   std::vector<const char *> AnnotatedRelatedDeclarations;
   std::vector<const char *> ModuleGroups;
@@ -1665,15 +1653,14 @@ struct ResponseSymbolInfo {
     Symbol.ModuleInterfaceName =
         sourcekitd_variant_dictionary_get_string(Info, KeyModuleInterfaceName);
 
-    sourcekitd_variant_t OffsetObj =
-        sourcekitd_variant_dictionary_get_value(Info, KeyOffset);
-    if (sourcekitd_variant_get_type(OffsetObj) !=
-        SOURCEKITD_VARIANT_TYPE_NULL) {
-      Symbol.Offset = sourcekitd_variant_int64_get_value(OffsetObj);
-      Symbol.Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
-    }
     Symbol.FilePath =
         sourcekitd_variant_dictionary_get_string(Info, KeyFilePath);
+    if (Symbol.FilePath) {
+      Symbol.Offset = sourcekitd_variant_dictionary_get_int64(Info, KeyOffset);
+      Symbol.Length = sourcekitd_variant_dictionary_get_int64(Info, KeyLength);
+      Symbol.Line = sourcekitd_variant_dictionary_get_int64(Info, KeyLine);
+      Symbol.Column = sourcekitd_variant_dictionary_get_int64(Info, KeyColumn);
+    }
 
     Symbol.OverrideUSRs = readStringArray(Info, KeyOverrides, KeyUSR);
     Symbol.AnnotatedRelatedDeclarations =
@@ -1728,14 +1715,19 @@ struct ResponseSymbolInfo {
     }
 
     OS << Kind << " (";
-    if (Offset.hasValue()) {
+    if (FilePath) {
       if (CurrentFilename != StringRef(FilePath))
-        OS << FilePath << ":";
-      auto LineCol = resolveToLineCol(Offset.getValue(), FilePath, VFSFiles);
-      OS << LineCol.first << ':' << LineCol.second;
-      auto EndLineCol =
-          resolveToLineCol(Offset.getValue() + Length, FilePath, VFSFiles);
-      OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
+        OS << FilePath << ':';
+
+      auto LineCol = resolveToLineCol(Offset, FilePath, VFSFiles);
+      if (LineCol.first != Line || LineCol.second != Column) {
+        OS << "*offset does not match line/column in response*";
+      } else {
+        OS << LineCol.first << ':' << LineCol.second;
+        auto EndLineCol = resolveToLineCol(Offset + Length, FilePath,
+                                           VFSFiles);
+        OS << '-' << EndLineCol.first << ':' << EndLineCol.second;
+      }
     }
     OS << ")" << '\n';
 

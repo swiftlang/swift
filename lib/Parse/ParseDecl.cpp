@@ -6067,9 +6067,6 @@ ParserStatus Parser::parseGetEffectSpecifier(ParsedAccessors &accessors,
                                              SourceLoc const& currentLoc) {
   ParserStatus Status;
 
-  if (!shouldParseExperimentalConcurrency())
-    return Status;
-
   if (isEffectsSpecifier(Tok)) {
     if (currentKind == AccessorKind::Get) {
       Status |=
@@ -7078,8 +7075,10 @@ BraceStmt *Parser::parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD) {
     return nullptr;
 
   BraceStmt *BS = Body.get();
+  // Reset the single expression body status.
+  AFD->setHasSingleExpressionBody(false);
   AFD->setBodyParsed(BS);
-  
+
   if (Parser::shouldReturnSingleExpressionElement(BS->getElements())) {
     auto Element = BS->getLastElement();
     if (auto *stmt = Element.dyn_cast<Stmt *>()) {

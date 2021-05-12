@@ -95,6 +95,20 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
   }
 }
 
+void NullaryContinuationJob::process(Job *_job) {
+  auto *job = cast<NullaryContinuationJob>(_job);
+
+  auto *task = job->Task;
+  auto *continuation = job->Continuation;
+
+  _swift_task_dealloc_specific(task, job);
+
+  auto *context = cast<ContinuationAsyncContext>(continuation->ResumeContext);
+
+  context->setErrorResult(nullptr);
+  swift_continuation_resume(continuation);
+}
+
 void AsyncTask::completeFuture(AsyncContext *context) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
@@ -901,6 +915,21 @@ static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
   swift_task_removeStatusRecord(record);
   swift_task_dealloc(record);
+}
+
+SWIFT_CC(swift)
+static NullaryContinuationJob*
+swift_task_createNullaryContinuationJobImpl(
+    size_t priority,
+    AsyncTask *continuation) {
+  void *allocation =
+      swift_task_alloc(sizeof(NullaryContinuationJob));
+  auto *job =
+      new (allocation) NullaryContinuationJob(
+        swift_task_getCurrent(), static_cast<JobPriority>(priority),
+        continuation);
+
+  return job;
 }
 
 SWIFT_CC(swift)
