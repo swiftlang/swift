@@ -5427,7 +5427,7 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
     return;
   }
 
-  // distributed can only be declared on an `actor class`
+  // distributed can only be declared on an `actor`
   if (auto classDecl = dyn_cast<ClassDecl>(D)) {
     if (!classDecl->isActor()) {
       diagnoseAndRemoveAttr(attr, diag::distributed_actor_not_actor);
