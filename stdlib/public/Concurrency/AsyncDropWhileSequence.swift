@@ -22,14 +22,14 @@ extension AsyncSequence {
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The `drop(while:)` function causes the modified
-  /// sequence to ignore the values `1` through `4`, and instead emit
-  /// `5` through `10`:
+  /// sequence to ignore received values until it encounters one that is
+  /// divisible by `3`:
   ///
-  ///     for try await number in Counter(howHigh: 10)
-  ///             .drop(while: { $0 < 5 } ) {
+  ///     for await number in Counter(howHigh: 10)
+  ///             .drop(while: { $0 % 3 != 0 } ) {
   ///         print("\(number) ", terminator: " ")
   ///     }
-  ///     // prints "5 6 7 8 9 10"
+  ///     // prints "3 4 5 6 7 8 9 10"
   ///
   /// After the predicate returns `false`, the sequence never executes it again,
   /// and from then on the sequence passes through elements from its underlying

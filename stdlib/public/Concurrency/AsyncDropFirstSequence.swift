@@ -24,7 +24,7 @@ extension AsyncSequence {
   /// values from `1` to `10`. The `dropFirst(_:)` function causes the modified
   /// sequence to ignore the values `0` through `4`, and instead emit `5` through `10`:
   ///
-  ///     for try await number in Counter(howHigh: 10)
+  ///     for await number in Counter(howHigh: 10)
   ///             .dropFirst(3) {
   ///         print("\(number) ", terminator: " ")
   ///     }

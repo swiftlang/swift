@@ -53,7 +53,7 @@ import Swift
 /// `AsyncSequence`. Given the `Counter` sequence from the previous example,
 /// you can test for the existence of a sequence member with a one-line call:
 ///
-///     let found = try await Counter(howHigh: 10).contains(5) // true
+///     let found = await Counter(howHigh: 10).contains(5) // true
 ///
 /// Functions that return another `AsyncSequence` return a type specific to the
 /// function's semantics. For example, the `.map(_:)` operator returns a
@@ -293,7 +293,7 @@ extension AsyncSequence {
   /// member of the sequence that's evenly divisible by both `2` and `3`.
   ///
   ///     let divisibleBy2And3 = await Counter(howHigh: 10)
-  ///         .first (where: { $0 % 2 == 0 && $0 % 3 == 0 } )
+  ///         .first(where: { $0 % 2 == 0 && $0 % 3 == 0 } )
   ///     print (divisibleBy2And3 ?? "none")
   ///     // Prints: 6
   ///

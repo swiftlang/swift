@@ -26,7 +26,7 @@ extension AsyncSequence {
   /// sequence to pass along values so long as they aren’t divisible by both
   /// `2` and `3`:
   ///
-  ///     for try await number in Counter(howHigh: 10)
+  ///     for await number in Counter(howHigh: 10)
   ///             .prefix (while: { $0 % 2 != 0 || $0 % 3 != 0 } ) {
   ///         print("\(number) ", terminator: " ")
   ///     }

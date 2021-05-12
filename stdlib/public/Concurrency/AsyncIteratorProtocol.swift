@@ -37,7 +37,7 @@ import Swift
 ///         let howHigh: Int
 ///         var current = 1
 ///         mutating func next() async -> Int? {
-///           // A genuinely asychronous implementation could use the `Task`
+///           // A genuinely asychronous implementation should use the `Task`
 ///           // API to check for cancellation here and return early.
 ///           guard current <= howHigh else {
 ///             return nil
@@ -56,7 +56,7 @@ import Swift
 ///
 /// At the call site, this looks like:
 ///
-///     for await i in Counter(howHigh: 3) {
+///     for await i in Counter(howHigh: 10) {
 ///       print(i, terminator: " ")
 ///     }
 ///     // Prints: 1 2 3 4 5 6 7 8 9 10
@@ -76,7 +76,7 @@ import Swift
 ///
 /// If the iterator needs to clean up on cancellation, it can do so after
 /// checking for cancellation (using the `Task` API), or in `deinit` (if it is
-/// a class type).
+/// a reference type).
 @available(SwiftStdlib 5.5, *)
 @rethrows
 public protocol AsyncIteratorProtocol {
