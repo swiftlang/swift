@@ -4168,7 +4168,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     }
   } else {
     auto argumentNames = member.getArgumentNames();
-    if (!member.isCompoundName() || argumentNames.size() == 1) {
+    if (member.isSimpleName() || argumentNames.size() == 1) {
       if (baseName == DeclBaseName::createConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
@@ -4180,7 +4180,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
            (member.isSimpleName() || argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
       }
-    } else if (!member.isCompoundName() || argumentNames.size() == 2) {
+    } else if (member.isSimpleName() || argumentNames.size() == 2) {
       if (baseName == DeclBaseName::createConstructor() &&
           argumentNames[0] == Context.Id_resolve &&
           argumentNames[1] == Context.Id_using) {
