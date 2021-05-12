@@ -276,6 +276,13 @@ static int run_driver(StringRef ExecName,
   if (Diags.hadAnyError())
     return 1;
 
+  for (auto arg: ArgList->getArgs()) {
+    if (arg->getOption().hasFlag(options::NewDriverOnlyOption)) {
+      Diags.diagnose(SourceLoc(), diag::warning_unsupported_driver_option,
+                     arg->getSpelling());
+    }
+  }
+
   std::unique_ptr<Compilation> C =
       TheDriver.buildCompilation(*TC, std::move(ArgList));
 
