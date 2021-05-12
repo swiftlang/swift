@@ -13,19 +13,11 @@
 import Swift
 
 @available(SwiftStdlib 5.5, *)
-@frozen
-@usableFromInline
 struct _Deque<Element> {
-  @frozen
-  @usableFromInline
   internal struct _UnsafeHandle {
-    @usableFromInline
     let _header: UnsafeMutablePointer<_Storage._Header>
-    @usableFromInline
     let _elements: UnsafeMutablePointer<Element>?
 
-    @inlinable
-    @inline(__always)
     init(
       header: UnsafeMutablePointer<_Storage._Header>,
       elements: UnsafeMutablePointer<Element>?,
@@ -35,26 +27,19 @@ struct _Deque<Element> {
       self._elements = elements
     }
     
-    @inlinable
-    @inline(__always)
     var header: _Storage._Header {
       _header.pointee
     }
     
-    @inlinable
-    @inline(__always)
     var capacity: Int {
       _header.pointee.capacity
     }
     
-    @inlinable
-    @inline(__always)
     var count: Int {
       get { _header.pointee.count }
       nonmutating set { _header.pointee.count = newValue }
     }
     
-    @inlinable
     internal func slot(after slot: Int) -> Int {
       assert(slot < capacity)
       let position = slot + 1
@@ -65,7 +50,6 @@ struct _Deque<Element> {
     }
 
     
-    @inlinable
     internal func slot(_ slot: Int, offsetBy delta: Int) -> Int {
       assert(slot <= capacity)
       let position = slot + delta
@@ -77,20 +61,16 @@ struct _Deque<Element> {
       return position
     }
     
-    @inlinable
-    @inline(__always)
     internal var endSlot: Int {
       slot(startSlot, offsetBy: count)
     }
     
-    @inlinable
     internal func uncheckedAppend(_ element: Element) {
       assert(count < capacity)
       ptr(at: endSlot).initialize(to: element)
       count += 1
     }
     
-    @inlinable
     internal func uncheckedRemoveFirst() -> Element {
       assert(count > 0)
       let result = ptr(at: startSlot).move()
@@ -99,7 +79,6 @@ struct _Deque<Element> {
       return result
     }
     
-    @inlinable
     internal func uncheckedRemoveFirstIfPresent() -> Element? {
       if count > 0 {
         let result = ptr(at: startSlot).move()
@@ -111,17 +90,11 @@ struct _Deque<Element> {
       }
     }
     
-    @frozen
-    @usableFromInline
     struct _UnsafeWrappedBuffer {
-      @usableFromInline
       internal let first: UnsafeBufferPointer<Element>
 
-      @usableFromInline
       internal let second: UnsafeBufferPointer<Element>?
 
-      @inlinable
-      @inline(__always)
       internal init(
         _ first: UnsafeBufferPointer<Element>,
         _ second: UnsafeBufferPointer<Element>? = nil
@@ -131,7 +104,6 @@ struct _Deque<Element> {
         assert(first.count > 0 || second == nil)
       }
 
-      @inlinable
       internal init(
         start: UnsafePointer<Element>,
         count: Int
@@ -139,7 +111,6 @@ struct _Deque<Element> {
         self.init(UnsafeBufferPointer(start: start, count: count))
       }
       
-      @inlinable
       internal init(
         first start1: UnsafePointer<Element>,
         count count1: Int,
@@ -150,21 +121,14 @@ struct _Deque<Element> {
                   UnsafeBufferPointer(start: start2, count: count2))
       }
 
-      @inlinable
       internal var count: Int { first.count + (second?.count ?? 0) }
     }
     
-    @frozen
-    @usableFromInline
     internal struct _UnsafeMutableWrappedBuffer {
-      @usableFromInline
       internal let first: UnsafeMutableBufferPointer<Element>
 
-      @usableFromInline
       internal let second: UnsafeMutableBufferPointer<Element>?
 
-      @inlinable
-      @inline(__always)
       internal init(
         _ first: UnsafeMutableBufferPointer<Element>,
         _ second: UnsafeMutableBufferPointer<Element>? = nil
@@ -174,8 +138,6 @@ struct _Deque<Element> {
         assert(first.count > 0 || second == nil)
       }
 
-      @inlinable
-      @inline(__always)
       internal init(
         start: UnsafeMutablePointer<Element>,
         count: Int
@@ -183,8 +145,6 @@ struct _Deque<Element> {
         self.init(UnsafeMutableBufferPointer(start: start, count: count))
       }
 
-      @inlinable
-      @inline(__always)
       internal init(
         first start1: UnsafeMutablePointer<Element>,
         count count1: Int,
@@ -195,15 +155,12 @@ struct _Deque<Element> {
                   UnsafeMutableBufferPointer(start: start2, count: count2))
       }
 
-      @inlinable
-      @inline(__always)
       internal init(mutating buffer: _UnsafeWrappedBuffer) {
         self.init(.init(mutating: buffer.first),
                   buffer.second.map { .init(mutating: $0) })
       }
     }
     
-    @inlinable
     internal func segments() -> _UnsafeWrappedBuffer {
       let wrap = capacity - startSlot
       if count <= wrap {
@@ -213,29 +170,20 @@ struct _Deque<Element> {
                    second: ptr(at: .zero), count: count - wrap)
     }
     
-    @inlinable
-    @inline(__always)
     internal func mutableSegments() -> _UnsafeMutableWrappedBuffer {
       return .init(mutating: segments())
     }
     
-    @inlinable
-    @inline(__always)
     var startSlot: Int {
       get { _header.pointee.startSlot }
       nonmutating set { _header.pointee.startSlot = newValue }
     }
     
-    @inlinable
-    @inline(__always)
     func ptr(at slot: Int) -> UnsafeMutablePointer<Element> {
       assert(slot >= 0 && slot <= capacity)
       return _elements! + slot
     }
-    
-    
-    
-    @inlinable
+
     @discardableResult
     func initialize(
       at start: Int,
@@ -247,8 +195,6 @@ struct _Deque<Element> {
       return start + source.count
     }
     
-    @inlinable
-    @inline(__always)
     @discardableResult
     func moveInitialize(
       at start: Int,
@@ -260,7 +206,6 @@ struct _Deque<Element> {
       return start + source.count
     }
     
-    @inlinable
     internal func copyElements() -> _Storage {
       let object = _Storage._DequeBuffer.create(
         minimumCapacity: capacity,
@@ -277,7 +222,6 @@ struct _Deque<Element> {
       return result
     }
     
-    @inlinable
     internal func moveElements(minimumCapacity: Int) -> _Storage {
       let count = self.count
       assert(minimumCapacity >= count)
@@ -303,21 +247,14 @@ struct _Deque<Element> {
     }
   }
   
-  @frozen
-  @usableFromInline
   enum _Storage {
-    @usableFromInline
     internal struct _Header {
-      @usableFromInline
       var capacity: Int
 
-      @usableFromInline
       var count: Int
 
-      @usableFromInline
       var startSlot: Int
 
-      @usableFromInline
       init(capacity: Int, count: Int, startSlot: Int) {
         self.capacity = capacity
         self.count = count
@@ -325,16 +262,12 @@ struct _Deque<Element> {
       }
     }
     
-    @usableFromInline
     internal typealias _Buffer = ManagedBufferPointer<_Header, Element>
 
     case empty
     case buffer(_Buffer)
-
-    @_fixed_layout
-    @usableFromInline
+    
     internal class _DequeBuffer: ManagedBuffer<_Header, Element> {
-      @inlinable
       deinit {
         self.withUnsafeMutablePointers { header, elements in
           let capacity = header.pointee.capacity
@@ -352,24 +285,18 @@ struct _Deque<Element> {
       }
     }
     
-    @inlinable
-    @inline(__always)
     internal init(_buffer: _Buffer) {
       self = .buffer(_buffer)
     }
     
-    @inlinable
     internal init() {
       self = .empty
     }
     
-    @inlinable
     internal init(_ object: _DequeBuffer) {
       self.init(_buffer: _Buffer(unsafeBufferObject: object))
     }
     
-    @inlinable
-    @inline(__always)
     internal var capacity: Int {
       switch self {
       case .empty: return 0
@@ -379,8 +306,6 @@ struct _Deque<Element> {
       
     }
     
-    @inlinable
-    @inline(__always)
     internal mutating func ensure(
       minimumCapacity: Int
     ) {
@@ -389,11 +314,8 @@ struct _Deque<Element> {
       }
     }
     
-    @inlinable
-    @inline(__always)
     internal static var growthFactor: Double { 1.5 }
 
-    @usableFromInline
     internal func _growCapacity(
       to minimumCapacity: Int
     ) -> Int {
@@ -401,7 +323,6 @@ struct _Deque<Element> {
                        minimumCapacity)
     }
     
-    @inlinable
     internal mutating func _ensure(
       minimumCapacity: Int
     ) {
@@ -415,8 +336,6 @@ struct _Deque<Element> {
       }
     }
     
-    @inlinable
-    @inline(__always)
     internal var count: Int {
       switch self {
       case .empty: return 0
@@ -426,8 +345,6 @@ struct _Deque<Element> {
       
     }
     
-    @inlinable
-    @inline(__always)
     internal func read<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
       switch self {
       case .empty:
@@ -446,8 +363,6 @@ struct _Deque<Element> {
       
     }
     
-    @inlinable
-    @inline(__always)
     internal func update<R>(_ body: (_UnsafeHandle) throws -> R) rethrows -> R {
       switch self {
       case .empty:
@@ -467,19 +382,14 @@ struct _Deque<Element> {
   }
   
 
-  @usableFromInline
   internal var _storage: _Storage
   
-  @inlinable
   init() {
     _storage = _Storage()
   }
   
-  @inlinable
-  @inline(__always)
   var count: Int { _storage.count }
   
-  @inlinable
   mutating func append(_ newElement: Element) {
     _storage.ensure(minimumCapacity: _storage.count + 1)
     _storage.update {
@@ -487,13 +397,11 @@ struct _Deque<Element> {
     }
   }
   
-  @inlinable
   @discardableResult
   mutating func removeFirst() -> Element {
     return _storage.update { $0.uncheckedRemoveFirst() }
   }
   
-  @inlinable
   @discardableResult
   mutating func removeFirstIfPresent() -> Element? {
     return _storage.update { $0.uncheckedRemoveFirstIfPresent() }
