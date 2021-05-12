@@ -665,14 +665,14 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(spawn, Spawn,
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc |
-  ConcurrencyOnly | DistributedOnly |
+  DistributedOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   118)
 
 SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
   OnFunc | OnVar |
-  ConcurrencyOnly | DistributedOnly | UserInaccessible |
+  DistributedOnly | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   119)
