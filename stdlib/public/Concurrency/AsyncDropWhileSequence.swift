@@ -14,22 +14,22 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
-  /// Omits elements from the base sequence until a given closure returns
-  /// `false`, after which it passes through all remaining elements.
+  /// Omits elements from the base asynchronous sequence until a given closure
+  /// returns false, after which it passes through all remaining elements.
   ///
   /// Use `drop(while:)` to omit elements from an asynchronous sequence until
   /// the element received meets a condition you specify.
   ///
-  /// In the following example, an `AsyncSequence` called `numbers` generates
-  /// `Int` values monotonically, starting at `0` and ending at `10`. The
-  /// `drop(while:)` function causes the modified sequence to ignore the values
-  /// `0` through `4`, and instead emit `5` through `10`:
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `drop(while:)` function causes the modified
+  /// sequence to ignore the values `1` through `4`, and instead emit
+  /// `5` through `10`:
   ///
-  ///     for try await number in number
-  ///             .drop(while: { number < 5 } ) {
-  ///         print("\(number) ")
+  ///     for try await number in Counter(howHigh: 10)
+  ///             .drop(while: { $0 < 5 } ) {
+  ///         print("\(number) ", terminator: " ")
   ///     }
-  ///     // prints "5, 6, 7, 8, 9, 10"
+  ///     // prints "5 6 7 8 9 10"
   ///
   /// After the predicate returns `false`, the sequence never executes it again,
   /// and from then on the sequence passes through elements from its underlying
@@ -38,8 +38,8 @@ extension AsyncSequence {
   /// - Parameter predicate: A closure that takes an element as a parameter and
   ///   returns a Boolean value indicating whether to drop the element from the
   ///   modified sequence.
-  /// - Returns: A sequence that skips over values until the provided closure
-  ///   returns `false`.
+  /// - Returns: An `AsyncDropWhileSequence` that skips over values from the
+  ///   base sequence until the provided closure returns `false`.
   @inlinable
   public __consuming func drop(
     while predicate: @escaping (Element) async -> Bool
@@ -49,7 +49,7 @@ extension AsyncSequence {
 }
 
 /// An asynchronous sequence which omits elements from the base sequence until a
-/// given closure returns `false`, after which it passes through all remaining
+/// given closure returns false, after which it passes through all remaining
 /// elements.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncDropWhileSequence<Base: AsyncSequence> {
