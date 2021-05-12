@@ -88,7 +88,7 @@ extension AsyncPrefixSequence: AsyncSequence {
       self.remaining = count
     }
 
-    /// Produces the next element in the drop-while sequence.
+    /// Produces the next element in the prefix sequence.
     ///
     /// Until reaching the number of elements to include, this iterator calls
     /// `next()` on its base iterator and passes through the result. After

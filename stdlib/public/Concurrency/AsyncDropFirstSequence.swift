@@ -88,7 +88,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
       self.count = count
     }
 
-    /// Produces the next element in the drop-while sequence.
+    /// Produces the next element in the drop-first sequence.
     ///
     /// Until reaching the number of elements to drop, this iterator calls
     /// `next()` on its base iterator and discards the result. If the base
