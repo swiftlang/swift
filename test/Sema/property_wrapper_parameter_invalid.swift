@@ -224,9 +224,7 @@ func testInvalidWrapperInference() {
   S<Int>.test({ $value in })
 
   func testGenericClosure<T>(_ closure: T) {}
-  // FIXME: the following error should use the name of the closure parameter.
-  // It's not anonymous, even though it starts with $
-  // expected-error@+1 {{unable to infer type of a closure parameter $0 in the current context}}
+  // expected-error@+1 {{unable to infer type of a closure parameter '$value' in the current context}}
   testGenericClosure { $value in }
   testGenericClosure { ($value: ProjectionWrapper<Int>) in } // okay
 

@@ -499,7 +499,7 @@ struct S_3520 {
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
 sr3520_set_via_closure({ $0.number1 = $1 })
 // expected-error@-1 {{generic parameter 'S' could not be inferred}}
-// expected-error@-2 {{unable to infer type of a closure parameter $1 in the current context}}
+// expected-error@-2 {{unable to infer type of a closure parameter '$1' in the current context}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 

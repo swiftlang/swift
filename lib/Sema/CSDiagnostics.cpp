@@ -6770,13 +6770,9 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
   llvm::SmallString<16> id;
   llvm::raw_svector_ostream OS(id);
 
-  if (PD->isAnonClosureParam()) {
-    OS << "$" << paramIdx;
-  } else {
-    OS << "'" << PD->getParameterName() << "'";
-  }
+  OS << "'" << PD->getParameterName() << "'";
 
-  auto loc = PD->isAnonClosureParam() ? getLoc() : PD->getLoc();
+  auto loc = PD->isImplicit() ? getLoc() : PD->getLoc();
   emitDiagnosticAt(loc, diag::cannot_infer_closure_parameter_type, OS.str());
   return true;
 }
