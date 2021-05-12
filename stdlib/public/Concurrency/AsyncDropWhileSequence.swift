@@ -74,8 +74,8 @@ extension AsyncDropWhileSequence: AsyncSequence {
   
   /// The type of element produced by this asynchronous sequence.
   ///
-  /// The drop-while sequence iterator produces whatever type of element its
-  /// base iterator produces.
+  /// The drop-while sequence produces whatever type of element its base
+  /// sequence produces.
   public typealias Element = Base.Element
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
