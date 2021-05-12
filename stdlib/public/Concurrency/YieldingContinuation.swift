@@ -95,6 +95,7 @@ extension YieldingContinuation where Failure == Error {
   ///
   /// When multiple calls are awaiting a produced value from next any call to
   /// yield will resume all awaiting calls to next with that value. 
+  @available(*, deprecated, message: "`YieldingContinuation` was replaced by `Series` and will be removed shortly.")
   public func next() async throws -> Element {
     var existing: UnsafeContinuation<Element, Error>?
     do {
@@ -119,11 +120,13 @@ extension YieldingContinuation where Failure == Never {
   /// checked counterparts. Each call to the yielding functions will resume any
   /// awaiter on the next function. This type is inherently sendable and can
   /// safely be used and stored in multiple task contexts.
+  @available(*, deprecated, message: "`YieldingContinuation` was replaced by `Series` and will be removed shortly.")
   public init(yielding: Element.Type) { }
 
   /// Await a resume from a call to a yielding function.
   ///
   /// - Return: The element that was yielded.
+  @available(*, deprecated, message: "`YieldingContinuation` was replaced by `Series` and will be removed shortly.")
   public func next() async -> Element {
     var existing: UnsafeContinuation<Element, Error>?
     let result = try! await withUnsafeThrowingContinuation {
@@ -148,6 +151,7 @@ extension YieldingContinuation {
   /// once. However if there are no potential awaiting calls to `next` this
   /// function will return false, indicating that the caller needs to decide how
   /// the behavior should be handled.
+  @available(*, deprecated, message: "`YieldingContinuation` was replaced by `Series` and will be removed shortly.")
   public func yield<Er: Error>(
     with result: Result<Element, Er>
   ) -> Bool where Failure == Error {
@@ -170,6 +174,7 @@ extension YieldingContinuation {
   /// once. However if there are no potential awaiting calls to `next` this
   /// function will return false, indicating that the caller needs to decide how
   /// the behavior should be handled.
+  @available(*, deprecated, message: "`YieldingContinuation` was replaced by `Series` and will be removed shortly.")
   public func yield(with result: Result<Element, Failure>) -> Bool {
     switch result {
       case .success(let val):
@@ -186,6 +191,7 @@ extension YieldingContinuation {
   /// once. However if there are no potential awaiting calls to `next` this
   /// function will return false, indicating that the caller needs to decide how
   /// the behavior should be handled.
+  @available(*, deprecated, message: "`YieldingContinuation` was replaced by `Series` and will be removed shortly.")
   public func yield() -> Bool where Element == Void {
     return self.yield(())
   }
