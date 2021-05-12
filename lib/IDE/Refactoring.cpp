@@ -25,14 +25,15 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/Index/Index.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -3955,17 +3956,23 @@ PtrArrayRef<Expr *> callArgs(const ApplyExpr *AE) {
   return PtrArrayRef<Expr *>();
 }
 
-FuncDecl *getUnderlyingFunc(const Expr *Fn) {
+/// A more aggressive variant of \c Expr::getReferencedDecl that also looks
+/// through autoclosures created to pass the \c self parameter to a member funcs
+ValueDecl *getReferencedDecl(const Expr *Fn) {
   Fn = Fn->getSemanticsProvidingExpr();
   if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
-    return dyn_cast_or_null<FuncDecl>(DRE->getDecl());
+    return DRE->getDecl();
   if (auto ApplyE = dyn_cast<SelfApplyExpr>(Fn))
-    return getUnderlyingFunc(ApplyE->getFn());
+    return getReferencedDecl(ApplyE->getFn());
   if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
     if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
-      return getUnderlyingFunc(Unwrapped);
+      return getReferencedDecl(Unwrapped);
   }
   return nullptr;
+}
+
+FuncDecl *getUnderlyingFunc(const Expr *Fn) {
+  return dyn_cast_or_null<FuncDecl>(getReferencedDecl(Fn));
 }
 
 /// Find the outermost call of the given location
@@ -4073,40 +4080,32 @@ public:
 enum class HandlerType { INVALID, PARAMS, RESULT };
 
 /// Given a function with an async alternative (or one that *could* have an
-/// async alternative), stores information about the handler parameter.
+/// async alternative), stores information about the completion handler.
+/// The completion handler can be either a variable (which includes a parameter)
+/// or a function
 struct AsyncHandlerDesc {
-  const ParamDecl *Handler = nullptr;
-  int Index = -1;
+  PointerUnion<const VarDecl *, const AbstractFunctionDecl *> Handler = nullptr;
   HandlerType Type = HandlerType::INVALID;
   bool HasError = false;
 
-  static AsyncHandlerDesc find(const FuncDecl *FD, bool ignoreName) {
-    if (!FD || FD->hasAsync() || FD->hasThrows())
-      return AsyncHandlerDesc();
-
-    // Require at least one parameter and void return type
-    auto *Params = FD->getParameters();
-    if (Params->size() == 0 || !FD->getResultInterfaceType()->isVoid())
-      return AsyncHandlerDesc();
-
+  static AsyncHandlerDesc get(const ValueDecl *Handler, bool ignoreName) {
     AsyncHandlerDesc HandlerDesc;
-
-    // Assume the handler is the last parameter for now
-    HandlerDesc.Index = Params->size() - 1;
-    HandlerDesc.Handler = Params->get(HandlerDesc.Index);
-
-    // Callback must not be attributed with @autoclosure
-    if (HandlerDesc.Handler->isAutoClosure())
+    if (auto Var = dyn_cast<VarDecl>(Handler)) {
+      HandlerDesc.Handler = Var;
+    } else if (auto Func = dyn_cast<AbstractFunctionDecl>(Handler)) {
+      HandlerDesc.Handler = Func;
+    } else {
+      // The handler must be a variable or function
       return AsyncHandlerDesc();
+    }
 
     // Callback must have a completion-like name (if we're not ignoring it)
-    if (!ignoreName &&
-        !isCompletionHandlerParamName(HandlerDesc.Handler->getNameStr()))
+    if (!ignoreName && !isCompletionHandlerParamName(HandlerDesc.getNameStr()))
       return AsyncHandlerDesc();
 
     // Callback must be a function type and return void. Doesn't need to have
     // any parameters - may just be a "I'm done" callback
-    auto *HandlerTy = HandlerDesc.Handler->getType()->getAs<AnyFunctionType>();
+    auto *HandlerTy = HandlerDesc.getType()->getAs<AnyFunctionType>();
     if (!HandlerTy || !HandlerTy->getResult()->isVoid())
       return AsyncHandlerDesc();
 
@@ -4135,7 +4134,7 @@ struct AsyncHandlerDesc {
       if (!HandlerParams.empty()) {
         auto LastParamTy = HandlerParams.back().getParameterType();
         HandlerDesc.HasError = isErrorType(LastParamTy->getOptionalObjectType(),
-                                           FD->getModuleContext());
+                                           Handler->getModuleContext());
       }
     }
 
@@ -4144,8 +4143,55 @@ struct AsyncHandlerDesc {
 
   bool isValid() const { return Type != HandlerType::INVALID; }
 
+  /// Return the declaration of the completion handler as a \c ValueDecl.
+  /// In practice, the handler will always be a \c VarDecl or \c
+  /// AbstractFunctionDecl.
+  /// \c getNameStr and \c getType provide access functions that are available
+  /// for both variables and functions, but not on \c ValueDecls.
+  const ValueDecl *getHandler() const {
+    if (!Handler) {
+      return nullptr;
+    }
+    if (auto Var = Handler.dyn_cast<const VarDecl *>()) {
+      return Var;
+    } else if (auto Func = Handler.dyn_cast<const AbstractFunctionDecl *>()) {
+      return Func;
+    } else {
+      llvm_unreachable("Unknown handler type");
+    }
+  }
+
+  /// Return the name of the completion handler. If it is a variable, the
+  /// variable name, if it's a function, the function base name.
+  StringRef getNameStr() const {
+    if (auto Var = Handler.dyn_cast<const VarDecl *>()) {
+      return Var->getNameStr();
+    } else if (auto Func = Handler.dyn_cast<const AbstractFunctionDecl *>()) {
+      return Func->getNameStr();
+    } else {
+      llvm_unreachable("Unknown handler type");
+    }
+  }
+
+  /// Get the type of the completion handler.
+  swift::Type getType() const {
+    if (auto Var = Handler.dyn_cast<const VarDecl *>()) {
+      return Var->getType();
+    } else if (auto Func = Handler.dyn_cast<const AbstractFunctionDecl *>()) {
+      auto Type = Func->getInterfaceType();
+      // Undo the self curry thunk if we are referencing a member function.
+      if (Func->hasImplicitSelfDecl()) {
+        assert(Type->is<AnyFunctionType>());
+        Type = Type->getAs<AnyFunctionType>()->getResult();
+      }
+      return Type;
+    } else {
+      llvm_unreachable("Unknown handler type");
+    }
+  }
+
   ArrayRef<AnyFunctionType::Param> params() const {
-    auto Ty = Handler->getType()->getAs<AnyFunctionType>();
+    auto Ty = getType()->getAs<AnyFunctionType>();
     assert(Ty && "Type must be a function type");
     return Ty->getParams();
   }
@@ -4195,7 +4241,7 @@ struct AsyncHandlerDesc {
 
     if (Node.isExpr(swift::ExprKind::Call)) {
       CallExpr *CE = cast<CallExpr>(Node.dyn_cast<Expr *>());
-      if (CE->getFn()->getReferencedDecl().getDecl() == Handler)
+      if (CE->getFn()->getReferencedDecl().getDecl() == getHandler())
         return CE;
     }
     return nullptr;
@@ -4296,6 +4342,44 @@ struct AsyncHandlerDesc {
 
   bool shouldUnwrap(swift::Type Ty) const {
     return HasError && Ty->isOptional();
+  }
+};
+
+/// Given a completion handler that is part of a function signature, stores
+/// information about that completion handler and its index within the function
+/// declaration.
+struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
+  /// The index of the completion handler in the function that declares it.
+  int Index = -1;
+
+  AsyncHandlerParamDesc() : AsyncHandlerDesc() {}
+  AsyncHandlerParamDesc(const AsyncHandlerDesc &Handler, int Index)
+      : AsyncHandlerDesc(Handler), Index(Index) {}
+
+  static AsyncHandlerParamDesc find(const FuncDecl *FD, bool ignoreName) {
+    if (!FD || FD->hasAsync() || FD->hasThrows())
+      return AsyncHandlerParamDesc();
+
+    // Require at least one parameter and void return type
+    auto *Params = FD->getParameters();
+    if (Params->size() == 0 || !FD->getResultInterfaceType()->isVoid())
+      return AsyncHandlerParamDesc();
+
+    // Assume the handler is the last parameter for now
+    int Index = Params->size() - 1;
+    const ParamDecl *Param = Params->get(Index);
+
+    // Callback must not be attributed with @autoclosure
+    if (Param->isAutoClosure())
+      return AsyncHandlerParamDesc();
+
+    return AsyncHandlerParamDesc(AsyncHandlerDesc::get(Param, ignoreName),
+                                 Index);
+  }
+
+  bool operator==(const AsyncHandlerParamDesc &Other) const {
+    return Handler == Other.Handler && Type == Other.Type &&
+           HasError == Other.HasError && Index == Other.Index;
   }
 };
 
@@ -4803,7 +4887,7 @@ class AsyncConverter : private SourceEntityWalker {
 
   // Completion handler of `StartNode` (if it's a function with an async
   // alternative)
-  const AsyncHandlerDesc &TopHandler;
+  const AsyncHandlerParamDesc &TopHandler;
   SmallString<0> Buffer;
   llvm::raw_svector_ostream OS;
 
@@ -4829,15 +4913,14 @@ class AsyncConverter : private SourceEntityWalker {
 
 public:
   AsyncConverter(SourceManager &SM, DiagnosticEngine &DiagEngine,
-                 ASTNode StartNode, const AsyncHandlerDesc &TopHandler)
+                 ASTNode StartNode, const AsyncHandlerParamDesc &TopHandler)
       : SM(SM), DiagEngine(DiagEngine), StartNode(StartNode),
         TopHandler(TopHandler), Buffer(), OS(Buffer) {
-    Placeholders.insert(TopHandler.Handler);
+    Placeholders.insert(TopHandler.getHandler());
   }
 
   bool convert() {
-    if (!Buffer.empty())
-      return !DiagEngine.hadAnyError();
+    assert(Buffer.empty() && "AsyncConverter can only be used once");
 
     if (auto *FD = dyn_cast_or_null<FuncDecl>(StartNode.dyn_cast<Decl *>())) {
       addFuncDecl(FD);
@@ -4848,6 +4931,36 @@ public:
       convertNode(StartNode);
     }
     return !DiagEngine.hadAnyError();
+  }
+
+  /// When adding an async alternative method for the function declaration \c
+  /// FD, this function tries to create a function body for the legacy function
+  /// (the one with a completion handler), which calls the newly converted async
+  /// function. There are certain situations in which we fail to create such a
+  /// body, e.g. if the completion handler has the signature `(String, Error?)
+  /// -> Void` in which case we can't synthesize the result of type \c String in
+  /// the error case.
+  bool createLegacyBody() {
+    assert(Buffer.empty() &&
+           "AsyncConverter can only be used once");
+    if (!canCreateLegacyBody()) {
+      return false;
+    }
+    FuncDecl *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+
+    OS << tok::l_brace << "\n"; // start function body
+    OS << "async " << tok::l_brace << "\n";
+    addHoistedNamedCallback(FD, TopHandler, TopHandler.getNameStr(), [&]() {
+      if (TopHandler.HasError) {
+        OS << tok::kw_try << " ";
+      }
+      OS << "await ";
+      addCallToAsyncMethod(FD, TopHandler);
+    });
+    OS << "\n";
+    OS << tok::r_brace << "\n"; // end 'async'
+    OS << tok::r_brace << "\n"; // end function body
+    return true;
   }
 
   void replace(ASTNode Node, SourceEditConsumer &EditConsumer,
@@ -4869,6 +4982,23 @@ public:
   }
 
 private:
+  bool canCreateLegacyBody() {
+    FuncDecl *FD = dyn_cast<FuncDecl>(StartNode.dyn_cast<Decl *>());
+    if (!FD) {
+      return false;
+    }
+    if (FD == nullptr || FD->getBody() == nullptr) {
+      return false;
+    }
+    if (FD->hasThrows()) {
+      assert(!TopHandler.isValid() && "We shouldn't have found a handler desc "
+                                       "if the original function throws");
+      return false;
+    }
+    return TopHandler.isValid();
+  }
+
+
   void convertNodes(ArrayRef<ASTNode> Nodes) {
     for (auto Node : Nodes) {
       OS << "\n";
@@ -4944,7 +5074,7 @@ private:
         return addCustom(CE->getSourceRange(), [&]() { addHandlerCall(CE); });
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
-        auto HandlerDesc = AsyncHandlerDesc::find(
+        auto HandlerDesc = AsyncHandlerParamDesc::find(
             getUnderlyingFunc(CE->getFn()), StartNode.dyn_cast<Expr *>() == CE);
         if (HandlerDesc.isValid())
           return addCustom(CE->getSourceRange(),
@@ -5138,33 +5268,89 @@ private:
   /// From the given expression \p E, which is an argument to a function call,
   /// extract the passed closure if there is one. Otherwise return \c nullptr.
   ClosureExpr *extractCallback(Expr *E) {
+    E = lookThroughFunctionConversionExpr(E);
     if (auto Closure = dyn_cast<ClosureExpr>(E)) {
       return Closure;
     } else if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
       return CaptureList->getClosureBody();
-    } else if (auto FunctionConversion = dyn_cast<FunctionConversionExpr>(E)) {
-      // Closure arguments marked as e.g. `@convention(block)` produce arguments
-      // that are `FunctionConversionExpr`.
-      return extractCallback(FunctionConversion->getSubExpr());
     } else {
       return nullptr;
     }
   }
 
+  /// Callback arguments marked as e.g. `@convention(block)` produce arguments
+  /// that are `FunctionConversionExpr`.
+  /// We don't care about the conversions and want to shave them off.
+  Expr *lookThroughFunctionConversionExpr(Expr *E) {
+    if (auto FunctionConversion = dyn_cast<FunctionConversionExpr>(E)) {
+      return lookThroughFunctionConversionExpr(
+          FunctionConversion->getSubExpr());
+    } else {
+      return E;
+    }
+  }
+
   void addHoistedCallback(const CallExpr *CE,
-                          const AsyncHandlerDesc &HandlerDesc) {
+                          const AsyncHandlerParamDesc &HandlerDesc) {
     auto ArgList = callArgs(CE);
     if ((size_t)HandlerDesc.Index >= ArgList.ref().size()) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;
     }
 
-    ClosureExpr *Callback = extractCallback(ArgList.ref()[HandlerDesc.Index]);
-    if (!Callback) {
-      DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
+    Expr *CallbackArg =
+        lookThroughFunctionConversionExpr(ArgList.ref()[HandlerDesc.Index]);
+    if (ClosureExpr *Callback = extractCallback(CallbackArg)) {
+      // The user is using a closure for the completion handler
+      addHoistedClosureCallback(CE, HandlerDesc, Callback, ArgList);
       return;
     }
+    if (auto CallbackDecl = getReferencedDecl(CallbackArg)) {
+      if (CallbackDecl == TopHandler.getHandler()) {
+        // We are refactoring the function that declared the completion handler
+        // that would be called here. We can't call the completion handler
+        // anymore because it will be removed. But since the function that
+        // declared it is being refactored to async, we can just return the
+        // values.
+        if (!HandlerDesc.willAsyncReturnVoid()) {
+          OS << tok::kw_return << " ";
+        }
+        addAwaitCall(CE, ArgList.ref(), ClassifiedBlock(), {}, HandlerDesc,
+                     /*AddDeclarations=*/false);
+        return;
+      }
+      // We are not removing the completion handler, so we can call it once the
+      // async function returns.
 
+      // The completion handler that is called as part of the \p CE call.
+      // This will be called once the async function returns.
+      auto CompletionHandler = AsyncHandlerDesc::get(CallbackDecl,
+                                                     /*ignoreName=*/true);
+      if (CompletionHandler.isValid()) {
+        if (auto CalledFunc = getUnderlyingFunc(CE->getFn())) {
+          StringRef HandlerName = Lexer::getCharSourceRangeFromSourceRange(
+                                      SM, CallbackArg->getSourceRange())
+                                      .str();
+          addHoistedNamedCallback(
+              CalledFunc, CompletionHandler, HandlerName, [&] {
+                addAwaitCall(CE, ArgList.ref(), ClassifiedBlock(), {},
+                             HandlerDesc, /*AddDeclarations=*/false);
+              });
+          return;
+        }
+      }
+    }
+    DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
+  }
+
+  /// Add a call to the async alternative of \p CE and convert the \p Callback
+  /// to be executed after the async call. \p HandlerDesc describes the
+  /// completion handler in the function that's called by \p CE and \p ArgList
+  /// are the arguments being passed in \p CE.
+  void addHoistedClosureCallback(const CallExpr *CE,
+                                 const AsyncHandlerDesc &HandlerDesc,
+                                 const ClosureExpr *Callback,
+                                 PtrArrayRef<Expr *> ArgList) {
     ArrayRef<const ParamDecl *> CallbackParams =
         Callback->getParameters()->getArray();
     ArrayRef<ASTNode> CallbackBody = Callback->getBody()->getElements();
@@ -5265,6 +5451,43 @@ private:
       convertNodes(Blocks.ErrorBlock.nodes());
       OS << "\n" << tok::r_brace;
       clearNames(llvm::makeArrayRef(ErrParam));
+    }
+  }
+
+  /// Add a call to the async alternative of \p FD. Afterwards, pass the results
+  /// of the async call to the completion handler, named \p HandlerName and
+  /// described by \p HandlerDesc.
+  /// \p AddAwaitCall adds the call to the refactored async method to the output
+  /// stream without storing the result to any variables.
+  /// This is used when the user didn't use a closure for the callback, but
+  /// passed in a variable or function name for the completion handler.
+  void addHoistedNamedCallback(const FuncDecl *FD,
+                               const AsyncHandlerDesc &HandlerDesc,
+                               StringRef HandlerName,
+                               std::function<void(void)> AddAwaitCall) {
+    if (HandlerDesc.HasError) {
+      addDo();
+      if (!HandlerDesc.willAsyncReturnVoid()) {
+        OS << tok::kw_let << " result";
+        addResultTypeAnnotationIfNecessary(FD, HandlerDesc);
+        OS << " " << tok::equal << " ";
+      }
+      AddAwaitCall();
+      OS << "\n";
+      addCallToCompletionHandler(/*HasResult=*/true, HandlerDesc, HandlerName);
+      OS << "\n";
+      OS << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n";
+      addCallToCompletionHandler(/*HasResult=*/false, HandlerDesc, HandlerName);
+      OS << "\n" << tok::r_brace; // end catch
+    } else {
+      if (!HandlerDesc.willAsyncReturnVoid()) {
+        OS << tok::kw_let << " result";
+        addResultTypeAnnotationIfNecessary(FD, HandlerDesc);
+        OS << " " << tok::equal << " ";
+      }
+      AddAwaitCall();
+      OS << "\n";
+      addCallToCompletionHandler(/*HasResult=*/true, HandlerDesc, HandlerName);
     }
   }
 
@@ -5421,89 +5644,88 @@ private:
       Names.erase(Param);
     }
   }
-};
 
-/// When adding an async alternative method for the function declaration \c FD,
-/// this class tries to create a function body for the legacy function (the one
-/// with a completion handler), which calls the newly converted async function.
-/// There are certain situations in which we fail to create such a body, e.g.
-/// if the completion handler has the signature `(String, Error?) -> Void` in
-/// which case we can't synthesize the result of type \c String in the error
-/// case.
-class LegacyAlternativeBodyCreator {
-  /// The old function declaration for which an async alternative has been added
-  /// and whose body shall be rewritten to call the newly added async
-  /// alternative.
-  FuncDecl *FD;
-
-  /// The description of the completion handler in the old function declaration.
-  AsyncHandlerDesc HandlerDesc;
-
-  std::string Buffer;
-  llvm::raw_string_ostream OS;
-
-  /// Adds the call to the refactored 'async' method without the 'await'
-  /// keyword to the output stream.
-  void addCallToAsyncMethod() {
-    OS << FD->getBaseName() << "(";
+  /// Adds the call to an 'async' version of \p FD, where \p HanderDesc
+  /// describes the async completion handler of \p FD. This does not add an
+  /// 'await' keyword.
+  void addCallToAsyncMethod(const FuncDecl *FD,
+                            const AsyncHandlerDesc &HandlerDesc) {
+    OS << FD->getBaseName() << tok::l_paren;
     bool FirstParam = true;
     for (auto Param : *FD->getParameters()) {
-      if (Param == HandlerDesc.Handler) {
+      if (Param == HandlerDesc.getHandler()) {
         /// We don't need to pass the completion handler to the async method.
         continue;
       }
       if (!FirstParam) {
-        OS << ", ";
+        OS << tok::comma << " ";
       } else {
         FirstParam = false;
       }
       if (!Param->getArgumentName().empty()) {
-        OS << Param->getArgumentName() << ": ";
+        OS << Param->getArgumentName() << tok::colon << " ";
       }
       OS << Param->getParameterName();
     }
-    OS << ")";
+    OS << tok::r_paren;
   }
 
-  /// If the returned error type is more specialized than \c Error, adds an
-  /// 'as! CustomError' cast to the more specialized error type to the output
-  /// stream.
-  void addCastToCustomErrorTypeIfNecessary() {
+  /// If the error type of \p HandlerDesc is more specialized than \c Error,
+  /// adds an 'as! CustomError' cast to the more specialized error type to the
+  /// output stream.
+  void
+  addCastToCustomErrorTypeIfNecessary(const AsyncHandlerDesc &HandlerDesc) {
+    const ASTContext &Ctx = HandlerDesc.getHandler()->getASTContext();
     auto ErrorType = *HandlerDesc.getErrorType();
-    if (ErrorType->getCanonicalType() !=
-        FD->getASTContext().getExceptionType()) {
-      OS << " as! ";
+    if (ErrorType->getCanonicalType() != Ctx.getExceptionType()) {
+      OS << " " << tok::kw_as << tok::exclaim_postfix << " ";
       ErrorType->lookThroughSingleOptionalType()->print(OS);
     }
   }
 
-  /// Adds the \c Index -th parameter to the completion handler.
-  /// If \p HasResult is \c true, it is assumed that a variable named 'result'
-  /// contains the result returned from the async alternative. If the callback
-  /// also takes an error parameter, \c nil passed to the completion handler for
-  /// the error.
-  /// If \p HasResult is \c false, it is a assumed that a variable named 'error'
-  /// contains the error thrown from the async method and 'nil' will be passed
-  /// to the completion handler for all result parameters.
-  void addCompletionHandlerArgument(size_t Index, bool HasResult) {
+  /// If \p T has a natural default value like \c nil for \c Optional or \c ()
+  /// for \c Void, add that default value to the output. Otherwise, add a
+  /// placeholder that contains \p T's name as the hint.
+  void addDefaultValueOrPlaceholder(Type T) {
+    if (T->isOptional()) {
+      OS << tok::kw_nil;
+    } else if (T->isVoid()) {
+      OS << "()";
+    } else {
+      OS << "<#";
+      T.print(OS);
+      OS << "#>";
+    }
+  }
+
+  /// Adds the \c Index -th parameter to the completion handler described by \p
+  /// HanderDesc.
+  /// If \p HasResult is \c true, it is assumed that a variable named
+  /// 'result' contains the result returned from the async alternative. If the
+  /// callback also takes an error parameter, \c nil passed to the completion
+  /// handler for the error. If \p HasResult is \c false, it is a assumed that a
+  /// variable named 'error' contains the error thrown from the async method and
+  /// 'nil' will be passed to the completion handler for all result parameters.
+  void addCompletionHandlerArgument(size_t Index, bool HasResult,
+                                    const AsyncHandlerDesc &HandlerDesc) {
     if (HandlerDesc.HasError && Index == HandlerDesc.params().size() - 1) {
       // The error parameter is the last argument of the completion handler.
       if (!HasResult) {
         OS << "error";
-        addCastToCustomErrorTypeIfNecessary();
+        addCastToCustomErrorTypeIfNecessary(HandlerDesc);
       } else {
-        OS << "nil";
+        addDefaultValueOrPlaceholder(HandlerDesc.params()[Index].getPlainType());
       }
     } else {
       if (!HasResult) {
-        OS << "nil";
+        addDefaultValueOrPlaceholder(HandlerDesc.params()[Index].getPlainType());
       } else if (HandlerDesc
                      .getSuccessParamAsyncReturnType(
                          HandlerDesc.params()[Index].getPlainType())
                      ->isVoid()) {
         // Void return types are not returned by the async function, synthesize
         // a Void instance.
-        OS << "()";
+        OS << tok::l_paren << tok::r_paren;
       } else if (HandlerDesc.getSuccessParams().size() > 1) {
         // If the async method returns a tuple, we need to pass its elements to
         // the completion handler separately. For example:
@@ -5518,18 +5740,20 @@ class LegacyAlternativeBodyCreator {
         //     completion(result.0, result.1)
         //   }
         // }
-        OS << "result." << Index;
+        OS << "result" << tok::period << Index;
       } else {
         OS << "result";
       }
     }
   }
 
-  /// Adds the call to the completion handler. See \c
-  /// getCompletionHandlerArgument for how the arguments are synthesized if the
-  /// completion handler takes arguments, not a \c Result type.
-  void addCallToCompletionHandler(bool HasResult) {
-    OS << HandlerDesc.Handler->getParameterName() << "(";
+  /// Add a call to the completion handler named \p HandlerName and described by
+  /// \p HandlerDesc, passing all the required arguments. See \c
+  /// getCompletionHandlerArgument for how the arguments are synthesized.
+  void addCallToCompletionHandler(bool HasResult,
+                                  const AsyncHandlerDesc &HandlerDesc,
+                                  StringRef HandlerName) {
+    OS << HandlerName << tok::l_paren;
 
     // Construct arguments to pass to the completion handler
     switch (HandlerDesc.Type) {
@@ -5539,52 +5763,55 @@ class LegacyAlternativeBodyCreator {
     case HandlerType::PARAMS: {
       for (size_t I = 0; I < HandlerDesc.params().size(); ++I) {
         if (I > 0) {
-          OS << ", ";
+          OS << tok::comma << " ";
         }
-        addCompletionHandlerArgument(I, HasResult);
+        addCompletionHandlerArgument(I, HasResult, HandlerDesc);
       }
       break;
     }
     case HandlerType::RESULT: {
       if (HasResult) {
-        OS << ".success(result)";
+        OS << tok::period_prefix << "success" << tok::l_paren << "result"
+           << tok::r_paren;
       } else {
-        OS << ".failure(error";
-        addCastToCustomErrorTypeIfNecessary();
-        OS << ")";
+        OS << tok::period_prefix << "failure" << tok::l_paren << "error";
+        addCastToCustomErrorTypeIfNecessary(HandlerDesc);
+        OS << tok::r_paren;
       }
       break;
     }
     }
-    OS << ")"; // Close the call to the completion handler
+    OS << tok::r_paren; // Close the call to the completion handler
   }
 
-  /// Adds the result type of the converted async function.
-  void addAsyncFuncReturnType() {
+  /// Adds the result type of a refactored async function that previously
+  /// returned results via a completion handler described by \p HandlerDesc.
+  void addAsyncFuncReturnType(const AsyncHandlerDesc &HandlerDesc) {
     SmallVector<Type, 2> Scratch;
     auto ReturnTypes = HandlerDesc.getAsyncReturnTypes(Scratch);
     if (ReturnTypes.size() > 1) {
-      OS << "(";
+      OS << tok::l_paren;
     }
 
     llvm::interleave(
-        ReturnTypes, [&](Type Ty) { Ty->print(OS); }, [&]() { OS << ", "; });
+        ReturnTypes, [&](Type Ty) { Ty->print(OS); },
+        [&]() { OS << tok::comma << " "; });
 
     if (ReturnTypes.size() > 1) {
-      OS << ")";
+      OS << tok::r_paren;
     }
   }
 
-  /// If the async alternative function is generic, adds the type annotation
-  /// to the 'return' variable in the legacy function so that the generic
-  /// parameters of the legacy function are passed to the generic function.
-  /// For example for
+  /// If \p FD is generic, adds a type annotation with the return type of the
+  /// converted async function. This is used when creating a legacy function,
+  /// calling the converted 'async' function so that the generic parameters of
+  /// the legacy function are passed to the generic function. For example for
   /// \code
   /// func foo<GenericParam>() async -> GenericParam {}
   /// \endcode
   /// we generate
   /// \code
-  /// func foo<GenericParam>(completion: (T) -> Void) {
+  /// func foo<GenericParam>(completion: (GenericParam) -> Void) {
   ///   async {
   ///     let result: GenericParam = await foo()
   ///               <------------>
@@ -5593,88 +5820,12 @@ class LegacyAlternativeBodyCreator {
   /// }
   /// \endcode
   /// This function adds the range marked by \c <----->
-  void addResultTypeAnnotationIfNecessary() {
+  void addResultTypeAnnotationIfNecessary(const FuncDecl *FD,
+                                          const AsyncHandlerDesc &HandlerDesc) {
     if (FD->isGeneric()) {
-      OS << ": ";
-      addAsyncFuncReturnType();
+      OS << tok::colon << " ";
+      addAsyncFuncReturnType(HandlerDesc);
     }
-  }
-
-public:
-  LegacyAlternativeBodyCreator(FuncDecl *FD, AsyncHandlerDesc HandlerDesc)
-      : FD(FD), HandlerDesc(HandlerDesc), OS(Buffer) {}
-
-  bool canRewriteLegacyBody() {
-    if (FD == nullptr || FD->getBody() == nullptr) {
-      return false;
-    }
-    if (FD->hasThrows()) {
-      assert(!HandlerDesc.isValid() && "We shouldn't have found a handler desc "
-                                       "if the original function throws");
-      return false;
-    }
-    switch (HandlerDesc.Type) {
-    case HandlerType::INVALID:
-      return false;
-    case HandlerType::PARAMS: {
-      if (HandlerDesc.HasError) {
-        // The non-error parameters must be optional so that we can set them to
-        // nil in the error case.
-        // The error parameter must be optional so we can set it to nil in the
-        // success case.
-        // Otherwise we can't synthesize the values to return for these
-        // parameters.
-        return llvm::all_of(HandlerDesc.params(),
-                            [](AnyFunctionType::Param Param) -> bool {
-                              return Param.getPlainType()->isOptional();
-                            });
-      } else {
-        return true;
-      }
-    }
-    case HandlerType::RESULT:
-      return true;
-    }
-  }
-
-  std::string create() {
-    assert(Buffer.empty() &&
-           "LegacyAlternativeBodyCreator can only be used once");
-    assert(canRewriteLegacyBody() &&
-           "Cannot create a legacy body if the body can't be rewritten");
-    OS << "{\n"; // start function body
-    OS << "async {\n";
-    if (HandlerDesc.HasError) {
-      OS << "do {\n";
-      if (!HandlerDesc.willAsyncReturnVoid()) {
-        OS << "let result";
-        addResultTypeAnnotationIfNecessary();
-        OS << " = ";
-      }
-      OS << "try await ";
-      addCallToAsyncMethod();
-      OS << "\n";
-      addCallToCompletionHandler(/*HasResult=*/true);
-      OS << "\n"
-         << "} catch {\n";
-      addCallToCompletionHandler(/*HasResult=*/false);
-      OS << "\n"
-         << "}\n"; // end catch
-    } else {
-      if (!HandlerDesc.willAsyncReturnVoid()) {
-        OS << "let result";
-        addResultTypeAnnotationIfNecessary();
-        OS << " = ";
-      }
-      OS << "await ";
-      addCallToAsyncMethod();
-      OS << "\n";
-      addCallToCompletionHandler(/*HasResult=*/true);
-      OS << "\n";
-    }
-    OS << "}\n"; // end 'async'
-    OS << "}\n"; // end function body
-    return Buffer;
   }
 };
 
@@ -5691,8 +5842,8 @@ bool RefactoringActionConvertCallToAsyncAlternative::isApplicable(
   if (!CE)
     return false;
 
-  auto HandlerDesc = AsyncHandlerDesc::find(getUnderlyingFunc(CE->getFn()),
-                                            /*ignoreName=*/true);
+  auto HandlerDesc = AsyncHandlerParamDesc::find(getUnderlyingFunc(CE->getFn()),
+                                                 /*ignoreName=*/true);
   return HandlerDesc.isValid();
 }
 
@@ -5711,7 +5862,7 @@ bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
   assert(CE &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncHandlerDesc TempDesc;
+  AsyncHandlerParamDesc TempDesc;
   AsyncConverter Converter(SM, DiagEngine, CE, TempDesc);
   if (!Converter.convert())
     return true;
@@ -5739,7 +5890,7 @@ bool RefactoringActionConvertToAsync::performChange() {
   assert(FD &&
          "Should not run performChange when refactoring is not applicable");
 
-  auto HandlerDesc = AsyncHandlerDesc::find(FD, /*ignoreName=*/true);
+  auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
   AsyncConverter Converter(SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
@@ -5756,7 +5907,7 @@ bool RefactoringActionAddAsyncAlternative::isApplicable(
   if (!FD)
     return false;
 
-  auto HandlerDesc = AsyncHandlerDesc::find(FD, /*ignoreName=*/true);
+  auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
   return HandlerDesc.isValid();
 }
 
@@ -5773,7 +5924,7 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   assert(FD &&
          "Should not run performChange when refactoring is not applicable");
 
-  auto HandlerDesc = AsyncHandlerDesc::find(FD, /*ignoreName=*/true);
+  auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
   assert(HandlerDesc.isValid() &&
          "Should not run performChange when refactoring is not applicable");
 
@@ -5784,12 +5935,9 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
-  LegacyAlternativeBodyCreator LegacyBody(FD, HandlerDesc);
-  if (LegacyBody.canRewriteLegacyBody()) {
-    EditConsumer.accept(SM,
-                        Lexer::getCharSourceRangeFromSourceRange(
-                            SM, FD->getBody()->getSourceRange()),
-                        LegacyBody.create());
+  AsyncConverter LegacyBodyCreator(SM, DiagEngine, FD, HandlerDesc);
+  if (LegacyBodyCreator.createLegacyBody()) {
+    LegacyBodyCreator.replace(FD->getBody(), EditConsumer);
   }
   Converter.insertAfter(FD, EditConsumer);
 
