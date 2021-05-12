@@ -1899,6 +1899,26 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     return conformance;
   }
 
+  if (T->isActorType()) {
+    if (auto globalActor = Proto->getGlobalActorAttr()) {
+      C.Diags.diagnose(ComplainLoc,
+                       diag::actor_cannot_conform_to_global_actor_protocol, T,
+                       ProtoType);
+
+      CustomAttr *attr;
+      NominalTypeDecl *actor;
+
+      std::tie(attr, actor) = *globalActor;
+
+      C.Diags.diagnose(attr->getLocation(),
+                       diag::protocol_isolated_to_global_actor_here, ProtoType,
+                       actor->getDeclaredInterfaceType());
+
+      conformance->setInvalid();
+      return conformance;
+    }
+  }
+
   if (Proto->isObjC()) {
     // Foreign classes cannot conform to objc protocols.
     if (auto clas = canT->getClassOrBoundGenericClass()) {
