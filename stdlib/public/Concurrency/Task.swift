@@ -171,7 +171,6 @@ extension Task {
   /// In both cases, priority elevation helps you prevent a low-priority task
   /// blocking the execution of a high priority task,
   /// which is also known as *priority inversion*.
-  /// ◊TR: Let's revisit the above
   public enum Priority: Int, Comparable {
     // Values must be same as defined by the internal `JobPriority`.
     case userInteractive = 0x21

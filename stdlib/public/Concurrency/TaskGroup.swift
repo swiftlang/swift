@@ -172,8 +172,6 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 ///         group.spawn { throw SomeError() }
 ///         try group.next()
 ///     }
-/// ◊TR: I revised the code listings above compared to what @ktoso suggested
-/// ◊TR: Are they still correct?
 ///
 /// An individual task throws its error
 /// in the corresponding call to `Group.next()`,
