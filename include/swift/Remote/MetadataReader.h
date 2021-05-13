@@ -1435,6 +1435,10 @@ public:
 
       return metadataFn(metadata);
     }
+
+    case TypeReferenceKind::MetadataKind: {
+      return None;
+    }
     }
 
     return None;

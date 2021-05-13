@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -392,7 +392,19 @@ enum : unsigned {
   NumGenericMetadataPrivateDataWords = 16,
 };
 
-/// Kinds of type metadata/protocol conformance records.
+/// Kinds of type metadata records.
+enum class TypeMetadataRecordKind : unsigned {
+  /// A direct reference to the nominal type descriptor.
+  DirectTypeDescriptor = 0x00,
+
+  /// An indirect reference to a nominal type descriptor.
+  IndirectTypeDescriptor = 0x01,
+
+  First_Kind = DirectTypeDescriptor,
+  Last_Kind = IndirectTypeDescriptor,
+};
+
+/// Kinds of references to type metadata.
 enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
   /// getTypeDescriptor() points to the type context descriptor.
@@ -415,10 +427,14 @@ enum class TypeReferenceKind : unsigned {
   /// unused.
   IndirectObjCClass = 0x03,
 
+  /// The conformance is for a non-nominal type whose metadata kind we recorded;
+  /// getMetadataKind() returns the kind.
+  MetadataKind = 0x04,
+
   // We only reserve three bits for this in the various places we store it.
 
   First_Kind = DirectTypeDescriptor,
-  Last_Kind = IndirectObjCClass,
+  Last_Kind = MetadataKind,
 };
 
 /// Flag that indicates whether an existential type is class-constrained or not.

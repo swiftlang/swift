@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -79,6 +79,12 @@ swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
   // shared linkage.
   if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
     return SILLinkage::Shared;
+
+  // If the conforming type is a non-nominal, give it public linkage.
+  // These conformances are implemented within the runtime.
+  if (!C->getType()->getAnyNominal()) {
+    return definition ? SILLinkage::Public : SILLinkage::PublicExternal;
+  }
 
   auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),

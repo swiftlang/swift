@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -104,6 +104,7 @@ namespace swift {
   class InheritedProtocolConformance;
   class SelfProtocolConformance;
   class SpecializedProtocolConformance;
+  class BuiltinProtocolConformance;
   enum class ProtocolConformanceState;
   class Pattern;
   enum PointerTypeKind : unsigned;
@@ -999,6 +1000,11 @@ public:
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *
   getSelfConformance(ProtocolDecl *protocol);
+
+  /// Produce the builtin conformance for some structural type to some protocol.
+  BuiltinProtocolConformance *
+  getBuiltinConformance(Type type, ProtocolDecl *protocol,
+                        ArrayRef<ProtocolConformanceRef> conformances);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the

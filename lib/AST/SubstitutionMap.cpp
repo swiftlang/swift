@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -410,7 +410,20 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     // For the second step, we're looking into the requirement signature for
     // this protocol.
     auto concrete = conformance.getConcrete();
-    auto normal = concrete->getRootNormalConformance();
+    auto root = concrete->getRootConformance();
+
+    // If we see a builtin conformance here as the root, simply lookup the
+    // conformance for the substitute type.
+    if (isa<BuiltinProtocolConformance>(root)) {
+      auto substType = type.subst(*this);
+      if (substType->hasError()) {
+        return ProtocolConformanceRef(proto);
+      }
+
+      return proto->getParentModule()->lookupConformance(substType, proto);
+    }
+
+    auto normal = cast<NormalProtocolConformance>(root);
 
     // If we haven't set the signature conformances yet, force the issue now.
     if (normal->getSignatureConformances().empty()) {

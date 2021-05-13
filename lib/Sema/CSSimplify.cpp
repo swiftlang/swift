@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -6085,7 +6085,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     // This conformance may be conditional, in which case we need to consider
     // those requirements as constraints too.
-    if (conformance.isConcrete()) {
+    if (conformance.isConcrete() &&
+        !isa<BuiltinProtocolConformance>(conformance.getConcrete())) {
       unsigned index = 0;
       auto *conformanceLoc = getConstraintLocator(
           loc,

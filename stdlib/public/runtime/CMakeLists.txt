@@ -31,6 +31,7 @@ set(swift_runtime_sources
     Array.cpp
     AutoDiffSupport.cpp
     Bincompat.cpp
+    BuiltinProtocolConformances.cpp
     Casting.cpp
     CygwinPort.cpp
     Demangle.cpp

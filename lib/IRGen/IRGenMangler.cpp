@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -156,6 +156,37 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
+  // Builtin conformances are different because they don't use a mangled name
+  // for their conformance descriptors. For now, we used predefined symbol names
+  // just in case in the future we have some conflict between actual
+  // conformances and these builtin ones.
+  if (isa<BuiltinProtocolConformance>(conformance)) {
+    auto &ctx = conformance->getType()->getASTContext();
+
+    if (conformance->getType()->is<TupleType>()) {
+      auto equatable = ctx.getProtocol(KnownProtocolKind::Equatable);
+      auto comparable = ctx.getProtocol(KnownProtocolKind::Comparable);
+      auto hashable = ctx.getProtocol(KnownProtocolKind::Hashable);
+
+      if (conformance->getProtocol() == equatable) {
+        return "_swift_tupleEquatable_conf";
+      }
+
+      if (conformance->getProtocol() == comparable) {
+        return "_swift_tupleComparable_conf";
+      }
+
+      if (conformance->getProtocol() == hashable) {
+        return "_swift_tupleHashable_conf";
+      }
+
+      llvm_unreachable("mangling conformance descriptor for unknown tuple \
+                        conformance");
+    }
+
+    llvm_unreachable("mangling conformance descriptor for unknown builtin type");
+  }
+
   beginMangling();
   if (isa<NormalProtocolConformance>(conformance)) {
     appendProtocolConformance(conformance);

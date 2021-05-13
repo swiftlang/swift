@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -254,6 +254,12 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   SILWitnessTable *wtable;
 
   auto rootC = C->getRootConformance();
+
+  // Builtin conformances don't have witness tables in SIL.
+  if (isa<BuiltinProtocolConformance>(rootC)) {
+    return nullptr;
+  }
+
   // Attempt to lookup the witness table from the table.
   auto found = WitnessTableMap.find(rootC);
   if (found == WitnessTableMap.end()) {

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Runtime/BuiltinProtocolConformances.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -194,6 +195,11 @@ computeMetadataBoundsForSuperclass(const void *ref,
 #else
     break;
 #endif
+  }
+
+  // Non-nominals don't have superclass bounds.
+  case TypeReferenceKind::MetadataKind: {
+    break;
   }
   }
   swift_unreachable("unsupported superclass reference kind");
@@ -4507,6 +4513,13 @@ template <> SWIFT_USED void EnumDescriptor::dump() const {
 
 namespace {
 
+static bool
+isTupleBuiltinConformance(const ProtocolConformanceDescriptor *conformance) {
+  return intptr_t(conformance) == intptr_t(&_swift_tupleEquatable_conf) ||
+         intptr_t(conformance) == intptr_t(&_swift_tupleComparable_conf) ||
+         intptr_t(conformance) == intptr_t(&_swift_tupleHashable_conf);
+}
+
 /// A cache-entry type suitable for use with LockingConcurrentMap.
 class WitnessTableCacheEntry :
     public SimpleLockingCacheEntryBase<WitnessTableCacheEntry, WitnessTable*> {
@@ -4543,18 +4556,27 @@ public:
                              const Metadata *type,
                              const ProtocolConformanceDescriptor *conformance,
                              const void * const *instantiationArgs) {
-    return getWitnessTableSize(conformance);
+    return getWitnessTableSize(type, conformance);
   }
 
   size_t getExtraAllocationSize() const {
-    return getWitnessTableSize(Conformance);
+    return getWitnessTableSize(Type, Conformance);
   }
 
-  static size_t getWitnessTableSize(
+  static size_t getWitnessTableSize(const Metadata *type,
                             const ProtocolConformanceDescriptor *conformance) {
     auto protocol = conformance->getProtocol();
     auto genericTable = conformance->getGenericWitnessTable();
     size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
+
+    // Builtin conformance descriptors, namely tuple conformances at the moment,
+    // have their private size in words be determined via the number of elements
+    // the type has.
+    if (isTupleBuiltinConformance(conformance)) {
+      auto tuple = cast<TupleTypeMetadata>(type);
+      numPrivateWords = tuple->NumElements;
+    }
+
     size_t numRequirementWords =
       WitnessTableFirstRequirementOffset + protocol->NumRequirements;
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
@@ -4813,6 +4835,14 @@ instantiateWitnessTable(const Metadata *Type,
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->getWitnessTablePrivateSizeInWords();
 
+  // Builtin conformance descriptors, namely tuple conformances at the moment,
+  // have their private size in words be determined via the number of elements
+  // the type has.
+  if (isTupleBuiltinConformance(conformance)) {
+    auto tuple = cast<TupleTypeMetadata>(Type);
+    privateSizeInWords = tuple->NumElements;
+  }
+
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
@@ -4855,6 +4885,16 @@ instantiateWitnessTable(const Metadata *Type,
       if (conditionalRequirement.Flags.hasExtraArgument())
         copyNextInstantiationArg();
     }
+
+    // Builtin conformance descriptors, namely tuple conformances at the moment,
+    // have instantiation arguments equal to the number of element conformances.
+    if (isTupleBuiltinConformance(conformance)) {
+      auto tuple = cast<TupleTypeMetadata>(Type);
+
+      for (size_t i = 0; i != tuple->NumElements; i += 1) {
+        copyNextInstantiationArg();
+      }
+    }
   }
 
   // Fill in any default requirements.
@@ -4878,7 +4918,7 @@ WitnessTableCacheEntry::allocate(
   void **fullTable = reinterpret_cast<void**>(this + 1);
 
   // Zero out the witness table.
-  memset(fullTable, 0, getWitnessTableSize(conformance));
+  memset(fullTable, 0, getWitnessTableSize(Type, conformance));
 
   // Instantiate the table.
   return instantiateWitnessTable(Type, Conformance, instantiationArgs, fullTable);
@@ -4899,7 +4939,7 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
   }
 
   // Allocate space for the table.
-  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(conformance);
+  auto tableSize = WitnessTableCacheEntry::getWitnessTableSize(type, conformance);
   TaggedMetadataAllocator<SingletonGenericWitnessTableCacheTag> allocator;
   auto buffer = (void **)allocator.Allocate(tableSize, alignof(void*));
   memset(buffer, 0, tableSize);

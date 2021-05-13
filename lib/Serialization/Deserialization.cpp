@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -561,6 +561,34 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     auto conformance =
       ctx.getInheritedConformance(conformingType,
                                   inheritedConformance.getConcrete());
+    return ProtocolConformanceRef(conformance);
+  }
+
+  case BUILTIN_PROTOCOL_CONFORMANCE: {
+    TypeID conformingTypeID;
+    DeclID protoID;
+    size_t numConformances;
+    BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
+                                                 protoID, numConformances);
+
+    Type conformingType = getType(conformingTypeID);
+
+    auto decl = getDeclChecked(protoID);
+    if (!decl) {
+      return decl.takeError();
+    }
+
+    auto proto = cast<ProtocolDecl>(decl.get());
+
+    // Read the conformances.
+    SmallVector<ProtocolConformanceRef, 4> conformances;
+    conformances.reserve(numConformances);
+    for (unsigned i : range(numConformances)) {
+      conformances.push_back(readConformance(Cursor));
+    }
+
+    auto conformance = getContext().getBuiltinConformance(conformingType, proto,
+                                                          conformances);
     return ProtocolConformanceRef(conformance);
   }
 
