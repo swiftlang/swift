@@ -282,7 +282,7 @@ public func withCheckedContinuation<T>(
 ///     You must resume the continuation exactly once.
 ///
 /// If `resume(throwing:)` is called on the continuation,
-/// this method thows that error.
+/// this function throws that error.
 @available(SwiftStdlib 5.5, *)
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,

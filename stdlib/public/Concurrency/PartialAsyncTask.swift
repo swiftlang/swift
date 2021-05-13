@@ -242,9 +242,6 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// You must resume the continuation exactly once.
 ///
 /// - Returns: The value passed to the continuation by the closure.
-///
-/// If `resume(throwing:)` is called on the continuation,
-/// this method thows that error.
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
@@ -262,6 +259,9 @@ public func withUnsafeContinuation<T>(
 /// You must resume the continuation exactly once.
 ///
 /// - Returns: The value passed to the continuation by the closure.
+///
+/// If `resume(throwing:)` is called on the continuation,
+/// this function throws that error.
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
