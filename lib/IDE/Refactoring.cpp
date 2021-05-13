@@ -4545,12 +4545,112 @@ private:
   }
 };
 
+/// A list of nodes to print, along with a list of locations that may have
+/// preceding comments attached, which also need printing. For example:
+///
+/// \code
+/// if .random() {
+///   // a
+///   print("hello")
+///   // b
+/// }
+/// \endcode
+///
+/// To print out the contents of the if statement body, we'll include the AST
+/// node for the \c print call. This will also include the preceding comment
+/// \c a, but won't include the comment \c b. To ensure the comment \c b gets
+/// printed, the SourceLoc for the closing brace \c } is added as a possible
+/// comment loc.
+class NodesToPrint {
+  SmallVector<ASTNode, 0> Nodes;
+  SmallVector<SourceLoc, 2> PossibleCommentLocs;
+
+public:
+  NodesToPrint() {}
+  NodesToPrint(ArrayRef<ASTNode> Nodes, ArrayRef<SourceLoc> PossibleCommentLocs)
+      : Nodes(Nodes.begin(), Nodes.end()),
+        PossibleCommentLocs(PossibleCommentLocs.begin(),
+                            PossibleCommentLocs.end()) {}
+
+  ArrayRef<ASTNode> getNodes() const { return Nodes; }
+  ArrayRef<SourceLoc> getPossibleCommentLocs() const {
+    return PossibleCommentLocs;
+  }
+
+  /// Add an AST node to print.
+  void addNode(ASTNode Node) {
+    // Note we skip vars as they'll be printed as a part of their
+    // PatternBindingDecl.
+    if (!Node.isDecl(DeclKind::Var))
+      Nodes.push_back(Node);
+  }
+
+  /// Add a SourceLoc which may have a preceding comment attached. If so, the
+  /// comment will be printed out at the appropriate location.
+  void addPossibleCommentLoc(SourceLoc Loc) {
+    if (Loc.isValid())
+      PossibleCommentLocs.push_back(Loc);
+  }
+
+  /// Add all the nodes in the brace statement to the list of nodes to print.
+  /// This should be preferred over adding the nodes manually as it picks up the
+  /// end location of the brace statement as a possible comment loc, ensuring
+  /// that we print any trailing comments in the brace statement.
+  void addNodesInBraceStmt(BraceStmt *Brace) {
+    for (auto Node : Brace->getElements())
+      addNode(Node);
+
+    // Ignore the end locations of implicit braces, as they're likely bogus.
+    // e.g for a case statement, the r-brace loc points to the last token of the
+    // last node in the body.
+    if (!Brace->isImplicit())
+      addPossibleCommentLoc(Brace->getRBraceLoc());
+  }
+
+  /// Add the nodes and comment locs from another NodesToPrint.
+  void addNodes(NodesToPrint OtherNodes) {
+    Nodes.append(OtherNodes.Nodes.begin(), OtherNodes.Nodes.end());
+    PossibleCommentLocs.append(OtherNodes.PossibleCommentLocs.begin(),
+                               OtherNodes.PossibleCommentLocs.end());
+  }
+
+  /// Whether the last recorded node is an explicit return or break statement.
+  bool hasTrailingReturnOrBreak() const {
+    if (Nodes.empty())
+      return false;
+    return (Nodes.back().isStmt(StmtKind::Return) ||
+            Nodes.back().isStmt(StmtKind::Break)) &&
+           !Nodes.back().isImplicit();
+  }
+
+  /// If the last recorded node is an explicit return or break statement, drop
+  /// it from the list.
+  void dropTrailingReturnOrBreak() {
+    if (!hasTrailingReturnOrBreak())
+      return;
+
+    // Remove the node from the list, but make sure to add it as a possible
+    // comment loc to preserve any of its attached comments.
+    auto Node = Nodes.pop_back_val();
+    addPossibleCommentLoc(Node.getStartLoc());
+  }
+
+  /// Returns a list of nodes to print in a brace statement. This picks up the
+  /// end location of the brace statement as a possible comment loc, ensuring
+  /// that we print any trailing comments in the brace statement.
+  static NodesToPrint inBraceStmt(BraceStmt *stmt) {
+    NodesToPrint Nodes;
+    Nodes.addNodesInBraceStmt(stmt);
+    return Nodes;
+  }
+};
+
 /// The statements within the closure of call to a function taking a callback
 /// are split into a `SuccessBlock` and `ErrorBlock` (`ClassifiedBlocks`).
 /// This class stores the nodes for each block, as well as a mapping of
 /// decls to any patterns they are used in.
 class ClassifiedBlock {
-  SmallVector<ASTNode, 0> Nodes;
+  NodesToPrint Nodes;
   // closure param -> name
   llvm::DenseMap<const Decl *, StringRef> BoundNames;
   // var (ie. from a let binding) -> closure param
@@ -4558,7 +4658,7 @@ class ClassifiedBlock {
   bool AllLet = true;
 
 public:
-  ArrayRef<ASTNode> nodes() const { return llvm::makeArrayRef(Nodes); }
+  const NodesToPrint &nodesToPrint() const { return Nodes; }
 
   StringRef boundName(const Decl *D) const { return BoundNames.lookup(D); }
 
@@ -4568,15 +4668,18 @@ public:
 
   bool allLet() const { return AllLet; }
 
-  void addAllNodes(ArrayRef<ASTNode> Nodes) {
-    for (auto Node : Nodes) {
-      addNode(Node);
-    }
+  void addNodesInBraceStmt(BraceStmt *Brace) {
+    Nodes.addNodesInBraceStmt(Brace);
+  }
+  void addPossibleCommentLoc(SourceLoc Loc) {
+    Nodes.addPossibleCommentLoc(Loc);
+  }
+  void addAllNodes(NodesToPrint OtherNodes) {
+    Nodes.addNodes(std::move(OtherNodes));
   }
 
-  void addNode(const ASTNode Node) {
-    if (!Node.isDecl(DeclKind::Var))
-      Nodes.push_back(Node);
+  void addNode(ASTNode Node) {
+    Nodes.addNode(Node);
   }
 
   void addBinding(const CallbackCondition &FromCondition,
@@ -4639,12 +4742,12 @@ struct CallbackClassifier {
                            DiagnosticEngine &DiagEngine,
                            llvm::DenseSet<const Decl *> UnwrapParams,
                            const ParamDecl *ErrParam, HandlerType ResultType,
-                           ArrayRef<ASTNode> Body) {
-    assert(!Body.empty() && "Cannot classify empty body");
+                           BraceStmt *Body) {
+    assert(!Body->getElements().empty() && "Cannot classify empty body");
     CallbackClassifier Classifier(Blocks, HandledSwitches, DiagEngine,
                                   UnwrapParams, ErrParam,
                                   ResultType == HandlerType::RESULT);
-    Classifier.classifyNodes(Body);
+    Classifier.classifyNodes(Body->getElements(), Body->getRBraceLoc());
   }
 
 private:
@@ -4666,21 +4769,21 @@ private:
         UnwrapParams(UnwrapParams), ErrParam(ErrParam),
         IsResultParam(IsResultParam) {}
 
-  void classifyNodes(ArrayRef<ASTNode> Nodes) {
+  void classifyNodes(ArrayRef<ASTNode> Nodes, SourceLoc endCommentLoc) {
     for (auto I = Nodes.begin(), E = Nodes.end(); I < E; ++I) {
       auto *Statement = I->dyn_cast<Stmt *>();
       if (auto *IS = dyn_cast_or_null<IfStmt>(Statement)) {
-        ArrayRef<ASTNode> TempNodes;
+        NodesToPrint TempNodes;
         if (auto *BS = dyn_cast<BraceStmt>(IS->getThenStmt())) {
-          TempNodes = BS->getElements();
+          TempNodes = NodesToPrint::inBraceStmt(BS);
         } else {
-          TempNodes = ArrayRef<ASTNode>(IS->getThenStmt());
+          TempNodes = NodesToPrint({IS->getThenStmt()}, /*commentLocs*/ {});
         }
 
-        classifyConditional(IS, IS->getCond(), TempNodes, IS->getElseStmt());
+        classifyConditional(IS, IS->getCond(), std::move(TempNodes),
+                            IS->getElseStmt());
       } else if (auto *GS = dyn_cast_or_null<GuardStmt>(Statement)) {
-        classifyConditional(GS, GS->getCond(), ArrayRef<ASTNode>(),
-                            GS->getBody());
+        classifyConditional(GS, GS->getCond(), NodesToPrint(), GS->getBody());
       } else if (auto *SS = dyn_cast_or_null<SwitchStmt>(Statement)) {
         classifySwitch(SS);
       } else {
@@ -4690,10 +4793,12 @@ private:
       if (DiagEngine.hadAnyError())
         return;
     }
+    // Make sure to pick up any trailing comments.
+    CurrentBlock->addPossibleCommentLoc(endCommentLoc);
   }
 
   void classifyConditional(Stmt *Statement, StmtCondition Condition,
-                           ArrayRef<ASTNode> ThenNodes, Stmt *ElseStmt) {
+                           NodesToPrint ThenNodesToPrint, Stmt *ElseStmt) {
     llvm::DenseMap<const Decl *, CallbackCondition> CallbackConditions;
     bool UnhandledConditions =
         !CallbackCondition::all(Condition, UnwrapParams, CallbackConditions);
@@ -4765,33 +4870,35 @@ private:
       }
     }
 
+    // We'll be dropping the statement, but make sure to keep any attached
+    // comments.
+    CurrentBlock->addPossibleCommentLoc(Statement->getStartLoc());
+
     ThenBlock->addAllBindings(CallbackConditions, DiagEngine);
     if (DiagEngine.hadAnyError())
       return;
 
     // TODO: Handle nested ifs
-    setNodes(ThenBlock, ElseBlock, ThenNodes);
+    setNodes(ThenBlock, ElseBlock, std::move(ThenNodesToPrint));
 
     if (ElseStmt) {
       if (auto *BS = dyn_cast<BraceStmt>(ElseStmt)) {
-        setNodes(ElseBlock, ThenBlock, BS->getElements());
+        setNodes(ElseBlock, ThenBlock, NodesToPrint::inBraceStmt(BS));
       } else {
-        classifyNodes(ArrayRef<ASTNode>(ElseStmt));
+        classifyNodes(ArrayRef<ASTNode>(ElseStmt),
+                      /*endCommentLoc*/ SourceLoc());
       }
     }
   }
 
   void setNodes(ClassifiedBlock *Block, ClassifiedBlock *OtherBlock,
-                ArrayRef<ASTNode> Nodes) {
-    if (Nodes.empty())
-      return;
-    if ((Nodes.back().isStmt(StmtKind::Return) ||
-         Nodes.back().isStmt(StmtKind::Break)) &&
-        !Nodes.back().isImplicit()) {
+                NodesToPrint Nodes) {
+    if (Nodes.hasTrailingReturnOrBreak()) {
       CurrentBlock = OtherBlock;
-      Block->addAllNodes(Nodes.drop_back());
+      Nodes.dropTrailingReturnOrBreak();
+      Block->addAllNodes(std::move(Nodes));
     } else {
-      Block->addAllNodes(Nodes);
+      Block->addAllNodes(std::move(Nodes));
     }
   }
 
@@ -4801,7 +4908,16 @@ private:
       return;
     }
 
-    for (auto *CS : SS->getCases()) {
+    // We'll be dropping the switch, but make sure to keep any attached
+    // comments.
+    CurrentBlock->addPossibleCommentLoc(SS->getStartLoc());
+
+    // Push the cases into a vector. This is only done to eagerly evaluate the
+    // AsCaseStmtRange sequence so we can know what the last case is.
+    SmallVector<CaseStmt *, 2> Cases;
+    Cases.append(SS->getCases().begin(), SS->getCases().end());
+
+    for (auto *CS : Cases) {
       if (CS->hasFallthroughDest()) {
         DiagEngine.diagnose(CS->getLoc(), diag::callback_with_fallthrough);
         return;
@@ -4831,7 +4947,16 @@ private:
         OtherBlock = &Blocks.SuccessBlock;
       }
 
-      setNodes(Block, OtherBlock, CS->getBody()->getElements());
+      // We'll be dropping the case, but make sure to keep any attached
+      // comments. Because these comments will effectively be part of the
+      // previous case, add them to CurrentBlock.
+      CurrentBlock->addPossibleCommentLoc(CS->getStartLoc());
+
+      // Make sure to grab trailing comments in the last case stmt.
+      if (CS == Cases.back())
+        Block->addPossibleCommentLoc(SS->getRBraceLoc());
+
+      setNodes(Block, OtherBlock, NodesToPrint::inBraceStmt(CS->getBody()));
       Block->addBinding(CC, DiagEngine);
       if (DiagEngine.hadAnyError())
         return;
@@ -5271,10 +5396,65 @@ private:
   }
 
 
-  void convertNodes(ArrayRef<ASTNode> Nodes) {
-    for (auto Node : Nodes) {
+  /// Retrieves the location for the start of a comment attached to the token
+  /// at the provided location, or the location itself if there is no comment.
+  SourceLoc getLocIncludingPrecedingComment(SourceLoc loc) {
+    auto tokens = SF->getAllTokens();
+    auto tokenIter = token_lower_bound(tokens, loc);
+    if (tokenIter != tokens.end() && tokenIter->hasComment())
+      return tokenIter->getCommentStart();
+    return loc;
+  }
+
+  /// If the provided SourceLoc has a preceding comment, print it out. Returns
+  /// true if a comment was printed, false otherwise.
+  bool printCommentIfNeeded(SourceLoc Loc, bool AddNewline = false) {
+    auto PrecedingLoc = getLocIncludingPrecedingComment(Loc);
+    if (Loc == PrecedingLoc)
+      return false;
+    if (AddNewline)
       OS << "\n";
+    OS << CharSourceRange(SM, PrecedingLoc, Loc).str();
+    return true;
+  }
+
+  void convertNodes(const NodesToPrint &ToPrint) {
+    // Sort the possible comment locs in reverse order so we can pop them as we
+    // go.
+    SmallVector<SourceLoc, 2> CommentLocs;
+    CommentLocs.append(ToPrint.getPossibleCommentLocs().begin(),
+                       ToPrint.getPossibleCommentLocs().end());
+    llvm::sort(CommentLocs.begin(), CommentLocs.end(), [](auto lhs, auto rhs) {
+      return lhs.getOpaquePointerValue() > rhs.getOpaquePointerValue();
+    });
+
+    // First print the nodes we've been asked to print.
+    for (auto Node : ToPrint.getNodes()) {
+      OS << "\n";
+
+      // If we need to print comments, do so now.
+      while (!CommentLocs.empty()) {
+        auto CommentLoc = CommentLocs.back().getOpaquePointerValue();
+        auto NodeLoc = Node.getStartLoc().getOpaquePointerValue();
+        assert(CommentLoc != NodeLoc &&
+               "Added node to both comment locs and nodes to print?");
+
+        // If the comment occurs after the node, don't print now. Wait until
+        // the right node comes along.
+        if (CommentLoc > NodeLoc)
+          break;
+
+        printCommentIfNeeded(CommentLocs.pop_back_val());
+      }
       convertNode(Node);
+    }
+
+    // We're done printing nodes. Make sure to output the remaining comments.
+    bool HasPrintedComment = false;
+    while (!CommentLocs.empty()) {
+      HasPrintedComment |=
+          printCommentIfNeeded(CommentLocs.pop_back_val(),
+                               /*AddNewline*/ !HasPrintedComment);
     }
   }
 
@@ -5282,6 +5462,12 @@ private:
                    bool ConvertCalls = true) {
     if (!StartOverride.isValid())
       StartOverride = Node.getStartLoc();
+
+    // Unless this is the start node, make sure to include any preceding
+    // comments attached to the loc. If it's the start node, the attached
+    // comment is outside the range of the transform.
+    if (Node != StartNode)
+      StartOverride = getLocIncludingPrecedingComment(StartOverride);
 
     llvm::SaveAndRestore<SourceLoc> RestoreLoc(LastAddedLoc, StartOverride);
     llvm::SaveAndRestore<int> RestoreCount(NestedExprCount,
@@ -5661,7 +5847,7 @@ private:
                                  PtrArrayRef<Expr *> ArgList) {
     ArrayRef<const ParamDecl *> CallbackParams =
         Callback->getParameters()->getArray();
-    ArrayRef<ASTNode> CallbackBody = Callback->getBody()->getElements();
+    auto CallbackBody = Callback->getBody();
     if (HandlerDesc.params().size() != CallbackParams.size()) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::mismatched_callback_args);
       return;
@@ -5681,8 +5867,8 @@ private:
 
     ClassifiedBlocks Blocks;
     if (!HandlerDesc.HasError) {
-      Blocks.SuccessBlock.addAllNodes(CallbackBody);
-    } else if (!CallbackBody.empty()) {
+      Blocks.SuccessBlock.addNodesInBraceStmt(CallbackBody);
+    } else if (!CallbackBody->getElements().empty()) {
       llvm::DenseSet<const Decl *> UnwrapParams;
       for (auto *Param : SuccessParams) {
         if (HandlerDesc.shouldUnwrap(Param->getType()))
@@ -5712,16 +5898,17 @@ private:
                    HandlerDesc, /*AddDeclarations=*/!HandlerDesc.HasError);
       addFallbackCatch(ErrParam);
       OS << "\n";
-      convertNodes(CallbackBody);
+      convertNodes(NodesToPrint::inBraceStmt(CallbackBody));
 
       clearNames(CallbackParams);
       return;
     }
 
-    bool RequireDo = !Blocks.ErrorBlock.nodes().empty();
+    auto ErrorNodes = Blocks.ErrorBlock.nodesToPrint().getNodes();
+    bool RequireDo = !ErrorNodes.empty();
     // Check if we *actually* need a do/catch (see class comment)
-    if (Blocks.ErrorBlock.nodes().size() == 1) {
-      auto Node = Blocks.ErrorBlock.nodes()[0];
+    if (ErrorNodes.size() == 1) {
+      auto Node = ErrorNodes[0];
       if (auto *HandlerCall = TopHandler.getAsHandlerCall(Node)) {
         auto Res = TopHandler.extractResultArgs(HandlerCall);
         if (Res.args().size() == 1) {
@@ -5735,6 +5922,16 @@ private:
       }
     }
 
+    // If we're not requiring a 'do', we'll be dropping the error block. But
+    // let's make sure we at least preserve the comments in the error block by
+    // transplanting them into the success block. This should make sure they
+    // maintain a sensible ordering.
+    if (!RequireDo) {
+      auto ErrorNodes = Blocks.ErrorBlock.nodesToPrint();
+      for (auto CommentLoc : ErrorNodes.getPossibleCommentLocs())
+        Blocks.SuccessBlock.addPossibleCommentLoc(CommentLoc);
+    }
+
     if (RequireDo) {
       addDo();
     }
@@ -5745,7 +5942,7 @@ private:
 
     addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
                  HandlerDesc, /*AddDeclarations=*/true);
-    convertNodes(Blocks.SuccessBlock.nodes());
+    convertNodes(Blocks.SuccessBlock.nodesToPrint());
     clearNames(SuccessParams);
 
     if (RequireDo) {
@@ -5756,7 +5953,7 @@ private:
                                     /*Success=*/false);
 
       addCatch(ErrParam);
-      convertNodes(Blocks.ErrorBlock.nodes());
+      convertNodes(Blocks.ErrorBlock.nodesToPrint());
       OS << "\n" << tok::r_brace;
       clearNames(llvm::makeArrayRef(ErrParam));
     }
