@@ -101,7 +101,7 @@ internal final class CheckedContinuationCanary {
 ///   on every execution path throughout the program.
 ///
 /// Resuming from a continuation more than once is undefined behavior.
-/// Never resuming leaves the task in a suspended state,
+/// Never resuming leaves the task in a suspended state indefinitely,
 /// and leaks any associated resources.
 /// `CheckedContinuation` logs a message
 /// if either of these invariants is violated.
