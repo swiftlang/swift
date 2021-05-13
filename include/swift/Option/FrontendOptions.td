@@ -126,9 +126,6 @@ def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
   HelpText<"Path to diagnostic documentation resources">;
 
-def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
-  HelpText<"Enable the use of LLVM swiftcall support">;
-
 def enable_testable_attr_requires_testable_module :
   Flag<["-"], "enable-testable-attr-requires-testable-module">,
   HelpText<"Enable checking of @testable">;
