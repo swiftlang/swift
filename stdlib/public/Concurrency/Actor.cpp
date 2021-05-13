@@ -34,6 +34,7 @@
 #include "swift/Runtime/ThreadLocal.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#include "llvm/Config/config.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 
@@ -63,6 +64,11 @@
 
 #if HAVE_PTHREAD_H
 #include <pthread.h>
+
+// Only use __has_include since HAVE_PTHREAD_NP_H is not provided.
+#if __has_include(<pthread_np.h>)
+#include <pthread_np.h>
+#endif
 #endif
 
 #if defined(_WIN32)
