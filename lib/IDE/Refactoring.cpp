@@ -5109,7 +5109,7 @@ private:
 /// the code the user intended. In most cases the refactoring will continue,
 /// with any unhandled decls wrapped in placeholders instead.
 class AsyncConverter : private SourceEntityWalker {
-  ASTContext &Context;
+  SourceFile *SF;
   SourceManager &SM;
   DiagnosticEngine &DiagEngine;
 
@@ -5162,11 +5162,11 @@ class AsyncConverter : private SourceEntityWalker {
 
 public:
   /// Convert a function
-  AsyncConverter(ASTContext &Context, SourceManager &SM,
+  AsyncConverter(SourceFile *SF, SourceManager &SM,
                  DiagnosticEngine &DiagEngine, AbstractFunctionDecl *FD,
                  const AsyncHandlerParamDesc &TopHandler)
-      : Context(Context), SM(SM), DiagEngine(DiagEngine),
-        StartNode(FD), TopHandler(TopHandler), OS(Buffer) {
+      : SF(SF), SM(SM), DiagEngine(DiagEngine), StartNode(FD),
+        TopHandler(TopHandler), OS(Buffer) {
     Placeholders.insert(TopHandler.getHandler());
     ScopedDecls.collect(FD);
 
@@ -5176,20 +5176,20 @@ public:
   }
 
   /// Convert a call
-  AsyncConverter(ASTContext &Context, SourceManager &SM,
-                 DiagnosticEngine &DiagEngine, CallExpr *CE, BraceStmt *Scope,
-                 SourceFile &SF)
-      : Context(Context), SM(SM), DiagEngine(DiagEngine),
-        StartNode(CE), OS(Buffer) {
+  AsyncConverter(SourceFile *SF, SourceManager &SM,
+                 DiagnosticEngine &DiagEngine, CallExpr *CE, BraceStmt *Scope)
+      : SF(SF), SM(SM), DiagEngine(DiagEngine), StartNode(CE), OS(Buffer) {
     ScopedDecls.collect(CE);
 
     // Create the initial scope, can be more accurate than the general
     // \c ScopedDeclCollector as there is a starting point.
     llvm::DenseSet<const Decl *> UsedDecls;
-    DeclCollector::collect(Scope, SF, UsedDecls);
-    ReferenceCollector::collect(StartNode, Scope, SF, UsedDecls);
+    DeclCollector::collect(Scope, *SF, UsedDecls);
+    ReferenceCollector::collect(StartNode, Scope, *SF, UsedDecls);
     addNewScope(UsedDecls);
   }
+
+  ASTContext &getASTContext() const { return SF->getASTContext(); }
 
   bool convert() {
     assert(Buffer.empty() && "AsyncConverter can only be used once");
@@ -5948,7 +5948,7 @@ private:
   /// Returns a unique name using \c Name as base that doesn't clash with any
   /// other names in the current scope.
   Identifier createUniqueName(StringRef Name) {
-    Identifier Ident = Context.getIdentifier(Name);
+    Identifier Ident = getASTContext().getIdentifier(Name);
 
     auto &CurrentNames = ScopedNames.back();
     if (CurrentNames.count(Ident)) {
@@ -5959,7 +5959,7 @@ private:
       do {
         UniquedName = Name;
         UniquedName.append(std::to_string(UniqueId));
-        Ident = Context.getIdentifier(UniquedName);
+        Ident = getASTContext().getIdentifier(UniquedName);
         UniqueId++;
       } while (CurrentNames.count(Ident));
     }
@@ -6246,7 +6246,7 @@ bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
   if (!Scopes.empty())
     Scope = cast<BraceStmt>(Scopes.back().get<Stmt *>());
 
-  AsyncConverter Converter(Ctx, SM, DiagEngine, CE, Scope, *CursorInfo.SF);
+  AsyncConverter Converter(TheFile, SM, DiagEngine, CE, Scope);
   if (!Converter.convert())
     return true;
 
@@ -6274,7 +6274,7 @@ bool RefactoringActionConvertToAsync::performChange() {
          "Should not run performChange when refactoring is not applicable");
 
   auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
-  AsyncConverter Converter(Ctx, SM, DiagEngine, FD, HandlerDesc);
+  AsyncConverter Converter(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
 
@@ -6311,14 +6311,14 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   assert(HandlerDesc.isValid() &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncConverter Converter(Ctx, SM, DiagEngine, FD, HandlerDesc);
+  AsyncConverter Converter(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
 
   EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
-  AsyncConverter LegacyBodyCreator(Ctx, SM, DiagEngine, FD, HandlerDesc);
+  AsyncConverter LegacyBodyCreator(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (LegacyBodyCreator.createLegacyBody()) {
     LegacyBodyCreator.replace(FD->getBody(), EditConsumer);
   }
