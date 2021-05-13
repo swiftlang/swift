@@ -693,6 +693,12 @@ def create_argument_parser():
     option('--symbols-package', store_path,
            help='if provided, an archive of the symbols directory will be '
                 'generated at this path')
+    option('--darwin-symroot-path-filters', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of patterns used to match '
+                'a subset of files to generate symbols for. '
+                'Only supported on Darwin. Can be called multiple times '
+                'to add multiple such options.')
 
     # -------------------------------------------------------------------------
     in_group('Build variant')
