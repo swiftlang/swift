@@ -2,6 +2,7 @@
 add_swift_host_library(swiftIDE STATIC
   CodeCompletion.cpp
   CodeCompletionCache.cpp
+  CodeCompletionDiagnostics.cpp
   CodeCompletionResultPrinter.cpp
   CommentConversion.cpp
   CompletionInstance.cpp

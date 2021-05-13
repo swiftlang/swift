@@ -1170,9 +1170,10 @@ Completion *CompletionBuilder::finish() {
           semanticContext, flair, current.getNumBytesToErase(), completionString,
           current.getAssociatedDeclKind(), current.isSystem(),
           current.getModuleName(), current.getSourceFilePath(),
-          current.getNotRecommendedReason(), current.getBriefDocComment(),
-          current.getAssociatedUSRs(), current.getDeclKeywords(), typeRelation,
-          opKind);
+          current.getNotRecommendedReason(), current.getDiagnosticSeverity(),
+          current.getDiagnosticMessage(), current.getBriefDocComment(),
+          current.getAssociatedUSRs(), current.getDeclKeywords(),
+          typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext, flair,
                          current.getNumBytesToErase(), completionString,

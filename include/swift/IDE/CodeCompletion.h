@@ -568,6 +568,14 @@ enum class CompletionKind {
   TypeAttrBeginning,
 };
 
+enum class CodeCompletionDiagnosticSeverity: uint8_t {
+  None,
+  Error,
+  Warning,
+  Remark,
+  Note,
+};
+
 /// A single code completion result.
 class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
@@ -607,6 +615,7 @@ public:
   enum class NotRecommendedReason {
     None = 0,
     RedundantImport,
+    RedundantImportIndirect,
     Deprecated,
     InvalidAsyncContext,
     CrossActorReference,
@@ -638,6 +647,8 @@ private:
   ArrayRef<StringRef> AssociatedUSRs;
   ArrayRef<std::pair<StringRef, StringRef>> DocWords;
   unsigned TypeDistance : 3;
+  unsigned DiagnosticSeverity: 3;
+  StringRef DiagnosticMessage;
 
 public:
   /// Constructs a \c Pattern, \c Keyword or \c BuiltinOperator result.
@@ -664,6 +675,7 @@ public:
            getOperatorKind() != CodeCompletionOperatorKind::None);
     AssociatedKind = 0;
     IsSystem = 0;
+    DiagnosticSeverity = 0;
   }
 
   /// Constructs a \c Keyword result.
@@ -684,6 +696,7 @@ public:
     assert(CompletionString);
     AssociatedKind = static_cast<unsigned>(Kind);
     IsSystem = 0;
+    DiagnosticSeverity = 0;
   }
 
   /// Constructs a \c Literal result.
@@ -701,6 +714,7 @@ public:
         TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(LiteralKind);
     IsSystem = 0;
+    DiagnosticSeverity = 0;
     assert(CompletionString);
   }
 
@@ -728,6 +742,7 @@ public:
     assert(AssociatedDecl && "should have a decl");
     AssociatedKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     IsSystem = getDeclIsSystem(AssociatedDecl);
+    DiagnosticSeverity = 0;
     assert(CompletionString);
     if (isOperator())
       KnownOperatorKind =
@@ -743,20 +758,22 @@ public:
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
                        StringRef ModuleName, StringRef SourceFilePath,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
-                       StringRef BriefDocComment,
+                       CodeCompletionDiagnosticSeverity diagSeverity,
+                       StringRef DiagnosticMessage, StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)),
-        Flair(unsigned(Flair.toRaw())), NotRecommended(unsigned(NotRecReason)),
-        IsSystem(IsSystem), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString), ModuleName(ModuleName),
-        SourceFilePath(SourceFilePath), BriefDocComment(BriefDocComment),
-        AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
-        TypeDistance(TypeDistance) {
+        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
+        NotRecommended(unsigned(NotRecReason)), IsSystem(IsSystem),
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
+        ModuleName(ModuleName), SourceFilePath(SourceFilePath),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        DocWords(DocWords), TypeDistance(TypeDistance),
+        DiagnosticSeverity(unsigned(diagSeverity)),
+        DiagnosticMessage(DiagnosticMessage) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     assert(!isOperator() ||
@@ -857,6 +874,19 @@ public:
 
   void setSourceFilePath(StringRef value) {
     SourceFilePath = value;
+  }
+
+  void setDiagnostics(CodeCompletionDiagnosticSeverity severity, StringRef message) {
+    DiagnosticSeverity = static_cast<unsigned>(severity);
+    DiagnosticMessage = message;
+  }
+
+  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+    return static_cast<CodeCompletionDiagnosticSeverity>(DiagnosticSeverity);
+  }
+
+  StringRef getDiagnosticMessage() const {
+    return DiagnosticMessage;
   }
 
   /// Returns the source file path where the associated decl was declared.

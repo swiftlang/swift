@@ -203,12 +203,15 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto context = static_cast<SemanticContextKind>(*cursor++);
     auto notRecommended =
         static_cast<CodeCompletionResult::NotRecommendedReason>(*cursor++);
+    auto diagSeverity =
+        static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
     auto numBytesToErase = static_cast<unsigned>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
     auto sourceFilePathIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
+    auto diagMessageIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
     SmallVector<StringRef, 4> assocUSRs;
@@ -228,12 +231,14 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto moduleName = getString(moduleIndex);
     auto sourceFilePath = getString(sourceFilePathIndex);
     auto briefDocComment = getString(briefDocIndex);
+    auto diagMessage = getString(diagMessageIndex);
 
     CodeCompletionResult *result = nullptr;
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, CodeCompletionFlair(), numBytesToErase, string, declKind,
-          isSystem, moduleName, sourceFilePath, notRecommended, briefDocComment,
+          context, CodeCompletionFlair(), numBytesToErase, string,
+          declKind, isSystem, moduleName, sourceFilePath, notRecommended,
+          diagSeverity, diagMessage, briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
           copyArray(*V.Sink.Allocator, ArrayRef<std::pair<StringRef, StringRef>>(declKeywords)),
           CodeCompletionResult::Unknown, opKind);
@@ -367,6 +372,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
       LE.write(static_cast<uint8_t>(R->getSemanticContext()));
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
+      LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
       LE.write(static_cast<uint8_t>(R->getNumBytesToErase()));
       LE.write(
@@ -374,6 +380,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       LE.write(addString(R->getModuleName()));      // index into strings
       LE.write(addString(R->getSourceFilePath()));  // index into strings
       LE.write(addString(R->getBriefDocComment())); // index into strings
+      LE.write(addString(R->getDiagnosticMessage())); // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
