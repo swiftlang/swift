@@ -376,6 +376,30 @@ func testPrintingWrapper(completionHandler: (String) -> Void) {
 // PRINTING-WRAPPER-FUNC-NEXT:   print("Operation scheduled")
 // PRINTING-WRAPPER-FUNC-NEXT: }
 
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=SHADOWING-BEFORE %s
+func testShadowingBefore() {
+  let complete: (String) -> Void = { print($0) }
+  let result = 1
+  simple(completion: complete)
+}
+// SHADOWING-BEFORE: func testShadowingBefore() async {
+// SHADOWING-BEFORE-NEXT: let complete: (String) -> Void = { print($0) }
+// SHADOWING-BEFORE-NEXT: let result = 1
+// SHADOWING-BEFORE-NEXT: let result1 = await simple()
+// SHADOWING-BEFORE-NEXT: complete(result1)
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=SHADOWING-AFTER %s
+func testShadowingAfter() {
+  let complete: (String) -> Void = { print($0) }
+  simple(completion: complete)
+  let result = 1
+}
+// SHADOWING-AFTER: func testShadowingAfter() async {
+// SHADOWING-AFTER-NEXT: let complete: (String) -> Void = { print($0) }
+// SHADOWING-AFTER-NEXT: let result = await simple()
+// SHADOWING-AFTER-NEXT: complete(result)
+// SHADOWING-AFTER-NEXT: let result1 = 1
+
 class Foo {
   var foo: Foo
 
