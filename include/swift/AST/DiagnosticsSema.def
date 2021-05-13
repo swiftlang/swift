@@ -3816,7 +3816,7 @@ WARNING(bitcasting_to_change_from_unsized_to_sized_int, none,
         "initializer",
         (Type, Type))
 
-WARNING(use_of_qq_on_non_optional_value,NoUsage,
+WARNING(use_of_qq_on_non_optional_value,none,
         "left side of nil coalescing operator '?""?' has non-optional type %0, "
         "so the right side is never used", (Type))
 WARNING(nonoptional_compare_to_nil,none,
