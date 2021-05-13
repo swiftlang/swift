@@ -121,8 +121,8 @@ extension AsyncDropWhileSequence: AsyncSequence {
     }
   }
 
-  @inlinable
   /// Creates an instance of the drop-while sequence iterator.
+  @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
     return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }

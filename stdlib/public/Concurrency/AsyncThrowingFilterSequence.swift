@@ -14,7 +14,6 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
-  @inlinable
   /// Creates an asynchronous sequence that contains, in order, the elements of
   /// the base sequence that satisfy the given error-throwing predicate.
   ///
@@ -46,6 +45,7 @@ extension AsyncSequence {
   ///   of the base sequence that satisfy the given predicate. If the predicate
   ///   throws an error, the sequence contains only values produced prior to
   ///   the error.
+  @inlinable
   public __consuming func filter(
     _ isIncluded: @escaping (Element) async throws -> Bool
   ) -> AsyncThrowingFilterSequence<Self> {
