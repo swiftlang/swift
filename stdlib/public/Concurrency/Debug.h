@@ -21,6 +21,13 @@
 
 namespace swift {
 
+// Dispatch knows about these symbol names. Don't change them without consulting
+// dispatch.
+
+/// The metadata pointer used for job objects.
+SWIFT_RUNTIME_STDLIB_SPI
+const void *const _swift_concurrency_debug_jobMetadata;
+
 /// The metadata pointer used for async task objects.
 SWIFT_RUNTIME_STDLIB_SPI
 const void *const _swift_concurrency_debug_asyncTaskMetadata;
