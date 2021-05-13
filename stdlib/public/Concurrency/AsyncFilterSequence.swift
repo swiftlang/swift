@@ -22,7 +22,7 @@ extension AsyncSequence {
   /// values and `false` for odd values, thereby filtering out the odd values:
   ///
   ///     let stream = Counter(howHigh: 10)
-  ///         .filter{ $0 % 2 == 0 }
+  ///         .filter { $0 % 2 == 0 }
   ///     for await number in stream {
   ///         print("\(number) ", terminator: " ")
   ///     }

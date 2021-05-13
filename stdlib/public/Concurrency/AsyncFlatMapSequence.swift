@@ -31,7 +31,7 @@ extension AsyncSequence {
   ///     let stream = Counter(howHigh: 5)
   ///         .flatMap { Counter(howHigh: $0) }
   ///     for await number in stream {
-  ///         print ("\(number)", terminator: " ")
+  ///         print("\(number)", terminator: " ")
   ///     }
   ///     // Prints: 1 1 2 1 2 3 1 2 3 4 1 2 3 4 5
   ///

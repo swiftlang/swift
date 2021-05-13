@@ -36,7 +36,7 @@ extension AsyncSequence {
   ///
   ///     do {
   ///         let stream = Counter(howHigh: 5)
-  ///             .compactMap{ (value) throws -> String? in
+  ///             .compactMap { (value) throws -> String? in
   ///                 if value == 5 {
   ///                     throw MyError()
   ///                 }

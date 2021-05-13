@@ -26,7 +26,7 @@ extension AsyncSequence {
   /// divisible by `3`:
   ///
   ///     let stream = Counter(howHigh: 10)
-  ///         .drop{ $0 % 3 != 0 }
+  ///         .drop { $0 % 3 != 0 }
   ///     for await number in stream {
   ///         print("\(number) ", terminator: " ")
   ///     }

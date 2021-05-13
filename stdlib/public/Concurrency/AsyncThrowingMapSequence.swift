@@ -36,7 +36,7 @@ extension AsyncSequence {
   ///
   ///     do {
   ///         let stream = Counter(howHigh: 5)
-  ///             .map{ (value) -> String in
+  ///             .map { (value) throws -> String in
   ///                 guard let roman = romanNumeralDict[value] else {
   ///                     throw MyError()
   ///                 }

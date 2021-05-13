@@ -22,7 +22,7 @@ import Swift
 /// available.
 ///
 /// As with `Sequence`, you typically iterate through an `AsyncSequence` with a
-/// `for`-`in` loop. However, since the caller must potentially wait for values,
+/// `for await`-`in` loop. However, since the caller must potentially wait for values,
 /// you use the `await` keyword. The following example shows how to iterate
 /// over `Counter`, a custom `AsyncSequence` that produces `Int` values from
 /// `1` up to a `howHigh` value:
@@ -47,7 +47,7 @@ import Swift
 /// functions: those that return a single value, and those that return another
 /// `AsyncSequence`.
 ///
-/// Single-value functions eliminate the need for a `for`-`in` loop, and instead
+/// Single-value functions eliminate the need for a `for await`-`in` loop, and instead
 /// let you make a single `await` call. For example, the `contains(_:)` method
 /// returns a Boolean value that indicates if a given value exists in the
 /// `AsyncSequence`. Given the `Counter` sequence from the previous example,
@@ -61,12 +61,13 @@ import Swift
 /// provide to the `map(_:)` function can throw an error). These returned
 /// sequences don't eagerly await the next member of the sequence, which allows
 /// the caller to decide when to start work. Typically, you'll iterate over
-/// these sequences with `for`-`in`, like the base `AsyncSequence` you started
+/// these sequences with `for await`-`in`, like the base `AsyncSequence` you started
 /// with. In the following example, the `map(_:)` function transforms each `Int`
 /// received from a `Counter` sequence into a `String`:
 ///
-///     for await s in Counter(howHigh: 10)
-///       .map( { $0 % 2 == 0 ? "Even" : "Odd" } ) {
+///     let stream = Counter(howHigh: 10)
+///       .map { $0 % 2 == 0 ? "Even" : "Odd" }
+///     for await s in stream {
 ///         print(s, terminator: " ")
 ///     }
 ///     // Prints: Odd Even Odd Even Odd Even Odd Even Odd Even
@@ -104,7 +105,7 @@ extension AsyncSequence {
   ///         .reduce(0) {
   ///             $0 + $1
   ///         }
-  ///     print (sum)
+  ///     print(sum)
   ///     // Prints: 10
   ///
   ///
@@ -199,8 +200,8 @@ extension AsyncSequence {
   /// whether the sequence produces a value divisible by `3`:
   ///
   ///     let containsDivisibleByThree = await Counter(howHigh: 10)
-  ///         .contains(where: { $0 % 3 == 0 } )
-  ///     print (containsDivisibleByThree)
+  ///         .contains { $0 % 3 == 0 }
+  ///     print(containsDivisibleByThree)
   ///     // Prints: true
   ///
   /// The predicate executes each time the asynchronous sequence produces an
@@ -226,7 +227,7 @@ extension AsyncSequence {
   /// all elements produced by the sequence are less than `10`.
   ///
   ///     let allLessThanTen = await Counter(howHigh: 10)
-  ///         .allSatisfy( { $0 < 10 } )
+  ///         .allSatisfy { $0 < 10 }
   ///     print (allLessThanTen)
   ///     // Prints: false
   ///
@@ -257,7 +258,7 @@ extension AsyncSequence where Element: Equatable {
   ///
   ///     let containsFive = await Counter(howHigh: 10)
   ///         .contains(5)
-  ///     print (containsFive)
+  ///     print(containsFive)
   ///
   /// - Parameter search: The element to find in the asynchronous sequence.
   /// - Returns: `true` if the method found the element in the asynchronous
@@ -298,8 +299,8 @@ extension AsyncSequence {
   /// member of the sequence that's evenly divisible by both `2` and `3`.
   ///
   ///     let divisibleBy2And3 = await Counter(howHigh: 10)
-  ///         .first(where: { $0 % 2 == 0 && $0 % 3 == 0 } )
-  ///     print (divisibleBy2And3 ?? "none")
+  ///         .first { $0 % 2 == 0 && $0 % 3 == 0 }
+  ///     print(divisibleBy2And3 ?? "none")
   ///     // Prints: 6
   ///
   /// The predicate executes each time the asynchronous sequence produces an
@@ -349,7 +350,7 @@ extension AsyncSequence {
   ///     }
   ///
   ///     let min = await RankCounter()
-  ///         .min(by: { $0.rawValue < $1.rawValue } )
+  ///         .min { $0.rawValue < $1.rawValue }
   ///     print(min ?? "none")
   ///     // Prints: ace
   ///
@@ -404,7 +405,7 @@ extension AsyncSequence {
   ///     }
   ///
   ///     let max = await RankCounter()
-  ///         .max(by: { $0.rawValue < $1.rawValue } )
+  ///         .max { $0.rawValue < $1.rawValue }
   ///     print(max ?? "none")
   ///     // Prints: king
   ///
@@ -442,7 +443,7 @@ extension AsyncSequence where Element: Comparable {
   ///
   ///     let min = await Counter(howHigh: 10)
   ///         .min()
-  ///     print (min ?? "none")
+  ///     print(min ?? "none")
   ///     // Prints: 1
   ///
   /// - Returns: The sequence’s minimum element. If the sequence has no
@@ -462,7 +463,7 @@ extension AsyncSequence where Element: Comparable {
   ///
   ///     let max = await Counter(howHigh: 10)
   ///         .max()
-  ///     print (max ?? "none")
+  ///     print(max ?? "none")
   ///     // Prints: 10
   ///
   /// - Returns: The sequence’s maximum element. If the sequence has no

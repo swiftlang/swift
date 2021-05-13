@@ -24,7 +24,7 @@ extension AsyncSequence {
   ///
   ///     do {
   ///         let stream =  Counter(howHigh: 10)
-  ///             .filter{
+  ///             .filter {
   ///                 if $0 % 5 == 0 {
   ///                     throw MyError()
   ///                 }
@@ -34,7 +34,7 @@ extension AsyncSequence {
   ///             print("\(number) ", terminator: " ")
   ///         }
   ///     } catch {
-  ///         print ("Error: \(error)")
+  ///         print("Error: \(error)")
   ///     }
   ///     // Prints: 2  4  Error: MyError()
   ///

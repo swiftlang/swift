@@ -32,7 +32,7 @@ extension AsyncSequence {
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///
   ///     let stream = Counter(howHigh: 5)
-  ///         .map{ romanNumeralDict[$0] ?? "(unknown)" }
+  ///         .map { romanNumeralDict[$0] ?? "(unknown)" }
   ///     for await numeral in stream {
   ///         print("\(numeral) ", terminator: " ")
   ///     }

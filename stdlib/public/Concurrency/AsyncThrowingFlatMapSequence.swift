@@ -42,7 +42,7 @@ extension AsyncSequence {
   ///             print ("\(number)", terminator: " ")
   ///         }
   ///     } catch {
-  ///         print (error)
+  ///         print(error)
   ///     }
   ///     // Prints: 1 1 2 1 2 3 MyError()
   ///
