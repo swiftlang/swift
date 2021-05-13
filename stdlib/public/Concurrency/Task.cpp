@@ -247,6 +247,8 @@ static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   }
 };
 
+const void *const swift::_swift_concurrency_debug_jobMetadata =
+    static_cast<Metadata *>(&jobHeapMetadata);
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
 
