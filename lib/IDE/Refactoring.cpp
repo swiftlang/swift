@@ -4553,12 +4553,18 @@ class ClassifiedBlock {
   SmallVector<ASTNode, 0> Nodes;
   // closure param -> name
   llvm::DenseMap<const Decl *, StringRef> BoundNames;
+  // var (ie. from a let binding) -> closure param
+  llvm::DenseMap<const Decl *, const Decl *> Aliases;
   bool AllLet = true;
 
 public:
   ArrayRef<ASTNode> nodes() const { return llvm::makeArrayRef(Nodes); }
 
   StringRef boundName(const Decl *D) const { return BoundNames.lookup(D); }
+
+  const llvm::DenseMap<const Decl *, const Decl *> &aliases() const {
+    return Aliases;
+  }
 
   bool allLet() const { return AllLet; }
 
@@ -4585,22 +4591,16 @@ public:
     }
 
     StringRef Name = FromCondition.BindPattern->getBoundName().str();
-    if (Name.empty())
+    VarDecl *SingleVar = FromCondition.BindPattern->getSingleVar();
+    if (Name.empty() || !SingleVar)
       return;
 
-    auto Res = BoundNames.try_emplace(FromCondition.Subject, Name);
-    if (Res.second)
-      return;
+    auto Res = Aliases.try_emplace(SingleVar, FromCondition.Subject);
+    assert(Res.second && "Should not have seen this var before");
+    (void)Res;
 
-    // Already inserted, only handle cases where the name is the same
-    // TODO: This wouldn't be that hard to handle, just need to keep track
-    //       of the decl and replace its name with the same as the original
-    StringRef OldName = Res.first->second;
-    if (OldName != Name) {
-      DiagEngine.diagnose(FromCondition.BindPattern->getLoc(),
-                          diag::callback_multiple_bound_names,
-                          StringRef(OldName), Name);
-    }
+    // Use whichever name comes first
+    BoundNames.try_emplace(FromCondition.Subject, Name);
   }
 
   void addAllBindings(
@@ -4841,6 +4841,244 @@ private:
   }
 };
 
+/// Whether or not the given statement starts a new scope. Note that most
+/// statements are handled by the \c BraceStmt check. The others listed are
+/// a somewhat special case since they can also declare variables in their
+/// condition.
+static bool startsNewScope(Stmt *S) {
+  switch (S->getKind()) {
+  case StmtKind::Brace:
+  case StmtKind::If:
+  case StmtKind::While:
+  case StmtKind::ForEach:
+  case StmtKind::Case:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Name of a decl if it has one, an empty \c Identifier otherwise.
+static Identifier getDeclName(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->hasName())
+      return VD->getBaseIdentifier();
+  }
+  return Identifier();
+}
+
+class DeclCollector : private SourceEntityWalker {
+  llvm::DenseSet<const Decl *> &Decls;
+
+public:
+  /// Collect all explicit declarations declared in \p Scope (or \p SF if
+  /// \p Scope is a nullptr) that are not within their own scope.
+  static void collect(BraceStmt *Scope, SourceFile &SF,
+                      llvm::DenseSet<const Decl *> &Decls) {
+    DeclCollector Collector(Decls);
+    if (Scope) {
+      for (auto Node : Scope->getElements()) {
+        Collector.walk(Node);
+      }
+    } else {
+      Collector.walk(SF);
+    }
+  }
+
+private:
+  DeclCollector(llvm::DenseSet<const Decl *> &Decls)
+      : Decls(Decls) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    // Want to walk through top level code decls (which are implicitly added
+    // for top level non-decl code) and pattern binding decls (which contain
+    // the var decls that we care about).
+    if (isa<TopLevelCodeDecl>(D) || isa<PatternBindingDecl>(D))
+      return true;
+
+    if (!D->isImplicit())
+      Decls.insert(D);
+    return false;
+  }
+
+  bool walkToExprPre(Expr *E) override {
+    return !isa<ClosureExpr>(E);
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    return S->isImplicit() || !startsNewScope(S);
+  }
+};
+
+class ReferenceCollector : private SourceEntityWalker {
+  SourceManager *SM;
+  llvm::DenseSet<const Decl *> DeclaredDecls;
+  llvm::DenseSet<const Decl *> &ReferencedDecls;
+
+  ASTNode Target;
+  bool AfterTarget;
+
+public:
+  /// Collect all explicit references in \p Scope (or \p SF if \p Scope is
+  /// a nullptr) that are after \p Target and not first declared. That is,
+  /// references that we don't want to shadow with hoisted declarations.
+  ///
+  /// Also collect all declarations that are \c DeclContexts, which is an
+  /// over-appoximation but let's us ignore them elsewhere.
+  static void collect(ASTNode Target, BraceStmt *Scope, SourceFile &SF,
+                      llvm::DenseSet<const Decl *> &Decls) {
+    ReferenceCollector Collector(Target, &SF.getASTContext().SourceMgr,
+                                 Decls);
+    if (Scope)
+      Collector.walk(Scope);
+    else
+      Collector.walk(SF);
+  }
+
+private:
+  ReferenceCollector(ASTNode Target, SourceManager *SM,
+                     llvm::DenseSet<const Decl *> &Decls)
+      : SM(SM), DeclaredDecls(), ReferencedDecls(Decls), Target(Target),
+        AfterTarget(false) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    // Bit of a hack, include all contexts so they're never renamed (seems worse
+    // to rename a class/function than it does a variable). Again, an
+    // over-approximation, but hopefully doesn't come up too often.
+    if (isa<DeclContext>(D) && !D->isImplicit()) {
+      ReferencedDecls.insert(D);
+    }
+
+    if (AfterTarget && !D->isImplicit()) {
+      DeclaredDecls.insert(D);
+    } else if (D == Target.dyn_cast<Decl *>()) {
+      AfterTarget = true;
+    }
+    return shouldWalkInto(D->getSourceRange());
+  }
+
+  bool walkToExprPre(Expr *E) override {
+    if (AfterTarget && !E->isImplicit()) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto *D = DRE->getDecl()) {
+          // Only care about references that aren't declared as seen decls will
+          // be renamed (if necessary) during the refactoring.
+          if (!D->isImplicit() && !DeclaredDecls.count(D))
+            ReferencedDecls.insert(D);
+        }
+      }
+    } else if (E == Target.dyn_cast<Expr *>()) {
+      AfterTarget = true;
+    }
+    return shouldWalkInto(E->getSourceRange());
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    if (S == Target.dyn_cast<Stmt *>())
+      AfterTarget = true;
+    return shouldWalkInto(S->getSourceRange());
+  }
+
+  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) {
+    if (P == Target.dyn_cast<Pattern *>())
+      AfterTarget = true;
+    return { shouldWalkInto(P->getSourceRange()), P };
+  }
+
+  bool shouldWalkInto(SourceRange Range) {
+    return AfterTarget || (SM &&
+        SM->rangeContainsTokenLoc(Range, Target.getStartLoc()));
+  }
+};
+
+/// Similar to the \c ReferenceCollector but collects references in all scopes
+/// without any starting point in each scope.
+class ScopedDeclCollector : private SourceEntityWalker {
+public:
+  using DeclsTy = llvm::DenseSet<const Decl *>;
+
+private:
+  using ScopedDeclsTy = llvm::DenseMap<const Stmt *, DeclsTy>;
+
+  struct Scope {
+    DeclsTy DeclaredDecls;
+    DeclsTy *ReferencedDecls;
+    Scope(DeclsTy *ReferencedDecls) : DeclaredDecls(),
+        ReferencedDecls(ReferencedDecls) {}
+  };
+
+  ScopedDeclsTy ReferencedDecls;
+  llvm::SmallVector<Scope, 4> ScopeStack;
+
+public:
+  /// Starting at \c Scope, collect all explicit references in every scope
+  /// within (including the initial) that are not first declared, ie. those that
+  /// could end up shadowed. Also include all \c DeclContext declarations as
+  /// we'd like to avoid renaming functions and types completely.
+  void collect(ASTNode Node) {
+    walk(Node);
+  }
+
+  DeclsTy *getReferencedDecls(Stmt *Scope) {
+    auto Res = ReferencedDecls.find(Scope);
+    if (Res == ReferencedDecls.end())
+      return nullptr;
+    return &Res->second;
+  }
+
+private:
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    if (ScopeStack.empty() || D->isImplicit())
+      return true;
+
+    ScopeStack.back().DeclaredDecls.insert(D);
+    if (isa<DeclContext>(D))
+      ScopeStack.back().ReferencedDecls->insert(D);
+    return true;
+  }
+
+  bool walkToExprPre(Expr *E) override {
+    if (ScopeStack.empty())
+      return true;
+
+    if (!E->isImplicit()) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto *D = DRE->getDecl()) {
+          if (!D->isImplicit() && !ScopeStack.back().DeclaredDecls.count(D))
+            ScopeStack.back().ReferencedDecls->insert(D);
+        }
+      }
+    }
+    return true;
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    // Purposely check \c BraceStmt here rather than \c startsNewScope.
+    // References in the condition should be applied to the previous scope, not
+    // the scope of that statement.
+    if (isa<BraceStmt>(S))
+      ScopeStack.emplace_back(&ReferencedDecls[S]);
+    return true;
+  }
+
+  bool walkToStmtPost(Stmt *S) override {
+    if (isa<BraceStmt>(S)) {
+      size_t NumScopes = ScopeStack.size();
+      if (NumScopes >= 2) {
+        // Add any referenced decls to the parent scope that weren't declared
+        // there.
+        auto &ParentStack = ScopeStack[NumScopes - 2];
+        for (auto *D : *ScopeStack.back().ReferencedDecls) {
+          if (!ParentStack.DeclaredDecls.count(D))
+            ParentStack.ReferencedDecls->insert(D);
+        }
+      }
+      ScopeStack.pop_back();
+    }
+    return true;
+  }
+};
+
 /// Builds up async-converted code for an AST node.
 ///
 /// If it is a function, its declaration will have `async` added. If a
@@ -4871,6 +5109,7 @@ private:
 /// the code the user intended. In most cases the refactoring will continue,
 /// with any unhandled decls wrapped in placeholders instead.
 class AsyncConverter : private SourceEntityWalker {
+  ASTContext &Context;
   SourceManager &SM;
   DiagnosticEngine &DiagEngine;
 
@@ -4879,7 +5118,8 @@ class AsyncConverter : private SourceEntityWalker {
 
   // Completion handler of `StartNode` (if it's a function with an async
   // alternative)
-  const AsyncHandlerParamDesc &TopHandler;
+  AsyncHandlerParamDesc TopHandler;
+
   SmallString<0> Buffer;
   llvm::raw_svector_ostream OS;
 
@@ -4887,28 +5127,68 @@ class AsyncConverter : private SourceEntityWalker {
   // elided, e.g for a previously optional closure parameter that has become a
   // non-optional local.
   llvm::DenseSet<const Decl *> Unwraps;
+
   // Decls whose references should be replaced with, either because they no
   // longer exist or are a different type. Any replaced code should ideally be
   // handled by the refactoring properly, but that's not possible in all cases
   llvm::DenseSet<const Decl *> Placeholders;
-  // Mapping from decl -> name, used as both the name of possibly new local
-  // declarations of old parameters, as well as the replacement for any
-  // references to it
-  llvm::DenseMap<const Decl *, std::string> Names;
+
+  // Mapping from decl -> name, used as the name of possible new local
+  // declarations of old completion handler parametes, as well as the
+  // replacement for other hoisted declarations and their references
+  llvm::DenseMap<const Decl *, Identifier> Names;
+  // Names of decls in each scope, where the first element is the initial scope
+  // and the last is the current scope.
+  llvm::SmallVector<llvm::DenseSet<Identifier>, 4> ScopedNames;
+  // Mapping of \c BraceStmt -> declarations referenced in that statement
+  // without first being declared. These are used to fill the \c ScopeNames
+  // map on entering that scope.
+  ScopedDeclCollector ScopedDecls;
 
   /// The switch statements that have been re-written by this transform.
   llvm::DenseSet<SwitchStmt *> HandledSwitches;
 
-  // These are per-node (ie. are saved and restored on each convertNode call)
+  // The last source location that has been output. Used to output the source
+  // between handled nodes
   SourceLoc LastAddedLoc;
+
+  // Number of expressions (or pattern binding decl) currently nested in, taking
+  // into account hoisting and the possible removal of ifs/switches
   int NestedExprCount = 0;
 
+  // Whether a completion handler body is currently being hoisted out of its
+  // call
+  bool Hoisting = false;
+
 public:
-  AsyncConverter(SourceManager &SM, DiagnosticEngine &DiagEngine,
-                 ASTNode StartNode, const AsyncHandlerParamDesc &TopHandler)
-      : SM(SM), DiagEngine(DiagEngine), StartNode(StartNode),
-        TopHandler(TopHandler), Buffer(), OS(Buffer) {
+  /// Convert a function
+  AsyncConverter(ASTContext &Context, SourceManager &SM,
+                 DiagnosticEngine &DiagEngine, AbstractFunctionDecl *FD,
+                 const AsyncHandlerParamDesc &TopHandler)
+      : Context(Context), SM(SM), DiagEngine(DiagEngine),
+        StartNode(FD), TopHandler(TopHandler), OS(Buffer) {
     Placeholders.insert(TopHandler.getHandler());
+    ScopedDecls.collect(FD);
+
+    // Shouldn't strictly be necessary, but prefer possible shadowing over
+    // crashes caused by a missing scope
+    addNewScope({});
+  }
+
+  /// Convert a call
+  AsyncConverter(ASTContext &Context, SourceManager &SM,
+                 DiagnosticEngine &DiagEngine, CallExpr *CE, BraceStmt *Scope,
+                 SourceFile &SF)
+      : Context(Context), SM(SM), DiagEngine(DiagEngine),
+        StartNode(CE), OS(Buffer) {
+    ScopedDecls.collect(CE);
+
+    // Create the initial scope, can be more accurate than the general
+    // \c ScopedDeclCollector as there is a starting point.
+    llvm::DenseSet<const Decl *> UsedDecls;
+    DeclCollector::collect(Scope, SF, UsedDecls);
+    ReferenceCollector::collect(StartNode, Scope, SF, UsedDecls);
+    addNewScope(UsedDecls);
   }
 
   bool convert() {
@@ -5006,6 +5286,7 @@ private:
     llvm::SaveAndRestore<SourceLoc> RestoreLoc(LastAddedLoc, StartOverride);
     llvm::SaveAndRestore<int> RestoreCount(NestedExprCount,
                                            ConvertCalls ? 0 : 1);
+
     walk(Node);
     addRange(LastAddedLoc, Node.getEndLoc(), /*ToEndOfToken=*/true);
   }
@@ -5015,6 +5296,19 @@ private:
       NestedExprCount++;
       return true;
     }
+
+    // Functions and types already have their names in \c ScopedNames, only
+    // variables should need to be renamed.
+    if (isa<VarDecl>(D) && Names.find(D) == Names.end()) {
+      Identifier Ident = assignUniqueName(D, StringRef());
+      if (!Ident.empty()) {
+        ScopedNames.back().insert(Ident);
+        addCustom(D->getSourceRange(), [&]() {
+          OS << Ident.str();
+        });
+      }
+    }
+
     // Note we don't walk into any nested local function decls. If we start
     // doing so in the future, be sure to update the logic that deals with
     // converting unhandled returns into placeholders in walkToStmtPre.
@@ -5086,34 +5380,54 @@ private:
     });
   }
 
-  bool walkToStmtPre(Stmt *S) override {
-    // Some break and return statements need to be turned into placeholders,
-    // as they may no longer perform the control flow that the user is
-    // expecting.
-    if (!S->isImplicit()) {
-      // For a break, if it's jumping out of a switch statement that we've
-      // re-written as a part of the transform, turn it into a placeholder, as
-      // it would have been lifted out of the switch statement.
-      if (auto *BS = dyn_cast<BreakStmt>(S)) {
-        if (auto *SS = dyn_cast<SwitchStmt>(BS->getTarget())) {
-          if (HandledSwitches.contains(SS))
-            replaceRangeWithPlaceholder(S->getSourceRange());
-        }
-      }
-
-      // For a return, if it's not nested inside another closure or function,
-      // turn it into a placeholder, as it will be lifted out of the callback.
-      if (isa<ReturnStmt>(S) && NestedExprCount == 0)
-        replaceRangeWithPlaceholder(S->getSourceRange());
-    }
+  bool walkToExprPost(Expr *E) override {
+    NestedExprCount--;
     return true;
   }
 
 #undef PLACEHOLDER_START
 #undef PLACEHOLDER_END
 
-  bool walkToExprPost(Expr *E) override {
-    NestedExprCount--;
+  bool walkToStmtPre(Stmt *S) override {
+    // CaseStmt has an implicit BraceStmt inside it, which *should* start a new
+    // scope, so don't check isImplicit here.
+    if (startsNewScope(S)) {
+      // Add all names of decls referenced within this statement that aren't
+      // also declared first, plus any contexts. Note that \c getReferencedDecl
+      // will only return a value for a \c BraceStmt. This means that \c IfStmt
+      // (and other statements with conditions) will have their own empty scope,
+      // which is fine for our purposes - their existing names are always valid.
+      // The body of those statements will include the decls if they've been
+      // referenced, so shadowing is still avoided there.
+      if (auto *ReferencedDecls = ScopedDecls.getReferencedDecls(S)) {
+        addNewScope(*ReferencedDecls);
+      } else {
+        addNewScope({});
+      }
+    } else if (Hoisting && !S->isImplicit()) {
+      // Some break and return statements need to be turned into placeholders,
+      // as they may no longer perform the control flow that the user is
+      // expecting.
+      if (auto *BS = dyn_cast<BreakStmt>(S)) {
+        // For a break, if it's jumping out of a switch statement that we've
+        // re-written as a part of the transform, turn it into a placeholder, as
+        // it would have been lifted out of the switch statement.
+        if (auto *SS = dyn_cast<SwitchStmt>(BS->getTarget())) {
+          if (HandledSwitches.contains(SS))
+            replaceRangeWithPlaceholder(S->getSourceRange());
+        }
+      } else if (isa<ReturnStmt>(S) && NestedExprCount == 0) {
+        // For a return, if it's not nested inside another closure or function,
+        // turn it into a placeholder, as it will be lifted out of the callback.
+        replaceRangeWithPlaceholder(S->getSourceRange());
+      }
+    }
+    return true;
+  }
+
+  bool walkToStmtPost(Stmt *S) override {
+    if (startsNewScope(S))
+      ScopedNames.pop_back();
     return true;
   }
 
@@ -5284,6 +5598,8 @@ private:
 
   void addHoistedCallback(const CallExpr *CE,
                           const AsyncHandlerParamDesc &HandlerDesc) {
+    llvm::SaveAndRestore<bool> RestoreHoisting(Hoisting, true);
+
     auto ArgList = callArgs(CE);
     if ((size_t)HandlerDesc.Index >= ArgList.ref().size()) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
@@ -5458,6 +5774,8 @@ private:
                                StringRef HandlerName,
                                std::function<void(void)> AddAwaitCall) {
     if (HandlerDesc.HasError) {
+      // "result" and "error" always okay to use here since they're added
+      // in their own scope, which only contains new code.
       addDo();
       if (!HandlerDesc.willAsyncReturnVoid()) {
         OS << tok::kw_let << " result";
@@ -5466,20 +5784,31 @@ private:
       }
       AddAwaitCall();
       OS << "\n";
-      addCallToCompletionHandler(/*HasResult=*/true, HandlerDesc, HandlerName);
+      addCallToCompletionHandler("result", HandlerDesc, HandlerName);
       OS << "\n";
       OS << tok::r_brace << " " << tok::kw_catch << " " << tok::l_brace << "\n";
-      addCallToCompletionHandler(/*HasResult=*/false, HandlerDesc, HandlerName);
+      addCallToCompletionHandler(StringRef(), HandlerDesc, HandlerName);
       OS << "\n" << tok::r_brace; // end catch
     } else {
+      // This code may be placed into an existing scope, in that case create
+      // a unique "result" name so that it doesn't cause shadowing or redecls.
+      StringRef ResultName;
       if (!HandlerDesc.willAsyncReturnVoid()) {
-        OS << tok::kw_let << " result";
+        Identifier Unique = createUniqueName("result");
+        ScopedNames.back().insert(Unique);
+        ResultName = Unique.str();
+
+        OS << tok::kw_let << " " << ResultName;
         addResultTypeAnnotationIfNecessary(FD, HandlerDesc);
         OS << " " << tok::equal << " ";
+      } else {
+        // The name won't end up being used, just give it a bogus one so that
+        // the result path is taken (versus the error path).
+        ResultName = "result";
       }
       AddAwaitCall();
       OS << "\n";
-      addCallToCompletionHandler(/*HasResult=*/true, HandlerDesc, HandlerName);
+      addCallToCompletionHandler(ResultName, HandlerDesc, HandlerName);
     }
   }
 
@@ -5596,28 +5925,71 @@ private:
     }
   }
 
-  // TODO: Check for clashes with existing names and add all decls, not just
-  //       params
+  /// Add a mapping from each passed parameter to a new name, possibly
+  /// synthesizing a new one if hoisting it would cause a redeclaration or
+  /// shadowing. If there's no bound name and \c AddIfMissing is false, no
+  /// name will be added.
   void prepareNames(const ClassifiedBlock &Block,
                     ArrayRef<const ParamDecl *> Params,
                     bool AddIfMissing = true) {
-    for (auto *Param : Params) {
-      StringRef Name = Block.boundName(Param);
-      if (!Name.empty()) {
-        Names[Param] = Name.str();
-        continue;
-      }
-
-      if (!AddIfMissing)
-        continue;
-
-      auto ParamName = Param->getNameStr();
-      if (ParamName.startswith("$")) {
-        Names[Param] = "val" + ParamName.drop_front().str();
-      } else {
-        Names[Param] = ParamName.str();
-      }
+    for (auto *PD : Params) {
+      StringRef Name = Block.boundName(PD);
+      if (!Name.empty() || AddIfMissing)
+        assignUniqueName(PD, Name);
     }
+
+    for (auto &Entry : Block.aliases()) {
+      auto It = Names.find(Entry.second);
+      assert(It != Names.end() && "Param should already have an entry");
+      Names[Entry.first] = It->second;
+    }
+  }
+
+  /// Returns a unique name using \c Name as base that doesn't clash with any
+  /// other names in the current scope.
+  Identifier createUniqueName(StringRef Name) {
+    Identifier Ident = Context.getIdentifier(Name);
+
+    auto &CurrentNames = ScopedNames.back();
+    if (CurrentNames.count(Ident)) {
+      // Add a number to the end of the name until it's unique given the current
+      // names in scope.
+      llvm::SmallString<32> UniquedName;
+      unsigned UniqueId = 1;
+      do {
+        UniquedName = Name;
+        UniquedName.append(std::to_string(UniqueId));
+        Ident = Context.getIdentifier(UniquedName);
+        UniqueId++;
+      } while (CurrentNames.count(Ident));
+    }
+    return Ident;
+  }
+
+  /// Create a unique name for the variable declared by \p D that doesn't
+  /// clash with any other names in scope, using \p BoundName as the base name
+  /// if not empty and the name of \p D otherwise. Adds this name to both
+  /// \c Names and the current scope's names (\c ScopedNames).
+  Identifier assignUniqueName(const Decl *D, StringRef BoundName) {
+    Identifier Ident;
+    if (BoundName.empty()) {
+      BoundName = getDeclName(D).str();
+      if (BoundName.empty())
+        return Ident;
+    }
+
+    if (BoundName.startswith("$")) {
+      llvm::SmallString<8> NewName;
+      NewName.append("val");
+      NewName.append(BoundName.drop_front());
+      Ident = createUniqueName(NewName);
+    } else {
+      Ident = createUniqueName(BoundName);
+    }
+
+    Names.try_emplace(D, Ident);
+    ScopedNames.back().insert(Ident);
+    return Ident;
   }
 
   StringRef newNameFor(const Decl *D, bool Required = true) {
@@ -5626,7 +5998,16 @@ private:
       assert(!Required && "Missing name for decl when one was required");
       return StringRef();
     }
-    return StringRef(Res->second);
+    return Res->second.str();
+  }
+
+  void addNewScope(const llvm::DenseSet<const Decl *> &Decls) {
+    ScopedNames.push_back({});
+    for (auto *D : Decls) {
+      auto Name = getDeclName(D);
+      if (!Name.empty())
+        ScopedNames.back().insert(Name);
+    }
   }
 
   void clearNames(ArrayRef<const ParamDecl *> Params) {
@@ -5692,24 +6073,24 @@ private:
 
   /// Adds the \c Index -th parameter to the completion handler described by \p
   /// HanderDesc.
-  /// If \p HasResult is \c true, it is assumed that a variable named
-  /// 'result' contains the result returned from the async alternative. If the
+  /// If \p ResultName is not empty, it is assumed that a variable with that
+  /// name contains the result returned from the async alternative. If the
   /// callback also takes an error parameter, \c nil passed to the completion
-  /// handler for the error. If \p HasResult is \c false, it is a assumed that a
+  /// handler for the error. If \p ResultName is empty, it is a assumed that a
   /// variable named 'error' contains the error thrown from the async method and
   /// 'nil' will be passed to the completion handler for all result parameters.
-  void addCompletionHandlerArgument(size_t Index, bool HasResult,
+  void addCompletionHandlerArgument(size_t Index, StringRef ResultName,
                                     const AsyncHandlerDesc &HandlerDesc) {
     if (HandlerDesc.HasError && Index == HandlerDesc.params().size() - 1) {
       // The error parameter is the last argument of the completion handler.
-      if (!HasResult) {
+      if (ResultName.empty()) {
         OS << "error";
         addCastToCustomErrorTypeIfNecessary(HandlerDesc);
       } else {
         addDefaultValueOrPlaceholder(HandlerDesc.params()[Index].getPlainType());
       }
     } else {
-      if (!HasResult) {
+      if (ResultName.empty()) {
         addDefaultValueOrPlaceholder(HandlerDesc.params()[Index].getPlainType());
       } else if (HandlerDesc
                      .getSuccessParamAsyncReturnType(
@@ -5732,9 +6113,9 @@ private:
         //     completion(result.0, result.1)
         //   }
         // }
-        OS << "result" << tok::period << Index;
+        OS << ResultName << tok::period << Index;
       } else {
-        OS << "result";
+        OS << ResultName;
       }
     }
   }
@@ -5742,7 +6123,7 @@ private:
   /// Add a call to the completion handler named \p HandlerName and described by
   /// \p HandlerDesc, passing all the required arguments. See \c
   /// getCompletionHandlerArgument for how the arguments are synthesized.
-  void addCallToCompletionHandler(bool HasResult,
+  void addCallToCompletionHandler(StringRef ResultName,
                                   const AsyncHandlerDesc &HandlerDesc,
                                   StringRef HandlerName) {
     OS << HandlerName << tok::l_paren;
@@ -5757,13 +6138,13 @@ private:
         if (I > 0) {
           OS << tok::comma << " ";
         }
-        addCompletionHandlerArgument(I, HasResult, HandlerDesc);
+        addCompletionHandlerArgument(I, ResultName, HandlerDesc);
       }
       break;
     }
     case HandlerType::RESULT: {
-      if (HasResult) {
-        OS << tok::period_prefix << "success" << tok::l_paren << "result"
+      if (!ResultName.empty()) {
+        OS << tok::period_prefix << "success" << tok::l_paren << ResultName
            << tok::r_paren;
       } else {
         OS << tok::period_prefix << "failure" << tok::l_paren << "error";
@@ -5854,8 +6235,18 @@ bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
   assert(CE &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncHandlerParamDesc TempDesc;
-  AsyncConverter Converter(SM, DiagEngine, CE, TempDesc);
+  // Find the scope this call is in
+  ContextFinder Finder(*CursorInfo.SF, CursorInfo.Loc,
+                      [](ASTNode N) {
+    return N.isStmt(StmtKind::Brace) && !N.isImplicit();
+  });
+  Finder.resolve();
+  auto Scopes = Finder.getContexts();
+  BraceStmt *Scope = nullptr;
+  if (!Scopes.empty())
+    Scope = cast<BraceStmt>(Scopes.back().get<Stmt *>());
+
+  AsyncConverter Converter(Ctx, SM, DiagEngine, CE, Scope, *CursorInfo.SF);
   if (!Converter.convert())
     return true;
 
@@ -5883,7 +6274,7 @@ bool RefactoringActionConvertToAsync::performChange() {
          "Should not run performChange when refactoring is not applicable");
 
   auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
-  AsyncConverter Converter(SM, DiagEngine, FD, HandlerDesc);
+  AsyncConverter Converter(Ctx, SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
 
@@ -5920,14 +6311,14 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   assert(HandlerDesc.isValid() &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncConverter Converter(SM, DiagEngine, FD, HandlerDesc);
+  AsyncConverter Converter(Ctx, SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
 
   EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
-  AsyncConverter LegacyBodyCreator(SM, DiagEngine, FD, HandlerDesc);
+  AsyncConverter LegacyBodyCreator(Ctx, SM, DiagEngine, FD, HandlerDesc);
   if (LegacyBodyCreator.createLegacyBody()) {
     LegacyBodyCreator.replace(FD->getBody(), EditConsumer);
   }

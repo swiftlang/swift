@@ -178,7 +178,7 @@ simple { res in
 // UNKNOWNUNBOUND-NEXT: print("after")
 // UNKNOWN-NOT: }
 
-// RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-BINDS %s
 simple { res in
   print("before")
   if case .success(let str) = res {
@@ -189,6 +189,13 @@ simple { res in
   }
   print("after")
 }
+// MULTIPLE-BINDS: convert_result.swift
+// MULTIPLE-BINDS-NEXT: let str = try await simple()
+// MULTIPLE-BINDS-NEXT: print("before")
+// MULTIPLE-BINDS-NEXT: print("result \(str)")
+// MULTIPLE-BINDS-NEXT: print("result \(str)")
+// MULTIPLE-BINDS-NEXT: print("after")
+// MULTIPLE-BINDS-NOT: }
 
 // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 simple { res in
