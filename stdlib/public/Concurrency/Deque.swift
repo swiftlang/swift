@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 struct _Deque<Element> {
   internal struct _UnsafeHandle {
     let _header: UnsafeMutablePointer<_Storage._Header>

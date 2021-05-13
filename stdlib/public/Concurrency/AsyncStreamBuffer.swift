@@ -24,7 +24,7 @@ func _lock(_ ptr: UnsafeRawPointer)
 @_silgen_name("_swift_async_stream_lock_unlock")
 func _unlock(_ ptr: UnsafeRawPointer)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncStream {
   internal final class _Storage: UnsafeSendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void
@@ -200,7 +200,7 @@ extension AsyncStream {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncThrowingStream {
   internal final class _Storage: UnsafeSendable {
     typealias TerminationHandler = @Sendable (Continuation.Termination) -> Void

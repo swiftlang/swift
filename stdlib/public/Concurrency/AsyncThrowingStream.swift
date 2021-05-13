@@ -12,7 +12,7 @@
 
 import Swift
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingStream<Element> {
   public struct Continuation: Sendable {
     public enum Termination {
@@ -94,7 +94,7 @@ public struct AsyncThrowingStream<Element> {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating a AsyncThrowingStream.
   ///
@@ -116,7 +116,7 @@ extension AsyncThrowingStream: AsyncSequence {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension AsyncThrowingStream.Continuation {
   /// Resume the task awaiting the next iteration point by having it return
   /// normally from its suspension point or buffer the value if no awaiting
