@@ -973,6 +973,27 @@ bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
   return false;
 }
 
+llvm::VersionTuple
+swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
+  llvm::VersionTuple result;
+  // Read the inteface file and extract its compiler arguments line
+  if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
+    llvm::BumpPtrAllocator alloc;
+    llvm::StringSaver argSaver(alloc);
+    SmallVector<const char*, 8> args;
+    (void)extractCompilerFlagsFromInterface((*file)->getBuffer(), argSaver, args);
+    for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
+      // Check the version number specified via -user-module-version.
+      StringRef current(args[I]), next(args[I + 1]);
+      if (current == "-user-module-version") {
+        result.tryParse(next);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 bool SerializedModuleLoaderBase::canImportModule(
     ImportPath::Element mID, llvm::VersionTuple version, bool underlyingVersion) {
   // If underlying version is specified, this should be handled by Clang importer.
@@ -1009,21 +1030,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   assert(!underlyingVersion);
   llvm::VersionTuple currentVersion;
   if (!moduleInterfacePath.empty()) {
-    // Read the inteface file and extract its compiler arguments line
-    if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
-      llvm::BumpPtrAllocator alloc;
-      llvm::StringSaver argSaver(alloc);
-      SmallVector<const char*, 8> args;
-      (void)extractCompilerFlagsFromInterface((*file)->getBuffer(), argSaver, args);
-      for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
-        // Check the version number specified via -user-module-version.
-        StringRef current(args[I]), next(args[I + 1]);
-        if (current == "-user-module-version") {
-          currentVersion.tryParse(next);
-          break;
-        }
-      }
-    }
+    currentVersion = extractUserModuleVersionFromInterface(moduleInterfacePath);
   }
   // If failing to extract the user version from the interface file, try the binary
   // format, if present.

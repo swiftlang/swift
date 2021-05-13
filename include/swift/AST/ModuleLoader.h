@@ -157,6 +157,8 @@ public:
                                ArrayRef<std::string> candidates,
                                StringRef outPath) = 0;
   virtual ~ModuleInterfaceChecker() = default;
+  virtual std::string getBackupPublicModuleInterfacePath(StringRef moduleName,
+                                                         StringRef interfacePath) = 0;
 };
 
 /// Abstract interface to run an action in a sub ASTContext.

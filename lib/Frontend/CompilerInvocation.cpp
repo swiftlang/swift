@@ -129,6 +129,13 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
   FrontendOpts.PrebuiltModuleCachePath = computePrebuiltCachePath(
       SearchPathOpts.RuntimeResourcePath, LangOpts.Target, LangOpts.SDKVersion);
+  if (!FrontendOpts.PrebuiltModuleCachePath.empty())
+    return;
+  StringRef anchor = "prebuilt-modules";
+  assert(((StringRef)FrontendOpts.PrebuiltModuleCachePath).contains(anchor));
+  auto pair = ((StringRef)FrontendOpts.PrebuiltModuleCachePath).split(anchor);
+  FrontendOpts.BackupModuleInterfaceDir =
+    (llvm::Twine(pair.first) + "preferred-interfaces" + pair.second).str();
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,

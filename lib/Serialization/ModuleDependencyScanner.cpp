@@ -54,6 +54,7 @@ std::error_code ModuleDependencyScanner::findModuleFilesInDirectory(
     }
   }
   assert(fs.exists(InPath));
+
   // Use the private interface file if exits.
   auto PrivateInPath =
   BaseName.getName(file_types::TY_PrivateSwiftModuleInterfaceFile);
