@@ -243,7 +243,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 ///
 /// - Returns: The value passed to the continuation by the closure.
 ///
-/// If the closure calls `resume(throwing:)` on the continuation,
+/// If `resume(throwing:)` is called on the continuation,
 /// this method thows that error.
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient

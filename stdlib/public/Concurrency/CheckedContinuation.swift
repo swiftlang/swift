@@ -281,7 +281,7 @@ public func withCheckedContinuation<T>(
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.
 ///     The closure must resume the continuation exactly once.
 ///
-/// If the closure calls `resume(throwing:)` on the continuation,
+/// If `resume(throwing:)` is called on the continuation,
 /// this method thows that error.
 @available(SwiftStdlib 5.5, *)
 public func withCheckedThrowingContinuation<T>(
