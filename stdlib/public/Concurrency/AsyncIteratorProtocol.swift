@@ -64,19 +64,26 @@ import Swift
 /// ### End of Iteration
 ///
 /// The iterator returns `nil` to indicate the end of the sequence. After
-/// returning `nil` (or throwing an error) from `next()`, all future calls to
-/// `next()` must return `nil`.
+/// returning `nil` (or throwing an error) from `next()`, the iterator enters
+/// a terminal state, and all future calls to `next()` must return `nil`.
 ///
 /// ### Cancellation
 ///
 /// Types conforming to `AsyncIteratorProtocol` should use the cancellation
-/// primitives provided by Swift's Task API. The iterator can choose how to
-/// respond to cancellation, such as by thowing `CancellationError` or
-/// returning `nil` from `next()`.
+/// primitives provided by Swift's `Task` API. The iterator can choose how to
+/// handle and respond to cancellation, including:
+///
+/// * Checking the `isCancelled` value of the current `Task` inside `next()`
+///   and returning `nil` to terminate the sequence.
+/// * Calling `checkCancellation()` on the `Task`, which throws a
+///   `CancellationError`.
+/// * Implementing `next()` with a
+///   `withTaskCancellationHandler(handler:operation:)` invocation to
+///   immediately react to cancellation.
 ///
 /// If the iterator needs to clean up on cancellation, it can do so after
-/// checking for cancellation (using the `Task` API), or in `deinit` (if it is
-/// a reference type).
+/// checking for cancellation as described above, or in `deinit` if it is
+/// a reference type.
 @available(SwiftStdlib 5.5, *)
 @rethrows
 public protocol AsyncIteratorProtocol {
