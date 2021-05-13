@@ -23,16 +23,21 @@ extension AsyncSequence {
   /// values and `false` for odd values, thereby filtering out the odd values,
   /// but also throws an error for values divisible by 5:
   ///
-  ///     for try await number in Counter(howHigh: 10)
-  ///             .filter({
-  ///         if $0 % 5 == 0 {
-  ///             throw MyError()
+  ///     do {
+  ///         let stream =  Counter(howHigh: 10)
+  ///             .filter{
+  ///                 if $0 % 5 == 0 {
+  ///                     throw MyError()
+  ///                 }
+  ///                 return $0 % 2 == 0
+  ///             }
+  ///         for try await number in stream {
+  ///             print("\(number) ", terminator: " ")
   ///         }
-  ///         return $0 % 2 == 0
-  ///     }) {
-  ///         print("\(number) ", terminator: " ")
+  ///     } catch {
+  ///         print ("Error: \(error)")
   ///     }
-  ///     // Prints: 2 4
+  ///     // Prints: 2  4  Error: MyError()
   ///
   /// - Parameter isIncluded: An error-throwing closure that takes an element
   ///   of the asynchronous sequence as its argument and returns a Boolean value

@@ -21,6 +21,31 @@ extension AsyncSequence {
   /// Use this method to receive a single-level asynchronous sequence when your
   /// transformation produces an asynchronous sequence for each element.
   ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `5`. The transforming closure takes the received `Int`
+  /// and returns a new `Counter` that counts that high. For example, when the
+  /// transform receives `3` from the base sequence, it creates a new `Counter`
+  /// that produces the values `1`, `2`, and `3`. The `flatMap(_:)` operator
+  /// "flattens" the resulting sequence-of-sequences into a single
+  /// `AsyncSequence`. However, when the closure receives `4`, it throws an
+  /// error, terminating the sequence.
+  ///
+  ///     do {
+  ///         let stream = Counter(howHigh: 5)
+  ///             .flatMap { (value) -> Counter in
+  ///                 if value == 4 {
+  ///                     throw MyError()
+  ///                 }
+  ///                 return Counter(howHigh: value)
+  ///             }
+  ///         for try await number in stream {
+  ///             print ("\(number)", terminator: " ")
+  ///         }
+  ///     } catch {
+  ///         print (error)
+  ///     }
+  ///     // Prints: 1 1 2 1 2 3 MyError()
+  ///
   /// - Parameter transform: An error-throwing mapping closure. `transform`
   ///   accepts an element of this sequence as its parameter and returns an
   ///   `AsyncSequence`. If `transform` throws an error, the sequence ends.

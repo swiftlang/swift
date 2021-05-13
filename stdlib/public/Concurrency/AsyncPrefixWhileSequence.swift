@@ -24,10 +24,11 @@ extension AsyncSequence {
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The `prefix(while:)` function causes the modified
   /// sequence to pass along values so long as they aren’t divisible by both
-  /// `2` and `3`:
+  /// `2` and `3`. Upon reaching `6`, the sequence ends:
   ///
-  ///     for await number in Counter(howHigh: 10)
-  ///             .prefix (while: { $0 % 2 != 0 || $0 % 3 != 0 } ) {
+  ///     let stream = Counter(howHigh: 10)
+  ///         .prefix { $0 % 2 != 0 || $0 % 3 != 0 }
+  ///     for try await number in stream {
   ///         print("\(number) ", terminator: " ")
   ///     }
   ///     // prints "1  2  3  4  5"

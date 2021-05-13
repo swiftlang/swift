@@ -29,17 +29,21 @@ extension AsyncSequence {
   /// predicate throws when it receives `2` from the base sequence, this example
   /// throws without ever printing anything.
   ///
-  ///     for try await number in Counter(howHigh: 10)
-  ///             .drop(while: {
+  ///     do {
+  ///         let stream =  Counter(howHigh: 10)
+  ///             .drop {
   ///                 if $0 % 2 == 0 {
   ///                     throw EvenError()
   ///                 }
   ///                 return $0 < 5
-  ///             })
-  ///     {
-  ///         print("\(number) ")
+  ///             }
+  ///         for try await number in stream {
+  ///             print("\(number) ")
+  ///         }
+  ///     } catch {
+  ///         print ("\(error)")
   ///     }
-  ///     // No output; throws EvenError
+  ///     // Prints: EvenError()
   ///
   /// After the predicate returns `false`, the sequence never executes it again,
   /// and from then on the sequence passes through elements from its underlying

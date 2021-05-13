@@ -23,13 +23,18 @@ extension AsyncSequence {
   /// element to another.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `5`. The `compactMap(_:)` function takes each `Int` and
-  /// looks up a corresponding `String` from a `romanNumeralDict` dictionary.
-  /// Since there is no key for `4`, the closure returns `nil` in this case,
-  /// which `compactMap(_:)` omits from the transformed asynchronous sequence.
+  /// values from `1` to `5`. The closure provided to the `compactMap(_:)`
+  /// function takes each `Int` and looks up a corresponding `String` from a
+  /// `romanNumeralDict` dictionary. Since there is no key for `4`, the closure
+  /// returns `nil` in this case, which `compactMap(_:)` omits from the
+  /// transformed asynchronous sequence.
   ///
-  ///     for await numeral in Counter(howHigh: 5)
-  ///             .compactMap( { romanNumeralDict[$0] } ) {
+  ///     let romanNumeralDict: [Int : String] =
+  ///         [1: "I", 2: "II", 3: "III", 5: "V"]
+  ///         
+  ///     let stream = Counter(howHigh: 5)
+  ///         .compactMap{ romanNumeralDict[$0] }
+  ///     for await numeral in stream {
   ///         print("\(numeral) ", terminator: " ")
   ///     }
   ///     // Prints: I  II  III  V

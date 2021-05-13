@@ -22,16 +22,18 @@ extension AsyncSequence {
   /// of element to another.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `5`. The `map(_:)` function takes each `Int` and looks
-  /// up a corresponding `String` from a `romanNumeralDict` dictionary. This
-  /// means the outer `for await in` loop iterates over `String` instances
-  /// instead of the underlying `Int` values that `Counter` produces:
+  /// values from `1` to `5`. The closure provided to the `map(_:)` function
+  /// takes each `Int` and looks up a corresponding `String` from a
+  /// `romanNumeralDict` dictionary. This means the outer `for await in` loop
+  /// iterates over `String` instances instead of the underlying `Int` values
+  /// that `Counter` produces:
   ///
   ///     let romanNumeralDict: [Int : String] =
   ///         [1: "I", 2: "II", 3: "III", 5: "V"]
   ///
-  ///     for await numeral in Counter(howHigh: 5)
-  ///             .map( { romanNumeralDict[$0] ?? "(unknown)" } ) {
+  ///     let stream = Counter(howHigh: 5)
+  ///         .map{ romanNumeralDict[$0] ?? "(unknown)" }
+  ///     for await numeral in stream {
   ///         print("\(numeral) ", terminator: " ")
   ///     }
   ///     // Prints: I  II  III  (unknown)  V

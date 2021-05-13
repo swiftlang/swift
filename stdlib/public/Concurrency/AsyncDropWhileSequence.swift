@@ -25,8 +25,9 @@ extension AsyncSequence {
   /// sequence to ignore received values until it encounters one that is
   /// divisible by `3`:
   ///
-  ///     for await number in Counter(howHigh: 10)
-  ///             .drop(while: { $0 % 3 != 0 } ) {
+  ///     let stream = Counter(howHigh: 10)
+  ///         .drop{ $0 % 3 != 0 }
+  ///     for await number in stream {
   ///         print("\(number) ", terminator: " ")
   ///     }
   ///     // prints "3 4 5 6 7 8 9 10"

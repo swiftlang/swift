@@ -21,8 +21,9 @@ extension AsyncSequence {
   /// values from `1` to `10`. The `filter(_:)` method returns `true` for even
   /// values and `false` for odd values, thereby filtering out the odd values:
   ///
-  ///     for await number in Counter(howHigh: 10)
-  ///             .filter( { $0 % 2 == 0 } ) {
+  ///     let stream = Counter(howHigh: 10)
+  ///         .filter{ $0 % 2 == 0 }
+  ///     for await number in stream {
   ///         print("\(number) ", terminator: " ")
   ///     }
   ///     // Prints: 2  4  6  8  10

@@ -27,16 +27,21 @@ extension AsyncSequence {
   /// sequence to pass through values less than `8`, but throws an
   /// error when it receives a value that is divisible by `5`:
   ///
-  ///     for try await number in try Counter(howHigh: 10)
-  ///             .prefix(while: {
+  ///     do {
+  ///         let stream = try Counter(howHigh: 10)
+  ///             .prefix {
   ///                 if $0 % 5 == 0 {
   ///                     throw MyError()
   ///                 }
   ///                 return $0 < 8
-  ///             }) {
-  ///         print("\(number) ", terminator: " ")
+  ///             }
+  ///         for try await number in stream {
+  ///             print("\(number) ", terminator: " ")
+  ///         }
+  ///     } catch {
+  ///         print("Error: \(error)")
   ///     }
-  ///     // Prints: 1 2 3 4
+  ///     // Prints: 1  2  3  4  Error: MyError()
   ///
   /// - Parameter isIncluded: A error-throwing closure that takes an element of
   ///   the asynchronous sequence as its argument and returns a Boolean value

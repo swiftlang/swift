@@ -28,10 +28,9 @@ extension AsyncSequence {
   /// "flattens" the resulting sequence-of-sequences into a single
   /// `AsyncSequence`.
   ///
-  ///     for await number in Counter(howHigh: 5)
-  ///             .flatMap ( {
-  ///                 Counter(howHigh: $0)
-  ///             } ) {
+  ///     let stream = Counter(howHigh: 5)
+  ///         .flatMap { Counter(howHigh: $0) }
+  ///     for await number in stream {
   ///         print ("\(number)", terminator: " ")
   ///     }
   ///     // Prints: 1 1 2 1 2 3 1 2 3 4 1 2 3 4 5
