@@ -252,7 +252,8 @@ extension CheckedContinuation {
   }
 }
 
-/// Calls the given closure with a checked continuation.
+/// Suspends the current task,
+/// then calls the given closure with a checked continuation for the current task.
 ///
 /// - Parameters:
 ///   - function: A string identifying the declaration that is the notional
@@ -270,7 +271,8 @@ public func withCheckedContinuation<T>(
   }
 }
 
-/// Calls the given throwing closure with a checked continuation.
+/// Suspends the current task,
+/// then calls the given closure with a checked throwing continuation for the current task.
 ///
 /// - Parameters:
 ///   - function: A string identifying the declaration that is the notional
@@ -279,8 +281,8 @@ public func withCheckedContinuation<T>(
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.
 ///     The closure must resume the continuation exactly once.
 ///
-/// If the closure throws an error,
-/// this function rethrows that error.
+/// If the closure calls `resume(throwing:)` on the continuation,
+/// this method thows that error.
 @available(SwiftStdlib 5.5, *)
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
