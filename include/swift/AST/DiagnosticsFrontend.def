@@ -405,6 +405,8 @@ ERROR(error_option_required,none, "option '%0' is required", (StringRef))
 ERROR(error_nonexistent_output_dir,none,
       "'-output-dir' argument '%0' does not exist or is not a directory", (StringRef))
 
+REMARK(interface_file_backup_used,none,
+      "building module from '%0' failed; retrying building module from '%1'", (StringRef, StringRef))
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,

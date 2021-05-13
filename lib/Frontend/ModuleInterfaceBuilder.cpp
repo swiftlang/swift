@@ -103,7 +103,11 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
     // dependency list -- don't serialize that.
     if (!prebuiltCachePath.empty() && DepName.startswith(prebuiltCachePath))
       continue;
-
+    // Don't serialize interface path if it's from the preferred interface dir.
+    // This ensures the prebuilt module caches generated from these interfaces are
+    // relocatable.
+    if (!backupInterfaceDir.empty() && DepName.startswith(backupInterfaceDir))
+      continue;
     if (dependencyTracker) {
       dependencyTracker->addDependency(DepName, /*isSystem*/IsSDKRelative);
     }

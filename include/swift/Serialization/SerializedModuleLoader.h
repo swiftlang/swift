@@ -471,6 +471,9 @@ public:
 /// Extract compiler arguments from an interface file buffer.
 bool extractCompilerFlagsFromInterface(StringRef buffer, llvm::StringSaver &ArgSaver,
                                        SmallVectorImpl<const char *> &SubArgs);
+
+/// Extract the user module version number from an interface file.
+llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
 } // end namespace swift
 
 #endif
