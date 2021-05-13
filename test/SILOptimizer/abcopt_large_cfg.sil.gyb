@@ -1,0 +1,84 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.sil
+
+// Check that the optimization does not crash due to a stack overflow.
+
+// RUN: %target-sil-opt -sil-verify-none -abcopts  %t/main.sil | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct ArrayInt{
+  var buffer : ArrayIntBuffer
+}
+
+sil [ossa] @take_array : $@convention(thin) (@inout ArrayInt) -> () {
+bb0(%0 : $*ArrayInt):
+  unreachable
+}
+
+
+sil public_external [ossa] [_semantics "array.check_subscript"] @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken {
+bb0(%0: $Int32, %1: $Bool, %2: @owned $ArrayInt):
+    unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_very_deep_domtree :
+
+// Currently there is nothing ot check here, because the optimization bails in
+// this case.
+// In future we might check that even with a deep domtree it can hoist the check.
+
+// CHECK-LABEL: } // end sil function 'test_very_deep_domtree'
+sil [ossa] @test_very_deep_domtree : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
+bb0(%0 : $Int32, %1 : $*ArrayInt):
+  %%2 = integer_literal $Builtin.Int1, -1
+  %%3 = struct $Bool (%2 : $Builtin.Int1)
+  %%4 = struct_extract %0 : $Int32, #Int32._value
+  %%5 = integer_literal $Builtin.Int32, 0
+  br bb1(%5 : $Builtin.Int32)
+
+bb1(%10 : $Builtin.Int32):
+
+% for i in range(50000):
+  br bb${i+2}
+bb${i+2}:
+% end
+
+  br bb200000
+
+bb200000:
+  %%11 = struct $Int32 (%10 : $Builtin.Int32)
+  %%12 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %%13 = load [copy] %1 : $*ArrayInt
+  %%17 = apply %12(%11, %3, %13) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %%18 = integer_literal $Builtin.Int32, 1
+  %%19 = integer_literal $Builtin.Int1, -1
+  %%20 = builtin "sadd_with_overflow_Int32"(%10 : $Builtin.Int32, %18 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %%21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  %%22 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %22 : $Builtin.Int1, ""
+  %%24 = builtin "cmp_eq_Int32"(%21 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %24, bb200002, bb200001
+
+bb200001:
+  br bb1(%21 : $Builtin.Int32)
+
+bb200002:
+  %%27 = function_ref @take_array : $@convention(thin) (@inout ArrayInt) -> ()
+  %%28 = apply %27(%1) : $@convention(thin) (@inout ArrayInt) -> ()
+  %%29 = load [copy] %1 : $*ArrayInt
+  %%30 = apply %12(%11, %3, %29) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
+  %%33 = struct $Int32 (%21 : $Builtin.Int32)
+  return %33 : $Int32
+}
+
+
+

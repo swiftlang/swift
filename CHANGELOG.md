@@ -29,6 +29,24 @@ CHANGELOG
 Swift 5.5
 ---------
 
+* Type names are no longer allowed as an argument to a subscript parameter that expects a metatype type
+
+```swift
+struct MyValue {
+}
+
+struct MyStruct {
+  subscript(a: MyValue.Type) -> Int { get { ... } }
+}
+
+func test(obj: MyStruct) {
+  let _ = obj[MyValue]
+}
+```
+
+Accepting subscripts with `MyValue` as an argument was an oversight because `MyValue` requires explicit `.self`
+to reference its metatype, so correct syntax would be to use `obj[MyValue.self]`.
+
 * [SE-0310][]:
   
   Read-only computed properties and subscripts can now define their `get` accessor to be `async` and/or `throws`, by writing one or both of those keywords between the `get` and `{`.  Thus, these members can now make asynchronous calls or throw errors in the process of producing a value:
@@ -71,7 +89,6 @@ Swift 5.5
     //            ^~~~~~~~~ this access is async
   }
   ```
-
 
 * [SE-0306][]:
 

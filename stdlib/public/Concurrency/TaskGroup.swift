@@ -266,6 +266,21 @@ public struct TaskGroup<ChildTaskResult> {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    spawn(priority: priority, operation: operation)
+  }
+
+  /// Adds a child task to the group.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
   public mutating func spawn(
     priority: Task.Priority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
@@ -299,6 +314,23 @@ public struct TaskGroup<ChildTaskResult> {
   ) -> Bool {
     let optPriority: Task.Priority? = priority
     return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
+  /// Adds a child task to the group, unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the operation was added to the group successfully;
+  ///   otherwise; `false`.
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    spawnUnlessCancelled(priority: priority, operation: operation)
   }
 
   /// Adds a child task to the group, unless the group has been canceled.
@@ -528,6 +560,24 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///     Omit this parameter or pass `.unspecified`
   ///     to set the child task's priority to the priority of the group.
   ///   - operation: The operation to execute as part of the task group.
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    spawn(priority: priority, operation: operation)
+  }
+
+  /// Adds a child task to the group.
+  ///
+  /// This method doesn't throw an error, even if the child task does.
+  /// Instead, corresponding next call to `TaskGroup.next()` rethrows that error.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
   public mutating func spawn(
     priority: Task.Priority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
@@ -562,6 +612,26 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ) -> Bool {
     let optPriority: Task.Priority? = priority
     return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
+  /// Adds a child task to the group, unless the group has been canceled.
+  ///
+  /// This method doesn't throw an error, even if the child task does.
+  /// Instead, the corresponding call to `TaskGroup.next()` rethrows that error.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the operation was added to the group successfully;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    spawnUnlessCancelled(priority: priority, operation: operation)
   }
 
   /// Adds a child task to the group, unless the group has been canceled.

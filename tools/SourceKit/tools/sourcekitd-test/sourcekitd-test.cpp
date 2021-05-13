@@ -834,11 +834,24 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
 
   case SourceKitRequest::ExpandPlaceholder:
-    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
-    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
-    sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    if (Opts.Length) {
+      // Single placeholder by location.
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorExpandPlaceholder);
+      sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+      sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    } else {
+      if (ByteOffset) {
+        llvm::errs() << "Missing '-length <number>'\n";
+        return 1;
+      }
+      // Expand all placeholders.
+      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
+      sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+      sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, false);
+      sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
+      sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
+    }
     break;
 
   case SourceKitRequest::SyntaxTree:
@@ -1341,7 +1354,13 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       break;
 
       case SourceKitRequest::ExpandPlaceholder:
-        expandPlaceholders(SourceBuf.get(), llvm::outs());
+        if (Opts.Length) {
+          // Single placeholder by location.
+          sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+        } else {
+          // Expand all placeholders.
+          expandPlaceholders(SourceBuf.get(), llvm::outs());
+        }
         break;
       case SourceKitRequest::ModuleGroups:
         printModuleGroupNames(Info, llvm::outs());

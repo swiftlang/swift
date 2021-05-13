@@ -733,19 +733,13 @@ extension Task {
   /// - Parameters:
   ///   - duration: The time to sleep, in nanoseconds.
   public static func sleep(_ duration: UInt64) async {
-    // Set up the job flags for a new task.
-    var flags = Task.JobFlags()
-    flags.kind = .task
-    flags.priority = .default
-    flags.isFuture = true
+    let currentTask = Builtin.getCurrentAsyncTask()
+    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
 
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, {})
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
-
-    await Handle<Void, Never>(task).get()
+    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
+      let job = _taskCreateNullaryContinuationJob(priority: priority.rawValue, continuation: continuation)
+      _enqueueJobGlobalWithDelay(duration, job)
+    }
   }
 }
 
@@ -767,22 +761,13 @@ extension Task {
   /// As such,
   /// this method isn't necessarily a way to avoid resource starvation.
   public static func yield() async {
-    // Prepare the job flags
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = .default
-    flags.isFuture = true
+    let currentTask = Builtin.getCurrentAsyncTask()
+    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
 
-    // Create the asynchronous task future, it will do nothing, but simply serves
-    // as a way for us to yield our execution until the executor gets to it and
-    // resumes us.
-    // TODO: consider if it would be useful for this task to be a child task
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, {})
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-    let _ = await Handle<Void, Never>(task).get()
+    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
+      let job = _taskCreateNullaryContinuationJob(priority: priority.rawValue, continuation: continuation)
+      _enqueueJobGlobal(job)
+    }
   }
 }
 
@@ -1009,6 +994,10 @@ func _taskCancel(_ task: Builtin.NativeObject)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_isCancelled")
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@_silgen_name("swift_task_createNullaryContinuationJob")
+func _taskCreateNullaryContinuationJob(priority: Int, continuation: Builtin.RawUnsafeContinuation) -> Builtin.Job
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @usableFromInline

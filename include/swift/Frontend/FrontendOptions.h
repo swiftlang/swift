@@ -394,6 +394,10 @@ public:
   ///
   /// \sa SymbolGraphASTWalker
   std::string SymbolGraphOutputDir;
+  
+  /// Whether to emit doc comment information in symbol graphs for symbols
+  /// which are inherited through classes or default implementations.
+  bool SkipInheritedDocs = false;
 
 private:
   static bool canActionEmitDependencies(ActionType);

@@ -1722,78 +1722,14 @@ AllowKeyPathWithoutComponents::create(ConstraintSystem &cs,
 }
 
 bool IgnoreInvalidResultBuilderBody::diagnose(const Solution &solution,
-                                                bool asNote) const {
-  switch (Phase) {
-  // Handled below
-  case ErrorInPhase::PreCheck:
-    break;
-  case ErrorInPhase::ConstraintGeneration:
-    return true; // Already diagnosed by `matchResultBuilder`.
-  }
-
-  auto *S = castToExpr<ClosureExpr>(getAnchor())->getBody();
-
-  class PreCheckWalker : public ASTWalker {
-    DeclContext *DC;
-    DiagnosticTransaction Transaction;
-    // Check whether expression(s) in the body of the
-    // result builder had any `ErrorExpr`s before pre-check.
-    bool FoundErrorExpr = false;
-
-  public:
-    PreCheckWalker(DeclContext *dc)
-        : DC(dc), Transaction(dc->getASTContext().Diags) {}
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // This has to be checked before `preCheckExpression`
-      // because pre-check would convert invalid references
-      // into `ErrorExpr`s.
-      E->forEachChildExpr([&](Expr *expr) {
-        FoundErrorExpr |= isa<ErrorExpr>(expr);
-        return FoundErrorExpr ? nullptr : expr;
-      });
-
-      auto hasError = ConstraintSystem::preCheckExpression(
-          E, DC, /*replaceInvalidRefsWithErrors=*/true);
-
-      return std::make_pair(false, hasError ? nullptr : E);
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return std::make_pair(true, S);
-    }
-
-    // Ignore patterns because result builder pre-check does so as well.
-    std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-      return std::make_pair(false, P);
-    }
-
-    bool diagnosed() const {
-      // pre-check produced an error.
-      if (Transaction.hasErrors())
-        return true;
-
-      // If there were `ErrorExpr`s before pre-check
-      // they should have been diagnosed already by parser.
-      if (FoundErrorExpr) {
-        auto &DE = DC->getASTContext().Diags;
-        return DE.hadAnyError();
-      }
-
-      return false;
-    }
-  };
-
-  PreCheckWalker walker(solution.getDC());
-  S->walk(walker);
-
-  return walker.diagnosed();
+                                              bool asNote) const {
+  return true; // Already diagnosed by `matchResultBuilder`.
 }
 
-IgnoreInvalidResultBuilderBody *IgnoreInvalidResultBuilderBody::create(
-    ConstraintSystem &cs, ErrorInPhase phase, ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      IgnoreInvalidResultBuilderBody(cs, phase, locator);
+IgnoreInvalidResultBuilderBody *
+IgnoreInvalidResultBuilderBody::create(ConstraintSystem &cs,
+                                       ConstraintLocator *locator) {
+  return new (cs.getAllocator()) IgnoreInvalidResultBuilderBody(cs, locator);
 }
 
 bool SpecifyContextualTypeForNil::diagnose(const Solution &solution,
@@ -1883,6 +1819,26 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
             continue;
           if (memberDecl->isInstanceMember())
             continue;
+
+          // Disable this warning for ambiguities related to a
+          // static member lookup in generic context because it's
+          // possible to declare a member with the same name on
+          // a concrete type and in an extension of a protocol
+          // that type conforms to e.g.:
+          //
+          // struct S : P { static var test: S { ... }
+          //
+          // extension P where Self == S { static var test: { ... } }
+          //
+          // And use that in an optional context e.g. passing `.test`
+          // to a parameter of expecting `S?`.
+          if (auto *extension =
+                  dyn_cast<ExtensionDecl>(memberDecl->getDeclContext())) {
+            if (extension->getSelfProtocolDecl()) {
+              allOptionalBase = false;
+              break;
+            }
+          }
 
           allOptionalBase &= bool(choice.getBaseType()
                                       ->getMetatypeInstanceType()

@@ -149,11 +149,11 @@ func callReasyncWithAutoclosure3() {
   reasyncWithAutoclosure2("Hello \(world)")
 }
 
-//// spawn let
+//// async let
 
 func callReasyncWithAutoclosure4(_: () async -> ()) reasync {
   await reasyncFunction {
-    spawn let x = 123
+    async let x = 123
 
     _ = await x
   }
