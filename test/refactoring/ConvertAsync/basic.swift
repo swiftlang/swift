@@ -111,11 +111,18 @@ func errorOnly(completion: (Error?) -> Void) { }
 // ASYNC-ERRORONLY-NEXT: }
 // ASYNC-ERRORONLY: func errorOnly() async throws { }
 
-// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERRORNONOPTIONALRESULT %s
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-ERRORNONOPTIONALRESULT %s
 func errorNonOptionalResult(completion: (String, Error?) -> Void) { }
-// We cannot convert the deprecated non-async method to call the async method because we can't synthesize the non-optional completion param. Smoke check for some keywords that would indicate we rewrote the body.
-// ASYNC-ERRORNONOPTIONALRESULT-NOT: detach
-// ASYNC-ERRORNONOPTIONALRESULT-NOT: await
+// ASYNC-ERRORNONOPTIONALRESULT: {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: async {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: do {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: let result = try await errorNonOptionalResult()
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: completion(result, nil)
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: } catch {
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: completion(<#String#>, error)
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: }
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: }
+// ASYNC-ERRORNONOPTIONALRESULT-NEXT: }
 // ASYNC-ERRORNONOPTIONALRESULT: func errorNonOptionalResult() async throws -> String { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-CUSTOMERROR %s
@@ -234,6 +241,40 @@ func manyOptional(_ completion: (String?, Int?) -> Void) { }
 // MANY-OPTIONAL-NEXT: }
 // MANY-OPTIONAL: func manyOptional() async -> (String?, Int?) { }
 
+// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED %s
+func mixed(_ completion: (String?, Int) -> Void) { }
+// MIXED: {
+// MIXED-NEXT: async {
+// MIXED-NEXT: let result = await mixed()
+// MIXED-NEXT: completion(result.0, result.1)
+// MIXED-NEXT: }
+// MIXED-NEXT: }
+// MIXED: func mixed() async -> (String?, Int) { }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+func mixedOptionalError(_ completion: (String?, Int, Error?) -> Void) { }
+// MIXED-OPTIONAL-ERROR: {
+// MIXED-OPTIONAL-ERROR-NEXT: async {
+// MIXED-OPTIONAL-ERROR-NEXT: do {
+// MIXED-OPTIONAL-ERROR-NEXT: let result = try await mixedOptionalError()
+// MIXED-OPTIONAL-ERROR-NEXT: completion(result.0, result.1, nil)
+// MIXED-OPTIONAL-ERROR-NEXT: } catch {
+// MIXED-OPTIONAL-ERROR-NEXT: completion(nil, <#Int#>, error)
+// MIXED-OPTIONAL-ERROR-NEXT: }
+// MIXED-OPTIONAL-ERROR-NEXT: }
+// MIXED-OPTIONAL-ERROR-NEXT: }
+// MIXED-OPTIONAL-ERROR: func mixedOptionalError() async throws -> (String, Int) { }
+
+// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-ERROR %s
+func mixedError(_ completion: (String?, Int, Error) -> Void) { }
+// MIXED-ERROR: {
+// MIXED-ERROR-NEXT: async {
+// MIXED-ERROR-NEXT: let result = await mixedError()
+// MIXED-ERROR-NEXT: completion(result.0, result.1, result.2)
+// MIXED-ERROR-NEXT: }
+// MIXED-ERROR-NEXT: }
+// MIXED-ERROR: func mixedError() async -> (String?, Int, Error) { }
+
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=GENERIC %s
 func generic<T, R>(completion: (T, R) -> Void) { }
 // GENERIC: {
@@ -333,26 +374,39 @@ protocol MyProtocol {
   // PROTO-MEMBER: func protoMember() async -> String{{$}}
 }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-COMPLETION %s
 func nonCompletion(a: Int) { }
+// NON-COMPLETION: func nonCompletion(a: Int) async { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-RESULTS %s
 func multipleResults(completion: (Result<String, Error>, Result<String, Error>) -> Void) { }
+// MULTIPLE-RESULTS: func multipleResults(completion: (Result<String, Error>, Result<String, Error>) -> Void) async { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NOT-LAST %s
 func completionNotLast(completion: (String) -> Void, a: Int) { }
+// NOT-LAST: func completionNotLast(completion: (String) -> Void, a: Int) async { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-VOID %s
 func nonVoid(completion: (String) -> Void) -> Int { return 0 }
+// NON-VOID: func nonVoid(completion: (String) -> Void) async -> Int { return 0 }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=COMPLETION-NON-VOID %s
 func completionNonVoid(completion: (String) -> Int) -> Void { }
+// COMPLETION-NON-VOID: func completionNonVoid(completion: (String) -> Int) async -> Void { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1
 func alreadyThrows(completion: (String) -> Void) throws { }
 
-// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: not %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+2):1
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=AUTO-CLOSURE %s
 func noParamAutoclosure(completion: @autoclosure () -> Void) { }
+// AUTO-CLOSURE: func noParamAutoclosure(completion: @autoclosure () -> Void) async { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix BLOCK-CONVENTION %s
 func blockConvention(completion: @convention(block) () -> Void) { }
@@ -372,19 +426,19 @@ func voidCompletion(completion: (Void) -> Void) {}
 // VOID-HANDLER-NEXT: }
 // VOID-HANDLER: func voidCompletion() async {}
 
-// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
-func voidAndErrorCompletion(completion: (Void?, Error?) -> Void) {}
-// VOID-AND-ERROR-HANDLER: {
-// VOID-AND-ERROR-HANDLER-NEXT: async {
-// VOID-AND-ERROR-HANDLER-NEXT: do {
-// VOID-AND-ERROR-HANDLER-NEXT: try await voidAndErrorCompletion()
-// VOID-AND-ERROR-HANDLER-NEXT: completion((), nil)
-// VOID-AND-ERROR-HANDLER-NEXT: } catch {
-// VOID-AND-ERROR-HANDLER-NEXT: completion(nil, error)
-// VOID-AND-ERROR-HANDLER-NEXT: }
-// VOID-AND-ERROR-HANDLER-NEXT: }
-// VOID-AND-ERROR-HANDLER-NEXT: }
-// VOID-AND-ERROR-HANDLER: func voidAndErrorCompletion() async throws {}
+// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix OPT-VOID-AND-ERROR-HANDLER %s
+func optVoidAndErrorCompletion(completion: (Void?, Error?) -> Void) {}
+// OPT-VOID-AND-ERROR-HANDLER: {
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: async {
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: do {
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: try await optVoidAndErrorCompletion()
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: completion((), nil)
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: } catch {
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: completion(nil, error)
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: }
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: }
+// OPT-VOID-AND-ERROR-HANDLER-NEXT: }
+// OPT-VOID-AND-ERROR-HANDLER: func optVoidAndErrorCompletion() async throws {}
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix TOO-MUCH-VOID-AND-ERROR-HANDLER %s
 func tooMuchVoidAndErrorCompletion(completion: (Void?, Void?, Error?) -> Void) {}
@@ -414,6 +468,20 @@ func tooVoidProperAndErrorCompletion(completion: (Void?, String?, Error?) -> Voi
 // VOID-PROPER-AND-ERROR-HANDLER-NEXT: }
 // VOID-PROPER-AND-ERROR-HANDLER: func tooVoidProperAndErrorCompletion() async throws -> (Void, String) {}
 
+// RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+func voidAndErrorCompletion(completion: (Void, Error?) -> Void) {}
+// VOID-AND-ERROR-HANDLER: {
+// VOID-AND-ERROR-HANDLER-NEXT: async {
+// VOID-AND-ERROR-HANDLER-NEXT: do {
+// VOID-AND-ERROR-HANDLER-NEXT: try await voidAndErrorCompletion()
+// VOID-AND-ERROR-HANDLER-NEXT: completion((), nil)
+// VOID-AND-ERROR-HANDLER-NEXT: } catch {
+// VOID-AND-ERROR-HANDLER-NEXT: completion((), error)
+// VOID-AND-ERROR-HANDLER-NEXT: }
+// VOID-AND-ERROR-HANDLER-NEXT: }
+// VOID-AND-ERROR-HANDLER-NEXT: }
+// VOID-AND-ERROR-HANDLER: func voidAndErrorCompletion() async throws {}
+
 // 2. Check that the various ways to call a function (and the positions the
 //    refactoring is called from) are handled correctly
 
@@ -430,9 +498,8 @@ func simpleClassParam(completion: (MyClass) -> Void) { }
 // before the 'RUN' lines were removed, thus pointing past the end of the
 // rewritten buffer.
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,CALL-ARG,MANY-CALL,MEMBER-CALL,MEMBER-CALL2,MEMBER-PARENS,EMPTY-CAPTURE,CAPTURE,DEFAULT-ARGS-MISSING,DEFAULT-ARGS-CALL,BLOCK-CONVENTION-CALL,C-CONVENTION-CALL %s
-func testCalls() {
-// CONVERT-FUNC: {{^}}func testCalls() async {
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL %s
+func testSimple() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+4):3 | %FileCheck -check-prefix=CALL %s
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+3):10
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):24
@@ -441,170 +508,247 @@ func testCalls() {
     // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):5
     print("with label")
   })
-  // CALL: let str = await simple(){{$}}
-  // CALL-NEXT: {{^}}print("with label")
+}
+// CALL: let str = await simple(){{$}}
+// CALL-NEXT: {{^}}print("with label")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-NOLABEL %s
+func testSimpleWithoutLabel() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=CALL-NOLABEL %s
   simpleWithoutLabel({ str in
     print("without label")
   })
-  // CALL-NOLABEL: let str = await simpleWithoutLabel(){{$}}
-  // CALL-NOLABEL-NEXT: {{^}}print("without label")
+}
+// CALL-NOLABEL: let str = await simpleWithoutLabel(){{$}}
+// CALL-NOLABEL-NEXT: {{^}}print("without label")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-WRAPPED %s
+func testWrapped() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=CALL-WRAPPED %s
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):5 | %FileCheck -check-prefix=CALL-WRAPPED %s
   ((simple))(completion: { str in
     print("wrapped call")
   })
-  // CALL-WRAPPED: let str = await ((simple))(){{$}}
-  // CALL-WRAPPED-NEXT: {{^}}print("wrapped call")
+}
+// CALL-WRAPPED: let str = await ((simple))(){{$}}
+// CALL-WRAPPED-NEXT: {{^}}print("wrapped call")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=TRAILING %s
+func testTrailing() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=TRAILING %s
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):12
   simple { str in
     print("trailing")
   }
-  // TRAILING: let str = await simple(){{$}}
-  // TRAILING-NEXT: {{^}}print("trailing")
+}
+// TRAILING: let str = await simple(){{$}}
+// TRAILING-NEXT: {{^}}print("trailing")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=TRAILING-PARENS %s
+func testTrailingParens() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=TRAILING-PARENS %s
   simple() { str in
     print("trailing with parens")
   }
-  // TRAILING-PARENS: let str = await simple(){{$}}
-  // TRAILING-PARENS-NEXT: {{^}}print("trailing with parens")
+}
+// TRAILING-PARENS: let str = await simple(){{$}}
+// TRAILING-PARENS-NEXT: {{^}}print("trailing with parens")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=TRAILING-WRAPPED %s
+func testTrailingWrapped() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):5 | %FileCheck -check-prefix=TRAILING-WRAPPED %s
   ((simple)) { str in
     print("trailing with wrapped call")
   }
-  // TRAILING-WRAPPED: let str = await ((simple))(){{$}}
-  // TRAILING-WRAPPED-NEXT: {{^}}print("trailing with wrapped call")
+}
+// TRAILING-WRAPPED: let str = await ((simple))(){{$}}
+// TRAILING-WRAPPED-NEXT: {{^}}print("trailing with wrapped call")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-ARG %s
+func testCallArg() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+3):3 | %FileCheck -check-prefix=CALL-ARG %s
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):17
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):20
   simpleWithArg(a: 10) { str in
     print("with arg")
   }
-  // CALL-ARG: let str = await simpleWithArg(a: 10){{$}}
-  // CALL-ARG-NEXT: {{^}}print("with arg")
+}
+// CALL-ARG: let str = await simpleWithArg(a: 10){{$}}
+// CALL-ARG-NEXT: {{^}}print("with arg")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=MANY-CALL %s
+func testMany() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MANY-CALL %s
   many { str, num in
     print("many")
   }
-  // MANY-CALL: let (str, num) = await many(){{$}}
-  // MANY-CALL-NEXT: {{^}}print("many")
+}
+// MANY-CALL: let (str, num) = await many(){{$}}
+// MANY-CALL-NEXT: {{^}}print("many")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MEMBER-CALL %s
+func testMember() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):15 | %FileCheck -check-prefix=MEMBER-CALL %s
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MEMBER-CALL %s
   retStruct().publicMember { str in
     print("call on member")
   }
-  // MEMBER-CALL: let str = await retStruct().publicMember(){{$}}
-  // MEMBER-CALL-NEXT: {{^}}print("call on member")
+}
+// MEMBER-CALL: let str = await retStruct().publicMember(){{$}}
+// MEMBER-CALL-NEXT: {{^}}print("call on member")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MEMBER-CALL2 %s
+func testMember2() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):25 | %FileCheck -check-prefix=MEMBER-CALL2 %s
   retStruct().retSelf().publicMember { str in
     print("call on member 2")
   }
-  // MEMBER-CALL2: let str = await retStruct().retSelf().publicMember(){{$}}
-  // MEMBER-CALL2-NEXT: {{^}}print("call on member 2")
+}
+// MEMBER-CALL2: let str = await retStruct().retSelf().publicMember(){{$}}
+// MEMBER-CALL2-NEXT: {{^}}print("call on member 2")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MEMBER-PARENS %s
+func testMemberParens() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+3):3 | %FileCheck -check-prefix=MEMBER-PARENS %s
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):5 | %FileCheck -check-prefix=MEMBER-PARENS %s
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):15 | %FileCheck -check-prefix=MEMBER-PARENS %s
   (((retStruct().retSelf()).publicMember)) { str in
     print("call on member parens")
   }
-  // MEMBER-PARENS: let str = await (((retStruct().retSelf()).publicMember))(){{$}}
-  // MEMBER-PARENS-NEXT: {{^}}print("call on member parens")
+}
+// MEMBER-PARENS: let str = await (((retStruct().retSelf()).publicMember))(){{$}}
+// MEMBER-PARENS-NEXT: {{^}}print("call on member parens")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=SKIP-ASSIGN-FUNC %s
+func testSkipAssign() {
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):13
   let _: Void = simple { str in
     print("assigned")
   }
-  // CONVERT-FUNC: let _: Void = simple { str in{{$}}
-  // CONVERT-FUNC-NEXT: print("assigned"){{$}}
-  // CONVERT-FUNC-NEXT: }{{$}}
+}
+// SKIP-ASSIGN-FUNC: {{^}}func testSkipAssign() async {
+// SKIP-ASSIGN-FUNC: let _: Void = simple { str in{{$}}
+// SKIP-ASSIGN-FUNC-NEXT: print("assigned"){{$}}
+// SKIP-ASSIGN-FUNC-NEXT: }{{$}}
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=SKIP-AUTOCLOSURE-FUNC %s
+func testSkipAutoclosure() {
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3
   noParamAutoclosure(completion: print("autoclosure"))
-  // CONVERT-FUNC: noParamAutoclosure(completion: print("autoclosure")){{$}}
+}
+// SKIP-AUTOCLOSURE-FUNC: {{^}}func testSkipAutoclosure() async {
+// SKIP-AUTOCLOSURE-FUNC: noParamAutoclosure(completion: print("autoclosure")){{$}}
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=EMPTY-CAPTURE %s
+func testEmptyCapture() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=EMPTY-CAPTURE %s
   simple { [] str in
     print("closure with empty capture list")
   }
-  // EMPTY-CAPTURE: let str = await simple(){{$}}
-  // EMPTY-CAPTURE-NEXT: {{^}}print("closure with empty capture list")
+}
+// EMPTY-CAPTURE: let str = await simple(){{$}}
+// EMPTY-CAPTURE-NEXT: {{^}}print("closure with empty capture list")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CAPTURE %s
+func testCapture() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=CAPTURE %s
   let myClass = MyClass()
   simpleClassParam { [unowned myClass] str in
     print("closure with capture list \(myClass)")
   }
-  // CAPTURE: let str = await simpleClassParam(){{$}}
-  // CAPTURE-NEXT: {{^}}print("closure with capture list \(myClass)")
+}
+// CAPTURE: let str = await simpleClassParam(){{$}}
+// CAPTURE-NEXT: {{^}}print("closure with capture list \(myClass)")
 
-  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=OTHER-DIRECT %s
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=NOT-HANDLER-FUNC %s
+func testNotCompletionHandler() {
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=NOT-HANDLER %s
   otherName(execute: { str in
     print("otherName")
   })
-  // OTHER-DIRECT: let str = await otherName(){{$}}
-  // OTHER-DIRECT-NEXT: {{^}}print("otherName")
-  // CONVERT-FUNC: otherName(execute: { str in{{$}}
-  // CONVERT-FUNC-NEXT: print("otherName"){{$}}
-  // CONVERT-FUNC-NEXT: }){{$}}
+}
+// NOT-HANDLER-FUNC: otherName(execute: { str in{{$}}
+// NOT-HANDLER-FUNC-NEXT: print("otherName"){{$}}
+// NOT-HANDLER-FUNC-NEXT: }){{$}}
+// NOT-HANDLER: let str = await otherName(){{$}}
+// NOT-HANDLER-NEXT: {{^}}print("otherName")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=DEFAULT-ARGS-MISSING %s
+func testDefaultArgsMissing() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=DEFAULT-ARGS-MISSING %s
   defaultArgs(a: 1) { str in
     print("defaultArgs missing")
   }
-  // DEFAULT-ARGS-MISSING: let str = await defaultArgs(a: 1){{$}}
-  // DEFAULT-ARGS-MISSING-NEXT: {{^}}print("defaultArgs missing")
+}
+// DEFAULT-ARGS-MISSING: let str = await defaultArgs(a: 1){{$}}
+// DEFAULT-ARGS-MISSING-NEXT: {{^}}print("defaultArgs missing")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=DEFAULT-ARGS-CALL %s
+func testDefaultArgs() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=DEFAULT-ARGS-CALL %s
   defaultArgs(a: 1, b: 2) { str in
     print("defaultArgs")
   }
-  // DEFAULT-ARGS-CALL: let str = await defaultArgs(a: 1, b: 2){{$}}
-  // DEFAULT-ARGS-CALL-NEXT: {{^}}print("defaultArgs")
+}
+// DEFAULT-ARGS-CALL: let str = await defaultArgs(a: 1, b: 2){{$}}
+// DEFAULT-ARGS-CALL-NEXT: {{^}}print("defaultArgs")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=BLOCK-CONVENTION-CALL %s
+func testBlockConvention() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=BLOCK-CONVENTION-CALL %s
   blockConvention {
     print("blockConvention")
   }
-  // BLOCK-CONVENTION-CALL: await blockConvention(){{$}}
-  // BLOCK-CONVENTION-CALL-NEXT: {{^}}print("blockConvention")
+}
+// BLOCK-CONVENTION-CALL: await blockConvention(){{$}}
+// BLOCK-CONVENTION-CALL-NEXT: {{^}}print("blockConvention")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=C-CONVENTION-CALL %s
+func testCConvention() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=C-CONVENTION-CALL %s
   cConvention {
     print("cConvention")
   }
-  // C-CONVENTION-CALL: await cConvention(){{$}}
-  // C-CONVENTION-CALL-NEXT: {{^}}print("cConvention")
+}
+// C-CONVENTION-CALL: await cConvention(){{$}}
+// C-CONVENTION-CALL-NEXT: {{^}}print("cConvention")
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL %s
+func testVoidAndError() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL %s
-  voidAndErrorCompletion { v, err in
-    print("void and error completion \(v)")
+  optVoidAndErrorCompletion { v, err in
+    print("opt void and error completion \(v)")
   }
-  // VOID-AND-ERROR-CALL: {{^}}try await voidAndErrorCompletion(){{$}}
-  // VOID-AND-ERROR-CALL: {{^}}print("void and error completion \(<#v#>)"){{$}}
+}
+// VOID-AND-ERROR-CALL: try await optVoidAndErrorCompletion(){{$}}
+// VOID-AND-ERROR-CALL-NEXT: {{^}}print("opt void and error completion \(<#v#>)"){{$}}
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL2 %s
+func testVoidAndError2() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL2 %s
-  voidAndErrorCompletion { _, err in
-    print("void and error completion 2")
+  optVoidAndErrorCompletion { _, err in
+    print("opt void and error completion 2")
   }
-  // VOID-AND-ERROR-CALL2: {{^}}try await voidAndErrorCompletion(){{$}}
-  // VOID-AND-ERROR-CALL2: {{^}}print("void and error completion 2"){{$}}
+}
+// VOID-AND-ERROR-CALL2: try await optVoidAndErrorCompletion(){{$}}
+// VOID-AND-ERROR-CALL2-NEXT: {{^}}print("opt void and error completion 2"){{$}}
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL3 %s
+func testVoidAndError3() {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL3 %s
   tooMuchVoidAndErrorCompletion { v, v1, err in
     print("void and error completion 3")
   }
-  // VOID-AND-ERROR-CALL3: {{^}}try await tooMuchVoidAndErrorCompletion(){{$}}
-  // VOID-AND-ERROR-CALL3: {{^}}print("void and error completion 3"){{$}}
 }
-// CONVERT-FUNC: {{^}}}
+// VOID-AND-ERROR-CALL3: try await tooMuchVoidAndErrorCompletion(){{$}}
+// VOID-AND-ERROR-CALL3-NEXT: {{^}}print("void and error completion 3"){{$}}
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL4 %s
+func testVoidAndError4() {
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=VOID-AND-ERROR-CALL4 %s
+  voidAndErrorCompletion { v, err in
+    print("void and error completion \(v)")
+  }
+}
+// VOID-AND-ERROR-CALL4: try await voidAndErrorCompletion(){{$}}
+// VOID-AND-ERROR-CALL4-NEXT: {{^}}print("void and error completion \(<#v#>)"){{$}}

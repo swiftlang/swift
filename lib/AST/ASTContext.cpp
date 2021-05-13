@@ -1938,7 +1938,7 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
-bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
+bool ASTContext::canImportModuleImpl(ImportPath::Element ModuleName) const {
   // If this module has already been successfully imported, it is importable.
   if (getLoadedModule(ImportPath::Module::Builder(ModuleName).get()) != nullptr)
     return true;
@@ -1954,8 +1954,20 @@ bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
     }
   }
 
-  FailedModuleImportNames.insert(ModuleName.Item);
   return false;
+}
+
+bool ASTContext::canImportModule(ImportPath::Element ModuleName) {
+  if (canImportModuleImpl(ModuleName)) {
+    return true;
+  } else {
+    FailedModuleImportNames.insert(ModuleName.Item);
+    return false;
+  }
+}
+
+bool ASTContext::canImportModule(ImportPath::Element ModuleName) const {
+  return canImportModuleImpl(ModuleName);
 }
 
 ModuleDecl *

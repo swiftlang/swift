@@ -2,6 +2,12 @@
 
 // RUN: %FileCheck %s -check-prefix=PRINT-CLASS -strict-whitespace < %t.printed.Class.txt
 
+// rdar://77558075
+// UNSUPPORTED: OS=tvos && CPU=x86_64
+
+// rdar://77916860
+// UNSUPPORTED: OS=watchos && CPU=i386
+
 // PRINT-CLASS-LABEL: class SomeClass : NSObject {
 // PRINT-CLASS-NEXT:   init()
 // PRINT-CLASS-NEXT: }

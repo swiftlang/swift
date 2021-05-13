@@ -31,7 +31,7 @@ import Swift
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Partial tasks are generally not interacted with by end-users directly,
 /// unless implementing a scheduler.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct Task {
   internal let _task: Builtin.NativeObject
 
@@ -43,7 +43,7 @@ public struct Task {
 
 // ==== Current Task -----------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
 
   /// Returns 'current' `Task` instance, representing the task from within which
@@ -68,7 +68,7 @@ extension Task {
 
 // ==== Task Priority ----------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
 
   /// Returns the `current` task's priority.
@@ -151,7 +151,7 @@ extension Task {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task.Priority {
   /// Downgrade user-interactive to user-initiated.
   var _downgradeUserInteractive: Task.Priority {
@@ -165,7 +165,7 @@ extension Task.Priority {
 
 // ==== Task Handle ------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
   /// A task handle refers to an in-flight `Task`,
   /// allowing for potentially awaiting for its result or Cancelling it.
@@ -241,7 +241,7 @@ extension Task {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task.Handle where Failure == Never {
 
   /// Wait for the task to complete, returning its result.
@@ -263,14 +263,14 @@ extension Task.Handle where Failure == Never {
   
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task.Handle: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task.Handle: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
@@ -280,14 +280,14 @@ extension Task.Handle: Equatable {
 
 // ==== Conformances -----------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
@@ -297,7 +297,7 @@ extension Task: Equatable {
 
 // ==== Job Flags --------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
   /// Flags for schedulable jobs.
   ///
@@ -402,7 +402,7 @@ extension Task {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
 
   @discardableResult
@@ -449,7 +449,7 @@ extension Task {
 ///     tasks result or `cancel` it. If the operation fails the handle will
 ///     throw the error the operation has thrown when awaited on.
 @discardableResult
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func detach<T>(
   priority: Task.Priority = .unspecified,
   operation: __owned @Sendable @escaping () async -> T
@@ -502,7 +502,7 @@ public func detach<T>(
 ///     tasks result or `cancel` it. If the operation fails the handle will
 ///     throw the error the operation has thrown when awaited on.
 @discardableResult
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func detach<T>(
   priority: Task.Priority = .unspecified,
   operation: __owned @Sendable @escaping () async throws -> T
@@ -523,7 +523,7 @@ public func detach<T>(
 }
 
 @discardableResult
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func asyncDetached<T>(
   priority: Task.Priority? = nil,
   @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> T
@@ -532,7 +532,7 @@ public func asyncDetached<T>(
 }
 
 @discardableResult
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func asyncDetached<T>(
   priority: Task.Priority? = nil,
   @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> T
@@ -541,7 +541,7 @@ public func asyncDetached<T>(
 }
 
 /// ABI stub while we stage in the new signatures
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @usableFromInline
 func async(
   priority: Task.Priority,
@@ -570,7 +570,7 @@ func async(
 ///   - priority: priority of the task. If nil, the priority will come from
 ///     Task.currentPriority.
 ///   - operation: the operation to execute
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @discardableResult
 public func async<T>(
   priority: Task.Priority? = nil,
@@ -606,7 +606,7 @@ public func async<T>(
 ///   - priority: priority of the task. If nil, the priority will come from
 ///     Task.currentPriority.
 ///   - operation: the operation to execute
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @discardableResult
 public func async<T>(
   priority: Task.Priority? = nil,
@@ -631,7 +631,7 @@ public func async<T>(
 // ==== Async Handler ----------------------------------------------------------
 
 // TODO: remove this?
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @Sendable () async -> ()
   detach(
@@ -641,32 +641,26 @@ func _runAsyncHandler(operation: @escaping () async -> ()) {
 
 // ==== Async Sleep ------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
   /// Suspends the current task for _at least_ the given duration
   /// in nanoseconds.
   ///
   /// This function does _not_ block the underlying thread.
   public static func sleep(_ duration: UInt64) async {
-    // Set up the job flags for a new task.
-    var flags = Task.JobFlags()
-    flags.kind = .task
-    flags.priority = .default
-    flags.isFuture = true
+    let currentTask = Builtin.getCurrentAsyncTask()
+    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
 
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, {})
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
-
-    await Handle<Void, Never>(task).get()
+    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
+      let job = _taskCreateNullaryContinuationJob(priority: priority.rawValue, continuation: continuation)
+      _enqueueJobGlobalWithDelay(duration, job)
+    }
   }
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
 
   /// Explicitly suspend the current task, potentially giving up execution actor
@@ -676,28 +670,19 @@ extension Task {
   /// if the task is the highest-priority task in the system, it might go
   /// immediately back to executing.
   public static func yield() async {
-    // Prepare the job flags
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = .default
-    flags.isFuture = true
+    let currentTask = Builtin.getCurrentAsyncTask()
+    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
 
-    // Create the asynchronous task future, it will do nothing, but simply serves
-    // as a way for us to yield our execution until the executor gets to it and
-    // resumes us.
-    // TODO: consider if it would be useful for this task to be a child task
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, {})
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-    let _ = await Handle<Void, Never>(task).get()
+    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
+      let job = _taskCreateNullaryContinuationJob(priority: priority.rawValue, continuation: continuation)
+      _enqueueJobGlobal(job)
+    }
   }
 }
 
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
 
   @available(*, deprecated, message: "`Task.unsafeCurrent` was replaced by `withUnsafeCurrentTask { task in ... }`, and will be removed soon.")
@@ -729,7 +714,7 @@ extension Task {
 /// It is possible to obtain a `Task` fom the `UnsafeCurrentTask` which is safe
 /// to access from other tasks or even store for future reference e.g. equality
 /// checks.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
     return try body(nil)
@@ -756,7 +741,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 /// represented by this handle itself. Doing so may result in undefined behavior,
 /// and most certainly will break invariants in other places of the program
 /// actively running on this task.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct UnsafeCurrentTask {
   internal let _task: Builtin.NativeObject
 
@@ -791,14 +776,14 @@ public struct UnsafeCurrentTask {
 
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension UnsafeCurrentTask: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension UnsafeCurrentTask: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
@@ -808,29 +793,29 @@ extension UnsafeCurrentTask: Equatable {
 
 // ==== Internal ---------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_getCurrent")
 func _getCurrentAsyncTask() -> Builtin.NativeObject?
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelay")
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_asyncMainDrainQueue")
 public func _asyncMainDrainQueue() -> Never
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 #if os(Windows)
   detach {
@@ -862,15 +847,15 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 // FIXME: both of these ought to take their arguments _owned so that
 // we can do a move out of the future in the common case where it's
 // unreferenced
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_future_wait")
 public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_future_wait_throwing")
 public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func _runChildTask<T>(
   operation: @Sendable @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
@@ -893,20 +878,24 @@ public func _runChildTask<T>(
   return task
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_cancel")
 func _taskCancel(_ task: Builtin.NativeObject)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_isCancelled")
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
+@_silgen_name("swift_task_createNullaryContinuationJob")
+func _taskCreateNullaryContinuationJob(priority: Int, continuation: Builtin.RawUnsafeContinuation) -> Builtin.Job
+
+@available(SwiftStdlib 5.5, *)
 @usableFromInline
 @_silgen_name("swift_task_isCurrentExecutor")
 func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @usableFromInline
 @_silgen_name("swift_task_reportUnexpectedExecutor")
 func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
@@ -915,7 +904,7 @@ func _reportUnexpectedExecutor(_ _filenameStart: Builtin.RawPointer,
                                _ _line: Builtin.Word,
                                _ _executor: Builtin.Executor)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_getCurrentThreadPriority")
 func _getCurrentThreadPriority() -> Int
 
@@ -923,7 +912,7 @@ func _getCurrentThreadPriority() -> Int
 
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {

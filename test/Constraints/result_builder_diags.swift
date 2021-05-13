@@ -142,6 +142,12 @@ func testOverloading(name: String) {
     }
   }
 
+  _ = overloadedTuplify(true) { cond in
+    if cond {
+      print(\"hello") // expected-error {{invalid component of Swift key path}}
+    }
+  }
+
   let _: A = a1
 
   _ = overloadedTuplify(true) { b in // expected-error {{ambiguous use of 'overloadedTuplify(_:body:)'}}
@@ -461,7 +467,7 @@ struct TestConstraintGenerationErrors {
   func buildTupleClosure() {
     tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
-      String(nothing) // expected-error {{cannot find 'nothing' in scope}}
+      String(nothing)
     }
   }
 }

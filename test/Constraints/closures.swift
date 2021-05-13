@@ -499,7 +499,7 @@ struct S_3520 {
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
 sr3520_set_via_closure({ $0.number1 = $1 })
 // expected-error@-1 {{generic parameter 'S' could not be inferred}}
-// expected-error@-2 {{unable to infer type of a closure parameter $1 in the current context}}
+// expected-error@-2 {{unable to infer type of a closure parameter '$1' in the current context}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -1105,3 +1105,30 @@ struct R_76250381<Result, Failure: Error> {
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 3 were used in closure body}}
 (0..<10).map { x, y, z, w in } 
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) throws -> ()' (aka '(Int) throws -> ()') expects 1 argument, but 4 were used in closure body}}
+
+// rdar://77022842 - crash due to a missing argument to a ternary operator
+func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
+  if let a = argA ?? false, if let b = argB ?? {
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
+    // expected-error@-2 {{cannot convert value of type '() -> ()' to expected argument type 'Bool?'}}
+    // expected-error@-3 {{expected expression in conditional}}
+  } // expected-error {{expected '{' after 'if' condition}}
+}
+
+// rdar://76058892 - spurious ambiguity diagnostic
+func rdar76058892() {
+  struct S {
+    var test: Int = 0
+  }
+
+  func test(_: Int) {}
+  func test(_: () -> String) {}
+
+  func experiment(arr: [S]?) {
+    test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
+      if let arr = arr {
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
+      }
+    }
+  }
+}

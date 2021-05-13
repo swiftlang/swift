@@ -8,13 +8,13 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 enum TL {
   @TaskLocal
   static var number: Int = 0
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -32,7 +32,7 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func async_let_nested() async {
   print("TL: \(TL.$number)")
   
@@ -56,7 +56,7 @@ func async_let_nested() async {
   printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (0)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func async_let_nested_skip_optimization() async {
   async let x1: Int? = TL.$number.withValue(2) {
     async let x2: Int? = { () async -> Int? in
@@ -79,7 +79,7 @@ func async_let_nested_skip_optimization() async {
   _ = await x1
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await async_let_nested()

@@ -4433,7 +4433,7 @@ public:
   /// Given expression represents computed result of the closure.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
                              bool isDefaultWrappedValue = false,
-                             bool isSpawnLetWrapper = false);
+                             bool isAsyncLetWrapper = false);
 
   /// Builds a type-erased return expression that can be used in dynamic
   /// replacement.
@@ -4995,6 +4995,13 @@ public:
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
   void maybeProduceFallbackDiagnostic(SolutionApplicationTarget target) const;
+
+  /// Check whether given AST node represents an argument of an application
+  /// of some sort (call, operator invocation, subscript etc.)
+  /// and return AST node representing and argument index. E.g. for regular
+  /// calls `test(42)` passing `42` should return node representing
+  /// entire call and index `0`.
+  Optional<std::pair<Expr *, unsigned>> isArgumentExpr(Expr *expr);
 
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));

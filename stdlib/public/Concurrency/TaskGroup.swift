@@ -15,7 +15,7 @@ import Swift
 
 // ==== TaskGroup --------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension Task {
   @available(*, deprecated, message: "`Task.Group` was replaced by `ThrowingTaskGroup` and `TaskGroup` and will be removed shortly.")
   public typealias Group<TaskResult> = ThrowingTaskGroup<TaskResult, Error>
@@ -79,7 +79,7 @@ extension Task {
 /// - if the body returns normally:
 ///   - the group will await any not yet complete tasks,
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -158,7 +158,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
 /// - if the body throws:
 ///   - all tasks remaining in the group will be automatically cancelled.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -195,7 +195,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// A task group serves as storage for dynamically spawned tasks.
 ///
 /// It is created by the `withTaskGroup` function.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @frozen
 public struct TaskGroup<ChildTaskResult> {
 
@@ -228,6 +228,14 @@ public struct TaskGroup<ChildTaskResult> {
   ) {
     let optPriority: Task.Priority? = priority
     spawn(priority: optPriority, operation: operation)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    spawn(priority: priority, operation: operation)
   }
 
   /// Add a child task to the group.
@@ -278,6 +286,14 @@ public struct TaskGroup<ChildTaskResult> {
   ) -> Bool {
     let optPriority: Task.Priority? = priority
     return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    spawnUnlessCancelled(priority: priority, operation: operation)
   }
 
   /// Add a child task to the group.
@@ -455,7 +471,7 @@ public struct TaskGroup<ChildTaskResult> {
 /// child tasks.
 ///
 /// It is created by the `withTaskGroup` function.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @frozen
 public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 
@@ -500,6 +516,14 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ) {
     let optPriority: Task.Priority? = priority
     return spawn(priority: optPriority, operation: operation)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    spawn(priority: priority, operation: operation)
   }
 
   /// Spawn, unconditionally, a child task in the group.
@@ -551,6 +575,14 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ) -> Bool {
     let optPriority: Task.Priority? = priority
     return spawnUnlessCancelled(priority: optPriority, operation: operation)
+  }
+
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: Task.Priority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    spawnUnlessCancelled(priority: priority, operation: operation)
   }
 
   /// Add a child task to the group.
@@ -712,7 +744,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
 
 /// ==== TaskGroup: AsyncSequence ----------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension TaskGroup: AsyncSequence {
   public typealias AsyncIterator = Iterator
   public typealias Element = ChildTaskResult
@@ -731,7 +763,7 @@ extension TaskGroup: AsyncSequence {
   /// after any task completes by throwing an error.
   ///
   /// - SeeAlso: `TaskGroup.next()`
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.5, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
 
@@ -765,7 +797,7 @@ extension TaskGroup: AsyncSequence {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension ThrowingTaskGroup: AsyncSequence {
   public typealias AsyncIterator = Iterator
   public typealias Element = ChildTaskResult
@@ -785,7 +817,7 @@ extension ThrowingTaskGroup: AsyncSequence {
   /// throwing an error, no further task results are returned.
   ///
   /// - SeeAlso: `ThrowingTaskGroup.next()`
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.5, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
 
@@ -825,43 +857,43 @@ extension ThrowingTaskGroup: AsyncSequence {
 /// ==== -----------------------------------------------------------------------
 
 /// Attach task group child to the group group to the task.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_attachChild")
 func _taskGroupAttachChild(
   group: Builtin.RawPointer,
   child: Builtin.NativeObject
 ) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_destroy")
 func _taskGroupDestroy(group: __owned Builtin.RawPointer)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_addPending")
 func _taskGroupAddPendingTask(
   group: Builtin.RawPointer,
   unconditionally: Bool
 ) -> Bool
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(group: Builtin.RawPointer)
 
 /// Checks ONLY if the group was specifically cancelled.
 /// The task itself being cancelled must be checked separately.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_isCancelled")
 func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_wait_next_throwing")
 func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")
 func _taskHasTaskGroupStatusRecord() -> Bool
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 enum PollStatus: Int {
   case empty   = 0
   case waiting = 1
@@ -869,7 +901,7 @@ enum PollStatus: Int {
   case error   = 3
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_isEmpty")
 func _taskGroupIsEmpty(
   _ group: Builtin.RawPointer

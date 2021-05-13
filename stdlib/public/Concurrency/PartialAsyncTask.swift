@@ -14,7 +14,7 @@ import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 /// A unit of scheduleable work.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @frozen
 public struct PartialAsyncTask {
   private var context: Builtin.Job
@@ -22,7 +22,6 @@ public struct PartialAsyncTask {
   /// Starts running the task.
   public func run() { }
 }
-
 
 /// A mechanism to interface
 /// between synchronous and asynchronous code,
@@ -56,7 +55,7 @@ public struct PartialAsyncTask {
 /// Because both types have the same interface,
 /// you can replace one with the other in most circumstances,
 /// without making other changes.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @frozen
 public struct UnsafeContinuation<T, E: Error> {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
@@ -133,7 +132,7 @@ public struct UnsafeContinuation<T, E: Error> {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension UnsafeContinuation {
 
   /// Resume the task that's awaiting the continuation
@@ -207,7 +206,7 @@ extension UnsafeContinuation {
 #if _runtime(_ObjC)
 
 // Intrinsics used by SILGen to resume or fail continuations.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
@@ -216,7 +215,7 @@ internal func _resumeUnsafeContinuation<T>(
   continuation.resume(returning: value)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
@@ -225,7 +224,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
   continuation.resume(returning: value)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
@@ -246,7 +245,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 ///
 /// The continuation won't start executing until the operation function returns.
 /// ◊TR: What does this mean?
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
   _ fn: (UnsafeContinuation<T, Never>) -> Void
@@ -266,7 +265,7 @@ public func withUnsafeContinuation<T>(
 ///
 /// The continuation won't start executing until the operation function returns.
 /// ◊TR: What does this mean?
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
@@ -276,6 +275,6 @@ public func withUnsafeThrowingContinuation<T>(
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @available(*, deprecated, message: "please use UnsafeContination<..., Error>")
 public typealias UnsafeThrowingContinuation<T> = UnsafeContinuation<T, Error>

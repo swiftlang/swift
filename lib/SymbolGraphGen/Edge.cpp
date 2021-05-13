@@ -15,8 +15,28 @@
 #include "Symbol.h"
 #include "SymbolGraphASTWalker.h"
 
+#include <queue>
+
 using namespace swift;
 using namespace symbolgraphgen;
+
+namespace {
+const ValueDecl *getForeignProtocolRequirement(const ValueDecl *VD, const ModuleDecl *M) {
+  std::queue<const ValueDecl *> requirements;
+  while (true) {
+    for (auto *req : VD->getSatisfiedProtocolRequirements()) {
+      if (req->getModuleContext()->getNameStr() != M->getNameStr())
+        return req;
+      else
+        requirements.push(req);
+    }
+    if (requirements.empty())
+      return nullptr;
+    VD = requirements.front();
+    requirements.pop();
+  }
+}
+} // end anonymous namespace
 
 void Edge::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
@@ -56,6 +76,36 @@ void Edge::serialize(llvm::json::OStream &OS) const {
           }
         });
       }
+    }
+    
+    const ValueDecl *InheritingDecl = nullptr;
+    if (const auto *ID = Source.getDeclInheritingDocs()) {
+      if (Target.getSymbolDecl() == ID || Source.getSynthesizedBaseTypeDecl())
+        InheritingDecl = ID;
+    }
+
+    if (!InheritingDecl && Source.getSynthesizedBaseTypeDecl())
+      InheritingDecl = Source.getSymbolDecl();
+
+    if (!InheritingDecl) {
+      if (const auto *ID = getForeignProtocolRequirement(Source.getSymbolDecl(), &Graph->M))
+        InheritingDecl = ID;
+    }
+    
+    // If our source symbol is a inheriting decl, write in information about
+    // where it's inheriting docs from.
+    if (InheritingDecl) {
+      Symbol inheritedSym(Graph, InheritingDecl, nullptr);
+      SmallString<256> USR, Display;
+      llvm::raw_svector_ostream DisplayOS(Display);
+      
+      inheritedSym.getUSR(USR);
+      inheritedSym.printPath(DisplayOS);
+      
+      OS.attributeObject("sourceOrigin", [&](){
+        OS.attribute("identifier", USR.str());
+        OS.attribute("displayName", Display.str());
+      });
     }
   });
 }

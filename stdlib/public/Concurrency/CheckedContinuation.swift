@@ -12,13 +12,13 @@
 
 import Swift
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_continuation_logFailedCheck")
 internal func logFailedCheck(_ message: UnsafeRawPointer)
 
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 internal final class CheckedContinuationCanary {
   // The instance state is stored in tail-allocated raw memory, so that
   // we can atomically check the continuation state.
@@ -118,7 +118,7 @@ internal final class CheckedContinuationCanary {
 /// Because both types have the same interface,
 /// you can replace one with the other in most circumstances,
 /// without making other changes.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct CheckedContinuation<T, E: Error> {
   private let canary: CheckedContinuationCanary
   
@@ -186,7 +186,7 @@ public struct CheckedContinuation<T, E: Error> {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension CheckedContinuation {
   /// Resume the task awaiting the continuation by having it either
   /// return normally or throw an error based on the state of the given
@@ -260,7 +260,7 @@ extension CheckedContinuation {
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.
 ///     The closure must resume the continuation *exactly once*.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func withCheckedContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Never>) -> Void
@@ -281,7 +281,7 @@ public func withCheckedContinuation<T>(
 ///
 /// If the closure throws an error,
 /// this function rethrows that error.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T, Error>) -> Void
