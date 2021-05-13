@@ -798,7 +798,7 @@ extension Task {
 /// and that function isn't executing in the context of any task,
 /// the unsafe task handle is `nil`.
 ///
-/// Don't try to store an unsafe task handle
+/// Don't store an unsafe task handle
 /// for use outside this method's closure.
 /// Storing an unsafe task handle doesn't have an impact on the task's actual life cycle,
 /// and the behavior of accessing an unsafe task handle
