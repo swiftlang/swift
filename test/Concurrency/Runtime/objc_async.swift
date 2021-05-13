@@ -11,6 +11,10 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// Disable this test because it's flaky without a proper way to make the main
+// Swift task await a background queue.
+// REQUIRES: rdar77934626
+
 func buttTest() async {
   let butt = Butt()
   let result = await butt.butt(1738)
