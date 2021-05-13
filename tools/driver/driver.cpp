@@ -158,18 +158,18 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
     llvm::sys::path::append(buffer, *driverNameOp);
     return true;
   }
-#ifdef __APPLE__
-  // FIXME: use swift-driver as the default driver for all platforms.
+
   llvm::sys::path::append(buffer, "swift-driver");
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
   llvm::sys::path::remove_filename(buffer);
   llvm::sys::path::append(buffer, "swift-driver-new");
-  return true;
-#else
+  if (llvm::sys::fs::exists(buffer)) {
+    return true;
+  }
+
   return false;
-#endif
 }
 
 static int run_driver(StringRef ExecName,

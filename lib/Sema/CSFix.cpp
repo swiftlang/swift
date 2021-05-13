@@ -1533,11 +1533,7 @@ std::string SpecifyClosureParameterType::getName() const {
   auto *PD = closure->getParameters()->get(paramLoc.getIndex());
 
   OS << "specify type for parameter ";
-  if (PD->isAnonClosureParam()) {
-    OS << "$" << paramLoc.getIndex();
-  } else {
-    OS << "'" << PD->getParameterName() << "'";
-  }
+  OS << "'" << PD->getParameterName() << "'";
 
   return OS.str();
 }

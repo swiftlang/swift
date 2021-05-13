@@ -327,21 +327,10 @@ withError { res, err in
   }
   print("after")
 }
-// MULTIBIND: var res: String? = nil
-// MULTIBIND-NEXT: var err: Error? = nil
-// MULTIBIND-NEXT: do {
-// MULTIBIND-NEXT: res = try await withError()
-// MULTIBIND-NEXT: } catch {
-// MULTIBIND-NEXT: err = error
-// MULTIBIND-NEXT: }
-// MULTIBIND-EMPTY:
+// MULTIBIND: let str = try await withError()
 // MULTIBIND-NEXT: print("before")
-// MULTIBIND-NEXT: if let str = res {
 // MULTIBIND-NEXT: print("got result \(str)")
-// MULTIBIND-NEXT: }
-// MULTIBIND-NEXT: if let str2 = res {
-// MULTIBIND-NEXT: print("got result \(str2)")
-// MULTIBIND-NEXT: }
+// MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("after")
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=NESTEDRET %s
