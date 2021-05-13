@@ -97,12 +97,12 @@ internal final class CheckedContinuationCanary {
 /// `resume(with:)`,
 /// or `resume()` method.
 ///
-/// - Important: You must call a resume methods exactly once
-///   on every execution path through the program.
+/// - Important: You must call a resume method exactly once
+///   on every execution path throughout the program.
 ///
 /// Resuming from a continuation more than once is undefined behavior.
 /// Never resuming leaves the task in a suspended state,
-/// leaking any associated resources.
+/// and leaks any associated resources.
 /// `CheckedContinuation` logs a message
 /// if either of these invariants is violated.
 ///
@@ -113,11 +113,11 @@ internal final class CheckedContinuationCanary {
 /// for interfacing Swift tasks with
 /// event loops, delegate methods, callbacks,
 /// and other non-`async` scheduling mechanisms.
-/// However, during development, being able to verify that the
+/// However, during development, the ability to verify that the
 /// invariants are being upheld in testing is important.
 /// Because both types have the same interface,
 /// you can replace one with the other in most circumstances,
-/// without the need for any other changes.
+/// without making other changes.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct CheckedContinuation<T, E: Error> {
   private let canary: CheckedContinuationCanary
@@ -133,9 +133,9 @@ public struct CheckedContinuation<T, E: Error> {
   ///
   /// - Parameters:
   ///   - continuation: An instance of `UnsafeContinuation`
-  ///     that has not yet been resumed.
+  ///     that hasn't yet been resumed.
   ///     After passing the unsafe continuation to this initializer,
-  ///     do not use it outside of this object.
+  ///     don't use it outside of this object.
   ///   - function: A string identifying the declaration that is the notional
   ///     source for the continuation, used to identify the continuation in
   ///     runtime diagnostics related to misuse of this continuation.
@@ -152,10 +152,10 @@ public struct CheckedContinuation<T, E: Error> {
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will trap.
+  /// the continuation will trap.
   ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
+  /// After `resume` enqueues the task, control immediately returns to
+  /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   public func resume(returning x: __owned T) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
@@ -172,10 +172,10 @@ public struct CheckedContinuation<T, E: Error> {
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will trap.
+  /// the continuation will trap.
   ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
+  /// After `resume` enqueues the task, control immediately returns to
+  /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   public func resume(throwing x: __owned E) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
@@ -197,10 +197,10 @@ extension CheckedContinuation {
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will trap.
+  /// the continuation will trap.
   ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
+  /// After `resume` enqueues the task, control immediately returns to
+  /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
@@ -221,10 +221,10 @@ extension CheckedContinuation {
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will trap.
+  /// the continuation will trap.
   ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
+  /// After `resume` enqueues the task, control immediately returns to
+  /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(with result: Result<T, E>) {
@@ -241,10 +241,10 @@ extension CheckedContinuation {
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will trap.
+  /// the continuation will trap.
   ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
+  /// After `resume` enqueues the task, control immediately returns to
+  /// the caller. The task continues executing when its executor is
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume() where T == Void {
@@ -255,7 +255,7 @@ extension CheckedContinuation {
 /// Calls the given closure with a checked continuation.
 ///
 /// - Parameters:
-///   - function: a string identifying the declaration that is the notional
+///   - function: A string identifying the declaration that is the notional
 ///     source for the continuation, used to identify the continuation in
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.

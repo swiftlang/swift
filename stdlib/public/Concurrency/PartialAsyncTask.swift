@@ -39,10 +39,10 @@ public struct PartialAsyncTask {
 /// or `resume()` method.
 ///
 /// - Important: You must call a resume methods exactly once
-///   on every execution path through the program.
+///   on every execution path throughout the program.
 ///   Resuming from a continuation more than once is undefined behavior.
 ///   Never resuming leaves the task in a suspended state,
-///   leaking any associated resources.
+///   and leaks any associated resources.
 ///
 /// `CheckedContinuation` performs runtime checks
 /// for missing or multiple resume operations.
@@ -51,11 +51,11 @@ public struct PartialAsyncTask {
 /// for interfacing Swift tasks with
 /// event loops, delegate methods, callbacks,
 /// and other non-`async` scheduling mechanisms.
-/// However, during development, being able to verify that the
+/// However, during development, the ability to verify that the
 /// invariants are being upheld in testing is important.
 /// Because both types have the same interface,
 /// you can replace one with the other in most circumstances,
-/// without the need for any other changes.
+/// without making other changes.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
 public struct UnsafeContinuation<T, E: Error> {
@@ -72,12 +72,12 @@ public struct UnsafeContinuation<T, E: Error> {
   /// - Parameter value: The value to return from the continuation.
   ///
   /// A continuation must be resumed exactly once.
-  /// If the continuation has already been resumed,
-  /// then calling this method will result in undefined behavior.
+  /// If the continuation has already resumed,
+  /// then calling this method results in undefined behavior.
   ///
   /// After calling this method,
-  /// control is immediately returned to the caller.
-  /// The task will continue executing
+  /// control immediately returns to the caller.
+  /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) where E == Never {
@@ -94,12 +94,12 @@ public struct UnsafeContinuation<T, E: Error> {
   /// - Parameter value: The value to return from the continuation.
   ///
   /// A continuation must be resumed exactly once.
-  /// If the continuation has already been resumed,
-  /// then calling this method will result in undefined behavior.
+  /// If the continuation has already resumed,
+  /// then calling this method results in undefined behavior.
   ///
   /// After calling this method,
-  /// control is immediately returned to the caller.
-  /// The task will continue executing
+  /// control immediately returns to the caller.
+  /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) {
@@ -116,12 +116,12 @@ public struct UnsafeContinuation<T, E: Error> {
   /// - Parameter error: The error to throw from the continuation.
   ///
   /// A continuation must be resumed exactly once.
-  /// If the continuation has already been resumed,
-  /// then calling this method will result in undefined behavior.
+  /// If the continuation has already resumed,
+  /// then calling this method results in undefined behavior.
   ///
   /// After calling this method,
-  /// control is immediately returned to the caller.
-  /// The task will continue executing
+  /// control immediately returns to the caller.
+  /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume(throwing error: __owned E) {
@@ -145,12 +145,12 @@ extension UnsafeContinuation {
   ///   otherwise, it throws the `.error` value.
   ///
   /// A continuation must be resumed exactly once.
-  /// If the continuation has already been resumed,
-  /// then calling this method will result in undefined behavior.
+  /// If the continuation has already resumed,
+  /// then calling this method results in undefined behavior.
   ///
   /// After calling this method,
-  /// control is immediately returned to the caller.
-  /// The task will continue executing
+  /// control immediately returns to the caller.
+  /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
@@ -171,12 +171,12 @@ extension UnsafeContinuation {
   ///   otherwise, it throws the `.error` value.
   ///
   /// A continuation must be resumed exactly once.
-  /// If the continuation has already been resumed,
-  /// then calling this method will result in undefined behavior.
+  /// If the continuation has already resumed,
+  /// then calling this method results in undefined behavior.
   ///
   /// After calling this method,
-  /// control is immediately returned to the caller.
-  /// The task will continue executing
+  /// control immediately returns to the caller.
+  /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume(with result: Result<T, E>) {
@@ -191,12 +191,12 @@ extension UnsafeContinuation {
   /// Resume the task that's awaiting the continuation by returning.
   ///
   /// A continuation must be resumed exactly once.
-  /// If the continuation has already been resumed,
-  /// then calling this method will result in undefined behavior.
+  /// If the continuation has already resumed,
+  /// then calling this method results in undefined behavior.
   ///
   /// After calling this method,
-  /// control is immediately returned to the caller.
-  /// The task will continue executing
+  /// control immediately returns to the caller.
+  /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
   public func resume() where T == Void {
@@ -240,11 +240,11 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// and returns its result.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
-/// The closure must resume the continuation *exactly once*.
+/// The closure must resume the continuation exactly once.
 ///
 /// - Returns: The value passed to the continuation by the closure.
 ///
-/// The continuation will not begin executing until the operation function returns.
+/// The continuation won't start executing until the operation function returns.
 /// ◊TR: What does this mean?
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
@@ -260,11 +260,11 @@ public func withUnsafeContinuation<T>(
 /// and returns its result or throws its error.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
-/// The closure must resume the continuation *exactly once*.
+/// The closure must resume the continuation exactly once.
 ///
 /// - Returns: The value passed to the continuation by the closure.
 ///
-/// The continuation will not begin executing until the operation function returns.
+/// The continuation won't start executing until the operation function returns.
 /// ◊TR: What does this mean?
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
