@@ -25,9 +25,9 @@ import Swift
 /// To implement your own `AsyncSequence`, implement a wrapped type that
 /// conforms to `AsyncIteratorProtocol`. The following example shows a `Counter`
 /// type that uses an inner iterator to monotonically generate `Int` values
-/// until a `howHigh` value is reached. While this example is not itself
-/// asychronous, it shows the shape of a custom sequence and iterator, and can
-/// be used as if it were asynchronous:
+/// until reaching a `howHigh` value. While this example isn't itself
+/// asychronous, it shows the shape of a custom sequence and iterator, and how
+/// to use it as if it were asynchronous:
 ///
 ///     struct Counter : AsyncSequence {
 ///       typealias Element = Int
@@ -37,7 +37,7 @@ import Swift
 ///         let howHigh: Int
 ///         var current = 1
 ///         mutating func next() async -> Int? {
-///           // A genuinely asychronous implementation should use the `Task`
+///           // A genuinely asychronous implementation uses the `Task`
 ///           // API to check for cancellation here and return early.
 ///           guard current <= howHigh else {
 ///             return nil
@@ -82,14 +82,14 @@ import Swift
 ///   immediately react to cancellation.
 ///
 /// If the iterator needs to clean up on cancellation, it can do so after
-/// checking for cancellation as described above, or in `deinit` if it is
+/// checking for cancellation as described above, or in `deinit` if it's
 /// a reference type.
 @available(SwiftStdlib 5.5, *)
 @rethrows
 public protocol AsyncIteratorProtocol {
   associatedtype Element
-  /// Asynchronously advances to the next element and returns it, or nil if no
-  /// next element exists.
+  /// Asynchronously advances to the next element and returns it, or ends the
+  /// sequence if there is no next element.
   /// - Returns: The next element, if it exists, or `nil` to signal the end of
   ///   the sequence.
   mutating func next() async throws -> Element?

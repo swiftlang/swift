@@ -15,7 +15,7 @@ import Swift
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
   /// Omits elements from the base sequence until a given error-throwing closure
-  /// returns `false`, after which it passes through all remaining elements.
+  /// returns false, after which it passes through all remaining elements.
   ///
   /// Use `drop(while:)` to omit elements from an asynchronous sequence until
   /// the element received meets a condition you specify. If the closure you

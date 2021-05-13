@@ -40,7 +40,7 @@ extension AsyncSequence {
   ///
   /// - Parameter isIncluded: An error-throwing closure that takes an element
   ///   of the asynchronous sequence as its argument and returns a Boolean value
-  ///   indicating whether to include the element in the filtered sequence.
+  ///   that indicates whether to include the element in the filtered sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   of the base sequence that satisfy the given predicate. If the predicate
   ///   throws an error, the sequence contains only values produced prior to

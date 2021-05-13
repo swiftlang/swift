@@ -114,7 +114,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
       self.transform = transform
     }
 
-    /// Produces the next element in the flatp map sequence.
+    /// Produces the next element in the flat map sequence.
     ///
     /// This iterator calls `next()` on its base iterator; if this call returns
     /// `nil`, `next()` returns `nil`. Otherwise, `next()` calls the

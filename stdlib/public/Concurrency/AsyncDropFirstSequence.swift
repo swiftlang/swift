@@ -17,7 +17,7 @@ extension AsyncSequence {
   /// Omits a specified number of elements from the base asynchronous sequence,
   /// then passes through all remaining elements.
   ///
-  /// Use `dropFirst(_:)` when you want to drop the first n elements from the
+  /// Use `dropFirst(_:)` when you want to drop the first *n* elements from the
   /// base sequence, and pass through the remaining elements.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
@@ -121,8 +121,8 @@ extension AsyncDropFirstSequence {
   /// Omits a specified number of elements from the base asynchronous sequence,
   /// then passes through all remaining elements.
   ///
-  /// When you call dropFirst(_:) on an asynchronous sequence that is already an
-  /// `AsyncDropFirstSequence`, the returned sequence simply adds the new
+  /// When you call `dropFirst(_:)` on an asynchronous sequence that is already
+  /// an `AsyncDropFirstSequence`, the returned sequence simply adds the new
   /// drop count to the current drop count.
   @inlinable
   public __consuming func dropFirst(

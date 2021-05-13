@@ -22,7 +22,7 @@ import Swift
 /// available.
 ///
 /// As with `Sequence`, you typically iterate through an `AsyncSequence` with a
-/// `for await`-`in` loop. However, since the caller must potentially wait for values,
+/// `for await`-`in` loop. However, because the caller must potentially wait for values,
 /// you use the `await` keyword. The following example shows how to iterate
 /// over `Counter`, a custom `AsyncSequence` that produces `Int` values from
 /// `1` up to a `howHigh` value:
@@ -38,14 +38,13 @@ import Swift
 /// method. This returns an instance of type `AsyncIterator`. Like the standard
 /// `IteratorProtocol`, the `AsyncIteratorProtocol` defines a single `next()`
 /// method to produce elements. The difference is that the `AsyncIterator`
-/// defines its `next()` method as `async`, which a caller to `await` the next
-/// value.
+/// defines its `next()` method as `async`, which requires a caller to `await`
+/// the next value.
 ///
-/// `AsyncSequence` also defines functions that allow you to perform common
-/// processing of the elements you receive, modeled on the operations provided
-/// by the basic `Sequence` in the standard library. There are two categories of
-/// functions: those that return a single value, and those that return another
-/// `AsyncSequence`.
+/// `AsyncSequence` also defines functions for processing the elements you
+/// receive, modeled on the operations provided by the basic `Sequence` in the
+/// standard library. There are two categories of functions: those that return a
+/// single value, and those that return another `AsyncSequence`.
 ///
 /// Single-value functions eliminate the need for a `for await`-`in` loop, and instead
 /// let you make a single `await` call. For example, the `contains(_:)` method
@@ -90,11 +89,11 @@ extension AsyncSequence {
   /// Returns the result of combining the elements of the asynchronous sequence
   /// using the given closure.
   ///
-  /// Use the reduce(_:_:) method to produce a single value from the elements of
+  /// Use the `reduce(_:_:)` method to produce a single value from the elements of
   /// an entire sequence. For example, you can use this method on an sequence of
   /// numbers to find their sum or product.
   ///
-  /// The nextPartialResult closure executes sequentially with an accumulating
+  /// The `nextPartialResult` closure executes sequentially with an accumulating
   /// value initialized to `initialResult` and each element of the sequence.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
@@ -112,7 +111,7 @@ extension AsyncSequence {
   /// - Parameters:
   ///   - initialResult: The value to use as the initial accumulating value.
   ///     The `nextPartialResult` closure receives `initialResult` the first
-  ///     time the closure executes.
+  ///     time the closure runs.
   ///   - nextPartialResult: A closure that combines an accumulating value and
   ///     an element of the asynchronous sequence into a new accumulating value,
   ///     for use in the next call of the `nextPartialResult` closure or
@@ -136,15 +135,15 @@ extension AsyncSequence {
   /// Returns the result of combining the elements of the asynchronous sequence
   /// using the given closure, given a mutable initial value.
   ///
-  /// Use the reduce(into:_:) method to produce a single value from the elements
-  /// of an entire sequence. For example, you can use this method on an sequence
-  /// of numbers to find their sum or product.
+  /// Use the `reduce(into:_:)` method to produce a single value from the
+  /// elements of an entire sequence. For example, you can use this method on a
+  /// sequence of numbers to find their sum or product.
   ///
-  /// The nextPartialResult closure executes sequentially with an accumulating
+  /// The `nextPartialResult` closure executes sequentially with an accumulating
   /// value initialized to `initialResult` and each element of the sequence.
   ///
-  /// Prever this method over `reduce(_:_:)` for efficiency when the result is
-  /// a copy-on-write type, for example an Array or a Dictionary.
+  /// Prefer this method over `reduce(_:_:)` for efficiency when the result is
+  /// a copy-on-write type, for example an `Array` or `Dictionary`.
   ///
   /// - Parameters:
   ///   - initialResult: The value to use as the initial accumulating value.
@@ -188,7 +187,7 @@ func _contains<Source: AsyncSequence>(
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
-  /// Returns a Boolean value indicating whether the asynchronous sequence
+  /// Returns a Boolean value that indicates whether the asynchronous sequence
   /// contains an element that satisfies the given predicate.
   ///
   /// You can use the predicate to check for an element of a type that doesn’t
@@ -219,7 +218,7 @@ extension AsyncSequence {
     return try await _contains(self, where: predicate)
   }
   
-  /// Returns a Boolean value indicating whether all elements produced by the
+  /// Returns a Boolean value that indicates whether all elements produced by the
   /// asynchronous sequence satisfies the given predicate.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
@@ -249,7 +248,7 @@ extension AsyncSequence {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence where Element: Equatable {
-  /// Returns a Boolean value indicating whether the asynchronous sequence
+  /// Returns a Boolean value that indicates whether the asynchronous sequence
   /// contains the given element.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
@@ -307,8 +306,8 @@ extension AsyncSequence {
   /// element, until either the predicate finds a match or the sequence ends.
   ///
   /// - Parameter predicate: A closure that takes an element of the asynchronous
-  ///  sequence as its argument and returns a Boolean value indicating whether
-  ///  the element is a match.
+  ///  sequence as its argument and returns a Boolean value that indicates
+  ///  whether the element is a match.
   /// - Returns: The first element of the sequence that satisfies `predicate`,
   ///   or `nil` if there is no element that satisfies `predicate`.
   @inlinable
@@ -329,16 +328,16 @@ extension AsyncSequence {
   /// sequence.
   ///
   /// The predicate must be a *strict weak ordering* over the elements. That is,
-  /// for any elements a, b, and c, the following conditions must hold:
+  /// for any elements `a`, `b`, and `c`, the following conditions must hold:
   ///
-  ///   - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  ///   - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///     both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
-  ///     (Transitive comparability)
-  ///   - Two elements are incomparable if neither is ordered before the other
-  ///     according to the predicate. If a and b are incomparable, and b and c
-  ///     are incomparable, then a and c are also incomparable.
-  ///     (Transitive incomparability)
+  ///   - Irreflexivity — `areInIncreasingOrder(a, a)` is always `false`.
+  ///   - Transitive comparability — If `areInIncreasingOrder(a, b)` and
+  ///     `areInIncreasingOrder(b, c)` are both `true`, then
+  ///     `areInIncreasingOrder(a, c)` is also `true`.
+  ///   - Transitive incomparability — Two elements are incomparable if neither
+  ///     is ordered before the other according to the predicate. If `a` and `b`
+  ///     are incomparable, and `b` and `c` are incomparable, then `a` and `c`
+  ///     are also incomparable.
   ///
   /// The following example uses an enumeration of playing cards ranks, `Rank`,
   /// which ranges from `ace` (low) to `king` (high). An asynchronous sequence
@@ -355,8 +354,7 @@ extension AsyncSequence {
   ///     // Prints: ace
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
-  ///   first argument should be ordered before its second argument; otherwise,
-  ///   `false`.
+  ///   first argument comes before its second argument; otherwise, `false`.
   /// - Returns: The sequence’s minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns `nil`.
   @inlinable
@@ -384,16 +382,16 @@ extension AsyncSequence {
   /// sequence.
   ///
   /// The predicate must be a *strict weak ordering* over the elements. That is,
-  /// for any elements a, b, and c, the following conditions must hold:
+  /// for any elements `a`, `b`, and `c`, the following conditions must hold:
   ///
-  ///   - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  ///   - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///     both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
-  ///     (Transitive comparability)
-  ///   - Two elements are incomparable if neither is ordered before the other
-  ///     according to the predicate. If a and b are incomparable, and b and c
-  ///     are incomparable, then a and c are also incomparable.
-  ///     (Transitive incomparability)
+  ///   - Irreflexivity — `areInIncreasingOrder(a, a)` is always `false`.
+  ///   - Transitive comparability — If `areInIncreasingOrder(a, b)` and
+  ///     `areInIncreasingOrder(b, c)` are both `true`, then
+  ///     `areInIncreasingOrder(a, c)` is also `true`.
+  ///   - Transitive incomparability — Two elements are incomparable if neither
+  ///     is ordered before the other according to the predicate. If `a` and `b`
+  ///     are incomparable, and `b` and `c` are incomparable, then `a` and `c`
+  ///     are also incomparable.
   ///
   /// The following example uses an enumeration of playing cards ranks, `Rank`,
   /// which ranges from `ace` (low) to `king` (high). An asynchronous sequence
@@ -410,8 +408,7 @@ extension AsyncSequence {
   ///     // Prints: king
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
-  ///   first argument should be ordered before its second argument; otherwise,
-  ///   `false`.
+  ///   first argument comes before its second argument; otherwise, `false`.
   /// - Returns: The sequence’s minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns `nil`.
   @inlinable
@@ -447,7 +444,7 @@ extension AsyncSequence where Element: Comparable {
   ///     // Prints: 1
   ///
   /// - Returns: The sequence’s minimum element. If the sequence has no
-  ///   elements, returns nil.
+  ///   elements, returns `nil`.
   @inlinable
   @warn_unqualified_access
   public func min() async rethrows -> Element? {
@@ -467,7 +464,7 @@ extension AsyncSequence where Element: Comparable {
   ///     // Prints: 10
   ///
   /// - Returns: The sequence’s maximum element. If the sequence has no
-  ///   elements, returns nil.
+  ///   elements, returns `nil`.
   @inlinable
   @warn_unqualified_access
   public func max() async rethrows -> Element? {

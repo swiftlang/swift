@@ -14,9 +14,8 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
-  /// Creates an asynchronous sequence that maps the given error-throwing
-  /// closure over the asynchronous sequence’s elements, omitting results that
-  /// return no value.
+  /// Creates an asynchronous sequence that maps an error-throwing closure over
+  /// the base sequence’s elements, omitting results that don't return a value.
   ///
   /// Use the `compactMap(_:)` function to transform every element received from
   /// a base asynchronous sequence, while also discarding any `nil` results
@@ -66,8 +65,8 @@ extension AsyncSequence {
   }
 }
 
-/// An asynchronous sequence that maps a given error-throwing closure over the
-/// asynchronous sequence’s elements, omitting results that return no value.
+/// An asynchronous sequence that maps an error-throwing closure over the base
+/// sequence’s elements, omitting results that don't return a value.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline

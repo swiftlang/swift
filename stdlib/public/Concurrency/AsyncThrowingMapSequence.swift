@@ -26,8 +26,8 @@ extension AsyncSequence {
   /// takes each `Int` and looks up a corresponding `String` from a
   /// `romanNumeralDict` dictionary. This means the outer `for await in` loop
   /// iterates over `String` instances instead of the underlying `Int` values
-  /// that `Counter` produces. Also, the dictionary does not provide a key for
-  /// `4`, and the closure throws an error for any key it cannot look up, so
+  /// that `Counter` produces. Also, the dictionary doesn't provide a key for
+  /// `4`, and the closure throws an error for any key it can't look up, so
   /// receiving this value from `Counter` ends the modified sequence with an
   /// error.
   ///

@@ -25,7 +25,7 @@ extension AsyncSequence {
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The `prefix(_:)` function causes the modified
   /// sequence to pass through values less than `8`, but throws an
-  /// error when it receives a value that is divisible by `5`:
+  /// error when it receives a value that's divisible by `5`:
   ///
   ///     do {
   ///         let stream = try Counter(howHigh: 10)
@@ -45,7 +45,7 @@ extension AsyncSequence {
   ///
   /// - Parameter isIncluded: A error-throwing closure that takes an element of
   ///   the asynchronous sequence as its argument and returns a Boolean value
-  ///   indicating whether to include the element in the modified sequence.
+  ///   that indicates whether to include the element in the modified sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
   ///   of the base sequence that satisfy the given predicate. If the predicate
   ///   throws an error, the sequence contains only values produced prior to
@@ -111,7 +111,7 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
 
     /// Produces the next element in the prefix-while sequence.
     ///
-    /// If the predicate hasn't yet failed, this method gets the next element
+    /// If the predicate hasn't failed yet, this method gets the next element
     /// from the base sequence and calls the predicate with it. If this call
     /// succeeds, this method passes along the element. Otherwise, it returns
     /// `nil`, ending the sequence. If calling the predicate closure throws an

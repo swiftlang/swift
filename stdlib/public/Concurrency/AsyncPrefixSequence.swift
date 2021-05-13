@@ -30,7 +30,7 @@ extension AsyncSequence {
   ///     // prints "1 2 3 4 5 6"
   ///
   /// If the count passed to `prefix(_:)` exceeds the number of elements in the
-  /// base sequence, the result contains all the elements in the sequence.
+  /// base sequence, the result contains all of the elements in the sequence.
   ///
   /// - Parameter count: The maximum number of elements to return. The value of
   ///   `count` must be greater than or equal to zero.
