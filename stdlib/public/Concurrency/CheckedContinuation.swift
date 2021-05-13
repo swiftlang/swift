@@ -259,7 +259,7 @@ extension CheckedContinuation {
 ///     source for the continuation, used to identify the continuation in
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.
-///     The closure must resume the continuation *exactly once*.
+///     The closure must resume the continuation exactly once.
 @available(SwiftStdlib 5.5, *)
 public func withCheckedContinuation<T>(
     function: String = #function,
@@ -273,11 +273,11 @@ public func withCheckedContinuation<T>(
 /// Calls the given throwing closure with a checked continuation.
 ///
 /// - Parameters:
-///   - function: a string identifying the declaration that is the notional
+///   - function: A string identifying the declaration that is the notional
 ///     source for the continuation, used to identify the continuation in
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.
-///     The closure must resume the continuation *exactly once*.
+///     The closure must resume the continuation exactly once.
 ///
 /// If the closure throws an error,
 /// this function rethrows that error.
