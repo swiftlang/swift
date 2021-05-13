@@ -622,6 +622,11 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!type)
     return Type();
 
+  // If the declaration came from a module file, there's no need to
+  // compute the auxiliary variables.
+  if (!var->getDeclContext()->getParentSourceFile())
+    return type;
+
   // Set the interface type of each synthesized declaration.
   auto auxiliaryVars = var->getPropertyWrapperAuxiliaryVariables();
   auxiliaryVars.backingVar->setInterfaceType(type);
