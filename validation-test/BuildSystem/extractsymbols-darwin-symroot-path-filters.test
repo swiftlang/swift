@@ -1,0 +1,111 @@
+# REQUIRES: standalone_build
+# REQUIRES: OS=macosx
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: split-file %s %t
+
+# Even though we are running build-script with dry-run,
+# symbol extraction runs real commands against the file system.
+# Thus we generate a series of files
+# to exercise the filtering logic
+# RUN: mkdir -p %t/destdir/bin
+# RUN: mkdir -p %t/destdir/lib
+# RUN: %swiftc_driver %t/hello.swift -o %t/destdir/bin/swift-demangle
+# RUN: %swiftc_driver %t/hello.swift -o %t/destdir/bin/swift-def-to-yaml-converter
+# RUN: ln -s %t/destdir/swift-demangle %t/destdir/bin/swift-api-digester
+# RUN: cp %t/swift-util.py %t/destdir/bin
+# RUN: chmod a+x %t/destdir/bin/swift-util.py
+# RUN: %swiftc_driver %t/dylib.swift -emit-library -o %t/destdir/lib/libswiftDemangle.dylib
+# RUN: %swiftc_driver %t/dylib.swift -emit-library -o %t/destdir/lib/lib_InternalSwiftScan.dylib
+# RUN: %swiftc_driver %t/dylib.swift -emit-library -static -o %t/destdir/lib/libswiftASTSectionImporter.a 
+# RUN: mkdir -p %t/symroot/macosx-%target-cpu
+
+# test build-script-impl on its own
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script-impl --dry-run --build-dir=%t/build --workspace=%swift_src_root/.. --cmake %cmake --only-execute macosx-%target-cpu-extractsymbols --host-cc /usr/bin/true --darwin-install-extract-symbols=1 --host-target=macosx-%target-cpu --install-symroot=%t/symroot --install-destdir=%t/destdir --build-jobs=1 --darwin-symroot-path-filters="/lib/ /swift-demangle"  2>&1 | tee %t/build-script-impl-output.txt
+# RUN: %FileCheck --input-file=%t/build-script-impl-output.txt %s
+# RUN: %FileCheck --input-file=%t/build-script-impl-output.txt --check-prefixes CHECK-SKIPPED %s
+
+# ensure build-script pass the argument to build-script-impl
+# RUN: %empty-directory(%t/symroot)
+# RUN: mkdir -p %t/symroot/macosx-%target-cpu
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --darwin-install-extract-symbols=1 --install-destdir=%t/destdir --toolchain-prefix="" --install-symroot=%t/symroot --darwin-symroot-path-filters="/lib/ /swift-demangle" --jobs=1  2>&1 | tee %t/build-script-output.txt
+# RUN: %FileCheck --input-file=%t/build-script-output.txt %s
+# RUN: %FileCheck --input-file=%t/build-script-output.txt --check-prefixes CHECK-SKIPPED %s
+
+# ensure we get all the values if we specify the flag multiple times
+# RUN: %empty-directory(%t/symroot)
+# RUN: mkdir -p %t/symroot/macosx-%target-cpu
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --darwin-install-extract-symbols=1 --install-destdir=%t/destdir --toolchain-prefix="" --install-symroot=%t/symroot --darwin-symroot-path-filters="/lib/" --darwin-symroot-path-filters="/swift-demangle" --jobs=1  2>&1 | tee %t/build-script-output.txt
+# RUN: %FileCheck --input-file=%t/build-script-output.txt %s
+# RUN: %FileCheck --input-file=%t/build-script-output.txt --check-prefixes CHECK-SKIPPED %s
+
+
+# CHECK: --- Extracting symbols ---
+
+# Ensure we copy all the files in lib and the swift-demangle executable
+# CHECK-LABEL: cpio
+# CHECK-DAG: swift-demangle
+# CHECK-DAG: libswiftDemangle.dylib
+# CHECK-DAG: lib_InternalSwiftScan.dylib
+
+# Ensure we generate symbols for the file in the symroot
+# CHECK-LABEL: "command": "dsymutil", "start"
+# CHECK-DAG: dsymutil {{.*}}swift-demangle
+# CHECK-DAG: dsymutil {{.*}}libswiftDemangle.dylib
+# CHECK-DAG: dsymutil {{.*}}lib_InternalSwiftScan.dylib
+
+# Ensure we strip the files in the installation directory
+# (which are not subject to the filters)
+# CHECK-LABEL: xcrun_find_tool strip
+# CHECK-DAG: strip {{.*}}swift-demangle
+# CHECK-DAG: strip {{.*}}swift-def-to-yaml-converter
+# CHECK-DAG: strip {{.*}}libswiftDemangle.dylib
+# CHECK-DAG: strip {{.*}}lib_InternalSwiftScan.dylib
+# CHECK-DAG: strip {{.*}}libswiftASTSectionImporter.a
+# CHECK-DAG: strip {{.*}}swift-util.py
+
+# Ensure we codesign dylibs
+# CHECK-LABEL: xcrun_find_tool codesign
+# CHECK-DAG: codesign {{.*}}libswiftDemangle.dylib
+# CHECK-DAG: codesign {{.*}}lib_InternalSwiftScan.dylib
+
+
+# CHECK-SKIPPED: --- Extracting symbols ---
+
+# Ensure we don't copy files not included by the filters
+# CHECK-SKIPPED-LABEL: cpio
+# CHECK-SKIPPED-NOT: swift-util.py
+# CHECK-SKIPPED-NOT: swift-def-to-yaml-converter
+# CHECK-SKIPPED-NOT: libswiftASTSectionImporter.a
+# CHECK-SKIPPED-NOT: swift-api-digester
+
+# Ensure we don't generate symbols for files we did not copy
+# CHECK-SKIPPED-LABEL: "command": "dsymutil", "start"
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}swift-def-to-yaml-converter
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}libswiftASTSectionImporter.a
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}swift-util.py
+# CHECK-SKIPPED-NOT: dsymutil {{.*}}swift-api-digester
+
+# Ensure we don't strip symlinks
+# CHECK-SKIPPED-LABEL: xcrun_find_tool strip
+# CHECK-SKIPPED-NOT: strip {{.*}}swift-api-digester
+
+# Ensure we don't codesign executables, symlinks,
+# static archives and python scripts
+# CHECK-SKIPPED-LABEL: xcrun_find_tool codesign
+# CHECK-SKIPPED-NOT: codesign {{.*}}swift-demangle
+# CHECK-SKIPPED-NOT: codesign {{.*}}libswiftASTSectionImporter.a
+# CHECK-SKIPPED-NOT: codesign {{.*}}swift-util.py
+# CHECK-SKIPPED-NOT: codesign {{.*}}swift-api-digester
+# CHECK-SKIPPED-NOT: codesign {{.*}}swift-def-to-yaml-converter
+
+#--- hello.swift
+print("hello")
+
+#--- dylib.swift
+func greet(person: String) -> String {
+    return "Hello \(person)"
+}
+#--- swift-util.py
+print("hello")

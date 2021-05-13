@@ -137,6 +137,7 @@ EXPECTED_DEFAULTS = {
         defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
     'darwin_deployment_version_watchos':
         defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+    'darwin_symroot_path_filters': [],
     'darwin_xcrun_toolchain': None,
     'distcc': False,
     'sccache': False,
@@ -695,6 +696,7 @@ EXPECTED_OPTIONS = [
     AppendOption('--test-paths'),
     AppendOption('--llvm-ninja-targets'),
     AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
+    AppendOption('--darwin-symroot-path-filters'),
 
     UnsupportedOption('--build-jobs'),
     UnsupportedOption('--common-cmake-options'),
