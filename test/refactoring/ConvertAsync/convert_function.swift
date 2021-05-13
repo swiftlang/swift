@@ -150,6 +150,51 @@ func asyncUnhandledCompletion(_ completion: (String) -> Void) {
 // ASYNC-UNHANDLED-NEXT: }
 // ASYNC-UNHANDLED-NEXT: }
 
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-UNHANDLED-COMMENT %s
+func asyncUnhandledCommentedCompletion(_ completion: (String) -> Void) {
+  // a
+  simple { str in // b
+    // c
+    let success = run {
+      // d
+      completion(str)
+      // e
+      return true
+      // f
+    }
+    // g
+    if !success {
+      // h
+      completion("bad")
+      // i
+    }
+    // j
+  }
+  // k
+}
+// ASYNC-UNHANDLED-COMMENT:      func asyncUnhandledCommentedCompletion() async -> String {
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // a
+// ASYNC-UNHANDLED-COMMENT-NEXT:   let str = await simple()
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // b
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // c
+// ASYNC-UNHANDLED-COMMENT-NEXT:   let success = run {
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // d
+// ASYNC-UNHANDLED-COMMENT-NEXT:     <#completion#>(str)
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // e
+// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return true{{$}}
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // f
+// ASYNC-UNHANDLED-COMMENT-NEXT:   }
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // g
+// ASYNC-UNHANDLED-COMMENT-NEXT:   if !success {
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // h
+// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return "bad"{{$}}
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // i
+// ASYNC-UNHANDLED-COMMENT-NEXT:   }
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // j
+// ASYNC-UNHANDLED-COMMENT-NEXT:   {{ }}
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // k
+// ASYNC-UNHANDLED-COMMENT-NEXT: }
+
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
 func voidAndErrorCompletion(completion: (Void?, Error?) -> Void) {
   if .random() {

@@ -510,7 +510,8 @@ func testSimple() {
   })
 }
 // CALL: let str = await simple(){{$}}
-// CALL-NEXT: {{^}}print("with label")
+// CALL-NEXT: //
+// CALL-NEXT: {{^}} print("with label")
 
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-NOLABEL %s
 func testSimpleWithoutLabel() {
@@ -752,3 +753,94 @@ func testVoidAndError4() {
 }
 // VOID-AND-ERROR-CALL4: try await voidAndErrorCompletion(){{$}}
 // VOID-AND-ERROR-CALL4-NEXT: {{^}}print("void and error completion \(<#v#>)"){{$}}
+
+func testPreserveComments() {
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=PRESERVE-COMMENTS %s
+  simpleWithArg(/*hello*/ a: /*a*/5) { str in
+  // b1
+  // b2
+  print("1")
+  // c
+  print("2") /*
+   d1
+   d2
+   */
+  if .random() {
+    // e
+  }
+  /* f1 */
+  /* f2 */} // don't pick this up
+}
+// PRESERVE-COMMENTS:      let str = await simpleWithArg(/*hello*/ a: /*a*/5)
+// PRESERVE-COMMENTS-NEXT: // b1
+// PRESERVE-COMMENTS-NEXT: // b2
+// PRESERVE-COMMENTS-NEXT: print("1")
+// PRESERVE-COMMENTS-NEXT: // c
+// PRESERVE-COMMENTS-NEXT: print("2")
+// PRESERVE-COMMENTS-NEXT: /*
+// PRESERVE-COMMENTS-NEXT:  d1
+// PRESERVE-COMMENTS-NEXT:  d2
+// PRESERVE-COMMENTS-NEXT: */
+// PRESERVE-COMMENTS-NEXT: if .random() {
+// PRESERVE-COMMENTS-NEXT:   // e
+// PRESERVE-COMMENTS-NEXT: }
+// PRESERVE-COMMENTS-NEXT: /* f1 */
+// PRESERVE-COMMENTS-NEXT: /* f2 */{{$}}
+// PRESERVE-COMMENTS-NOT: }{{$}}
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=PRESERVE-COMMENTS-ERROR %s
+func testPreserveComments2() {
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=PRESERVE-COMMENTS-ERROR %s
+  errorOnly { err in
+    // a
+    if err != nil {
+      // b
+      print("oh no") // c
+      /* d */
+      return /* e */
+    }
+    if err != nil {
+      // f
+      print("fun")
+      // g
+    }
+    // h
+    print("good times") // i
+  }
+}
+// PRESERVE-COMMENTS-ERROR:      do {
+// PRESERVE-COMMENTS-ERROR-NEXT:   try await errorOnly()
+// PRESERVE-COMMENTS-ERROR-NEXT:   // a
+// PRESERVE-COMMENTS-ERROR-NEXT:   // h
+// PRESERVE-COMMENTS-ERROR-NEXT:   print("good times")
+// PRESERVE-COMMENTS-ERROR-NEXT:   // i
+// PRESERVE-COMMENTS-ERROR:      } catch let err {
+// PRESERVE-COMMENTS-ERROR-NEXT:   // b
+// PRESERVE-COMMENTS-ERROR-NEXT:   print("oh no")
+// PRESERVE-COMMENTS-ERROR-NEXT:   // c
+// PRESERVE-COMMENTS-ERROR-NEXT:   /* d */
+// PRESERVE-COMMENTS-ERROR-NEXT:   /* e */
+// PRESERVE-COMMENTS-ERROR-NEXT:   // f
+// PRESERVE-COMMENTS-ERROR-NEXT:   print("fun")
+// PRESERVE-COMMENTS-ERROR-NEXT:   // g
+// PRESERVE-COMMENTS-ERROR-NEXT:  {{ }}
+// PRESERVE-COMMENTS-ERROR-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=PRESERVE-TRAILING-COMMENT-FN %s
+func testPreserveComments3() {
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=PRESERVE-TRAILING-COMMENT-CALL %s
+  simple { s in
+    print(s)
+  }
+  // make sure we pickup this trailing comment if we're converting the function, but not the call
+}
+// PRESERVE-TRAILING-COMMENT-FN:      func testPreserveComments3() async {
+// PRESERVE-TRAILING-COMMENT-FN-NEXT:   //
+// PRESERVE-TRAILING-COMMENT-FN-NEXT:   let s = await simple()
+// PRESERVE-TRAILING-COMMENT-FN-NEXT:   print(s)
+// PRESERVE-TRAILING-COMMENT-FN-NEXT:   // make sure we pickup this trailing comment if we're converting the function, but not the call
+// PRESERVE-TRAILING-COMMENT-FN-NEXT: }
+
+// PRESERVE-TRAILING-COMMENT-CALL:      let s = await simple()
+// PRESERVE-TRAILING-COMMENT-CALL-NEXT: print(s)
+// PRESERVE-TRAILING-COMMENT-CALL-NOT:  // make sure we pickup this trailing comment if we're converting the function, but not the call
