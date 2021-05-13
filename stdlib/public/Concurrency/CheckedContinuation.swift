@@ -260,7 +260,7 @@ extension CheckedContinuation {
 ///     source for the continuation, used to identify the continuation in
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.
-///     The closure must resume the continuation exactly once.
+///     You must resume the continuation exactly once.
 @available(SwiftStdlib 5.5, *)
 public func withCheckedContinuation<T>(
     function: String = #function,
@@ -279,7 +279,7 @@ public func withCheckedContinuation<T>(
 ///     source for the continuation, used to identify the continuation in
 ///     runtime diagnostics related to misuse of this continuation.
 ///   - body: A closure that takes an `UnsafeContinuation` parameter.
-///     The closure must resume the continuation exactly once.
+///     You must resume the continuation exactly once.
 ///
 /// If `resume(throwing:)` is called on the continuation,
 /// this method thows that error.

@@ -239,7 +239,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// then calls the given closure with the an unsafe continuation for the current task.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
-/// The closure must resume the continuation exactly once.
+/// You must resume the continuation exactly once.
 ///
 /// - Returns: The value passed to the continuation by the closure.
 ///
@@ -259,7 +259,7 @@ public func withUnsafeContinuation<T>(
 /// then calls the given closure with the an unsafe throwing continuation for the current task.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
-/// The closure must resume the continuation exactly once.
+/// You must resume the continuation exactly once.
 ///
 /// - Returns: The value passed to the continuation by the closure.
 @available(SwiftStdlib 5.5, *)
