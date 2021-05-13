@@ -35,7 +35,7 @@ extension AsyncSequence {
   ///
   /// - Parameter count: The number of elements to drop from the beginning of
   ///   the sequence. `count` must be greater than or equal to zero.
-  /// - Returns: An `AsyncDropFirstSequence` that drops the first `count`
+  /// - Returns: An asynchronous sequence that drops the first `count`
   ///   elements from the base sequence.
   @inlinable
   public __consuming func dropFirst(

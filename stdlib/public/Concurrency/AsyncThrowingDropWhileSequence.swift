@@ -14,8 +14,8 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
-  /// Omits elements from the base sequence until a given throwing closure returns
-  /// `false`, after which it passes through all remaining elements.
+  /// Omits elements from the base sequence until a given error-throwing closure
+  /// returns `false`, after which it passes through all remaining elements.
   ///
   /// Use `drop(while:)` to omit elements from an asynchronous sequence until
   /// the element received meets a condition you specify. If the closure you
@@ -45,11 +45,11 @@ extension AsyncSequence {
   /// and from then on the sequence passes through elements from its underlying
   /// sequence. A predicate that throws an error also never executes again.
   ///
-  /// - Parameter predicate: A closure that takes an element as a parameter and
-  ///   returns a Boolean value indicating whether to drop the element from the
-  ///   modified sequence.
-  /// - Returns: A sequence that skips over values until the provided closure
-  ///   returns `false`.
+  /// - Parameter predicate: An error-throwing closure that takes an element as
+  ///   a parameter and returns a Boolean value indicating whether to drop the
+  ///   element from the modified sequence.
+  /// - Returns: An asynchronous sequence that skips over values until the
+  ///   provided closure returns `false` or throws an error.
   @inlinable
   public __consuming func drop(
     while predicate: @escaping (Element) async throws -> Bool
@@ -58,6 +58,9 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence which omits elements from the base sequence until a
+/// given error-throwing closure returns false, after which it passes through
+/// all remaining elements.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
@@ -78,9 +81,15 @@ public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncThrowingDropWhileSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The drop-while sequence produces whatever type of element its base
+  /// sequence produces.
   public typealias Element = Base.Element
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the drop-while sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -103,6 +112,16 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
       self.predicate = predicate
     }
 
+    /// Produces the next element in the drop-while sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator and evaluates the
+    /// result with the `predicate` closure. As long as the predicate returns
+    /// `true`, this method returns `nil`. After the predicate returns `false`,
+    /// for a value received from the base iterator, this method returns that
+    /// value. After that, the iterator returns values received from its
+    /// base iterator as-is, and never executes the predicate closure again.
+    /// If calling the closure throws an error, the sequence ends and `next()`
+    /// rethrows the error.
     @inlinable
     public mutating func next() async throws -> Base.Element? {
       while !finished && !doneDropping {

@@ -15,6 +15,32 @@ import Swift
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
   @inlinable
+  /// Creates an asynchronous sequence that contains, in order, the elements of
+  /// the base sequence that satisfy the given error-throwing predicate.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `filter(_:)` method returns `true` for even
+  /// values and `false` for odd values, thereby filtering out the odd values,
+  /// but also throws an error for values divisible by 5:
+  ///
+  ///     for try await number in Counter(howHigh: 10)
+  ///             .filter({
+  ///         if $0 % 5 == 0 {
+  ///             throw MyError()
+  ///         }
+  ///         return $0 % 2 == 0
+  ///     }) {
+  ///         print("\(number) ", terminator: " ")
+  ///     }
+  ///     // Prints: 2 4
+  ///
+  /// - Parameter isIncluded: An error-throwing closure that takes an element
+  ///   of the asynchronous sequence as its argument and returns a Boolean value
+  ///   indicating whether to include the element in the filtered sequence.
+  /// - Returns: An asynchronous sequence that contains, in order, the elements
+  ///   of the base sequence that satisfy the given predicate. If the predicate
+  ///   throws an error, the sequence contains only values produced prior to
+  ///   the error.
   public __consuming func filter(
     _ isIncluded: @escaping (Element) async throws -> Bool
   ) -> AsyncThrowingFilterSequence<Self> {
@@ -22,6 +48,8 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence that contains, in order, the elements of
+/// the base sequence that satisfy the given error-throwing predicate.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   @usableFromInline
@@ -42,9 +70,15 @@ public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncThrowingFilterSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The filter sequence produces whatever type of element its base
+  /// sequence produces.
   public typealias Element = Base.Element
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the filter sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -64,6 +98,14 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
       self.isIncluded = isIncluded
     }
 
+    /// Produces the next element in the filter sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator; if this call returns
+    /// `nil`, `next()` returns nil. Otherwise, `next()` evaluates the
+    /// result with the `predicate` closure. If the closure returns `true`,
+    /// `next()` returns the received element; otherwise it awaits the next
+    /// element from the base iterator. If calling the closure throws an error,
+    /// the sequence ends and `next()` rethrows the error.
     @inlinable
     public mutating func next() async throws -> Base.Element? {
       while !finished {

@@ -14,6 +14,19 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Creates an asynchronous sequence that maps the given error-throwing
+  /// closure over the asynchronous sequence’s elements.
+  ///
+  /// Use the `map(_:)` function to transform every element received from a base
+  /// asynchronous sequence. Typically, you use this to transform from one type
+  /// of element to another.
+  ///
+  /// - Parameter transform: A mapping closure. `transform` accepts an element
+  ///   of this sequence as its parameter and returns a transformed value of the
+  ///   same or of a different type. `transform` can also throw an error, which
+  ///   ends the transformed sequence.
+  /// - Returns: An asynchronous sequence that contains, in order, the elements
+  ///   produced by the `transform` closure.
   @inlinable
   public __consuming func map<Transformed>(
     _ transform: @escaping (Element) async throws -> Transformed
@@ -22,6 +35,8 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence that maps the given error-throwing closure over the
+/// asynchronous sequence’s elements.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
@@ -42,9 +57,15 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncThrowingMapSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The map sequence produces whatever type of element its the transforming
+  /// closure produces.
   public typealias Element = Transformed
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the map sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -64,7 +85,14 @@ extension AsyncThrowingMapSequence: AsyncSequence {
       self.transform = transform
     }
 
-    @inlinable
+    /// Produces the next element in the map sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator; if this call returns
+    /// `nil`, `next()` returns nil. Otherwise, `next()` returns the result of
+    /// calling the transforming closure on the received element. If calling
+    /// the closure throws an error, the sequence ends and `next()` rethrows
+    /// the error.
+   @inlinable
     public mutating func next() async throws -> Transformed? {
       guard !finished, let element = try await baseIterator.next() else {
         return nil

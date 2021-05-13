@@ -35,7 +35,7 @@ extension AsyncSequence {
   ///
   /// - Parameter count: The maximum number of elements to return. The value of
   ///   `count` must be greater than or equal to zero.
-  /// - Returns: An `AsyncPrefixSequence` starting at the beginning of the
+  /// - Returns: An asynchronous sequence starting at the beginning of the
   ///   base sequence with at most `count` elements.
   @inlinable
   public __consuming func prefix(
@@ -74,7 +74,7 @@ extension AsyncPrefixSequence: AsyncSequence {
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
-  /// The iterator that produces elements of the drop-first sequence.
+  /// The iterator that produces elements of the prefix sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator

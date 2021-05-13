@@ -14,6 +14,20 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Creates an asynchronous sequence that concatenates the results of calling
+  /// the given error-throwing transformation with each element of this
+  /// sequence.
+  ///
+  /// Use this method to receive a single-level asynchronous sequence when your
+  /// transformation produces an asynchronous sequence for each element.
+  ///
+  /// - Parameter transform: An error-throwing mapping closure. `transform`
+  ///   accepts an element of this sequence as its parameter and returns an
+  ///   `AsyncSequence`. If `transform` throws an error, the sequence ends.
+  /// - Returns: A single, flattened asynchronous sequence that contains all
+  ///   elements in all the asychronous sequences produced by `transform`. The
+  ///   sequence ends either when the the last sequence created from the last
+  ///   element from base sequence ends, or when `transform` throws an error.
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @escaping (Element) async throws -> SegmentOfResult
@@ -22,6 +36,8 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence that concatenates the results of calling a given
+/// error-throwing transformation with each element of this sequence.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
@@ -42,9 +58,15 @@ public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult:
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncThrowingFlatMapSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The flat map sequence produces the type of element in the asynchronous
+  /// sequence produced by the `transform` closure.
   public typealias Element = SegmentOfResult.Element
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the flat map sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -67,6 +89,15 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
       self.transform = transform
     }
 
+    /// Produces the next element in the flatp map sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator; if this call returns
+    /// `nil`, `next()` returns `nil`. Otherwise, `next()` calls the
+    /// transforming closure on the received element, takes the resulting
+    /// asynchronous sequence, and creates an asynchronous iterator from it.
+    /// `next()` then consumes values from this iterator until it terminates.
+    /// At this point, `next()` is ready to receive the next value from the base
+    /// sequence. If `transform` throws an error, the sequence terminates.
     @inlinable
     public mutating func next() async throws -> SegmentOfResult.Element? {
       while !finished {

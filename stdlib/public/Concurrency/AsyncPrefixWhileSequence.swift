@@ -34,7 +34,7 @@ extension AsyncSequence {
   /// - Parameter predicate: A closure that takes an element as a parameter and
   ///   returns a Boolean value indicating whether the element should be
   ///   included in the modified sequence.
-  /// - Returns: An `AsyncDropWhileSequence` of the initial, consecutive
+  /// - Returns: An asynchronous sequence of the initial, consecutive
   ///   elements that satisfy `predicate`.
   @inlinable
   public __consuming func prefix(
@@ -74,6 +74,7 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the prefix-while sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var predicateHasFailed = false

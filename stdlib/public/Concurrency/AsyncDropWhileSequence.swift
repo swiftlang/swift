@@ -38,7 +38,7 @@ extension AsyncSequence {
   /// - Parameter predicate: A closure that takes an element as a parameter and
   ///   returns a Boolean value indicating whether to drop the element from the
   ///   modified sequence.
-  /// - Returns: An `AsyncDropWhileSequence` that skips over values from the
+  /// - Returns: An asynchronous sequence that skips over values from the
   ///   base sequence until the provided closure returns `false`.
   @inlinable
   public __consuming func drop(
@@ -97,7 +97,6 @@ extension AsyncDropWhileSequence: AsyncSequence {
       self.predicate = predicate
     }
 
-    @inlinable
     /// Produces the next element in the drop-while sequence.
     ///
     /// This iterator calls `next()` on its base iterator and evaluates the
@@ -106,6 +105,7 @@ extension AsyncDropWhileSequence: AsyncSequence {
     /// for a value received from the base iterator, this method returns that
     /// value. After that, the iterator returns values received from its
     /// base iterator as-is, and never executes the predicate closure again.
+    @inlinable
     public mutating func next() async rethrows -> Base.Element? {
       while let predicate = self.predicate {
         guard let element = try await baseIterator.next() else {
