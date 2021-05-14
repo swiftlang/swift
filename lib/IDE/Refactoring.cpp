@@ -4088,7 +4088,7 @@ struct AsyncHandlerDesc {
   HandlerType Type = HandlerType::INVALID;
   bool HasError = false;
 
-  static AsyncHandlerDesc get(const ValueDecl *Handler, bool ignoreName) {
+  static AsyncHandlerDesc get(const ValueDecl *Handler, bool RequireName) {
     AsyncHandlerDesc HandlerDesc;
     if (auto Var = dyn_cast<VarDecl>(Handler)) {
       HandlerDesc.Handler = Var;
@@ -4099,8 +4099,8 @@ struct AsyncHandlerDesc {
       return AsyncHandlerDesc();
     }
 
-    // Callback must have a completion-like name (if we're not ignoring it)
-    if (!ignoreName && !isCompletionHandlerParamName(HandlerDesc.getNameStr()))
+    // Callback must have a completion-like name
+    if (RequireName && !isCompletionHandlerParamName(HandlerDesc.getNameStr()))
       return AsyncHandlerDesc();
 
     // Callback must be a function type and return void. Doesn't need to have
@@ -4349,16 +4349,25 @@ struct AsyncHandlerDesc {
 /// information about that completion handler and its index within the function
 /// declaration.
 struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
+  /// The function the completion handler is a parameter of.
+  const FuncDecl *Func = nullptr;
   /// The index of the completion handler in the function that declares it.
   int Index = -1;
 
   AsyncHandlerParamDesc() : AsyncHandlerDesc() {}
-  AsyncHandlerParamDesc(const AsyncHandlerDesc &Handler, int Index)
-      : AsyncHandlerDesc(Handler), Index(Index) {}
+  AsyncHandlerParamDesc(const AsyncHandlerDesc &Handler, const FuncDecl *Func,
+                        int Index)
+      : AsyncHandlerDesc(Handler), Func(Func), Index(Index) {}
 
-  static AsyncHandlerParamDesc find(const FuncDecl *FD, bool ignoreName) {
+  static AsyncHandlerParamDesc find(const FuncDecl *FD,
+                                    bool RequireAttributeOrName) {
     if (!FD || FD->hasAsync() || FD->hasThrows())
       return AsyncHandlerParamDesc();
+
+    bool RequireName = RequireAttributeOrName;
+    if (RequireAttributeOrName &&
+        FD->getAttrs().hasAttribute<CompletionHandlerAsyncAttr>())
+      RequireName = false;
 
     // Require at least one parameter and void return type
     auto *Params = FD->getParameters();
@@ -4373,8 +4382,28 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
     if (Param->isAutoClosure())
       return AsyncHandlerParamDesc();
 
-    return AsyncHandlerParamDesc(AsyncHandlerDesc::get(Param, ignoreName),
+    return AsyncHandlerParamDesc(AsyncHandlerDesc::get(Param, RequireName), FD,
                                  Index);
+  }
+
+  /// Print the name of the function with the completion handler, without
+  /// the completion handler parameter, to \p OS. That is, the name of the
+  /// async alternative function.
+  void printAsyncFunctionName(llvm::raw_ostream &OS) const {
+    if (!Func || Index < 0)
+      return;
+
+    DeclName Name = Func->getName();
+    OS << Name.getBaseName();
+
+    OS << tok::l_paren;
+    ArrayRef<Identifier> ArgNames = Name.getArgumentNames();
+    for (size_t I = 0; I < ArgNames.size(); ++I) {
+      if (I != (size_t)Index) {
+        OS << ArgNames[I] << tok::colon;
+      }
+    }
+    OS << tok::r_paren;
   }
 
   bool operator==(const AsyncHandlerParamDesc &Other) const {
@@ -5554,8 +5583,12 @@ private:
         return addCustom(CE->getSourceRange(), [&]() { addHandlerCall(CE); });
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
+        // If the refactoring is on the call itself, do not require the callee
+        // to have the @completionHandlerAsync attribute or a completion-like
+        // name.
         auto HandlerDesc = AsyncHandlerParamDesc::find(
-            getUnderlyingFunc(CE->getFn()), StartNode.dyn_cast<Expr *>() == CE);
+            getUnderlyingFunc(CE->getFn()),
+            /*RequireAttributeOrName=*/StartNode.dyn_cast<Expr *>() != CE);
         if (HandlerDesc.isValid())
           return addCustom(CE->getSourceRange(),
                            [&]() { addHoistedCallback(CE, HandlerDesc); });
@@ -5826,8 +5859,8 @@ private:
 
       // The completion handler that is called as part of the \p CE call.
       // This will be called once the async function returns.
-      auto CompletionHandler = AsyncHandlerDesc::get(CallbackDecl,
-                                                     /*ignoreName=*/true);
+      auto CompletionHandler =
+          AsyncHandlerDesc::get(CallbackDecl, /*RequireAttributeOrName=*/false);
       if (CompletionHandler.isValid()) {
         if (auto CalledFunc = getUnderlyingFunc(CE->getFn())) {
           StringRef HandlerName = Lexer::getCharSourceRangeFromSourceRange(
@@ -6420,8 +6453,8 @@ bool RefactoringActionConvertCallToAsyncAlternative::isApplicable(
   if (!CE)
     return false;
 
-  auto HandlerDesc = AsyncHandlerParamDesc::find(getUnderlyingFunc(CE->getFn()),
-                                                 /*ignoreName=*/true);
+  auto HandlerDesc = AsyncHandlerParamDesc::find(
+      getUnderlyingFunc(CE->getFn()), /*RequireAttributeOrName=*/false);
   return HandlerDesc.isValid();
 }
 
@@ -6478,7 +6511,8 @@ bool RefactoringActionConvertToAsync::performChange() {
   assert(FD &&
          "Should not run performChange when refactoring is not applicable");
 
-  auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
+  auto HandlerDesc =
+      AsyncHandlerParamDesc::find(FD, /*RequireAttributeOrName=*/false);
   AsyncConverter Converter(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (!Converter.convert())
     return true;
@@ -6495,7 +6529,8 @@ bool RefactoringActionAddAsyncAlternative::isApplicable(
   if (!FD)
     return false;
 
-  auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
+  auto HandlerDesc =
+      AsyncHandlerParamDesc::find(FD, /*RequireAttributeOrName=*/false);
   return HandlerDesc.isValid();
 }
 
@@ -6512,7 +6547,8 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   assert(FD &&
          "Should not run performChange when refactoring is not applicable");
 
-  auto HandlerDesc = AsyncHandlerParamDesc::find(FD, /*ignoreName=*/true);
+  auto HandlerDesc =
+      AsyncHandlerParamDesc::find(FD, /*RequireAttributeOrName=*/false);
   assert(HandlerDesc.isValid() &&
          "Should not run performChange when refactoring is not applicable");
 
@@ -6520,13 +6556,28 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   if (!Converter.convert())
     return true;
 
+  // Deprecate the synchronous function
   EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
+
+  if (Ctx.LangOpts.EnableExperimentalConcurrency) {
+    // Add an attribute to describe its async alternative
+    llvm::SmallString<0> HandlerAttribute;
+    llvm::raw_svector_ostream OS(HandlerAttribute);
+    OS << "@completionHandlerAsync(\"";
+    HandlerDesc.printAsyncFunctionName(OS);
+    OS << "\", completionHandlerIndex: " << HandlerDesc.Index << ")\n";
+    EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
+                        HandlerAttribute);
+  }
+
   AsyncConverter LegacyBodyCreator(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (LegacyBodyCreator.createLegacyBody()) {
     LegacyBodyCreator.replace(FD->getBody(), EditConsumer);
   }
+
+  // Add the async alternative
   Converter.insertAfter(FD, EditConsumer);
 
   return false;
