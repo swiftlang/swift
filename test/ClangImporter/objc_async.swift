@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency -enable-experimental-async-handler %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -119,10 +119,6 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
 
   func independentMethod() {
     syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from a non-isolated context}}
-  }
-
-  func asyncHandlerMethod() {
-    await globalAsync() // okay because we infer @asyncHandler from the protocol
   }
 
   func mainActorMethod() {

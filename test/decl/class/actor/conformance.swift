@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
 // REQUIRES: concurrency
 
@@ -20,8 +20,6 @@ protocol SyncProtocol {
 
   func syncMethodA()
 
-  func syncMethodB()
-
   func syncMethodC() -> Int
 
   subscript (index: Int) -> String { get }
@@ -42,11 +40,6 @@ actor OtherActor: SyncProtocol {
   func syncMethodA() { }
   // expected-error@-1{{actor-isolated instance method 'syncMethodA()' cannot be used to satisfy a protocol requirement}}
   // expected-note@-2{{add 'nonisolated' to 'syncMethodA()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
-  // expected-note@-3{{add '@asyncHandler' to function 'syncMethodA()' to create an implicit asynchronous context}}{{3-3=@asyncHandler }}
-
-  // Async handlers are okay.
-  @asyncHandler
-  func syncMethodB() { }
 
   // nonisolated methods are okay.
   // FIXME: Consider suggesting nonisolated if this didn't match.

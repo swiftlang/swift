@@ -586,17 +586,6 @@ public func async<T>(
   return Task.Handle(task)
 }
 
-// ==== Async Handler ----------------------------------------------------------
-
-// TODO: remove this?
-@available(SwiftStdlib 5.5, *)
-func _runAsyncHandler(operation: @escaping () async -> ()) {
-  typealias ConcurrentFunctionType = @Sendable () async -> ()
-  detach(
-    operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)
-  )
-}
-
 // ==== Async Sleep ------------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
