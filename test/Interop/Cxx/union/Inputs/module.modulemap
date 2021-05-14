@@ -1,0 +1,4 @@
+module AnonymousUnionPartlyInvalid {
+  header "anonymous-union-partly-invalid.h"
+  requires cplusplus
+}
