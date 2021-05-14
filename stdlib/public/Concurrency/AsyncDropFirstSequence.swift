@@ -14,6 +14,28 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Omits a specified number of elements from the base asynchronous sequence,
+  /// then passes through all remaining elements.
+  ///
+  /// Use `dropFirst(_:)` when you want to drop the first *n* elements from the
+  /// base sequence and pass through the remaining elements.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `dropFirst(_:)` method causes the modified
+  /// sequence to ignore the values `0` through `4`, and instead emit `5` through `10`:
+  ///
+  ///     for await number in Counter(howHigh: 10).dropFirst(3) {
+  ///         print("\(number) ", terminator: " ")
+  ///     }
+  ///     // prints "4 5 6 7 8 9 10"
+  ///
+  /// If the number of elements to drop exceeds the number of elements in the
+  /// sequence, the result is an empty sequence.
+  ///
+  /// - Parameter count: The number of elements to drop from the beginning of
+  ///   the sequence. `count` must be greater than or equal to zero.
+  /// - Returns: An asynchronous sequence that drops the first `count`
+  ///   elements from the base sequence.
   @inlinable
   public __consuming func dropFirst(
     _ count: Int = 1
@@ -24,6 +46,8 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence which omits a specified number of elements from the
+/// base asynchronous sequence, then passes through all remaining elements.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncDropFirstSequence<Base: AsyncSequence> {
   @usableFromInline
@@ -41,9 +65,15 @@ public struct AsyncDropFirstSequence<Base: AsyncSequence> {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncDropFirstSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The drop-first sequence produces whatever type of element its base
+  /// iterator produces.
   public typealias Element = Base.Element
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the drop-first sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -57,6 +87,14 @@ extension AsyncDropFirstSequence: AsyncSequence {
       self.count = count
     }
 
+    /// Produces the next element in the drop-first sequence.
+    ///
+    /// Until reaching the number of elements to drop, this iterator calls
+    /// `next()` on its base iterator and discards the result. If the base
+    /// iterator returns `nil`, indicating the end of the sequence, this
+    /// iterator returns `nil`. After reaching the number of elements to
+    /// drop, this iterator passes along the result of calling `next()` on
+    /// the base iterator.
     @inlinable
     public mutating func next() async rethrows -> Base.Element? {
       var remainingToDrop = count
@@ -80,6 +118,12 @@ extension AsyncDropFirstSequence: AsyncSequence {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncDropFirstSequence {
+  /// Omits a specified number of elements from the base asynchronous sequence,
+  /// then passes through all remaining elements.
+  ///
+  /// When you call `dropFirst(_:)` on an asynchronous sequence that is already
+  /// an `AsyncDropFirstSequence`, the returned sequence simply adds the new
+  /// drop count to the current drop count.
   @inlinable
   public __consuming func dropFirst(
     _ count: Int = 1
@@ -91,4 +135,3 @@ extension AsyncDropFirstSequence {
     return AsyncDropFirstSequence(base, dropping: self.count + count)
   }
 }
-
