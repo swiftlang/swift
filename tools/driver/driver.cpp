@@ -134,19 +134,28 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   return true;
 }
 
-static bool shouldDisallowNewDriver(StringRef ExecName,
+static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
+                                    StringRef ExecName,
                                     const ArrayRef<const char *> argv) {
   // We are not invoking the driver, so don't forward.
   if (ExecName != "swift" && ExecName != "swiftc") {
     return true;
   }
+  StringRef disableArg = "-disallow-use-new-driver";
+  StringRef disableEnv = "SWIFT_USE_OLD_DRIVER";
+  auto shouldWarn = !llvm::sys::Process::
+    GetEnv("SWIFT_AVOID_WARNING_USING_OLD_DRIVER").hasValue();
   // If user specified using the old driver, don't forward.
-  if (llvm::find_if(argv, [](const char* arg) {
-    return StringRef(arg) == "-disallow-use-new-driver";
+  if (llvm::find_if(argv, [&](const char* arg) {
+    return StringRef(arg) == disableArg;
   }) != argv.end()) {
+    if (shouldWarn)
+      diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableArg);
     return true;
   }
-  if (llvm::sys::Process::GetEnv("SWIFT_USE_OLD_DRIVER").hasValue()) {
+  if (llvm::sys::Process::GetEnv(disableEnv).hasValue()) {
+    if (shouldWarn)
+      diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableEnv);
     return true;
   }
   return false;
@@ -208,7 +217,7 @@ static int run_driver(StringRef ExecName,
 
   // Forwarding calls to the swift driver if the C++ driver is invoked as `swift`
   // or `swiftc`, and an environment variable SWIFT_USE_NEW_DRIVER is defined.
-  if (!shouldDisallowNewDriver(ExecName, argv)) {
+  if (!shouldDisallowNewDriver(Diags, ExecName, argv)) {
     SmallString<256> NewDriverPath(llvm::sys::path::parent_path(Path));
     if (appendSwiftDriverName(NewDriverPath) &&
         llvm::sys::fs::exists(NewDriverPath)) {

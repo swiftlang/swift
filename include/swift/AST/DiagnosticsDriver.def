@@ -175,5 +175,8 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
 
 WARNING(warning_unsupported_driver_option,none,
         "option '%0' is ony supported in swift-driver", (StringRef))
+
+WARNING(old_driver_deprecated,none,
+        "legacy driver is now deprecated; consider avoiding specifying `%0`", (StringRef))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
