@@ -18,7 +18,7 @@ extension AsyncSequence {
   /// asynchronous sequence’s elements, omitting results that don't return a
   /// value.
   ///
-  /// Use the `compactMap(_:)` function to transform every element received from
+  /// Use the `compactMap(_:)` method to transform every element received from
   /// a base asynchronous sequence, while also discarding any `nil` results
   /// from the closure. Typically, you use this to transform from one type of
   /// element to another.
@@ -26,7 +26,7 @@ extension AsyncSequence {
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `5`. The closure provided to the `compactMap(_:)`
   /// function takes each `Int` and looks up a corresponding `String` from a
-  /// `romanNumeralDict` dictionary. Since there is no key for `4`, the closure
+  /// `romanNumeralDict` dictionary. Because there is no key for `4`, the closure
   /// returns `nil` in this case, which `compactMap(_:)` omits from the
   /// transformed asynchronous sequence.
   ///

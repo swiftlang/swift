@@ -21,7 +21,7 @@ extension AsyncSequence {
   /// the element received meets a condition you specify.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `10`. The `drop(while:)` function causes the modified
+  /// values from `1` to `10`. The `drop(while:)` method causes the modified
   /// sequence to ignore received values until it encounters one that is
   /// divisible by `3`:
   ///

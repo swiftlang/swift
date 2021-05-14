@@ -18,10 +18,10 @@ extension AsyncSequence {
   /// then passes through all remaining elements.
   ///
   /// Use `dropFirst(_:)` when you want to drop the first *n* elements from the
-  /// base sequence, and pass through the remaining elements.
+  /// base sequence and pass through the remaining elements.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `10`. The `dropFirst(_:)` function causes the modified
+  /// values from `1` to `10`. The `dropFirst(_:)` method causes the modified
   /// sequence to ignore the values `0` through `4`, and instead emit `5` through `10`:
   ///
   ///     for await number in Counter(howHigh: 10).dropFirst(3) {

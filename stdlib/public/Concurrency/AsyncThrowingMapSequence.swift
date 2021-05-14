@@ -17,12 +17,12 @@ extension AsyncSequence {
   /// Creates an asynchronous sequence that maps the given error-throwing
   /// closure over the asynchronous sequence’s elements.
   ///
-  /// Use the `map(_:)` function to transform every element received from a base
+  /// Use the `map(_:)` method to transform every element received from a base
   /// asynchronous sequence. Typically, you use this to transform from one type
   /// of element to another.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `5`. The closure provided to the `map(_:)` function
+  /// values from `1` to `5`. The closure provided to the `map(_:)` method
   /// takes each `Int` and looks up a corresponding `String` from a
   /// `romanNumeralDict` dictionary. This means the outer `for await in` loop
   /// iterates over `String` instances instead of the underlying `Int` values

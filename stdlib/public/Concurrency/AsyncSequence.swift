@@ -41,12 +41,12 @@ import Swift
 /// defines its `next()` method as `async`, which requires a caller to wait for
 /// the next value with the `await` keyword.
 ///
-/// `AsyncSequence` also defines functions for processing the elements you
+/// `AsyncSequence` also defines methods for processing the elements you
 /// receive, modeled on the operations provided by the basic `Sequence` in the
-/// standard library. There are two categories of functions: those that return a
+/// standard library. There are two categories of methods: those that return a
 /// single value, and those that return another `AsyncSequence`.
 ///
-/// Single-value functions eliminate the need for a `for await`-`in` loop, and instead
+/// Single-value methods eliminate the need for a `for await`-`in` loop, and instead
 /// let you make a single `await` call. For example, the `contains(_:)` method
 /// returns a Boolean value that indicates if a given value exists in the
 /// `AsyncSequence`. Given the `Counter` sequence from the previous example,
@@ -54,14 +54,14 @@ import Swift
 ///
 ///     let found = await Counter(howHigh: 10).contains(5) // true
 ///
-/// Functions that return another `AsyncSequence` return a type specific to the
-/// function's semantics. For example, the `.map(_:)` operator returns a
+/// Methods that return another `AsyncSequence` return a type specific to the
+/// method's semantics. For example, the `.map(_:)` method returns a
 /// `AsyncMapSequence` (or a `AsyncThrowingMapSequence`, if the closure you
-/// provide to the `map(_:)` function can throw an error). These returned
+/// provide to the `map(_:)` method can throw an error). These returned
 /// sequences don't eagerly await the next member of the sequence, which allows
 /// the caller to decide when to start work. Typically, you'll iterate over
 /// these sequences with `for await`-`in`, like the base `AsyncSequence` you started
-/// with. In the following example, the `map(_:)` function transforms each `Int`
+/// with. In the following example, the `map(_:)` method transforms each `Int`
 /// received from a `Counter` sequence into a `String`:
 ///
 ///     let stream = Counter(howHigh: 10)
@@ -227,7 +227,7 @@ extension AsyncSequence {
   ///
   ///     let allLessThanTen = await Counter(howHigh: 10)
   ///         .allSatisfy { $0 < 10 }
-  ///     print (allLessThanTen)
+  ///     print(allLessThanTen)
   ///     // Prints: false
   ///
   /// The predicate executes each time the asynchronous sequence produces an

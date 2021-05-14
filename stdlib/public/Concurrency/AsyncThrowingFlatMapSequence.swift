@@ -25,7 +25,7 @@ extension AsyncSequence {
   /// values from `1` to `5`. The transforming closure takes the received `Int`
   /// and returns a new `Counter` that counts that high. For example, when the
   /// transform receives `3` from the base sequence, it creates a new `Counter`
-  /// that produces the values `1`, `2`, and `3`. The `flatMap(_:)` operator
+  /// that produces the values `1`, `2`, and `3`. The `flatMap(_:)` method
   /// "flattens" the resulting sequence-of-sequences into a single
   /// `AsyncSequence`. However, when the closure receives `4`, it throws an
   /// error, terminating the sequence.

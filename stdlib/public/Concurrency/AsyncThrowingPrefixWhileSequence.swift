@@ -23,7 +23,7 @@ extension AsyncSequence {
   /// the predicate closure returns `false` or throws an error.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `10`. The `prefix(_:)` function causes the modified
+  /// values from `1` to `10`. The `prefix(_:)` method causes the modified
   /// sequence to pass through values less than `8`, but throws an
   /// error when it receives a value that's divisible by `5`:
   ///
