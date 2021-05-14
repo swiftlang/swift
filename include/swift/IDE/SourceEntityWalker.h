@@ -14,6 +14,7 @@
 #define SWIFT_IDE_SOURCE_ENTITY_WALKER_H
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -176,6 +177,24 @@ protected:
   virtual ~SourceEntityWalker() {}
 
   virtual void anchor();
+
+  /// Retrieve the current ASTWalker being used to traverse the AST.
+  const ASTWalker &getWalker() const {
+    assert(Walker && "Not walking!");
+    return *Walker;
+  }
+
+private:
+  ASTWalker *Walker = nullptr;
+
+  /// Utility that lets us keep track of an ASTWalker when walking.
+  bool performWalk(ASTWalker &W, llvm::function_ref<bool(void)> DoWalk) {
+    Walker = &W;
+    SWIFT_DEFER {
+      Walker = nullptr;
+    };
+    return DoWalk();
+  }
 };
 
 } // namespace swift
