@@ -132,6 +132,11 @@ def run_build_script_helper(action, host_target, product, args):
         helper_cmd += [
             '--lit-test-dir', lit_test_dir
         ]
+    # Pass Cross compile host info
+    if swiftpm.SwiftPM.has_cross_compile_hosts(args):
+        helper_cmd += ['--cross-compile-hosts']
+        for cross_compile_host in args.cross_compile_hosts:
+            helper_cmd += [cross_compile_host]
     if args.verbose_build:
         helper_cmd.append('--verbose')
 
