@@ -4623,16 +4623,24 @@ public:
            !Nodes.back().isImplicit();
   }
 
-  /// If the last recorded node is an explicit return or break statement, drop
-  /// it from the list.
-  void dropTrailingReturnOrBreak() {
+  /// If the last recorded node is an explicit return or break statement that
+  /// can be safely dropped, drop it from the list.
+  void dropTrailingReturnOrBreakIfPossible() {
     if (!hasTrailingReturnOrBreak())
       return;
 
+    auto *Node = Nodes.back().get<Stmt *>();
+
+    // If this is a return statement with return expression, let's preserve it.
+    if (auto *RS = dyn_cast<ReturnStmt>(Node)) {
+      if (RS->hasResult())
+        return;
+    }
+
     // Remove the node from the list, but make sure to add it as a possible
     // comment loc to preserve any of its attached comments.
-    auto Node = Nodes.pop_back_val();
-    addPossibleCommentLoc(Node.getStartLoc());
+    Nodes.pop_back();
+    addPossibleCommentLoc(Node->getStartLoc());
   }
 
   /// Returns a list of nodes to print in a brace statement. This picks up the
@@ -4895,7 +4903,7 @@ private:
                 NodesToPrint Nodes) {
     if (Nodes.hasTrailingReturnOrBreak()) {
       CurrentBlock = OtherBlock;
-      Nodes.dropTrailingReturnOrBreak();
+      Nodes.dropTrailingReturnOrBreakIfPossible();
       Block->addAllNodes(std::move(Nodes));
     } else {
       Block->addAllNodes(std::move(Nodes));
@@ -5600,12 +5608,14 @@ private:
         // it would have been lifted out of the switch statement.
         if (auto *SS = dyn_cast<SwitchStmt>(BS->getTarget())) {
           if (HandledSwitches.contains(SS))
-            replaceRangeWithPlaceholder(S->getSourceRange());
+            return replaceRangeWithPlaceholder(S->getSourceRange());
         }
       } else if (isa<ReturnStmt>(S) && NestedExprCount == 0) {
         // For a return, if it's not nested inside another closure or function,
         // turn it into a placeholder, as it will be lifted out of the callback.
-        replaceRangeWithPlaceholder(S->getSourceRange());
+        // Note that we only turn the 'return' token into a placeholder as we
+        // still want to be able to apply transforms to the argument.
+        replaceRangeWithPlaceholder(S->getStartLoc());
       }
     }
     return true;
@@ -5734,15 +5744,23 @@ private:
   void addHandlerCall(const CallExpr *CE) {
     auto Exprs = TopHandler.extractResultArgs(CE);
 
+    bool AddedReturnOrThrow = true;
     if (!Exprs.isError()) {
-      OS << tok::kw_return;
+      // It's possible the user has already written an explicit return statement
+      // for the completion handler call, e.g 'return completion(args...)'. In
+      // that case, be sure not to add another return.
+      auto *parent = getWalker().Parent.getAsStmt();
+      AddedReturnOrThrow = !(parent && isa<ReturnStmt>(parent));
+      if (AddedReturnOrThrow)
+        OS << tok::kw_return;
     } else {
       OS << tok::kw_throw;
     }
 
     ArrayRef<Expr *> Args = Exprs.args();
     if (!Args.empty()) {
-      OS << " ";
+      if (AddedReturnOrThrow)
+        OS << " ";
       if (Args.size() > 1)
         OS << tok::l_paren;
       for (size_t I = 0, E = Args.size(); I < E; ++I) {
