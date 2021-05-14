@@ -247,3 +247,13 @@ func voidResultCompletion(completion: (Result<Void, Error>) -> Void) {
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
 func functionWithSomeHandler(handler: (String) -> Void) {}
 // NON-COMPLETION-HANDLER: func functionWithSomeHandler() async -> String {}
+
+// rdar://77789360 Make sure we don't print a double return statement.
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING %s
+func testReturnHandling(_ completion: (String?, Error?) -> Void) {
+  return completion("", nil)
+}
+// RETURN-HANDLING:      func testReturnHandling() async throws -> String {
+// RETURN-HANDLING-NEXT:   {{^}} return ""{{$}}
+// RETURN-HANDLING-NEXT: }
+
