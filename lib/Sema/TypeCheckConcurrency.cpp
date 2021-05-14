@@ -62,76 +62,6 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
   return false;
 }
 
-/// Check whether the @asyncHandler attribute can be applied to the given
-/// function declaration.
-///
-/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
-///
-/// \returns \c true if there was a problem with adding the attribute, \c false
-/// otherwise.
-static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
-  if (!func->getResultInterfaceType()->isVoid()) {
-    if (diagnose) {
-      func->diagnose(diag::asynchandler_returns_value)
-          .highlight(func->getResultTypeSourceRange());
-    }
-
-    return true;
-  }
-
-  if (func->hasThrows()) {
-    if (diagnose) {
-      func->diagnose(diag::asynchandler_throws)
-          .fixItRemove(func->getThrowsLoc());
-    }
-
-    return true;
-  }
-
-  if (func->hasAsync()) {
-    if (diagnose) {
-      func->diagnose(diag::asynchandler_async)
-          .fixItRemove(func->getAsyncLoc());
-    }
-
-    return true;
-  }
-
-  for (auto param : *func->getParameters()) {
-    if (param->isInOut()) {
-      if (diagnose) {
-        param->diagnose(diag::asynchandler_inout_parameter)
-            .fixItRemove(param->getSpecifierLoc());
-      }
-
-      return true;
-    }
-
-    if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
-      if (fnType->isNoEscape()) {
-        if (diagnose) {
-          param->diagnose(diag::asynchandler_noescape_closure_parameter);
-        }
-
-        return true;
-      }
-    }
-  }
-
-  if (func->isMutating()) {
-    if (diagnose) {
-      auto diag = func->diagnose(diag::asynchandler_mutating);
-      if (auto mutatingAttr = func->getAttrs().getAttribute<MutatingAttr>()) {
-        diag.fixItRemove(mutatingAttr->getRange());
-      }
-    }
-
-    return true;
-  }
-
-  return false;
-}
-
 void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   assert(func);
   if (!isa<DestructorDecl>(func) && !isa<AccessorDecl>(func)) {
@@ -149,100 +79,6 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
                        " async");
     }
   }
-
-  if (func->canBeAsyncHandler()) {
-    func->diagnose(
-            diag::note_add_asynchandler_to_function, func->getName())
-        .fixItInsert(func->getAttributeInsertionLoc(false), "@asyncHandler ");
-  }
-}
-
-bool IsAsyncHandlerRequest::evaluate(
-    Evaluator &evaluator, FuncDecl *func) const {
-  // Turn off @asyncHandler when not specifically enabled.
-  if (!func->getASTContext().LangOpts.EnableExperimentalAsyncHandler) {
-    return false;
-  }
-
-  // Check whether the attribute was explicitly specified.
-  if (auto attr = func->getAttrs().getAttribute<AsyncHandlerAttr>()) {
-    // Check for well-formedness.
-    if (checkAsyncHandler(func, /*diagnose=*/true)) {
-      attr->setInvalid();
-      return false;
-    }
-
-    return true;
-  }
-
-  if (!shouldInferAttributeInContext(func->getDeclContext()))
-    return false;
-
-  // Are we in a context where inference is possible?
-  auto dc = func->getDeclContext();
-  if (!dc->getSelfClassDecl() || !dc->getParentSourceFile() || !func->hasBody())
-    return false;
-
-  // Is it possible to infer @asyncHandler for this function at all?
-  if (!func->canBeAsyncHandler())
-    return false;
-
-  if (!dc->getSelfClassDecl()->isActor())
-    return false;
-
-  // Add an implicit @asyncHandler attribute and return true. We're done.
-  auto addImplicitAsyncHandlerAttr = [&] {
-    func->getAttrs().add(new (func->getASTContext()) AsyncHandlerAttr(true));
-    return true;
-  };
-
-  // Check whether any of the conformances in the context of the function
-  // implies @asyncHandler.
-  {
-    auto idc = cast<IterableDeclContext>(dc->getAsDecl());
-    auto conformances = idc->getLocalConformances(
-        ConformanceLookupKind::NonStructural);
-
-    for (auto conformance : conformances) {
-      auto protocol = conformance->getProtocol();
-      for (auto found : protocol->lookupDirect(func->getName())) {
-        if (!isa<ProtocolDecl>(found->getDeclContext()))
-          continue;
-
-        auto requirement = dyn_cast<FuncDecl>(found);
-        if (!requirement)
-          continue;
-
-        if (!requirement->isAsyncHandler())
-          continue;
-
-        auto witness = conformance->getWitnessDecl(requirement);
-        if (witness != func)
-          continue;
-
-        return addImplicitAsyncHandlerAttr();
-      }
-    }
-  }
-
-  // Look through dynamic replacements.
-  if (auto replaced = func->getDynamicallyReplacedDecl()) {
-    if (auto replacedFunc = dyn_cast<FuncDecl>(replaced))
-      if (replacedFunc->isAsyncHandler())
-        return addImplicitAsyncHandlerAttr();
-  }
-
-  return false;
-}
-
-bool CanBeAsyncHandlerRequest::evaluate(
-    Evaluator &evaluator, FuncDecl *func) const {
-  // Turn off @asyncHandler when not specifically enabled.
-  if (!func->getASTContext().LangOpts.EnableExperimentalAsyncHandler) {
-    return false;
-  }
-
-  return !checkAsyncHandler(func, /*diagnose=*/false);
 }
 
 bool IsActorRequest::evaluate(
@@ -2682,16 +2518,6 @@ static Optional<ActorIsolation> getIsolationFromWrappers(
   return foundIsolation;
 }
 
-// Check whether a declaration is an asynchronous handler.
-static bool isAsyncHandler(ValueDecl *value) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->isAsyncHandler())
-      return true;
-  }
-
-  return false;
-}
-
 namespace {
 
 /// Describes how actor isolation is propagated to a member, if at all.
@@ -2815,19 +2641,15 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If the declaration overrides another declaration, it must have the same
   // actor isolation.
   if (auto overriddenValue = value->getOverriddenDecl()) {
-    // Ignore the overridden declaration's isolation for an async handler,
-    // because async handlers dispatch to wherever they need to be.
-    if (!isAsyncHandler(value)) {
-      auto isolation = getActorIsolation(overriddenValue);
-      SubstitutionMap subs;
+    auto isolation = getActorIsolation(overriddenValue);
+    SubstitutionMap subs;
 
-      if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
-        subs = selfType->getMemberSubstitutionMap(
-            value->getModuleContext(), overriddenValue);
-      }
-
-      return inferredIsolation(isolation.subst(subs));
+    if (Type selfType = value->getDeclContext()->getSelfInterfaceType()) {
+      subs = selfType->getMemberSubstitutionMap(
+          value->getModuleContext(), overriddenValue);
     }
+
+    return inferredIsolation(isolation.subst(subs));
   }
 
   // If this is an accessor, use the actor isolation of its storage
@@ -2956,10 +2778,6 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (!overridden)
     return;
 
-  // Actor isolation doesn't matter for async handlers.
-  if (isAsyncHandler(value))
-    return;
-
   // Determine the actor isolation of this declaration.
   auto isolation = getActorIsolation(value);
 
@@ -3070,11 +2888,6 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         // Async and concurrent functions use concurrency features.
         if (func->hasAsync() || func->isSendable())
-          return true;
-
-        // If there is an explicit @asyncHandler, we're using concurrency
-        // features.
-        if (func->getAttrs().hasAttribute<AsyncHandlerAttr>())
           return true;
 
         // If we're in an accessor declaration, also check the storage

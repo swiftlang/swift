@@ -411,8 +411,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
                  false);
-  Opts.EnableExperimentalAsyncHandler |=
-    Args.hasArg(OPT_enable_experimental_async_handler);
   Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
     Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 

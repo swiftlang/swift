@@ -2782,17 +2782,6 @@ bool ConformanceChecker::checkActorIsolation(
     witness->diagnose(diag::actor_isolated_witness,
                       witness->getDescriptiveKind(),
                       witness->getName());
-    if (auto witnessFunc = dyn_cast<FuncDecl>(witness)) {
-      witnessFunc->canBeAsyncHandler();
-      if (!witnessFunc->isAsyncHandler()) {
-        auto handlerNote = witness->diagnose(
-            diag::note_add_asynchandler_to_function,
-            witness->getName());
-        handlerNote.fixItInsert(witness->getAttributeInsertionLoc(false),
-            "@asyncHandler ");
-      }
-    }
-
     {
       auto witnessVar = dyn_cast<VarDecl>(witness);
       if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {

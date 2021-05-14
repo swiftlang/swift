@@ -4299,8 +4299,6 @@ ERROR(async_in_nonasync_function,none,
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
-NOTE(note_add_asynchandler_to_function,none,
-     "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
@@ -4335,30 +4333,6 @@ ERROR(async_let_in_illegal_context,none,
       "async let %0 cannot be referenced in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
       (DeclName, unsigned))
-
-ERROR(asynchandler_non_func,none,
-      "'@asyncHandler' can only be applied to functions",
-      ())
-ERROR(asynchandler_returns_value,none,
-      "'@asyncHandler' function can only return 'Void'",
-      ())
-ERROR(asynchandler_throws,none,
-      "'@asyncHandler' function cannot throw",
-      ())
-ERROR(asynchandler_async,none,
-      "'@asyncHandler' function cannot be 'async' itself",
-      ())
-ERROR(asynchandler_inout_parameter,none,
-      "'inout' parameter is not allowed in '@asyncHandler' function",
-      ())
-ERROR(asynchandler_noescape_closure_parameter,none,
-      "non-escaping closure parameter is not allowed in '@asyncHandler' function",
-      ())
-ERROR(asynchandler_mutating,none,
-      "'@asyncHandler' function cannot be 'mutating'",
-      ())
-ERROR(asynchandler_removed,none,
-      "'@asyncHandler' has been removed from the language", ())
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "

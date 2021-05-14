@@ -1,11 +1,6 @@
 // REQUIRES: VENDOR=apple
 // REQUIRES: concurrency
-// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-concurrency -enable-experimental-async-handler -validate-tbd-against-ir=all -module-name test | %FileCheck %s
-
-// CHECK: @"$s4test6testityyYaFTu" = hidden global %swift.async_func_pointer
-
-@asyncHandler
-public func testit() { }
+// RUN: %target-swift-frontend -emit-ir %s -enable-experimental-concurrency -validate-tbd-against-ir=all -module-name test | %FileCheck %s
 
 // CHECK: @barTu = global %swift.async_func_pointer
 @_silgen_name("bar")

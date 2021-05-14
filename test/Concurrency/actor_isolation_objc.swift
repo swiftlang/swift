@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -45,13 +45,4 @@ actor A {
   func f() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}
   func g() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}
   @objc func h() async { }
-
-  @objc @asyncHandler func i() {}
 }
-
-func outside(a : A) async {
-  await a.i() // expected-warning {{no 'async' operations occur within 'await' expression}}
-}
-
-
-
