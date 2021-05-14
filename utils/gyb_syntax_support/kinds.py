@@ -38,3 +38,18 @@ def lowercase_first_word(name):
     if word_index == 0:
         return name
     return name[:word_index].lower() + name[word_index:]
+
+
+def syntax_buildable_child_type(type_name, syntax_kind, is_token, 
+                                is_optional=False):
+    if syntax_kind in SYNTAX_BASE_KINDS:
+        buildable_type = syntax_kind + 'Buildable'
+    elif not is_token:
+        buildable_type = syntax_kind
+    else:
+        buildable_type = type_name
+
+    if is_optional:
+        buildable_type += '?'
+
+    return buildable_type
