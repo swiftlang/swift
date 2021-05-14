@@ -5736,15 +5736,23 @@ private:
   void addHandlerCall(const CallExpr *CE) {
     auto Exprs = TopHandler.extractResultArgs(CE);
 
+    bool AddedReturnOrThrow = true;
     if (!Exprs.isError()) {
-      OS << tok::kw_return;
+      // It's possible the user has already written an explicit return statement
+      // for the completion handler call, e.g 'return completion(args...)'. In
+      // that case, be sure not to add another return.
+      auto *parent = getWalker().Parent.getAsStmt();
+      AddedReturnOrThrow = !(parent && isa<ReturnStmt>(parent));
+      if (AddedReturnOrThrow)
+        OS << tok::kw_return;
     } else {
       OS << tok::kw_throw;
     }
 
     ArrayRef<Expr *> Args = Exprs.args();
     if (!Args.empty()) {
-      OS << " ";
+      if (AddedReturnOrThrow)
+        OS << " ";
       if (Args.size() > 1)
         OS << tok::l_paren;
       for (size_t I = 0, E = Args.size(); I < E; ++I) {
