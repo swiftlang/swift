@@ -118,6 +118,10 @@ static llvm::cl::opt<bool>
 IsNonProtocolType("is-non-protocol-type",
                   llvm::cl::desc("The symbol being renamed is a type and not a protocol"));
 
+static llvm::cl::opt<bool> EnableExperimentalConcurrency(
+    "enable-experimental-concurrency",
+    llvm::cl::desc("Whether to enable experimental concurrency or not"));
+
 enum class DumpType {
   REWRITTEN,
   JSON,
@@ -273,7 +277,9 @@ int main(int argc, char *argv[]) {
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
-  Invocation.getLangOptions().EnableExperimentalConcurrency = true;
+
+  if (options::EnableExperimentalConcurrency)
+    Invocation.getLangOptions().EnableExperimentalConcurrency = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
