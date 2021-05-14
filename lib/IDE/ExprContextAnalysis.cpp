@@ -847,9 +847,9 @@ static bool getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
     }
 
     if (!AdvancedPosInParams) {
-      // We haven't performed any special advance logic. Assume the argument
-      // and parameter match, so advance PosInParams by 1.
-      ++PosInParams;
+      // If there is no matching argument label. These arguments can't be
+      // applied to the params.
+      return false;
     }
   }
   if (PosInArgs < tuple->getNumElements() && PosInParams < Params.size()) {
