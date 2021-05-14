@@ -4623,16 +4623,24 @@ public:
            !Nodes.back().isImplicit();
   }
 
-  /// If the last recorded node is an explicit return or break statement, drop
-  /// it from the list.
-  void dropTrailingReturnOrBreak() {
+  /// If the last recorded node is an explicit return or break statement that
+  /// can be safely dropped, drop it from the list.
+  void dropTrailingReturnOrBreakIfPossible() {
     if (!hasTrailingReturnOrBreak())
       return;
 
+    auto *Node = Nodes.back().get<Stmt *>();
+
+    // If this is a return statement with return expression, let's preserve it.
+    if (auto *RS = dyn_cast<ReturnStmt>(Node)) {
+      if (RS->hasResult())
+        return;
+    }
+
     // Remove the node from the list, but make sure to add it as a possible
     // comment loc to preserve any of its attached comments.
-    auto Node = Nodes.pop_back_val();
-    addPossibleCommentLoc(Node.getStartLoc());
+    Nodes.pop_back();
+    addPossibleCommentLoc(Node->getStartLoc());
   }
 
   /// Returns a list of nodes to print in a brace statement. This picks up the
@@ -4895,7 +4903,7 @@ private:
                 NodesToPrint Nodes) {
     if (Nodes.hasTrailingReturnOrBreak()) {
       CurrentBlock = OtherBlock;
-      Nodes.dropTrailingReturnOrBreak();
+      Nodes.dropTrailingReturnOrBreakIfPossible();
       Block->addAllNodes(std::move(Nodes));
     } else {
       Block->addAllNodes(std::move(Nodes));
