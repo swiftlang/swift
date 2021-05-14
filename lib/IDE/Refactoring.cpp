@@ -5600,12 +5600,14 @@ private:
         // it would have been lifted out of the switch statement.
         if (auto *SS = dyn_cast<SwitchStmt>(BS->getTarget())) {
           if (HandledSwitches.contains(SS))
-            replaceRangeWithPlaceholder(S->getSourceRange());
+            return replaceRangeWithPlaceholder(S->getSourceRange());
         }
       } else if (isa<ReturnStmt>(S) && NestedExprCount == 0) {
         // For a return, if it's not nested inside another closure or function,
         // turn it into a placeholder, as it will be lifted out of the callback.
-        replaceRangeWithPlaceholder(S->getSourceRange());
+        // Note that we only turn the 'return' token into a placeholder as we
+        // still want to be able to apply transforms to the argument.
+        replaceRangeWithPlaceholder(S->getStartLoc());
       }
     }
     return true;
