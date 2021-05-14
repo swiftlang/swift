@@ -85,7 +85,6 @@ protected:
 public:
   enum class SymbolKind {
     Default,
-    AsyncHandlerBody,
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
@@ -347,7 +346,6 @@ protected:
   enum FunctionManglingKind {
     NoFunctionMangling,
     FunctionMangling,
-    AsyncHandlerBodyMangling
   };
 
   void appendFunction(AnyFunctionType *fn,
@@ -433,7 +431,7 @@ protected:
 
   void appendEntity(const ValueDecl *decl, StringRef EntityOp, bool isStatic);
 
-  void appendEntity(const ValueDecl *decl, bool isAsyncHandlerBody = false);
+  void appendEntity(const ValueDecl *decl);
 
   void appendProtocolConformance(const ProtocolConformance *conformance);
   void appendProtocolConformanceRef(const RootProtocolConformance *conformance);

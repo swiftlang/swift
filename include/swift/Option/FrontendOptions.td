@@ -226,10 +226,6 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_async_handler :
-  Flag<["-"], "enable-experimental-async-handler">,
-  HelpText<"Enable experimental @asyncHandler feature">;
-
 def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;

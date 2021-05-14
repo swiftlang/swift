@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -enable-experimental-async-handler -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
+// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
 // RUN: %FileCheck --check-prefix CHECK-EXTENSION %s <%t/Library.swiftinterface
 // RUN: %FileCheck --check-prefix CHECK %s <%t/Library.swiftinterface
 // REQUIRES: concurrency
@@ -27,9 +27,9 @@ public actor ExplicitActorClass : Actor {
 @available(SwiftStdlib 5.5, *)
 public actor EmptyActor {}
 
-// CHECK: actor public class EmptyActorClass {
+// CHECK: public actor EmptyActorClass {
 @available(SwiftStdlib 5.5, *)
-public actor class EmptyActorClass {}
+public actor EmptyActorClass {}
 
 // CHECK: public protocol Cat : _Concurrency.Actor {
 @available(SwiftStdlib 5.5, *)
@@ -40,7 +40,7 @@ public protocol Cat : Actor {
 // CHECK: public actor HouseCat : Library.Cat {
 @available(SwiftStdlib 5.5, *)
 public actor HouseCat : Cat {
-  @asyncHandler public func mew() {}
+  nonisolated public func mew() {}
   @actorIndependent public func enqueue(_ job: UnownedJob) { }
 }
 
@@ -53,6 +53,6 @@ public protocol ToothyMouth {
 // CHECK: public actor Lion : Library.ToothyMouth, _Concurrency.Actor {
 @available(SwiftStdlib 5.5, *)
 public actor Lion : ToothyMouth, Actor {
-  @asyncHandler public func chew() {}
+  nonisolated public func chew() {}
   @actorIndependent public func enqueue(_ job: UnownedJob) { }
 }

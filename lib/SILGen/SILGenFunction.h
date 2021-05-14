@@ -611,8 +611,6 @@ public:
   
   /// Generates code for a FuncDecl.
   void emitFunction(FuncDecl *fd);
-  /// Generate code for @asyncHandler functions.
-  void emitAsyncHandler(FuncDecl *fd);
   /// Emits code for a ClosureExpr.
   void emitClosure(AbstractClosureExpr *ce);
   /// Generates code for a class destroying destructor. This

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler -warn-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
@@ -387,16 +387,6 @@ actor Crystal {
   await syncGlobalActorFunc()
   await asyncGlobalActorFunc()
 }
-
-// test global actor funcs that are marked asyncHandler
-@available(SwiftStdlib 5.5, *)
-@SomeGlobalActor func goo1() async {
-  let _ = goo2
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  goo2() // expected-note{{calls to global function 'goo2()' from outside of its actor context are implicitly asynchronous}}
-}
-@available(SwiftStdlib 5.5, *)
-@asyncHandler @SomeOtherGlobalActor func goo2() { await goo1() }
 
 @available(SwiftStdlib 5.5, *)
 func testGlobalActorClosures() {
