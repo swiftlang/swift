@@ -933,3 +933,16 @@ func testGenericConstructor() {
 // GENERIC_INITIALIZER-DAG: Pattern/ExprSpecific:               {#text: String#}[#String#]
 // GENERIC_INITIALIZER: End completions
 }
+
+struct Rdar77867723 {
+  enum Horizontal { case east, west }
+  enum Vertical { case up, down }
+  func fn(aaa: Horizontal = .east, bbb: Vertical = .up) {}
+  func fn(ccc: Vertical = .up, ddd: Horizontal = .west) {}
+  func test {
+    self.fn(ccc: .up, #^OVERLOAD_LABEL^#)
+// OVERLOAD_LABEL: Begin completions, 1 items
+// OVERLOAD_LABEL-DAG: Pattern/ExprSpecific:               {#ddd: Horizontal#}[#Horizontal#];
+// OVERLOAD_LABEL: End completions
+  }
+}
