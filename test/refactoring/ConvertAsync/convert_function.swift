@@ -280,3 +280,12 @@ func testReturnHandling2(completion: @escaping (String) -> ()) {
 // RETURN-HANDLING2-NEXT:     {{^}}<#return#> a{{$}}
 // RETURN-HANDLING2-NEXT:   }
 // RETURN-HANDLING2-NEXT: }
+
+// FIXME: We should arguably be able to handle transforming this completion handler call (rdar://78011350).
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING3 %s
+func testReturnHandling3(_ completion: (String?, Error?) -> Void) {
+  return (completion("", nil))
+}
+// RETURN-HANDLING3:      func testReturnHandling3() async throws -> String {
+// RETURN-HANDLING3-NEXT:   {{^}} return (<#completion#>("", nil)){{$}}
+// RETURN-HANDLING3-NEXT: }
