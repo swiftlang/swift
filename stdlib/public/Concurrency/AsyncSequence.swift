@@ -38,8 +38,8 @@ import Swift
 /// method. This returns an instance of type `AsyncIterator`. Like the standard
 /// `IteratorProtocol`, the `AsyncIteratorProtocol` defines a single `next()`
 /// method to produce elements. The difference is that the `AsyncIterator`
-/// defines its `next()` method as `async`, which requires a caller to `await`
-/// the next value.
+/// defines its `next()` method as `async`, which requires a caller to wait for
+/// the next value with the `await` keyword.
 ///
 /// `AsyncSequence` also defines functions for processing the elements you
 /// receive, modeled on the operations provided by the basic `Sequence` in the
@@ -354,7 +354,8 @@ extension AsyncSequence {
   ///     // Prints: ace
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
-  ///   first argument comes before its second argument; otherwise, `false`.
+  ///   first argument should be ordered before its second argument; otherwise,
+  ///   `false`.
   /// - Returns: The sequence’s minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns `nil`.
   @inlinable
@@ -408,7 +409,8 @@ extension AsyncSequence {
   ///     // Prints: king
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
-  ///   first argument comes before its second argument; otherwise, `false`.
+  ///   first argument should be ordered before its second argument; otherwise,
+  ///   `false`.
   /// - Returns: The sequence’s minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns `nil`.
   @inlinable
