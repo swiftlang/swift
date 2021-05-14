@@ -24,7 +24,7 @@ extension AsyncSequence {
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `10`. The predicate passed to the `drop(while:)`
-  /// function throws an error if it encounters an even number, and otherwise
+  /// method throws an error if it encounters an even number, and otherwise
   /// returns `true` while it receives elements less than `5`. Because the
   /// predicate throws when it receives `2` from the base sequence, this example
   /// throws without ever printing anything.

@@ -25,7 +25,7 @@ extension AsyncSequence {
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
   /// values from `1` to `5`. The closure provided to the `compactMap(_:)`
-  /// function takes each `Int` and looks up a corresponding `String` from a
+  /// method takes each `Int` and looks up a corresponding `String` from a
   /// `romanNumeralDict` dictionary. Because there is no key for `4`, the closure
   /// returns `nil` in this case, which `compactMap(_:)` omits from the
   /// transformed asynchronous sequence.

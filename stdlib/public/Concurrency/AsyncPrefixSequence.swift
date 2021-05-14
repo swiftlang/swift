@@ -21,7 +21,7 @@ extension AsyncSequence {
   /// asynchronous sequence.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `10`. The `prefix(_:)` function causes the modified
+  /// values from `1` to `10`. The `prefix(_:)` method causes the modified
   /// sequence to pass through the first six values, then end.
   ///
   ///     for await number in Counter(howHigh: 10).prefix(6) {

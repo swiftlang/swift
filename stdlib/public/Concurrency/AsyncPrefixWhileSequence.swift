@@ -22,7 +22,7 @@ extension AsyncSequence {
   /// the predicate closure returns `false`.
   ///
   /// In this example, an asynchronous sequence called `Counter` produces `Int`
-  /// values from `1` to `10`. The `prefix(while:)` function causes the modified
+  /// values from `1` to `10`. The `prefix(while:)` method causes the modified
   /// sequence to pass along values so long as they aren’t divisible by `2` and
   /// `3`. Upon reaching `6`, the sequence ends:
   ///
@@ -32,6 +32,7 @@ extension AsyncSequence {
   ///         print("\(number) ", terminator: " ")
   ///     }
   ///     // prints "1  2  3  4  5"
+  ///     
   /// - Parameter predicate: A closure that takes an element as a parameter and
   ///   returns a Boolean value indicating whether the element should be
   ///   included in the modified sequence.

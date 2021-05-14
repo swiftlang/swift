@@ -30,28 +30,28 @@ import Swift
 /// to use it as if it were asynchronous:
 ///
 ///     struct Counter : AsyncSequence {
-///       typealias Element = Int
-///       let howHigh: Int
-///
-///       struct AsyncIterator : AsyncIteratorProtocol {
+///         typealias Element = Int
 ///         let howHigh: Int
-///         var current = 1
-///         mutating func next() async -> Int? {
-///           // A genuinely asychronous implementation uses the `Task`
-///           // API to check for cancellation here and return early.
-///           guard current <= howHigh else {
-///             return nil
-///           }
 ///
-///           let result = current
-///           current += 1
-///           return result
+///         struct AsyncIterator : AsyncIteratorProtocol {
+///             let howHigh: Int
+///             var current = 1
+///             mutating func next() async -> Int? {
+///                 // A genuinely asychronous implementation uses the `Task`
+///                 // API to check for cancellation here and return early.
+///                 guard current <= howHigh else {
+///                     return nil
+///                 }
+///
+///                 let result = current
+///                 current += 1
+///                 return result
+///             }
 ///         }
-///       }
 ///
-///       func makeAsyncIterator() -> AsyncIterator {
-///         return AsyncIterator(howHigh: howHigh)
-///       }
+///         func makeAsyncIterator() -> AsyncIterator {
+///             return AsyncIterator(howHigh: howHigh)
+///         }
 ///     }
 ///
 /// At the call site, this looks like:
@@ -73,11 +73,11 @@ import Swift
 /// primitives provided by Swift's `Task` API. The iterator can choose how to
 /// handle and respond to cancellation, including:
 ///
-/// * Checking the `isCancelled` value of the current `Task` inside `next()`
+/// - Checking the `isCancelled` value of the current `Task` inside `next()`
 ///   and returning `nil` to terminate the sequence.
-/// * Calling `checkCancellation()` on the `Task`, which throws a
+/// - Calling `checkCancellation()` on the `Task`, which throws a
 ///   `CancellationError`.
-/// * Implementing `next()` with a
+/// - Implementing `next()` with a
 ///   `withTaskCancellationHandler(handler:operation:)` invocation to
 ///   immediately react to cancellation.
 ///
@@ -90,6 +90,7 @@ public protocol AsyncIteratorProtocol {
   associatedtype Element
   /// Asynchronously advances to the next element and returns it, or ends the
   /// sequence if there is no next element.
+  /// 
   /// - Returns: The next element, if it exists, or `nil` to signal the end of
   ///   the sequence.
   mutating func next() async throws -> Element?

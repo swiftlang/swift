@@ -28,7 +28,7 @@ import Swift
 /// `1` up to a `howHigh` value:
 ///
 ///     for await i in Counter(howHigh: 10) {
-///       print(i, terminator: " ")
+///         print(i, terminator: " ")
 ///     }
 ///     // Prints: 1 2 3 4 5 6 7 8 9 10
 ///
@@ -65,7 +65,7 @@ import Swift
 /// received from a `Counter` sequence into a `String`:
 ///
 ///     let stream = Counter(howHigh: 10)
-///       .map { $0 % 2 == 0 ? "Even" : "Odd" }
+///         .map { $0 % 2 == 0 ? "Even" : "Odd" }
 ///     for await s in stream {
 ///         print(s, terminator: " ")
 ///     }
@@ -78,6 +78,7 @@ public protocol AsyncSequence {
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
   /// Creates the asynchronous iterator that produces elements of this
   /// asynchronous sequence.
+  ///
   /// - Returns: An instance of the `AsyncIterator` type used to produce
   /// elements of the asynchronous sequence.
   associatedtype Element
@@ -258,6 +259,7 @@ extension AsyncSequence where Element: Equatable {
   ///     let containsFive = await Counter(howHigh: 10)
   ///         .contains(5)
   ///     print(containsFive)
+  ///     // Prints: true
   ///
   /// - Parameter search: The element to find in the asynchronous sequence.
   /// - Returns: `true` if the method found the element in the asynchronous
@@ -330,14 +332,14 @@ extension AsyncSequence {
   /// The predicate must be a *strict weak ordering* over the elements. That is,
   /// for any elements `a`, `b`, and `c`, the following conditions must hold:
   ///
-  ///   - Irreflexivity — `areInIncreasingOrder(a, a)` is always `false`.
-  ///   - Transitive comparability — If `areInIncreasingOrder(a, b)` and
-  ///     `areInIncreasingOrder(b, c)` are both `true`, then
-  ///     `areInIncreasingOrder(a, c)` is also `true`.
-  ///   - Transitive incomparability — Two elements are incomparable if neither
-  ///     is ordered before the other according to the predicate. If `a` and `b`
-  ///     are incomparable, and `b` and `c` are incomparable, then `a` and `c`
-  ///     are also incomparable.
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
   ///
   /// The following example uses an enumeration of playing cards ranks, `Rank`,
   /// which ranges from `ace` (low) to `king` (high). An asynchronous sequence
@@ -385,14 +387,14 @@ extension AsyncSequence {
   /// The predicate must be a *strict weak ordering* over the elements. That is,
   /// for any elements `a`, `b`, and `c`, the following conditions must hold:
   ///
-  ///   - Irreflexivity — `areInIncreasingOrder(a, a)` is always `false`.
-  ///   - Transitive comparability — If `areInIncreasingOrder(a, b)` and
-  ///     `areInIncreasingOrder(b, c)` are both `true`, then
-  ///     `areInIncreasingOrder(a, c)` is also `true`.
-  ///   - Transitive incomparability — Two elements are incomparable if neither
-  ///     is ordered before the other according to the predicate. If `a` and `b`
-  ///     are incomparable, and `b` and `c` are incomparable, then `a` and `c`
-  ///     are also incomparable.
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also
+  ///   `true`. (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
   ///
   /// The following example uses an enumeration of playing cards ranks, `Rank`,
   /// which ranges from `ace` (low) to `king` (high). An asynchronous sequence
