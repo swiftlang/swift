@@ -14,6 +14,9 @@ import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 /// A partial task is a unit of scheduleable work.
+///
+/// Unless you're implementing a scheduler,
+/// you don't generally interact with partial tasks directly.
 @available(SwiftStdlib 5.5, *)
 @frozen
 public struct PartialAsyncTask {
