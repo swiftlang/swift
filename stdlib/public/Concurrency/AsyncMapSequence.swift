@@ -14,6 +14,35 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Creates an asynchronous sequence that maps the given closure over the
+  /// asynchronous sequence’s elements.
+  ///
+  /// Use the `map(_:)` method to transform every element received from a base
+  /// asynchronous sequence. Typically, you use this to transform from one type
+  /// of element to another.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `5`. The closure provided to the `map(_:)` method
+  /// takes each `Int` and looks up a corresponding `String` from a
+  /// `romanNumeralDict` dictionary. This means the outer `for await in` loop
+  /// iterates over `String` instances instead of the underlying `Int` values
+  /// that `Counter` produces:
+  ///
+  ///     let romanNumeralDict: [Int: String] =
+  ///         [1: "I", 2: "II", 3: "III", 5: "V"]
+  ///
+  ///     let stream = Counter(howHigh: 5)
+  ///         .map { romanNumeralDict[$0] ?? "(unknown)" }
+  ///     for await numeral in stream {
+  ///         print("\(numeral) ", terminator: " ")
+  ///     }
+  ///     // Prints: I  II  III  (unknown)  V
+  ///
+  /// - Parameter transform: A mapping closure. `transform` accepts an element
+  ///   of this sequence as its parameter and returns a transformed value of the
+  ///   same or of a different type.
+  /// - Returns: An asynchronous sequence that contains, in order, the elements
+  ///   produced by the `transform` closure.
   @inlinable
   public __consuming func map<Transformed>(
     _ transform: @escaping (Element) async -> Transformed
@@ -22,6 +51,8 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence that maps the given closure over the asynchronous
+/// sequence’s elements.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
@@ -42,9 +73,15 @@ public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncMapSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The map sequence produces whatever type of element its transforming
+  /// closure produces.
   public typealias Element = Transformed
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the map sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -61,6 +98,11 @@ extension AsyncMapSequence: AsyncSequence {
       self.transform = transform
     }
 
+    /// Produces the next element in the map sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator; if this call returns
+    /// `nil`, `next()` returns `nil`. Otherwise, `next()` returns the result of
+    /// calling the transforming closure on the received element.
     @inlinable
     public mutating func next() async rethrows -> Transformed? {
       guard let element = try await baseIterator.next() else {

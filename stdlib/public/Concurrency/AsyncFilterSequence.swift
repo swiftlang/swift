@@ -14,6 +14,25 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Creates an asynchronous sequence that contains, in order, the elements of
+  /// the base sequence that satisfy the given predicate.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `filter(_:)` method returns `true` for even
+  /// values and `false` for odd values, thereby filtering out the odd values:
+  ///
+  ///     let stream = Counter(howHigh: 10)
+  ///         .filter { $0 % 2 == 0 }
+  ///     for await number in stream {
+  ///         print("\(number) ", terminator: " ")
+  ///     }
+  ///     // Prints: 2  4  6  8  10
+  ///
+  /// - Parameter isIncluded: A closure that takes an element of the
+  ///   asynchronous sequence as its argument and returns a Boolean value
+  ///   that indicates whether to include the element in the filtered sequence.
+  /// - Returns: An asynchronous sequence that contains, in order, the elements
+  ///   of the base sequence that satisfy the given predicate.
   @inlinable
   public __consuming func filter(
     _ isIncluded: @escaping (Element) async -> Bool
@@ -22,6 +41,8 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence that contains, in order, the elements of
+/// the base sequence that satisfy a given predicate.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncFilterSequence<Base: AsyncSequence> {
   @usableFromInline
@@ -42,9 +63,15 @@ public struct AsyncFilterSequence<Base: AsyncSequence> {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncFilterSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The filter sequence produces whatever type of element its base
+  /// sequence produces.
   public typealias Element = Base.Element
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the filter sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -61,6 +88,13 @@ extension AsyncFilterSequence: AsyncSequence {
       self.isIncluded = isIncluded
     }
 
+    /// Produces the next element in the filter sequence.
+    ///
+    /// This iterator calls `next()` on its base iterator; if this call returns
+    /// `nil`, `next()` returns nil. Otherwise, `next()` evaluates the
+    /// result with the `predicate` closure. If the closure returns `true`,
+    /// `next()` returns the received element; otherwise it awaits the next
+    /// element from the base iterator.
     @inlinable
     public mutating func next() async rethrows -> Base.Element? {
       while true {

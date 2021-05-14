@@ -14,6 +14,30 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncSequence {
+  /// Returns an asynchronous sequence, containing the initial, consecutive
+  /// elements of the base sequence that satisfy the given predicate.
+  ///
+  /// Use `prefix(while:)` to produce values while elements from the base
+  /// sequence meet a condition you specify. The modified sequence ends when
+  /// the predicate closure returns `false`.
+  ///
+  /// In this example, an asynchronous sequence called `Counter` produces `Int`
+  /// values from `1` to `10`. The `prefix(while:)` method causes the modified
+  /// sequence to pass along values so long as they aren’t divisible by `2` and
+  /// `3`. Upon reaching `6`, the sequence ends:
+  ///
+  ///     let stream = Counter(howHigh: 10)
+  ///         .prefix { $0 % 2 != 0 || $0 % 3 != 0 }
+  ///     for try await number in stream {
+  ///         print("\(number) ", terminator: " ")
+  ///     }
+  ///     // prints "1  2  3  4  5"
+  ///     
+  /// - Parameter predicate: A closure that takes an element as a parameter and
+  ///   returns a Boolean value indicating whether the element should be
+  ///   included in the modified sequence.
+  /// - Returns: An asynchronous sequence of the initial, consecutive
+  ///   elements that satisfy `predicate`.
   @inlinable
   public __consuming func prefix(
     while predicate: @escaping (Element) async -> Bool
@@ -22,6 +46,8 @@ extension AsyncSequence {
   }
 }
 
+/// An asynchronous sequence, containing the initial, consecutive
+/// elements of the base sequence that satisfy a given predicate.
 @available(SwiftStdlib 5.5, *)
 public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
@@ -42,9 +68,15 @@ public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
 
 @available(SwiftStdlib 5.5, *)
 extension AsyncPrefixWhileSequence: AsyncSequence {
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The prefix-while sequence produces whatever type of element its base
+  /// iterator produces.
   public typealias Element = Base.Element
+  /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
+  /// The iterator that produces elements of the prefix-while sequence.
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var predicateHasFailed = false
@@ -64,6 +96,12 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
       self.predicate = predicate
     }
 
+    /// Produces the next element in the prefix-while sequence.
+    ///
+    /// If the predicate hasn't yet failed, this method gets the next element
+    /// from the base sequence and calls the predicate with it. If this call
+    /// succeeds, this method passes along the element. Otherwise, it returns
+    /// `nil`, ending the sequence.
     @inlinable
     public mutating func next() async rethrows -> Base.Element? {
       if !predicateHasFailed, let nextElement = try await baseIterator.next() {
