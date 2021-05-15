@@ -7,6 +7,7 @@
 
 // rdar://77916860
 // UNSUPPORTED: OS=watchos && CPU=i386
+// UNSUPPORTED: OS=ios && CPU=x86_64
 
 // PRINT-CLASS-LABEL: class SomeClass : NSObject {
 // PRINT-CLASS-NEXT:   init()
