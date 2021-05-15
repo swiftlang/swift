@@ -2798,22 +2798,16 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
         typeEraser->getContextSubstitutionMap(nominalTypeDecl->getParentModule(),
                                               nominalTypeDecl);
     QuerySubstitutionMap getSubstitution{baseMap};
-    auto subMap = SubstitutionMap::get(
-        genericSignature,
-        [&](SubstitutableType *type) -> Type {
-          if (type->isEqual(genericParamType))
-            return protocol->getSelfTypeInContext();
-
-          return getSubstitution(type);
-        },
-        LookUpConformanceInModule(dc->getParentModule()));
 
     // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
-          dc, SourceLoc(), SourceLoc(), typeEraser,
-          genericSignature->getGenericParams(),
-          genericSignature->getRequirements(),
-          QuerySubstitutionMap{subMap});
+          genericSignature,
+          [&](SubstitutableType *type) -> Type {
+            if (type->isEqual(genericParamType))
+              return protocol->getSelfTypeInContext();
+
+            return getSubstitution(type);
+          });
 
     if (result != RequirementCheckResult::Success) {
       unviable.push_back(

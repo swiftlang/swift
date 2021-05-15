@@ -870,6 +870,37 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
   return RequirementCheckResult::SubstitutionFailure;
 }
 
+RequirementCheckResult
+TypeChecker::checkGenericArguments(GenericSignature sig,
+                                   TypeSubstitutionFn substitutions) {
+  SmallVector<Requirement, 4> worklist;
+  bool valid = true;
+
+  for (auto req : sig->getRequirements()) {
+    if (auto resolved = req.subst(
+          substitutions,
+          LookUpConformanceInSignature(sig.getPointer()))) {
+      worklist.push_back(*resolved);
+    } else {
+      valid = false;
+    }
+  }
+
+  while (!worklist.empty()) {
+    auto req = worklist.pop_back_val();
+    ArrayRef<Requirement> conditionalRequirements;
+    if (!req.isSatisfied(conditionalRequirements))
+      return RequirementCheckResult::Failure;
+
+    worklist.append(conditionalRequirements.begin(),
+                    conditionalRequirements.end());
+  }
+
+  if (valid)
+    return RequirementCheckResult::Success;
+  return RequirementCheckResult::SubstitutionFailure;
+}
+
 Requirement
 RequirementRequest::evaluate(Evaluator &evaluator,
                              WhereClauseOwner owner,

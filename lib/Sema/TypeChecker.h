@@ -498,6 +498,10 @@ RequirementCheckResult checkGenericArguments(
     ArrayRef<Requirement> requirements, TypeSubstitutionFn substitutions,
     SubstOptions options = None);
 
+/// A lower-level version of the above without diagnostic emission.
+RequirementCheckResult checkGenericArguments(
+    GenericSignature sig, TypeSubstitutionFn substitutions);
+
 bool checkContextualRequirements(GenericTypeDecl *decl,
                                  Type parentTy,
                                  SourceLoc loc,
