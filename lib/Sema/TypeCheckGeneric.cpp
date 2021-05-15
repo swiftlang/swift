@@ -791,47 +791,17 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         req = *substed;
       }
 
-      auto checkRequirement = [&]() {
-        switch (req.getKind()) {
-        case RequirementKind::Conformance: {
-          // Protocol conformance requirements.
-          auto proto = req.getProtocolDecl();
-          auto conformance = module->lookupConformance(
-              req.getFirstType(), proto);
+      ArrayRef<Requirement> conditionalRequirements;
+      if (req.isSatisfied(conditionalRequirements)) {
+        if (!conditionalRequirements.empty()) {
+          assert(req.getKind() == RequirementKind::Conformance);
 
-          if (!conformance)
-            return false;
-
-          auto conditionalReqs = conformance.getConditionalRequirements();
-          if (!conditionalReqs.empty()) {
-            auto history = current.Parents;
-            history.push_back({req.getFirstType(), proto});
-            pendingReqs.push_back({conditionalReqs, std::move(history)});
-          }
-
-          return true;
+          auto history = current.Parents;
+          history.push_back({req.getFirstType(), req.getProtocolDecl()});
+          pendingReqs.push_back({conditionalRequirements, std::move(history)});
         }
-
-        case RequirementKind::Layout: {
-          // TODO: Statically check other layout constraints, once they can
-          // be spelled in Swift.
-          if (req.getLayoutConstraint()->isClass() &&
-              !req.getFirstType()->satisfiesClassConstraint())
-            return false;
-
-          return true;
-        }
-
-        case RequirementKind::Superclass:
-          return req.getSecondType()->isExactSuperclassOf(req.getFirstType());
-
-        case RequirementKind::SameType:
-          return req.getFirstType()->isEqual(req.getSecondType());
-        }
-      };
-
-      if (checkRequirement())
         continue;
+      }
 
       if (loc.isValid()) {
         Diag<Type, Type, Type> diagnostic;

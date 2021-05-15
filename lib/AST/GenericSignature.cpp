@@ -722,3 +722,67 @@ ProtocolDecl *Requirement::getProtocolDecl() const {
   assert(getKind() == RequirementKind::Conformance);
   return getSecondType()->castTo<ProtocolType>()->getDecl();
 }
+
+bool
+Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements) const {
+  switch (getKind()) {
+  case RequirementKind::Conformance: {
+    auto *proto = getProtocolDecl();
+    auto *module = proto->getParentModule();
+    auto conformance = module->lookupConformance(getFirstType(), proto);
+    if (!conformance)
+      return false;
+
+    conditionalRequirements = conformance.getConditionalRequirements();
+    return true;
+  }
+
+  case RequirementKind::Layout: {
+    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      return (layout && layout.merge(getLayoutConstraint()));
+    }
+
+    if (getLayoutConstraint()->isClass())
+      return getFirstType()->satisfiesClassConstraint();
+
+    // TODO: Statically check other layout constraints, once they can
+    // be spelled in Swift.
+    return true;
+  }
+
+  case RequirementKind::Superclass:
+    return getSecondType()->isExactSuperclassOf(getFirstType());
+
+  case RequirementKind::SameType:
+    return getFirstType()->isEqual(getSecondType());
+  }
+
+  llvm_unreachable("Bad requirement kind");
+}
+
+bool Requirement::canBeSatisfied() const {
+  switch (getKind()) {
+  case RequirementKind::Conformance:
+    return getFirstType()->is<ArchetypeType>();
+
+  case RequirementKind::Layout: {
+    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      return (!layout || layout.merge(getLayoutConstraint()));
+    }
+
+    return false;
+  }
+
+  case RequirementKind::Superclass:
+    return (getFirstType()->isBindableTo(getSecondType()) ||
+            getSecondType()->isBindableTo(getFirstType()));
+
+  case RequirementKind::SameType:
+    return (getFirstType()->isBindableTo(getSecondType()) ||
+            getSecondType()->isBindableTo(getFirstType()));
+  }
+
+  llvm_unreachable("Bad requirement kind");
+}
