@@ -1160,9 +1160,9 @@ DiagnosticEngine::diagnosticStringFor(const DiagID id,
   auto defaultMessage = printDiagnosticNames
                             ? debugDiagnosticStrings[(unsigned)id]
                             : diagnosticStrings[(unsigned)id];
-  if (localization) {
-    auto localizedMessage =
-        localization.get()->getMessageOr(id, defaultMessage);
+
+  if (auto producer = localization.get()) {
+    auto localizedMessage = producer->getMessageOr(id, defaultMessage);
     return localizedMessage;
   }
   return defaultMessage;
