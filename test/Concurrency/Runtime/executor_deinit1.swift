@@ -10,6 +10,8 @@
 // UNSUPPORTED: linux
 // rdar://76611676
 // UNSUPPORTED: CPU=x86_64 && OS=ios
+// rdar://78039465
+// UNSUPPORTED: CPU=x86_64 && OS=watchos
 
 
 // doesn't matter that it's bool identity function or not
