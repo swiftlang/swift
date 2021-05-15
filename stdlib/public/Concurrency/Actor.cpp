@@ -1800,6 +1800,13 @@ static bool tryAssumeThreadForSwitch(ExecutorRef newExecutor,
   return false;
 }
 
+__attribute__((noinline))
+SWIFT_CC(swiftasync)
+static void force_tail_call_hack(AsyncTask *task) {
+  // This *should* be executed as a tail call.
+  return task->runInFullyEstablishedContext();
+}
+
 /// Given that we've assumed control of an executor on this thread,
 /// continue to run the given task on it.
 SWIFT_CC(swiftasync)
@@ -1813,7 +1820,9 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
     oldTracking->setActiveExecutor(executor);
 
     // FIXME: force tail call
-    return task->runInFullyEstablishedContext();
+    // return task->runInFullyEstablishedContext();
+    // This hack "ensures" that this call gets executed as a tail call.
+    return force_tail_call_hack(task);
   }
 
   // Otherwise, set up tracking info.
