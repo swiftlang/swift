@@ -1285,11 +1285,6 @@ bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
 
-bool areGenericRequirementsSatisfied(const DeclContext *DC,
-                                     GenericSignature sig,
-                                     SubstitutionMap Substitutions,
-                                     bool isExtension);
-
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.
 void checkUnknownAttrRestrictions(

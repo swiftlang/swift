@@ -4135,31 +4135,6 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   e->walk(optimizer);
 }
 
-bool swift::areGenericRequirementsSatisfied(
-    const DeclContext *DC, GenericSignature sig,
-    SubstitutionMap Substitutions, bool isExtension) {
-
-  ConstraintSystemOptions Options;
-  ConstraintSystem CS(const_cast<DeclContext *>(DC), Options);
-  auto Loc = CS.getConstraintLocator({});
-
-  // For every requirement, add a constraint.
-  for (auto Req : sig->getRequirements()) {
-    if (auto resolved = Req.subst(
-          QuerySubstitutionMap{Substitutions},
-          LookUpConformanceInModule(DC->getParentModule()))) {
-      CS.addConstraint(*resolved, Loc);
-    } else if (isExtension) {
-      return false;
-    }
-    // Unresolved requirements are requirements of the function itself. This
-    // does not prevent it from being applied. E.g. func foo<T: Sequence>(x: T).
-  }
-
-  // Having a solution implies the requirements have been fulfilled.
-  return CS.solveSingle().hasValue();
-}
-
 struct ResolvedMemberResult::Implementation {
   llvm::SmallVector<ValueDecl*, 4> AllDecls;
   unsigned ViableStartIdx;

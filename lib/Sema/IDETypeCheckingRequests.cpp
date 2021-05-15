@@ -116,6 +116,36 @@ public:
   }
 };
 
+static bool areGenericRequirementsSatisfied(GenericSignature sig,
+                                            SubstitutionMap substMap,
+                                            bool isExtension) {
+  SmallVector<Requirement, 4> worklist;
+
+  for (auto req : sig->getRequirements()) {
+    if (auto resolved = req.subst(
+          QuerySubstitutionMap{substMap},
+          LookUpConformanceInSignature(sig.getPointer()))) {
+      worklist.push_back(*resolved);
+    } else if (isExtension) {
+      return false;
+    }
+    // Unresolved requirements are requirements of the function itself. This
+    // does not prevent it from being applied. E.g. func foo<T: Sequence>(x: T).
+  }
+
+  while (!worklist.empty()) {
+    auto req = worklist.pop_back_val();
+    ArrayRef<Requirement> conditionalRequirements;
+    if (req.isSatisfied(conditionalRequirements) != Requirement::Satisfied)
+      return false;
+
+    worklist.append(conditionalRequirements.begin(),
+                    conditionalRequirements.end());
+  }
+
+  return true;
+}
+
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
                                        const ExtensionDecl *ED) {
   // We can't do anything if the base type has unbound generic parameters.
@@ -133,7 +163,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), ED->getExtendedNominal());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
+  return areGenericRequirementsSatisfied(genericSig, substMap,
                                          /*isExtension=*/true);
 }
 
@@ -157,7 +187,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
 
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), VD->getDeclContext());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
+  return areGenericRequirementsSatisfied(genericSig, substMap,
                                          /*isExtension=*/false);
 }
 
