@@ -774,7 +774,12 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
       auto req = rawReq;
       if (current.Parents.empty()) {
         auto substed = rawReq.subst(
-            substitutions,
+            [&](SubstitutableType *type) -> Type {
+              auto substType = substitutions(type);
+              if (substType->hasTypeParameter())
+                return dc->mapTypeIntoContext(substType);
+              return substType;
+            },
             LookUpConformanceInModule(module),
             options);
         if (!substed) {
@@ -786,105 +791,100 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         req = *substed;
       }
 
-      auto kind = req.getKind();
-      Type rawFirstType = rawReq.getFirstType();
-      Type firstType = req.getFirstType();
-      if (firstType->hasTypeParameter())
-        firstType = dc->mapTypeIntoContext(firstType);
+      auto checkRequirement = [&]() {
+        switch (req.getKind()) {
+        case RequirementKind::Conformance: {
+          // Protocol conformance requirements.
+          auto proto = req.getProtocolDecl();
+          auto conformance = module->lookupConformance(
+              req.getFirstType(), proto);
 
-      Type rawSecondType, secondType;
-      if (kind != RequirementKind::Layout) {
-        rawSecondType = rawReq.getSecondType();
-        secondType = req.getSecondType();
-        if (secondType->hasTypeParameter())
-          secondType = dc->mapTypeIntoContext(secondType);
-      }
+          if (!conformance)
+            return false;
 
-      // Don't do further checking on error types.
-      if (firstType->hasError() || (secondType && secondType->hasError())) {
-        // Another requirement will fail later; just continue.
-        valid = false;
-        continue;
-      }
-
-      bool requirementFailure = false;
-
-      Diag<Type, Type, Type> diagnostic;
-      Diag<Type, Type, StringRef> diagnosticNote;
-
-      switch (kind) {
-      case RequirementKind::Conformance: {
-        // Protocol conformance requirements.
-        auto proto = secondType->castTo<ProtocolType>();
-        auto conformance = module->lookupConformance(firstType, proto->getDecl());
-
-        if (conformance) {
           auto conditionalReqs = conformance.getConditionalRequirements();
           if (!conditionalReqs.empty()) {
             auto history = current.Parents;
-            history.push_back({firstType, proto});
+            history.push_back({req.getFirstType(), proto});
             pendingReqs.push_back({conditionalReqs, std::move(history)});
           }
-          continue;
+
+          return true;
         }
 
-        if (loc.isValid())
-          diagnoseConformanceFailure(firstType, proto->getDecl(), module, loc);
+        case RequirementKind::Layout: {
+          // TODO: Statically check other layout constraints, once they can
+          // be spelled in Swift.
+          if (req.getLayoutConstraint()->isClass() &&
+              !req.getFirstType()->satisfiesClassConstraint())
+            return false;
 
-        if (current.Parents.empty())
-          return RequirementCheckResult::Failure;
-
-        // Failure needs to emit a diagnostic.
-        diagnostic = diag::type_does_not_conform_owner;
-        diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-        requirementFailure = true;
-        break;
-      }
-
-      case RequirementKind::Layout:
-        // TODO: Statically check other layout constraints, once they can
-        // be spelled in Swift.
-        if (req.getLayoutConstraint()->isClass() &&
-            !firstType->satisfiesClassConstraint()) {
-          diagnostic = diag::type_is_not_a_class;
-          diagnosticNote = diag::anyobject_requirement;
-          requirementFailure = true;
+          return true;
         }
-        break;
 
-      case RequirementKind::Superclass: {
-        // Superclass requirements.
-        if (!secondType->isExactSuperclassOf(firstType)) {
-          diagnostic = diag::type_does_not_inherit;
-          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-          requirementFailure = true;
+        case RequirementKind::Superclass:
+          return req.getSecondType()->isExactSuperclassOf(req.getFirstType());
+
+        case RequirementKind::SameType:
+          return req.getFirstType()->isEqual(req.getSecondType());
         }
-        break;
-      }
+      };
 
-      case RequirementKind::SameType:
-        if (!firstType->isEqual(secondType)) {
-          diagnostic = diag::types_not_equal;
-          diagnosticNote = diag::types_not_equal_requirement;
-          requirementFailure = true;
-        }
-        break;
-      }
-
-      if (!requirementFailure)
+      if (checkRequirement())
         continue;
 
       if (loc.isValid()) {
+        Diag<Type, Type, Type> diagnostic;
+        Diag<Type, Type, StringRef> diagnosticNote;
+
+        switch (req.getKind()) {
+        case RequirementKind::Conformance: {
+          diagnoseConformanceFailure(req.getFirstType(), req.getProtocolDecl(),
+                                     module, loc);
+
+          if (current.Parents.empty())
+            return RequirementCheckResult::Failure;
+
+          diagnostic = diag::type_does_not_conform_owner;
+          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+          break;
+        }
+
+        case RequirementKind::Layout:
+          diagnostic = diag::type_is_not_a_class;
+          diagnosticNote = diag::anyobject_requirement;
+          break;
+
+        case RequirementKind::Superclass:
+          diagnostic = diag::type_does_not_inherit;
+          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+          break;
+
+        case RequirementKind::SameType:
+          diagnostic = diag::types_not_equal;
+          diagnosticNote = diag::types_not_equal_requirement;
+          break;
+        }
+
+        Type rawSecondType, secondType;
+        if (req.getKind() != RequirementKind::Layout) {
+          rawSecondType = rawReq.getSecondType();
+          secondType = req.getSecondType();
+        }
+
         // FIXME: Poor source-location information.
-        ctx.Diags.diagnose(loc, diagnostic, owner, firstType, secondType);
+        ctx.Diags.diagnose(loc, diagnostic, owner,
+                           req.getFirstType(), secondType);
 
         std::string genericParamBindingsText;
         if (!genericParams.empty()) {
           genericParamBindingsText =
             gatherGenericParamBindingsText(
-              {rawFirstType, rawSecondType}, genericParams, substitutions);
+              {rawReq.getFirstType(), rawSecondType},
+              genericParams, substitutions);
         }
-        ctx.Diags.diagnose(noteLoc, diagnosticNote, rawFirstType, rawSecondType,
+        ctx.Diags.diagnose(noteLoc, diagnosticNote,
+                           rawReq.getFirstType(), rawSecondType,
                            genericParamBindingsText);
 
         ParentConditionalConformance::diagnoseConformanceStack(

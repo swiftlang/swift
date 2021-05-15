@@ -216,7 +216,7 @@ void ParentConditionalConformance::diagnoseConformanceStack(
     ArrayRef<ParentConditionalConformance> conformances) {
   for (auto history : llvm::reverse(conformances)) {
     diags.diagnose(loc, diag::requirement_implied_by_conditional_conformance,
-                   history.ConformingType, history.Protocol);
+                   history.ConformingType, history.Protocol->getDeclaredInterfaceType());
   }
 }
 

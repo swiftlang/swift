@@ -188,7 +188,7 @@ enum class Comparison {
 /// formatted with \c diagnoseConformanceStack.
 struct ParentConditionalConformance {
   Type ConformingType;
-  ProtocolType *Protocol;
+  ProtocolDecl *Protocol;
 
   /// Format the stack \c conformances as a series of notes that trace a path of
   /// conditional conformances that lead to some other failing requirement (that
