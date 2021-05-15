@@ -277,9 +277,16 @@ function(_add_host_variant_c_compile_flags target)
 
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
     if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
-      # this is the minimum architecture that supports 16 byte CAS, which is
-      # necessary to avoid a dependency to libatomic
-      target_compile_options(${target} PRIVATE -march=core2)
+      # We support all x86 architectures that support the -mcx16 flag. 
+      # This flag ensures that was have a 16-byte cas.
+      # NOTE: This used to be -march=core2. The reason why we changed this was 
+      # that this caused the following problems:
+      #   1. Setting core2 allows for the usage of intel-specific instructions 
+      #      (e.g. SSSE3) causing binary incompatibility issues on AMD processors.
+      #   2. There are intel processors older than core2-duo that support cx16. 
+      #      If we compiled for core2, we could use newer intel intrinsics than 
+      #      these older processors would support. 
+      target_compile_options(${target} PRIVATE -mcx16)
     endif()
   endif()
 
