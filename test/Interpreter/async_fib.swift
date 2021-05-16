@@ -7,6 +7,7 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: OS=windows-msvc
 
 var gg = 0
 
