@@ -70,6 +70,10 @@ class Stmt;
 class TypeRepr;
 struct FingerprintAndMembers;
 
+/// Get the number of instructions executed since this process was launched.
+/// Returns 0 if the number of instructions executed could not be determined.
+uint64_t getInstructionsExecuted();
+
 // There are a handful of cases where the swift compiler can introduce
 // counter-measurement noise via nondeterminism, especially via
 // parallelism; inhibiting all such cases reliably using existing avenues
