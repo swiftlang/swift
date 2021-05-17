@@ -1023,8 +1023,10 @@ func _getCurrentThreadPriority() -> Int
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-#if compiler(>=5.5) && $Sendable
+#if compiler(>=5.5) && $Sendable && $InheritActorContext && $ImplicitSelfCapture
   async { await body() }
+#else
+  detach { await body() }
 #endif
 }
 
