@@ -11499,6 +11499,67 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       }
     }
 
+    auto anchor = locator->getAnchor();
+    auto *AE = getAsExpr<ApplyExpr>(anchor);
+    if (AE && getContextualTypePurpose(anchor) == CTP_ReturnSingleExpr) {
+      auto resultTy = getType(AE);
+      auto overload = findSelectedOverloadFor(AE->getSemanticFn());
+      auto resultTypeVar = resultTy->getAs<TypeVariableType>();
+      auto applyFnType = overload->openedType->castTo<FunctionType>();
+      // When a function result being returned is a generic parameter that can
+      // be inferred by a closure argument result e.g.
+      //   func callit<T>(_ f: () -> T) -> T {
+      //      f()
+      //   }
+      //
+      //   func caller() -> Int {
+      //      callit {
+      //        print("hello")
+      //      }
+      //   }
+      // let's score a contextual mismatch for the result call a bit higher
+      // to avoid ambiguity because we may have contextual mismatches for
+      // the closure as well.
+      if (overload && resultTypeVar &&
+          resultTypeVar->getImpl().getGenericParameter()) {
+        auto typeInvolvesTypeVar = [](Type type, TypeVariableType *typeVar) {
+          bool contains = false;
+          type.visit([&](Type ty) {
+            if (ty->isEqual(typeVar))
+              contains = true;
+          });
+          return contains;
+        };
+
+        // A single closure argument.
+        if (isExpr<ClosureExpr>(AE->getArg()->getSemanticsProvidingExpr())) {
+          auto param = applyFnType->getParams().front();
+          auto closureParamType =
+              param.getParameterType()->getAs<FunctionType>();
+          if (closureParamType &&
+              typeInvolvesTypeVar(closureParamType->getResult(),
+                                  resultTypeVar)) {
+            increaseScore(SK_Fix);
+          }
+        } else if (auto *argTuple = getAsExpr<TupleExpr>(AE->getArg())) {
+          if (llvm::any_of(indices(argTuple->getElements()), [&](unsigned i) {
+                auto *arg = argTuple->getElements()[i];
+                if (!isExpr<ClosureExpr>(arg))
+                  return false;
+
+                auto param = applyFnType->getParams()[i];
+                auto closureParamType =
+                    param.getParameterType()->getAs<FunctionType>();
+                return closureParamType &&
+                       typeInvolvesTypeVar(closureParamType->getResult(),
+                                           resultTypeVar);
+              })) {
+            increaseScore(SK_Fix);
+          }
+        }
+      }
+    }
+
     return SolutionKind::Solved;
   }
 
