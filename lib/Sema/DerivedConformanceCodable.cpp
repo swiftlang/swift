@@ -249,7 +249,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!TypeChecker::conformsToProtocol(codingKeysType, codingKeyProto,
-                                       derived.getConformanceContext())) {
+                                       derived.getParentModule())) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -308,7 +308,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     auto target = derived.getConformanceContext()->mapTypeIntoContext(
          it->second->getValueInterfaceType());
     if (TypeChecker::conformsToProtocol(target, derived.Protocol,
-                                        derived.getConformanceContext())
+                                        derived.getParentModule())
             .isInvalid()) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
@@ -1828,7 +1828,8 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (TypeChecker::conformsToProtocol(superType, proto, superclassDecl)) {
+      if (TypeChecker::conformsToProtocol(superType, proto,
+                                          derived.getParentModule())) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {

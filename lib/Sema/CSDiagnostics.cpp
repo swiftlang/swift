@@ -165,7 +165,8 @@ Type FailureDiagnostic::restoreGenericParameters(
 bool FailureDiagnostic::conformsToKnownProtocol(
     Type type, KnownProtocolKind protocol) const {
   auto &cs = getConstraintSystem();
-  return constraints::conformsToKnownProtocol(cs.DC, type, protocol);
+  return TypeChecker::conformsToKnownProtocol(type, protocol,
+                                              cs.DC->getParentModule());
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -2073,10 +2074,10 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
   if (!member->choice.isDecl())
     return member->choice;
 
-  auto *DC = getDC();
   auto *decl = member->choice.getDecl();
   if (isa<SubscriptDecl>(decl) &&
-      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl), DC)) {
+      isValidDynamicMemberLookupSubscript(cast<SubscriptDecl>(decl),
+                                          getParentModule())) {
     auto *subscript = cast<SubscriptDecl>(decl);
     // If this is a keypath dynamic member lookup, we have to
     // adjust the locator to find member referred by it.
@@ -2754,7 +2755,7 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
           Ctx.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
     Type errorCodeType = getFromType();
     auto conformance = TypeChecker::conformsToProtocol(
-        errorCodeType, errorCodeProtocol, getDC());
+        errorCodeType, errorCodeProtocol, getParentModule());
     if (conformance) {
       Type errorType =
           conformance
@@ -2962,7 +2963,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   SmallVector<std::string, 8> missingProtoTypeStrings;
   SmallVector<ProtocolDecl *, 8> missingProtocols;
   for (auto protocol : layout.getProtocols()) {
-    if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(), getDC())) {
+    if (!TypeChecker::conformsToProtocol(fromType, protocol->getDecl(),
+                                         getParentModule())) {
       missingProtoTypeStrings.push_back(protocol->getString());
       missingProtocols.push_back(protocol->getDecl());
     }

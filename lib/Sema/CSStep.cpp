@@ -538,8 +538,8 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
 }
 
 bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
-                                          ValueDecl *declA,
-                                          ValueDecl *declB) const {
+                                         ValueDecl *declA,
+                                         ValueDecl *declB) const {
   auto *typeA = declA->getInterfaceType()->getAs<GenericFunctionType>();
   auto *typeB = declB->getInterfaceType()->getAs<GenericFunctionType>();
 
@@ -578,8 +578,7 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
     return false;
 
   auto result = TypeChecker::checkGenericArguments(
-      declA->getDeclContext(), SourceLoc(), SourceLoc(), typeB,
-      genericSignatureB->getGenericParams(),
+      declA->getDeclContext()->getParentModule(),
       genericSignatureB->getRequirements(),
       QueryTypeSubstitutionMap{ substMap });
 
@@ -681,7 +680,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
           continue;
 
         for (auto *protocol : signature->getRequiredProtocols(paramType)) {
-          if (!TypeChecker::conformsToProtocol(argType, protocol, useDC))
+          if (!TypeChecker::conformsToProtocol(argType, protocol,
+                                               useDC->getParentModule()))
             return skip("unsatisfied");
         }
       }

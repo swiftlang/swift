@@ -150,6 +150,10 @@ protected:
     return cs.DC;
   }
 
+  ModuleDecl *getParentModule() const {
+    return getDC()->getParentModule();
+  }
+
   ASTContext &getASTContext() const {
     auto &cs = getConstraintSystem();
     return cs.getASTContext();
