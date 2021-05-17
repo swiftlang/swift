@@ -939,10 +939,17 @@ struct Rdar77867723 {
   enum Vertical { case up, down }
   func fn(aaa: Horizontal = .east, bbb: Vertical = .up) {}
   func fn(ccc: Vertical = .up, ddd: Horizontal = .west) {}
-  func test {
-    self.fn(ccc: .up, #^OVERLOAD_LABEL^#)
-// OVERLOAD_LABEL: Begin completions, 1 items
-// OVERLOAD_LABEL-DAG: Pattern/ExprSpecific:               {#ddd: Horizontal#}[#Horizontal#];
-// OVERLOAD_LABEL: End completions
+  func test1 {
+    self.fn(ccc: .up, #^OVERLOAD_LABEL1^#)
+// OVERLOAD_LABEL1: Begin completions, 1 items
+// OVERLOAD_LABEL1-DAG: Pattern/ExprSpecific:               {#ddd: Horizontal#}[#Horizontal#];
+// OVERLOAD_LABEL1: End completions
+  }
+  func test2 {
+    self.fn(eee: .up, #^OVERLOAD_LABEL2^#)
+// OVERLOAD_LABEL2: Begin completions, 2 items
+// OVERLOAD_LABEL2-DAG: Pattern/ExprSpecific:               {#bbb: Vertical#}[#Vertical#];
+// OVERLOAD_LABEL2-DAG: Pattern/ExprSpecific:               {#ddd: Horizontal#}[#Horizontal#];
+// OVERLOAD_LABEL2: End completions
   }
 }
