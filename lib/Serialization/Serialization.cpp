@@ -3086,10 +3086,7 @@ public:
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
     for (auto inherited : extension->getInherited()) {
-      if (extension->getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
-          !inherited.getType())
-        continue;
-      assert(!inherited.getType()->hasArchetype());
+      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
     }
     size_t numInherited = inheritedAndDependencyTypes.size();
@@ -3327,7 +3324,7 @@ public:
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theStruct->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
+      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
     }
 
@@ -3372,7 +3369,7 @@ public:
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theEnum->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
+      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
     }
 
@@ -3430,7 +3427,7 @@ public:
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theClass->getInherited()) {
-      assert(!inherited.getType()->hasArchetype());
+      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
     }
 
@@ -3488,10 +3485,11 @@ public:
     llvm::SmallSetVector<Type, 4> dependencyTypes;
 
     for (auto element : proto->getInherited()) {
-      assert(!element.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(element.getType()));
-      if (element.getType()->is<ProtocolType>())
-        dependencyTypes.insert(element.getType());
+      auto elementType = element.getType();
+      assert(!elementType || !elementType->hasArchetype());
+      inheritedAndDependencyTypes.push_back(S.addTypeRef(elementType));
+      if (elementType && elementType->is<ProtocolType>())
+        dependencyTypes.insert(elementType);
     }
 
     for (Requirement req : proto->getRequirementSignature()) {
