@@ -138,7 +138,6 @@ public:
       return true;
 
     case ActorInstance:
-      return lhs.actor == rhs.actor;
     case DistributedActorInstance:
       return lhs.actor == rhs.actor;
 
