@@ -2824,6 +2824,28 @@ static void fillDictionaryForDiagnosticInfo(
 static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
+  if (!Info.ID.empty())
+    Elem.set(KeyID, Info.ID);
+
+  if (!Info.Categories.empty()) {
+    SmallVector<SourceKit::UIdent, 1> CategoryUIDs;
+
+    static UIdent UIDKindDiagDeprecation(KindDiagDeprecation.str());
+    static UIdent UIDKindDiagNoUsage(KindDiagNoUsage.str());
+
+    for (auto C : Info.Categories) {
+      switch (C) {
+      case DiagnosticCategory::Deprecation:
+        CategoryUIDs.push_back(UIDKindDiagDeprecation);
+        break;
+      case DiagnosticCategory::NoUsage:
+        CategoryUIDs.push_back(UIDKindDiagNoUsage);
+        break;
+      }
+    }
+    Elem.set(KeyCategories, CategoryUIDs);
+  }
+
   Elem.set(KeyDescription, Info.Description);
   if (Info.Line != 0) {
     Elem.set(KeyLine, Info.Line);

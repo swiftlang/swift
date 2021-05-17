@@ -55,22 +55,34 @@ enum class DiagnosticOptions {
 
   /// An API or ABI breakage diagnostic emitted by the API digester.
   APIDigesterBreakage,
+
+  /// A deprecation warning or error.
+  Deprecation,
+
+  /// A diagnostic warning about an unused element.
+  NoUsage,
 };
 struct StoredDiagnosticInfo {
   DiagnosticKind kind : 2;
   bool pointsToFirstBadToken : 1;
   bool isFatal : 1;
   bool isAPIDigesterBreakage : 1;
+  bool isDeprecation : 1;
+  bool isNoUsage : 1;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
-                                 bool fatal, bool isAPIDigesterBreakage)
+                                 bool fatal, bool isAPIDigesterBreakage,
+                                 bool deprecation, bool noUsage)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
-        isAPIDigesterBreakage(isAPIDigesterBreakage) {}
+        isAPIDigesterBreakage(isAPIDigesterBreakage), isDeprecation(deprecation),
+        isNoUsage(noUsage) {}
   constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
       : StoredDiagnosticInfo(k,
                              opts == DiagnosticOptions::PointsToFirstBadToken,
                              opts == DiagnosticOptions::Fatal,
-                             opts == DiagnosticOptions::APIDigesterBreakage) {}
+                             opts == DiagnosticOptions::APIDigesterBreakage,
+                             opts == DiagnosticOptions::Deprecation,
+                             opts == DiagnosticOptions::NoUsage) {}
 };
 
 // Reproduce the DiagIDs, as we want both the size and access to the raw ids
@@ -106,6 +118,12 @@ static constexpr const char * const diagnosticStrings[] = {
 
 static constexpr const char *const debugDiagnosticStrings[] = {
 #define DIAG(KIND, ID, Options, Text, Signature) Text " [" #ID "]",
+#include "swift/AST/DiagnosticsAll.def"
+    "<not a diagnostic>",
+};
+
+static constexpr const char *const diagnosticIDStrings[] = {
+#define DIAG(KIND, ID, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
     "<not a diagnostic>",
 };
@@ -324,6 +342,14 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
 
 bool DiagnosticEngine::isAPIDigesterBreakageDiagnostic(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned)ID].isAPIDigesterBreakage;
+}
+
+bool DiagnosticEngine::isDeprecationDiagnostic(DiagID ID) const {
+  return storedDiagnosticInfos[(unsigned)ID].isDeprecation;
+}
+
+bool DiagnosticEngine::isNoUsageDiagnostic(DiagID ID) const {
+  return storedDiagnosticInfos[(unsigned)ID].isNoUsage;
 }
 
 bool DiagnosticEngine::finishProcessing() {
@@ -1102,10 +1128,13 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
     }
   }
 
-  // Currently, only API digester diagnostics are assigned a category.
   StringRef Category;
   if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
     Category = "api-digester-breaking-change";
+  else if (isDeprecationDiagnostic(diagnostic.getID()))
+    Category = "deprecation";
+  else if (isNoUsageDiagnostic(diagnostic.getID()))
+    Category = "no-usage";
 
   return DiagnosticInfo(
       diagnostic.getID(), loc, toDiagnosticKind(behavior),
@@ -1166,6 +1195,11 @@ DiagnosticEngine::diagnosticStringFor(const DiagID id,
     return localizedMessage;
   }
   return defaultMessage;
+}
+
+llvm::StringRef
+DiagnosticEngine::diagnosticIDStringFor(const DiagID id) {
+  return diagnosticIDStrings[(unsigned)id];
 }
 
 const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {

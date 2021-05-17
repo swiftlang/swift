@@ -999,6 +999,12 @@ namespace swift {
     /// diagnostic.
     bool isAPIDigesterBreakageDiagnostic(DiagID id) const;
 
+    /// \returns true if the diagnostic is marking a deprecation.
+    bool isDeprecationDiagnostic(DiagID id) const;
+
+    /// \returns true if the diagnostic is marking an unused element.
+    bool isNoUsageDiagnostic(DiagID id) const;
+
     /// \returns true if any diagnostic consumer gave an error while invoking
     //// \c finishProcessing.
     bool finishProcessing();
@@ -1036,6 +1042,8 @@ namespace swift {
   public:
     llvm::StringRef diagnosticStringFor(const DiagID id,
                                         bool printDiagnosticNames);
+
+    static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.

@@ -44,14 +44,19 @@ func test() {
 
 // CHECK_SYSTEM_2-LABEL: ## THREE
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
+// CHECK_SYSTEM_2-NEXT: key.id: "cannot_find_in_scope",
 // CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
+// CHECK_SYSTEM_2-NEXT: key.id: "cannot_find_in_scope",
 // CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooSubFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
+// CHECK_SYSTEM_2-NEXT: key.id: "cannot_find_in_scope",
 // CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
+// CHECK_SYSTEM_2-NEXT: key.id: "cannot_find_in_scope",
 // CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperSubFunc' in scope",
 // CHECK_SYSTEM_2: key.severity: source.diagnostic.severity.error,
+// CHECK_SYSTEM_2-NEXT: key.id: "cannot_find_in_scope",
 // CHECK_SYSTEM_2-NEXT: key.description: "cannot find 'fooHelperExplicitFunc' in scope",
 
 // -----------------------------------------------------------------------------
@@ -78,8 +83,10 @@ func test() {
 // CHECK_USER-LABEL: ## TWO
 // CHECK_USER-NOT: key.severity: 
 // CHECK_USER: key.severity: source.diagnostic.severity.error,
+// CHECK_USER-NEXT: key.id: "cannot_find_in_scope",
 // CHECK_USER-NEXT: key.description: "cannot find 'fooFunc' in scope",
 // CHECK_USER: key.severity: source.diagnostic.severity.error,
+// CHECK_USER-NEXT: key.id: "cannot_find_in_scope",
 // CHECK_USER-NEXT: key.description: "cannot find 'fooSubFunc' in scope",
 // CHECK_USER-NOT: key.severity: 
 
