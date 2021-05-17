@@ -2829,8 +2829,15 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
         auto collectAccessorCaptures = [&](AccessorKind kind) {
-          if (auto *accessor = capturedVar->getParsedAccessor(kind))
+          if (auto *accessor = capturedVar->getParsedAccessor(kind)) {
             collectFunctionCaptures(accessor);
+          } else if (capturedVar->hasAttachedPropertyWrapper() ||
+                     capturedVar->getOriginalWrappedProperty(
+                         PropertyWrapperSynthesizedPropertyKind::Projection)) {
+            // Wrapped properties have synthesized accessors.
+            if (auto *accessor = capturedVar->getSynthesizedAccessor(kind))
+              collectFunctionCaptures(accessor);
+          }
         };
 
         // 'Lazy' properties don't fit into the below categorization,
