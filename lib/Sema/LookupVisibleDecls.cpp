@@ -573,7 +573,7 @@ static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
   // for classes.
   if (!NTD->getASTContext().evaluator.hasActiveRequest(
           SynthesizeMemberwiseInitRequest{NTD}))
-    TypeChecker::addImplicitConstructors(NTD); // interesting, maybe invoked this from DerivedConformance instead?
+    TypeChecker::addImplicitConstructors(NTD);
 
   // Check all conformances to trigger the synthesized decl generation.
   // e.g. init(rawValue:) for RawRepresentable.

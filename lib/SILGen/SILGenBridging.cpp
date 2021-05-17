@@ -1965,9 +1965,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   // }
   //
 
-  // FIXME: It should be possible to define the distributed function
-  //        as neither `throws` nor `async` and it should still work.
-
   assert(thunk.isDistributed);
   SILDeclRef native = thunk.asDistributed(false);
   auto fd = cast<AbstractFunctionDecl>(thunk.getDecl());

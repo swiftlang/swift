@@ -779,7 +779,8 @@ bool CompilerInvocation::shouldImportSwiftConcurrency() const {
 }
 
 bool CompilerInvocation::shouldImportSwiftDistributed() const {
-  return getFrontendOptions().InputMode !=
+  return getLangOptions().EnableExperimentalDistributed &&
+      getFrontendOptions().InputMode !=
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
