@@ -98,12 +98,17 @@ static llvm::VersionTuple getCanImportVersion(TupleExpr *te,
     }
     return result;
   }
+  StringRef verText;
   if (auto *nle = dyn_cast<NumberLiteralExpr>(subE)) {
-    auto digits = nle->getDigitsText();
-    if (result.tryParse(digits)) {
-      if (D) {
-        D->diagnose(nle->getLoc(), diag::canimport_version, digits);
-      }
+    verText = nle->getDigitsText();
+  } else if (auto *sle= dyn_cast<StringLiteralExpr>(subE)) {
+    verText = sle->getValue();
+  }
+  if (verText.empty())
+    return result;
+  if (result.tryParse(verText)) {
+    if (D) {
+      D->diagnose(subE->getLoc(), diag::canimport_version, verText);
     }
   }
   return result;
