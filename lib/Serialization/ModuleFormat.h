@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 613; // isStaticLibrary option
+const uint16_t SWIFTMODULE_VERSION_MINOR = 614; // add subminor and build in user module version
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -765,6 +765,8 @@ namespace control_block {
     BCVBR<8>, // length of "short compatibility version string" in the blob
     BCVBR<17>, // User module format major version
     BCVBR<17>, // User module format minor version
+    BCVBR<17>, // User module format sub-minor version
+    BCVBR<17>, // User module format build version
     BCBlob // misc. version information
   >;
 

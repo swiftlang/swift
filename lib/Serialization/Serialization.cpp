@@ -966,11 +966,20 @@ void Serializer::writeHeader(const SerializationOptions &options) {
     if (auto minor = options.UserModuleVersion.getMinor()) {
       userModuleMinor = *minor;
     }
+    auto userModuleSubminor = 0;
+    if (auto subMinor = options.UserModuleVersion.getSubminor()) {
+      userModuleSubminor = *subMinor;
+    }
+    auto userModuleBuild = 0;
+    if (auto build = options.UserModuleVersion.getBuild()) {
+      userModuleBuild = *build;
+    }
     Metadata.emit(ScratchRecord,
                   SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
                   shortVersionStringLength,
                   compatibilityVersionStringLength,
                   userModuleMajor, userModuleMinor,
+                  userModuleSubminor, userModuleBuild,
                   versionString.str());
 
     Target.emit(ScratchRecord, M->getASTContext().LangOpts.Target.str());
