@@ -107,6 +107,8 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
   case SILInstructionKind::MarkFunctionEscapeInst:
+  case SILInstructionKind::DeallocRefInst:
+  case SILInstructionKind::DeallocPartialRefInst:
     writeAccumulator.push_back(op);
     return true;
 
