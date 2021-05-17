@@ -228,7 +228,6 @@ struct SILDeclRef {
   enum class ManglingKind {
     Default,
     DynamicThunk,
-    AsyncHandlerBody
   };
 
   /// Produce a mangled form of this constant.

@@ -1,10 +1,12 @@
+# REQUIRES: standalone_build,OS=macosx
+
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
-# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --darwin-install-extract-symbols --dsymutil-jobs 5 --cmake %cmake 2>&1 | %FileCheck %s
-
-# REQUIRES: standalone_build,OS=macosx
+# RUN: mkdir -p %t/destdir
+# RUN: mkdir -p %t/symroot/macosx-%target-cpu
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --darwin-install-extract-symbols --dsymutil-jobs 5 --cmake %cmake --install-symroot=%t/symroot --install-destdir=%t/destdir --toolchain-prefix= 2>&1 | %FileCheck %s
 
 # CHECK: --- Extracting symbols ---
 # CHECK: { "command": "dsymutil", "start": "
-# CHECK-NEXT: xargs -n 1 -P 5 dsymutil
-# CHECK-NEXT: { "command": "dsymutil", "end": "
+# CHECK: xargs -n 1 -P 5 {{.*}}dsymutil
+# CHECK: { "command": "dsymutil", "end": "

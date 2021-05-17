@@ -62,8 +62,6 @@ ERROR(unknown_callback_conditions, none, "cannot refactor complex if conditions"
 
 ERROR(mixed_callback_conditions, none, "cannot refactor mixed nil and not-nil conditions", ())
 
-ERROR(callback_multiple_bound_names, none, "cannot refactor when multiple names bound to single declaration, had '%0' and found '%1'", (StringRef, StringRef))
-
 ERROR(callback_with_fallthrough, none, "cannot refactor switch with fallthrough", ())
 
 ERROR(callback_with_default, none, "cannot refactor switch with default case", ())

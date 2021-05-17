@@ -4984,20 +4984,69 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
         params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
         fnType->getNumParams(), params->size(), (params->size() == 1));
 
-    bool onlyAnonymousParams =
+    // Unsed parameter is represented by `_` before `in`.
+    bool onlyUnusedParams =
         std::all_of(params->begin(), params->end(),
                     [](ParamDecl *param) { return !param->hasName(); });
 
     // If closure expects no parameters but N was given,
-    // and all of them are anonymous let's suggest removing them.
-    if (fnType->getNumParams() == 0 && onlyAnonymousParams) {
+    // and all of them are unused, let's suggest removing them.
+    if (fnType->getNumParams() == 0 && onlyUnusedParams) {
       auto inLoc = closure->getInLoc();
       auto &sourceMgr = getASTContext().SourceMgr;
 
-      if (inLoc.isValid())
+      if (inLoc.isValid()) {
         diag.fixItRemoveChars(params->getStartLoc(),
                               Lexer::getLocForEndOfToken(sourceMgr, inLoc));
+        return true;
+      }
     }
+
+    diag.flush();
+
+    // If all of the parameters are anonymous, let's point out references
+    // to make it explicit where parameters are used in complex closure body,
+    // which helps in situations where braces are missing for potential inner
+    // closures e.g.
+    //
+    // func a(_: () -> Void) {}
+    // func b(_: (Int) -> Void) {}
+    //
+    // a {
+    //   ...
+    //   b($0.member)
+    // }
+    //
+    // Here `$0` is associated with `a` since braces around `member` reference
+    // are missing.
+    if (!closure->hasSingleExpressionBody() &&
+        llvm::all_of(params->getArray(),
+                     [](ParamDecl *P) { return P->isAnonClosureParam(); })) {
+      if (auto *body = closure->getBody()) {
+        struct ParamRefFinder : public ASTWalker {
+          DiagnosticEngine &D;
+          ParameterList *Params;
+
+          ParamRefFinder(DiagnosticEngine &diags, ParameterList *params)
+              : D(diags), Params(params) {}
+
+          std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+            if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+              if (llvm::is_contained(Params->getArray(), DRE->getDecl())) {
+                auto *P = cast<ParamDecl>(DRE->getDecl());
+                D.diagnose(DRE->getLoc(), diag::use_of_anon_closure_param,
+                           P->getName());
+              }
+            }
+            return {true, E};
+          }
+        };
+
+        ParamRefFinder finder(getASTContext().Diags, params);
+        body->walk(finder);
+      }
+    }
+
     return true;
   }
 
@@ -6770,13 +6819,9 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
   llvm::SmallString<16> id;
   llvm::raw_svector_ostream OS(id);
 
-  if (PD->isAnonClosureParam()) {
-    OS << "$" << paramIdx;
-  } else {
-    OS << "'" << PD->getParameterName() << "'";
-  }
+  OS << "'" << PD->getParameterName() << "'";
 
-  auto loc = PD->isAnonClosureParam() ? getLoc() : PD->getLoc();
+  auto loc = PD->isImplicit() ? getLoc() : PD->getLoc();
   emitDiagnosticAt(loc, diag::cannot_infer_closure_parameter_type, OS.str());
   return true;
 }

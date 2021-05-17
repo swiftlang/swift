@@ -89,7 +89,7 @@ std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
 
 std::string ASTMangler::mangleEntity(const ValueDecl *decl, SymbolKind SKind) {
   beginMangling();
-  appendEntity(decl, SKind == SymbolKind::AsyncHandlerBody);
+  appendEntity(decl);
   appendSymbolKind(SKind);
   return finalize();
 }
@@ -818,7 +818,6 @@ std::string ASTMangler::mangleGenericSignature(const GenericSignature sig) {
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
-    case SymbolKind::AsyncHandlerBody: return;
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
@@ -2450,7 +2449,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
                                         FunctionManglingKind functionMangling) {
   appendFunctionResultType(fn->getResult(), forDecl);
   appendFunctionInputType(fn->getParams(), forDecl);
-  if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
+  if (fn->isAsync())
     appendOperator("Ya");
   if (fn->isSendable())
     appendOperator("Yb");
@@ -2999,7 +2998,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl, StringRef EntityOp,
     appendOperator("Z");
 }
 
-void ASTMangler::appendEntity(const ValueDecl *decl, bool isAsyncHandlerBody) {
+void ASTMangler::appendEntity(const ValueDecl *decl) {
   assert(!isa<ConstructorDecl>(decl));
   assert(!isa<DestructorDecl>(decl));
   
@@ -3020,8 +3019,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl, bool isAsyncHandlerBody) {
 
   appendContextOf(decl);
   appendDeclName(decl);
-  appendDeclType(decl, isAsyncHandlerBody ? AsyncHandlerBodyMangling
-                                          : FunctionMangling);
+  appendDeclType(decl, FunctionMangling);
   appendOperator("F");
   if (decl->isStatic())
     appendOperator("Z");

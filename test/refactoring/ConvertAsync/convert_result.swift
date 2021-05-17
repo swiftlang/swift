@@ -178,7 +178,7 @@ simple { res in
 // UNKNOWNUNBOUND-NEXT: print("after")
 // UNKNOWN-NOT: }
 
-// RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-BINDS %s
 simple { res in
   print("before")
   if case .success(let str) = res {
@@ -189,6 +189,13 @@ simple { res in
   }
   print("after")
 }
+// MULTIPLE-BINDS: convert_result.swift
+// MULTIPLE-BINDS-NEXT: let str = try await simple()
+// MULTIPLE-BINDS-NEXT: print("before")
+// MULTIPLE-BINDS-NEXT: print("result \(str)")
+// MULTIPLE-BINDS-NEXT: print("result \(str)")
+// MULTIPLE-BINDS-NEXT: print("after")
+// MULTIPLE-BINDS-NOT: }
 
 // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1
 simple { res in
@@ -309,6 +316,96 @@ simple { res in
 // NESTEDBREAK-NEXT: print("result \(str)")
 // NESTEDBREAK-NEXT: print("after")
 // NESTEDBREAK-NOT: }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NESTEDBREAK-COMMENT %s
+simple { res in // a
+  // b
+  print("before")
+  // c
+  switch res {
+  // d
+  case .success(let str): // e
+    if test(str) {
+      // f
+      break
+      // g
+    }
+    // h
+    print("result \(str)")
+    // i
+  case .failure:
+    // j
+    break
+    // k
+  }
+  // l
+  print("after")
+  // m
+}
+// NESTEDBREAK-COMMENT:      let str = try await simple()
+// NESTEDBREAK-COMMENT-NEXT: // a
+// NESTEDBREAK-COMMENT-NEXT: // b
+// NESTEDBREAK-COMMENT-NEXT: print("before")
+// NESTEDBREAK-COMMENT-NEXT: // c
+// NESTEDBREAK-COMMENT-NEXT: // d
+// NESTEDBREAK-COMMENT-NEXT: // e
+// NESTEDBREAK-COMMENT-NEXT: if test(str) {
+// NESTEDBREAK-COMMENT-NEXT: // f
+// NESTEDBREAK-COMMENT-NEXT:   <#break#>
+// NESTEDBREAK-COMMENT-NEXT: // g
+// NESTEDBREAK-COMMENT-NEXT: }
+// NESTEDBREAK-COMMENT-NEXT: // h
+// NESTEDBREAK-COMMENT-NEXT: print("result \(str)")
+// NESTEDBREAK-COMMENT-NEXT: // i
+// NESTEDBREAK-COMMENT-NEXT: // j
+// NESTEDBREAK-COMMENT-NEXT: // k
+// NESTEDBREAK-COMMENT-NEXT: // l
+// NESTEDBREAK-COMMENT-NEXT: print("after")
+// NESTEDBREAK-COMMENT-NEXT: // m
+// NESTEDBREAK-COMMENT-EMPTY:
+// NESTEDBREAK-COMMENT-NOT: }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ERROR-BLOCK-COMMENT %s
+simple { res in
+  // a
+  print("before")
+  // b
+  switch res {
+  case .success(let str):
+    // c
+    print("result \(str)")
+    // d
+  case .failure:
+    // e
+    print("fail")
+    // f
+    return
+    // g
+  }
+  // h
+  print("after")
+  // i
+}
+// ERROR-BLOCK-COMMENT:      do {
+// ERROR-BLOCK-COMMENT-NEXT:   let str = try await simple()
+// ERROR-BLOCK-COMMENT-NEXT:   // a
+// ERROR-BLOCK-COMMENT-NEXT:   print("before")
+// ERROR-BLOCK-COMMENT-NEXT:   // b
+// ERROR-BLOCK-COMMENT-NEXT:   // c
+// ERROR-BLOCK-COMMENT-NEXT:   print("result \(str)")
+// ERROR-BLOCK-COMMENT-NEXT:   // d
+// ERROR-BLOCK-COMMENT-NEXT:   // h
+// ERROR-BLOCK-COMMENT-NEXT:   print("after")
+// ERROR-BLOCK-COMMENT-NEXT:   // i
+// ERROR-BLOCK-COMMENT-EMPTY:
+// ERROR-BLOCK-COMMENT-NEXT: } catch {
+// ERROR-BLOCK-COMMENT-NEXT:   // e
+// ERROR-BLOCK-COMMENT-NEXT:   print("fail")
+// ERROR-BLOCK-COMMENT-NEXT:   // f
+// ERROR-BLOCK-COMMENT-NEXT:   // g
+// ERROR-BLOCK-COMMENT-NEXT:   {{ }}
+// ERROR-BLOCK-COMMENT-NEXT: }
+// ERROR-BLOCK-COMMENT-NOT: }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=VOID-RESULT-CALL %s
 voidResult { res in

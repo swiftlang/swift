@@ -97,7 +97,7 @@ OVERRIDE_ACTOR(task_switch, void,
                (resumeToContext, resumeFunction, newExecutor))
 
 OVERRIDE_TASK(task_create_group_future_common, AsyncTaskAndContext, , , ,
-              (JobFlags flags, TaskGroup *group,
+              (size_t flags, TaskGroup *group,
                const Metadata *futureResultType,
                FutureAsyncSignature::FunctionType *function,
                void *closureContext, bool isAsyncLetTask,
@@ -233,19 +233,25 @@ OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
 OVERRIDE_TASK_LOCAL(task_localValuePush, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
-                    (AsyncTask *task, const HeapObject *key,
-                     OpaqueValue *value, const Metadata *valueType),
-                    (task, key, value, valueType))
+                    (const HeapObject *key, OpaqueValue *value,
+                     const Metadata *valueType),
+                    (key, value, valueType))
 
 OVERRIDE_TASK_LOCAL(task_localValueGet, OpaqueValue *,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::,
-                    (AsyncTask *task, const HeapObject *key),
-                    (task, key))
+                    (const HeapObject *key),
+                    (key))
 
 OVERRIDE_TASK_LOCAL(task_localValuePop, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                    swift::, (AsyncTask *task), (task))
+                    swift::, ,)
+
+OVERRIDE_TASK_LOCAL(task_localsCopyTo, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::,
+                    (AsyncTask *target),
+                    (target))
 
 OVERRIDE_TASK_STATUS(task_addStatusRecord, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

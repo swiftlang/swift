@@ -6120,13 +6120,14 @@ static bool isClosureLiteralExpr(Expr *expr) {
   return (isa<CaptureListExpr>(expr) || isa<ClosureExpr>(expr));
 }
 
-/// Whether we should propagate async down to a closure.
-static bool shouldPropagateAsyncToClosure(Expr *expr) {
+/// Whether the given expression is a closure that should inherit
+/// the actor context from where it was formed.
+static bool closureInheritsActorContext(Expr *expr) {
   if (auto IE = dyn_cast<IdentityExpr>(expr))
-    return shouldPropagateAsyncToClosure(IE->getSubExpr());
+    return closureInheritsActorContext(IE->getSubExpr());
 
   if (auto CLE = dyn_cast<CaptureListExpr>(expr))
-    return shouldPropagateAsyncToClosure(CLE->getClosureBody());
+    return closureInheritsActorContext(CLE->getClosureBody());
 
   if (auto CE = dyn_cast<ClosureExpr>(expr))
     return CE->inheritsActorContext();
@@ -7012,22 +7013,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    // If we have a ClosureExpr, then we can safely propagate the 'async'
-    // bit to the closure without invalidating prior analysis.
-    fromEI = fromFunc->getExtInfo();
-    if (toEI.isAsync() && !fromEI.isAsync() &&
-        shouldPropagateAsyncToClosure(expr)) {
-      auto newFromFuncType = fromFunc->withExtInfo(fromEI.withAsync());
-      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
-        fromFunc = newFromFuncType->castTo<FunctionType>();
-
-        // Propagating the 'concurrent' bit might have satisfied the entire
-        // conversion. If so, we're done, otherwise keep converting.
-        if (fromFunc->isEqual(toType))
-          return expr;
-      }
-    }
-
     // If we have a ClosureExpr, then we can safely propagate a global actor
     // to the closure without invalidating prior analysis.
     fromEI = fromFunc->getExtInfo();
@@ -7044,27 +7029,28 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       }
     }
 
-    /// Whether the given effect should be propagated to a closure expression.
-    auto shouldApplyEffect = [&](EffectKind kind) -> bool {
+    /// Whether the given effect is polymorphic at this location.
+    auto isEffectPolymorphic = [&](EffectKind kind) -> bool {
       auto last = locator.last();
       if (!(last && last->is<LocatorPathElt::ApplyArgToParam>()))
-        return true;
+        return false;
 
-      // The effect should not be applied if the closure is an argument
-      // to a function where that effect is polymorphic.
       if (auto *call = getAsExpr<ApplyExpr>(locator.getAnchor())) {
         if (auto *declRef = dyn_cast<DeclRefExpr>(call->getFn())) {
           if (auto *fn = dyn_cast<AbstractFunctionDecl>(declRef->getDecl()))
-            return !fn->hasPolymorphicEffect(kind);
+            return fn->hasPolymorphicEffect(kind);
         }
       }
 
-      return true;
+      return false;
     };
 
-    // If we have a ClosureExpr, we can safely propagate 'async' to the closure.
+    // If we have a ClosureExpr, and we can safely propagate 'async' to the
+    // closure, do that here.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.isAsync() && !fromEI.isAsync() && shouldApplyEffect(EffectKind::Async)) {
+    bool shouldPropagateAsync =
+        !isEffectPolymorphic(EffectKind::Async) || closureInheritsActorContext(expr);
+    if (toEI.isAsync() && !fromEI.isAsync() && shouldPropagateAsync) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withAsync());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();

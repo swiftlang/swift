@@ -499,7 +499,7 @@ struct S_3520 {
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
 sr3520_set_via_closure({ $0.number1 = $1 })
 // expected-error@-1 {{generic parameter 'S' could not be inferred}}
-// expected-error@-2 {{unable to infer type of a closure parameter $1 in the current context}}
+// expected-error@-2 {{unable to infer type of a closure parameter '$1' in the current context}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -1113,4 +1113,22 @@ func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
     // expected-error@-2 {{cannot convert value of type '() -> ()' to expected argument type 'Bool?'}}
     // expected-error@-3 {{expected expression in conditional}}
   } // expected-error {{expected '{' after 'if' condition}}
+}
+
+// rdar://76058892 - spurious ambiguity diagnostic
+func rdar76058892() {
+  struct S {
+    var test: Int = 0
+  }
+
+  func test(_: Int) {}
+  func test(_: () -> String) {}
+
+  func experiment(arr: [S]?) {
+    test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
+      if let arr = arr {
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
+      }
+    }
+  }
 }

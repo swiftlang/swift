@@ -64,6 +64,9 @@ def SwiftSymbolGraphExtractOption : OptionFlag;
 // The option should be accepted by swift-api-digester.
 def SwiftAPIDigesterOption : OptionFlag;
 
+// The option only functions in the new driver.
+def NewDriverOnlyOption : OptionFlag;
+
 /////////
 // Options
 
@@ -1181,7 +1184,7 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
 def user_module_version : Separate<["-"], "user-module-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, NewDriverOnlyOption]>,
   HelpText<"Module version specified from Swift module authors">,
   MetaVarName<"<vers>">;
 

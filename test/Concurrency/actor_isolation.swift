@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler -warn-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
@@ -387,16 +387,6 @@ actor Crystal {
   await syncGlobalActorFunc()
   await asyncGlobalActorFunc()
 }
-
-// test global actor funcs that are marked asyncHandler
-@available(SwiftStdlib 5.5, *)
-@SomeGlobalActor func goo1() async {
-  let _ = goo2
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  goo2() // expected-note{{calls to global function 'goo2()' from outside of its actor context are implicitly asynchronous}}
-}
-@available(SwiftStdlib 5.5, *)
-@asyncHandler @SomeOtherGlobalActor func goo2() { await goo1() }
 
 @available(SwiftStdlib 5.5, *)
 func testGlobalActorClosures() {
@@ -817,4 +807,16 @@ extension MyActor {
       await synchronous() // expected-warning{{no 'async' operations occur within 'await' expression}}
     }
   }
+}
+
+@available(SwiftStdlib 5.5, *)
+@MainActor // expected-note {{'GloballyIsolatedProto' is isolated to global actor 'MainActor' here}}
+protocol GloballyIsolatedProto {
+}
+
+// rdar://75849035 - trying to conform an actor to a global-actor isolated protocol should result in an error
+func test_conforming_actor_to_global_actor_protocol() {
+  @available(SwiftStdlib 5.5, *)
+  actor MyValue : GloballyIsolatedProto {}
+  // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
 }

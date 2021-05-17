@@ -878,45 +878,6 @@ public:
   void cacheResult(SelfAccessKind value) const;
 };
 
-/// Determine whether the given function is an @asyncHandler.
-class IsAsyncHandlerRequest :
-    public SimpleRequest<IsAsyncHandlerRequest,
-                         bool(FuncDecl *),
-                         RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
-
-public:
-  // Separate caching.
-  bool isCached() const { return true; }
-  Optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
-};
-
-/// Determine whether the given function can be an @asyncHandler, without
-/// producing any diagnostics.
-class CanBeAsyncHandlerRequest :
-    public SimpleRequest<CanBeAsyncHandlerRequest,
-                         bool(FuncDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-};
-
 /// Determine whether the given nominal type is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,

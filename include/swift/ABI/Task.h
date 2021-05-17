@@ -68,6 +68,9 @@ public:
 
   JobFlags Flags;
 
+  // Derived classes can use this to store a Job Id.
+  uint32_t Id = 0;
+
   // We use this union to avoid having to do a second indirect branch
   // when resuming an asynchronous task, which we expect will be the
   // common case.
@@ -121,8 +124,13 @@ public:
 };
 
 // The compiler will eventually assume these.
+#if defined(__LP64__) || defined(_WIN64)
 static_assert(sizeof(Job) == 6 * sizeof(void*),
               "Job size is wrong");
+#else
+static_assert(sizeof(Job) == 8 * sizeof(void*),
+              "Job size is wrong");
+#endif
 static_assert(alignof(Job) == 2 * alignof(void*),
               "Job alignment is wrong");
 
@@ -229,6 +237,7 @@ public:
       Status(ActiveTaskStatus()),
       Local(TaskLocal::Storage()) {
     assert(flags.isAsyncTask());
+    Id = getNextTaskId();
   }
 
   /// Create a task with "immortal" reference counts.
@@ -242,6 +251,7 @@ public:
       Status(ActiveTaskStatus()),
       Local(TaskLocal::Storage()) {
     assert(flags.isAsyncTask());
+    Id = getNextTaskId();
   }
 
   ~AsyncTask();
@@ -271,8 +281,9 @@ public:
     return Local.getValue(this, key);
   }
 
-  void localValuePop() {
-    Local.popValue(this);
+  /// Returns true if storage has still more bindings.
+  bool localValuePop() {
+    return Local.popValue(this);
   }
 
   // ==== Child Fragment -------------------------------------------------------
@@ -504,6 +515,14 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
+
+  /// Get the next non-zero Task ID.
+  uint32_t getNextTaskId() {
+    static std::atomic<uint32_t> Id(1);
+    uint32_t Next = Id.fetch_add(1, std::memory_order_relaxed);
+    if (Next == 0) Next = Id.fetch_add(1, std::memory_order_relaxed);
+    return Next;
+  }
 };
 
 // The compiler will eventually assume these.
@@ -511,6 +530,9 @@ static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
+// Libc hardcodes this offset to extract the TaskID
+static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
+              "AsyncTask::Id offset is wrong");
 
 inline void Job::runInFullyEstablishedContext() {
   if (auto task = dyn_cast<AsyncTask>(this))

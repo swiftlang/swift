@@ -565,10 +565,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   100)
 
-SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
-  OnFunc | ConcurrencyOnly |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  101)
+// 101 was @asyncHandler and is now unused
 
 // TODO: Remove this once we don't need to support 'actor' as a modifier
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,

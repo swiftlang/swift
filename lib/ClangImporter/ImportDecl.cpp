@@ -3516,6 +3516,20 @@ namespace {
             Impl.ImportedDecls.end())
           continue;
 
+        // If we encounter an IndirectFieldDecl, ensure that its parent is
+        // importable before attempting to import it because they are dependent
+        // when it comes to getter/setter generation.
+        if (const auto *ind = dyn_cast<clang::IndirectFieldDecl>(nd)) {
+          const clang::CXXRecordDecl *parentUnion =
+              (ind->getChainingSize() >= 2)
+                  ? dyn_cast<clang::CXXRecordDecl>(
+                        ind->getAnonField()->getParent())
+                  : nullptr;
+          if (parentUnion && parentUnion->isAnonymousStructOrUnion() &&
+              parentUnion->isUnion() && !isCxxRecordImportable(parentUnion))
+            continue;
+        }
+
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {

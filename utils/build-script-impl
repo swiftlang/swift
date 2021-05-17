@@ -103,6 +103,7 @@ KNOWN_SETTINGS=(
     darwin-deployment-version-watchos             "2.0"             "minimum deployment target version for watchOS"
     darwin-install-extract-symbols                ""                "whether to extract symbols with dsymutil during installations"
     darwin-install-extract-symbols-use-just-built-dsymutil "1"       "whether we should extract symbols using the just built dsymutil"
+    darwin-symroot-path-filters                   ""                "space-separated list of path patterns to consider for symbol generation"
     darwin-overlay-target                         ""                "single overlay target to build, dependencies are computed later"
     darwin-sdk-deployment-targets                 "xctest-ios-8.0"  "semicolon-separated list of triples like 'fookit-ios-9.0;barkit-watchos-9.0'"
     darwin-stdlib-install-name-dir                ""                "the directory of the install_name for standard library dylibs"
@@ -1015,11 +1016,19 @@ if [ -z "${CMAKE}" ] ; then
 fi
 
 function xcrun_find_tool() {
-  xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$@"
+  if [[ "${DRY_RUN}" ]]; then
+    echo echo "$@"
+  else
+    xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$@"
+  fi
 }
 
 function find_just_built_local_host_llvm_tool() {
-  find $(build_directory "${LOCAL_HOST}" llvm) -name "$1" -type f -print
+  if [[ "${DRY_RUN}" ]]; then
+    echo echo "$1"
+  else
+    find $(build_directory "${LOCAL_HOST}" llvm) -name "$1" -type f -print
+  fi
 }
 
 function not() {
@@ -3104,6 +3113,26 @@ function printJSONEndTimestamp() {
     printJSONTimestamp ${command} "end"
 }
 
+function grep_that_allows_no_matches() {
+    # This will not cause the script to fail
+    # if no line in the input matches the pattern
+    grep "$@" || test $? = 1
+}
+
+function filter_paths() {
+    if [[ -n "$1" ]]; then
+        local -a filters
+        filters=($1)
+        local -a grep_arguments
+        for cfilter in "${filters[@]}"; do
+            grep_arguments+=('-e' "$cfilter")
+        done
+        grep_that_allows_no_matches "${grep_arguments[@]}"
+    else
+        cat
+    fi
+}
+
 for host in "${ALL_HOSTS[@]}"; do
     # Check if we should perform this action.
     if ! [[ $(should_execute_action "${host}-extractsymbols") ]]; then
@@ -3131,15 +3160,10 @@ for host in "${ALL_HOSTS[@]}"; do
         # descibes
         host_symroot="${INSTALL_SYMROOT}/${host}"
 
-        # FIXME: Since it's hard to trace output pipe call,
-        #        For now, We don't support dry-run trace for this block
-        #        Instead, just echo we do "darwin_intall_extract_symbols".
-        if [[ "${DRY_RUN}" ]]; then
-            call darwin_install_extract_symbols
-            printJSONStartTimestamp dsymutil
-            echo xargs -n 1 -P ${DSYMUTIL_JOBS} dsymutil
-            printJSONEndTimestamp dsymutil
-        else
+        # FIXME this if statement is a trick to have a more readable
+        # diff for the PR that made the following code
+        # amenable to dry run testing
+        if [ -n "${DRY_RUN}" -o -z "${DRY_RUN}" ]; then
             set -x
 
             CURRENT_INSTALL_DIR=${host_install_destdir}
@@ -3148,7 +3172,9 @@ for host in "${ALL_HOSTS[@]}"; do
             # Copy executables and shared libraries from the `host_install_destdir` to
             # INSTALL_SYMROOT and run dsymutil on them.
             (cd "${CURRENT_INSTALL_DIR}" &&
-             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | cpio --insecure -pdm "${host_symroot}")
+             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
+             filter_paths "${DARWIN_SYMROOT_PATH_FILTERS}" | \
+             cpio --insecure -pdm -v "${host_symroot}")
 
             dsymutil_path=
             if [[ -n "${DARWIN_INSTALL_EXTRACT_SYMBOLS_USE_JUST_BUILT_DSYMUTIL}" ]]; then
@@ -3160,15 +3186,11 @@ for host in "${ALL_HOSTS[@]}"; do
             # Run dsymutil on executables and shared libraries.
             #
             # Exclude shell scripts and static archives.
-            # Exclude swift-api-digester dSYM to reduce debug toolchain size.
             # Tweak carefully the amount of parallelism -- dsymutil can be memory intensive and
             # as such too many instance can exhaust the memory and slow down/panic the machine
             printJSONStartTimestamp dsymutil
             (cd "${host_symroot}" &&
-             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
-               grep -v '.py$' | \
-               grep -v '.a$' | \
-               grep -v 'swift-api-digester' | \
+             find ./"${CURRENT_PREFIX}" -perm -0111 -type f -not -name "*.a" -not -name "*.py" -print | \
                xargs -n 1 -P ${DSYMUTIL_JOBS} ${dsymutil_path})
             printJSONEndTimestamp dsymutil
 

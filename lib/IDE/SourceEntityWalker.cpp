@@ -806,32 +806,32 @@ bool SemaAnnotator::shouldIgnore(Decl *D) {
 
 bool SourceEntityWalker::walk(SourceFile &SrcFile) {
   SemaAnnotator Annotator(*this);
-  return SrcFile.walk(Annotator);
+  return performWalk(Annotator, [&]() { return SrcFile.walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(ModuleDecl &Mod) {
   SemaAnnotator Annotator(*this);
-  return Mod.walk(Annotator);
+  return performWalk(Annotator, [&]() { return Mod.walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(Stmt *S) {
   SemaAnnotator Annotator(*this);
-  return S->walk(Annotator);
+  return performWalk(Annotator, [&]() { return S->walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(Expr *E) {
   SemaAnnotator Annotator(*this);
-  return E->walk(Annotator);
+  return performWalk(Annotator, [&]() { return E->walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(Decl *D) {
   SemaAnnotator Annotator(*this);
-  return D->walk(Annotator);
+  return performWalk(Annotator, [&]() { return D->walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(DeclContext *DC) {
   SemaAnnotator Annotator(*this);
-  return DC->walkContext(Annotator);
+  return performWalk(Annotator, [&]() { return DC->walkContext(Annotator); });
 }
 
 bool SourceEntityWalker::walk(ASTNode N) {

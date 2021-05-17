@@ -279,7 +279,6 @@ public:
   void visitDerivativeAttr(DerivativeAttr *attr);
   void visitTransposeAttr(TransposeAttr *attr);
 
-  void visitAsyncHandlerAttr(AsyncHandlerAttr *attr);
   void visitActorAttr(ActorAttr *attr);
   void visitDistributedActorAttr(DistributedActorAttr *attr);
   void visitActorIndependentAttr(ActorIndependentAttr *attr);
@@ -5391,22 +5390,6 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   // Set the resolved linearity parameter indices in the attribute.
   attr->setParameterIndices(linearParamIndices);
-}
-
-void AttributeChecker::visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
-  if (!Ctx.LangOpts.EnableExperimentalAsyncHandler) {
-    diagnoseAndRemoveAttr(attr, diag::asynchandler_removed);
-    return;
-  }
-
-  auto func = dyn_cast<FuncDecl>(D);
-  if (!func) {
-    diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
-    return;
-  }
-
-  // Trigger the request to check for @asyncHandler.
-  (void)func->isAsyncHandler();
 }
 
 void AttributeChecker::visitActorAttr(ActorAttr *attr) {

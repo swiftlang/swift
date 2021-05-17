@@ -764,7 +764,6 @@ public:
       assert(DiagnosticSuppression::isEnabled(getASTContext().Diags) &&
              "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
       options |= TypeCheckExprFlags::LeaveClosureBodyUnchecked;
-      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
     }
 
     ContextualTypePurpose ctp = CTP_ReturnStmt;

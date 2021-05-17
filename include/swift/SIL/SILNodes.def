@@ -150,7 +150,7 @@
 ///
 ///   A concrete subclass of MultipleValueInstruction. ID is a member of
 ///   SILInstructionKind. The Node's class name is ID and the name of the base
-///   class in the heirarchy is PARENT.
+///   class in the hierarchy is PARENT.
 #ifndef MULTIPLE_VALUE_INST
 #define MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
@@ -190,7 +190,7 @@
 ///
 ///   A concrete subclass of MultipleValueInstructionResult. ID is a member of
 ///   ValueKind. The Node's class name is ID and the name of the base class in
-///   the heirarchy is PARENT.
+///   the hierarchy is PARENT.
 #ifndef MULTIPLE_VALUE_INST_RESULT
 #define MULTIPLE_VALUE_INST_RESULT(ID, PARENT) VALUE(ID, PARENT)
 #endif

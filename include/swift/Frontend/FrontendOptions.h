@@ -81,6 +81,10 @@ public:
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
 
+  /// The path to look in to find backup .swiftinterface files if those found
+  /// from SDKs are failing.
+  std::string BackupModuleInterfaceDir;
+
   /// For these modules, we should prefer using Swift interface when importing them.
   std::vector<std::string> PreferInterfaceForModules;
 

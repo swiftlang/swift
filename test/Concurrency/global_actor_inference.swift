@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -227,19 +227,6 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
 
   func onGenericGlobalActorString() { }
   @GenericGlobalActor<Int> func onGenericGlobalActorInt() { }
-
-  @asyncHandler @GenericGlobalActor<String>
-  override func i() { // okay to differ from superclass because it's an asyncHandler.
-    onGenericGlobalActorString()
-  }
-
-  @asyncHandler
-  override func j() { // okay, isolated to GenericGlobalActor<String>
-    onGenericGlobalActorString() // okay
-
-    // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-    onGenericGlobalActorInt() // expected-note{{calls to instance method 'onGenericGlobalActorInt()' from outside of its actor context are implicitly asynchronous}}
-  }
 }
 
 // ----------------------------------------------------------------------

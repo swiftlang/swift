@@ -253,12 +253,12 @@ extension Task {
   /// This is a port of the C++ FlagSet.
   struct JobFlags {
     /// Kinds of schedulable jobs.
-    enum Kind: Int {
+    enum Kind: Int32 {
       case task = 0
     }
 
     /// The actual bit representation of these flags.
-    var bits: Int = 0
+    var bits: Int32 = 0
 
     /// The kind of job described by these flags.
     var kind: Kind {
@@ -277,11 +277,11 @@ extension Task {
     /// The priority given to the job.
     var priority: Priority? {
       get {
-        Priority(rawValue: (bits & 0xFF00) >> 8)
+        Priority(rawValue: (Int(bits) & 0xFF00) >> 8)
       }
 
       set {
-        bits = (bits & ~0xFF00) | ((newValue?.rawValue ?? 0) << 8)
+        bits = (bits & ~0xFF00) | Int32((newValue?.rawValue ?? 0) << 8)
       }
     }
 
@@ -410,7 +410,7 @@ public func detach<T>(
   flags.isFuture = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -463,7 +463,7 @@ public func detach<T>(
   flags.isFuture = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -533,7 +533,16 @@ public func async<T>(
   flags.isContinuingAsyncTask = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
+
+  // Copy all task locals to the newly created task.
+  // We must copy them rather than point to the current task since the new task
+  // is not structured and may out-live the current task.
+  //
+  // WARNING: This MUST be done BEFORE we enqueue the task,
+  // because it acts as-if it was running inside the task and thus does not
+  // take any extra steps to synchronize the task-local operations.
+  _taskLocalsCopy(to: task)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -569,23 +578,12 @@ public func async<T>(
   flags.isContinuingAsyncTask = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
   return Task.Handle(task)
-}
-
-// ==== Async Handler ----------------------------------------------------------
-
-// TODO: remove this?
-@available(SwiftStdlib 5.5, *)
-func _runAsyncHandler(operation: @escaping () async -> ()) {
-  typealias ConcurrentFunctionType = @Sendable () async -> ()
-  detach(
-    operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)
-  )
 }
 
 // ==== Async Sleep ------------------------------------------------------------

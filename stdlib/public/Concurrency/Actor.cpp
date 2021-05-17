@@ -34,6 +34,7 @@
 #include "swift/Runtime/ThreadLocal.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
+#include "llvm/Config/config.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
 
@@ -63,6 +64,11 @@
 
 #if HAVE_PTHREAD_H
 #include <pthread.h>
+
+// Only use __has_include since HAVE_PTHREAD_NP_H is not provided.
+#if __has_include(<pthread_np.h>)
+#include <pthread_np.h>
+#endif
 #endif
 
 #if defined(_WIN32)
@@ -1833,6 +1839,13 @@ static bool tryAssumeThreadForSwitch(ExecutorRef newExecutor,
   return false;
 }
 
+__attribute__((noinline))
+SWIFT_CC(swiftasync)
+static void force_tail_call_hack(AsyncTask *task) {
+  // This *should* be executed as a tail call.
+  return task->runInFullyEstablishedContext();
+}
+
 /// Given that we've assumed control of an executor on this thread,
 /// continue to run the given task on it.
 SWIFT_CC(swiftasync)
@@ -1846,7 +1859,9 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
     oldTracking->setActiveExecutor(executor);
 
     // FIXME: force tail call
-    return task->runInFullyEstablishedContext();
+    // return task->runInFullyEstablishedContext();
+    // This hack "ensures" that this call gets executed as a tail call.
+    return force_tail_call_hack(task);
   }
 
   // Otherwise, set up tracking info.

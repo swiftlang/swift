@@ -279,6 +279,9 @@ FIXIT(insert_closure_return_type_placeholder,
       "%select{| () }0-> <#Result#> %select{|in }0",
       (bool))
 
+NOTE(use_of_anon_closure_param,none,
+     "anonymous closure parameter %0 is used here", (Identifier))
+
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
@@ -2972,7 +2975,8 @@ NOTE(codable_enum_duplicate_case_name_here,none,
 NOTE(codable_enum_duplicate_parameter_name_here,none,
      "cannot automatically synthesize %0 for %1 because "
      "user defined parameter name %2 in %3 conflicts with "
-     "automatically generated parameter name", (Type, Type, Identifier, Identifier))
+     "automatically generated parameter name",
+     (Type, Type, Identifier, Identifier))
 
 WARNING(decodable_property_will_not_be_decoded, none,
         "immutable property will not be decoded because it is declared with "
@@ -4295,8 +4299,6 @@ ERROR(async_in_nonasync_function,none,
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
-NOTE(note_add_asynchandler_to_function,none,
-     "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
@@ -4331,30 +4333,6 @@ ERROR(async_let_in_illegal_context,none,
       "async let %0 cannot be referenced in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
       (DeclName, unsigned))
-
-ERROR(asynchandler_non_func,none,
-      "'@asyncHandler' can only be applied to functions",
-      ())
-ERROR(asynchandler_returns_value,none,
-      "'@asyncHandler' function can only return 'Void'",
-      ())
-ERROR(asynchandler_throws,none,
-      "'@asyncHandler' function cannot throw",
-      ())
-ERROR(asynchandler_async,none,
-      "'@asyncHandler' function cannot be 'async' itself",
-      ())
-ERROR(asynchandler_inout_parameter,none,
-      "'inout' parameter is not allowed in '@asyncHandler' function",
-      ())
-ERROR(asynchandler_noescape_closure_parameter,none,
-      "non-escaping closure parameter is not allowed in '@asyncHandler' function",
-      ())
-ERROR(asynchandler_mutating,none,
-      "'@asyncHandler' function cannot be 'mutating'",
-      ())
-ERROR(asynchandler_removed,none,
-      "'@asyncHandler' has been removed from the language", ())
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "
@@ -4499,6 +4477,11 @@ ERROR(global_actor_isolated_requirement_witness_conflict,none,
       "%0 %1 isolated to global actor %2 can not satisfy corresponding "
       "requirement from protocol %3 isolated to global actor %4",
       (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
+ERROR(actor_cannot_conform_to_global_actor_protocol,none,
+      "actor %0 cannot conform to global actor isolated protocol %1",
+      (Type, Type))
+NOTE(protocol_isolated_to_global_actor_here,none,
+     "%0 is isolated to global actor %1 here", (Type, Type))
 
 WARNING(non_concurrent_param_type,none,
         "cannot pass argument of non-sendable type %0 across actors",
