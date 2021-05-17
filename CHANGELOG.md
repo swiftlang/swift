@@ -8,21 +8,21 @@ Swift 5.5
 
 * Type names are no longer allowed as an argument to a subscript parameter that expects a metatype type
 
-```swift
-struct MyValue {
-}
+  ```swift
+  struct MyValue {
+  }
 
-struct MyStruct {
-  subscript(a: MyValue.Type) -> Int { get { ... } }
-}
+  struct MyStruct {
+    subscript(a: MyValue.Type) -> Int { get { ... } }
+  }
 
-func test(obj: MyStruct) {
-  let _ = obj[MyValue]
-}
-```
+  func test(obj: MyStruct) {
+    let _ = obj[MyValue]
+  }
+  ```
 
-Accepting subscripts with `MyValue` as an argument was an oversight because `MyValue` requires explicit `.self`
-to reference its metatype, so correct syntax would be to use `obj[MyValue.self]`.
+  Accepting subscripts with `MyValue` as an argument was an oversight because `MyValue` requires explicit `.self`
+  to reference its metatype, so correct syntax would be to use `obj[MyValue.self]`.
 
 * [SE-0310][]:
   
