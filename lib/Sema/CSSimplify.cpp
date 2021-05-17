@@ -3469,9 +3469,10 @@ static bool repairArrayLiteralUsedAsDictionary(
   if (unwrappedDict->isTypeVariableOrMember())
     return false;
 
-  if (!conformsToKnownProtocol(
-          cs.DC, unwrappedDict,
-          KnownProtocolKind::ExpressibleByDictionaryLiteral))
+  if (!TypeChecker::conformsToKnownProtocol(
+          unwrappedDict,
+          KnownProtocolKind::ExpressibleByDictionaryLiteral,
+          cs.DC->getParentModule()))
     return false;
 
   // Ignore any attempts at promoting the value to an optional as even after
@@ -6108,7 +6109,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
-        type, protocol, DC, /*skipConditionalRequirements=*/true);
+        type, protocol, DC->getParentModule(),
+        /*skipConditionalRequirements=*/true);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -6237,7 +6239,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       if (auto rawValue = isRawRepresentable(*this, type)) {
         if (!rawValue->isTypeVariableOrMember() &&
-            TypeChecker::conformsToProtocol(rawValue, protocol, DC)) {
+            TypeChecker::conformsToProtocol(rawValue, protocol,
+                                            DC->getParentModule())) {
           auto *fix = UseRawValue::create(*this, type, protocolTy, loc);
           return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
         }
@@ -7575,7 +7578,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         auto *SD = cast<SubscriptDecl>(candidate.getDecl());
         bool isKeyPathBased = isValidKeyPathDynamicMemberLookup(SD);
 
-        if (isValidStringDynamicMemberLookup(SD, DC) || isKeyPathBased)
+        if (isValidStringDynamicMemberLookup(SD, DC->getParentModule()) ||
+            isKeyPathBased)
           result.addViable(OverloadChoice::getDynamicMemberLookup(
               baseTy, SD, name, isKeyPathBased));
       }
@@ -10212,7 +10216,6 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
-  auto decl = type->getAnyNominal();
   DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
   auto matches = CS.performMemberLookup(
       ConstraintKind::ValueMember, methodName, type,
@@ -10222,7 +10225,8 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
   auto candidates = matches.ViableCandidates;
   auto filter = [&](OverloadChoice choice) {
     auto cand = cast<FuncDecl>(choice.getDecl());
-    return !isValidDynamicCallableMethod(cand, decl, hasKeywordArgs);
+    return !isValidDynamicCallableMethod(cand, CS.DC->getParentModule(),
+                                         hasKeywordArgs);
   };
   candidates.erase(
       std::remove_if(candidates.begin(), candidates.end(), filter),

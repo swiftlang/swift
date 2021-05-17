@@ -871,15 +871,15 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 }
 
 RequirementCheckResult
-TypeChecker::checkGenericArguments(GenericSignature sig,
+TypeChecker::checkGenericArguments(ModuleDecl *module,
+                                   ArrayRef<Requirement> requirements,
                                    TypeSubstitutionFn substitutions) {
   SmallVector<Requirement, 4> worklist;
   bool valid = true;
 
-  for (auto req : sig->getRequirements()) {
-    if (auto resolved = req.subst(
-          substitutions,
-          LookUpConformanceInSignature(sig.getPointer()))) {
+  for (auto req : requirements) {
+    if (auto resolved = req.subst(substitutions,
+                                  LookUpConformanceInModule(module))) {
       worklist.push_back(*resolved);
     } else {
       valid = false;

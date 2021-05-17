@@ -3197,7 +3197,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     }
 
     witnessMethodConformance = TypeChecker::conformsToProtocol(
-        selfType, protocolType->getDecl(), getDeclContext());
+        selfType, protocolType->getDecl(),
+        getDeclContext()->getParentModule());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
   }

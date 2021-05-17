@@ -500,7 +500,9 @@ RequirementCheckResult checkGenericArguments(
 
 /// A lower-level version of the above without diagnostic emission.
 RequirementCheckResult checkGenericArguments(
-    GenericSignature sig, TypeSubstitutionFn substitutions);
+    ModuleDecl *module,
+    ArrayRef<Requirement> requirements,
+    TypeSubstitutionFn substitutions);
 
 bool checkContextualRequirements(GenericTypeDecl *decl,
                                  Type parentTy,
@@ -714,13 +716,10 @@ Expr *addImplicitLoadExpr(
 
 /// Determine whether the given type contains the given protocol.
 ///
-/// \param DC The context in which to check conformance. This affects, for
-/// example, extension visibility.
-///
 /// \returns the conformance, if \c T conforms to the protocol \c Proto, or
 /// an empty optional.
 ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
-                                        DeclContext *DC,
+                                        ModuleDecl *M,
                                         bool skipConditionalRequirements=false);
 
 /// Determine whether the given type conforms to the given protocol.
@@ -728,25 +727,22 @@ ProtocolConformanceRef containsProtocol(Type T, ProtocolDecl *Proto,
 /// Unlike subTypeOfProtocol(), this will return false for existentials of
 /// non-self conforming protocols.
 ///
-/// \param DC The context in which to check conformance. This affects, for
-/// example, extension visibility.
-///
 /// \returns The protocol conformance, if \c T conforms to the
 /// protocol \c Proto, or \c None.
 ProtocolConformanceRef conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                          DeclContext *DC);
+                                          ModuleDecl *M);
+
+/// Check whether the type conforms to a given known protocol.
+bool conformsToKnownProtocol(Type type, KnownProtocolKind protocol,
+                             ModuleDecl *module);
 
 /// This is similar to \c conformsToProtocol, but returns \c true for cases where
 /// the type \p T could be dynamically cast to \p Proto protocol, such as a non-final
 /// class where a subclass conforms to \p Proto.
 ///
-/// \param DC The context in which to check conformance. This affects, for
-/// example, extension visibility.
-///
-///
 /// \returns True if \p T conforms to the protocol \p Proto, false otherwise.
 bool couldDynamicallyConformToProtocol(Type T, ProtocolDecl *Proto,
-                                       DeclContext *DC);
+                                       ModuleDecl *M);
 /// Completely check the given conformance.
 void checkConformance(NormalProtocolConformance *conformance);
 
@@ -1185,13 +1181,13 @@ diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
+bool isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
                                   bool hasKeywordArguments);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
-bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
+bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, ModuleDecl *module,
                                          bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
@@ -1199,7 +1195,7 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
-bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
+bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, ModuleDecl *module,
                                       bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of

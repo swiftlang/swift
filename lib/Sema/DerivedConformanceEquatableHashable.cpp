@@ -864,17 +864,16 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (TypeChecker::conformsToProtocol(
-          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::Hashable,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
-  ProtocolDecl *intLiteralProto =
-      C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::ExpressibleByIntegerLiteral,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;

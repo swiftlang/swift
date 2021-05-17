@@ -411,7 +411,7 @@ namespace {
       if (otherArgTy && otherArgTy->getAnyNominal()) {
         if (otherArgTy->isEqual(paramTy) &&
             TypeChecker::conformsToProtocol(
-                otherArgTy, literalProto, CS.DC)) {
+                otherArgTy, literalProto, CS.DC->getParentModule())) {
           return true;
         }
       } else if (Type defaultType =
@@ -1737,13 +1737,15 @@ namespace {
         if (!contextualType)
           return false;
 
+        auto *M = CS.DC->getParentModule();
+
         auto type = contextualType->lookThroughAllOptionalTypes();
-        if (conformsToKnownProtocol(
-                CS.DC, type, KnownProtocolKind::ExpressibleByArrayLiteral))
+        if (TypeChecker::conformsToKnownProtocol(
+                type, KnownProtocolKind::ExpressibleByArrayLiteral, M))
           return false;
 
-        return conformsToKnownProtocol(
-            CS.DC, type, KnownProtocolKind::ExpressibleByDictionaryLiteral);
+        return TypeChecker::conformsToKnownProtocol(
+            type, KnownProtocolKind::ExpressibleByDictionaryLiteral, M);
       };
 
       if (isDictionaryContextualType(contextualType)) {

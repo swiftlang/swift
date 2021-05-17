@@ -2539,20 +2539,21 @@ public:
 
     // If the reference is 'async', all types must be 'Sendable'.
     if (implicitlyAsync && T) {
+      auto *M = CurrDeclContext->getParentModule();
       if (isa<VarDecl>(VD)) {
-        if (!isSendableType(CurrDeclContext, T)) {
+        if (!isSendableType(M, T)) {
           NotRecommended = NotRecommendedReason::CrossActorReference;
         }
       } else {
         assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
         // Check if the result and the param types are all 'Sendable'.
         auto *AFT = T->castTo<AnyFunctionType>();
-        if (!isSendableType(CurrDeclContext, AFT->getResult())) {
+        if (!isSendableType(M, AFT->getResult())) {
           NotRecommended = NotRecommendedReason::CrossActorReference;
         } else {
           for (auto &param : AFT->getParams()) {
             Type paramType = param.getPlainType();
-            if (!isSendableType(CurrDeclContext, paramType)) {
+            if (!isSendableType(M, paramType)) {
               NotRecommended = NotRecommendedReason::CrossActorReference;
               break;
             }

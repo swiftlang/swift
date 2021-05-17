@@ -578,7 +578,9 @@ bool IsDeclRefinementOfRequest::evaluate(Evaluator &evaluator,
     return false;
 
   auto result = TypeChecker::checkGenericArguments(
-      genericSignatureB, QueryTypeSubstitutionMap{ substMap });
+      declA->getDeclContext()->getParentModule(),
+      genericSignatureB->getRequirements(),
+      QueryTypeSubstitutionMap{ substMap });
 
   if (result != RequirementCheckResult::Success)
     return false;
@@ -678,7 +680,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
           continue;
 
         for (auto *protocol : signature->getRequiredProtocols(paramType)) {
-          if (!TypeChecker::conformsToProtocol(argType, protocol, useDC))
+          if (!TypeChecker::conformsToProtocol(argType, protocol,
+                                               useDC->getParentModule()))
             return skip("unsatisfied");
         }
       }

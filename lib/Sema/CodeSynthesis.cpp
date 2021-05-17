@@ -745,7 +745,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // satisfied by the derived class. In this case, we don't want to inherit
     // this initializer; there's no way to call it on the derived class.
     auto checkResult = TypeChecker::checkGenericArguments(
-        superclassCtorSig,
+        classDecl->getParentModule(),
+        superclassCtorSig->getRequirements(),
         [&](Type type) -> Type {
           auto substType = type.subst(overrideInfo.OverrideSubMap);
           return GenericEnvironment::mapTypeIntoContext(

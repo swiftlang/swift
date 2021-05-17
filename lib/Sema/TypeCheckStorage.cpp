@@ -978,7 +978,8 @@ static ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var,
   auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
-    if (auto result = TypeChecker::conformsToProtocol(type, proto, dc))
+    if (auto result = TypeChecker::conformsToProtocol(type, proto,
+                                                      dc->getParentModule()))
       return result;
   }
 
