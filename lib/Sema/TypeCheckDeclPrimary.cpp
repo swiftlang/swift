@@ -368,10 +368,10 @@ static void checkForEmptyOptionSet(const VarDecl *VD) {
     return;
   
   // Make sure this type conforms to OptionSet
-  auto *optionSetProto = VD->getASTContext().getProtocol(KnownProtocolKind::OptionSet);
-  bool conformsToOptionSet = (bool)TypeChecker::conformsToProtocol(
-                                                  DC->getSelfTypeInContext(),
-                                                  optionSetProto, DC);
+  bool conformsToOptionSet =
+    (bool)TypeChecker::conformsToKnownProtocol(DC->getSelfTypeInContext(),
+                                               KnownProtocolKind::OptionSet,
+                                               DC->getParentModule());
   
   if (!conformsToOptionSet)
     return;
@@ -1111,13 +1111,13 @@ static Optional<std::string> buildDefaultInitializerString(DeclContext *dc,
     // Special-case the various types we might see here.
     auto type = pattern->getType();
 
+    auto *module = dc->getParentModule();
+
     // For literal-convertible types, form the corresponding literal.
-#define CHECK_LITERAL_PROTOCOL(Kind, String)                                   \
-  if (auto proto = TypeChecker::getProtocol(                                   \
-          type->getASTContext(), SourceLoc(), KnownProtocolKind::Kind)) {      \
-    if (TypeChecker::conformsToProtocol(type, proto, dc))                      \
-      return std::string(String);                                              \
-  }
+#define CHECK_LITERAL_PROTOCOL(Kind, String)                                       \
+  if (TypeChecker::conformsToKnownProtocol(type, KnownProtocolKind::Kind, module)) \
+    return std::string(String);
+
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
     CHECK_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "[:]")
     CHECK_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "\"\"")
@@ -1236,7 +1236,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
     auto ref = TypeChecker::conformsToProtocol(
-        superclassType, decodableProto, superclassDecl);
+        superclassType, decodableProto, classDecl->getParentModule());
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1264,7 +1264,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
       auto ref = TypeChecker::conformsToProtocol(
-          superclassType, encodableProto, superclassDecl);
+          superclassType, encodableProto, classDecl->getParentModule());
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).

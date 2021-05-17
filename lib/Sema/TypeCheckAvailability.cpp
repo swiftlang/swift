@@ -3015,16 +3015,11 @@ swift::diagnoseDeclAvailability(const ValueDecl *D,
 
 /// Return true if the specified type looks like an integer of floating point
 /// type.
-static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
-                                         ASTContext &Context) {
-  auto integerType =
-    Context.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  auto floatingType =
-    Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
-  if (!integerType || !floatingType) return false;
-
-  return TypeChecker::conformsToProtocol(ty, integerType, DC) ||
-         TypeChecker::conformsToProtocol(ty, floatingType, DC);
+static bool isIntegerOrFloatingPointType(Type ty, ModuleDecl *M) {
+  return (TypeChecker::conformsToKnownProtocol(
+            ty, KnownProtocolKind::ExpressibleByIntegerLiteral, M) ||
+          TypeChecker::conformsToKnownProtocol(
+            ty, KnownProtocolKind::ExpressibleByFloatLiteral, M));
 }
 
 
@@ -3054,7 +3049,7 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
   // to "lvalue += 1".
   auto *DC = Where.getDeclContext();
   std::string replacement;
-  if (isIntegerOrFloatingPointType(call->getType(), DC, Context))
+  if (isIntegerOrFloatingPointType(call->getType(), DC->getParentModule()))
     replacement = isInc ? " += 1" : " -= 1";
   else {
     // Otherwise, it must be an index type.  Rewrite to:

@@ -26,14 +26,11 @@ class E {
 }
 
 class F<T> where T : module_with_class_extension.D {
+
+    func bar()
 }
 
 extension F : module_with_class_extension.P8 {
-}
-
-extension F where T : D {
-
-    func bar()
 }
 
 protocol P8 {
@@ -270,193 +267,162 @@ extension P8 where Self.T : module_with_class_extension.E {
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 328,
+    key.offset: 330,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 335,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 344,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.class,
     key.name: "F",
     key.usr: "s:27module_with_class_extension1FC",
-    key.offset: 338,
+    key.offset: 354,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 342,
+    key.offset: 358,
     key.length: 27
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P8",
     key.usr: "s:27module_with_class_extension2P8P",
-    key.offset: 370,
+    key.offset: 386,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 378,
-    key.length: 9
-  },
-  {
-    key.kind: source.lang.swift.ref.class,
-    key.name: "F",
-    key.usr: "s:27module_with_class_extension1FC",
-    key.offset: 388,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 390,
-    key.length: 5
-  },
-  {
-    key.kind: source.lang.swift.ref.generic_type_param,
-    key.name: "T",
-    key.usr: "s:27module_with_class_extension1FC1Txmfp",
-    key.offset: 396,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.class,
-    key.name: "D",
-    key.usr: "s:27module_with_class_extension1DC",
-    key.offset: 400,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 409,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 414,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 423,
+    key.offset: 394,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 432,
+    key.offset: 403,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 442,
+    key.offset: 413,
     key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 457,
+    key.offset: 428,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 462,
+    key.offset: 433,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P8",
     key.usr: "s:27module_with_class_extension2P8P",
-    key.offset: 472,
+    key.offset: 443,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 475,
+    key.offset: 446,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
     key.usr: "s:27module_with_class_extension2P8PA2A1DC1TRczrlE4Selfxmfp",
-    key.offset: 481,
+    key.offset: 452,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.ref.associatedtype,
     key.name: "T",
     key.usr: "s:27module_with_class_extension2P8P1TQa",
-    key.offset: 486,
+    key.offset: 457,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 490,
+    key.offset: 461,
     key.length: 27
   },
   {
     key.kind: source.lang.swift.ref.class,
     key.name: "D",
     key.usr: "s:27module_with_class_extension1DC",
-    key.offset: 518,
+    key.offset: 489,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 527,
+    key.offset: 498,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 532,
+    key.offset: 503,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 541,
+    key.offset: 512,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P8",
     key.usr: "s:27module_with_class_extension2P8P",
-    key.offset: 551,
+    key.offset: 522,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 554,
+    key.offset: 525,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.generic_type_param,
     key.name: "Self",
     key.usr: "s:27module_with_class_extension2P8PA2A1EC1TRczrlE4Selfxmfp",
-    key.offset: 560,
+    key.offset: 531,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.ref.associatedtype,
     key.name: "T",
     key.usr: "s:27module_with_class_extension2P8P1TQa",
-    key.offset: 565,
+    key.offset: 536,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 569,
+    key.offset: 540,
     key.length: 27
   },
   {
     key.kind: source.lang.swift.ref.class,
     key.name: "E",
     key.usr: "s:27module_with_class_extension1EC",
-    key.offset: 597,
+    key.offset: 568,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 606,
+    key.offset: 577,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 611,
+    key.offset: 582,
     key.length: 3
   }
 ]
@@ -590,8 +556,19 @@ extension P8 where Self.T : module_with_class_extension.E {
       }
     ],
     key.offset: 272,
-    key.length: 54,
-    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>F</decl.name>&lt;<decl.generic_type_param usr=\"s:27module_with_class_extension1FC1Txmfp\"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:27module_with_class_extension1FC1Txmfp\">T</ref.generic_type_param> : <ref.class usr=\"s:27module_with_class_extension1DC\">D</ref.class></decl.generic_type_requirement></decl.class>"
+    key.length: 70,
+    key.fully_annotated_decl: "<decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>F</decl.name>&lt;<decl.generic_type_param usr=\"s:27module_with_class_extension1FC1Txmfp\"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:27module_with_class_extension1FC1Txmfp\">T</ref.generic_type_param> : <ref.class usr=\"s:27module_with_class_extension1DC\">D</ref.class></decl.generic_type_requirement></decl.class>",
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "bar()",
+        key.usr: "s:27module_with_class_extension2P8PA2A1DC1TRczrlE3baryyF::SYNTHESIZED::s:27module_with_class_extension1FC",
+        key.original_usr: "s:27module_with_class_extension2P8PA2A1DC1TRczrlE3baryyF",
+        key.offset: 330,
+        key.length: 10,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>()</decl.function.method.instance>"
+      }
+    ]
   },
   {
     key.kind: source.lang.swift.decl.extension.class,
@@ -605,7 +582,7 @@ extension P8 where Self.T : module_with_class_extension.E {
         key.description: "T : D"
       }
     ],
-    key.offset: 328,
+    key.offset: 344,
     key.length: 48,
     key.fully_annotated_decl: "<decl.extension.class>extension <decl.name><ref.class usr=\"s:27module_with_class_extension1FC\">F</ref.class></decl.name> : <ref.protocol usr=\"s:27module_with_class_extension2P8P\">P8</ref.protocol></decl.extension.class>",
     key.conforms: [
@@ -622,37 +599,10 @@ extension P8 where Self.T : module_with_class_extension.E {
     }
   },
   {
-    key.kind: source.lang.swift.decl.extension.class,
-    key.generic_requirements: [
-      {
-        key.description: "T : D"
-      }
-    ],
-    key.offset: 378,
-    key.length: 43,
-    key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.class usr=\"s:27module_with_class_extension1FC\">F</ref.class> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:27module_with_class_extension1FC1Txmfp\">T</ref.generic_type_param> : <ref.class usr=\"s:27module_with_class_extension1DC\">D</ref.class></decl.generic_type_requirement>",
-    key.extends: {
-      key.kind: source.lang.swift.ref.class,
-      key.name: "F",
-      key.usr: "s:27module_with_class_extension1FC"
-    },
-    key.entities: [
-      {
-        key.kind: source.lang.swift.decl.function.method.instance,
-        key.name: "bar()",
-        key.usr: "s:27module_with_class_extension2P8PA2A1DC1TRczrlE3baryyF::SYNTHESIZED::s:27module_with_class_extension1FC",
-        key.original_usr: "s:27module_with_class_extension2P8PA2A1DC1TRczrlE3baryyF",
-        key.offset: 409,
-        key.length: 10,
-        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>()</decl.function.method.instance>"
-      }
-    ]
-  },
-  {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "P8",
     key.usr: "s:27module_with_class_extension2P8P",
-    key.offset: 423,
+    key.offset: 394,
     key.length: 37,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P8</decl.name></decl.protocol>",
     key.entities: [
@@ -660,7 +610,7 @@ extension P8 where Self.T : module_with_class_extension.E {
         key.kind: source.lang.swift.decl.associatedtype,
         key.name: "T",
         key.usr: "s:27module_with_class_extension2P8P1TQa",
-        key.offset: 442,
+        key.offset: 413,
         key.length: 16,
         key.fully_annotated_decl: "<decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>T</decl.name></decl.associatedtype>"
       }
@@ -673,7 +623,7 @@ extension P8 where Self.T : module_with_class_extension.E {
         key.description: "Self.T : D"
       }
     ],
-    key.offset: 462,
+    key.offset: 433,
     key.length: 77,
     key.fully_annotated_decl: "<decl.extension.protocol>extension <decl.name><ref.protocol usr=\"s:27module_with_class_extension2P8P\">P8</ref.protocol></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:27module_with_class_extension2P8PA2A1DC1TRczrlE4Selfxmfp\">Self</ref.generic_type_param>.<ref.associatedtype usr=\"s:27module_with_class_extension2P8P1TQa\">T</ref.associatedtype> : <ref.class usr=\"s:27module_with_class_extension1DC\">D</ref.class></decl.generic_type_requirement></decl.extension.protocol>",
     key.extends: {
@@ -686,7 +636,7 @@ extension P8 where Self.T : module_with_class_extension.E {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "bar()",
         key.usr: "s:27module_with_class_extension2P8PA2A1DC1TRczrlE3baryyF",
-        key.offset: 527,
+        key.offset: 498,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar</decl.name>()</decl.function.method.instance>"
       }
@@ -699,7 +649,7 @@ extension P8 where Self.T : module_with_class_extension.E {
         key.description: "Self.T : E"
       }
     ],
-    key.offset: 541,
+    key.offset: 512,
     key.length: 77,
     key.fully_annotated_decl: "<decl.extension.protocol>extension <decl.name><ref.protocol usr=\"s:27module_with_class_extension2P8P\">P8</ref.protocol></decl.name> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr=\"s:27module_with_class_extension2P8PA2A1EC1TRczrlE4Selfxmfp\">Self</ref.generic_type_param>.<ref.associatedtype usr=\"s:27module_with_class_extension2P8P1TQa\">T</ref.associatedtype> : <ref.class usr=\"s:27module_with_class_extension1EC\">E</ref.class></decl.generic_type_requirement></decl.extension.protocol>",
     key.extends: {
@@ -712,7 +662,7 @@ extension P8 where Self.T : module_with_class_extension.E {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "baz()",
         key.usr: "s:27module_with_class_extension2P8PA2A1EC1TRczrlE3bazyyF",
-        key.offset: 606,
+        key.offset: 577,
         key.length: 10,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>baz</decl.name>()</decl.function.method.instance>"
       }

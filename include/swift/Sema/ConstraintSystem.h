@@ -5269,17 +5269,9 @@ bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice);
 bool hasAppliedSelf(const OverloadChoice &choice,
                     llvm::function_ref<Type(Type)> getFixedType);
 
-/// Check whether type conforms to a given known protocol.
-bool conformsToKnownProtocol(DeclContext *dc, Type type,
-                             KnownProtocolKind protocol);
-
-/// Check whether given type conforms to `RawPepresentable` protocol
+/// Check whether given type conforms to `RawRepresentable` protocol
 /// and return witness type.
 Type isRawRepresentable(ConstraintSystem &cs, Type type);
-/// Check whether given type conforms to a specific known kind
-/// `RawPepresentable` protocol and return witness type.
-Type isRawRepresentable(ConstraintSystem &cs, Type type,
-                        KnownProtocolKind rawRepresentableProtocol);
 
 /// Compute the type that shall stand in for dynamic 'Self' in a member
 /// reference with a base of the given object type.

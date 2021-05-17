@@ -1890,7 +1890,7 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
       return refined->inheritsFrom(protocol);
 
     return (bool)TypeChecker::conformsToProtocol(nominal->getDeclaredType(), protocol,
-                                                 nominal->getDeclContext());
+                                                 CS.DC->getParentModule());
   };
 
   // Gather Numeric and Sequence overloads into separate buckets.
@@ -1938,15 +1938,18 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
     if (argType->isTypeVariableOrMember())
       continue;
 
-    if (conformsToKnownProtocol(CS.DC, argType,
-                                KnownProtocolKind::AdditiveArithmetic)) {
+    if (TypeChecker::conformsToKnownProtocol(
+            argType, KnownProtocolKind::AdditiveArithmetic,
+            CS.DC->getParentModule())) {
       first =
           std::copy(numericOverloads.begin(), numericOverloads.end(), first);
       numericOverloads.clear();
       break;
     }
 
-    if (conformsToKnownProtocol(CS.DC, argType, KnownProtocolKind::Sequence)) {
+    if (TypeChecker::conformsToKnownProtocol(
+            argType, KnownProtocolKind::Sequence,
+            CS.DC->getParentModule())) {
       first =
           std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
       sequenceOverloads.clear();

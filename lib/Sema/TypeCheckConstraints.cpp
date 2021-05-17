@@ -216,7 +216,7 @@ void ParentConditionalConformance::diagnoseConformanceStack(
     ArrayRef<ParentConditionalConformance> conformances) {
   for (auto history : llvm::reverse(conformances)) {
     diags.diagnose(loc, diag::requirement_implied_by_conditional_conformance,
-                   history.ConformingType, history.Protocol);
+                   history.ConformingType, history.Protocol->getDeclaredInterfaceType());
   }
 }
 
@@ -1325,6 +1325,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   Type origFromType = fromType;
   Type origToType = toType;
 
+  auto *module = dc->getParentModule();
+
   auto &diags = dc->getASTContext().Diags;
   bool optionalToOptionalCast = false;
 
@@ -1713,7 +1715,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //
     if (auto *protocolDecl =
           dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal())) {
-      if (!couldDynamicallyConformToProtocol(toType, protocolDecl, dc)) {
+      if (!couldDynamicallyConformToProtocol(toType, protocolDecl, module)) {
         return failed();
       }
     } else if (auto protocolComposition =
@@ -1723,7 +1725,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                          if (auto protocolDecl = dyn_cast_or_null<ProtocolDecl>(
                                  protocolType->getAnyNominal())) {
                            return !couldDynamicallyConformToProtocol(
-                               toType, protocolDecl, dc);
+                               toType, protocolDecl, module);
                          }
                          return false;
                        })) {
@@ -1819,7 +1821,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     auto nsErrorTy = Context.getNSErrorType();
 
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
-      if (!conformsToProtocol(toType, errorTypeProto, dc).isInvalid()) {
+      if (conformsToProtocol(toType, errorTypeProto, module)) {
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
@@ -1829,7 +1831,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         }
       }
 
-      if (!conformsToProtocol(fromType, errorTypeProto, dc).isInvalid()) {
+      if (conformsToProtocol(fromType, errorTypeProto, module)) {
         // Cast of an error-conforming type to NSError or NSObject.
         if ((nsObject && toType->isEqual(nsObject)) ||
              (nsErrorTy && toType->isEqual(nsErrorTy)))
