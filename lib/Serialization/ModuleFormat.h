@@ -1855,11 +1855,6 @@ namespace decls_block {
     BCFixed<2>  // inline value
   >;
 
-  using ActorIndependentDeclAttrLayout = BCRecordLayout<
-    ActorIndependent_DECL_ATTR,
-    BCFixed<1>  // unsafe flag
-  >;
-
   using OptimizeDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // optimize value
