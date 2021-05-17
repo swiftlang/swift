@@ -80,7 +80,7 @@
                 "swift-driver": "main",
                 "swift-numerics": "0.1.0",
                 "swift-syntax": "main",
-                "swift-system": "0.0.1",
+                "swift-system": "0.0.2",
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
