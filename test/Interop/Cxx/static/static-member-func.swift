@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang -c %S/Inputs/static-member-func.cpp -I %S/Inputs -o %t/static-member-func.o -std=c++11
+// RUN: %target-clangxx -c %S/Inputs/static-member-func.cpp -I %S/Inputs -o %t/static-member-func.o
 // RUN: %target-build-swift %s -I %S/Inputs -o %t/statics %t/static-member-func.o -Xfrontend -enable-cxx-interop
 // RUN: %target-codesign %t/statics
 // RUN: %target-run %t/statics

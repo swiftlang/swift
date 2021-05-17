@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/FortyTwo.swiftmodule -I %S/Inputs -enable-cxx-interop %s
+// RUN: %target-swiftxx-frontend -emit-module -o %t/FortyTwo.swiftmodule -I %S/Inputs %s
 
 // Swift should consider all sources for a decl and recognize that the
 // decl is not hidden behind @_implementationOnly in all modules.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -module-cache-path %t -enable-cxx-interop -emit-ir -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swiftxx-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -emit-ir -o - -primary-file %s | %FileCheck %s
 
 import CXXInterop
 

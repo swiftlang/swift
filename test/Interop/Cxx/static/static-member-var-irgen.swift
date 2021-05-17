@@ -14,7 +14,10 @@
 //to depend on external definitions. However, our code generation pattern loads
 //the value dynamically. Instead, we should inline known constants. That would
 //allow Swift code to even read the value of WithIncompleteStaticMember::notDefined.
-// CHECK: @{{_ZN25WithConstexprStaticMember13definedInlineE|"\?definedInline@WithConstexprStaticMember@@2HB"}} = linkonce_odr {{(dso_local )?}}constant i32 139, {{(comdat, )?}}align 4
+// NOTE: we allow both available_externally and linkonce_odr as there are
+// differences in between MSVC and itanium model semantics where the constexpr
+// value is emitted into COMDAT.
+// CHECK: @{{_ZN25WithConstexprStaticMember13definedInlineE|"\?definedInline@WithConstexprStaticMember@@2HB"}} = {{available_externally|linkonce_odr}} {{(dso_local )?}}constant i32 139, {{(comdat, )?}}align 4
 
 import StaticMemberVar
 
