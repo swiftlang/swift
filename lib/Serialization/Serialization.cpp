@@ -76,10 +76,7 @@ using namespace llvm::support;
 using swift::version::Version;
 using llvm::BCBlockRAII;
 
-
-ASTContext &SerializerBase::getASTContext() {
-  return M->getASTContext();
-}
+ASTContext &SerializerBase::getASTContext() const { return M->getASTContext(); }
 
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
@@ -644,8 +641,9 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(M->getASTContext(), "serializing", typeToSerialize);
-  assert(M->getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
-         !typeToSerialize || !typeToSerialize->hasError() && "serializing type with an error");
+  assert((allowCompilerErrors() || !typeToSerialize ||
+          !typeToSerialize->hasError()) &&
+         "serializing type with an error");
 #endif
 
   return TypesToSerialize.addRef(typeToSerialize);
@@ -1015,7 +1013,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         Strategy.emit(ScratchRecord, unsigned(M->getResilienceStrategy()));
       }
 
-      if (getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      if (allowCompilerErrors()) {
         options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
             AllowErrors(Out);
         AllowErrors.emit(ScratchRecord);
@@ -1439,8 +1437,7 @@ void Serializer::writeASTBlockEntity(
   using namespace decls_block;
 
   // The conformance must be complete, or we can't serialize it.
-  assert(conformance->isComplete() ||
-         getASTContext().LangOpts.AllowModuleWithCompilerErrors);
+  assert(conformance->isComplete() || allowCompilerErrors());
   assert(NormalConformancesToSerialize.hasRef(conformance));
 
   auto protocol = conformance->getProtocol();
@@ -2853,7 +2850,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // Retrieve the type of the pattern.
     auto getPatternType = [&] {
       if (!pattern->hasType()) {
-        if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+        if (S.allowCompilerErrors())
           return ErrorType::get(S.getASTContext());
         llvm_unreachable("all nodes should have types");
       }
@@ -3617,8 +3614,7 @@ public:
         getRawStableDefaultArgumentKind(argKind),
         defaultArgumentText);
 
-    if (interfaceType->hasError() &&
-        !S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+    if (interfaceType->hasError() && !S.allowCompilerErrors()) {
       param->getDeclContext()->printContext(llvm::errs());
       interfaceType->dump(llvm::errs());
       llvm_unreachable("error in interface type of parameter");
@@ -3985,8 +3981,8 @@ void Serializer::writeASTBlockEntity(const Decl *D) {
     }
   };
 
-  assert(getASTContext().LangOpts.AllowModuleWithCompilerErrors ||
-         !D->isInvalid() && "cannot create a module with an invalid decl");
+  assert((allowCompilerErrors() || !D->isInvalid()) &&
+         "cannot create a module with an invalid decl");
   if (isDeclXRef(D)) {
     writeCrossReference(D);
     return;
@@ -4148,7 +4144,7 @@ public:
   void visitType(const TypeBase *) = delete;
 
   void visitErrorType(const ErrorType *ty) {
-    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+    if (S.allowCompilerErrors()) {
       using namespace decls_block;
       unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorTypeLayout::Code];
       ErrorTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -5244,8 +5240,7 @@ static void collectInterestingNestedDeclarations(
         if (!nominalParent) {
           const DeclContext *DC = member->getDeclContext();
           nominalParent = DC->getSelfNominalTypeDecl();
-          assert(nominalParent ||
-                 nestedType->getASTContext().LangOpts.AllowModuleWithCompilerErrors &&
+          assert((nominalParent || S.allowCompilerErrors()) &&
                  "parent context is not a type or extension");
         }
         nestedTypeDecls[nestedType->getName()].push_back({
@@ -5529,6 +5524,10 @@ void Serializer::writeToStream(
   }
 
   S.writeToStream(os);
+}
+
+bool Serializer::allowCompilerErrors() const {
+  return getASTContext().LangOpts.AllowModuleWithCompilerErrors;
 }
 
 void swift::serializeToBuffers(
