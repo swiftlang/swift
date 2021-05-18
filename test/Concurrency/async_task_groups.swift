@@ -16,7 +16,7 @@ func asyncThrowsOnCancel() async throws -> Int {
     await Task.sleep(1_000_000_000)
   }
 
-  throw Task.CancellationError()
+  throw CancellationError()
 }
 
 @available(SwiftStdlib 5.5, *)
