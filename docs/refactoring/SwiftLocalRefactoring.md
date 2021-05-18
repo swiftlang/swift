@@ -1,3 +1,5 @@
+# Swift Local Refactoring
+
 Xcode 9 includes a brand new refactoring engine. It can transform code locally
 within a single Swift source file, or globally, such as renaming a method or property
 that occurs in multiple files and even different languages. The logic behind local refactorings is
@@ -334,7 +336,7 @@ This post just touches on some of the things that are now possible to implement 
 If you are excited about extending the refactoring engine to implement additional transformations,
 Swift's [issue database](https://bugs.swift.org) contains [several ideas of refactoring transformations](https://bugs.swift.org/issues/?jql=labels%3DStarterProposal%20AND%20labels%3DRefactoring%20AND%20resolution%3DUnresolved) awaiting implementations.
 
-For further help with implementing refactoring transformations, please see the [documentation] or feel free to ask questions on the [swift-dev](https://lists.swift.org/mailman/listinfo/swift-dev) mailing list.
+For further help with implementing refactoring transformations, please feel free to ask questions on the [Swift forums](https://forums.swift.org/c/development/compiler/9).
 
 [sourcekitd]: https://github.com/apple/swift/tree/main/tools/SourceKit
 [ResolvedCursorInfo]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L158
@@ -345,5 +347,4 @@ For further help with implementing refactoring transformations, please see the [
 [DiagnosticsRefactoring.def]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/AST/DiagnosticsRefactoring.def
 [swift-refactor]: https://github.com/apple/swift/tree/60a91bb7360dde5ce9531889e0ed10a2edbc961a/tools/swift-refactor
 [Refactoring.cpp]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/lib/IDE/Refactoring.cpp
-[documentation]: https://github.com/apple/swift/blob/main/docs/Refactoring.md
 [EditConsumer]: https://github.com/apple/swift/blob/60a91bb7360dde5ce9531889e0ed10a2edbc961a/include/swift/IDE/Utils.h#L506
