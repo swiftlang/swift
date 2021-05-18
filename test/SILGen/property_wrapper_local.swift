@@ -173,3 +173,20 @@ func testLocalReference(count: Int) {
   // setter of value #1 in testLocalReference(count:)
   // CHECK: sil private [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var BoundedNumber<Int> }) -> ()
 }
+
+func takesAutoclosure(_: @autoclosure () -> Int) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local12testCapturesyyF : $@convention(thin) () -> ()
+func testCaptures() {
+  @Wrapper var value = 10
+  takesAutoclosure(value)
+  // implicit closure #1 in testCaptures()
+  // CHECK-LABEL: sil private [transparent] [ossa] @$s22property_wrapper_local12testCapturesyyFSiyXEfu_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int
+
+  let _: () -> Void = {
+    _ = value
+    value = 100
+  }
+  // closure #1 in testCaptures()
+  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local12testCapturesyyFyycfU_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> ()
+}
