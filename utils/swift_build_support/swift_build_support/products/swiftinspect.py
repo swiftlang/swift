@@ -32,7 +32,7 @@ from .. import targets
 class SwiftInspect(product.Product):
     @classmethod
     def product_source_name(cls):
-        return "swift-dt"
+        return "swift-inspect"
 
     @classmethod
     def is_build_script_impl_product(cls):
