@@ -2424,6 +2424,10 @@ NOTE(redundant_conformance_here,none,
      "conformance constraint %0 : %1 implied here",
      (Type, ProtocolDecl *))
 
+WARNING(missing_protocol_refinement, none,
+        "protocol %0 should be declared to refine %1 due to a same-type constraint on 'Self'",
+        (ProtocolDecl *, ProtocolDecl *))
+
 ERROR(unsupported_recursive_requirements, none,
       "requirement involves recursion that is not currently supported", ())
 
