@@ -228,7 +228,7 @@ namespace {
 
 /// Promotes a single AllocStackInst into registers..
 class StackAllocationPromoter {
-  using BlockSet = BasicBlockSetVector;
+  using BlockSetVector = BasicBlockSetVector;
   using BlockToInstMap = llvm::DenseMap<SILBasicBlock *, SILInstruction *>;
 
   // Use a priority queue keyed on dominator tree level so that inserted nodes
@@ -291,26 +291,27 @@ private:
   void promoteAllocationToPhi();
 
   /// Replace the dummy nodes with new block arguments.
-  void addBlockArguments(BlockSet &phiBlocks);
+  void addBlockArguments(BlockSetVector &phiBlocks);
 
   /// Fix all of the branch instructions and the uses to use
   /// the AllocStack definitions (which include stores and Phis).
-  void fixBranchesAndUses(BlockSet &blocks);
+  void fixBranchesAndUses(BlockSetVector &blocks);
 
   /// update the branch instructions with the new Phi argument.
   /// The blocks in \p PhiBlocks are blocks that define a value, \p Dest is
   /// the branch destination, and \p Pred is the predecessors who's branch we
   /// modify.
-  void fixPhiPredBlock(BlockSet &phiBlocks, SILBasicBlock *dest,
+  void fixPhiPredBlock(BlockSetVector &phiBlocks, SILBasicBlock *dest,
                        SILBasicBlock *pred);
 
   /// Get the value for this AllocStack variable that is
   /// flowing out of StartBB.
-  SILValue getLiveOutValue(BlockSet &phiBlocks, SILBasicBlock *startBlock);
+  SILValue getLiveOutValue(BlockSetVector &phiBlocks,
+                           SILBasicBlock *startBlock);
 
   /// Get the value for this AllocStack variable that is
   /// flowing into BB.
-  SILValue getLiveInValue(BlockSet &phiBlocks, SILBasicBlock *block);
+  SILValue getLiveInValue(BlockSetVector &phiBlocks, SILBasicBlock *block);
 
   /// Prune AllocStacks usage in the function. Scan the function
   /// and remove in-block usage of the AllocStack. Leave only the first
@@ -450,14 +451,14 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
   return lastStore;
 }
 
-void StackAllocationPromoter::addBlockArguments(BlockSet &phiBlocks) {
+void StackAllocationPromoter::addBlockArguments(BlockSetVector &phiBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *block : phiBlocks)
     block->createPhiArgument(asi->getElementType(), OwnershipKind::Owned);
 }
 
-SILValue StackAllocationPromoter::getLiveOutValue(BlockSet &phiBlocks,
+SILValue StackAllocationPromoter::getLiveOutValue(BlockSetVector &phiBlocks,
                                                   SILBasicBlock *startBlock) {
   LLVM_DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
   // Walk the Dom tree in search of a defining value:
@@ -489,7 +490,7 @@ SILValue StackAllocationPromoter::getLiveOutValue(BlockSet &phiBlocks,
   return SILUndef::get(asi->getElementType(), *asi->getFunction());
 }
 
-SILValue StackAllocationPromoter::getLiveInValue(BlockSet &phiBlocks,
+SILValue StackAllocationPromoter::getLiveInValue(BlockSetVector &phiBlocks,
                                                  SILBasicBlock *block) {
   // First, check if there is a Phi value in the current block. We know that
   // our loads happen before stores, so we need to first check for Phi nodes
@@ -512,7 +513,7 @@ SILValue StackAllocationPromoter::getLiveInValue(BlockSet &phiBlocks,
   return getLiveOutValue(phiBlocks, iDom->getBlock());
 }
 
-void StackAllocationPromoter::fixPhiPredBlock(BlockSet &phiBlocks,
+void StackAllocationPromoter::fixPhiPredBlock(BlockSetVector &phiBlocks,
                                               SILBasicBlock *destBlock,
                                               SILBasicBlock *predBlock) {
   TermInst *ti = predBlock->getTerminator();
@@ -526,7 +527,7 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &phiBlocks,
   deleter.forceDelete(ti);
 }
 
-void StackAllocationPromoter::fixBranchesAndUses(BlockSet &phiBlocks) {
+void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks) {
   // First update uses of the value.
   SmallVector<LoadInst *, 4> collectedLoads;
 
@@ -609,7 +610,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &phiBlocks) {
 
 void StackAllocationPromoter::pruneAllocStackUsage() {
   LLVM_DEBUG(llvm::dbgs() << "*** Pruning : " << *asi);
-  BlockSet functionBlocks(asi->getFunction());
+  BlockSetVector functionBlocks(asi->getFunction());
 
   // Insert all of the blocks that asi is live in.
   for (auto *use : asi->getUses())
@@ -630,7 +631,7 @@ void StackAllocationPromoter::promoteAllocationToPhi() {
   LLVM_DEBUG(llvm::dbgs() << "*** Placing Phis for : " << *asi);
 
   // A list of blocks that will require new Phi values.
-  BlockSet phiBlocks(asi->getFunction());
+  BlockSetVector phiBlocks(asi->getFunction());
 
   // The "piggy-bank" data-structure that we use for processing the dom-tree
   // bottom-up.
