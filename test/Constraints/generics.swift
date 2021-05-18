@@ -858,3 +858,15 @@ func rdar56212087() {
 
   setValue(foo("", ""), forKey: "") // Ok (T is inferred as a `String` instead of `Any?`)
 }
+
+// rdar://77233864 - Ternary operator fails to deduce non-default literal type in SwiftUI preview
+func test_ternary_operator_with_regular_conformance_to_literal_protocol() {
+  // Note that in this case `ExpressibleByIntegerLiteral` is a non-literal requirement
+  func test<T: ExpressibleByIntegerLiteral>(_: T) -> T {
+    fatalError()
+  }
+
+  func bug(_: Float?) {}
+
+  bug(true ? test(0) : test(42)) // Ok - type is `CGFloat` for 0 and 42
+}
