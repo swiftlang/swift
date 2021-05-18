@@ -335,12 +335,12 @@ extension Task {
   /// Flags for schedulable jobs.
   struct JobFlags {
     /// Kinds of schedulable jobs.
-    enum Kind: Int {
+    enum Kind: Int32 {
       case task = 0
     }
 
     /// The actual bit representation of these flags.
-    var bits: Int = 0
+    var bits: Int32 = 0
 
     /// The kind of job described by these flags.
     var kind: Kind {
@@ -359,11 +359,11 @@ extension Task {
     /// The priority given to the job.
     var priority: Priority? {
       get {
-        Priority(rawValue: (bits & 0xFF00) >> 8)
+        Priority(rawValue: (Int(bits) & 0xFF00) >> 8)
       }
 
       set {
-        bits = (bits & ~0xFF00) | ((newValue?.rawValue ?? 0) << 8)
+        bits = (bits & ~0xFF00) | Int32((newValue?.rawValue ?? 0) << 8)
       }
     }
 
@@ -478,7 +478,7 @@ public func detach<T>(
   flags.isFuture = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -520,7 +520,7 @@ public func detach<T>(
   flags.isFuture = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -654,7 +654,7 @@ public func async<T>(
   flags.isContinuingAsyncTask = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -695,7 +695,7 @@ public func async<T>(
   flags.isContinuingAsyncTask = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))

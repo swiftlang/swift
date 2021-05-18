@@ -5154,6 +5154,8 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
+  case KnownProtocolKind::Actor:
+    return KnownDerivableProtocolKind::Actor;
   default: return None;
   }
 }
@@ -8088,12 +8090,43 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
   return {};
 }
 
-bool ClassDecl::hasExplicitCustomActorMethods() const {
-  return false;
+const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
+  auto &ctx = getASTContext();
+
+  auto hasUnownedSerialExecutorType = [&](VarDecl *property) {
+    if (auto type = property->getInterfaceType())
+      if (auto td = type->getAnyNominal())
+        if (td == ctx.getUnownedSerialExecutorDecl())
+          return true;
+    return false;
+  };
+
+  VarDecl *candidate = nullptr;
+  for (auto member: getMembers()) {
+    // Instance properties called unownedExecutor.
+    if (auto property = dyn_cast<VarDecl>(member)) {
+      if (property->getName() == ctx.Id_unownedExecutor &&
+          !property->isStatic()) {
+        if (!candidate) {
+          candidate = property;
+          continue;
+        }
+
+        bool oldHasRightType = hasUnownedSerialExecutorType(candidate);
+        if (oldHasRightType == hasUnownedSerialExecutorType(property)) {
+          // just ignore the new property, we should diagnose this eventually
+        } else if (!oldHasRightType) {
+          candidate = property;
+        }
+      }
+    }
+  }
+
+  return candidate;
 }
 
 bool ClassDecl::isRootDefaultActor() const {
-  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Minimal);
+  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
 }
 
 bool ClassDecl::isRootDefaultActor(ModuleDecl *M,

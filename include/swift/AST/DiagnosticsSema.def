@@ -4369,6 +4369,13 @@ ERROR(async_objc_dynamic_self,none,
 ERROR(actor_inheritance,none,
       "actor types do not support inheritance", ())
 
+ERROR(unowned_executor_outside_actor,none,
+      "'unownedExecutor' can only be implemented within the main "
+      "definition of an actor", ())
+ERROR(override_implicit_unowned_executor,none,
+      "cannot override an actor's 'unownedExecutor' property that wasn't "
+      "explicitly defined", ())
+
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
         "%select{from inside the actor|on 'self'}2",

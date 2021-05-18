@@ -8,3 +8,6 @@ import _Concurrency
 @available(SwiftStdlib 5.5, *)
 extension PartialAsyncTask {
 }
+@available(SwiftStdlib 5.5, *)
+extension UnownedJob {
+}
