@@ -76,7 +76,7 @@ func testInvalidTopLevelCompletion() {
 // RUN: %target-swift-frontend -merge-modules -emit-module -experimental-allow-module-with-compiler-errors %t/errors.a.swiftmodule %t/errors.b.swiftmodule %t/errors.c.swiftmodule -module-name errors -o %t/errors.swiftmodule
 
 // Read the module back in to make sure it can be deserialized
-// RUN: %target-swift-ide-test -print-module -source-filename dummy -module-to-print errors -I %t | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -source-filename dummy -module-to-print errors -I %t -allow-compiler-errors | %FileCheck %s
 // CHECK: typealias InvalidAlias = <<error type>>
 // CHECK: class InvalidClass : <<error type>>, InvalidProtocol
 // CHECK: var classMemberA: <<error type>>
@@ -123,22 +123,22 @@ func testInvalidTopLevelCompletion() {
 // CHECK: func typeUsesFunc
 
 // Check completions
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t-completions -I %t
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t-completions -I %t -allow-compiler-errors
 
 // Check cursor info for the various symbols
-// RUN: %sourcekitd-test -req=cursor -pos=4:3 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=4:3 %s -- -Xfrontend -experimental-allow-module-with-compiler-errors -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // CHECK-GLOBAL: source.lang.swift.ref.var.global
 // CHECK-GLOBAL: invalidGlobalMissingInit
 
-// RUN: %sourcekitd-test -req=cursor -pos=8:3 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-FUNC
+// RUN: %sourcekitd-test -req=cursor -pos=8:3 %s -- -Xfrontend -experimental-allow-module-with-compiler-errors -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-FUNC
 // CHECK-FUNC: source.lang.swift.ref.function.free
 // CHECK-FUNC: invalidPartialFunc
 
-// RUN: %sourcekitd-test -req=cursor -pos=12:12 %s -- -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-STRUCT
+// RUN: %sourcekitd-test -req=cursor -pos=12:12 %s -- -Xfrontend -experimental-allow-module-with-compiler-errors -I %t -target %target-triple %s | %FileCheck %s -check-prefix=CHECK-STRUCT
 // CHECK-STRUCT: source.lang.swift.ref.struct
 // CHECK-STRUCT: InvalidStruct
 
 // Currently doesn't work for any members with invalid types, even within the same module: rdar://71514163
-// RUN: %sourcekitd-test -req=cursor -pos=13:7 %s -- -I %t -target %target-triple %s | not %FileCheck %s -check-prefix=CHECK-MEMBER
+// RUN: %sourcekitd-test -req=cursor -pos=13:7 %s -- -Xfrontend -experimental-allow-module-with-compiler-errors -I %t -target %target-triple %s | not %FileCheck %s -check-prefix=CHECK-MEMBER
 // CHECK-MEMBER: source.lang.swift.ref.var.instance
 // CHECK-MEMBER: memberB
