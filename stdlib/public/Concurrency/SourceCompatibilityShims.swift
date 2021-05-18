@@ -34,7 +34,16 @@ extension Task where Success == Never, Failure == Never {
 @available(SwiftStdlib 5.5, *)
 extension TaskPriority {
   @available(*, deprecated, message: "unspecified priority will be removed; use nil")
-  public static let unspecified: TaskPriority = .init(rawValue: 0x00)
+  @_alwaysEmitIntoClient
+  public static var unspecified: TaskPriority {
+    .init(rawValue: 0x00)
+  }
+
+  @available(*, deprecated, message: "userInteractive priority will be removed")
+  @_alwaysEmitIntoClient
+  public static var userInteractive: TaskPriority {
+    .init(rawValue: 0x21)
+  }
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -55,7 +64,7 @@ extension Task where Failure == Error {
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "`Task.runDetached` was replaced by `Task.detached` and will be removed shortly.")
   public static func runDetached(
-    priority: TaskPriority = .unspecified,
+    priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
     detached(priority: priority, operation: operation)
