@@ -17,7 +17,7 @@ import Swift
 
 /// A unit of asynchronous work.
 ///
-/// An instance of `Task` always represents a "detached" task. The instance
+/// An instance of `Task` always represents a top-level task. The instance
 /// can be used to await its completion, cancel the task, etc., The task will
 /// run to completion even if there are no other instances of the `Task`.
 ///
@@ -177,7 +177,7 @@ extension Task: Equatable {
 /// ### Priority inheritance
 /// Child tasks automatically inherit their parent task's priority.
 ///
-/// Detached tasks (created by `detach`) DO NOT inherit task priority,
+/// Detached tasks (created by `Task.detached`) DO NOT inherit task priority,
 /// as they are "detached" from their parent tasks after all.
 ///
 /// ### Priority elevation
@@ -396,11 +396,13 @@ extension Task where Failure == Never {
   ///
   /// The `async` function should be used when creating asynchronous work
   /// that operates on behalf of the synchronous function that calls it.
-  /// Like `detach`, the async function creates a separate, top-level task.
-  /// Unlike `detach`, the task creating by `async` inherits the priority and
-  /// actor context of the caller, so the `operation` is treated more like an
-  /// asynchronous extension to the synchronous operation. Additionally, `async`
-  /// does not return a handle to refer to the task.
+  /// Like `Task.detached`, the async function creates a separate, top-level
+  /// task.
+  ///
+  /// Unlike `Task.detached`, the task creating by the `Task` initializer
+  /// inherits the priority and actor context of the caller, so the `operation`
+  /// is treated more like an asynchronous extension to the synchronous
+  /// operation.
   ///
   /// - Parameters:
   ///   - priority: priority of the task. If nil, the priority will come from
@@ -441,13 +443,11 @@ extension Task where Failure == Never {
 extension Task where Failure == Error {
   /// Run given `operation` as asynchronously in its own top-level task.
   ///
-  /// The `async` function should be used when creating asynchronous work
-  /// that operates on behalf of the synchronous function that calls it.
-  /// Like `detach`, the async function creates a separate, top-level task.
-  /// Unlike `detach`, the task creating by `async` inherits the priority and
+  /// This initializer creates asynchronous work on behalf of the synchronous function that calls it.
+  /// Like `Task.detached`, this initializer creates a separate, top-level task.
+  /// Unlike `Task.detached`, the task created inherits the priority and
   /// actor context of the caller, so the `operation` is treated more like an
-  /// asynchronous extension to the synchronous operation. Additionally, `async`
-  /// does not return a handle to refer to the task.
+  /// asynchronous extension to the synchronous operation.
   ///
   /// - Parameters:
   ///   - priority: priority of the task. If nil, the priority will come from
@@ -500,10 +500,10 @@ extension Task where Failure == Never {
   ///
   /// ### Cancellation
   /// A detached task always runs to completion unless it is explicitly cancelled.
-  /// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
+  /// Specifically, dropping a detached tasks `Task` does _not_ automatically
   /// cancel given task.
   ///
-  /// Cancelling a task must be performed explicitly via `handle.cancel()`.
+  /// Cancelling a task must be performed explicitly via `cancel()`.
   ///
   /// - Note: it is generally preferable to use child tasks rather than detached
   ///   tasks. Child tasks automatically carry priorities, task-local state,
@@ -513,10 +513,8 @@ extension Task where Failure == Never {
   ///
   /// - Parameters:
   ///   - priority: priority of the task
-  ///   - executor: the executor on which the detached closure should start
-  ///               executing on.
   ///   - operation: the operation to execute
-  /// - Returns: handle to the task, allowing to `await handle.get()` on the
+  /// - Returns: handle to the task, allowing to `await get()` on the
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
   @discardableResult
@@ -797,7 +795,7 @@ public func _asyncMainDrainQueue() -> Never
 @available(SwiftStdlib 5.5, *)
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 #if os(Windows)
-  detach {
+  Task.detached {
     do {
       try await asyncFun()
       exit(0)
@@ -815,7 +813,7 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
     }
   }
 
-  detach {
+  Task.detached {
     await _doMain(asyncFun)
     exit(0)
   }
