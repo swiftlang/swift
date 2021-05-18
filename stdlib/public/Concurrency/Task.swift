@@ -198,17 +198,18 @@ extension Task: Equatable {
 ///       much of a thing on other platforms (i.e. server side Linux systems).
 @available(SwiftStdlib 5.5, *)
 public struct TaskPriority: RawRepresentable, Sendable {
-  public typealias RawValue = Int
-  public var rawValue: Int
+  public typealias RawValue = UInt8
+  public var rawValue: UInt8
 
-  public init(rawValue: Int) {
+  public init(rawValue: UInt8) {
     self.rawValue = rawValue
   }
 
-  public static let userInteractive: TaskPriority = .init(rawValue: 0x21)
-  public static let userInitiated: TaskPriority = .init(rawValue: 0x19)
+  public static let high: TaskPriority = .init(rawValue: 0x19)
+  public static let userInitiated: TaskPriority = high
   public static let `default`: TaskPriority = .init(rawValue: 0x15)
-  public static let utility: TaskPriority = .init(rawValue: 0x11)
+  public static let low: TaskPriority = .init(rawValue: 0x11)
+  public static let utility: TaskPriority = low
   public static let background: TaskPriority = .init(rawValue: 0x09)
 }
 
@@ -263,7 +264,7 @@ extension Task where Success == Never, Failure == Never {
       }
 
       // Otherwise, query the system.
-      return TaskPriority(rawValue: _getCurrentThreadPriority())
+      return TaskPriority(rawValue: UInt8(_getCurrentThreadPriority()))
     }
   }
 }
@@ -318,11 +319,11 @@ struct JobFlags {
         return nil
       }
 
-      return TaskPriority(rawValue: value)
+      return TaskPriority(rawValue: UInt8(value))
     }
 
     set {
-      bits = (bits & ~0xFF00) | Int32(((newValue?.rawValue ?? 0) << 8))
+      bits = (bits & ~0xFF00) | Int32((Int(newValue?.rawValue ?? 0) << 8))
     }
   }
 
@@ -620,7 +621,7 @@ extension Task where Success == Never, Failure == Never {
     let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
 
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(priority: priority.rawValue, continuation: continuation)
+      let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
       _enqueueJobGlobalWithDelay(duration, job)
     }
   }
@@ -648,7 +649,7 @@ extension Task where Success == Never, Failure == Never {
     let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
 
     return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(priority: priority.rawValue, continuation: continuation)
+      let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
       _enqueueJobGlobal(job)
     }
   }
