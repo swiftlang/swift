@@ -9,6 +9,9 @@
 
 // RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
 
+// Assertion failed: (I != F.TypeRemap.end() && "Invalid index into type index remap"))
+// REQUIRES: rdar70691386
+
 // PRINT: struct Struct1 {
 // PRINT-NEXT:   var x: Double
 // PRINT-NEXT:   var y: Double
