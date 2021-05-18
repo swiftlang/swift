@@ -18,11 +18,17 @@ import Swift
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
-  @available(*, deprecated, message: "use TaskPriority")
+  @available(*, deprecated, message: "Task.Priority has been removed; use TaskPriority")
   public typealias Priority = TaskPriority
 
-  @available(*, deprecated, message: "use Task")
+  @available(*, deprecated, message: "Task.Handle has been removed; use Task")
   public typealias Handle = _Concurrency.Task
+
+  @available(*, deprecated, message: "Task.CancellationError has been removed; use CancellationError")
+  @_alwaysEmitIntoClient
+  public static func CancellationError() -> _Concurrency.CancellationError {
+    return _Concurrency.CancellationError()
+  }
 }
 
 @available(SwiftStdlib 5.5, *)
