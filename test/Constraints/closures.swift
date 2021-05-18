@@ -1132,3 +1132,51 @@ func rdar76058892() {
     }
   }
 }
+
+// SR-13239
+func callit<T>(_ f: () -> T) -> T {
+  f()
+}
+
+func callitArgs<T>(_ : Int, _ f: () -> T) -> T {
+  f()
+}
+
+func callitArgsFn<T>(_ : Int, _ f: () -> () -> T) -> T {
+  f()()
+}
+
+func callitGenericArg<T>(_ a: T, _ f: () -> T) -> T { 
+  f()
+}
+
+func testSR13239() -> Int {
+  callit {
+    print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+  }
+}
+
+func testSR13239_Args() -> Int {
+  callitArgs(1) {
+    print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+  }
+}
+
+func testSR13239_ArgsFn() -> Int {
+  callitArgsFn(1) {
+    { print("hello") } // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+  }
+}
+
+func testSR13239MultiExpr() -> Int {
+  callit {
+    print("hello") 
+    return print("hello") // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+  }
+}
+
+func testSR13239_GenericArg() -> Int {
+  callitGenericArg(1) {
+    print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+  }
+}
