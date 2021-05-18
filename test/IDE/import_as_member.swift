@@ -9,8 +9,8 @@
 
 // RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
 
-// rdar://77558075
-// UNSUPPORTED: OS=tvos && CPU=x86_64
+// Assertion failed: (I != F.TypeRemap.end() && "Invalid index into type index remap"))
+// REQUIRES: rdar70691386
 
 // PRINT: struct Struct1 {
 // PRINT-NEXT:   var x: Double
