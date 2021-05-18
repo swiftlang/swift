@@ -5961,7 +5961,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
-  case CompletionKind::CallArg:
   case CompletionKind::LabeledTrailingClosure:
   case CompletionKind::AfterPoundExpr:
   case CompletionKind::AfterPoundDirective:
@@ -6014,12 +6013,19 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
 
+  case CompletionKind::CallArg:
+  case CompletionKind::PostfixExprParen:
+    // Note that we don't add keywords here as the completion might be for
+    // an argument list pattern. We instead add keywords later in
+    // CodeCompletionCallbacksImpl::doneParsing when we know we're not
+    // completing for a argument list pattern.
+    break;
+
   case CompletionKind::CaseStmtKeyword:
     addCaseStmtKeywords(Sink);
     break;
 
   case CompletionKind::PostfixExpr:
-  case CompletionKind::PostfixExprParen:
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::TypeIdentifierWithDot:
   case CompletionKind::TypeIdentifierWithoutDot:
@@ -6657,6 +6663,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                               ContextInfo.isImplicitSingleExpressionReturn());
       Lookup.setHaveLParen(false);
+
+      // Add any keywords that can be used in an argument expr position.
+      addSuperKeyword(CompletionContext.getResultSink());
+      addExprKeywords(CompletionContext.getResultSink());
+
       DoPostfixExprBeginning();
     }
     break;
@@ -6798,6 +6809,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (shouldPerformGlobalCompletion) {
       Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                               ContextInfo.isImplicitSingleExpressionReturn());
+
+      // Add any keywords that can be used in an argument expr position.
+      addSuperKeyword(CompletionContext.getResultSink());
+      addExprKeywords(CompletionContext.getResultSink());
+
       DoPostfixExprBeginning();
     }
     break;
