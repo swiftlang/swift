@@ -4172,7 +4172,7 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
       if (baseName == DeclBaseName::createConstructor()) {
         if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
           action.emplace(ImplicitMemberAction::ResolveDecodable);
-        } else if (argumentNames[0] == Context.Id_transport) {
+        } else if (argumentNames.front() == Context.Id_transport) {
           action.emplace(ImplicitMemberAction::ResolveDistributedActor);
         }
       } else if (!baseName.isSpecial() &&
@@ -4181,10 +4181,11 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
       }
     } else if (member.isSimpleName() || argumentNames.size() == 2) {
-      if (baseName == DeclBaseName::createConstructor() &&
-          argumentNames[0] == Context.Id_resolve &&
-          argumentNames[1] == Context.Id_using) {
-        action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+      if (baseName == DeclBaseName::createConstructor()) {
+        if (argumentNames[0] == Context.Id_resolve &&
+            argumentNames[1] == Context.Id_using) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+        }
       }
     }
   }
