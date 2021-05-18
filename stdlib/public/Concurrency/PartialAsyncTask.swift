@@ -223,7 +223,3 @@ public func withUnsafeThrowingContinuation<T>(
     fn(UnsafeContinuation<T, Error>($0))
   }
 }
-
-@available(SwiftStdlib 5.5, *)
-@available(*, deprecated, message: "please use UnsafeContination<..., Error>")
-public typealias UnsafeThrowingContinuation<T> = UnsafeContinuation<T, Error>
