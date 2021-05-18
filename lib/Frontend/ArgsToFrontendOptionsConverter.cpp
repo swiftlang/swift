@@ -103,7 +103,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   if (auto A = Args.getLastArg(OPT_user_module_version)) {
-    if (Opts.UserModuleVersion.tryParse(StringRef(A->getValue()))) {
+    StringRef raw(A->getValue());
+    while(raw.count('.') > 3) {
+      raw = raw.rsplit('.').first;
+    }
+    if (Opts.UserModuleVersion.tryParse(raw)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
