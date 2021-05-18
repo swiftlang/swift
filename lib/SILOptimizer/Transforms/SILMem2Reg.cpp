@@ -288,6 +288,19 @@ private:
   /// Replace the dummy nodes with new block arguments.
   void addBlockArguments(BlockSetVector &phiBlocks);
 
+  /// Check if \p phi is a proactively added phi by SILMem2Reg
+  bool isProactivePhi(SILPhiArgument *phi, const BlockSetVector &phiBlocks);
+
+  /// Check if \p proactivePhi is live.
+  bool isNecessaryProactivePhi(SILPhiArgument *proactivePhi,
+                               const BlockSetVector &phiBlocks);
+
+  /// Given a \p proactivePhi that is live, backward propagate liveness to
+  /// other proactivePhis.
+  void propagateLiveness(SILPhiArgument *proactivePhi,
+                         const BlockSetVector &phiBlocks,
+                         SmallPtrSetImpl<SILPhiArgument *> &livePhis);
+
   /// Fix all of the branch instructions and the uses to use
   /// the AllocStack definitions (which include stores and Phis).
   void fixBranchesAndUses(BlockSetVector &blocks);
@@ -522,6 +535,52 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSetVector &phiBlocks,
   ti->eraseFromParent();
 }
 
+bool StackAllocationPromoter::isProactivePhi(SILPhiArgument *phi,
+                                             const BlockSetVector &phiBlocks) {
+  auto *phiBlock = phi->getParentBlock();
+  return phiBlocks.contains(phiBlock) &&
+         phi == phiBlock->getArgument(phiBlock->getNumArguments() - 1);
+}
+
+bool StackAllocationPromoter::isNecessaryProactivePhi(
+    SILPhiArgument *proactivePhi, const BlockSetVector &phiBlocks) {
+  assert(isProactivePhi(proactivePhi, phiBlocks));
+  for (auto *use : proactivePhi->getUses()) {
+    auto *branch = dyn_cast<BranchInst>(use->getUser());
+    // A non-branch use is a necessary use
+    if (!branch)
+      return true;
+    auto *destBB = branch->getDestBB();
+    auto opNum = use->getOperandNumber();
+    // A phi has a necessary use if it is used as a branch op for a
+    // non-proactive phi
+    if (!phiBlocks.contains(destBB) || (opNum != branch->getNumArgs() - 1))
+      return true;
+  }
+  return false;
+}
+
+void StackAllocationPromoter::propagateLiveness(
+    SILPhiArgument *proactivePhi, const BlockSetVector &phiBlocks,
+    SmallPtrSetImpl<SILPhiArgument *> &livePhis) {
+  assert(isProactivePhi(proactivePhi, phiBlocks));
+  if (livePhis.contains(proactivePhi))
+    return;
+  // If liveness has not been propagated, go over the incoming operands and mark
+  // any operand values that are proactivePhis as live
+  livePhis.insert(proactivePhi);
+  SmallVector<SILValue> incomingPhiVals;
+  proactivePhi->getIncomingPhiValues(incomingPhiVals);
+  for (auto &inVal : incomingPhiVals) {
+    auto *inPhi = dyn_cast<SILPhiArgument>(inVal);
+    if (!inPhi)
+      continue;
+    if (!isProactivePhi(inPhi, phiBlocks))
+      continue;
+    propagateLiveness(inPhi, phiBlocks, livePhis);
+  }
+}
+
 void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks) {
   // First update uses of the value.
   SmallVector<LoadInst *, 4> collectedLoads;
@@ -577,7 +636,6 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks) {
 
   // Now that all of the uses are fixed we can fix the branches that point
   // to the blocks with the added arguments.
-
   // For each Block with a new Phi argument:
   for (auto *block : phiBlocks) {
     // Fix all predecessors.
@@ -591,14 +649,30 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks) {
     }
   }
 
-  // If the owned phi arg we added did not have any uses, create end_lifetime to
-  // end its lifetime. In asserts mode, make sure we have only undef incoming
-  // values for such phi args.
-  for (auto *block : phiBlocks) {
-    auto *phiArg =
-        cast<SILPhiArgument>(block->getArgument(block->getNumArguments() - 1));
-    if (phiArg->use_empty()) {
-      erasePhiArgument(block, block->getNumArguments() - 1);
+  // Fix ownership of proactively created non-trivial phis
+  if (asi->getFunction()->hasOwnership() &&
+      !asi->getType().isTrivial(*asi->getFunction())) {
+    SmallPtrSet<SILPhiArgument *, 4> livePhis;
+
+    for (auto *block : phiBlocks) {
+      auto *proactivePhi = cast<SILPhiArgument>(
+          block->getArgument(block->getNumArguments() - 1));
+      // First, check if the proactively added phi is necessary by looking at
+      // it's immediate uses.
+      if (isNecessaryProactivePhi(proactivePhi, phiBlocks)) {
+        // Backward propagate liveness to other dependent proactively added phis
+        propagateLiveness(proactivePhi, phiBlocks, livePhis);
+      }
+    }
+    // Go over all proactively added phis, and delete those that were not marked
+    // live above.
+    for (auto *block : phiBlocks) {
+      auto *proactivePhi = cast<SILPhiArgument>(
+          block->getArgument(block->getNumArguments() - 1));
+      if (!livePhis.contains(proactivePhi)) {
+        proactivePhi->replaceAllUsesWithUndef();
+        erasePhiArgument(block, block->getNumArguments() - 1);
+      }
     }
   }
 }
