@@ -10,6 +10,11 @@
 // CHECK-NEXT: test{{[\\/]}}Frontend{{[\\/]}}crash.swift{{$}}
 // CHECK-NEXT: ---
 
+// Check that a message when allowing errors is output
+// RUN: not --crash %target-swift-frontend -typecheck -debug-crash-after-parse -experimental-allow-module-with-compiler-errors %s 2>&1 | %FileCheck -check-prefix CHECK-ALLOW %s
+// CHECK-ALLOW-LABEL: Stack dump
+// CHECK-ALLOW: While allowing modules with compiler errors enabled
+
 func anchor() {}
 anchor()
 
