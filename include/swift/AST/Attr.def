@@ -574,12 +574,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   APIBreakingToAdd | APIBreakingToRemove,
   102)
 
-DECL_ATTR(actorIndependent, ActorIndependent,
-  OnClass | OnStruct | OnEnum | OnExtension | OnFunc | OnConstructor |
-  OnVar | OnSubscript | ConcurrencyOnly |
-  ABIBreakingToAdd | ABIBreakingToRemove |
-  APIBreakingToAdd | APIBreakingToRemove,
-  103)
+// Unused attribute 103
 
 SIMPLE_DECL_ATTR(globalActor, GlobalActor,
   OnClass | OnStruct | OnEnum | ConcurrencyOnly |
