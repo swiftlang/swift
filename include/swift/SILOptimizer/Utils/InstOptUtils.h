@@ -678,6 +678,10 @@ makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock);
 /// Warning: This does not properly cleanup an OSSA lifetime with a consuming
 /// use blocks inside a loop relative to \p value. The client must create
 /// separate copies for any uses within the loop.
+void destroyValueAtLeakingBlocks(SILValue value,
+                                 ArrayRef<SILBasicBlock *> userBBs);
+
+/// Given an ssa value \p value, create end_lifetime at leaking blocks
 void endLifetimeAtLeakingBlocks(SILValue value,
                                 ArrayRef<SILBasicBlock *> userBBs);
 

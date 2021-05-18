@@ -261,6 +261,9 @@ class StackAllocationPromoter {
   /// AllocStackInst.
   BlockToInstMap lastStoreInBlock;
 
+  /// Records blocks in which the value in asi is moved out.
+  /// i.e There was a load [take] of the asi with no following store.
+  BasicBlockSet deadValueBlock;
 public:
   /// C'tor.
   StackAllocationPromoter(AllocStackInst *inputASI, DominanceInfo *inputDomInfo,
@@ -268,7 +271,8 @@ public:
                           SILBuilderContext &inputCtx,
                           InstructionDeleter &deleter)
       : asi(inputASI), dsi(nullptr), domInfo(inputDomInfo),
-        domTreeLevels(inputDomTreeLevels), ctx(inputCtx), deleter(deleter) {
+        domTreeLevels(inputDomTreeLevels), ctx(inputCtx), deleter(deleter),
+        deadValueBlock(inputASI->getFunction()) {
     // Scan the users in search of a deallocation instruction.
     for (auto *use : asi->getUses()) {
       if (auto *foundDealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
@@ -330,12 +334,14 @@ private:
 StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
     SILBasicBlock *blockPromotingWithin) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting ASI in block: " << *asi);
-
   // RunningVal is the current value in the stack location.
   // We don't know the value of the alloca until we find the first store.
   SILValue runningVal = SILValue();
   // Keep track of the last StoreInst that we found.
   StoreInst *lastStore = nullptr;
+  // Keep track if value in asi becomes dead via load [take] or destroy_addr in
+  // this block
+  bool deadAsi = false;
 
   // For all instructions in the block.
   for (auto bbi = blockPromotingWithin->begin(),
@@ -346,6 +352,10 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
 
     if (isLoadFromStack(inst, asi)) {
       auto *li = cast<LoadInst>(inst);
+      // The value in asi was moved out, set deadAsi to true
+      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+        deadAsi = true;
+      }
       if (runningVal) {
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
@@ -370,6 +380,9 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
     if (auto *si = dyn_cast<StoreInst>(inst)) {
       if (si->getDest() != asi)
         continue;
+
+      // Found a store to asi, set deadAsi to false.
+      deadAsi = false;
 
       // If we see a store [assign], always convert it to a store [init]. This
       // simplifies further processing.
@@ -416,19 +429,14 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
 
     // Replace destroys with a release of the value.
     if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
-      if (dai->getOperand() == asi && runningVal) {
-        replaceDestroy(dai, runningVal, ctx, deleter);
+      if (dai->getOperand() == asi) {
+        if (runningVal) {
+          replaceDestroy(dai, runningVal, ctx, deleter);
+        }
+        // The value in asi was destroyed, set deadAsi to true
+        deadAsi = true;
       }
       continue;
-    }
-
-    if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
-      if (dvi->getOperand() == runningVal) {
-        // Reset LastStore.
-        // So that we don't end up passing dead values as phi args in
-        // StackAllocationPromoter::fixBranchesAndUses
-        lastStore = nullptr;
-      }
     }
 
     // Stop on deallocation.
@@ -438,6 +446,11 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
     }
   }
 
+  // If the asi was dead in this block, insert into deadValueBlock in OSSA.
+  if (deadAsi && asi->getFunction()->hasOwnership() &&
+      !asi->getType().isTrivial(*asi->getFunction())) {
+    deadValueBlock.insert(blockPromotingWithin);
+  }
   if (lastStore) {
     assert(lastStore->getOwnershipQualifier() !=
                StoreOwnershipQualifier::Assign &&
@@ -461,11 +474,17 @@ void StackAllocationPromoter::addBlockArguments(BlockSetVector &phiBlocks) {
 SILValue StackAllocationPromoter::getLiveOutValue(BlockSetVector &phiBlocks,
                                                   SILBasicBlock *startBlock) {
   LLVM_DEBUG(llvm::dbgs() << "*** Searching for a value definition.\n");
+  auto *func = asi->getFunction();
+
   // Walk the Dom tree in search of a defining value:
   for (DomTreeNode *domNode = domInfo->getNode(startBlock); domNode;
        domNode = domNode->getIDom()) {
     SILBasicBlock *domBlock = domNode->getBlock();
 
+    // If the value in asi is moved out, then return undef
+    if (deadValueBlock.contains(domBlock)) {
+      return SILUndef::get(asi->getElementType(), *func);
+    }
     // If there is a store (that must come after the phi), use its value.
     BlockToInstMap::iterator it = lastStoreInBlock.find(domBlock);
     if (it != lastStoreInBlock.end())
@@ -487,7 +506,7 @@ SILValue StackAllocationPromoter::getLiveOutValue(BlockSetVector &phiBlocks,
     LLVM_DEBUG(llvm::dbgs() << "*** Walking up the iDOM.\n");
   }
   LLVM_DEBUG(llvm::dbgs() << "*** Could not find a Def. Using Undef.\n");
-  return SILUndef::get(asi->getElementType(), *asi->getFunction());
+  return SILUndef::get(asi->getElementType(), *func);
 }
 
 SILValue StackAllocationPromoter::getLiveInValue(BlockSetVector &phiBlocks,
@@ -596,14 +615,22 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSetVector &phiBlocks) {
     }
   }
 
-  // If the owned phi arg we added did not have any uses, create end_lifetime to
-  // end its lifetime. In asserts mode, make sure we have only undef incoming
-  // values for such phi args.
-  for (auto *block : phiBlocks) {
-    auto *phiArg =
-        cast<SILPhiArgument>(block->getArgument(block->getNumArguments() - 1));
-    if (phiArg->use_empty()) {
-      erasePhiArgument(block, block->getNumArguments() - 1);
+  // Fix ownership of newly created non-trivial phis
+  if (asi->getFunction()->hasOwnership() &&
+      !asi->getType().isTrivial(*asi->getFunction())) {
+    // Go over all the proactively added phis and create end_lifetime at
+    // leaking blocks
+    SmallVector<SILBasicBlock *, 4> consumingBlocks;
+    for (auto *block : phiBlocks) {
+      auto *phiArg = cast<SILPhiArgument>(
+          block->getArgument(block->getNumArguments() - 1));
+      if (phiArg->use_empty()) {
+        auto *insertPt = phiArg->getNextInstruction();
+        SILBuilderWithScope builder(insertPt);
+        builder.createEndLifetime(
+            RegularLocation::getAutoGeneratedLocation(insertPt->getLoc()),
+            phiArg);
+      }
     }
   }
 }
@@ -1049,6 +1076,10 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
   LLVM_DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
   ++NumAllocStackFound;
 
+  if (f.hasOwnership() && alloc->hasDynamicLifetime()) {
+    return false;
+  }
+
   // Don't handle captured AllocStacks.
   bool inSingleBlock = false;
   if (isCaptured(alloc, inSingleBlock)) {
@@ -1058,9 +1089,8 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
 
   // Remove write-only AllocStacks.
   if (isWriteOnlyAllocation(alloc)) {
-    deleter.forceDeleteWithUsers(alloc);
-
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
+    deleter.forceDeleteWithUsers(alloc);
     return true;
   }
 

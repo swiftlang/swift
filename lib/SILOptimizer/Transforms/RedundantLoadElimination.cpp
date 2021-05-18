@@ -1361,7 +1361,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     for (auto use : phi->getUses()) {
       userBBs.push_back(use->getParentBlock());
     }
-    endLifetimeAtLeakingBlocks(phi, userBBs);
+    destroyValueAtLeakingBlocks(phi, userBBs);
   }
   return makeNewValueAvailable(Val, BB);
 }
