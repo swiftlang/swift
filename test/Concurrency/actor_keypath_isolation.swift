@@ -20,8 +20,6 @@ actor Door {
         get { 0 }
     }
 
-    @actorIndependent(unsafe) var unsafeIndependent : Int = 0
-
     @MainActor var globActor_mutable : Int = 0
     @MainActor let globActor_immutable : Int = 0
 
@@ -32,7 +30,7 @@ actor Door {
 
     @MainActor subscript(byName: String) -> Int { 0 }
 
-    @actorIndependent subscript(byIEEE754: Double) -> Int { 0 }
+    nonisolated subscript(byIEEE754: Double) -> Int { 0 }
 }
 
 func attemptAccess<T, V>(_ t : T, _ f : (T) -> V) -> V {
@@ -71,7 +69,6 @@ func tryKeypaths() {
     _ = \Door.unsafeGlobActor_mutable // okay for now
 
     _ = \Door.immutable
-    _ = \Door.unsafeIndependent
     _ = \Door.globActor_immutable
     _ = \Door.[4.2]
     _ = \Door.immutableNeighbor?.immutableNeighbor?.immutableNeighbor
