@@ -793,8 +793,9 @@ ERROR(serialization_fatal,Fatal,
       SWIFT_BUG_REPORT_MESSAGE,
       (StringRef))
 NOTE(serialization_misc_version,none,
-     "module '%0' full misc version is '%1'",
-     (StringRef, StringRef))
+     "module '%0' full misc version is '%1'"
+     "%select{ (built while allowing compiler errors)|}2",
+     (StringRef, StringRef, bool))
 NOTE(serialization_compatibility_version_mismatch,none,
      "compiling as Swift %0, with '%1' built as Swift %2 "
      "(this is supported but may expose additional compiler issues)",

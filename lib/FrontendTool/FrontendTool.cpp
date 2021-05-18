@@ -2046,6 +2046,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
+  Optional<llvm::PrettyStackTraceString> allowErrorsStackTrace;
+  if (Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
+    allowErrorsStackTrace.emplace("While allowing modules with compiler errors "
+                                  "enabled");
+
   // Make an array of PrettyStackTrace objects to dump the configuration files
   // we used to parse the arguments. These are RAII objects, so they and the
   // buffers they refer to must be kept alive in order to be useful. (That is,

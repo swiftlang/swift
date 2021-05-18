@@ -470,8 +470,12 @@ public:
       : PrettyStackTraceModuleFile("While reading from", module) {}
 
   void print(raw_ostream &os) const override {
-    os << Action << " \'" << getNameOfModule(&MF) << "'\n";
+    os << Action << " \'" << getNameOfModule(&MF) << "'";
+    outputModuleBuildInfo(os);
+    os << "\n";
   }
+
+  void outputModuleBuildInfo(raw_ostream &os) const;
 };
 
 class PrettyStackTraceModuleFileCore : public llvm::PrettyStackTraceEntry {
