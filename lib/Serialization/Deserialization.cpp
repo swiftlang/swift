@@ -169,8 +169,9 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Core->Name);
-    getContext().Diags.diagnose(SourceLoc(), diag::serialization_misc_version,
-      Core->Name, Core->MiscVersion);
+    getContext().Diags.diagnose(
+        SourceLoc(), diag::serialization_misc_version, Core->Name,
+        Core->MiscVersion, allowCompilerErrors());
 
     if (!Core->CompatibilityVersion.empty()) {
       if (getContext().LangOpts.EffectiveLanguageVersion
@@ -6713,4 +6714,10 @@ Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
       completionHandlerErrorParamIndex,
       completionHandlerErrorFlagParamIndex,
       errorFlagPolarity);
+}
+
+void serialization::PrettyStackTraceModuleFile::outputModuleBuildInfo(
+    raw_ostream &os) const {
+  if (MF.compiledAllowingCompilerErrors())
+    os << " (built while allowing compiler errors)";
 }
