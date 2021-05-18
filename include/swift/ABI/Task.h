@@ -113,13 +113,15 @@ public:
   /// Given that we've fully established the job context in the current
   /// thread, actually start running this job.  To establish the context
   /// correctly, call swift_job_run or runJobInExecutorContext.
+  SWIFT_CC(swiftasync)
   void runInFullyEstablishedContext();
 
   /// Given that we've fully established the job context in the
   /// current thread, and that the job is a simple (non-task) job,
   /// actually start running this job.
+  SWIFT_CC(swiftasync)
   void runSimpleInFullyEstablishedContext() {
-    RunJob(this);
+    return RunJob(this); // 'return' forces tail call
   }
 };
 
@@ -260,8 +262,9 @@ public:
   /// in the current thread, start running this task.  To establish
   /// the job context correctly, call swift_job_run or
   /// runInExecutorContext.
+  SWIFT_CC(swiftasync)
   void runInFullyEstablishedContext() {
-    ResumeTask(ResumeContext);
+    return ResumeTask(ResumeContext); // 'return' forces tail call
   }
   
   /// Check whether this task has been cancelled.
@@ -534,11 +537,12 @@ static_assert(alignof(AsyncTask) == 2 * alignof(void*),
 static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
               "AsyncTask::Id offset is wrong");
 
+SWIFT_CC(swiftasync)
 inline void Job::runInFullyEstablishedContext() {
   if (auto task = dyn_cast<AsyncTask>(this))
-    task->runInFullyEstablishedContext();
+    return task->runInFullyEstablishedContext(); // 'return' forces tail call
   else
-    runSimpleInFullyEstablishedContext();
+    return runSimpleInFullyEstablishedContext(); // 'return' forces tail call
 }
 
 /// An asynchronous context within a task.  Generally contexts are
