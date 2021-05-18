@@ -977,7 +977,7 @@ public func _runChildTask<T>(
 
   // Create the asynchronous task future.
   let (task, _) = Builtin.createAsyncTaskFuture(
-      flags.bits, operation)
+      Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
