@@ -586,13 +586,9 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (<LHS>)
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
-    auto Args = TupleExpr::create(
-        DC->getASTContext(), SourceLoc(), {LHS, &dummyRHS}, {}, {}, SourceLoc(),
-        /*hasTrailingClosure=*/false, /*isImplicit=*/true);
-    BinaryExpr binaryExpr(opExpr, Args, /*isImplicit=*/true);
-
-    return getTypeOfCompletionOperatorImpl(DC, &binaryExpr,
-                                           referencedDecl);
+    auto *binaryExpr = BinaryExpr::create(DC->getASTContext(), LHS, opExpr,
+                                          &dummyRHS, /*implicit*/ true);
+    return getTypeOfCompletionOperatorImpl(DC, binaryExpr, referencedDecl);
   }
 
   default:
@@ -778,7 +774,7 @@ static bool isForPatternMatch(SolutionApplicationTarget &target) {
     }
     if (id != target.getDeclContext()->getASTContext().Id_MatchOperator)
       return false;
-    return isa<CodeCompletionExpr>(BE->getArg()->getElement(0));
+    return isa<CodeCompletionExpr>(BE->getLHS());
   }
   return false;
 }

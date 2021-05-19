@@ -412,11 +412,11 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
       case ExprKind::Binary: {
         BinaryExpr *BinE = cast<BinaryExpr>(E);
         // Visit in source order.
-        if (!BinE->getArg()->getElement(0)->walk(*this))
+        if (!BinE->getLHS()->walk(*this))
           return {false, nullptr};
         if (!BinE->getFn()->walk(*this))
           return {false, nullptr};
-        if (!BinE->getArg()->getElement(1)->walk(*this))
+        if (!BinE->getRHS()->walk(*this))
           return {false, nullptr};
 
         // We already visited the children.
