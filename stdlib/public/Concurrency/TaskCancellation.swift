@@ -29,8 +29,8 @@ import Swift
 /// This function returns instantly and will never suspend.
 @available(SwiftStdlib 5.5, *)
 public func withTaskCancellationHandler<T>(
-  handler: @Sendable () -> (),
-  operation: () async throws -> T
+  operation: () async throws -> T,
+  onCancel handler: @Sendable () -> Void
 ) async rethrows -> T {
   let task = Builtin.getCurrentAsyncTask()
 
