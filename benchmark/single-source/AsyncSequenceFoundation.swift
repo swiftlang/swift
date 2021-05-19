@@ -20,8 +20,8 @@ import _Concurrency
 
 @available(macOS 9999, *)
 public let AsyncSequenceFoundation = [
-  BenchmarkInfo(name: "LoopbackLinesNaive",
-                runFunction: run_loopbackLines_naive,
+  BenchmarkInfo(name: "LoopbackLines",
+                runFunction: run_loopbackLines,
                 tags: [.concurrency]
                 )
 ]
@@ -110,7 +110,7 @@ func valueOrErrno<I: FixedWidthInteger>(
 //end of copy-pasted System bits
 
 @available(macOS 9999, *)
-actor IOActor {
+final actor IOActor {
   func createNSError(posixErrno: Errno, fileDescriptor: FileDescriptor, isReading: Bool = true) -> Error {
     return NSError(domain: NSPOSIXErrorDomain, code: Int(posixErrno.rawValue), userInfo: [:])
   }
@@ -135,9 +135,9 @@ actor IOActor {
 @available(macOS 9999, *)
 extension FileHandle {
   
-  struct NaiveAsyncBytes: AsyncSequence {
+  struct FakeAsyncBytes: AsyncSequence {
     typealias Element = UInt8
-    typealias AsyncIterator = FileHandle.NaiveAsyncBytes.Iterator
+    typealias AsyncIterator = FileHandle.FakeAsyncBytes.Iterator
     var handle: FileHandle
     
     internal init(file: FileHandle) {
@@ -148,9 +148,9 @@ extension FileHandle {
       return Iterator(file: handle)
     }
     
-    actor Iterator : AsyncSequence, AsyncIteratorProtocol {
+    final actor Iterator : AsyncSequence, AsyncIteratorProtocol {
       typealias Element = UInt8
-      typealias AsyncIterator = FileHandle.NaiveAsyncBytes.Iterator
+      typealias AsyncIterator = FileHandle.FakeAsyncBytes.Iterator
       var handle: FileHandle
       var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 16384, alignment: MemoryLayout<AnyObject>.alignment)
       var bufferRange = 0..<0
@@ -204,53 +204,100 @@ extension FileHandle {
     }
   }
   
-  var naiveBytes: NaiveAsyncBytes {
-    return NaiveAsyncBytes(file: self)
+  var fakeBytes: FakeAsyncBytes {
+    return FakeAsyncBytes(file: self)
   }
 }
 
 @available(macOS 9999, *)
-struct NaiveAsyncLineSequence<Base: AsyncSequence>: AsyncSequence, AsyncIteratorProtocol where Base.Element == UInt8 {
-  typealias AsyncIterator = NaiveAsyncLineSequence<Base>
-  typealias Element = String
+struct FakeAsyncLineSequence<Base: AsyncSequence>: AsyncSequence, AsyncIteratorProtocol where Base.Element == UInt8 {
+  public typealias AsyncIterator = AsyncLineSequence<Base>
+  public typealias Element = String
   
-  var remaining: NaiveAsyncCharacterSequence<Base>.AsyncIterator
-  var inProgressResult = ""
+  var byteSource: Base.AsyncIterator
   
-  mutating func next() async throws -> String? {
-    while let char = try await remaining.next() {
-      if char.isNewline {
-        defer {
-          inProgressResult = ""
-        }
-        if inProgressResult.isEmpty {
-          continue
-        }
-        return inProgressResult
+  //We should see if this is faster as a local after fixing stack promotion
+  var buffer: Array<UInt8> = []
+  
+  public mutating func next() async throws -> String? {
+      /*
+       0D 0A: CR-LF
+       0A | 0B | 0C | 0D: LF, VT, FF, CR
+       E2 80 A8:  U+2028 (LINE SEPARATOR)
+       E2 80 A9:  U+2029 (PARAGRAPH SEPARATOR)
+       */
+      let _CR: UInt8 = 0x0D
+      let _LF: UInt8 = 0x0A
+      let _SEPARATOR_PREFIX: UInt8 = 0xE2
+      let _SEPARATOR_CONTINUATION: UInt8 = 0x80
+      let _SEPARATOR_SUFFIX_LINE: UInt8 = 0xA8
+      let _SEPARATOR_SUFFIX_PARAGRAPH: UInt8 = 0xA9
+    
+      func yield() -> String? {
+          defer {
+              buffer.removeAll(keepingCapacity: true)
+          }
+          return String(decoding: buffer, as: UTF8.self)
       }
-      inProgressResult.append(char)
-    }
-    if inProgressResult.isEmpty {
+      
+      while let first = try await byteSource.next() {
+          switch first {
+          case _CR:
+              let result = yield()
+              // Swallow up any subsequent LF
+              guard let next = try await byteSource.next() else { return nil }
+              if next != _LF { buffer.append(next) }
+              return result
+          case _LF..<_CR:
+              return yield()
+          case _SEPARATOR_PREFIX:
+              // Try to read: 80 [A8 | A9].
+              // If we can't, then we put the byte in the buffer for error correction
+              guard let next = try await byteSource.next() else {
+                  buffer.append(first)
+                  return yield()
+              }
+              guard next == _SEPARATOR_CONTINUATION else {
+                  buffer.append(first)
+                  buffer.append(next)
+                  continue
+              }
+              guard let fin = try await byteSource.next() else {
+                  buffer.append(first)
+                  buffer.append(next)
+                  return yield()
+                  
+              }
+              guard fin == _SEPARATOR_SUFFIX_LINE || fin == _SEPARATOR_SUFFIX_PARAGRAPH else {
+                  buffer.append(first)
+                  buffer.append(next)
+                  buffer.append(fin)
+                  continue
+              }
+              return yield()
+          default:
+              buffer.append(first)
+          }
+      }
+      // Don't emit an empty newline when there is no more content (e.g. end of file)
+      if !buffer.isEmpty {
+          return yield()
+      }
       return nil
-    }
-    defer {
-      inProgressResult = ""
-    }
-    return inProgressResult
   }
   
-  func makeAsyncIterator() -> NaiveAsyncLineSequence<Base> {
-    return self
+  public func makeAsyncIterator() -> AsyncLineSequence<Base> {
+      return self
   }
   
   internal init(underlyingSequence: Base) {
-    remaining = NaiveAsyncCharacterSequence(underlyingSequence: underlyingSequence).makeAsyncIterator()
+      byteSource = underlyingSequence.makeAsyncIterator()
   }
 }
 
 @available(macOS 9999, *)
-struct NaiveAsyncUnicodeScalarSequence<Base: AsyncSequence>: AsyncSequence, AsyncIteratorProtocol where Base.Element == UInt8 {
-  typealias AsyncIterator = NaiveAsyncUnicodeScalarSequence<Base>
+struct FakeAsyncUnicodeScalarSequence<Base: AsyncSequence>: AsyncSequence, AsyncIteratorProtocol where Base.Element == UInt8 {
+  typealias AsyncIterator = FakeAsyncUnicodeScalarSequence<Base>
   typealias Element = UnicodeScalar
   
   var remaining: Base.AsyncIterator
@@ -285,7 +332,7 @@ struct NaiveAsyncUnicodeScalarSequence<Base: AsyncSequence>: AsyncSequence, Asyn
     return nil
   }
   
-  func makeAsyncIterator() -> NaiveAsyncUnicodeScalarSequence<Base> {
+  func makeAsyncIterator() -> FakeAsyncUnicodeScalarSequence<Base> {
     return self
   }
   
@@ -295,11 +342,11 @@ struct NaiveAsyncUnicodeScalarSequence<Base: AsyncSequence>: AsyncSequence, Asyn
 }
 
 @available(macOS 9999, *)
-struct NaiveAsyncCharacterSequence<Base: AsyncSequence>: AsyncSequence, AsyncIteratorProtocol where Base.Element == UInt8 {
-  typealias AsyncIterator = NaiveAsyncCharacterSequence<Base>
+struct FakeAsyncCharacterSequence<Base: AsyncSequence>: AsyncSequence, AsyncIteratorProtocol where Base.Element == UInt8 {
+  typealias AsyncIterator = FakeAsyncCharacterSequence<Base>
   typealias Element = Character
   
-  var remaining: NaiveAsyncUnicodeScalarSequence<Base>.AsyncIterator
+  var remaining: FakeAsyncUnicodeScalarSequence<Base>.AsyncIterator
   var accumulator = ""
   
   @inline(__always)
@@ -313,27 +360,27 @@ struct NaiveAsyncCharacterSequence<Base: AsyncSequence>: AsyncSequence, AsyncIte
     return accumulator.count > 0 ? accumulator.removeFirst() : nil
   }
   
-  func makeAsyncIterator() -> NaiveAsyncCharacterSequence<Base> {
+  func makeAsyncIterator() -> FakeAsyncCharacterSequence<Base> {
     return self
   }
   
   internal init(underlyingSequence: Base) {
-    remaining = NaiveAsyncUnicodeScalarSequence(underlyingSequence: underlyingSequence).makeAsyncIterator()
+    remaining = FakeAsyncUnicodeScalarSequence(underlyingSequence: underlyingSequence).makeAsyncIterator()
   }
 }
 
 @available(macOS 9999, *)
 extension AsyncSequence where Self.Element == UInt8 {
-  var naiveLines: NaiveAsyncLineSequence<Self> {
-    NaiveAsyncLineSequence(underlyingSequence: self)
+  var fakeLines: FakeAsyncLineSequence<Self> {
+    FakeAsyncLineSequence(underlyingSequence: self)
   }
   
-  var naiveCharacters: NaiveAsyncCharacterSequence<Self> {
-    NaiveAsyncCharacterSequence(underlyingSequence: self)
+  var fakeCharacters: FakeAsyncCharacterSequence<Self> {
+    FakeAsyncCharacterSequence(underlyingSequence: self)
   }
   
-  var naiveUnicodeScalars: NaiveAsyncUnicodeScalarSequence<Self> {
-    NaiveAsyncUnicodeScalarSequence(underlyingSequence: self)
+  var fakeUnicodeScalars: FakeAsyncUnicodeScalarSequence<Self> {
+    FakeAsyncUnicodeScalarSequence(underlyingSequence: self)
   }
 }
 
@@ -342,7 +389,7 @@ extension AsyncSequence where Self.Element == UInt8 {
  of Async{Line, Character, UnicodeScalar}Sequence
  */
 @available(macOS 9999, *)
-public func run_loopbackLines_naive(_ N: Int) async {
+public func run_loopbackLines_fake(_ N: Int) async {
   let pipe = Pipe()
   let reader = pipe.fileHandleForReading
   let writer = pipe.fileHandleForWriting
@@ -358,7 +405,7 @@ public func run_loopbackLines_naive(_ N: Int) async {
   }
   
   do {
-    for try await line in reader.naiveBytes.naiveLines {
+    for try await line in reader.fakeBytes.fakeLines {
       blackHole(line)
     }
     try reader.close()
