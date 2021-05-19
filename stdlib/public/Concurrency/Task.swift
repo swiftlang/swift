@@ -87,9 +87,26 @@ extension Task {
   /// If the task gets cancelled internally, e.g. by checking for cancellation
   /// and throwing a specific error or using `checkCancellation` the error
   /// thrown out of the task will be re-thrown here.
-  public func get() async throws -> Success {
-    return try await _taskFutureGetThrowing(_task)
+  public var value: Success {
+    get async throws {
+      return try await _taskFutureGetThrowing(_task)
+    }
   }
+
+  /// Wait for the task to complete, returning (or throwing) its result.
+  ///
+  /// ### Priority
+  /// If the task has not completed yet, its priority will be elevated to the
+  /// priority of the current task. Note that this may not be as effective as
+  /// creating the task with the "right" priority to in the first place.
+  ///
+  /// ### Cancellation
+  /// If the awaited on task gets cancelled externally the `get()` will throw
+  /// a cancellation error.
+  ///
+  /// If the task gets cancelled internally, e.g. by checking for cancellation
+  /// and throwing a specific error or using `checkCancellation` the error
+  /// thrown out of the task will be re-thrown here.
 
   /// Wait for the task to complete, returning its `Result`.
   ///
@@ -105,11 +122,13 @@ extension Task {
   /// If the task gets cancelled internally, e.g. by checking for cancellation
   /// and throwing a specific error or using `checkCancellation` the error
   /// thrown out of the task will be re-thrown here.
-  public func getResult() async -> Result<Success, Failure> {
-    do {
-      return .success(try await get())
-    } catch {
-      return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
+  public var result: Result<Success, Failure> {
+    get async {
+      do {
+        return .success(try await get())
+      } catch {
+        return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
+      }
     }
   }
 
@@ -142,8 +161,10 @@ extension Task where Failure == Never {
   /// way than throwing a `CancellationError`, e.g. it could provide a neutral
   /// value of the `Success` type, or encode that cancellation has occurred in
   /// that type itself.
-  public func get() async -> Success {
-    return await _taskFutureGet(_task)
+  public var value: Success {
+    get async {
+      return await _taskFutureGet(_task)
+    }
   }
 }
 
