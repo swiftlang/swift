@@ -206,7 +206,7 @@ fileprivate func _allocate<T: AnyObject>(
   let totalTailBytes = total - numHeaderBytes
 
   let object = tailAllocator(totalTailBytes)
-  if let allocSize = _mallocSizeIfHeap(ofAllocation:
+  if let allocSize = _mallocSize(ofAllocation:
     UnsafeRawPointer(Builtin.bridgeToRawPointer(object))) {
     _internalInvariant(allocSize % MemoryLayout<Int>.stride == 0)
 

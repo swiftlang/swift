@@ -45,9 +45,11 @@ internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
   return _swift_stdlib_has_malloc_size() ? _swift_stdlib_malloc_size(ptr) : nil
 }
 
-@inline(__always) @inlinable @_effects(readonly)
-internal func _mallocSizeIfHeap(ofAllocation ptr: UnsafeRawPointer) -> Int? {
-  if Builtin.isOnStack(ptr) { return nil }
-  return _mallocSize(ofAllocation: ptr)
+@_transparent @inlinable @_effects(readonly)
+internal func _mallocSizeIfHeap(of object: AnyObject) -> Int? {
+  if Bool(Builtin.isOnStack(_nativeObject(fromNative: object))) { return nil }
+  return _mallocSize(
+    ofAllocation: UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
+  )
 }
 
