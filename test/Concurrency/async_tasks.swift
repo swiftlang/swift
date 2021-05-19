@@ -95,7 +95,7 @@ func test_detached() async throws {
     await someAsyncFunc() // able to call async functions
   }
 
-  let result: String = await handle.get()
+  let result: String = await handle.value
   _ = result
 }
 
@@ -106,7 +106,7 @@ func test_detached_throwing() async -> String {
   }
 
   do {
-    return try await handle.get()
+    return try await handle.value
   } catch {
     print("caught: \(error)")
   }

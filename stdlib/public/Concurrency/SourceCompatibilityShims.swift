@@ -165,6 +165,30 @@ extension Task where Success == Never, Failure == Never {
 }
 
 @available(SwiftStdlib 5.5, *)
+extension Task {
+  @available(*, deprecated, message: "get() has been replaced by .value")
+  @_alwaysEmitIntoClient
+  public func get() async throws -> Success {
+    return try await value
+  }
+
+  @available(*, deprecated, message: "getResult() has been replaced by .result")
+  @_alwaysEmitIntoClient
+  public func getResult() async -> Result<Success, Failure>  {
+    return await result
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+extension Task where Failure == Never {
+  @available(*, deprecated, message: "get() has been replaced by .value")
+  @_alwaysEmitIntoClient
+  public func get() async -> Success {
+    return await value
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
 extension TaskGroup {
   @available(*, deprecated, renamed: "async(priority:operation:)")
   @_alwaysEmitIntoClient
