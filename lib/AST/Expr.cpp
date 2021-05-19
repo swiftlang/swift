@@ -1768,6 +1768,14 @@ Expr *CallExpr::getDirectCallee() const {
   }
 }
 
+BinaryExpr *BinaryExpr::create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
+                               bool implicit, Type ty) {
+  auto *packedArg = TupleExpr::createImplicit(ctx, {lhs, rhs}, /*labels*/ {});
+  computeSingleArgumentType(ctx, packedArg, /*implicit*/ true,
+                            [](Expr *E) { return E->getType(); });
+  return new (ctx) BinaryExpr(fn, packedArg, implicit, ty);
+}
+
 SourceLoc DotSyntaxCallExpr::getLoc() const {
   if (isImplicit()) {
     SourceLoc baseLoc = getBase()->getLoc();

@@ -1590,11 +1590,8 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                     /*implicit*/ true, AccessSemantics::Ordinary, fnType);
     auto *oneExpr = IntegerLiteralExpr::createFromUnsigned(C, 1);
 
-    auto *tupleExpr = TupleExpr::createImplicit(C, {keysCountExpr, oneExpr},
-                                                {Identifier(), Identifier()});
-
-    auto *cmpExpr =
-        new (C) BinaryExpr(cmpFuncExpr, tupleExpr, /*implicit*/ true);
+    auto *cmpExpr = BinaryExpr::create(C, keysCountExpr, cmpFuncExpr, oneExpr,
+                                       /*implicit*/ true);
     cmpExpr->setThrows(false);
 
     auto *guardBody = BraceStmt::create(C, SourceLoc(), {throwStmt},
