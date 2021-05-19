@@ -428,62 +428,28 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
 
 bool GenericSignatureImpl::isRequirementSatisfied(
     Requirement requirement) const {
-  auto GSB = getGenericSignatureBuilder();
+  if (requirement.getFirstType()->hasTypeParameter()) {
+    auto *genericEnv = getGenericEnvironment();
 
-  auto firstType = requirement.getFirstType();
-  auto canFirstType = getCanonicalTypeInContext(firstType);
+    auto substituted = requirement.subst(
+        [&](SubstitutableType *type) -> Type {
+          if (auto *paramType = type->getAs<GenericTypeParamType>())
+            return genericEnv->mapTypeIntoContext(paramType);
 
-  switch (requirement.getKind()) {
-  case RequirementKind::Conformance: {
-    auto *protocol = requirement.getProtocolDecl();
+          return type;
+        },
+        LookUpConformanceInSignature(this));
 
-    if (canFirstType->isTypeParameter())
-      return requiresProtocol(canFirstType, protocol);
-    else
-      return (bool)GSB->lookupConformance(canFirstType, protocol);
-  }
-
-  case RequirementKind::SameType: {
-    auto canSecondType = getCanonicalTypeInContext(requirement.getSecondType());
-    return canFirstType->isEqual(canSecondType);
-  }
-
-  case RequirementKind::Superclass: {
-    auto requiredSuperclass =
-        getCanonicalTypeInContext(requirement.getSecondType());
-
-    // The requirement could be in terms of type parameters like a user-written
-    // requirement, but it could also be in terms of concrete types if it has
-    // been substituted/otherwise 'resolved', so we need to handle both.
-    auto baseType = canFirstType;
-    if (baseType->isTypeParameter()) {
-      auto directSuperclass = getSuperclassBound(baseType);
-      if (!directSuperclass)
-        return false;
-
-      baseType = getCanonicalTypeInContext(directSuperclass);
-    }
-
-    return requiredSuperclass->isExactSuperclassOf(baseType);
-  }
-
-  case RequirementKind::Layout: {
-    auto requiredLayout = requirement.getLayoutConstraint();
-
-    if (canFirstType->isTypeParameter()) {
-      if (auto layout = getLayoutConstraint(canFirstType))
-        return static_cast<bool>(layout.merge(requiredLayout));
-
+    if (!substituted)
       return false;
-    }
 
-    // The requirement is on a concrete type, so it's either globally correct
-    // or globally incorrect, independent of this generic context. The latter
-    // case should be diagnosed elsewhere, so let's assume it's correct.
-    return true;
+    requirement = *substituted;
   }
-  }
-  llvm_unreachable("unhandled kind");
+
+  // FIXME: Need to check conditional requirements here.
+  ArrayRef<Requirement> conditionalRequirements;
+
+  return requirement.isSatisfied(conditionalRequirements);
 }
 
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
@@ -494,7 +460,7 @@ SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
   if (otherSig.getPointer() == this) return result;
 
   // If there is no other signature, no requirements are satisfied.
-  if (!otherSig){
+  if (!otherSig) {
     const auto reqs = getRequirements();
     result.append(reqs.begin(), reqs.end());
     return result;
@@ -721,4 +687,68 @@ Requirement Requirement::getCanonical() const {
 ProtocolDecl *Requirement::getProtocolDecl() const {
   assert(getKind() == RequirementKind::Conformance);
   return getSecondType()->castTo<ProtocolType>()->getDecl();
+}
+
+bool
+Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements) const {
+  switch (getKind()) {
+  case RequirementKind::Conformance: {
+    auto *proto = getProtocolDecl();
+    auto *module = proto->getParentModule();
+    auto conformance = module->lookupConformance(getFirstType(), proto);
+    if (!conformance)
+      return false;
+
+    conditionalRequirements = conformance.getConditionalRequirements();
+    return true;
+  }
+
+  case RequirementKind::Layout: {
+    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      return (layout && layout.merge(getLayoutConstraint()));
+    }
+
+    if (getLayoutConstraint()->isClass())
+      return getFirstType()->satisfiesClassConstraint();
+
+    // TODO: Statically check other layout constraints, once they can
+    // be spelled in Swift.
+    return true;
+  }
+
+  case RequirementKind::Superclass:
+    return getSecondType()->isExactSuperclassOf(getFirstType());
+
+  case RequirementKind::SameType:
+    return getFirstType()->isEqual(getSecondType());
+  }
+
+  llvm_unreachable("Bad requirement kind");
+}
+
+bool Requirement::canBeSatisfied() const {
+  switch (getKind()) {
+  case RequirementKind::Conformance:
+    return getFirstType()->is<ArchetypeType>();
+
+  case RequirementKind::Layout: {
+    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      return (!layout || layout.merge(getLayoutConstraint()));
+    }
+
+    return false;
+  }
+
+  case RequirementKind::Superclass:
+    return (getFirstType()->isBindableTo(getSecondType()) ||
+            getSecondType()->isBindableTo(getFirstType()));
+
+  case RequirementKind::SameType:
+    return (getFirstType()->isBindableTo(getSecondType()) ||
+            getSecondType()->isBindableTo(getFirstType()));
+  }
+
+  llvm_unreachable("Bad requirement kind");
 }

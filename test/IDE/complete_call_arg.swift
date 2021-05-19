@@ -98,6 +98,11 @@ class C1 {
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: oi2[#Int?#]; name=oi2
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: oi1[#Int?#]; name=oi1
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule:         os1[#String?#]; name=os1
+// EXPECT_OINT-DAG: Keyword[try]/None: try; name=try
+// EXPECT_OINT-DAG: Keyword[try]/None: try!; name=try!
+// EXPECT_OINT-DAG: Keyword[try]/None: try?; name=try?
+// EXPECT_OINT-DAG: Keyword/None: await; name=await
+// EXPECT_OINT-NOT: Keyword[super]
 // EXPECT_OINT: End completions
 
 // EXPECT_INT: Begin completions
@@ -112,6 +117,11 @@ class C1 {
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         oi1[#Int?#]; name=oi1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         oi2[#Int?#]; name=oi2
+// EXPECT_INT-DAG: Keyword[try]/None: try; name=try
+// EXPECT_INT-DAG: Keyword[try]/None: try!; name=try!
+// EXPECT_INT-DAG: Keyword[try]/None: try?; name=try?
+// EXPECT_INT-DAG: Keyword/None: await; name=await
+// EXPECT_INT-NOT: Keyword[super]
 // EXPECT_INT: End completions
 
 class C2 {
@@ -140,6 +150,11 @@ class C2 {
 // EXPECT_OSTRING-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: ostringGen()[#String?#]; name=ostringGen()
 // EXPECT_OSTRING-DAG: Decl[GlobalVar]/CurrModule:         i1[#Int#]; name=i1
 // EXPECT_OSTRING-DAG: Decl[GlobalVar]/CurrModule:         i2[#Int#]; name=i2
+// EXPECT_OSTRING-DAG: Keyword[try]/None: try; name=try
+// EXPECT_OSTRING-DAG: Keyword[try]/None: try!; name=try!
+// EXPECT_OSTRING-DAG: Keyword[try]/None: try?; name=try?
+// EXPECT_OSTRING-DAG: Keyword/None: await; name=await
+// EXPECT_OSTRING-NOT: Keyword[super]
 // EXPECT_OSTRING: End completions
 
 // EXPECT_STRING: Begin completions
@@ -151,6 +166,11 @@ class C2 {
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule:         os1[#String?#]; name=os1
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
+// EXPECT_STRING-DAG: Keyword[try]/None: try; name=try
+// EXPECT_STRING-DAG: Keyword[try]/None: try!; name=try!
+// EXPECT_STRING-DAG: Keyword[try]/None: try?; name=try?
+// EXPECT_STRING-DAG: Keyword/None: await; name=await
+// EXPECT_STRING-NOT: Keyword[super]
 // EXPECT_STRING: End completions
 
 func foo2(_ a : C1, b1 : C2) {}
@@ -318,6 +338,11 @@ class C4 {
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
 // MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+// MEMBER1-NOT: Keyword[try]/None: try; name=try
+// MEMBER1-NOT: Keyword[try]/None: try!; name=try!
+// MEMBER1-NOT: Keyword[try]/None: try?; name=try?
+// MEMBER1-NOT: Keyword/None: await; name=await
+// MEMBER1-NOT: Keyword[super]
 
 // MEMBER2: Begin completions
 // MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]; name=IntGen()
@@ -364,6 +389,16 @@ class C4 {
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]
+
+class C5 {}
+class C6 : C5 {
+  func f1() {
+    foo(3, b: #^ARGSUPER?check=EXPECT-SUPER^#)
+  }
+}
+
+// EXPECT-SUPER: Begin completions
+// EXPECT-SUPER-DAG: Keyword[super]/CurrNominal: super[#C5#]; name=super
 
 func firstArg(arg1 arg1: Int, arg2: Int) {}
 func testArg1Name1() {
@@ -485,6 +520,11 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
 // SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s1[#String#]; name=s1
 // SUBSCRIPT_1-DAG: Decl[GlobalVar]/CurrModule: s2[#String#]; name=s2
+// SUBSCRIPT_1-DAG: Keyword[try]/None: try; name=try
+// SUBSCRIPT_1-DAG: Keyword[try]/None: try!; name=try!
+// SUBSCRIPT_1-DAG: Keyword[try]/None: try?; name=try?
+// SUBSCRIPT_1-DAG: Keyword/None: await; name=await
+// SUBSCRIPT_1-NOT: Keyword[super]
 
   let _ = obj[.#^SUBSCRIPT_1_DOT^#
 // SUBSCRIPT_1_DOT: Begin completions
@@ -509,6 +549,11 @@ func testSubscript(obj: HasSubscript, intValue: Int, strValue: String) {
 // SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule: i2[#Int#]; name=i2
 // SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s1[#String#]; name=s1
 // SUBSCRIPT_3-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
+// SUBSCRIPT_3-DAG: Keyword[try]/None: try; name=try
+// SUBSCRIPT_3-DAG: Keyword[try]/None: try!; name=try!
+// SUBSCRIPT_3-DAG: Keyword[try]/None: try?; name=try?
+// SUBSCRIPT_3-DAG: Keyword/None: await; name=await
+// SUBSCRIPT_3-NOT: Keyword[super]
 
   let _ = obj[42, default: .#^SUBSCRIPT_3_DOT^#
 // SUBSCRIPT_3_DOT: Begin completions
@@ -932,4 +977,24 @@ func testGenericConstructor() {
 // GENERIC_INITIALIZER: Begin completions, 1 item
 // GENERIC_INITIALIZER-DAG: Pattern/ExprSpecific:               {#text: String#}[#String#]
 // GENERIC_INITIALIZER: End completions
+}
+
+struct Rdar77867723 {
+  enum Horizontal { case east, west }
+  enum Vertical { case up, down }
+  func fn(aaa: Horizontal = .east, bbb: Vertical = .up) {}
+  func fn(ccc: Vertical = .up, ddd: Horizontal = .west) {}
+  func test1 {
+    self.fn(ccc: .up, #^OVERLOAD_LABEL1^#)
+// OVERLOAD_LABEL1: Begin completions, 1 items
+// OVERLOAD_LABEL1-DAG: Pattern/ExprSpecific:               {#ddd: Horizontal#}[#Horizontal#];
+// OVERLOAD_LABEL1: End completions
+  }
+  func test2 {
+    self.fn(eee: .up, #^OVERLOAD_LABEL2^#)
+// OVERLOAD_LABEL2: Begin completions, 2 items
+// OVERLOAD_LABEL2-DAG: Pattern/ExprSpecific:               {#bbb: Vertical#}[#Vertical#];
+// OVERLOAD_LABEL2-DAG: Pattern/ExprSpecific:               {#ddd: Horizontal#}[#Horizontal#];
+// OVERLOAD_LABEL2: End completions
+  }
 }

@@ -1743,6 +1743,7 @@
       key.line: 71,
       key.column: 5,
       key.severity: source.diagnostic.severity.error,
+      key.id: "getset_nontrivial_pattern",
       key.description: "getter/setter can only be defined for a single variable",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
@@ -1750,6 +1751,7 @@
       key.line: 77,
       key.column: 1,
       key.severity: source.diagnostic.severity.error,
+      key.id: "c_style_for_stmt_removed",
       key.description: "C-style for statement has been removed in Swift 3",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.ranges: [
@@ -1763,6 +1765,7 @@
       key.line: 116,
       key.column: 1,
       key.severity: source.diagnostic.severity.error,
+      key.id: "expected_keyword_in_decl",
       key.description: "expected 'func' keyword in instance method declaration",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.fixits: [
@@ -1777,6 +1780,7 @@
       key.line: 143,
       key.column: 12,
       key.severity: source.diagnostic.severity.error,
+      key.id: "initializer_decl_wrong_scope",
       key.description: "initializers may only be declared within a type",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
@@ -1784,6 +1788,7 @@
       key.line: 147,
       key.column: 1,
       key.severity: source.diagnostic.severity.error,
+      key.id: "destructor_decl_outside_class",
       key.description: "deinitializers may only be declared within a class",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     }

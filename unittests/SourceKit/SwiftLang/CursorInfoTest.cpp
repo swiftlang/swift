@@ -367,7 +367,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
+// This test is failing occassionally in CI: rdar://55314062
+TEST_F(CursorInfoTest, DISABLED_CursorInfoMustWaitDueTokenRace) {
   const char *DocName = "test.swift";
   const char *Contents = "let value = foo\n"
                          "let foo = 0\n";

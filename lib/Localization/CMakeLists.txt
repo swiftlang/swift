@@ -4,3 +4,5 @@ add_swift_host_library(swiftLocalization STATIC
 
   LLVM_LINK_COMPONENTS
     support)
+target_link_libraries(swiftLocalization PRIVATE
+  swiftAST)

@@ -25,6 +25,7 @@ class raw_ostream;
 
 namespace swift {
 class DeclContext;
+class ModuleDecl;
 class NominalTypeDecl;
 class SubstitutionMap;
 
@@ -33,7 +34,7 @@ class SubstitutionMap;
 bool areTypesEqual(Type type1, Type type2);
 
 /// Determine whether the given type is suitable as a concurrent value type.
-bool isSendableType(const DeclContext *dc, Type type);
+bool isSendableType(ModuleDecl *module, Type type);
 
 /// Describes the actor isolation of a given declaration, which determines
 /// the actors with which it can interact.

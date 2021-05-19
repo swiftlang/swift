@@ -130,6 +130,7 @@
       key.column: 7,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
+      key.id: "number_cant_start_decl_name",
       key.description: "class name can only start with a letter or underscore, not a number",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
@@ -138,6 +139,7 @@
       key.column: 1,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
+      key.id: "statement_begins_with_closure",
       key.description: "top-level statement cannot begin with a closure expression",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse
     },
@@ -146,6 +148,7 @@
       key.column: 1,
       key.filepath: invalid.swift,
       key.severity: source.diagnostic.severity.error,
+      key.id: "expected_closure_rbrace",
       key.description: "expected '}' at end of closure",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.diagnostics: [
@@ -154,6 +157,7 @@
           key.column: 1,
           key.filepath: invalid.swift,
           key.severity: source.diagnostic.severity.note,
+          key.id: "opening_brace",
           key.description: "to match this opening '{'"
         }
       ]

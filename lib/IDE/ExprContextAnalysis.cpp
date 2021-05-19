@@ -771,22 +771,22 @@ static Expr *getArgAtPosition(Expr *Args, unsigned Position) {
 /// be different than the position in \p Args if there are defaulted arguments
 /// in \p Params which don't occur in \p Args.
 ///
-/// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
-static bool getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
-                                ArrayRef<AnyFunctionType::Param> Params,
-                                unsigned &PosInParams) {
+/// \returns the position index number on success, \c None if \p CCExpr is not
+/// a part of \p Args.
+static Optional<unsigned>
+getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                    ArrayRef<AnyFunctionType::Param> Params, bool Lenient) {
   if (isa<ParenExpr>(Args)) {
-    PosInParams = 0;
-    return true;
+    return 0;
   }
 
   auto *tuple = dyn_cast<TupleExpr>(Args);
   if (!tuple) {
-    return false;
+    return None;
   }
 
   auto &SM = DC.getASTContext().SourceMgr;
-  PosInParams = 0;
+  unsigned PosInParams = 0;
   unsigned PosInArgs = 0;
   bool LastParamWasVariadic = false;
   // We advance PosInArgs until we find argument that is after the code
@@ -847,16 +847,22 @@ static bool getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
     }
 
     if (!AdvancedPosInParams) {
-      // We haven't performed any special advance logic. Assume the argument
-      // and parameter match, so advance PosInParams by 1.
-      ++PosInParams;
+      if (Lenient) {
+        // We haven't performed any special advance logic. Assume the argument
+        // and parameter match, so advance PosInParams by 1.
+        PosInParams += 1;
+      } else {
+        // If there is no matching argument label. These arguments can't be
+        // applied to the params.
+        return None;
+      }
     }
   }
   if (PosInArgs < tuple->getNumElements() && PosInParams < Params.size()) {
     // We didn't search until the end, so we found a position in Params. Success
-    return true;
+    return PosInParams;
   } else {
-    return false;
+    return None;
   }
 }
 
@@ -947,21 +953,45 @@ class ExprContextAnalyzer {
       }
       SmallPtrSet<CanType, 4> seenTypes;
       llvm::SmallSet<std::pair<Identifier, CanType>, 4> seenArgs;
-      for (auto &typeAndDecl : Candidates) {
-        DeclContext *memberDC = nullptr;
-        if (typeAndDecl.Decl)
-          memberDC = typeAndDecl.Decl->getInnermostDeclContext();
+      llvm::SmallVector<Optional<unsigned>, 2> posInParams;
+      {
+        bool found = false;
+        for (auto &typeAndDecl : Candidates) {
+          Optional<unsigned> pos = getPositionInParams(
+              *DC, Args, ParsedExpr, typeAndDecl.Type->getParams(),
+              /*lenient=*/false);
+          posInParams.push_back(pos);
+          found |= pos.hasValue();
+        }
+        if (!found) {
+          // If applicable overload is not found, retry with considering
+          // non-matching argument labels mis-typed.
+          for (auto i : indices(Candidates)) {
+            posInParams[i] = getPositionInParams(
+                *DC, Args, ParsedExpr, Candidates[i].Type->getParams(),
+                /*lenient=*/true);
+          }
+        }
+      }
+      assert(posInParams.size() == Candidates.size());
 
-        auto Params = typeAndDecl.Type->getParams();
-        unsigned PositionInParams;
-        if (!getPositionInParams(*DC, Args, ParsedExpr, Params,
-                                 PositionInParams)) {
+      for (auto i : indices(Candidates)) {
+        if (!posInParams[i].hasValue()) {
           // If the argument doesn't have a matching position in the parameters,
           // indicate that with optional nullptr param.
           if (seenArgs.insert({Identifier(), CanType()}).second)
             recordPossibleParam(nullptr, /*isRequired=*/false);
           continue;
         }
+
+        auto &typeAndDecl = Candidates[i];
+        DeclContext *memberDC = nullptr;
+        if (typeAndDecl.Decl)
+          memberDC = typeAndDecl.Decl->getInnermostDeclContext();
+
+        auto Params = typeAndDecl.Type->getParams();
+        auto PositionInParams = *posInParams[i];
+
         ParameterList *paramList = nullptr;
         if (auto VD = typeAndDecl.Decl) {
           paramList = getParameterList(VD);

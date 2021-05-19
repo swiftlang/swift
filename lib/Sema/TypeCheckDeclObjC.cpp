@@ -407,8 +407,8 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   case ActorIsolationRestriction::CrossActorSelf:
     // FIXME: Substitution map?
     diagnoseNonConcurrentTypesInReference(
-        const_cast<ValueDecl *>(VD), VD->getDeclContext(), VD->getLoc(),
-        ConcurrentReferenceKind::CrossActor, behavior);
+        const_cast<ValueDecl *>(VD), VD->getDeclContext()->getParentModule(),
+        VD->getLoc(), ConcurrentReferenceKind::CrossActor, behavior);
     return false;
   case ActorIsolationRestriction::ActorSelf:
     // Actor-isolated functions cannot be @objc.

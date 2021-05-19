@@ -6067,6 +6067,18 @@ void GenericSignatureBuilder::checkIfRequirementCanBeDerived(
   }
 }
 
+static bool involvesNonSelfSubjectTypes(const RequirementSource *source) {
+  while (source->kind != RequirementSource::RequirementSignatureSelf) {
+    if (source->isProtocolRequirement() &&
+        !source->getStoredType()->is<GenericTypeParamType>())
+      return true;
+
+    source = source->parent;
+  }
+
+  return false;
+}
+
 void GenericSignatureBuilder::computeRedundantRequirements(
     const ProtocolDecl *requirementSignatureSelfProto) {
   assert(!Impl->computedRedundantRequirements &&
@@ -6126,10 +6138,27 @@ void GenericSignatureBuilder::computeRedundantRequirements(
       auto found = equivClass->conformsTo.find(proto);
       assert(found != equivClass->conformsTo.end());
 
+      // If this is a conformance requirement on 'Self', only consider it
+      // redundant if it can be derived from other sources involving 'Self'.
+      //
+      // What this means in practice is that we will never try to build
+      // a witness table for an inherited conformance from an associated
+      // conformance.
+      //
+      // This is important since witness tables for inherited conformances
+      // are realized eagerly before the witness table for the original
+      // conformance, and allowing more complex requirement sources for
+      // inherited conformances could introduce cycles at runtime.
+      bool isProtocolRefinement =
+          (requirementSignatureSelfProto &&
+           equivClass->getAnchor(*this, { })->is<GenericTypeParamType>());
+
       checkIfRequirementCanBeDerived(
           req, found->second,
           requirementSignatureSelfProto,
           [&](const Constraint<ProtocolDecl *> &constraint) {
+            if (isProtocolRefinement)
+              return involvesNonSelfSubjectTypes(constraint.source);
             return false;
           });
 
@@ -6351,6 +6380,7 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
   processDelayedRequirements();
 
   computeRedundantRequirements(requirementSignatureSelfProto);
+  diagnoseProtocolRefinement(requirementSignatureSelfProto);
   diagnoseRedundantRequirements();
   diagnoseConflictingConcreteTypeRequirements(requirementSignatureSelfProto);
 
@@ -6926,6 +6956,50 @@ static bool isRedundantlyInheritableObjCProtocol(
   auto &ctx = proto->getASTContext();
   inheritingProto->getAttrs().add(new (ctx) RestatedObjCConformanceAttr(proto));
   return true;
+}
+
+/// Diagnose any conformance requirements on 'Self' that are not derived from
+/// the protocol's inheritance clause.
+void GenericSignatureBuilder::diagnoseProtocolRefinement(
+    const ProtocolDecl *requirementSignatureSelfProto) {
+  if (requirementSignatureSelfProto == nullptr)
+    return;
+
+  auto selfType = requirementSignatureSelfProto->getSelfInterfaceType();
+  auto *equivClass = resolveEquivalenceClass(
+      selfType, ArchetypeResolutionKind::AlreadyKnown);
+  assert(equivClass != nullptr);
+
+  for (auto pair : equivClass->conformsTo) {
+    auto *proto = pair.first;
+    bool found = false;
+    SourceLoc loc;
+    for (const auto &constraint : pair.second) {
+      if (!involvesNonSelfSubjectTypes(constraint.source)) {
+        found = true;
+        break;
+      }
+
+      auto *parent = constraint.source;
+      while (parent->kind != RequirementSource::RequirementSignatureSelf) {
+        loc = parent->getLoc();
+        if (loc)
+          break;
+      }
+    }
+
+    if (!found) {
+      requirementSignatureSelfProto->diagnose(
+          diag::missing_protocol_refinement,
+          const_cast<ProtocolDecl *>(requirementSignatureSelfProto),
+          proto);
+
+      if (loc.isValid()) {
+        Context.Diags.diagnose(loc, diag::redundant_conformance_here,
+                               selfType, proto);
+      }
+    }
+  }
 }
 
 void GenericSignatureBuilder::diagnoseRedundantRequirements() const {

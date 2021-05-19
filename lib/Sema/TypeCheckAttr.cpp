@@ -281,7 +281,6 @@ public:
 
   void visitActorAttr(ActorAttr *attr);
   void visitDistributedActorAttr(DistributedActorAttr *attr);
-  void visitActorIndependentAttr(ActorIndependentAttr *attr);
   void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr);
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
@@ -1231,9 +1230,9 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
-bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
+bool swift::isValidDynamicCallableMethod(FuncDecl *decl, ModuleDecl *module,
                                          bool hasKeywordArguments) {
-  auto &ctx = decl->getASTContext();
+  auto &ctx = module->getASTContext();
   // There are two cases to check.
   // 1. `dynamicallyCall(withArguments:)`.
   //    In this case, the method is valid if the argument has type `A` where
@@ -1254,7 +1253,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, DC);
+    return (bool)TypeChecker::conformsToProtocol(argType, arrayLitProto, module);
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -1263,11 +1262,11 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
     ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC);
+  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, module);
   if (dictConf.isInvalid())
     return false;
   auto keyType = dictConf.getTypeWitnessByName(argType, ctx.Id_Key);
-  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC);
+  return (bool)TypeChecker::conformsToProtocol(keyType, stringLitProtocol, module);
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1282,9 +1281,10 @@ static bool hasValidDynamicCallableMethod(NominalTypeDecl *decl,
   if (candidates.empty()) return false;
 
   // Filter valid candidates.
+  auto *module = decl->getParentModule();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) {
     auto candidate = cast<FuncDecl>(entry.getValueDecl());
-    return isValidDynamicCallableMethod(candidate, decl, hasKeywordArgs);
+    return isValidDynamicCallableMethod(candidate, module, hasKeywordArgs);
   });
 
   // If there are no valid candidates, return false.
@@ -1333,17 +1333,17 @@ static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                                DeclContext *DC,
+                                                ModuleDecl *module,
                                                 bool ignoreLabel) {
   // It could be
   // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
   // - `subscript(dynamicMember: String*)`
   return isValidKeyPathDynamicMemberLookup(decl, ignoreLabel) ||
-         isValidStringDynamicMemberLookup(decl, DC, ignoreLabel);
+         isValidStringDynamicMemberLookup(decl, module, ignoreLabel);
 }
 
 bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                             DeclContext *DC,
+                                             ModuleDecl *module,
                                              bool ignoreLabel) {
   auto &ctx = decl->getASTContext();
   // There are two requirements:
@@ -1356,11 +1356,9 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
   const auto *param = decl->getIndices()->get(0);
   auto paramType = param->getType();
 
-  auto stringLitProto =
-    ctx.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
-
   // If this is `subscript(dynamicMember: String*)`
-  return (bool)TypeChecker::conformsToProtocol(paramType, stringLitProto, DC);
+  return TypeChecker::conformsToKnownProtocol(
+      paramType, KnownProtocolKind::ExpressibleByStringLiteral, module);
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
@@ -1391,6 +1389,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   auto type = decl->getDeclaredType();
   auto &ctx = decl->getASTContext();
 
+  auto *module = decl->getParentModule();
+
   auto emitInvalidTypeDiagnostic = [&](const SourceLoc loc) {
     diagnose(loc, diag::invalid_dynamic_member_lookup_type, type);
     attr->setInvalid();
@@ -1406,7 +1406,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     auto oneCandidate = candidates.front().getValueDecl();
     candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      return isValidDynamicMemberLookupSubscript(cand, decl);
+      return isValidDynamicMemberLookupSubscript(cand, module);
     });
 
     if (candidates.empty()) {
@@ -1428,7 +1428,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    return isValidDynamicMemberLookupSubscript(cand, decl,
+    return isValidDynamicMemberLookupSubscript(cand, module,
                                                /*ignoreLabel*/ true);
   });
 
@@ -1802,8 +1802,9 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   }
 
   if (!ApplicationDelegateProto ||
-      !TypeChecker::conformsToProtocol(CD->getDeclaredType(),
-                                       ApplicationDelegateProto, CD)) {
+      !TypeChecker::conformsToProtocol(CD->getDeclaredInterfaceType(),
+                                       ApplicationDelegateProto,
+                                       CD->getParentModule())) {
     diagnose(attr->getLocation(),
              diag::attr_ApplicationMain_not_ApplicationDelegate,
              applicationMainKind);
@@ -2723,9 +2724,10 @@ bool
 TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
                                          TypeEraserAttr *attr,
                                          ProtocolDecl *protocol) const {
-  auto &ctx = protocol->getASTContext();
-  auto &diags = ctx.Diags;
   DeclContext *dc = protocol->getDeclContext();
+  ModuleDecl *module = dc->getParentModule();
+  auto &ctx = module->getASTContext();
+  auto &diags = ctx.Diags;
   Type protocolType = protocol->getDeclaredInterfaceType();
 
   // Get the NominalTypeDecl for the type eraser.
@@ -2753,7 +2755,7 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
   }
 
   // The type eraser must conform to the annotated protocol
-  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, dc)) {
+  if (!TypeChecker::conformsToProtocol(typeEraser, protocol, module)) {
     diags.diagnose(attr->getLoc(), diag::type_eraser_does_not_conform,
                    typeEraser, protocolType);
     diags.diagnose(nominalTypeDecl->getLoc(), diag::type_eraser_declared_here);
@@ -2796,26 +2798,21 @@ TypeEraserHasViableInitRequest::evaluate(Evaluator &evaluator,
     // type conforming to the annotated protocol. We will check this by
     // substituting the protocol's Self type for the generic arg and check that
     // the requirements in the generic signature are satisfied.
+    auto *module = nominalTypeDecl->getParentModule();
     auto baseMap =
-        typeEraser->getContextSubstitutionMap(nominalTypeDecl->getParentModule(),
+        typeEraser->getContextSubstitutionMap(module,
                                               nominalTypeDecl);
     QuerySubstitutionMap getSubstitution{baseMap};
-    auto subMap = SubstitutionMap::get(
-        genericSignature,
-        [&](SubstitutableType *type) -> Type {
-          if (type->isEqual(genericParamType))
-            return protocol->getSelfTypeInContext();
-
-          return getSubstitution(type);
-        },
-        LookUpConformanceInModule(dc->getParentModule()));
 
     // Use invalid 'SourceLoc's to suppress diagnostics.
     auto result = TypeChecker::checkGenericArguments(
-          dc, SourceLoc(), SourceLoc(), typeEraser,
-          genericSignature->getGenericParams(),
-          genericSignature->getRequirements(),
-          QuerySubstitutionMap{subMap});
+          module, genericSignature->getRequirements(),
+          [&](SubstitutableType *type) -> Type {
+            if (type->isEqual(genericParamType))
+              return protocol->getSelfTypeInContext();
+
+            return getSubstitution(type);
+          });
 
     if (result != RequirementCheckResult::Success) {
       unviable.push_back(
@@ -3550,12 +3547,12 @@ SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
 /// Returns true if the given type conforms to `Differentiable` in the given
 /// context. If `tangentVectorEqualsSelf` is true, also check whether the given
 /// type satisfies `TangentVector == Self`.
-static bool conformsToDifferentiable(Type type, DeclContext *DC,
+static bool conformsToDifferentiable(Type type, ModuleDecl *module,
                                      bool tangentVectorEqualsSelf = false) {
-  auto &ctx = type->getASTContext();
+  auto &ctx = module->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto conf = TypeChecker::conformsToProtocol(type, differentiableProto, DC);
+  auto conf = TypeChecker::conformsToProtocol(type, differentiableProto, module);
   if (conf.isInvalid())
     return false;
   if (!tangentVectorEqualsSelf)
@@ -3566,7 +3563,8 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC,
 
 IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
-  auto &ctx = AFD->getASTContext();
+  auto *module = AFD->getParentModule();
+  auto &ctx = module->getASTContext();
   auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
   auto numUncurriedParams = functionType->getNumParams();
   if (auto *resultFnType =
@@ -3589,7 +3587,7 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
     if (paramType->isExistentialType())
       return false;
     // Return true if the type conforms to `Differentiable`.
-    return conformsToDifferentiable(paramType, AFD);
+    return conformsToDifferentiable(paramType, module);
   };
 
   // Get all parameter types.
@@ -3622,7 +3620,8 @@ static IndexSubset *computeDifferentiabilityParameters(
     ArrayRef<ParsedAutoDiffParameter> parsedDiffParams,
     AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
     StringRef attrName, SourceLoc attrLoc) {
-  auto &ctx = function->getASTContext();
+  auto *module = function->getParentModule();
+  auto &ctx = module->getASTContext();
   auto &diags = ctx.Diags;
 
   // Get function type and parameters.
@@ -3649,7 +3648,7 @@ static IndexSubset *computeDifferentiabilityParameters(
         selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
       else
         selfType = function->mapTypeIntoContext(selfType);
-      if (!conformsToDifferentiable(selfType, function)) {
+      if (!conformsToDifferentiable(selfType, module)) {
         diags
             .diagnose(attrLoc, diag::diff_function_no_parameters,
                       function->getName())
@@ -5142,7 +5141,7 @@ static bool checkLinearityParameters(
     SmallVector<AnyFunctionType::Param, 4> linearParams,
     GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
     ArrayRef<ParsedAutoDiffParameter> parsedLinearParams, SourceLoc attrLoc) {
-  auto &ctx = originalAFD->getASTContext();
+  auto &ctx = module->getASTContext();
   auto &diags = ctx.Diags;
 
   // Check that linearity parameters have allowed types.
@@ -5158,7 +5157,7 @@ static bool checkLinearityParameters(
         parsedLinearParams.empty() ? attrLoc : parsedLinearParams[i].getLoc();
     // Parameter must conform to `Differentiable` and satisfy
     // `Self == Self.TangentVector`.
-    if (!conformsToDifferentiable(linearParamType, originalAFD,
+    if (!conformsToDifferentiable(linearParamType, module,
                                   /*tangentVectorEqualsSelf*/ true)) {
       diags.diagnose(loc,
                      diag::transpose_attr_invalid_linearity_parameter_or_result,
@@ -5205,6 +5204,7 @@ doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *transpose = cast<FuncDecl>(D);
+  auto *module = transpose->getParentModule();
   auto originalName = attr->getOriginalFunctionName();
   auto *transposeInterfaceType =
       transpose->getInterfaceType()->castTo<AnyFunctionType>();
@@ -5270,7 +5270,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   if (expectedOriginalResultType->hasTypeParameter())
     expectedOriginalResultType = transpose->mapTypeIntoContext(
         expectedOriginalResultType);
-  if (!conformsToDifferentiable(expectedOriginalResultType, transpose,
+  if (!conformsToDifferentiable(expectedOriginalResultType, module,
                                 /*tangentVectorEqualsSelf*/ true)) {
     diagnoseAndRemoveAttr(
         attr, diag::transpose_attr_invalid_linearity_parameter_or_result,
@@ -5443,48 +5443,6 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   }
 }
 
-void AttributeChecker::visitActorIndependentAttr(ActorIndependentAttr *attr) {
-  // @actorIndependent can be applied to global and static/class variables
-  // that do not have storage.
-  auto dc = D->getDeclContext();
-  if (auto var = dyn_cast<VarDecl>(D)) {
-    // @actorIndependent is meaningless on a `let`.
-    if (var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_let);
-      return;
-    }
-
-    // @actorIndependent can not be applied to stored properties, unless if
-    // the 'unsafe' option was specified
-    if (var->hasStorage()) {
-      switch (attr->getKind()) {
-        case ActorIndependentKind::Safe:
-          diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
-          return;
-
-        case ActorIndependentKind::Unsafe:
-          break;
-      }
-    }
-
-    // @actorIndependent can not be applied to local properties.
-    if (dc->isLocalContext()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_local_var);
-      return;
-    }
-
-    // If this is a static or global variable, we're all set.
-    if (dc->isModuleScopeContext() ||
-        (dc->isTypeContext() && var->isStatic())) {
-      return;
-    }
-  }
-
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    (void)getActorIsolation(VD);
-  }
-}
-
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
@@ -5502,7 +5460,7 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
       return;
     }
 
-    // @actorIndependent can not be applied to local properties.
+    // nonisolated can not be applied to local properties.
     if (dc->isLocalContext()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_local_var);
       return;
@@ -5662,10 +5620,6 @@ public:
   }
 
   void visitSendableAttr(SendableAttr *attr) {
-    // Nothing else to check.
-  }
-
-  void visitActorIndependentAttr(ActorIndependentAttr *attr) {
     // Nothing else to check.
   }
 

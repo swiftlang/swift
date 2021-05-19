@@ -255,9 +255,21 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       switch (scratch.size()) {
       default:
       // Add new cases here, in descending order.
+      case 8:
+      case 7:
       case 6:
       case 5: {
-        result.userModuleVersion = llvm::VersionTuple(scratch[4], scratch[5]);
+        auto subMinor = 0;
+        auto build = 0;
+        // case 7 and 8 were added after case 5 and 6, so we need to have this
+        // special handling to make sure we can still load the module without
+        // case 7 and case 8 successfully.
+        if (scratch.size() >= 8) {
+          subMinor = scratch[6];
+          build = scratch[7];
+        }
+        result.userModuleVersion = llvm::VersionTuple(scratch[4], scratch[5],
+                                                      subMinor, build);
         LLVM_FALLTHROUGH;
       }
       case 4:

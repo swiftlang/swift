@@ -290,6 +290,8 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
     return nullptr;
   }
 
+  auto *module = nominal->getParentModule();
+
   // Global actors have a static property "shared" that provides an actor
   // instance. The value must
   SmallVector<ValueDecl *, 4> decls;
@@ -309,7 +311,7 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
           cast<ExtensionDecl>(varDC)->isConstrainedExtension()) &&
         TypeChecker::conformsToProtocol(
             varDC->mapTypeIntoContext(var->getValueInterfaceType()),
-            actorProto, nominal)) {
+            actorProto, module)) {
       sharedVar = var;
       break;
     }
@@ -756,15 +758,14 @@ static bool isSendableClosure(
 }
 
 /// Determine whether the given type is suitable as a concurrent value type.
-bool swift::isSendableType(const DeclContext *dc, Type type) {
+bool swift::isSendableType(ModuleDecl *module, Type type) {
   class IsSendable : public TypeVisitor<IsSendable, bool> {
-    DeclContext *dc;
+    ModuleDecl *module;
     ProtocolDecl *SendableProto;
 
   public:
-    IsSendable(const DeclContext *dc)
-        : dc(const_cast<DeclContext *>(dc)) {
-      SendableProto = dc->getASTContext().getProtocol(
+    IsSendable(ModuleDecl *module) : module(module) {
+      SendableProto = module->getASTContext().getProtocol(
           KnownProtocolKind::Sendable);
     }
 
@@ -805,7 +806,7 @@ bool swift::isSendableType(const DeclContext *dc, Type type) {
         return true;
 
       return !TypeChecker::conformsToProtocol(
-          Type(type), SendableProto, dc).isInvalid();
+          Type(type), SendableProto, module).isInvalid();
     }
 
     bool visitTupleType(TupleType *type) {
@@ -838,7 +839,7 @@ bool swift::isSendableType(const DeclContext *dc, Type type) {
         return true;
 
       return !TypeChecker::containsProtocol(
-        Type(type), SendableProto, dc).isInvalid();
+        Type(type), SendableProto, module).isInvalid();
     }
 
     bool visitBoundGenericType(BoundGenericType *type) {
@@ -875,7 +876,7 @@ bool swift::isSendableType(const DeclContext *dc, Type type) {
       if (!SendableProto)
         return true;
 
-      return !TypeChecker::containsProtocol(type, SendableProto, dc)
+      return !TypeChecker::containsProtocol(type, SendableProto, module)
         .isInvalid();
     }
 
@@ -886,7 +887,7 @@ bool swift::isSendableType(const DeclContext *dc, Type type) {
     bool visitInOutType(InOutType *type) {
       return visit(type->getObjectType());
     }
-  } checker(dc);
+  } checker(module);
 
   return checker.visit(type);
 }
@@ -928,10 +929,10 @@ static bool shouldDiagnoseNonSendableViolations(
 }
 
 bool swift::diagnoseNonConcurrentTypesInReference(
-    ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
+    ConcreteDeclRef declRef, ModuleDecl *module, SourceLoc loc,
     ConcurrentReferenceKind refKind, DiagnosticBehavior behavior) {
   // Bail out immediately if we aren't supposed to do this checking.
-  if (!shouldDiagnoseNonSendableViolations(dc->getASTContext().LangOpts))
+  if (!shouldDiagnoseNonSendableViolations(module->getASTContext().LangOpts))
     return false;
 
   // For functions, check the parameter and result types.
@@ -939,7 +940,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
   if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
     for (auto param : *function->getParameters()) {
       Type paramType = param->getInterfaceType().subst(subs);
-      if (!isSendableType(dc, paramType)) {
+      if (!isSendableType(module, paramType)) {
         return diagnoseNonConcurrentParameter(
             loc, refKind, declRef, param, paramType, behavior);
       }
@@ -948,7 +949,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     // Check the result type of a function.
     if (auto func = dyn_cast<FuncDecl>(function)) {
       Type resultType = func->getResultInterfaceType().subst(subs);
-      if (!isSendableType(dc, resultType)) {
+      if (!isSendableType(module, resultType)) {
         return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType,
                                            behavior);
       }
@@ -961,7 +962,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     Type propertyType = var->isLocalCapture()
         ? var->getType()
         : var->getValueInterfaceType().subst(subs);
-    if (!isSendableType(dc, propertyType)) {
+    if (!isSendableType(module, propertyType)) {
       return diagnoseNonConcurrentProperty(loc, refKind, var, propertyType,
                                            behavior);
     }
@@ -970,7 +971,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
   if (auto subscript = dyn_cast<SubscriptDecl>(declRef.getDecl())) {
     for (auto param : *subscript->getIndices()) {
       Type paramType = param->getInterfaceType().subst(subs);
-      if (!isSendableType(dc, paramType)) {
+      if (!isSendableType(module, paramType)) {
         return diagnoseNonConcurrentParameter(
             loc, refKind, declRef, param, paramType, behavior);
       }
@@ -978,7 +979,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
 
     // Check the element type of a subscript.
     Type resultType = subscript->getElementInterfaceType().subst(subs);
-    if (!isSendableType(dc, resultType)) {
+    if (!isSendableType(module, resultType)) {
       return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType,
                                          behavior);
     }
@@ -1073,6 +1074,10 @@ namespace {
 
     const DeclContext *getDeclContext() const {
       return contextStack.back();
+    }
+
+    ModuleDecl *getParentModule() const {
+      return getDeclContext()->getParentModule();
     }
 
     /// Determine whether code in the given use context might execute
@@ -1682,7 +1687,7 @@ namespace {
         // Check for non-concurrent types.
         bool problemFound =
             diagnoseNonConcurrentTypesInReference(
-              concDeclRef, getDeclContext(), declLoc,
+              concDeclRef, getDeclContext()->getParentModule(), declLoc,
               ConcurrentReferenceKind::SynchronousAsAsyncCall);
         if (problemFound)
           result = AsyncMarkingResult::NotSendable;
@@ -1804,7 +1809,7 @@ namespace {
       // Check for sendability of the parameter types.
       for (const auto &param : fnType->getParams()) {
         // FIXME: Dig out the locations of the corresponding arguments.
-        if (!isSendableType(getDeclContext(), param.getParameterType())) {
+        if (!isSendableType(getParentModule(), param.getParameterType())) {
           ctx.Diags.diagnose(
               apply->getLoc(), diag::non_concurrent_param_type,
               param.getParameterType());
@@ -1813,7 +1818,7 @@ namespace {
       }
 
       // Check for sendability of the result type.
-      if (!isSendableType(getDeclContext(), fnType->getResult())) {
+      if (!isSendableType(getParentModule(), fnType->getResult())) {
         ctx.Diags.diagnose(
             apply->getLoc(), diag::non_concurrent_result_type,
             fnType->getResult());
@@ -1842,7 +1847,7 @@ namespace {
       // A cross-actor access requires types to be concurrent-safe.
       if (isCrossActor) {
         return diagnoseNonConcurrentTypesInReference(
-            valueRef, getDeclContext(), loc,
+            valueRef, getParentModule(), loc,
             ConcurrentReferenceKind::CrossActor);
       }
 
@@ -1973,7 +1978,7 @@ namespace {
             (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
              parent.dyn_cast<LoadExpr *>())) {
           return diagnoseNonConcurrentTypesInReference(
-              valueRef, getDeclContext(), loc,
+              valueRef, getParentModule(), loc,
               ConcurrentReferenceKind::LocalCapture);
         }
 
@@ -2024,7 +2029,7 @@ namespace {
           if (varDecl->isLet()) {
             auto type = component.getComponentType();
             if (shouldDiagnoseNonSendableViolations(ctx.LangOpts)
-                && !isSendableType(getDeclContext(), type)) {
+                && !isSendableType(getParentModule(), type)) {
               ctx.Diags.diagnose(
                   component.getLoc(), diag::non_concurrent_keypath_access,
                   type);
@@ -2090,7 +2095,7 @@ namespace {
         if (auto indexExpr = component.getIndexExpr()) {
           auto type = indexExpr->getType();
           if (type && shouldDiagnoseNonSendableViolations(ctx.LangOpts)
-              && !isSendableType(getDeclContext(), type)) {
+              && !isSendableType(getParentModule(), type)) {
             ctx.Diags.diagnose(
                 component.getLoc(), diag::non_concurrent_keypath_capture,
                 indexExpr->getType());
@@ -2203,7 +2208,7 @@ namespace {
           return false;
 
         return diagnoseNonConcurrentTypesInReference(
-            memberRef, getDeclContext(), memberLoc,
+            memberRef, getDeclContext()->getParentModule(), memberLoc,
             ConcurrentReferenceKind::CrossActor);
       }
 
@@ -2417,9 +2422,6 @@ namespace {
         AbstractClosureExpr *closure) {
       // If the closure specifies a global actor, use it.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-        if (explicitClosure->getAttrs().hasAttribute<ActorIndependentAttr>())
-          return ClosureActorIsolation::forIndependent();
-
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
           return ClosureActorIsolation::forGlobalActor(globalActorType);
 
@@ -2678,14 +2680,11 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     const Decl *decl, bool shouldDiagnose = true, bool onlyExplicit = false) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
-  auto independentAttr = decl->getAttrs().getAttribute<ActorIndependentAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
 
   // Remove implicit attributes if we only care about explicit ones.
   if (onlyExplicit) {
-    if (independentAttr && independentAttr->isImplicit())
-      independentAttr = nullptr;
     if (nonisolatedAttr && nonisolatedAttr->isImplicit())
       nonisolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
@@ -2693,8 +2692,7 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   }
 
   unsigned numIsolationAttrs =
-    (nonisolatedAttr ? 1 : 0) + (independentAttr ? 1 : 0) +
-    (globalActorAttr ? 1 : 0);
+    (nonisolatedAttr ? 1 : 0) + (globalActorAttr ? 1 : 0);
   if (numIsolationAttrs == 0)
     return None;
 
@@ -2710,22 +2708,12 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     }
 
     if (globalActorAttr) {
-      StringRef nonisolatedAttrName;
-      SourceRange nonisolatedRange;
-      if (independentAttr) {
-        nonisolatedAttrName = independentAttr->getAttrName();
-        nonisolatedRange = independentAttr->getRangeWithAt();
-      } else {
-        nonisolatedAttrName = nonisolatedAttr->getAttrName();
-        nonisolatedRange = nonisolatedAttr->getRangeWithAt();
-      }
-
       if (shouldDiagnose) {
         decl->diagnose(
             diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-            name, nonisolatedAttrName,
+            name, nonisolatedAttr->getAttrName(),
             globalActorAttr->second->getName().str())
-          .highlight(nonisolatedRange)
+          .highlight(nonisolatedAttr->getRangeWithAt())
           .highlight(globalActorAttr->first->getRangeWithAt());
       }
     }
@@ -2734,12 +2722,6 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
-    return ActorIsolation::forIndependent();
-  }
-
-  // If the declaration is explicitly marked @actorIndependent, report it as
-  // independent.
-  if (independentAttr) {
     return ActorIsolation::forIndependent();
   }
 
@@ -2834,7 +2816,7 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
         llvm_unreachable("protocol requirements cannot be actor instances");
 
       case ActorIsolation::Independent:
-        // We only need one @actorIndependent.
+        // We only need one nonisolated.
         if (sawActorIndependent)
           return true;
 
@@ -3050,19 +3032,12 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
     switch (inferred) {
-    case ActorIsolation::Independent: {
+    case ActorIsolation::Independent:
       if (onlyGlobal)
         return ActorIsolation::forUnspecified();
 
-      auto var = dyn_cast<VarDecl>(value);
-      if ((var && !var->isLet()) || !var) {
-        // It is illegal to add @actorIndependent to let properties,
-        // and if we did this would fail in type checking attributes.
-        value->getAttrs().add(new(ctx) ActorIndependentAttr(
-            ActorIndependentKind::Safe, /*IsImplicit=*/true));
-      }
+      value->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
       break;
-    }
 
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
@@ -3319,12 +3294,9 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      // A closure with an explicit global actor or @actorIndependent
+      // A closure with an explicit global actor or nonindependent
       // uses concurrency features.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-        if (explicitClosure->getAttrs().hasAttribute<ActorIndependentAttr>())
-          return true;
-
         if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
           return true;
       }
@@ -3420,7 +3392,7 @@ static bool checkSendableInstanceStorage(
       }
 
       auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType());
-      if (!isSendableType(dc, propertyType)) {
+      if (!isSendableType(dc->getParentModule(), propertyType)) {
         if (behavior == DiagnosticBehavior::Ignore)
           return true;
         property->diagnose(diag::non_concurrent_type_member,
@@ -3446,7 +3418,7 @@ static bool checkSendableInstanceStorage(
 
         auto elementType = dc->mapTypeIntoContext(
             element->getArgumentInterfaceType());
-        if (!isSendableType(dc, elementType)) {
+        if (!isSendableType(dc->getParentModule(), elementType)) {
           if (behavior == DiagnosticBehavior::Ignore)
             return true;
           element->diagnose(diag::non_concurrent_type_member,

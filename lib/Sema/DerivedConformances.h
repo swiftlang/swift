@@ -62,6 +62,9 @@ public:
   /// nominal type, or an extension of it) as a \c DeclContext.
   DeclContext *getConformanceContext() const;
 
+  /// Retrieve the module in which the conformance is declared.
+  ModuleDecl *getParentModule() const;
+
   /// Add \c children as members of the context that declares the conformance.
   void addMembersToConformanceContext(ArrayRef<Decl *> children);
 

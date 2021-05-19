@@ -6,6 +6,7 @@
 // RUN: %sourcekitd-test -req=sema %S/Inputs/top_level.swift -- %s %S/Inputs/top_level.swift -module-name main | %FileCheck %s -check-prefix=TOP_LEVEL_ERROR
 // TOP_LEVEL_ERROR: key.filepath: {{.*}}top_level.swift
 // TOP_LEVEL_ERROR-NEXT: key.severity: source.diagnostic.severity.error,
+// TOP_LEVEL_ERROR-NEXT: key.id: "illegal_top_level_expr"
 // TOP_LEVEL_ERROR-NEXT: key.description: {{.*}}top level
 
 print("hi") // Top-level code.

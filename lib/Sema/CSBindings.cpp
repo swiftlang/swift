@@ -859,7 +859,8 @@ bool LiteralRequirement::isCoveredBy(Type type, DeclContext *useDC) const {
   if (hasDefaultType() && coversDefaultType(type, getDefaultType()))
     return true;
 
-  return bool(TypeChecker::conformsToProtocol(type, getProtocol(), useDC));
+  return (bool)TypeChecker::conformsToProtocol(type, getProtocol(),
+                                               useDC->getParentModule());
 }
 
 std::pair<bool, Type>

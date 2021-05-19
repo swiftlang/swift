@@ -689,6 +689,9 @@ private:
   void computeRedundantRequirements(
       const ProtocolDecl *requirementSignatureSelfProto);
 
+  void diagnoseProtocolRefinement(
+      const ProtocolDecl *requirementSignatureSelfProto);
+
   void diagnoseRedundantRequirements() const;
 
   void diagnoseConflictingConcreteTypeRequirements(

@@ -1,4 +1,3 @@
-
 # Testing Swift
 
 This document describes how we test the Swift compiler, the Swift runtime, and
@@ -26,22 +25,6 @@ We use multiple approaches to test the Swift toolchain.
 * Buildbots run all tests, on all supported platforms.
   [Smoke testing](ContinuousIntegration.md#smoke-testing)
   skips the iOS, tvOS, and watchOS platforms.
-
-The [test/lit.cfg](https://github.com/apple/swift/blob/main/test/lit.cfg)
-uses an iOS 10.3 simulator configuration named "iPhone 5" for 32-bit testing.
-
-1.  Download and install the iOS 10.3 simulator runtime, in Xcode's
-    [Components](https://help.apple.com/xcode/#/deva7379ae35) preferences.
-
-2.  Create an "iPhone 5" simulator configuration, either in Xcode's
-    [Devices and Simulators](https://help.apple.com/xcode/#/devf225e58da)
-    window, or with the command line:
-
-    ```sh
-    xcrun simctl create 'iPhone 5' com.apple.CoreSimulator.SimDeviceType.iPhone-5 com.apple.CoreSimulator.SimRuntime.iOS-10-3
-    ```
-
-3.  Append `--ios` to the `utils/build-script` command line (see below).
 
 ### Testsuite subsets
 

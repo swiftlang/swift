@@ -40,6 +40,10 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
+ModuleDecl *DerivedConformance::getParentModule() const {
+  return cast<DeclContext>(ConformanceDecl)->getParentModule();
+}
+
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
@@ -164,7 +168,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
       nonconformingProperties.push_back(propertyDecl);
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
-                                         DC)) {
+                                         DC->getParentModule())) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -718,8 +722,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
 /// \p protocol The protocol being requested.
 /// \return The ParamDecl of each associated value whose type does not conform.
 SmallVector<ParamDecl *, 4>
-DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
-                                        ProtocolDecl *protocol) {
+DerivedConformance::associatedValuesNotConformingToProtocol(
+    DeclContext *DC, EnumDecl *theEnum, ProtocolDecl *protocol) {
   SmallVector<ParamDecl *, 4> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
     auto PL = elt->getParameterList();
@@ -729,7 +733,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(DeclContext *DC, Enu
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
       if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                          protocol, DC)
+                                          protocol, DC->getParentModule())
               .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
