@@ -439,11 +439,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     }
   } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
-    if (!BinE->getArg()->getElement(0)->walk(*this))
+    if (!BinE->getLHS()->walk(*this))
       return doStopTraversal();
     if (!BinE->getFn()->walk(*this))
       return doStopTraversal();
-    if (!BinE->getArg()->getElement(1)->walk(*this))
+    if (!BinE->getRHS()->walk(*this))
       return doStopTraversal();
 
     // We already visited the children.

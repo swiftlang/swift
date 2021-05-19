@@ -385,17 +385,8 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     return arrow;
   }
   
-  // Build the argument to the operation.
-  Expr *ArgElts[] = { LHS, RHS };
-  auto ArgElts2 = Ctx.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
-  TupleExpr *Arg = TupleExpr::create(Ctx,
-                                     SourceLoc(),
-                                     ArgElts2, { }, { }, SourceLoc(),
-                                     /*HasTrailingClosure=*/false,
-                                     /*Implicit=*/true);
-  
   // Build the operation.
-  return new (Ctx) BinaryExpr(Op, Arg, Op->isImplicit());
+  return BinaryExpr::create(Ctx, LHS, Op, RHS, Op->isImplicit());
 }
 
 namespace {

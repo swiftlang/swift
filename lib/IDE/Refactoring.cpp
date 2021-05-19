@@ -2469,11 +2469,11 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
     SmallString<64> ConditionalPattern = SmallString<64>();
 
     Expr *walkToExprPost(Expr *E) override {
-      if (E->getKind() != ExprKind::Binary)
+      auto *BE = dyn_cast<BinaryExpr>(E);
+      if (!BE)
         return E;
-      auto BE = dyn_cast<BinaryExpr>(E);
       if (isFunctionNameAllowed(BE))
-        appendPattern(dyn_cast<BinaryExpr>(E)->getArg());
+        appendPattern(BE->getLHS(), BE->getRHS());
       return E;
     }
 
@@ -2499,10 +2499,10 @@ bool RefactoringActionConvertToSwitchStmt::performChange() {
       || FunctionName == "__derived_struct_equals";
     }
 
-    void appendPattern(TupleExpr *Tuple) {
-      auto PatternArgument = Tuple->getElements().back();
+    void appendPattern(Expr *LHS, Expr *RHS) {
+      auto *PatternArgument = RHS;
       if (PatternArgument->getKind() == ExprKind::DeclRef)
-        PatternArgument = Tuple->getElements().front();
+        PatternArgument = LHS;
       if (ConditionalPattern.size() > 0)
         ConditionalPattern.append(", ");
       ConditionalPattern.append(Lexer::getCharSourceRangeFromSourceRange(SM, PatternArgument->getSourceRange()).str());
@@ -4424,7 +4424,7 @@ struct CallbackCondition {
   ///   - `<Subject> == nil`
   CallbackCondition(const BinaryExpr *BE, const FuncDecl *Operator) {
     bool FoundNil = false;
-    for (auto *Operand : BE->getArg()->getElements()) {
+    for (auto *Operand : {BE->getLHS(), BE->getRHS()}) {
       if (isa<NilLiteralExpr>(Operand)) {
         FoundNil = true;
       } else if (auto *DRE = dyn_cast<DeclRefExpr>(Operand)) {
@@ -4504,8 +4504,8 @@ struct CallbackCondition {
             auto *Operator = isOperator(BE);
             if (Operator) {
               if (Operator->getBaseName() == "&&") {
-                auto Args = BE->getArg()->getElements();
-                Exprs.insert(Exprs.end(), Args.begin(), Args.end());
+                Exprs.push_back(BE->getLHS());
+                Exprs.push_back(BE->getRHS());
               } else {
                 addCond(CallbackCondition(BE, Operator), Decls, AddTo, Handled);
               }

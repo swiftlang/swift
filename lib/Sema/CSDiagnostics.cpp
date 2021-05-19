@@ -457,7 +457,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
   if (isPatternMatchingOperator(anchor)) {
     auto *expr = castToExpr(anchor);
     if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(expr))) {
-      auto *caseExpr = binaryOp->getArg()->getElement(0);
+      auto *caseExpr = binaryOp->getLHS();
 
       llvm::SmallPtrSet<Expr *, 4> anchors;
       for (const auto *fix : getSolution().Fixes) {
@@ -4080,11 +4080,9 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
           ValueDecl *decl0 = overloadedFn->getDecls()[0];
           
           if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator) {
-            assert(binaryExpr->getArg()->getElements().size() == 2);
-            
             // If the rhs of '~=' is the enum type, a single dot suffixes
             // since the type can be inferred
-            Type secondArgType = getType(binaryExpr->getArg()->getElement(1));
+            Type secondArgType = getType(binaryExpr->getRHS());
             if (secondArgType->isEqual(baseTy)) {
               Diag->fixItInsert(loc, ".");
               return true;
@@ -6154,8 +6152,8 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
     return false;
 
   auto *binaryOp = castToExpr<BinaryExpr>(getRawAnchor());
-  auto *lhs = binaryOp->getArg()->getElement(0);
-  auto *rhs = binaryOp->getArg()->getElement(1);
+  auto *lhs = binaryOp->getLHS();
+  auto *rhs = binaryOp->getRHS();
 
   auto name = *getOperatorName(binaryOp->getFn());
 
@@ -6221,8 +6219,8 @@ bool ArgumentMismatchFailure::diagnosePatternMatchingMismatch() const {
     return false;
 
   auto *op = castToExpr<BinaryExpr>(getRawAnchor());
-  auto *lhsExpr = op->getArg()->getElement(0);
-  auto *rhsExpr = op->getArg()->getElement(1);
+  auto *lhsExpr = op->getLHS();
+  auto *rhsExpr = op->getRHS();
 
   auto lhsType = getType(lhsExpr);
   auto rhsType = getType(rhsExpr);
