@@ -60,6 +60,8 @@ CURSOR_REFACTORING(ConvertToAsync, "Convert Function to Async", convert.func-to-
 
 CURSOR_REFACTORING(AddAsyncAlternative, "Add Async Alternative", add.async-alternative)
 
+CURSOR_REFACTORING(AddAsyncWrapper, "Add Async Wrapper", add.async-wrapper)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)

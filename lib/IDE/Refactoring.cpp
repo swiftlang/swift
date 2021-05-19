@@ -4195,6 +4195,13 @@ struct AsyncHandlerDesc {
     return params();
   }
 
+  /// If the completion handler has an Error parameter, return it.
+  Optional<AnyFunctionType::Param> getErrorParam() const {
+    if (HasError && Type == HandlerType::PARAMS)
+      return params().back();
+    return None;
+  }
+
   /// Get the type of the error that will be thrown by the \c async method or \c
   /// None if the completion handler doesn't accept an error parameter.
   /// This may be more specialized than the generic 'Error' type if the
@@ -5397,6 +5404,41 @@ public:
     return true;
   }
 
+  /// Creates an async alternative function that forwards onto the completion
+  /// handler function through
+  /// withCheckedContinuation/withCheckedThrowingContinuation.
+  bool createAsyncWrapper() {
+    assert(Buffer.empty() && "AsyncConverter can only be used once");
+    auto *FD = cast<FuncDecl>(StartNode.get<Decl *>());
+
+    // First add the new async function declaration.
+    addFuncDecl(FD);
+    OS << tok::l_brace << "\n";
+
+    // Then add the body.
+    OS << tok::kw_return << " ";
+    if (TopHandler.HasError)
+      OS << tok::kw_try << " ";
+
+    OS << "await ";
+
+    // withChecked[Throwing]Continuation { cont in
+    if (TopHandler.HasError) {
+      OS << "withCheckedThrowingContinuation";
+    } else {
+      OS << "withCheckedContinuation";
+    }
+    OS << " " << tok::l_brace << " cont " << tok::kw_in << "\n";
+
+    // fnWithHandler(args...) { ... }
+    auto ClosureStr = getAsyncWrapperCompletionClosure("cont", TopHandler);
+    addForwardingCallTo(FD, TopHandler, /*HandlerReplacement*/ ClosureStr);
+
+    OS << tok::r_brace << "\n"; // end continuation closure
+    OS << tok::r_brace << "\n"; // end function body
+    return true;
+  }
+
   void replace(ASTNode Node, SourceEditConsumer &EditConsumer,
                SourceLoc StartOverride = SourceLoc()) {
     SourceRange Range = Node.getSourceRange();
@@ -5446,6 +5488,116 @@ private:
     OS << tok::r_paren;
   }
 
+  /// Retrieve the completion handler closure argument for an async wrapper
+  /// function.
+  std::string
+  getAsyncWrapperCompletionClosure(StringRef ContName,
+                                   const AsyncHandlerParamDesc &HandlerDesc) {
+    std::string OutputStr;
+    llvm::raw_string_ostream OS(OutputStr);
+
+    OS << " " << tok::l_brace; // start closure
+
+    // Prepare parameter names for the closure.
+    auto SuccessParams = HandlerDesc.getSuccessParams();
+    SmallVector<SmallString<4>, 2> SuccessParamNames;
+    for (auto idx : indices(SuccessParams)) {
+      SuccessParamNames.emplace_back("res");
+
+      // If we have multiple success params, number them e.g res1, res2...
+      if (SuccessParams.size() > 1)
+        SuccessParamNames.back().append(std::to_string(idx + 1));
+    }
+    Optional<SmallString<4>> ErrName;
+    if (HandlerDesc.getErrorParam())
+      ErrName.emplace("err");
+
+    auto HasAnyParams = !SuccessParamNames.empty() || ErrName;
+    if (HasAnyParams)
+      OS << " ";
+
+    // res1, res2
+    llvm::interleave(
+        SuccessParamNames, [&](auto Name) { OS << Name; },
+        [&]() { OS << tok::comma << " "; });
+
+    // , err
+    if (ErrName) {
+      if (!SuccessParamNames.empty())
+        OS << tok::comma << " ";
+
+      OS << *ErrName;
+    }
+    if (HasAnyParams)
+      OS << " " << tok::kw_in;
+
+    OS << "\n";
+
+    // The closure body.
+    switch (HandlerDesc.Type) {
+    case HandlerType::PARAMS: {
+      // For a (Success?, Error?) -> Void handler, we do an if let on the error.
+      if (ErrName) {
+        // if let err = err {
+        OS << tok::kw_if << " " << tok::kw_let << " ";
+        OS << *ErrName << " " << tok::equal << " " << *ErrName << " ";
+        OS << tok::l_brace << "\n";
+
+        // cont.resume(throwing: err)
+        OS << ContName << tok::period << "resume" << tok::l_paren;
+        OS << "throwing" << tok::colon << " " << *ErrName;
+        OS << tok::r_paren << "\n";
+
+        // return }
+        OS << tok::kw_return << "\n";
+        OS << tok::r_brace << "\n";
+      }
+
+      // If we have any success params that we need to unwrap, insert a guard.
+      for (auto Idx : indices(SuccessParamNames)) {
+        auto &Name = SuccessParamNames[Idx];
+        auto ParamTy = SuccessParams[Idx].getParameterType();
+        if (!HandlerDesc.shouldUnwrap(ParamTy))
+          continue;
+
+        // guard let res = res else {
+        OS << tok::kw_guard << " " << tok::kw_let << " ";
+        OS << Name << " " << tok::equal << " " << Name << " " << tok::kw_else;
+        OS << " " << tok::l_brace << "\n";
+
+        // fatalError(...)
+        OS << "fatalError" << tok::l_paren;
+        OS << "\"Expected non-nil success param '" << Name;
+        OS << "' for nil error\"";
+        OS << tok::r_paren << "\n";
+
+        // End guard.
+        OS << tok::r_brace << "\n";
+      }
+
+      // cont.resume(returning: (res1, res2, ...))
+      OS << ContName << tok::period << "resume" << tok::l_paren;
+      OS << "returning" << tok::colon << " ";
+      addTupleOf(llvm::makeArrayRef(SuccessParamNames), OS,
+                 [&](auto Ref) { OS << Ref; });
+      OS << tok::r_paren << "\n";
+      break;
+    }
+    case HandlerType::RESULT: {
+      // cont.resume(with: res)
+      assert(SuccessParamNames.size() == 1);
+      OS << ContName << tok::period << "resume" << tok::l_paren;
+      OS << "with" << tok::colon << " " << SuccessParamNames[0];
+      OS << tok::r_paren << "\n";
+      break;
+    }
+    case HandlerType::INVALID:
+      llvm_unreachable("Should not have an invalid handler here");
+    }
+
+    OS << tok::r_brace << "\n"; // end closure
+    return OutputStr;
+  }
 
   /// Retrieves the location for the start of a comment attached to the token
   /// at the provided location, or the location itself if there is no comment.
@@ -6472,6 +6624,24 @@ private:
   }
 };
 
+/// Adds an attribute to describe a completion handler function's async
+/// alternative if necessary.
+void addCompletionHandlerAsyncAttrIfNeccessary(
+    ASTContext &Ctx, const FuncDecl *FD,
+    const AsyncHandlerParamDesc &HandlerDesc,
+    SourceEditConsumer &EditConsumer) {
+  if (!Ctx.LangOpts.EnableExperimentalConcurrency)
+    return;
+
+  llvm::SmallString<0> HandlerAttribute;
+  llvm::raw_svector_ostream OS(HandlerAttribute);
+  OS << "@completionHandlerAsync(\"";
+  HandlerDesc.printAsyncFunctionName(OS);
+  OS << "\", completionHandlerIndex: " << HandlerDesc.Index << ")\n";
+  EditConsumer.accept(Ctx.SourceMgr, FD->getAttributeInsertionLoc(false),
+                      HandlerAttribute);
+}
+
 } // namespace asyncrefactorings
 
 bool RefactoringActionConvertCallToAsyncAlternative::isApplicable(
@@ -6593,16 +6763,7 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
 
-  if (Ctx.LangOpts.EnableExperimentalConcurrency) {
-    // Add an attribute to describe its async alternative
-    llvm::SmallString<0> HandlerAttribute;
-    llvm::raw_svector_ostream OS(HandlerAttribute);
-    OS << "@completionHandlerAsync(\"";
-    HandlerDesc.printAsyncFunctionName(OS);
-    OS << "\", completionHandlerIndex: " << HandlerDesc.Index << ")\n";
-    EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
-                        HandlerAttribute);
-  }
+  addCompletionHandlerAsyncAttrIfNeccessary(Ctx, FD, HandlerDesc, EditConsumer);
 
   AsyncConverter LegacyBodyCreator(TheFile, SM, DiagEngine, FD, HandlerDesc);
   if (LegacyBodyCreator.createLegacyBody()) {
@@ -6614,6 +6775,43 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
 
   return false;
 }
+
+bool RefactoringActionAddAsyncWrapper::isApplicable(
+    const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
+  using namespace asyncrefactorings;
+
+  auto *FD = findFunction(CursorInfo);
+  if (!FD)
+    return false;
+
+  auto HandlerDesc =
+      AsyncHandlerParamDesc::find(FD, /*RequireAttributeOrName=*/false);
+  return HandlerDesc.isValid();
+}
+
+bool RefactoringActionAddAsyncWrapper::performChange() {
+  using namespace asyncrefactorings;
+
+  auto *FD = findFunction(CursorInfo);
+  assert(FD &&
+         "Should not run performChange when refactoring is not applicable");
+
+  auto HandlerDesc =
+      AsyncHandlerParamDesc::find(FD, /*RequireAttributeOrName=*/false);
+  assert(HandlerDesc.isValid() &&
+         "Should not run performChange when refactoring is not applicable");
+
+  AsyncConverter Converter(TheFile, SM, DiagEngine, FD, HandlerDesc);
+  if (!Converter.createAsyncWrapper())
+    return true;
+
+  addCompletionHandlerAsyncAttrIfNeccessary(Ctx, FD, HandlerDesc, EditConsumer);
+
+  // Add the async wrapper.
+  Converter.insertAfter(FD, EditConsumer);
+  return false;
+}
+
 } // end of anonymous namespace
 
 StringRef swift::ide::
