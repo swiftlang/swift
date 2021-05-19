@@ -30,9 +30,10 @@ func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> Pic
   let handle: Task<PictureData, Error> = .init {
     let file = SomeFile()
 
-    return await withTaskCancellationHandler(
-      handler: { file.close() }) {
+    return await withTaskCancellationHandler {
       await test_cancellation_guard_isCancelled(file)
+    } onCancel: {
+      file.close()
     }
   }
 
