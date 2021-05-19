@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 add_swift_host_library(swiftSema STATIC
   BuilderTransform.cpp
   CSApply.cpp
@@ -77,3 +77,5 @@ target_link_libraries(swiftSema PRIVATE
   swiftAST
   swiftParse
   swiftSerialization)
+
+set_swift_llvm_is_available(swiftSema)

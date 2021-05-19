@@ -1,4 +1,4 @@
-set_swift_llvm_is_available()
+
 
 add_swift_host_library(swiftASTSectionImporter STATIC
   ASTSectionImporter.cpp
@@ -6,3 +6,4 @@ add_swift_host_library(swiftASTSectionImporter STATIC
 target_link_libraries(swiftASTSectionImporter PRIVATE
   swiftBasic)
 
+set_swift_llvm_is_available(swiftASTSectionImporter)
