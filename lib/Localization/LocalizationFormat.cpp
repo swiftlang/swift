@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Localization/LocalizationFormat.h"
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
@@ -38,6 +37,12 @@ enum LocalDiagID : uint32_t {
 #define DIAG(KIND, ID, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
+};
+
+static constexpr const char *const diagnosticNameStrings[] = {
+#define DIAG(KIND, ID, Options, Text, Signature) " [" #ID "]",
+#include "swift/AST/DiagnosticsAll.def"
+    "<not a diagnostic>",
 };
 
 } // namespace
@@ -110,9 +115,9 @@ LocalizationProducer::getMessageOr(swift::DiagID id,
   if (localizedMessage.empty())
     return defaultMessage;
   if (printDiagnosticNames) {
-    llvm::StringRef diagnosticID(DiagnosticEngine::diagnosticIDStringFor(id));
+    llvm::StringRef diagnosticName(diagnosticNameStrings[(unsigned)id]);
     auto localizedDebugDiagnosticMessage =
-        localizationSaver.save(localizedMessage.str() + " [" + diagnosticID.str() + "]");
+        localizationSaver.save(localizedMessage.str() + diagnosticName.str());
     return localizedDebugDiagnosticMessage;
   }
   return localizedMessage;
