@@ -88,9 +88,16 @@ std::string
 TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
   // Remangle the reflection name to resolve symbolic references.
   if (auto node = demangleTypeRef(reflectionName)) {
-    auto result = mangleNode(node);
-    clearNodeFactory();
-    return result;
+    switch (node->getKind()) {
+    case Node::Kind::TypeSymbolicReference:
+    case Node::Kind::ProtocolSymbolicReference:
+    case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+      break;
+    default:
+      auto result = mangleNode(node);
+      clearNodeFactory();
+      return result;
+    }
   }
 
   // Fall back to the raw string.
