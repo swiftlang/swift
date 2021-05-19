@@ -663,20 +663,14 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   auto *matchOp =
       TypeChecker::buildRefExpr(choices, DC, DeclNameLoc(EP->getLoc()),
                                 /*Implicit=*/true, FunctionRefKind::Compound);
-  auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
-                                                DeclNameLoc(EP->getLoc()),
-                                                /*Implicit=*/true);
-  
-  Expr *matchArgElts[] = {EP->getSubExpr(), matchVarRef};
-  auto *matchArgs
-    = TupleExpr::create(Context, EP->getSubExpr()->getSourceRange().Start,
-                        matchArgElts, { }, { },
-                        EP->getSubExpr()->getSourceRange().End,
-                        /*HasTrailingClosure=*/false, /*Implicit=*/true);
-  
-  Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
-                                             /*Implicit=*/true);
 
+  // Note we use getEndLoc here to have the BinaryExpr source range be the same
+  // as the expr pattern source range.
+  auto *matchVarRef = new (Context) DeclRefExpr(matchVar,
+                                                DeclNameLoc(EP->getEndLoc()),
+                                                /*Implicit=*/true);
+  Expr *matchCall = BinaryExpr::create(Context, EP->getSubExpr(), matchOp,
+                                       matchVarRef, /*implicit*/ true);
   // Check the expression as a condition.
   bool hadError = typeCheckCondition(matchCall, DC);
   // Save the type-checked expression in the pattern.

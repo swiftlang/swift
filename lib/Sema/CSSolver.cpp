@@ -884,8 +884,8 @@ void ConstraintSystem::shrink(Expr *expr) {
         return isArithmeticExprOfLiterals(postfix->getArg());
 
       if (auto binary = dyn_cast<BinaryExpr>(expr))
-        return isArithmeticExprOfLiterals(binary->getArg()->getElement(0)) &&
-               isArithmeticExprOfLiterals(binary->getArg()->getElement(1));
+        return isArithmeticExprOfLiterals(binary->getLHS()) &&
+               isArithmeticExprOfLiterals(binary->getRHS());
 
       return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
     }
