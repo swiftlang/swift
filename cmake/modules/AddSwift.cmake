@@ -121,6 +121,10 @@ function(_add_host_variant_c_compile_link_flags name)
       "-F${SWIFT_SDK_${SWIFT_HOST_VARIANT_ARCH}_PATH}/../../../Developer/Library/Frameworks")
   endif()
 
+  add_lto_flags(${name})
+endfunction()
+
+function(add_lto_flags name)
   _compute_lto_flag("${SWIFT_TOOLS_ENABLE_LTO}" _lto_flag_out)
   if (_lto_flag_out)
     target_compile_options(${name} PRIVATE ${_lto_flag_out})
