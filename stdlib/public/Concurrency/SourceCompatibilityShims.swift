@@ -47,6 +47,15 @@ extension TaskPriority {
 }
 
 @available(SwiftStdlib 5.5, *)
+@_alwaysEmitIntoClient
+public func withTaskCancellationHandler<T>(
+  handler: @Sendable () -> (),
+  operation: () async throws -> T
+) async rethrows -> T {
+  try await withTaskCancellationHandler(operation: operation, onCancel: handler)
+}
+
+@available(SwiftStdlib 5.5, *)
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, message: "`Task.withCancellationHandler` has been replaced by `withTaskCancellationHandler` and will be removed shortly.")
   @_alwaysEmitIntoClient
