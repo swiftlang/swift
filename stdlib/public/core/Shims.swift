@@ -47,7 +47,7 @@ internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
 
 @inline(__always) @inlinable @_effects(readonly)
 internal func _mallocSizeIfHeap(ofAllocation ptr: UnsafeRawPointer) -> Int? {
-  if !Builtin.isOnStack(ptr) { return nil }
+  if Builtin.isOnStack(ptr) { return nil }
   return _mallocSize(ofAllocation: ptr)
 }
 
