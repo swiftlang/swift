@@ -37,7 +37,9 @@ internal let _fastEnumerationStorageMutationsPtr =
   UnsafeMutablePointer<CUnsignedLong>(Builtin.addressof(&_fastEnumerationStorageMutationsTarget))
 #endif
 
-@usableFromInline @_alwaysEmitIntoClient
+@usableFromInline @_alwaysEmitIntoClient @_effects(readonly)
 internal func _mallocSize(ofAllocation ptr: UnsafeRawPointer) -> Int? {
-  return _swift_stdlib_has_malloc_size() ? _swift_stdlib_malloc_size(ptr) : nil
+  return !Builtin.isOnStack(ptr) && _swift_stdlib_has_malloc_size() ?
+    _swift_stdlib_malloc_size(ptr) :
+    nil
 }
