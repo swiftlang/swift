@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckDistributed.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/Strings.h"
@@ -59,92 +60,6 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
       return true;
     }
 
-    return true;
-  }
-
-  return false;
-}
-
-/// Check whether the function is a proper distributed function
-///
-/// \param diagnose Whether to emit a diagnostic when a problem is encountered.
-///
-/// \returns \c true if there was a problem with adding the attribute, \c false
-/// otherwise.
-static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
-  // === All parameters and the result type must be Codable
-
-  auto &C = func->getASTContext();
-  auto encodableType = C.getProtocol(KnownProtocolKind::Encodable);
-  auto decodableType = C.getProtocol(KnownProtocolKind::Decodable);
-
-  // --- Check parameters for 'Codable' conformance
-  for (auto param : *func->getParameters()) {
-    auto paramType = func->mapTypeIntoContext(param->getInterfaceType());
-    if (TypeChecker::conformsToProtocol(paramType, encodableType, func).isInvalid() ||
-        TypeChecker::conformsToProtocol(paramType, decodableType, func).isInvalid()) {
-      if (diagnose)
-        func->diagnose(
-            diag::distributed_actor_func_param_not_codable,
-            param->getArgumentName().str(),
-            param->getInterfaceType()
-        );
-      // TODO: suggest a fixit to add Codable to the type?
-      return true;
-    }
-  }
-
-  // --- Result type must be either void or a codable type
-  auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType());
-  if (!resultType->isVoid()) {
-    if (TypeChecker::conformsToProtocol(resultType, decodableType, func).isInvalid() ||
-        TypeChecker::conformsToProtocol(resultType, encodableType, func).isInvalid()) {
-      if (diagnose)
-        func->diagnose(
-            diag::distributed_actor_func_result_not_codable,
-            func->getResultInterfaceType()
-        );
-      // TODO: suggest a fixit to add Codable to the type?
-      return true;
-    }
-  }
-
-  // === Each distributed function must have a static _remote_<func_name> counterpart
-  ClassDecl *actorDecl = dyn_cast<ClassDecl>(func->getParent());
-  assert(actorDecl && actorDecl->isDistributedActor());
-
-  auto remoteFuncDecl = actorDecl->lookupDirectRemoteFunc(func);
-  if (!remoteFuncDecl) {
-    if (diagnose) {
-      auto localFuncName = func->getBaseIdentifier().str().str();
-      func->diagnose(
-          diag::distributed_actor_func_missing_remote_func,
-          C.getIdentifier("_remote_" + localFuncName));
-    }
-    return true;
-  }
-
-  if (!remoteFuncDecl->isStatic()) {
-    if (diagnose)
-      func->diagnose(
-          diag::distributed_actor_remote_func_is_not_static,
-          remoteFuncDecl->getName());
-    return true;
-  }
-
-  if (!remoteFuncDecl->hasAsync() || !remoteFuncDecl->hasThrows()) {
-    if (diagnose)
-      func->diagnose(
-          diag::distributed_actor_remote_func_is_not_async_throws,
-          remoteFuncDecl->getName());
-    return true;
-  }
-
-  if (remoteFuncDecl->isDistributed()) {
-    if (diagnose)
-      func->diagnose(
-          diag::distributed_actor_remote_func_must_not_be_distributed,
-          remoteFuncDecl->getName());
     return true;
   }
 
@@ -222,52 +137,6 @@ bool IsDefaultActorRequest::evaluate(
              .hasSemanticsAttr(SEMANTICS_DEFAULT_ACTOR);
 
   return true;
-}
-
-bool IsDistributedActorRequest::evaluate(
-    Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  // Protocols are actors if their `Self` type conforms to `DistributedActor`.
-  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-    // Simple case: we have the `DistributedActor` protocol itself.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::DistributedActor))
-      return true;
-
-    auto actorProto = nominal->getASTContext().getProtocol(
-        KnownProtocolKind::DistributedActor);
-    if (!actorProto)
-      return false;
-
-    auto selfType = Type(protocol->getProtocolSelfType());
-    auto genericSig = protocol->getGenericSignature();
-    if (!genericSig)
-      return false;
-
-    return genericSig->requiresProtocol(selfType, actorProto);
-  }
-
-  // Class declarations are 'distributed actors' if they are declared with 'distributed actor'
-  if(!dyn_cast<ClassDecl>(nominal))
-    return false;
-
-  auto distributedAttr = nominal->getAttrs()
-      .getAttribute<DistributedActorAttr>();
-  return distributedAttr != nullptr;
-}
-
-bool IsDistributedFuncRequest::evaluate(
-    Evaluator &evaluator, FuncDecl *func) const {
-  // Check whether the attribute was explicitly specified.
-  if (auto attr = func->getAttrs().getAttribute<DistributedActorAttr>()) {
-//    // Check for well-formedness.
-//    if (checkDistributedFunc(func, /*diagnose=*/true)) {
-//      attr->setInvalid();
-//      return false;
-//    }
-
-    return true;
-  } else {
-    return false;
-  }
 }
 
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
@@ -2234,12 +2103,8 @@ namespace {
             }
 
             assert(func->isDistributed());
-
             tryMarkImplicitlyAsync(memberLoc, memberRef, context);
-
             tryMarkImplicitlyThrows(memberLoc, memberRef, context);
-
-            // TODO: we don't really need to do anythign with the result, dont get it?
 
             // distributed func reference, that passes all checks, great!
             continueToCheckingLocalIsolation = true;
@@ -2270,10 +2135,6 @@ namespace {
         } // end !selfVar
 
         return false;
-//        // continue checking as if it was actor self isolated
-//        assert(selfVar);
-//         LLVM_FALLTHROUGH;
-//        return false;
       }
 
       case ActorIsolationRestriction::ActorSelf: {
@@ -2529,7 +2390,7 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
   }
   if (auto attr = decl->getAttrs().getAttribute<DistributedActorAttr>()) {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
-      checkDistributedFunc(func, /*diagnose=*/true);
+      checkDistributedFunction(func, /*diagnose=*/true);
     }
   }
 }
@@ -2537,43 +2398,8 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
 /// Some actor constructors are special, so we need to check rules about them.
 void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
   // bail out unless distributed actor, only those have special rules to check here
-  if (!decl->isDistributedActor())
-    return;
-
-  // bail out for synthesized constructors
-  if (ctor->isSynthesized())
-    return;
-
-  if (ctor->isDistributedActorLocalInit()) {
-    // it is not legal to manually define init(transport:)
-    // TODO: we want to lift this restriction but it is tricky
-    ctor->diagnose(diag::distributed_actor_local_init_explicitly_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    // TODO: we should be able to allow this, but then we need to inject
-    //       code or force users to "do the right thing"
-    return;
-  }
-
-  if (ctor->isDistributedActorResolveInit()) {
-    // It is illegal for users to attempt defining a resolve initializer;
-    // Suggest removing it entirely, there is no way users can implement this init.
-    ctor->diagnose(diag::distributed_actor_init_resolve_must_not_be_user_defined)
-        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
-    return;
-  }
-
-  // All user defined initializers on distributed actors must be 'convenience'.
-  //
-  // The only initializer that is allowed to be designated is init(transport:)
-  // which we synthesize on behalf of a distributed actor.
-  //
-  // When checking ctor bodies we'll check
-  if (!ctor->isConvenienceInit()) {
-    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
-                   ctor->getName())
-        .fixItInsert(ctor->getConstructorLoc(), "convenience ");
-    return;
-  }
+  if (decl->isDistributedActor())
+    checkDistributedActorConstructor(decl, ctor);
 }
 
 void swift::checkActorConstructorBody(ClassDecl *classDecl,
