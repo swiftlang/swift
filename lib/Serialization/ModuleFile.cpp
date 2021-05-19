@@ -1245,9 +1245,9 @@ bool SerializedASTFile::getAllGenericSignatures(
   return true;
 }
 
-Decl *SerializedASTFile::getMainDecl() const {
+ValueDecl *SerializedASTFile::getMainDecl() const {
   assert(hasEntryPoint());
-  return File.getDecl(File.getEntryPointDeclID());
+  return cast_or_null<ValueDecl>(File.getDecl(File.getEntryPointDeclID()));
 }
 
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {

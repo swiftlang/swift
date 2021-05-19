@@ -99,7 +99,7 @@ private:
 
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
-  Decl *MainDecl = nullptr;
+  ValueDecl *MainDecl = nullptr;
 
   /// The source location of the main type.
   SourceLoc MainDeclDiagLoc;
@@ -480,7 +480,7 @@ public:
     llvm_unreachable("bad SourceFileKind");
   }
 
-  Decl *getMainDecl() const override { return MainDecl; }
+  ValueDecl *getMainDecl() const override { return MainDecl; }
   SourceLoc getMainDeclDiagLoc() const {
     assert(hasMainDecl());
     return MainDeclDiagLoc;
@@ -494,7 +494,7 @@ public:
   /// one.
   ///
   /// Should only be called during type-checking.
-  bool registerMainDecl(Decl *mainDecl, SourceLoc diagLoc);
+  bool registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc);
 
   /// True if this source file has an application entry point.
   ///

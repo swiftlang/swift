@@ -26,6 +26,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -140,6 +141,9 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::EnumElement:
     return getMagicFunctionName(cast<EnumElementDecl>(ref.getDecl())
                                   ->getDeclContext());
+  case SILDeclRef::Kind::EntryPoint:
+    auto *file = ref.getDecl()->getDeclContext()->getParentSourceFile();
+    return getMagicFunctionName(file);
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -570,9 +574,13 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
 }
 
 void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
-  // Load argc and argv from the entry point arguments.
-  SILValue argc = F.begin()->getArgument(0);
-  SILValue argv = F.begin()->getArgument(1);
+  // Create the argc and argv arguments.
+  auto entry = B.getInsertionBB();
+  auto paramTypeIter = F.getConventions()
+                           .getParameterSILTypes(getTypeExpansionContext())
+                           .begin();
+  SILValue argc = entry->createFunctionArgument(*paramTypeIter);
+  SILValue argv = entry->createFunctionArgument(*std::next(paramTypeIter));
 
   switch (mainDecl->getArtificialMainKind()) {
   case ArtificialMainKind::UIApplicationMain: {
