@@ -9,6 +9,9 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: OS=windows-msvc
 
+// Test fails sporadically on macOS-x86_64 and other configurations.
+// REQUIRES: rdar78192131
+
 var gg = 0
 
 @inline(never)
