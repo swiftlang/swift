@@ -1670,6 +1670,7 @@ public:
   void completeAfterIfStmt(bool hasElse) override;
   void completeStmtLabel(StmtKind ParentKind) override;
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
+  void completeTypeAttrBeginning() override;
 
   void doneParsing() override;
 
@@ -4702,6 +4703,22 @@ public:
     }
   }
 
+  void getTypeAttributeKeywordCompletions() {
+    auto addTypeAttr = [&](StringRef Name) {
+      CodeCompletionResultBuilder Builder(
+          Sink,
+          CodeCompletionResult::ResultKind::Keyword,
+          SemanticContextKind::None, expectedTypeContext);
+      Builder.addAttributeKeyword(Name, "Type Attribute");
+    };
+    addTypeAttr("autoclosure");
+    addTypeAttr("convention(swift)");
+    addTypeAttr("convention(block)");
+    addTypeAttr("convention(c)");
+    addTypeAttr("convention(thin)");
+    addTypeAttr("escaping");
+  }
+
   void collectPrecedenceGroups() {
     assert(CurrDeclContext);
 
@@ -5835,6 +5852,11 @@ void CodeCompletionCallbacksImpl::completeForEachPatternBeginning(
     ParsedKeywords.emplace_back("await");
 }
 
+void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::TypeAttrBeginning;
+}
+
 static bool isDynamicLookup(Type T) {
   return T->getRValueType()->isAnyObject();
 }
@@ -5969,6 +5991,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::KeyPathExprSwift:
   case CompletionKind::PrecedenceGroup:
   case CompletionKind::StmtLabel:
+  case CompletionKind::TypeAttrBeginning:
     break;
 
   case CompletionKind::EffectsSpecifier: {
@@ -6986,6 +7009,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.getStmtLabelCompletions(Loc, ParentStmtKind == StmtKind::Continue);
     break;
+  }
+  case CompletionKind::TypeAttrBeginning: {
+    Lookup.getTypeAttributeKeywordCompletions();
+
+    // Type names at attribute position after '@'.
+    Lookup.getTypeCompletionsInDeclContext(
+      P.Context.SourceMgr.getCodeCompletionLoc());
+    break;
+
   }
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
