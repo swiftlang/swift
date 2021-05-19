@@ -425,9 +425,17 @@ class ModuleInterfaceLoaderImpl {
   }
 
   std::string getBackupPublicModuleInterfacePath() {
+    return getBackupPublicModuleInterfacePath(ctx.SourceMgr, backupInterfaceDir,
+                                              moduleName, interfacePath);
+  }
+
+  static std::string getBackupPublicModuleInterfacePath(SourceManager &SM,
+                                                        StringRef backupInterfaceDir,
+                                                        StringRef moduleName,
+                                                        StringRef interfacePath) {
     if (backupInterfaceDir.empty())
       return std::string();
-    auto &fs = *ctx.SourceMgr.getFileSystem();
+    auto &fs = *SM.getFileSystem();
     auto fileName = llvm::sys::path::filename(interfacePath);
     {
       llvm::SmallString<256> path(backupInterfaceDir);
@@ -1145,21 +1153,6 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
   return results;
 }
 
-std::string
-ModuleInterfaceCheckerImpl::getBackupPublicModuleInterfacePath(StringRef moduleName,
-                                                               StringRef interfacePath) {
-  // Derive .swiftmodule path from the .swiftinterface path.
-  auto newExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-  llvm::SmallString<32> modulePath = interfacePath;
-  llvm::sys::path::replace_extension(modulePath, newExt);
-  ModuleInterfaceLoaderImpl Impl(Ctx, modulePath, interfacePath, moduleName,
-                                 CacheDir, PrebuiltCacheDir, BackupInterfaceDir,
-                                 SourceLoc(), Opts,
-                                 RequiresOSSAModules, nullptr,
-                                 ModuleLoadingMode::PreferSerialized);
-  return Impl.getBackupPublicModuleInterfacePath();
-}
-
 bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
     StringRef moduleName, StringRef interfacePath,
     ArrayRef<std::string> candidates, StringRef outputPath) {
@@ -1212,9 +1205,29 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
                                  LoaderOpts.disableInterfaceLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
-  return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
-                                  /*ModuleBuffer*/nullptr, nullptr,
-                                  SearchPathOpts.CandidateCompiledModules);
+  auto failed = builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                         /*ModuleBuffer*/nullptr, nullptr,
+                                         SearchPathOpts.CandidateCompiledModules);
+  if (!failed)
+    return false;
+  auto backInPath =
+    ModuleInterfaceLoaderImpl::getBackupPublicModuleInterfacePath(SourceMgr,
+      BackupInterfaceDir, ModuleName, InPath);
+  if (backInPath.empty())
+    return true;
+  assert(failed);
+  assert(!backInPath.empty());
+  ModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
+                                       ModuleName, CacheDir, PrebuiltCacheDir,
+                                       BackupInterfaceDir,
+                                       LoaderOpts.disableInterfaceLock);
+  // Ensure we can rebuild module after user changed the original interface file.
+  backupBuilder.addExtraDependency(InPath);
+  // FIXME: We really only want to serialize 'important' dependencies here, if
+  //        we want to ship the built swiftmodules to another machine.
+  return backupBuilder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                        /*ModuleBuffer*/nullptr, nullptr,
+                                        SearchPathOpts.CandidateCompiledModules);
 }
 
 void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
