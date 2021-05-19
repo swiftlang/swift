@@ -3612,41 +3612,25 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
         // that scope, so we have to store enough state to emit the diagnostics
         // outside of the scope.
         bool isActorModifier = false;
-        bool isClassNext = false;
         SourceLoc actorLoc = Tok.getLoc();
-        SourceLoc classLoc;
+
         {
           BacktrackingScope Scope(*this);
 
-          // Is this the class token before the identifier?
-          auto atClassDecl = [this]() -> bool {
-            return peekToken().is(tok::identifier) ||
-              Tok.is(tok::kw_class) ||
-              Tok.is(tok::kw_enum) ||
-              Tok.is(tok::kw_struct);
-          };
           consumeToken(); // consume actor
           isActorModifier = isStartOfSwiftDecl();
-          if (isActorModifier) {
-            isClassNext = atClassDecl();
-            while (!atClassDecl())
-              consumeToken();
-            classLoc = Tok.getLoc();
-          }
         }
 
         if (!isActorModifier)
           break;
 
-        auto diag = diagnose(actorLoc,
-            diag::renamed_platform_condition_argument, "actor class", "actor");
-        if (isClassNext)
-          diag.fixItRemove(classLoc);
-        else
-          diag.fixItReplace(classLoc, "actor")
-              .fixItRemove(actorLoc);
-        Attributes.add(new (Context) ActorAttr({}, Tok.getLoc()));
-        consumeToken();
+        // Actor is a standalone keyword now, so it can't be used
+        // as a modifier. Let's diagnose and recover.
+        isError = true;
+
+        consumeToken(); // consume 'actor'
+
+        diagnose(actorLoc, diag::keyword_cant_be_identifier, Tok.getText());
         continue;
       }
 
