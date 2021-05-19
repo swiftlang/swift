@@ -181,7 +181,8 @@ struct SILDeclRef {
 
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(
-      ValueDecl *decl, Kind kind, bool isForeign = false,
+      ValueDecl *decl, Kind kind,
+      bool isForeign = false,
       bool isDistributed = false,
       AutoDiffDerivativeFunctionIdentifier *derivativeId = nullptr);
 
@@ -331,15 +332,19 @@ struct SILDeclRef {
   /// Returns the foreign (or native) entry point corresponding to the same
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind, foreign,
-                      /*distributed*/ false, defaultArgIndex,
+    return SILDeclRef(loc.getOpaqueValue(), kind,
+                      /*foreign=*/foreign,
+                      /*distributed=*/false,
+                      defaultArgIndex,
                       pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
   /// Returns the distributed entry point corresponding to the same
   /// decl.
   SILDeclRef asDistributed(bool distributed = true) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind, /*foreign*/ false,
-                      distributed, defaultArgIndex,
+    return SILDeclRef(loc.getOpaqueValue(), kind,
+                      /*foreign=*/false,
+                      /*distributed=*/distributed,
+                      defaultArgIndex,
                       pointer.get<AutoDiffDerivativeFunctionIdentifier *>());
   }
 
@@ -457,8 +462,10 @@ struct SILDeclRef {
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.
-  explicit SILDeclRef(void *opaqueLoc, Kind kind, bool isForeign,
-                      bool isDistributed, unsigned defaultArgIndex,
+  explicit SILDeclRef(void *opaqueLoc, Kind kind,
+                      bool isForeign,
+                      bool isDistributed,
+                      unsigned defaultArgIndex,
                       AutoDiffDerivativeFunctionIdentifier *derivativeId)
       : loc(Loc::getFromOpaqueValue(opaqueLoc)), kind(kind),
         isForeign(isForeign), isDistributed(isDistributed),

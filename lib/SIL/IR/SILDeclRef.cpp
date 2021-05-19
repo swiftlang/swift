@@ -708,8 +708,6 @@ bool SILDeclRef::isNativeToForeignThunk() const {
 bool SILDeclRef::isDistributedThunk() const {
   if (!isDistributed)
     return false;
-  if (!hasDecl())
-    return false;
   return kind == Kind::Func;
 }
 
@@ -910,7 +908,6 @@ static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
 }
 
 bool SILDeclRef::requiresNewVTableEntry() const {
-  // TODO: if distributed thunk return false here
   if (getDerivativeFunctionIdentifier())
     if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
@@ -1280,6 +1277,7 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
 bool SILDeclRef::hasAsync() const {
   if (isDistributedThunk())
     return true;
+
   if (hasDecl()) {
     if (auto afd = dyn_cast<AbstractFunctionDecl>(getDecl())) {
       return afd->hasAsync();

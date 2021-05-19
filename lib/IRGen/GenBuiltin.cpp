@@ -354,17 +354,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     emitBuildOrdinarySerialExecutorRef(IGF, actor, type, conf, out);
     return;
   }
-  
+
   if (Builtin.ID == BuiltinValueKind::InitializeDistributedRemoteActor) {
     auto fn = IGF.IGM.getDistributedActorInitializeRemoteFn();
     auto actor = args.claimNext();
     actor = IGF.Builder.CreateBitCast(actor, IGF.IGM.RefCountedPtrTy);
     // init(resolve address, using transport)
-    // auto address = args.claimNext(); // FIXME: actually take those parameters
-    // auto transport = args.claimNext();
     auto call = IGF.Builder.CreateCall(fn, {
       actor
-      // , address, transport
+      // TODO: might have to carry `address, transport` depending on how we implement the resolve initializers
     });
     call->setCallingConv(IGF.IGM.SwiftCC);
     return;

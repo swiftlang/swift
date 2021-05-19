@@ -467,7 +467,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     /*GenericParams=*/nullptr, params,
     property->getInterfaceType(), parentDC);
   getterDecl->setImplicit();
-  getterDecl->setSynthesized();
   getterDecl->setIsTransparent(false);
 
   getterDecl->copyFormalAccessFrom(property);
