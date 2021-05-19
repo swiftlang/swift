@@ -12,7 +12,8 @@
 // UNSUPPORTED: CPU=x86_64 && OS=ios
 // rdar://78039465
 // UNSUPPORTED: CPU=x86_64 && OS=watchos
-
+// rdar://78193017
+// UNSUPPORTED: CPU=x86_64 && OS=tvos
 
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }
