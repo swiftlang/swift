@@ -5432,6 +5432,20 @@ private:
     return TopHandler.isValid();
   }
 
+  /// Prints a tuple of elements, or a lone single element if only one is
+  /// present, using the provided printing function.
+  template <typename T, typename PrintFn>
+  void addTupleOf(ArrayRef<T> Elements, llvm::raw_ostream &OS,
+                  PrintFn PrintElt) {
+    if (Elements.size() == 1) {
+      PrintElt(Elements[0]);
+      return;
+    }
+    OS << tok::l_paren;
+    llvm::interleave(Elements, PrintElt, [&]() { OS << tok::comma << " "; });
+    OS << tok::r_paren;
+  }
+
 
   /// Retrieves the location for the start of a comment attached to the token
   /// at the provided location, or the location itself if there is no comment.
@@ -6075,16 +6089,9 @@ private:
         }
         OS << " ";
       }
-      if (SuccessParams.size() > 1)
-        OS << tok::l_paren;
-      OS << newNameFor(SuccessParams.front());
-      for (const auto Param : SuccessParams.drop_front()) {
-        OS << tok::comma << " ";
-        OS << newNameFor(Param);
-      }
-      if (SuccessParams.size() > 1) {
-        OS << tok::r_paren;
-      }
+      // 'res =' or '(res1, res2, ...) ='
+      addTupleOf(SuccessParams, OS,
+                 [&](auto &Param) { OS << newNameFor(Param); });
       OS << " " << tok::equal << " ";
     }
 
@@ -6408,19 +6415,10 @@ private:
   /// Adds the result type of a refactored async function that previously
   /// returned results via a completion handler described by \p HandlerDesc.
   void addAsyncFuncReturnType(const AsyncHandlerDesc &HandlerDesc) {
+    // Type or (Type1, Type2, ...)
     SmallVector<Type, 2> Scratch;
-    auto ReturnTypes = HandlerDesc.getAsyncReturnTypes(Scratch);
-    if (ReturnTypes.size() > 1) {
-      OS << tok::l_paren;
-    }
-
-    llvm::interleave(
-        ReturnTypes, [&](Type Ty) { Ty->print(OS); },
-        [&]() { OS << tok::comma << " "; });
-
-    if (ReturnTypes.size() > 1) {
-      OS << tok::r_paren;
-    }
+    addTupleOf(HandlerDesc.getAsyncReturnTypes(Scratch), OS,
+               [&](auto Ty) { Ty->print(OS); });
   }
 
   /// If \p FD is generic, adds a type annotation with the return type of the
