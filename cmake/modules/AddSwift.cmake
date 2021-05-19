@@ -129,6 +129,12 @@ function(add_lto_flags name)
   if (_lto_flag_out)
     target_compile_options(${name} PRIVATE ${_lto_flag_out})
     target_link_options(${name} PRIVATE ${_lto_flag_out})
+
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS AND
+        SWIFT_TOOLS_DARWIN_ENABLE_LTO_ONLY_FOR_TARGETS AND
+        NOT name IN_LIST SWIFT_TOOLS_DARWIN_ENABLE_LTO_ONLY_FOR_TARGETS)
+        target_link_options(${name} PRIVATE "LINKER:-flto-codegen-only")
+    endif()
   endif()
 endfunction()
 
