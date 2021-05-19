@@ -82,7 +82,9 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::ConvertToAsync,
                       "convert-to-async", "Convert the entire function to async"),
            clEnumValN(RefactoringKind::AddAsyncAlternative,
-                      "add-async-alternative", "Add an async alternative of a function taking a callback")));
+                      "add-async-alternative", "Add an async alternative of a function taking a callback"),
+           clEnumValN(RefactoringKind::AddAsyncWrapper,
+                      "add-async-wrapper", "Add an async alternative that forwards onto the function taking a callback")));
 
 
 static llvm::cl::opt<std::string>
