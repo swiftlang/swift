@@ -2512,6 +2512,9 @@ static CanSILFunctionType getNativeSILFunctionType(
           DefaultConventions(NormalParameterConvention::Guaranteed));
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionTypeForConventions(DeallocatorConventions());
+
+    case SILDeclRef::Kind::EntryPoint:
+      llvm_unreachable("Handled by getSILFunctionTypeForAbstractCFunction");
     }
   }
   }
@@ -3038,6 +3041,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+  case SILDeclRef::Kind::EntryPoint:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -3262,19 +3266,21 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   }
 
   // Anonymous functions currently always have Freestanding CC.
-  if (!c.hasDecl())
+  if (c.getAbstractClosureExpr())
     return SILFunctionTypeRepresentation::Thin;
 
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
-  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
-    // Use the regular method convention for foreign-to-native thunks.
-    if (c.isForeignToNativeThunk())
-      return SILFunctionTypeRepresentation::Method;
-    assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
-    return getProtocolWitnessRepresentation(proto);
+  if (c.hasDecl()) {
+    if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
+      // Use the regular method convention for foreign-to-native thunks.
+      if (c.isForeignToNativeThunk())
+        return SILFunctionTypeRepresentation::Method;
+      assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
+      return getProtocolWitnessRepresentation(proto);
+    }
   }
 
   switch (c.kind) {
@@ -3298,6 +3304,9 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;
+
+    case SILDeclRef::Kind::EntryPoint:
+      return SILFunctionTypeRepresentation::CFunctionPointer;
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -4125,6 +4134,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
+  case SILDeclRef::Kind::EntryPoint:
     return nullptr;
   }
   llvm_unreachable("bad SILDeclRef kind");

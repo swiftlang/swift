@@ -539,65 +539,6 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   return fn;
 }
 
-
-SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
-  ASTContext &C = getASTContext();
-
-  // Use standard library types if we have them; otherwise, fall back to
-  // builtins.
-  CanType Int32Ty;
-  if (auto Int32Decl = C.getInt32Decl()) {
-    Int32Ty = Int32Decl->getDeclaredInterfaceType()->getCanonicalType();
-  } else {
-    Int32Ty = CanType(BuiltinIntegerType::get(32, C));
-  }
-
-  CanType PtrPtrInt8Ty = C.TheRawPointerType;
-  if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
-    if (auto Int8Decl = C.getInt8Decl()) {
-      Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
-      Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
-                                                 nullptr,
-                                                 Int8Ty);
-      Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
-      PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
-                                           nullptr,
-                                           OptPointerInt8Ty)
-        ->getCanonicalType();
-    }
-  }
-
-  SILParameterInfo params[] = {
-    SILParameterInfo(Int32Ty, ParameterConvention::Direct_Unowned),
-    SILParameterInfo(PtrPtrInt8Ty, ParameterConvention::Direct_Unowned),
-  };
-  SILResultInfo results[] = {SILResultInfo(Int32Ty, ResultConvention::Unowned)};
-
-  auto rep = SILFunctionType::Representation::CFunctionPointer;
-  auto *clangTy = C.getCanonicalClangFunctionType(params, results[0], rep);
-  auto extInfo = SILFunctionType::ExtInfoBuilder()
-                     .withRepresentation(rep)
-                     .withClangFunctionType(clangTy)
-                     .build();
-
-  CanSILFunctionType topLevelType = SILFunctionType::get(nullptr, extInfo,
-                                   SILCoroutineKind::None,
-                                   ParameterConvention::Direct_Unowned,
-                                   params, /*yields*/ {},
-                                   SILResultInfo(Int32Ty,
-                                                 ResultConvention::Unowned),
-                                   None,
-                                   SubstitutionMap(), SubstitutionMap(),
-                                   C);
-
-  auto name = getASTContext().getEntryPointFunctionName();
-  SILGenFunctionBuilder builder(*this);
-  return builder.createFunction(
-      SILLinkage::Public, name, topLevelType, nullptr,
-      Loc, IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
-}
-
 SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
                                               ForDefinition_t forDefinition) {
   auto found = emittedFunctions.find(constant);
@@ -1064,6 +1005,20 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
     SILGenFunction(*this, *f, cd).emitIVarDestroyer(constant);
+    postEmitFunction(constant, f);
+    return;
+  }
+  case SILDeclRef::Kind::EntryPoint: {
+    f->setBare(IsBare);
+
+    // TODO: Handle main SourceFile emission (currently done by
+    // SourceFileScope).
+    auto loc = RegularLocation::getModuleLocation();
+    preEmitFunction(constant, f, loc);
+    auto *decl = constant.getDecl();
+    auto *dc = decl->getDeclContext();
+    PrettyStackTraceSILFunction X("silgen emitArtificialTopLevel", f);
+    SILGenFunction(*this, *f, dc).emitArtificialTopLevel(decl);
     postEmitFunction(constant, f);
     return;
   }
@@ -1868,10 +1823,9 @@ namespace {
 /// An RAII class to scope source file codegen.
 class SourceFileScope {
   SILGenModule &sgm;
-  SourceFile *sf;
   Optional<Scope> scope;
 public:
-  SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm), sf(sf) {
+  SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm) {
     // If this is the script-mode file for the module, create a toplevel.
     if (sf->isScriptMode()) {
       assert(!sgm.TopLevelSGF && "already emitted toplevel?!");
@@ -1880,7 +1834,9 @@ public:
              "already emitted toplevel?!");
 
       RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
-      SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
+      auto ref = SILDeclRef::getMainFileEntryPoint(sf);
+      auto *toplevel = sgm.getFunction(ref, ForDefinition);
+      toplevel->setBare(IsBare);
 
       // Assign a debug scope pointing into the void to the top level function.
       toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc, toplevel));
@@ -1995,31 +1951,6 @@ public:
       toplevel->verify();
       sgm.emitLazyConformancesForFunction(toplevel);
     }
-
-    // If the source file contains an artificial main, emit the implicit
-    // toplevel code.
-    if (auto mainDecl = sf->getMainDecl()) {
-      assert(!sgm.M.lookUpFunction(
-                 sgm.getASTContext().getEntryPointFunctionName()) &&
-             "already emitted toplevel before main class?!");
-
-      RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
-      SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
-
-      // Assign a debug scope pointing into the void to the top level function.
-      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc, toplevel));
-
-      // Create the argc and argv arguments.
-      SILGenFunction SGF(sgm, *toplevel, sf);
-      auto entry = SGF.B.getInsertionBB();
-      auto paramTypeIter =
-          SGF.F.getConventions()
-              .getParameterSILTypes(SGF.getTypeExpansionContext())
-              .begin();
-      entry->createFunctionArgument(*paramTypeIter);
-      entry->createFunctionArgument(*std::next(paramTypeIter));
-      SGF.emitArtificialTopLevel(mainDecl);
-    }
   }
 };
 
@@ -2034,7 +1965,7 @@ public:
     performTypeChecking(*sf);
 
     SourceFileScope scope(SGM, sf);
-    for (Decl *D : sf->getTopLevelDecls()) {
+    for (auto *D : sf->getTopLevelDecls()) {
       FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
                                       "SILgen-decl", D);
       SGM.visit(D);
@@ -2055,7 +1986,13 @@ public:
         continue;
       SGM.visit(TD);
     }
+
+    // If the source file contains an artificial main, emit the implicit
+    // top-level code.
+    if (auto *mainDecl = sf->getMainDecl())
+      emitSILFunctionDefinition(SILDeclRef::getMainDeclEntryPoint(mainDecl));
   }
+  
   void emitSILFunctionDefinition(SILDeclRef ref) {
     SGM.emitFunctionDefinition(ref, SGM.getFunction(ref, ForDefinition));
   }
