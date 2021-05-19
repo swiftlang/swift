@@ -638,6 +638,7 @@ endmacro()
 
 # Declare that files in this library are built with LLVM's support
 # libraries available.
-macro(set_swift_llvm_is_available)
-  add_compile_options(-DSWIFT_LLVM_SUPPORT_IS_AVAILABLE)
-endmacro()
+function(set_swift_llvm_is_available name)
+  target_compile_definitions(${name} PRIVATE
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:SWIFT_LLVM_SUPPORT_IS_AVAILABLE>)
+endfunction()
