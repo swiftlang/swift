@@ -27,10 +27,6 @@ public actor ExplicitActorClass : Actor {
 @available(SwiftStdlib 5.5, *)
 public actor EmptyActor {}
 
-// CHECK: actor public class EmptyActorClass {
-@available(SwiftStdlib 5.5, *)
-public actor class EmptyActorClass {}
-
 // CHECK: public protocol Cat : _Concurrency.Actor {
 @available(SwiftStdlib 5.5, *)
 public protocol Cat : Actor {
