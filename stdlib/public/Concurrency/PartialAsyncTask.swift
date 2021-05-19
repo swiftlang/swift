@@ -18,8 +18,12 @@ import Swift
 /// Unless you're implementing a scheduler,
 /// you don't generally interact with partial tasks directly.
 @available(SwiftStdlib 5.5, *)
+public typealias PartialAsyncTask = UnownedJob
+
+/// A job is a unit of scheduleable work.
+@available(SwiftStdlib 5.5, *)
 @frozen
-public struct PartialAsyncTask {
+public struct UnownedJob {
   private var context: Builtin.Job
 
   /// Starts running the task.

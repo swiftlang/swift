@@ -839,6 +839,15 @@ public:
             valueDescription + " cannot apply to a function type");
   }
 
+  /// Require the operand to be `$Optional<Builtin.Executor>`.
+  void requireOptionalExecutorType(SILValue value, const Twine &what) {
+    auto type = value->getType();
+    require(type.isObject(), what + " must be an object type");
+    auto objectType = type.getASTType().getOptionalObjectType();
+    require(objectType && objectType == M->getASTContext().TheExecutorType,
+            what + " must be Optional<Builtin.Executor>");
+  }
+
   /// Assert that two types are equal.
   void requireSameType(Type type1, Type type2, const Twine &complaint) {
     _require(type1->isEqual(type2), complaint,
@@ -1829,6 +1838,7 @@ public:
     }
 
     auto builtinKind = BI->getBuiltinKind();
+    auto arguments = BI->getArguments();
 
     // Check that 'getCurrentAsyncTask' only occurs within an async function.
     if (builtinKind == BuiltinValueKind::GetCurrentAsyncTask) {
@@ -1839,25 +1849,43 @@ public:
 
     if (builtinKind == BuiltinValueKind::InitializeDefaultActor ||
         builtinKind == BuiltinValueKind::DestroyDefaultActor) {
-      auto arguments = BI->getArguments();
       require(arguments.size() == 1,
               "default-actor builtin can only operate on a single object");
       auto argType = arguments[0]->getType().getASTType();
       auto argClass = argType.getClassOrBoundGenericClass();
-      require((argClass && argClass->isRootDefaultActor()) ||
+      require((argClass && argClass->isRootDefaultActor(M,
+                                        F.getResilienceExpansion())) ||
               isa<BuiltinNativeObjectType>(argType),
               "default-actor builtin can only operate on default actors");
       return;
     }
 
-    if (builtinKind == BuiltinValueKind::BuildSerialExecutorRef) {
-      requireObjectType(BuiltinExecutorType, BI,
-                        "result of buildSerialExecutorRef");
-      auto arguments = BI->getArguments();
+    // Check that 'getCurrentAsyncTask' only occurs within an async function.
+    if (builtinKind == BuiltinValueKind::GetCurrentExecutor) {
+      require(F.isAsync(),
+              "getCurrentExecutor can only be used in an async function");
+      require(arguments.empty(), "getCurrentExecutor takes no arguments");
+      requireOptionalExecutorType(BI, "result of getCurrentExecutor");
+      return;
+    }
+
+    if (builtinKind == BuiltinValueKind::BuildOrdinarySerialExecutorRef ||
+        builtinKind == BuiltinValueKind::BuildDefaultActorExecutorRef) {
       require(arguments.size() == 1,
-              "buildSerialExecutorRef expects one argument");
+              "builtin expects one argument");
       require(arguments[0]->getType().isObject(),
-              "operand of buildSerialExecutorRef should have object type");
+              "operand of builtin should have object type");
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of build*ExecutorRef");
+      return;
+    }
+
+    if (builtinKind == BuiltinValueKind::BuildMainActorExecutorRef) {
+      require(arguments.size() == 0,
+              "buildMainActorExecutorRef expects no arguments");
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of build*ExecutorRef");
+      return;
     }
   }
   
@@ -4789,9 +4817,8 @@ public:
   void checkHopToExecutorInst(HopToExecutorInst *HI) {
     auto executor = HI->getTargetExecutor();
     if (HI->getModule().getStage() == SILStage::Lowered) {
-      requireObjectType(BuiltinExecutorType, executor->getType(),
-                        "hop_to_executor instruction must take a "
-                        "Builtin.Executor in lowered SIL");
+      requireOptionalExecutorType(executor,
+                                  "hop_to_executor operand in lowered SIL");
     }
   }
 
@@ -5851,6 +5878,7 @@ void SILVTable::verify(const SILModule &M) const {
         assert(!superEntry->isNonOverridden()
                && "vtable entry overrides an entry that claims to have no overrides");
         // TODO: Check the root vtable entry for the method too.
+
         break;
       }
     }

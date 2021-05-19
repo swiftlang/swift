@@ -37,6 +37,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
   Actor.swift
+  AsyncLet.cpp
+  AsyncLet.swift
   CheckedContinuation.swift
   GlobalExecutor.cpp
   Errors.swift

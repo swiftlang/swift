@@ -2513,6 +2513,12 @@ static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
       return SpecialKind::TaskFutureWait;
     if (name.equals("swift_task_future_wait_throwing"))
       return SpecialKind::TaskFutureWaitThrowing;
+
+    if (name.equals("swift_asyncLet_wait"))
+      return SpecialKind::AsyncLetWait;
+    if (name.equals("swift_asyncLet_wait_throwing"))
+      return SpecialKind::AsyncLetWaitThrowing;
+
     if (name.equals("swift_taskGroup_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
   }
@@ -6150,12 +6156,8 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 }
 
 void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
-  if (!i->getFunction()->isAsync()) {
-    // This should never occur.
-    assert(false && "The hop_to_executor should have been eliminated");
-    return;
-  }
-  assert(i->getTargetExecutor()->getType().is<BuiltinExecutorType>());
+  assert(i->getTargetExecutor()->getType().getOptionalObjectType()
+           .is<BuiltinExecutorType>());
   llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
           llvm::Intrinsic::coro_async_resume, {});
 

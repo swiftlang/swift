@@ -355,10 +355,31 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C,
 }
 
 FuncDecl *
-SILGenModule::getRunChildTask() {
+SILGenModule::getAsyncLetStart() {
   return lookupConcurrencyIntrinsic(getASTContext(),
-                                    RunChildTask,
-                                    "_runChildTask");
+                                    AsyncLetStart,
+                                    "_asyncLetStart");
+}
+
+FuncDecl *
+SILGenModule::getAsyncLetGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    AsyncLetGet,
+                                    "_asyncLetGet");
+}
+
+FuncDecl *
+SILGenModule::getAsyncLetGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    AsyncLetGetThrowing,
+                                    "_asyncLetGetThrowing");
+}
+
+FuncDecl *
+SILGenModule::getEndAsyncLet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    EndAsyncLet,
+                                    "_asyncLetEnd");
 }
 
 FuncDecl *

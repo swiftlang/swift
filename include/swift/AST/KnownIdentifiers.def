@@ -218,6 +218,7 @@ IDENTIFIER(className)
 
 IDENTIFIER(_defaultActorInitialize)
 IDENTIFIER(_defaultActorDestroy)
+IDENTIFIER(unownedExecutor)
 
 IDENTIFIER_(ErrorType)
 IDENTIFIER(Code)

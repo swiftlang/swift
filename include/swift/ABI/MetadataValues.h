@@ -49,6 +49,9 @@ enum {
 
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
+
+  /// The number of words in an AsyncLet (flags + task pointer)
+  NumWords_AsyncLet = 8, // TODO: not sure how much is enough, these likely could be pretty small
 };
 
 struct InProcess;
@@ -126,6 +129,9 @@ const size_t Alignment_DefaultActor = MaximumAlignment;
 
 /// The alignment of a TaskGroup.
 const size_t Alignment_TaskGroup = MaximumAlignment;
+
+/// The alignment of an AsyncLet.
+const size_t Alignment_AsyncLet = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -1994,7 +2000,7 @@ enum class JobPriority : size_t {
 };
 
 /// Flags for schedulable jobs.
-class JobFlags : public FlagSet<size_t> {
+class JobFlags : public FlagSet<uint32_t> {
 public:
   enum {
     Kind           = 0,
@@ -2013,7 +2019,7 @@ public:
     Task_IsContinuingAsyncTask      = 27,
   };
 
-  explicit JobFlags(size_t bits) : FlagSet(bits) {}
+  explicit JobFlags(uint32_t bits) : FlagSet(bits) {}
   JobFlags(JobKind kind) { setKind(kind); }
   JobFlags(JobKind kind, JobPriority priority) {
     setKind(kind);
@@ -2192,20 +2198,6 @@ enum class ContinuationStatus : size_t {
 
   /// The continuation has already been resumed, but not yet awaited.
   Resumed = 2
-};
-
-/// Flags describing the executor implementation that are stored
-/// in the ExecutorRef.
-enum class ExecutorRefFlags : size_t {
-  // The number of bits available here is very limited because it's
-  // potentially just the alignment bits of a protocol witness table
-  // pointer
-
-  /// The executor is a default actor.
-  DefaultActor = 0x1,
-
-  /// TODO: remove this
-  MainActorIdentity = 0x2,
 };
 
 } // end namespace swift
