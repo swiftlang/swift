@@ -860,7 +860,8 @@ getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
 
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
-                         std::unique_ptr<llvm::opt::InputArgList> ArgList) {
+                         std::unique_ptr<llvm::opt::InputArgList> ArgList,
+                         bool AllowErrors) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
@@ -880,7 +881,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // Perform toolchain specific args validation.
   TC.validateArguments(Diags, *TranslatedArgList, DefaultTargetTriple);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (!handleImmediateArgs(*TranslatedArgList, TC)) {
@@ -891,7 +892,7 @@ Driver::buildCompilation(const ToolChain &TC,
   InputFileList Inputs;
   buildInputs(TC, *TranslatedArgList, Inputs);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   // Determine the OutputInfo for the driver.
@@ -900,14 +901,14 @@ Driver::buildCompilation(const ToolChain &TC,
   OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   assert(OI.CompilerOutputType != file_types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
 
   TC.validateOutputInfo(Diags, OI);
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   validateEmbedBitcode(*TranslatedArgList, OI, Diags);
@@ -919,7 +920,7 @@ Driver::buildCompilation(const ToolChain &TC,
   Optional<OutputFileMap> OFM = buildOutputFileMap(
       *TranslatedArgList, workingDirectory);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (ArgList->hasArg(options::OPT_driver_print_output_file_map)) {
@@ -927,7 +928,9 @@ Driver::buildCompilation(const ToolChain &TC,
       OFM->dump(llvm::errs(), true);
     else
       Diags.diagnose(SourceLoc(), diag::error_no_output_file_map_specified);
-    return nullptr;
+    if (!AllowErrors) {
+      return nullptr;
+    }
   }
 
   const bool ShowIncrementalBuildDecisions =
@@ -1044,7 +1047,7 @@ Driver::buildCompilation(const ToolChain &TC,
   buildActions(TopLevelActions, TC, OI,
                whyIgnoreIncrementallity.empty() ? &outOfDateMap : nullptr, *C);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (DriverPrintActions) {
@@ -1076,7 +1079,7 @@ Driver::buildCompilation(const ToolChain &TC,
   if (!whyIgnoreIncrementallity.empty())
     C->disableIncrementalBuild(whyIgnoreIncrementallity);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (DriverPrintBindings)
