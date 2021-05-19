@@ -6286,22 +6286,46 @@ private:
   /// 'await' keyword.
   void addCallToAsyncMethod(const FuncDecl *FD,
                             const AsyncHandlerDesc &HandlerDesc) {
+    // The call to the async function is the same as the call to the old
+    // completion handler function, minus the completion handler arg.
+    addForwardingCallTo(FD, HandlerDesc, /*HandlerReplacement*/ "");
+  }
+
+  /// Adds a forwarding call to the old completion handler function, with
+  /// \p HandlerReplacement that allows for a custom replacement or, if empty,
+  /// removal of the completion handler closure.
+  void addForwardingCallTo(
+      const FuncDecl *FD, const AsyncHandlerDesc &HandlerDesc,
+      StringRef HandlerReplacement, bool CanUseTrailingClosure = true) {
     OS << FD->getBaseName() << tok::l_paren;
-    bool FirstParam = true;
-    for (auto Param : *FD->getParameters()) {
+
+    auto *Params = FD->getParameters();
+    for (auto Param : *Params) {
       if (Param == HandlerDesc.getHandler()) {
-        /// We don't need to pass the completion handler to the async method.
-        continue;
+        /// If we're not replacing the handler with anything, drop it.
+        if (HandlerReplacement.empty())
+          continue;
+
+        // If this is the last param, and we can use a trailing closure, do so.
+        if (CanUseTrailingClosure && Param == Params->back()) {
+          OS << tok::r_paren << " ";
+          OS << HandlerReplacement;
+          return;
+        }
+        // Otherwise fall through to do the replacement.
       }
-      if (!FirstParam) {
+
+      if (Param != Params->front())
         OS << tok::comma << " ";
-      } else {
-        FirstParam = false;
-      }
-      if (!Param->getArgumentName().empty()) {
+
+      if (!Param->getArgumentName().empty())
         OS << Param->getArgumentName() << tok::colon << " ";
+
+      if (Param == HandlerDesc.getHandler()) {
+        OS << HandlerReplacement;
+      } else {
+        OS << Param->getParameterName();
       }
-      OS << Param->getParameterName();
     }
     OS << tok::r_paren;
   }
