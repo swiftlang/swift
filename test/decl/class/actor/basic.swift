@@ -9,20 +9,18 @@ class MyActorSubclass1: MyActor { } // expected-error{{actor types do not suppor
 
 actor MyActorSubclass2: MyActor { } // expected-error{{actor types do not support inheritance}}
 
-// expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{7-13=}}
+// expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
 actor class MyActorClass { }
 
 class NonActor { }
 
 actor NonActorSubclass : NonActor { } // expected-error{{actor types do not support inheritance}}
 
-// expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{14-20=}}
+// expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
 public actor class BobHope {}
-// expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{14-19=actor}}{{1-7=}}
+// expected-error@+1{{keyword 'public' cannot be used as an identifier here}}
 actor public class BarbraStreisand {}
-// expected-warning@+2{{'actor class' has been renamed to 'actor'}}{{14-21=}}
-// expected-error@+1{{'actor' may only be used on 'class' declarations}}
+// expected-error@+1{{keyword 'struct' cannot be used as an identifier here}}
 public actor struct JulieAndrews {}
-// expected-warning@+2{{'actor class' has been renamed to 'actor'}}{{14-18=actor}}{{1-7=}}
-// expected-error@+1{{'actor' may only be used on 'class' declarations}}
+// expected-error@+1{{keyword 'public' cannot be used as an identifier here}}
 actor public enum TomHanks {}
