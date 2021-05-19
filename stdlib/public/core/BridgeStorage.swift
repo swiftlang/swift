@@ -124,6 +124,15 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
   @inlinable
   internal var unflaggedNativeInstance: Native {
     @inline(__always) get {
+      if !isNative {
+        let result = Builtin.classifyBridgeObject(rawValue)
+        if result.isObjCObject {
+          _internalInvariant(!result.isObjCObject, "OBJC Object Bits Set")
+        }
+        if result.isObjCTaggedPointer {
+          _internalInvariant(!result.isObjCTaggedPointer, "OBJC Tagged Ptr Bits Set")
+        }
+      }
       _internalInvariant(isNative)
       _internalInvariant(_nonPointerBits(rawValue) == 0)
       return Builtin.reinterpretCast(rawValue)
