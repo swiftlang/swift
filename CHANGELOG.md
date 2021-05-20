@@ -6,6 +6,16 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.5
 ---------
 
+* [SE-0300][]:
+
+  Async functions can now be suspended using the `withUnsafeContinuation`
+  and `withUnsafeThrowingContinuation` functions. These both take a closure,
+  and then suspend the current async task, executing that closure with a
+  continuation value for the current task. The program must use that
+  continuation at some point in the future to resume the task, passing in
+  a value or error, which then becomes the result of the `withUnsafeContinuation`
+  call in the resumed task.
+
 * Type names are no longer allowed as an argument to a subscript parameter that expects a metatype type
 
   ```swift
@@ -8493,6 +8503,7 @@ Swift 1.0
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
+[SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 
