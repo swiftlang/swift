@@ -2461,22 +2461,37 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
     // Diagnose the conflict.
     anyConflicts = true;
 
-    // If the first method is in an extension and the second is not, swap them
-    // so the primary diagnostic is on the extension method.
+    /// If true, \p a has a "weaker" claim on the selector than \p b, and the
+    /// conflict diagnostic should appear on \p a instead of \p b.
+    auto areBackwards =
+        [&](AbstractFunctionDecl *a, AbstractFunctionDecl *b) -> bool {
+      #define RULE(aCriterion, bCriterion) do { \
+        bool _aCriterion = (aCriterion), _bCriterion = (bCriterion); \
+        if (!_aCriterion && _bCriterion) \
+          return true; \
+        if (_aCriterion && !_bCriterion) \
+          return false; \
+      } while (0)
+
+      // Is one of these from the main declaration?
+      RULE(!isa<ExtensionDecl>(a->getDeclContext()),
+           !isa<ExtensionDecl>(b->getDeclContext()));
+
+      // Are these from different source files? If so, fall back to the order in
+      // which the declarations were type checked.
+      // FIXME: This is gross and nondeterministic.
+      if (a->getParentSourceFile() != b->getParentSourceFile())
+        return false;
+
+      // Handle them in source order.
+      return !ordering(a, b);
+
+      #undef RULE
+    };
+
     MutableArrayRef<AbstractFunctionDecl *> methodsRef(methods);
-    if (isa<ExtensionDecl>(methods[0]->getDeclContext()) &&
-        !isa<ExtensionDecl>(methods[1]->getDeclContext())) {
+    if (areBackwards(methods[0], methods[1]))
       std::swap(methodsRef[0], methodsRef[1]);
-
-    // Within a source file, use our canonical ordering.
-    } else if (methods[0]->getParentSourceFile() ==
-               methods[1]->getParentSourceFile() &&
-              !ordering(methods[0], methods[1])) {
-      std::swap(methodsRef[0], methodsRef[1]);
-    }
-
-    // Otherwise, fall back to the order in which the declarations were type
-    // checked.
 
     auto originalMethod = methods.front();
     auto conflictingMethods = methodsRef.slice(1);
