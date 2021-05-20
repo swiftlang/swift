@@ -4972,8 +4972,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   // Accept mutable pointers in the place of immutables.
-  if ((lhs->isUnsafeMutableRawPointer() ||
-       lhs->isUnsafeMutablePointer()) && toImmutablePossible(lhs, rhs))
+  if (toImmutablePossible(lhs, rhs))
     conversionsOrFixes.push_back(
         ConversionRestrictionKind::PointerToPointer);
 
@@ -4981,8 +4980,9 @@ bool ConstraintSystem::repairFailures(
 }
 
 bool ConstraintSystem::toImmutablePossible(Type lhs, Type rhs) {
-  if (lhs->isUnsafeMutableRawPointer() && rhs->isUnsafeRawPointer())
-      return true; // UnsafeMutableRawPointer -> UnsafeRawPointer
+  if (rhs->isUnsafeRawPointer() && (lhs->isUnsafeMutableRawPointer() ||
+       lhs->isUnsafeMutablePointer() || lhs->isUnsafePointer()))
+    return true; // Unsafe[Mutable][Raw]Pointer -> UnsafeRawPointer
 
   auto firstGenericArgument = [&](Type ty) -> CanType {
     return dyn_cast<BoundGenericStructType>(ty->getCanonicalType())

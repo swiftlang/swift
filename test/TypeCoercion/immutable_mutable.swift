@@ -32,7 +32,7 @@ let immutable5: UnsafePointer<Int>? = mutable3
 let immutable6: UnsafePointer<Double> = mutable3 // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to specified type 'UnsafePointer<Double>'}}
 let mutable4: UnsafeMutablePointer<Int> = immutable3 // expected-error {{cannot convert value of type 'UnsafePointer<Int>' to specified type 'UnsafeMutablePointer<Int>'}}
 if mutable3 == immutable3 || immutable3 == mutable3 ||
-    immutable == immutable3 || immutable == mutable3 { // expected-error {{binary operator '==' cannot be applied to operands of type 'UnsafeRawPointer' and 'UnsafeMutablePointer<Int>'}} expected-error {{binary operator '==' cannot be applied to operands of type 'UnsafeRawPointer' and 'UnsafePointer<Int>'}}
+    immutable == immutable3 || immutable == mutable3 {
 }
 
 func demutable(immutable: UnsafePointer<Int>) -> UnsafeRawPointer {
