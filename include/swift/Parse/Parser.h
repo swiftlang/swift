@@ -331,9 +331,14 @@ public:
   class StructureMarkerRAII {
     Parser *const P;
 
-    /// Max nesting level
-    // TODO: customizable.
-    enum { MaxDepth = 256 };
+    /// The maximum depth that StructureMarkerRAII can be nested to avoid a
+    /// stack overflow in the parser.
+    /// This is set on first access through \c getMaxDepth() from the \c
+    /// SWIFT_MAX_NESTING_LEVEL environment variable. If that doesn't exist,
+    /// defaults to 100.
+    static size_t MaxDepth;
+
+    static size_t getMaxDepth();
 
     StructureMarkerRAII(Parser *parser) : P(parser) {}
 

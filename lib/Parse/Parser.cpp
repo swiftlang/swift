@@ -112,6 +112,8 @@ using namespace swift;
 using namespace swift::syntax;
 using ParsingFlags = SourceFile::ParsingFlags;
 
+size_t Parser::StructureMarkerRAII::MaxDepth = 0;
+
 void SILParserStateBase::anchor() { }
 
 void swift::performCodeCompletionSecondPass(
@@ -884,11 +886,24 @@ Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
     : StructureMarkerRAII(parser, tok.getLoc(),
                           getStructureMarkerKindForToken(tok)) {}
 
+size_t Parser::StructureMarkerRAII::getMaxDepth() {
+  if (MaxDepth == 0) {
+    // We haven't set MaxDepth yet. Default to 100 and overwrite from the
+    // SWIFT_MAX_NESTING_LEVEL environment variable if necessary.
+    MaxDepth = 100;
+    if (char *MaxNestingLevelStr = getenv("SWIFT_MAX_NESTING_LEVEL")) {
+      if (auto MaxNestingLevel = atoi(MaxNestingLevelStr)) {
+        MaxDepth = MaxNestingLevel;
+      }
+    }
+  }
+  return MaxDepth;
+}
+
 bool Parser::StructureMarkerRAII::pushStructureMarker(
                                       Parser &parser, SourceLoc loc,    
                                       StructureMarkerKind kind) {
-  
-  if (parser.StructureMarkers.size() < MaxDepth) {
+  if (parser.StructureMarkers.size() < getMaxDepth()) {
     parser.StructureMarkers.push_back({loc, kind, None});
     return true;
   } else {
