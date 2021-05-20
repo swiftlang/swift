@@ -1213,32 +1213,6 @@ public:
           DebugVars[ArgNo] = VarInfo->Name;
       }
     }
-
-// Disable these checks just on 5.4 when compiler asserts are enabled.
-//
-// These just verify some things about debug info that shouldn't stop a program
-// from not-compiling. When optimizing in certain cases, we found that we were
-// hitting these on linux platforms since on linux platforms, we ship the
-// compiler with assertions enabled. So by disabling this we can at least at
-// the expense of slightly worse debug info when compiling with optimization
-// eliminate these crashes. Darwin does not ship with compiler-asserts so is
-// unaffected.
-#if 0
-    // Regular locations are allowed on all instructions.
-    if (LocKind == SILLocation::RegularKind)
-      return;
-
-    if (LocKind == SILLocation::ReturnKind ||
-        LocKind == SILLocation::ImplicitReturnKind)
-      require(InstKind == SILInstructionKind::BranchInst ||
-              InstKind == SILInstructionKind::ReturnInst ||
-              InstKind == SILInstructionKind::UnreachableInst,
-        "return locations are only allowed on branch and return instructions");
-
-    if (LocKind == SILLocation::ArtificialUnreachableKind)
-      require(InstKind == SILInstructionKind::UnreachableInst,
-        "artificial locations are only allowed on Unreachable instructions");
-#endif
   }
 
   /// Check that the types of this value producer are all legal in the function
