@@ -2366,33 +2366,33 @@ class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
 class ThrowsRedecl1 {
   @objc // access-note-move{{ThrowsRedecl1.method1(_:error:)}}
   func method1(_ x: Int, error: Class_ObjC1) { } // expected-note{{declared here}}
-  @objc // access-note-move{{ThrowsRedecl1.method1(_:)}}
-  func method1(_ x: Int) throws { } // expected-error {{with Objective-C selector 'method1:error:'}}
+  @objc // bad-access-note-move{{ThrowsRedecl1.method1(_:)}}
+  func method1(_ x: Int) throws { } // access-note-adjust{{@objc}} expected-error {{method 'method1' with Objective-C selector 'method1:error:' conflicts with method 'method1(_:error:)' with the same Objective-C selector}}
 
   @objc // access-note-move{{ThrowsRedecl1.method2AndReturnError(_:)}}
   func method2AndReturnError(_ x: Int) { } // expected-note{{declared here}}
-  @objc // access-note-move{{ThrowsRedecl1.method2()}}
-  func method2() throws { } // expected-error {{with Objective-C selector 'method2AndReturnError:'}}
+  @objc // bad-access-note-move{{ThrowsRedecl1.method2()}}
+  func method2() throws { } // access-note-adjust{{@objc}} expected-error {{method 'method2()' with Objective-C selector 'method2AndReturnError:' conflicts with method 'method2AndReturnError' with the same Objective-C selector}}
 
   @objc // access-note-move{{ThrowsRedecl1.method3(_:error:closure:)}}
   func method3(_ x: Int, error: Int, closure: @escaping (Int) -> Int) { }  // expected-note{{declared here}}
-  @objc // access-note-move{{ThrowsRedecl1.method3(_:closure:)}}
-  func method3(_ x: Int, closure: (Int) -> Int) throws { } // expected-error {{with Objective-C selector 'method3:error:closure:'}}
+  @objc // bad-access-note-move{{ThrowsRedecl1.method3(_:closure:)}}
+  func method3(_ x: Int, closure: (Int) -> Int) throws { } // access-note-adjust{{@objc}} expected-error {{method 'method3(_:closure:)' with Objective-C selector 'method3:error:closure:' conflicts with method 'method3(_:error:closure:)' with the same Objective-C selector}}
 
   @objc(initAndReturnError:) // access-note-move{{ThrowsRedecl1.initMethod1(error:)}}
   func initMethod1(error: Int) { } // expected-note{{declared here}}
-  @objc // access-note-move{{ThrowsRedecl1.init()}}
-  init() throws { } // expected-error {{with Objective-C selector 'initAndReturnError:'}}
+  @objc // bad-access-note-move{{ThrowsRedecl1.init()}}
+  init() throws { } // access-note-adjust{{@objc}} expected-error {{initializer 'init()' with Objective-C selector 'initAndReturnError:' conflicts with method 'initMethod1(error:)' with the same Objective-C selector}}
 
   @objc(initWithString:error:) // access-note-move{{ThrowsRedecl1.initMethod2(string:error:)}}
   func initMethod2(string: String, error: Int) { } // expected-note{{declared here}}
-  @objc // access-note-move{{ThrowsRedecl1.init(string:)}}
-  init(string: String) throws { } // expected-error {{with Objective-C selector 'initWithString:error:'}}
+  @objc // bad-access-note-move{{ThrowsRedecl1.init(string:)}}
+  init(string: String) throws { } // access-note-adjust{{@objc}} expected-error {{initializer 'init(string:)' with Objective-C selector 'initWithString:error:' conflicts with method 'initMethod2(string:error:)' with the same Objective-C selector}}
 
   @objc(initAndReturnError:fn:) // access-note-move{{ThrowsRedecl1.initMethod3(error:fn:)}}
   func initMethod3(error: Int, fn: @escaping (Int) -> Int) { } // expected-note{{declared here}}
-  @objc // access-note-move{{ThrowsRedecl1.init(fn:)}}
-  init(fn: (Int) -> Int) throws { } // expected-error {{with Objective-C selector 'initAndReturnError:fn:'}}
+  @objc // bad-access-note-move{{ThrowsRedecl1.init(fn:)}}
+  init(fn: (Int) -> Int) throws { } // access-note-adjust{{@objc}} expected-error {{initializer 'init(fn:)' with Objective-C selector 'initAndReturnError:fn:' conflicts with method 'initMethod3(error:fn:)' with the same Objective-C selector}}
 }
 
 class ThrowsObjCName {

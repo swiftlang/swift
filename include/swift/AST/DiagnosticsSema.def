@@ -5018,10 +5018,11 @@ NOTE(objc_declared_here,none,
      OBJC_DIAG_SELECT " declared here",
      (unsigned, DeclName))
 
+// %2 and %3 are unused to make signature match with diag::objc_redecl.
 ERROR(objc_redecl_same,none,
-      OBJC_DIAG_SELECT " with Objective-C selector %2 conflicts with "
+      OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
       "previous declaration with the same Objective-C selector",
-      (unsigned, DeclName, ObjCSelector))
+      (unsigned, DeclName, unsigned, DeclName, ObjCSelector))
 
 ERROR(objc_override_other,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
