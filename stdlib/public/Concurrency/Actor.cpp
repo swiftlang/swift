@@ -624,7 +624,7 @@ class DefaultActorImpl : public HeapObject {
       Status_width = 3,
 
       HasActiveInlineJob = 3,
-      IsDistributedRemote = 3,
+      IsDistributedRemote = 4,
 
       MaxPriority = 8,
       MaxPriority_width = JobFlags::Priority_width,
