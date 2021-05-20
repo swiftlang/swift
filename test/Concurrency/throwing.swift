@@ -4,7 +4,9 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-// XFAIL: OS=windows-msvc
+
+// Failing sporadically SR-14333
+// UNSUPPORTED: OS=windows-msvc
 
 import _Concurrency
 import StdlibUnittest
