@@ -519,6 +519,12 @@ function(add_swift_host_library name)
       target_link_options(${name} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
+
+    # For now turn off in swift targets, debug info if we are compiling a static
+    # library.
+    if (ASHL_STATIC)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-gnone>)
+    endif()
   endif()
 
   add_dependencies(dev ${name})
