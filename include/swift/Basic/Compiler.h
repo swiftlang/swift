@@ -128,4 +128,13 @@
 #define SWIFT_ASSERT_ONLY(...) do { __VA_ARGS__; } while (false)
 #endif
 
+#if defined(__LP64__) || defined(_WIN64)
+#define SWIFT_POINTER_IS_8_BYTES 1
+#define SWIFT_POINTER_IS_4_BYTES 0
+#else
+// TODO: consider supporting 16-bit targets
+#define SWIFT_POINTER_IS_8_BYTES 0
+#define SWIFT_POINTER_IS_4_BYTES 1
+#endif
+
 #endif // SWIFT_BASIC_COMPILER_H
