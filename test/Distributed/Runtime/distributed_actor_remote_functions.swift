@@ -78,6 +78,15 @@ extension SomeSpecificDistributedActor {
   }
 }
 
+// ==== Execute ----------------------------------------------------------------
+
+@_silgen_name("swift_distributed_actor_is_remote")
+func __isRemoteActor(_ actor: AnyObject) -> Bool
+
+func __isLocalActor(_ actor: AnyObject) -> Bool {
+  return !__isRemoteActor(actor)
+}
+
 // ==== Fake Transport ---------------------------------------------------------
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

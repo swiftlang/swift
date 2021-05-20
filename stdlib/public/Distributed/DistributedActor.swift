@@ -249,9 +249,9 @@ public struct DistributedActorCodingError: ActorTransportError {
 // ==== isRemote / isLocal -----------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
-public func __isRemoteActor(_ actor: AnyObject) -> Bool // TODO: make them not public
+func __isRemoteActor(_ actor: AnyObject) -> Bool
 
-public func __isLocalActor(_ actor: AnyObject) -> Bool { // TODO: make them not public
+func __isLocalActor(_ actor: AnyObject) -> Bool {
     return !__isRemoteActor(actor)
 }
 

@@ -12,19 +12,6 @@ import _Distributed
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor SomeSpecificDistributedActor {
-//  // @derived let actorTransport: ActorTransport
-//  // @derived let actorAddress: ActorAddress
-
-//  // @derived
-//  required init(transport: ActorTransport) {
-//    self.actorTransport = transport
-//    self.actorAddress = ActorAddress(parse: "xxx")
-//  }
-//  // @derived
-//  required init(resolve address: ActorAddress, using transport: ActorTransport) {
-//    self.actorAddress = address
-//    self.actorTransport = transport
-//  }
 
   distributed func hello() async throws {
      print("hello from \(self.actorAddress)")
@@ -37,6 +24,16 @@ extension SomeSpecificDistributedActor {
     print("Remote invocation")
   }
 }
+
+// ==== Execute ----------------------------------------------------------------
+
+@_silgen_name("swift_distributed_actor_is_remote")
+func __isRemoteActor(_ actor: AnyObject) -> Bool
+
+func __isLocalActor(_ actor: AnyObject) -> Bool {
+  return !__isRemoteActor(actor)
+}
+
 
 // ==== Fake Transport ---------------------------------------------------------
 

@@ -53,6 +53,15 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
+@_silgen_name("swift_distributed_actor_is_remote")
+func __isRemoteActor(_ actor: AnyObject) -> Bool
+
+func __isLocalActor(_ actor: AnyObject) -> Bool {
+  return !__isRemoteActor(actor)
+}
+
+// ==== Execute ----------------------------------------------------------------
+
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_remote() async {
   let address = ActorAddress(parse: "")
@@ -77,3 +86,4 @@ func test_remote() async {
     await test_remote()
   }
 }
+
