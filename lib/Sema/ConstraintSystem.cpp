@@ -4733,6 +4733,9 @@ bool constraints::isStandardComparisonOperator(ASTNode node) {
 Optional<std::pair<Expr *, unsigned>>
 ConstraintSystem::isArgumentExpr(Expr *expr) {
   auto *argList = getParentExpr(expr);
+  if (!argList) {
+    return None;
+  }
 
   if (isa<ParenExpr>(argList)) {
     for (;;) {
