@@ -51,6 +51,9 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
   if (!func)
     return false;
 
+  if (func->getResilienceExpansion() == ResilienceExpansion::Minimal)
+    return false;
+
   // If a body is synthesized/implicit, it shouldn't be skipped.
   if (func->isImplicit())
     return false;
@@ -72,9 +75,8 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
       return false;
   }
 
-  // If none of those conditions trip, then this is something that _should_
-  // be serialized in the module even when we're skipping non-inlinable
-  // function bodies.
+  // If none of those conditions trip, then this is something that should
+  // _not_ be serialized in the module (ie. should be skipped).
   return true;
 }
 

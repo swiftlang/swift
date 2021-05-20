@@ -39,6 +39,21 @@
 @inline(never)
 func _blackHole(_ s: String) {}
 
+struct StructOuter {
+  @usableFromInline
+  struct StructInner {}
+}
+extension StructOuter.StructInner {
+  @inlinable
+  func inlinableInnerFunc() {
+    let ALLNOTYPECHECK_innerStructAndFuncLocal = 1
+    _blackHole("@inlinable func in inner @usableFromInline struct")
+    // CHECK-NONINLINE-SIL: "@inlinable func in inner @usableFromInline struct"
+    // CHECK-NONINLINE-TEXTUAL-NOT: "@inlinable func in inner @usableFromInline struct"
+    // CHECK-ALL-ONLY-NOT: "@inlinable func in inner @usableFromInline struct"
+  }
+}
+
 // NOTE: The order of the checks below is important. The checks try to be
 // logically grouped, but sometimes -emit-sorted-sil needs to break the logical
 // order.
@@ -174,9 +189,9 @@ public func inlinableNestedLocalTypeFunc() {
     typealias InlinableNestedLocalType = Int
     func takesLocalType(_ x: InlinableNestedLocalType) {
       let ALLNOTYPECHECK_innerLocal2 = 1
-      _blackHole("nested func body inside @inlinable func body taking local type")
-      // CHECK-NONINLINE-ONLY: "nested func body inside @inlinable func body taking local type"
-      // CHECK-ALL-ONLY-NOT: "nested func body inside @inlinable func body taking local type"
+      _blackHole("nested func body inside @inlinable func body taking nested local type")
+      // CHECK-NONINLINE-ONLY: "nested func body inside @inlinable func body taking nested local type"
+      // CHECK-ALL-ONLY-NOT: "nested func body inside @inlinable func body taking nested local type"
     }
     takesLocalType(0)
   }
