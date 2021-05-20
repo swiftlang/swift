@@ -29,6 +29,7 @@
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -918,6 +919,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
         dict.set(KeyValue, stat->value);
       };
 
+      Statistic instructionCount(
+          UIdentFromSKDUID(KindStatInstructionCount),
+          "# of instructions executed since the SourceKit process was started");
+      instructionCount.value.store(swift::getInstructionsExecuted());
+      addStat(&instructionCount);
       addStat(&numRequests);
       addStat(&numSemaRequests);
       std::for_each(stats.begin(), stats.end(), addStat);
