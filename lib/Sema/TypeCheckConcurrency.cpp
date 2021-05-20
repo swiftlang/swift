@@ -1292,12 +1292,16 @@ namespace {
 
     /// Note that the given actor member is isolated.
     /// @param context is allowed to be null if no context is appropriate.
-    void noteIsolatedActorMember(ValueDecl *decl, Expr *context,
-                                 bool isDistributedActor) {
-      // FIXME: Make this diagnostic more sensitive to the isolation context
-      // of the declaration.
+    void noteIsolatedActorMember(ValueDecl *decl, Expr *context) {
+      // detect if it is a distributed actor, to provide better isolation notes
+
+      auto isDistributedActor = false;
+      if (auto dc = dyn_cast<ClassDecl>(decl->getDeclContext()))
+        isDistributedActor = dc->isDistributedActor();
+
+      // FIXME: Make this diagnostic more sensitive to the isolation context of
+      // the declaration.
       if (isDistributedActor) {
-        // TODO: detect isDistributedActor based on the decl, rather than an explicit boolean
         if (dyn_cast<VarDecl>(decl)) {
           // Distributed actor properties are never accessible externally.
           decl->diagnose(diag::distributed_actor_isolated_property);
@@ -1720,13 +1724,9 @@ namespace {
             ConcurrentReferenceKind::CrossActor);
       }
 
-      bool isDistributedActor = false;
       switch (contextIsolation) {
+      case ActorIsolation::ActorInstance:
       case ActorIsolation::DistributedActorInstance: {
-        isDistributedActor = true;
-        LLVM_FALLTHROUGH;
-      }
-      case ActorIsolation::ActorInstance: {
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
@@ -1738,7 +1738,7 @@ namespace {
                            value->getDescriptiveKind(), value->getName(),
                            globalActor, contextIsolation.getActor()->getName(),
                            useKind, result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context, isDistributedActor);
+        noteIsolatedActorMember(value, context);
         return true;
       }
 
@@ -1759,7 +1759,7 @@ namespace {
             value->getDescriptiveKind(), value->getName(), globalActor,
             contextIsolation.getGlobalActor(), useKind,
             result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context, isDistributedActor);
+        noteIsolatedActorMember(value, context);
         return true;
       }
 
@@ -1776,7 +1776,7 @@ namespace {
                            globalActor,
                            /*actorIndependent=*/true, useKind,
                            result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context, isDistributedActor);
+        noteIsolatedActorMember(value, context);
         return true;
       }
 
@@ -1794,7 +1794,7 @@ namespace {
           /*actorIndependent=*/false, useKind,
           result == AsyncMarkingResult::SyncContext);
         noteGlobalActorOnContext(declContext, globalActor);
-        noteIsolatedActorMember(value, context, isDistributedActor);
+        noteIsolatedActorMember(value, context);
 
         return true;
       } // end Unspecified case
@@ -2060,7 +2060,6 @@ namespace {
         return false;
 
       auto member = memberRef.getDecl();
-      bool isDistributedActor = false;
       switch (auto isolation =
                   ActorIsolationRestriction::forDeclaration(memberRef)) {
       case ActorIsolationRestriction::Unrestricted:
@@ -2082,9 +2081,6 @@ namespace {
       }
 
       case ActorIsolationRestriction::DistributedActorSelf: {
-        /// mark for later diagnostics that we have we're in a distributed actor.
-        isDistributedActor = true;
-
         // distributed actor isolation is more strict;
         // we do not allow any property access, or synchronous access at all.
 
@@ -2098,7 +2094,7 @@ namespace {
             if (!func->isDistributed()) {
               ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
               // TODO: offer a fixit to add 'distributed' on the member; how to test fixits? See also https://github.com/apple/swift/pull/35930/files
-              noteIsolatedActorMember(member, context, isDistributedActor);
+              noteIsolatedActorMember(member, context);
               return true;
             }
 
@@ -2125,7 +2121,7 @@ namespace {
                     memberLoc, diag::distributed_actor_isolated_non_self_reference,
                     member->getDescriptiveKind(),
                     member->getName());
-                noteIsolatedActorMember(member, context, isDistributedActor);
+                noteIsolatedActorMember(member, context);
                 return true;
               }
             }
@@ -2159,19 +2155,15 @@ namespace {
                 getNearestEnclosingActorContext(getDeclContext()),
               useKind
               );
-          noteIsolatedActorMember(member, context, isDistributedActor);
+          noteIsolatedActorMember(member, context);
           return true;
         }
 
         // Check whether the current context is differently-isolated.
         auto curDC = const_cast<DeclContext *>(getDeclContext());
         switch (auto contextIsolation = getActorIsolationOfContext(curDC)) {
+          case ActorIsolation::ActorInstance:
           case ActorIsolation::DistributedActorInstance: {
-            isDistributedActor = true;
-            LLVM_FALLTHROUGH;
-          }
-
-          case ActorIsolation::ActorInstance: {
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
             if (isEscapingPartialApply) {
@@ -2179,7 +2171,7 @@ namespace {
                   memberLoc, diag::actor_isolated_partial_apply,
                   member->getDescriptiveKind(),
                   member->getName());
-              noteIsolatedActorMember(member, context, isDistributedActor);
+              noteIsolatedActorMember(member, context);
               return true;
             }
 
@@ -2204,7 +2196,7 @@ namespace {
             auto diag = findActorIndependentReason(curDC);
             ctx.Diags.diagnose(memberLoc, diag, member->getDescriptiveKind(),
                                member->getName(), useKind);
-            noteIsolatedActorMember(member, context, isDistributedActor);
+            noteIsolatedActorMember(member, context);
             return true;
           }
 
@@ -2226,7 +2218,7 @@ namespace {
                                contextIsolation.getGlobalActor(), useKind,
                                result == AsyncMarkingResult::SyncContext
                                );
-            noteIsolatedActorMember(member, context, isDistributedActor);
+            noteIsolatedActorMember(member, context);
             return true;
           }
         }

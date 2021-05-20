@@ -171,7 +171,6 @@ public enum ActorResolved<Act: DistributedActor> {
 ///
 /// For example: `sact://human-readable-name@127.0.0.1:7337/user/wallet/id-121242`.
 /// Note that the `ActorIncarnation` is not printed by default in the String representation of a path, yet may be inspected on demand.
-
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
     /// Uniquely specifies the actor transport and the protocol used by it.
@@ -187,6 +186,7 @@ public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
     /// Unique Identifier of this actor.
     public var uid: UInt64 // TODO: should we remove this
 
+    // FIXME: remove this or implement for real; this is just a hack implementation for now
     public init(parse: String) {
         self.protocol = "sact"
         self.host = "xxx"
@@ -209,9 +209,7 @@ extension ActorAddress: CustomStringConvertible {
         if let port = port {
             result += ":\(port)"
         }
-//    if let nodeID = nodeID {
-//      result += "@\(nodeID)"
-//    }
+        // TODO: decide if we'd want to print the nodeID too here.
         if let path = path {
             result += "/\(path)"
         }

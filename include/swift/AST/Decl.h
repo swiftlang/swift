@@ -3228,7 +3228,7 @@ public:
   bool isActor() const;
 
   /// Whether this nominal type qualifies as a distributed actor, meaning that
-  /// it is either a distributed actor. // TODO: also support DistributedActor protocols.
+  /// it is either a distributed actor.
   bool isDistributedActor() const;
 
   /// Return the range of semantics attributes attached to this NominalTypeDecl.

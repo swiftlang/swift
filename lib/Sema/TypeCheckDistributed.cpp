@@ -65,12 +65,6 @@ bool IsDistributedFuncRequest::evaluate(
     Evaluator &evaluator, FuncDecl *func) const {
   // Check whether the attribute was explicitly specified.
   if (auto attr = func->getAttrs().getAttribute<DistributedActorAttr>()) {
-//    // Check for well-formedness.
-//    if (checkDistributedFunction(func, /*diagnose=*/true)) {
-//      attr->setInvalid();
-//      return false;
-//    }
-
     return true;
   } else {
     return false;
