@@ -360,6 +360,12 @@ public:
       addTypeAnnotation(Annotation);
   }
 
+  void addAttributeKeyword(StringRef Name, StringRef Annotation) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Attribute, Name);
+    if (!Annotation.empty())
+      addTypeAnnotation(Annotation);
+  }
+
   StringRef escapeKeyword(StringRef Word, bool escapeAllKeywords,
                           llvm::SmallString<16> &EscapedKeyword) {
     EscapedKeyword.clear();
