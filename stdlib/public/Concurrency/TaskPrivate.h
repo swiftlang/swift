@@ -22,6 +22,10 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Error.h"
+#include "Error.h"
+
+#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
+#include "../runtime/StackAllocator.h"
 
 namespace swift {
 
@@ -30,16 +34,6 @@ namespace swift {
 
 class AsyncTask;
 class TaskGroup;
-
-/// Initialize the task-local allocator in the given task.
-void _swift_task_alloc_initialize(AsyncTask *task);
-
-void _swift_task_alloc_initialize_with_slab(AsyncTask *task,
-                   void *firstSlabBuffer,
-                   size_t bufferCapacity);
-
-/// Destroy the task-local allocator in the given task.
-void _swift_task_alloc_destroy(AsyncTask *task);
 
 /// Allocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
@@ -171,6 +165,142 @@ public:
 };
 
 } // end anonymous namespace
+
+/// The current state of a task's status records.
+class ActiveTaskStatus {
+  enum : uintptr_t {
+    IsCancelled = 0x1,
+    IsLocked = 0x2,
+    RecordMask = ~uintptr_t(IsCancelled | IsLocked)
+  };
+
+  uintptr_t Value;
+
+public:
+  constexpr ActiveTaskStatus() : Value(0) {}
+  ActiveTaskStatus(TaskStatusRecord *innermostRecord,
+                   bool cancelled, bool locked)
+    : Value(reinterpret_cast<uintptr_t>(innermostRecord)
+                + (locked ? IsLocked : 0)
+                + (cancelled ? IsCancelled : 0)) {}
+
+  /// Is the task currently cancelled?
+  bool isCancelled() const { return Value & IsCancelled; }
+
+  /// Is there an active lock on the cancellation information?
+  bool isLocked() const { return Value & IsLocked; }
+
+  /// Return the innermost cancellation record.  Code running
+  /// asynchronously with this task should not access this record
+  /// without having first locked it; see swift_taskCancel.
+  TaskStatusRecord *getInnermostRecord() const {
+    return reinterpret_cast<TaskStatusRecord*>(Value & RecordMask);
+  }
+
+  static TaskStatusRecord *getStatusRecordParent(TaskStatusRecord *ptr);
+
+  using record_iterator =
+    LinkedListIterator<TaskStatusRecord, getStatusRecordParent>;
+  llvm::iterator_range<record_iterator> records() const {
+    return record_iterator::rangeBeginning(getInnermostRecord());
+  }
+};
+
+/// The size of an allocator slab.
+///
+/// TODO: find the optimal value by experiment.
+static constexpr size_t SlabCapacity = 1024;
+
+using TaskAllocator = StackAllocator<SlabCapacity>;
+
+/// Private storage in an AsyncTask object.
+struct AsyncTask::PrivateStorage {
+  /// The currently-active information about cancellation.
+  /// Currently one word.
+  std::atomic<ActiveTaskStatus> Status;
+
+  /// The allocator for the task stack.
+  /// Currently 2 words + 8 bytes.
+  TaskAllocator Allocator;
+
+  /// Storage for task-local values.
+  /// Currently one word.
+  TaskLocal::Storage Local;
+
+  PrivateStorage()
+    : Status(ActiveTaskStatus()),
+      Local(TaskLocal::Storage()) {}
+
+  PrivateStorage(void *slab, size_t slabCapacity)
+    : Status(ActiveTaskStatus()),
+      Allocator(slab, slabCapacity),
+      Local(TaskLocal::Storage()) {}
+
+  void complete(AsyncTask *task) {
+    // Destroy and deallocate any remaining task local items.
+    // We need to do this before we destroy the task local deallocator.
+    Local.destroy(task);
+
+    this->~PrivateStorage();
+  }
+};
+
+static_assert(sizeof(AsyncTask::PrivateStorage)
+                <= sizeof(AsyncTask::OpaquePrivateStorage) &&
+              alignof(AsyncTask::PrivateStorage)
+                <= alignof(AsyncTask::OpaquePrivateStorage),
+              "Task-private storage doesn't fit in reserved space");
+
+inline AsyncTask::PrivateStorage &
+AsyncTask::OpaquePrivateStorage::get() {
+  return reinterpret_cast<PrivateStorage &>(*this);
+}
+inline const AsyncTask::PrivateStorage &
+AsyncTask::OpaquePrivateStorage::get() const {
+  return reinterpret_cast<const PrivateStorage &>(*this);
+}
+inline void AsyncTask::OpaquePrivateStorage::initialize(AsyncTask *task) {
+  new (this) PrivateStorage();
+}
+inline void
+AsyncTask::OpaquePrivateStorage::initializeWithSlab(AsyncTask *task,
+                                                    void *slab,
+                                                    size_t slabCapacity) {
+  new (this) PrivateStorage(slab, slabCapacity);
+}
+inline void AsyncTask::OpaquePrivateStorage::complete(AsyncTask *task) {
+  get().complete(task);
+}
+inline void AsyncTask::OpaquePrivateStorage::destroy() {
+  // nothing else to do
+}
+
+inline AsyncTask::PrivateStorage &AsyncTask::_private() {
+  return Private.get();
+}
+inline const AsyncTask::PrivateStorage &AsyncTask::_private() const {
+  return Private.get();
+}
+
+inline bool AsyncTask::isCancelled() const {
+  return _private().Status.load(std::memory_order_relaxed)
+                          .isCancelled();
+}
+
+inline void AsyncTask::localValuePush(const HeapObject *key,
+                                      /* +1 */ OpaqueValue *value,
+                                      const Metadata *valueType) {
+  _private().Local.pushValue(this, key, value, valueType);
+}
+
+inline OpaqueValue *AsyncTask::localValueGet(const HeapObject *key) {
+  return _private().Local.getValue(this, key);
+}
+
+/// Returns true if storage has still more bindings.
+inline bool AsyncTask::localValuePop() {
+  return _private().Local.popValue(this);
+}
 
 } // end namespace swift
 
