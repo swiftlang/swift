@@ -2411,6 +2411,17 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
   return classDecl->lookupDirect(selector, isInstanceMethod);
 }
 
+static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
+  if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>())
+    if (objc->getAddedByAccessNote())
+      return objc;
+
+  if (auto accessor = dyn_cast<AccessorDecl>(VD))
+    return getObjCAttrIfFromAccessNote(accessor->getStorage());
+
+  return nullptr;
+}
+
 bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // If there were no conflicts, we're done.
   if (sf.ObjCMethodConflicts.empty())
@@ -2473,6 +2484,10 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
           return false; \
       } while (0)
 
+      // Is one of these from an access note?
+      RULE(getObjCAttrIfFromAccessNote(a),
+           getObjCAttrIfFromAccessNote(b));
+
       // Is one of these from the main declaration?
       RULE(!isa<ExtensionDecl>(a->getDeclContext()),
            !isa<ExtensionDecl>(b->getDeclContext()));
@@ -2505,18 +2520,25 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
         if (auto accessor = dyn_cast<AccessorDecl>(originalMethod))
           originalDecl = accessor->getStorage();
 
-      if (diagInfo == origDiagInfo) {
-        Ctx.Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
-                           diagInfo.first, diagInfo.second, selector);
+      bool redeclSame = (diagInfo == origDiagInfo);
+      auto diag = Ctx.Diags.diagnose(conflictingDecl,
+                                     redeclSame ? diag::objc_redecl_same
+                                                : diag::objc_redecl,
+                                     diagInfo.first, diagInfo.second,
+                                     origDiagInfo.first, origDiagInfo.second,
+                                     selector);
+
+      auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
+      swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);
+      if (objcAttr)
+        objcAttr->setInvalid();
+
+      if (redeclSame)
         Ctx.Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
                            originalDecl->getBaseName());
-      } else {
-        Ctx.Diags.diagnose(conflictingDecl, diag::objc_redecl, diagInfo.first,
-                           diagInfo.second, origDiagInfo.first,
-                           origDiagInfo.second, selector);
+      else
         Ctx.Diags.diagnose(originalDecl, diag::objc_declared_here,
                            origDiagInfo.first, origDiagInfo.second);
-      }
     }
   }
 
