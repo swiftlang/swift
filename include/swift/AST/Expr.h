@@ -5833,7 +5833,10 @@ public:
   /// Indicates if the key path expression is composed by a single invalid
   /// component. e.g. missing component `\Root`
   bool hasSingleInvalidComponent() const {
-    return Components.size() == 1 && !Components.front().isValid();
+    if (ParsedRoot && ParsedRoot->getKind() == ExprKind::Type) {
+      return Components.size() == 1 && !Components.front().isValid();
+    }
+    return false;
   }
 
   /// Retrieve the string literal expression, which will be \c NULL prior to
