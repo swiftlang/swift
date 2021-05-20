@@ -39,6 +39,20 @@ actor SomeNotDistributedActor_4 {
   distributed func notInDistActorAsyncThrowing() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
 }
 
+protocol DP {
+  distributed func hello()  // expected-error{{'distributed' function can only be declared within 'distributed actor'}}
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+protocol DPOK: DistributedActor {
+  distributed func hello()  // ok
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+protocol DPOK2: DPOK {
+  distributed func again()  // ok
+}
+
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum SomeNotActorEnum_5 {
   distributed func nopeAsyncThrows() async throws -> Int { 42 } // expected-error{{'distributed' function can only be declared within 'distributed actor'}}

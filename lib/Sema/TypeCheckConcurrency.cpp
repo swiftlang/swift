@@ -2140,7 +2140,6 @@ namespace {
       case ActorIsolationRestriction::ActorSelf: {
         // Must reference actor-isolated state on 'self'.
         auto *selfVar = getReferencedSelf(base);
-        base->dump();
         if (!selfVar) {
           // Check for implicit async.
           auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);

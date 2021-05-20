@@ -5428,6 +5428,12 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
         !dc->getSelfClassDecl()->isDistributedActor()) {
       diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
+    } else if (auto protoDecl = dc->getSelfProtocolDecl()){
+      if (!protoDecl->inheritsFromDistributedActor()) {
+        // TODO: could suggest adding `: DistributedActor` to the protocol as well
+        diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+        return;
+      }
     } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
       diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
