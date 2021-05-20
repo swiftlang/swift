@@ -527,6 +527,11 @@ function(add_swift_host_library name)
     endif()
   endif()
 
+  # If we are compiling in release or release with deb info, compile swift code
+  # with -cross-module-optimization enabled.
+  target_compile_options(${name} PRIVATE
+    $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>>:-cross-module-optimization>)
+
   add_dependencies(dev ${name})
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     swift_install_in_component(TARGETS ${name}
