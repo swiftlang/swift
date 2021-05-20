@@ -1090,28 +1090,27 @@ public:
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
-  bool parseTypeAttributeList(ParamDecl::Specifier &Specifier,
-                              SourceLoc &SpecifierLoc,
-                              TypeAttributes &Attributes) {
+  ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
+                                      SourceLoc &SpecifierLoc,
+                                      TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (Tok.is(tok::identifier) &&
          (Tok.getRawText().equals("__shared") ||
           Tok.getRawText().equals("__owned"))))
       return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
-    return false;
+    return makeParserSuccess();
   }
-  bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                     SourceLoc &SpecifierLoc,
-                                     TypeAttributes &Attributes);
+  ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
+                                             SourceLoc &SpecifierLoc,
+                                             TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
                                         TypeAttributes::Convention &convention);
 
-  bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
-                          PatternBindingInitializer *&initContext,
-                          bool justChecking = false);
-  
-  
+  ParserStatus parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                                  PatternBindingInitializer *&initContext,
+                                  bool justChecking = false);
+
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,

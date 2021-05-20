@@ -562,6 +562,7 @@ enum class CompletionKind {
   PrecedenceGroup,
   StmtLabel,
   ForEachPatternBeginning,
+  TypeAttrBeginning,
 };
 
 /// A single code completion result.
