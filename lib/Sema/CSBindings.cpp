@@ -1851,6 +1851,15 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
       return None;
 
+    // If key path has any invalid component, let's just skip fix because the
+    // invalid component would be already diagnosed.
+    auto keyPath = castToExpr<KeyPathExpr>(srcLocator->getAnchor());
+    if (llvm::any_of(keyPath->getComponents(),
+                     [](KeyPathExpr::Component component) {
+                       return !component.isValid();
+                     }))
+      return None;
+
     ConstraintFix *fix = SpecifyKeyPathRootType::create(cs, dstLocator);
     return std::make_pair(fix, defaultImpact);
   }

@@ -1054,6 +1054,16 @@ func testSyntaxErrors() {
   _ = \A.a!;
 }
 
+// SR-14644
+func sr14644() {
+  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
+  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
+  _ = \Int // expected-error {{key path must have at least one component}}
+  _ = \Int? // expected-error {{key path must have at least one component}}
+  _ = \Int. // expected-error {{invalid component of Swift key path}}
+  // expected-error@-1 {{expected member name following '.'}}
+}
+
 // SR-13364 - keypath missing optional crashes compiler: "Inactive constraints left over?"
 func sr13364() {
   let _: KeyPath<String?, Int?> = \.utf8.count // expected-error {{no exact matches in reference to property 'count'}}
