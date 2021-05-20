@@ -125,11 +125,11 @@ TEST(TaskStatusTest, cancellation_simple) {
   withSimpleTask(Storage{47},
     [&](ValueContext<Storage> *context) {
     auto task = swift_task_getCurrent();
-    EXPECT_FALSE(task->isCancelled());
+    EXPECT_FALSE(swift_task_isCancelled(task));
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
     swift_job_run(task, createFakeExecutor(1234));
   });
@@ -143,7 +143,7 @@ TEST(TaskStatusTest, deadline) {
   withSimpleTask(Storage{47},
     [&](ValueContext<Storage> *context) {
     auto task = swift_task_getCurrent();
-    EXPECT_FALSE(task->isCancelled());
+    EXPECT_FALSE(swift_task_isCancelled(task));
 
     TaskDeadline deadlineOne = { 1234 };
     TaskDeadline deadlineTwo = { 2345 };
@@ -250,7 +250,7 @@ TEST(TaskStatusTest, deadline) {
 
     // Cancel.
     swift_task_cancel(task);
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
 
     // We should report already cancelled now.
     nearest = swift_task_getNearestDeadline(task);
@@ -275,7 +275,7 @@ TEST(TaskStatusTest, deadline) {
     nearest = swift_task_getNearestDeadline(task);
     EXPECT_EQ(NearestTaskDeadline::AlreadyCancelled, nearest.ValueKind);
 
-    EXPECT_TRUE(task->isCancelled());
+    EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
     swift_job_run(task, createFakeExecutor(1234));
   });
