@@ -5651,6 +5651,7 @@ void swift::serialize(ModuleOrSourceFile DC,
         /*EmitSynthesizedMembers*/true,
         /*PrintMessages*/false,
         /*EmitInheritedDocs*/options.SkipSymbolGraphInheritedDocs,
+        /*IncludeSPISymbols*/options.IncludeSPISymbolsInSymbolGraph,
       };
       symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
     }
