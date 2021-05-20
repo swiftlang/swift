@@ -471,6 +471,11 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   });
 }
 
+void Symbol::serializeSPIMixin(llvm::json::OStream &OS) const {
+  if (VD->isSPI())
+    OS.attribute("spi", true);
+}
+
 void Symbol::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
     serializeKind(OS);
@@ -487,6 +492,7 @@ void Symbol::serialize(llvm::json::OStream &OS) const {
     serializeAccessLevelMixin(OS);
     serializeAvailabilityMixin(OS);
     serializeLocationMixin(OS);
+    serializeSPIMixin(OS);
   });
 }
 
