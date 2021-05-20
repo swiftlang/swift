@@ -6379,6 +6379,37 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
   // Process any delayed requirements that we can handle now.
   processDelayedRequirements();
 
+  {
+    // In various places below, we iterate over the list of equivalence classes
+    // and call getMinimalConformanceSource(). Unfortunately, this function
+    // ends up calling maybeResolveEquivalenceClass(), which can delete equivalence
+    // classes. The workaround is to first iterate safely over a copy of the list,
+    // and pre-compute all minimal conformance sources, before proceeding with the
+    // rest of the function.
+    //
+    // FIXME: This is not even correct, because we may not have reached fixed point
+    // after one round of this. getMinimalConformanceSource() should be removed
+    // instead.
+    SmallVector<PotentialArchetype *, 8> equivalenceClassPAs;
+    for (auto &equivClass : Impl->EquivalenceClasses) {
+      equivalenceClassPAs.push_back(equivClass.members.front());
+    }
+
+    for (auto *pa : equivalenceClassPAs) {
+      auto &equivClass = *pa->getOrCreateEquivalenceClass(*this);
+
+      // Copy the vector and iterate over the copy to avoid iterator invalidation
+      // issues.
+      auto conformsTo = equivClass.conformsTo;
+      for (auto entry : conformsTo) {
+        for (const auto &constraint : entry.second) {
+          (void) constraint.source->getMinimalConformanceSource(
+              *this, constraint.getSubjectDependentType({ }), entry.first);
+        }
+      }
+    }
+  }
+
   computeRedundantRequirements(requirementSignatureSelfProto);
   diagnoseProtocolRefinement(requirementSignatureSelfProto);
   diagnoseRedundantRequirements();
