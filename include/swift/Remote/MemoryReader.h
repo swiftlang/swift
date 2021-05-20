@@ -100,6 +100,8 @@ public:
   virtual ReadBytesResult
   readBytes(RemoteAddress address, uint64_t size) {
     auto *Buf = malloc(size);
+    if (!Buf)
+      return ReadBytesResult{};
     ReadBytesResult Result(Buf, [](const void *ptr) {
       free(const_cast<void *>(ptr));
     });
