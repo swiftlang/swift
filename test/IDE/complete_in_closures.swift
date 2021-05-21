@@ -312,8 +312,8 @@ func testIIFE() {
   }()
 }
 // IN_IIFE_1: Begin completions
-// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: north[#SomeEnum#]
-// IN_IIFE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: south[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: north[#SomeEnum#]
+// IN_IIFE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: south[#SomeEnum#]
 
 extension Error {
   var myErrorNumber: Int { return 0 }

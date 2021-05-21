@@ -39,7 +39,7 @@ func testCallAsFunction(add: Adder, addTy: Adder.Type) {
 
   let _ = add(x: 12, #^INSTANCE_ARG2^#)
 // INSTANCE_ARG2: Begin completions, 1 items
-// INSTANCE_ARG2: Pattern/ExprSpecific:               {#y: Int#}[#Int#];
+// INSTANCE_ARG2: Pattern/Local/Flair[ExprSpecific]:               {#y: Int#}[#Int#];
 // INSTANCE_ARG2: End completions
 
   let _ = addTy#^METATYPE_NO_DOT^#;
@@ -104,13 +104,13 @@ func testCallAsFunctionOverloaded(fn: Functor) {
 
   fn(h: .left, #^OVERLOADED_ARG2_LABEL^#)
 //OVERLOADED_ARG2_LABEL: Begin completions, 1 item
-//OVERLOADED_ARG2_LABEL-DAG: Pattern/ExprSpecific:               {#v: Functor.Vertical#}[#Functor.Vertical#];
+//OVERLOADED_ARG2_LABEL-DAG: Pattern/Local/Flair[ExprSpecific]:               {#v: Functor.Vertical#}[#Functor.Vertical#];
 //OVERLOADED_ARG2_LABEL: End completions
 
   fn(h: .left, v: .#^OVERLOADED_ARG2_VALUE^#)
 //OVERLOADED_ARG2_VALUE: Begin completions, 3 items
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: up[#Functor.Vertical#];
-//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: down[#Functor.Vertical#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: up[#Functor.Vertical#];
+//OVERLOADED_ARG2_VALUE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: down[#Functor.Vertical#];
 //OVERLOADED_ARG2_VALUE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Functor.Vertical#})[#(into: inout Hasher) -> Void#];
 //OVERLOADED_ARG2_VALUE: End completions
 }

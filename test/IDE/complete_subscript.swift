@@ -94,12 +94,12 @@ func test2<U>(value: MyStruct<U>) {
 
   let _ = MyStruct<U>[42, #^METATYPE_LABEL^#
 // METATYPE_LABEL: Begin completions, 1 items
-// METATYPE_LABEL-DAG: Pattern/ExprSpecific: {#static: U#}[#U#];
+// METATYPE_LABEL-DAG: Pattern/Local/Flair[ExprSpecific]: {#static: U#}[#U#];
 // METATYPE_LABEL: End completions
 
   let _ = value[42, #^INSTANCE_LABEL^#
 // INSTANCE_LABEL: Begin completions, 1 items
-// INSTANCE_LABEL-DAG: Pattern/ExprSpecific: {#instance: U#}[#U#];
+// INSTANCE_LABEL-DAG: Pattern/Local/Flair[ExprSpecific]: {#instance: U#}[#U#];
 // INSTANCE_LABEL: End completions
 }
 

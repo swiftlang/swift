@@ -26,6 +26,7 @@ using swift::ide::CodeCompletionDeclKind;
 using swift::ide::CodeCompletionKeywordKind;
 using swift::ide::CodeCompletionLiteralKind;
 using swift::ide::SemanticContextKind;
+using swift::ide::CodeCompletionFlair;
 using swift::ide::CodeCompletionString;
 using SwiftResult = swift::ide::CodeCompletionResult;
 using swift::ide::CompletionKind;
@@ -126,6 +127,7 @@ class CompletionBuilder {
   bool modified = false;
   Completion::ExpectedTypeRelation typeRelation;
   SemanticContextKind semanticContext;
+  CodeCompletionFlair flair;
   CodeCompletionString *completionString;
   llvm::SmallVector<char, 64> originalName;
   void *customKind = nullptr;
@@ -150,6 +152,10 @@ public:
   void setSemanticContext(SemanticContextKind kind) {
     modified = true;
     semanticContext = kind;
+  }
+  void setFlair(CodeCompletionFlair value) {
+    modified = true;
+    flair = value;
   }
 
   void setPopularityFactor(PopularityFactor val) { popularityFactor = val; }

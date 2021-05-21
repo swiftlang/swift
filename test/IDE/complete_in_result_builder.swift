@@ -105,9 +105,9 @@ func testPatternMatching() {
     let x = Letters.b
     if case .#^COMPLETE_PATTERN_MATCHING_IN_IF?check=COMPLETE_CASE^# = x {
 // COMPLETE_CASE: Begin completions
-// COMPLETE_CASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: a[#Letters#];
-// COMPLETE_CASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: b[#Letters#];
-// COMPLETE_CASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: c[#Letters#];
+// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a[#Letters#];
+// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: b[#Letters#];
+// COMPLETE_CASE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: c[#Letters#];
 // COMPLETE_CASE: End completions
     }
   }
