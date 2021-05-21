@@ -27,26 +27,26 @@ namespace {
   /// A key used for the AliasAnalysis cache.
   ///
   /// This struct represents the argument list to the method 'alias'.  The two
-  /// SILValue pointers are mapped to size_t indices because we need an
+  /// SILValue pointers are mapped to integer indices because we need an
   /// efficient way to invalidate them (the mechanism is described below). The
   /// Type arguments are translated to void* because their underlying storage is
   /// opaque pointers that never goes away.
   struct AliasKeyTy {
     // The SILValue pair:
-    size_t V1, V2;
+    swift::ValueIndexTy V1, V2;
     // The TBAAType pair:
     void *T1, *T2;
   };
 
   /// A key used for the MemoryBehavior Analysis cache.
   ///
-  /// The two SILValue pointers are mapped to size_t indices because we need an
+  /// The two SILValue pointers are mapped to integer indices because we need an
   /// efficient way to invalidate them (the mechanism is described below).  The
   /// RetainObserveKind represents the inspection mode for the memory behavior
   /// analysis.
   struct MemBehaviorKeyTy {
     // The SILValue pair:
-    size_t V1, V2;
+    swift::ValueIndexTy V1, V2;
   };
 }
 
@@ -113,6 +113,19 @@ private:
   /// The computeMemoryBehavior() method uses this map to cache queries.
   llvm::DenseMap<MemBehaviorKeyTy, MemoryBehavior> MemoryBehaviorCache;
 
+  /// Set of instructions inside immutable-scopes.
+  ///
+  /// Contains pairs of intruction indices: the first instruction is the begin-
+  /// scope instruction (e.g. begin_access), the second instruction is an
+  /// instruction inside the scope (only may-write instructions are considered).
+  llvm::DenseSet<MemBehaviorKeyTy> instsInImmutableScopes;
+
+  /// Computed immutable scopes.
+  ///
+  /// Contains the begin-scope instruction's indices (e.g. begin_access) of
+  /// all computed scopes.
+  llvm::DenseSet<ValueIndexTy> immutableScopeComputed;
+
   /// The caches can't directly map a pair of value/instruction pointers
   /// to results because we'd like to be able to remove deleted instruction
   /// pointers without having to scan the whole map. So, instead of storing
@@ -135,6 +148,10 @@ private:
 
   virtual bool needsNotifications() override { return true; }
 
+  void computeImmutableScope(SingleValueInstruction *beginScopeInst,
+                             ValueIndexTy beginIdx);
+
+  bool isInImmutableScope(SILInstruction *inst, SILValue V);
 
 public:
   AliasAnalysis(SILModule *M)
@@ -246,6 +263,8 @@ public:
     MemoryBehaviorCache.clear();
     InstructionToIndex.clear();
     ValueToIndex.clear();
+    instsInImmutableScopes.clear();
+    immutableScopeComputed.clear();
   }
 
   virtual void invalidate(SILFunction *,
@@ -276,17 +295,17 @@ SILType computeTBAAType(SILValue V);
 namespace llvm {
   template <> struct DenseMapInfo<AliasKeyTy> {
     static inline AliasKeyTy getEmptyKey() {
-      auto Allone = std::numeric_limits<size_t>::max();
+      auto Allone = std::numeric_limits<swift::ValueIndexTy>::max();
       return {0, Allone, nullptr, nullptr};
     }
     static inline AliasKeyTy getTombstoneKey() {
-      auto Allone = std::numeric_limits<size_t>::max();
+      auto Allone = std::numeric_limits<swift::ValueIndexTy>::max();
       return {Allone, 0, nullptr, nullptr};
     }
     static unsigned getHashValue(const AliasKeyTy Val) {
       unsigned H = 0;
-      H ^= DenseMapInfo<size_t>::getHashValue(Val.V1);
-      H ^= DenseMapInfo<size_t>::getHashValue(Val.V2);
+      H ^= DenseMapInfo<swift::ValueIndexTy>::getHashValue(Val.V1);
+      H ^= DenseMapInfo<swift::ValueIndexTy>::getHashValue(Val.V2);
       H ^= DenseMapInfo<void *>::getHashValue(Val.T1);
       H ^= DenseMapInfo<void *>::getHashValue(Val.T2);
       return H;
@@ -301,17 +320,17 @@ namespace llvm {
 
   template <> struct DenseMapInfo<MemBehaviorKeyTy> {
     static inline MemBehaviorKeyTy getEmptyKey() {
-      auto Allone = std::numeric_limits<size_t>::max();
+      auto Allone = std::numeric_limits<swift::ValueIndexTy>::max();
       return {0, Allone};
     }
     static inline MemBehaviorKeyTy getTombstoneKey() {
-      auto Allone = std::numeric_limits<size_t>::max();
+      auto Allone = std::numeric_limits<swift::ValueIndexTy>::max();
       return {Allone, 0};
     }
     static unsigned getHashValue(const MemBehaviorKeyTy V) {
       unsigned H = 0;
-      H ^= DenseMapInfo<size_t>::getHashValue(V.V1);
-      H ^= DenseMapInfo<size_t>::getHashValue(V.V2);
+      H ^= DenseMapInfo<swift::ValueIndexTy>::getHashValue(V.V1);
+      H ^= DenseMapInfo<swift::ValueIndexTy>::getHashValue(V.V2);
       return H;
     }
     static bool isEqual(const MemBehaviorKeyTy LHS,

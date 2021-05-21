@@ -12,6 +12,8 @@ class X {
   init()
 }
 
+class Derived : X { }
+
 class C {
   @_hasStorage @_hasInitialValue final let prop: Builtin.Int32 { get }
 }
@@ -556,6 +558,134 @@ bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
   return %r : $()
 }
 
+// CHECK-LABEL: @testReadAccessOfClassProperty
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %1 = ref_element_addr %0 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = begin_access [read] [dynamic] %1 : $*Int32
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #8.
+// CHECK-NEXT:     %7 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = begin_access [read] [dynamic] %1 : $*Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @testReadAccessOfClassProperty : $@convention(thin) (@guaranteed X) -> Int32 {
+bb0(%0 : @guaranteed $X):
+  %1 = ref_element_addr %0 : $X, #X.a
+  %2 = begin_access [read] [dynamic] %1 : $*Int32
+  %3 = load [trivial] %2 : $*Int32
+  %4 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  end_access %2 : $*Int32
+  %7 = apply %4() : $@convention(thin) () -> ()
+  return %3 : $Int32
+}
+
+// CHECK-LABEL: @testModifyAccessOfClassProperty
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     %6 = apply %5() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = ref_element_addr %0 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %6 = apply %5() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %3 = begin_access [modify] [dynamic] %2 : $*Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @testModifyAccessOfClassProperty : $@convention(thin) (@guaranteed X, Int32) -> () {
+bb0(%0 : @guaranteed $X, %1 : $Int32):
+  %2 = ref_element_addr %0 : $X, #X.a
+  %3 = begin_access [modify] [dynamic] %2 : $*Int32
+  store %1 to [trivial] %3 : $*Int32
+  %5 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %6 = apply %5() : $@convention(thin) () -> ()
+  end_access %3 : $*Int32
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @testImmutableRefWithGuaranteedParam
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %4 = apply %3() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %1 = ref_element_addr [immutable] %0 : $X, #X.a
+// CHECK-NEXT:   r=1,w=0
+sil [ossa] @testImmutableRefWithGuaranteedParam : $@convention(thin) (@guaranteed X) -> Int32 {
+bb0(%0 : @guaranteed $X):
+  %1 = ref_element_addr [immutable] %0 : $X, #X.a
+  %3 = load [trivial] %1 : $*Int32
+  %5 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %6 = apply %5() : $@convention(thin) () -> ()
+  return %3 : $Int32
+}
+
+// CHECK-LABEL: @testImmutableRefWithBorrow
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = ref_element_addr [immutable] %1 : $X, #X.a
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     %7 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = ref_element_addr [immutable] %1 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @testImmutableRefWithBorrow : $@convention(thin) (@owned X) -> Int32 {
+bb0(%0 : @owned $X):
+  %1 = begin_borrow %0 : $X
+  %2 = ref_element_addr [immutable] %1 : $X, #X.a
+  %3 = load [trivial] %2 : $*Int32
+  %4 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  end_borrow %1 : $X
+  %7 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0 : $X
+  return %3 : $Int32
+}
+
+// CHECK-LABEL: @testImmutableRefWithControlFlow
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %2 = apply %1() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %6 = apply %1() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %9 = apply %1() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     %11 = apply %1() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #7.
+// CHECK-NEXT:     %14 = apply %1() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @testImmutableRefWithControlFlow : $@convention(thin) (@owned X) -> Int32 {
+bb0(%0 : @owned $X):
+  %1 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %2 = apply %1() : $@convention(thin) () -> ()
+  %3 = begin_borrow %0 : $X
+  %4 = ref_element_addr [immutable] %3 : $X, #X.a
+  %5 = load [trivial] %4 : $*Int32
+  %6 = apply %1() : $@convention(thin) () -> ()
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %3 : $X
+  %9 = apply %1() : $@convention(thin) () -> ()
+  br bb4
+bb2:
+  %11 = apply %1() : $@convention(thin) () -> ()
+  br bb3
+bb3:
+  end_borrow %3 : $X
+  %14 = apply %1() : $@convention(thin) () -> ()
+  br bb4
+bb4:
+  destroy_value %0 : $X
+  return %5 : $Int32
+}
+
 // CHECK-LABEL: @testLoadTake
 // CHECK:      PAIR #0.
 // CHECK-NEXT:   %2 = load [take] %0 : $*C
@@ -606,10 +736,9 @@ struct Int64Wrapper {
 
 // CHECK-LABEL: @testNestedAccessWithInterposedProjection
 // CHECK: PAIR #2.
-// CHECK:     %1 = begin_access [modify] [static] %0 : $*Int64Wrapper // users: %7, %2
-// CHECK:     %3 = begin_access [read] [static] %2 : $*Int64  // users: %6, %4
-// CHECK:   r=1,w=1
-// CHECK: PAIR #3.
+// CHECK-NEXT:   %1 = begin_access [modify] [static] %0 : $*Int64Wrapper // users: %7, %2
+// CHECK-NEXT:   %3 = begin_access [read] [static] %2 : $*Int64  // users: %6, %4
+// CHECK-NEXT: r=1,w=1
 sil @testNestedAccessWithInterposedProjection : $@convention(thin) (@inout Int64Wrapper) -> () {
 bb0(%0 : $*Int64Wrapper):
   %1 = begin_access [modify] [static] %0 : $*Int64Wrapper
