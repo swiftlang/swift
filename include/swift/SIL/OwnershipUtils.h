@@ -1076,10 +1076,10 @@ void findTransitiveReborrowBaseValuePairs(
     BorrowingOperand initialScopeOperand, SILValue origBaseValue,
     function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair);
 
-/// Given a begin_borrow visit all end_borrow users of the borrow or its
-/// reborrows.
+/// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
+/// its reborrows.
 void visitTransitiveEndBorrows(
-    BeginBorrowInst *borrowInst,
+    BorrowedValue beginBorrow,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
 
 } // namespace swift
