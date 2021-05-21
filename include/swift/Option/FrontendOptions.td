@@ -352,9 +352,6 @@ def disable_sil_perf_optzns : Flag<["-"], "disable-sil-perf-optzns">,
 def disable_swift_specific_llvm_optzns : Flag<["-"], "disable-swift-specific-llvm-optzns">,
   HelpText<"Don't run Swift specific LLVM optimization passes.">;
 
-def disable_llvm_slp_vectorizer : Flag<["-"], "disable-llvm-slp-vectorizer">,
-  HelpText<"Don't run LLVM SLP vectorizer">;
-
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
 
