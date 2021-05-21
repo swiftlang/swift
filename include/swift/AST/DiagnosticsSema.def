@@ -5879,9 +5879,10 @@ REMARK(attr_objc_name_conflicts_with_access_note, none,
        (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
 
 // Used on invalid @objc diagnostics
-NOTE(note_invalid_attr_added_by_access_note, none,
-     "%select{attribute|modifier}0 '%1' was added by access note for %2",
-     (bool, StringRef, StringRef))
+REMARK(wrap_invalid_attr_added_by_access_note, none,
+       "access note for %1 failed to add invalid "
+       "%select{attribute|modifier}2 '%3': %0",
+       (DiagnosticInfo *, StringRef, bool, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

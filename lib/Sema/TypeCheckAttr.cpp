@@ -1016,10 +1016,11 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
         else {
           firstNameLoc = D->getLoc();
         }
-        diagnose(firstNameLoc, diag::objc_name_req_nullary,
-                 D->getDescriptiveKind())
-          .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc())
-          .limitBehavior(behavior);
+        softenIfAccessNote(D, attr,
+          diagnose(firstNameLoc, diag::objc_name_req_nullary,
+                   D->getDescriptiveKind())
+            .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc())
+            .limitBehavior(behavior));
         const_cast<ObjCAttr *>(attr)->setName(
           ObjCSelector(Ctx, 0, objcName->getSelectorPieces()[0]),
           /*implicit=*/false);
@@ -1028,11 +1029,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
       SourceLoc diagLoc = attr->getLParenLoc();
       if (diagLoc.isInvalid())
         diagLoc = D->getLoc();
-      diagnose(diagLoc,
-               isa<SubscriptDecl>(D)
-                 ? diag::objc_name_subscript
-                 : diag::objc_name_deinit)
-          .limitBehavior(behavior);
+      softenIfAccessNote(D, attr,
+        diagnose(diagLoc,
+                 isa<SubscriptDecl>(D)
+                   ? diag::objc_name_subscript
+                   : diag::objc_name_deinit)
+            .limitBehavior(behavior));
       const_cast<ObjCAttr *>(attr)->clearName();
     } else {
       auto func = cast<AbstractFunctionDecl>(D);
@@ -1063,15 +1065,16 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
         SourceLoc firstNameLoc = func->getLoc();
         if (!attr->getNameLocs().empty())
           firstNameLoc = attr->getNameLocs().front();
-        diagnose(firstNameLoc,
-                 diag::objc_name_func_mismatch,
-                 isa<FuncDecl>(func),
-                 numArgumentNames,
-                 numArgumentNames != 1,
-                 numParameters,
-                 numParameters != 1,
-                 func->hasThrows())
-            .limitBehavior(behavior);
+        softenIfAccessNote(D, attr,
+          diagnose(firstNameLoc,
+                   diag::objc_name_func_mismatch,
+                   isa<FuncDecl>(func),
+                   numArgumentNames,
+                   numArgumentNames != 1,
+                   numParameters,
+                   numParameters != 1,
+                   func->hasThrows())
+              .limitBehavior(behavior));
         D->getAttrs().add(
           ObjCAttr::createUnnamed(Ctx, attr->AtLoc,  attr->Range.Start));
         D->getAttrs().removeAttribute(attr);
@@ -1180,26 +1183,13 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     default: break;
     }
 
-    DiagnosticBehavior behavior = attr->getAddedByAccessNote()
-                                ? DiagnosticBehavior::Remark
-                                : DiagnosticBehavior::Unspecified;
-
     if (!OnlyKind.empty())
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
-                                    attr, OnlyKind)
-          .limitBehavior(behavior);
+                                    attr, OnlyKind);
     else if (attr->isDeclModifier())
-      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr)
-          .limitBehavior(behavior);
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
     else
-      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr)
-          .limitBehavior(behavior);
-
-    if (attr->getAddedByAccessNote()) {
-      auto notesFileReason = D->getModuleContext()->getAccessNotes().Reason;
-      D->diagnose(diag::note_invalid_attr_added_by_access_note,
-                  attr->isDeclModifier(), attr->getAttrName(), notesFileReason);
-    }
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
   Checker.checkOriginalDefinedInAttrs(D, ODIAttrs);
 }

@@ -1462,6 +1462,17 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
   }
 }
 
+InFlightDiagnostic
+swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
+                          InFlightDiagnostic &diag) {
+  if (!attr || !attr->getAddedByAccessNote())
+    return std::move(diag);
+
+  return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
+                               D->getModuleContext()->getAccessNotes().Reason,
+                               attr->isDeclModifier(), attr->getAttrName()));
+}
+
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
                             const AccessNotesFile &notes) {
   ASTContext &ctx = VD->getASTContext();
@@ -1527,7 +1538,6 @@ void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
     auto reason = VD->getModuleContext()->getAccessNotes().Reason;
     VD->diagnose(diag::attr_added_by_access_note, reason, isModifier,
                  attr->getAttrName(), VD->getDescriptiveKind());
-//    VD->getModuleContext()->getAccessNotes().noteReason(VD);
 
     SmallString<64> attrString;
     llvm::raw_svector_ostream os(attrString);
