@@ -15,6 +15,8 @@
 // rdar://78193017
 // UNSUPPORTED: CPU=x86_64 && OS=tvos
 
+// REQUIRES: rdar78325660
+
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }
 
