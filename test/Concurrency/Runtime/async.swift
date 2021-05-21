@@ -23,7 +23,7 @@ var asyncTests = TestSuite("Async")
 actor MyActor {
   func synchronous() { }
 
-  func doSomething(expectedPriority: Task.Priority) {
+  func doSomething(expectedPriority: TaskPriority) {
     async {
       synchronous() // okay to be synchronous
       assert(Task.currentPriority == expectedPriority)
