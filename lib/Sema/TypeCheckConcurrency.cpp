@@ -271,8 +271,7 @@ bool IsActorRequest::evaluate(
   if (!classDecl)
     return false;
 
-  return classDecl->isExplicitActor() ||
-      classDecl->getAttrs().getAttribute<ActorAttr>();
+  return classDecl->isExplicitActor();
 }
 
 bool IsDefaultActorRequest::evaluate(
