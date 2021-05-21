@@ -608,7 +608,10 @@ public:
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
                     Type lhs, Type rhs, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), CTP(purpose), RawFromType(lhs),
-        RawToType(rhs) {}
+        RawToType(rhs) {
+    assert(lhs && "Expected a valid 'from' type");
+    assert(rhs && "Expected a valid 'to' type");
+  }
 
   SourceLoc getLoc() const override;
 
