@@ -5392,7 +5392,7 @@ public:
       ResultBuilderBuildFunction function) {
     switch (function) {
     case ResultBuilderBuildFunction::BuildArray:
-      return "Enables support for..in loops in a result builder by "
+      return "Enables support for 'for-in' loops in a result builder by "
         "combining the results of all iterations into a single result";
 
     case ResultBuilderBuildFunction::BuildBlock:
@@ -5423,7 +5423,7 @@ public:
         "type information";
 
     case ResultBuilderBuildFunction::BuildOptional:
-      return "Enables support for `if` statements that do not have an `else`";
+      return "Enables support for 'if' statements that do not have an 'else'";
     }
   }
 
