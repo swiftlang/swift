@@ -519,7 +519,18 @@ function(add_swift_host_library name)
       target_link_options(${name} PRIVATE
         "LINKER:-current_version,${SWIFT_COMPILER_VERSION}")
     endif()
+
+    # For now turn off in swift targets, debug info if we are compiling a static
+    # library.
+    if (ASHL_STATIC)
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-gnone>)
+    endif()
   endif()
+
+  # If we are compiling in release or release with deb info, compile swift code
+  # with -cross-module-optimization enabled.
+  target_compile_options(${name} PRIVATE
+    $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>>:-cross-module-optimization>)
 
   add_dependencies(dev ${name})
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
@@ -566,6 +577,9 @@ function(add_swift_host_tool executable)
   _add_host_variant_c_compile_link_flags(${executable})
   target_link_directories(${executable} PRIVATE
     ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+  # Force executables linker language to be CXX so that we do not link using the
+  # host toolchain swiftc.
+  set_target_properties(${executable} PROPERTIES LINKER_LANGUAGE CXX)
   add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})
 
   set_target_properties(${executable} PROPERTIES
