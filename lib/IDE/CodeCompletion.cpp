@@ -740,6 +740,7 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     }
     PRINT_FLAIR(ExpressionSpecific, "ExprSpecific");
     PRINT_FLAIR(SuperChain, "SuperChain");
+    PRINT_FLAIR(ArgumentLabels, "ArgLabels");
     Prefix.append("]");
   }
   if (NotRecommended)
@@ -1304,7 +1305,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     return new (*Sink.Allocator) CodeCompletionResult(
-        SemanticContext, Flair, IsArgumentLabels, NumBytesToErase, CCS, AssociatedDecl,
+        SemanticContext, Flair, NumBytesToErase, CCS, AssociatedDecl,
         ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
@@ -1313,21 +1314,21 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResult::ResultKind::Keyword:
     return new (*Sink.Allocator)
         CodeCompletionResult(
-          KeywordKind, SemanticContext, Flair, IsArgumentLabels, NumBytesToErase,
+          KeywordKind, SemanticContext, Flair, NumBytesToErase,
           CCS, ExpectedTypeRelation,
           copyString(*Sink.Allocator, BriefDocComment));
 
   case CodeCompletionResult::ResultKind::BuiltinOperator:
   case CodeCompletionResult::ResultKind::Pattern:
     return new (*Sink.Allocator) CodeCompletionResult(
-        Kind, SemanticContext, Flair, IsArgumentLabels, NumBytesToErase, CCS,
+        Kind, SemanticContext, Flair, NumBytesToErase, CCS,
         ExpectedTypeRelation, CodeCompletionOperatorKind::None,
         copyString(*Sink.Allocator, BriefDocComment));
 
   case CodeCompletionResult::ResultKind::Literal:
     assert(LiteralKind.hasValue());
     return new (*Sink.Allocator)
-        CodeCompletionResult(*LiteralKind, SemanticContext, Flair, IsArgumentLabels,
+        CodeCompletionResult(*LiteralKind, SemanticContext, Flair,
                              NumBytesToErase, CCS, ExpectedTypeRelation);
   }
 
@@ -2883,10 +2884,14 @@ public:
       Builder.setAssociatedDecl(SD);
       setClangDeclKeywords(SD, Pairs, Builder);
     }
-    if (!HaveLParen)
+    if (!HaveLParen) {
       Builder.addLeftBracket();
-    else
+    } else {
+      // Add 'ArgumentLabels' only if it has '['. Without existing '[',
+      // consider it suggesting 'subscript' itself, not call arguments for it.
+      Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
       Builder.addAnnotatedLeftBracket();
+    }
     ArrayRef<const ParamDecl *> declParams;
     if (SD)
       declParams = SD->getIndices()->getArray();
@@ -2920,7 +2925,7 @@ public:
               : CodeCompletionResult::ResultKind::Pattern,
           SemanticContext ? *SemanticContext : getSemanticContextKind(AFD),
           expectedTypeContext);
-      Builder.setIsArgumentLabels();
+      Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
       if (AFD) {
         Builder.setAssociatedDecl(AFD);
         setClangDeclKeywords(AFD, Pairs, Builder);
@@ -3240,6 +3245,8 @@ public:
         Builder.addBaseName("init");
       } else if (!addName.empty()) {
         Builder.addBaseName(addName.str());
+      } else {
+        Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
       }
 
       if (!ConstructorType) {
@@ -4609,8 +4616,7 @@ public:
                                /*isIUO=*/false, Arg->isAutoClosure(),
                                /*useUnderscoreLabel=*/true,
                                isLabeledTrailingClosure);
-      Builder.setIsArgumentLabels();
-      Builder.addFlair(CodeCompletionFlairBit::ExpressionSpecific);
+      Builder.addFlair(CodeCompletionFlairBit::ArgumentLabels);
       auto Ty = Arg->getPlainType();
       if (Arg->isInOut()) {
         Ty = InOutType::get(Ty);

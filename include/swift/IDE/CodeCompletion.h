@@ -414,6 +414,9 @@ enum class CodeCompletionFlairBit: uint8_t {
 
   /// E.g. override func foo() { super.foo() ...
   SuperChain = 1 << 1,
+
+  /// Argument label and type. i.e. 'label: <#Ty#>'.
+  ArgumentLabels = 1 << 2,
 };
 
 using CodeCompletionFlair = OptionSet<CodeCompletionFlairBit>;
@@ -600,7 +603,6 @@ private:
   unsigned KnownOperatorKind : 6;
   unsigned SemanticContext : 3;
   unsigned Flair: 8;
-  unsigned IsArgumentLabels : 1;
   unsigned NotRecommended : 4;
   unsigned IsSystem : 1;
 
@@ -625,8 +627,7 @@ public:
   ///
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
   CodeCompletionResult(ResultKind Kind, SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind =
@@ -634,7 +635,6 @@ public:
                        StringRef BriefDocComment = StringRef())
       : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
@@ -655,13 +655,12 @@ public:
   CodeCompletionResult(CodeCompletionKeywordKind Kind,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        StringRef BriefDocComment = StringRef())
       : Kind(Keyword), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
@@ -675,13 +674,11 @@ public:
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
   CodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
                        SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
       : Kind(Literal), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         TypeDistance(TypeDistance) {
@@ -696,8 +693,7 @@ public:
   /// arguments outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   CodeCompletionResult(SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl, StringRef ModuleName,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
@@ -707,7 +703,6 @@ public:
                        enum ExpectedTypeRelation TypeDistance)
       : Kind(ResultKind::Declaration), KnownOperatorKind(0),
         SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
         NotRecommended(unsigned(NotRecReason)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
@@ -726,8 +721,7 @@ public:
 
   // Used by deserialization.
   CodeCompletionResult(SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
                        StringRef ModuleName,
@@ -740,7 +734,6 @@ public:
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
         SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
         NotRecommended(unsigned(NotRecReason)), IsSystem(IsSystem),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
@@ -805,10 +798,6 @@ public:
 
   CodeCompletionFlair getFlair() const {
     return static_cast<CodeCompletionFlair>(Flair);
-  }
-
-  bool isArgumentLabels() const {
-    return static_cast<bool>(IsArgumentLabels);
   }
 
   bool isNotRecommended() const {

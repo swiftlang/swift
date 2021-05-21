@@ -155,7 +155,7 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     CodeCompletion::SwiftResult swiftResult(
         CodeCompletion::SwiftResult::ResultKind::Pattern,
         SemanticContextKind::Local, CodeCompletionFlairBit::ExpressionSpecific,
-        /*IsArgumentLabels=*/false, /*NumBytesToErase=*/0, completionString,
+        /*NumBytesToErase=*/0, completionString,
         CodeCompletionResult::ExpectedTypeRelation::Unknown);
 
     CompletionBuilder builder(sink, swiftResult);
@@ -660,12 +660,10 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
   if (!skipMetaGroups) {
     auto flair = completion->getFlair();
     if (flair.contains(CodeCompletionFlairBit::ExpressionSpecific) ||
-        flair.contains(CodeCompletionFlairBit::SuperChain))
+        flair.contains(CodeCompletionFlairBit::SuperChain) ||
+        flair.contains(CodeCompletionFlairBit::ArgumentLabels))
       return ResultBucket::ExpressionSpecific;
   }
-
-  if (completion->isArgumentLabels() && !skipMetaGroups)
-    return ResultBucket::ExpressionSpecific;
 
   if (completion->isOperator())
     return ResultBucket::Operator;
@@ -1169,15 +1167,13 @@ Completion *CompletionBuilder::finish() {
 
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(
-          semanticContext, flair, current.isArgumentLabels(),
-          current.getNumBytesToErase(), completionString,
+          semanticContext, flair, current.getNumBytesToErase(), completionString,
           current.getAssociatedDeclKind(), current.isSystem(),
           current.getModuleName(), current.getNotRecommendedReason(),
           current.getBriefDocComment(), current.getAssociatedUSRs(),
           current.getDeclKeywords(), typeRelation, opKind);
     } else {
       base = SwiftResult(current.getKind(), semanticContext, flair,
-                         current.isArgumentLabels(),
                          current.getNumBytesToErase(), completionString,
                          typeRelation, opKind);
     }

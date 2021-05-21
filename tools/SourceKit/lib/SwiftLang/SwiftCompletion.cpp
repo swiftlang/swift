@@ -921,7 +921,6 @@ static void transformAndForwardResults(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
         SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
-        /*IsArgumentLabels=*/false,
         exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
