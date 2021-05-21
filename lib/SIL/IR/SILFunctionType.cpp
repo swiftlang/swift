@@ -4305,11 +4305,6 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
 
-  // Distributed thunks are always `async throws`
-  if (constant.isDistributedThunk()) {
-    extInfo = extInfo.withAsync(true).withThrows(true);
-  }
-
   // If this is a C++ constructor, don't add the metatype "self" parameter
   // because we'll never use it and it will cause problems in IRGen.
   if (constant.getDecl()->getClangDecl() &&

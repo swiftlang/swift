@@ -84,15 +84,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     endif()
   endif()
 
-  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
-#    list(APPEND PLATFORM_SOURCES
-#      DistributedActor.cpp
-#      )
-    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
-      swift_Distributed${SWIFT_PRIMARY_VARIANT_SUFFIX}
-      )
-  endif()
-
   # Don't complain about these files not being in the sources list.
   set(LLVM_OPTIONAL_SOURCES
     weak.mm

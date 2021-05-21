@@ -1171,10 +1171,6 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift concurrency model.')
 
-    option('--enable-experimental-distributed', toggle_true,
-           default=True,
-           help='Enable experimental Swift distributed actors.')
-
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
 

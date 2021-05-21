@@ -88,7 +88,6 @@ public:
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
-    DistributedThunk,
   };
 
   ASTMangler(bool DWARFMangling = false)

@@ -2205,7 +2205,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
-  assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
   return SGF.emitDynamicMemberRefExpr(E, C);
 }
 
@@ -2228,7 +2227,6 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 RValue RValueEmitter::visitDynamicSubscriptExpr(
                                       DynamicSubscriptExpr *E, SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
-  assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
   return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
