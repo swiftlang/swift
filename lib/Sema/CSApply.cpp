@@ -3412,7 +3412,21 @@ namespace {
     }
 
     Expr *visitAnyTryExpr(AnyTryExpr *expr) {
-      cs.setType(expr, cs.getType(expr->getSubExpr()));
+      auto *subExpr = expr->getSubExpr();
+      auto type = simplifyType(cs.getType(subExpr));
+
+      // Let's load the value associated with this try.
+      if (type->hasLValueType()) {
+        subExpr = coerceToType(subExpr, type->getRValueType(),
+                               cs.getConstraintLocator(subExpr));
+
+        if (!subExpr)
+          return nullptr;
+      }
+
+      cs.setType(expr, cs.getType(subExpr));
+      expr->setSubExpr(subExpr);
+
       return expr;
     }
 
