@@ -389,6 +389,7 @@ endfunction()
 #   add_swift_host_library(name
 #     [SHARED]
 #     [STATIC]
+#     [OBJECT]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
 #     source1 [source2 source3 ...])
 #
@@ -401,6 +402,9 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
+# OBJECT
+#   Build an object library
+#
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
@@ -409,7 +413,8 @@ endfunction()
 function(add_swift_host_library name)
   set(options
         SHARED
-        STATIC)
+        STATIC
+        OBJECT)
   set(single_parameter_options)
   set(multiple_parameter_options
         LLVM_LINK_COMPONENTS)
@@ -423,8 +428,8 @@ function(add_swift_host_library name)
 
   translate_flags(ASHL "${options}")
 
-  if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
-    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
+  if(NOT ASHL_SHARED AND NOT ASHL_STATIC AND NOT ASHL_OBJECT)
+    message(FATAL_ERROR "One of SHARED/STATIC/OBJECT must be specified")
   endif()
 
   if(XCODE)
@@ -449,6 +454,8 @@ function(add_swift_host_library name)
     set(libkind SHARED)
   elseif(ASHL_STATIC)
     set(libkind STATIC)
+  elseif(ASHL_OBJECT)
+    set(libkind OBJECT)
   endif()
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
