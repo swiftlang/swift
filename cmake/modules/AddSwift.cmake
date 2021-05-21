@@ -390,6 +390,7 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [OBJECT]
+#     [IGNORE_LLVM_UPDATE_COMPILE_FLAGS]
 #     [LLVM_LINK_COMPONENTS comp1 ...]
 #     source1 [source2 source3 ...])
 #
@@ -408,13 +409,19 @@ endfunction()
 # LLVM_LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
+# IGNORE_LLVM_UPDATE_COMPILE_FLAGS
+#   If set do not use llvm_update_compile_flags to generate cflags/etc.  This is
+#   generally used when compiling a mixed c/c++/swift library and one wants to
+#   disable this for the swift part.
+#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_host_library name)
   set(options
         SHARED
         STATIC
-        OBJECT)
+        OBJECT
+        IGNORE_LLVM_UPDATE_COMPILE_FLAGS)
   set(single_parameter_options)
   set(multiple_parameter_options
         LLVM_LINK_COMPONENTS)
@@ -460,7 +467,9 @@ function(add_swift_host_library name)
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
   add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
-  llvm_update_compile_flags(${name})
+  if (NOT ASHL_IGNORE_LLVM_UPDATE_COMPILE_FLAGS)
+    llvm_update_compile_flags(${name})
+  endif()
   swift_common_llvm_config(${name} ${ASHL_LLVM_LINK_COMPONENTS})
   set_output_directory(${name}
       BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
