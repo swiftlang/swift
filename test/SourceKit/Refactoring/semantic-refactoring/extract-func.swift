@@ -5,7 +5,7 @@ func foo() -> Int {
 }
 
 // RUN: %empty-directory(%t.result)
-// RUN: %sourcekitd-test -req=extract-func -pos=2:1 -end-pos 4:11 -name new_name %s -- %s > %t.result/extract-func.swift.expected
+// RUN: %sourcekitd-test -req=refactoring.extract.function -pos=2:1 -end-pos 4:11 -name new_name %s -- %s > %t.result/extract-func.swift.expected
 // RUN: %diff -u %S/extract-func.swift.expected %t.result/extract-func.swift.expected
 
 // FIXME: Fails on linux with assertion: "!GlibcModuleMapPath.empty()"" failed
