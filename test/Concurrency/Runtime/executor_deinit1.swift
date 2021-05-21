@@ -9,6 +9,8 @@
 // https://bugs.swift.org/browse/SR-14461
 // UNSUPPORTED: linux
 
+// REQUIRES: rdar78325660
+
 // doesn't matter that it's bool identity function or not
 func boolIdentityFn(_ x : Bool) -> Bool { return x }
 
