@@ -2,6 +2,7 @@
 
 add_swift_host_library(swiftDependencyScan STATIC
   DependencyScanningTool.cpp
+  ModuleDependencyCacheSerialization.cpp
   ScanDependencies.cpp
   StringUtils.cpp)
 

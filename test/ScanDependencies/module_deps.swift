@@ -25,6 +25,10 @@
 // Check the contents of the JSON output
 // RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
 
+// Ensure that round-trip serialization does not affect result
+// RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
+// RUN: %FileCheck %s < %t/deps.json
+
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
