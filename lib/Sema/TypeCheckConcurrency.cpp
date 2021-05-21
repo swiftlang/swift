@@ -1082,7 +1082,7 @@ namespace {
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
         checkMemberReference(lookup->getBase(), lookup->getMember(),
                              lookup->getLoc(),
-                             /*isEscapingPartialApply*/false,
+                             /*partialApply*/None,
                              lookup);
         return { true, expr };
       }
@@ -1108,7 +1108,7 @@ namespace {
             // implicitly async, regardless of whether they are escaping.
             checkMemberReference(
                 partialApply->base, memberRef->first, memberRef->second,
-                partialApply->isEscaping);
+                partialApply);
 
             partialApply->base->walk(*this);
 
@@ -1127,7 +1127,7 @@ namespace {
         if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
               call->getArg(), memberRef->first, memberRef->second,
-              /*isEscapingPartialApply=*/false, call);
+              /*partialApply=*/None, call);
 
           call->getArg()->walk(*this);
 
@@ -1951,7 +1951,7 @@ namespace {
     /// in an invalid or unsafe way such that a diagnostic was emitted.
     bool checkMemberReference(
         Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
-        bool isEscapingPartialApply = false, 
+        Optional<PartialApplyThunkInfo> partialApply = None,
         Expr *context = nullptr) {
       if (!base || !memberRef)
         return false;
@@ -1999,7 +1999,9 @@ namespace {
                 getNearestEnclosingActorContext(getDeclContext()),
               useKind
               );
-          noteIsolatedActorMember(member, context);
+
+          if (!partialApply)
+            noteIsolatedActorMember(member, context);
           return true;
         }
 
@@ -2009,12 +2011,11 @@ namespace {
           case ActorIsolation::ActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
-            if (isEscapingPartialApply) {
+            if (partialApply && partialApply->isEscaping) {
               ctx.Diags.diagnose(
                   memberLoc, diag::actor_isolated_partial_apply,
                   member->getDescriptiveKind(),
                   member->getName());
-              noteIsolatedActorMember(member, context);
               return true;
             }
 
@@ -2037,7 +2038,9 @@ namespace {
             auto diag = findActorIndependentReason(curDC);
             ctx.Diags.diagnose(memberLoc, diag, member->getDescriptiveKind(),
                                member->getName(), useKind);
-            noteIsolatedActorMember(member, context);
+
+            if (!partialApply)
+              noteIsolatedActorMember(member, context);
             return true;
           }
 
@@ -2059,7 +2062,9 @@ namespace {
                                contextIsolation.getGlobalActor(), useKind,
                                result == AsyncMarkingResult::SyncContext
                                );
-            noteIsolatedActorMember(member, context);
+
+            if (!partialApply)
+              noteIsolatedActorMember(member, context);
             return true;
           }
         }
