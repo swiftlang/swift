@@ -6893,16 +6893,17 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
   
   // Parse the generic-params, if present.
-  GenericParamList *GenericParams;
-  auto GenericParamResult = maybeParseGenericParams();
-  GenericParams = GenericParamResult.getPtrOrNull();
-  if (GenericParamResult.hasCodeCompletion()) {
+  GenericParamList *GenericArgParams;
+  auto GenericArgParamResult = maybeParseGenericParams();
+  GenericArgParams = GenericArgParamResult.getPtrOrNull();
+  if (GenericArgParamResult.hasCodeCompletion()) {
     Status.setHasCodeCompletionAndIsError();
     if (!CodeCompletion)
       return Status;
   }
 
   DefaultArgumentInfo DefaultArgs;
+  GenericParamList *GenericRetParams = nullptr;
   TypeRepr *FuncRetTy = nullptr;
   DeclName FullName;
   ParameterList *BodyParams;
@@ -6914,13 +6915,14 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                                    DefaultArgs,
                                    asyncLoc, reasync,
                                    throwsLoc, rethrows,
-                                   FuncRetTy);
+                                   GenericRetParams, FuncRetTy);
   if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
     return Status;
   }
 
-  diagnoseWhereClauseInGenericParamList(GenericParams);
+  diagnoseWhereClauseInGenericParamList(GenericArgParams);
+  diagnoseWhereClauseInGenericParamList(GenericRetParams);
 
   // If there was an 'async' modifier, put it in the right place for a function.
   bool isAsync = asyncLoc.isValid();
@@ -6940,7 +6942,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               FuncLoc, FullName, NameLoc,
                               /*Async=*/asyncLoc.isValid(), asyncLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              GenericParams,
+                              GenericArgParams,
                               BodyParams, FuncRetTy,
                               CurDeclContext);
 

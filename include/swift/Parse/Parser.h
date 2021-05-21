@@ -1391,6 +1391,7 @@ public:
                                       bool &reasync,
                                       SourceLoc &throws,
                                       bool &rethrows,
+                                      GenericParamList *&genericParams,
                                       TypeRepr *&retType);
 
   /// Parse 'async' and 'throws', if present, putting the locations of the

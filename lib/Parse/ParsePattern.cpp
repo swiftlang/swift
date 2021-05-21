@@ -775,7 +775,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ///   func-signature:
 ///     func-arguments ('async'|'reasync')? func-throws? func-signature-result?
 ///   func-signature-result:
-///     '->' type
+///     '->' generic-params? type
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
@@ -787,6 +787,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                bool &reasync,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
+                               GenericParamList *&genericParams,
                                TypeRepr *&retType) {
   SyntaxParsingContext SigContext(SyntaxContext, SyntaxKind::FunctionSignature);
   SmallVector<Identifier, 4> NamePieces;
@@ -819,6 +820,12 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     // Check for effect specifiers after the arrow, but before the type, and
     // correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
+
+    // Parse the generic-params, if present.
+    auto GenericParamsResult = maybeParseGenericParams();
+    genericParams = GenericParamsResult.getPtrOrNull();
+    if (GenericParamsResult.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);

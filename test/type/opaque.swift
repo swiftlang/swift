@@ -65,6 +65,9 @@ func zlop() -> some C & AnyObject & P {
   return D()
 }
 
+// Generalized opaque return types.
+func bar1() -> <T> () { } // TODO: make test do more than return unit when sematics of general synatax is implemented
+
 // Don't allow opaque types to propagate by inference into other global decls'
 // types
 struct Test {
