@@ -632,7 +632,6 @@ DECL_ATTR(completionHandlerAsync, CompletionHandlerAsync,
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript |
-  ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,
   112)
