@@ -103,12 +103,6 @@ void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
   emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
 }
 
-void SILGenModule::emitDistributedThunk(SILDeclRef thunk) {
-  // Thunks are always emitted by need, so don't need delayed emission.
-  assert(thunk.isDistributedThunk() && "distributed thunks only");
-  emitFunctionDefinition(thunk, getFunction(thunk, ForDefinition));
-}
-
 SILValue
 SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                                       SILConstantInfo constantInfo,

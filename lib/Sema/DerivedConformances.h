@@ -301,15 +301,7 @@ public:
   /// Derive a Decodable requirement for a struct type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveDecodable(ValueDecl *requirement);  
-
-  /// Whether we can derive the given DistributedActor requirement in the given context.
-  static bool canDeriveDistributedActor(NominalTypeDecl *nominal, DeclContext *dc);
-
-  /// Derive a DistributedActor requirement for an distributed actor.
-  ///
-  /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveDistributedActor(ValueDecl *requirement);
+  ValueDecl *deriveDecodable(ValueDecl *requirement);
 
   /// Determine if \c Actor can be derived for the given type.
   static bool canDeriveActor(DeclContext *DC, NominalTypeDecl *NTD);

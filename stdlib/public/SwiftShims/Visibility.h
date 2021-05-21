@@ -178,11 +178,6 @@
 #else
 #define SWIFT_IMAGE_EXPORTS_swift_Concurrency 0
 #endif
-#if defined(swift_Distributed_EXPORTS)
-#define SWIFT_IMAGE_EXPORTS_swift_Distributed 1
-#else
-#define SWIFT_IMAGE_EXPORTS_swift_Distributed 0
-#endif
 #if defined(swift_Differentiation_EXPORTS)
 #define SWIFT_IMAGE_EXPORTS_swift_Differentiation 1
 #else

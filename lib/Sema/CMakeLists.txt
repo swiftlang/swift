@@ -12,7 +12,6 @@ add_swift_host_library(swiftSema STATIC
   CSFix.cpp
   CSDiagnostics.cpp
   CodeSynthesis.cpp
-  CodeSynthesisDistributedActor.cpp
   ConstantnessSemaDiagnostics.cpp
   Constraint.cpp
   ConstraintGraph.cpp
@@ -20,7 +19,6 @@ add_swift_host_library(swiftSema STATIC
   ConstraintSystem.cpp
   DebuggerTestingTransform.cpp
   DerivedConformanceActor.cpp
-  DerivedConformanceDistributedActor.cpp
   DerivedConformanceAdditiveArithmetic.cpp
   DerivedConformanceCaseIterable.cpp
   DerivedConformanceCodable.cpp
@@ -47,7 +45,6 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckCircularity.cpp
   TypeCheckCodeCompletion.cpp
   TypeCheckConcurrency.cpp
-  TypeCheckDistributed.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
   TypeCheckDeclObjC.cpp

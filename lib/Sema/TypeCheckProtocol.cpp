@@ -2773,29 +2773,6 @@ bool ConformanceChecker::checkActorIsolation(
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
                   witness, /*fromExpression=*/false)) {
-  case ActorIsolationRestriction::DistributedActorSelf: {
-    if (witness->isSynthesized()) {
-      // Some of our synthesized properties get special treatment,
-      // they are always available, regardless if the actor is remote even.
-      auto &C = requirement->getASTContext();
-
-      // actorAddress is special, it is *always* available.
-      // even if the actor is 'remote' it is always available and immutable.
-      if (witness->getName() == C.Id_actorAddress &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorAddressDecl()->getDeclaredInterfaceType()))
-        return false;
-
-      // TODO: we don't *really* need to expose the transport like that... reconsider?
-      if (witness->getName() == C.Id_actorTransport &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorTransportDecl()->getDeclaredInterfaceType()))
-        return false;
-    }
-
-    // continue checking ActorSelf rules
-    LLVM_FALLTHROUGH;
-  }
   case ActorIsolationRestriction::ActorSelf: {
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
@@ -2851,7 +2828,6 @@ bool ConformanceChecker::checkActorIsolation(
   bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
     llvm_unreachable("There are not actor protocols");
 
   case ActorIsolation::GlobalActorUnsafe:
@@ -6318,9 +6294,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
-
-  case KnownDerivableProtocolKind::DistributedActor:
-    return derived.deriveDistributedActor(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(

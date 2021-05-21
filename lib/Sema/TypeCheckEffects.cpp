@@ -648,8 +648,8 @@ public:
                                   ConditionalEffectKind conditionalKind,
                                   PotentialEffectReason reason) {
     Classification result;
-    for (auto k : kinds)
 
+    for (auto k : kinds)
       result.merge(forEffect(k, conditionalKind, reason));
 
     return result;
@@ -774,7 +774,6 @@ public:
 
     // If the function doesn't have any effects, we're done here.
     if (!fnType->isThrowing() &&
-        !E->implicitlyThrows() &&
         !fnType->isAsync() &&
         !E->implicitlyAsync()) {
       return Classification();
@@ -794,8 +793,8 @@ public:
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
-          !(kind == EffectKind::Async && E->implicitlyAsync()) &&
-          !(kind == EffectKind::Throws && E->implicitlyThrows())) {
+          !(kind == EffectKind::Async &&
+            E->implicitlyAsync())) {
         return;
       }
 
@@ -2521,7 +2520,7 @@ private:
                                   PotentialEffectReason::forPropertyAccess()));
 
     } else if (E->isImplicitlyAsync()) {
-      checkThrowAsyncSite(E, /*requiresTry=*/E->isImplicitlyThrows(),
+      checkThrowAsyncSite(E, /*requiresTry=*/false,
             Classification::forUnconditional(EffectKind::Async,
                                    PotentialEffectReason::forPropertyAccess()));
 
@@ -2693,7 +2692,7 @@ private:
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowReason());
       } else if (!isTryCovered) {
-        CurContext.diagnoseUncoveredThrowSite(Ctx, E, // we want this one to trigger
+        CurContext.diagnoseUncoveredThrowSite(Ctx, E,
                                               classification.getThrowReason());
       }
       break;
