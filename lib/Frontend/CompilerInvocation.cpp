@@ -407,10 +407,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
-
-  Opts.EnableExperimentalDistributed |=
-    Args.hasArg(OPT_enable_experimental_distributed);
-
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
@@ -420,12 +416,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
-
-  /// experimental distributed also implicitly enables experimental concurrency
-  Opts.EnableExperimentalDistributed |=
-    Args.hasArg(OPT_enable_experimental_distributed);
-  Opts.EnableExperimentalConcurrency |=
-    Args.hasArg(OPT_enable_experimental_distributed);
 
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);

@@ -39,9 +39,6 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   if (method->hasForcedStaticDispatch())
     return MethodDispatch::Static;
 
-  if (method->getAttrs().hasAttribute<DistributedActorAttr>())
-    return MethodDispatch::Static;
-
   // Import-as-member declarations are always statically referenced.
   if (method->isImportAsMember())
     return MethodDispatch::Static;
@@ -122,12 +119,11 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
-                       bool isDistributed,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
-      defaultArgIndex(0), pointer(derivativeId) {}
+    : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
+      pointer(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistributed)
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
     : defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
@@ -166,7 +162,6 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistribut
   }
 
   isForeign = asForeign;
-  isDistributed = asDistributed;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
@@ -202,7 +197,7 @@ ASTContext &SILDeclRef::getASTContext() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk() || isDistributedThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -707,12 +702,6 @@ EffectsKind SILDeclRef::getEffectsAttribute() const {
   return MA->getKind();
 }
 
-bool SILDeclRef::isAnyThunk() const {
-  return isForeignToNativeThunk() ||
-    isNativeToForeignThunk() ||
-    isDistributedThunk();
-}
-
 bool SILDeclRef::isForeignToNativeThunk() const {
   // If this isn't a native entry-point, it's not a foreign-to-native thunk.
   if (isForeign)
@@ -756,12 +745,6 @@ bool SILDeclRef::isNativeToForeignThunk() const {
     return false;
   }
   llvm_unreachable("Unhandled case in switch");
-}
-
-bool SILDeclRef::isDistributedThunk() const {
-  if (!isDistributed)
-    return false;
-  return kind == Kind::Func;
 }
 
 /// Use the Clang importer to mangle a Clang declaration.
@@ -842,8 +825,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         SKind = ASTMangler::SymbolKind::SwiftAsObjCThunk;
       } else if (isForeignToNativeThunk()) {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
-      } else if (isDistributedThunk()) {
-        SKind = ASTMangler::SymbolKind::DistributedThunk;
       }
       break;
     case SILDeclRef::ManglingKind::DynamicThunk:
@@ -860,7 +841,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // Use the SILGen name only for the original non-thunked, non-curried entry
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
-      if (!NameA->Name.empty() && !isAnyThunk()) {
+      if (!NameA->Name.empty() &&
+          !isForeignToNativeThunk() && !isNativeToForeignThunk()) {
         return NameA->Name.str();
       }
       
@@ -970,8 +952,6 @@ bool SILDeclRef::requiresNewVTableEntry() const {
       return true;
   if (!hasDecl())
     return false;
-  if (isDistributedThunk())
-    return false;
   auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
   if (!fnDecl)
     return false;
@@ -1003,10 +983,6 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // accessor for a property that overrides an ObjC decl, or if it is an
     // @NSManaged property, then it won't be in the vtable.
     if (overridden.getDecl()->hasClangNode())
-      return SILDeclRef();
-
-    // Distributed thunks are not in the vtable.
-    if (isDistributedThunk())
       return SILDeclRef();
     
     // An @objc convenience initializer can be "overridden" in the sense that
@@ -1287,8 +1263,6 @@ bool SILDeclRef::canBeDynamicReplacement() const {
   // generic class can't be a dynamic replacement.
   if (isForeign && hasDecl() && getDecl()->isNativeMethodReplacement())
     return false;
-  if (isDistributedThunk())
-    return false;
   if (kind == SILDeclRef::Kind::Destroyer ||
       kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
@@ -1303,9 +1277,6 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
   // The non-foreign entry of a @dynamicReplacement(for:) of @objc method in a
   // generic class can't be a dynamically replaced.
   if (!isForeign && hasDecl() && getDecl()->isNativeMethodReplacement())
-    return false;
-
-  if (isDistributedThunk())
     return false;
 
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
@@ -1343,9 +1314,6 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
 }
 
 bool SILDeclRef::hasAsync() const {
-  if (isDistributedThunk())
-    return true;
-
   if (hasDecl()) {
     if (auto afd = dyn_cast<AbstractFunctionDecl>(getDecl())) {
       return afd->hasAsync();

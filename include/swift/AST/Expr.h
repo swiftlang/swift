@@ -166,10 +166,9 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
   SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
-  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1+1,
+  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1,
     IsSuper : 1,
-    IsImplicitlyAsync : 1,
-    IsImplicitlyThrows : 1
+    IsImplicitlyAsync : 1
   );
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicLookupExpr, LookupExpr);
 
@@ -195,11 +194,10 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1+1,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1,
     Semantics : 2, // an AccessSemantics
     FunctionRefKind : 2,
-    IsImplicitlyAsync : 1,
-    IsImplicitlyThrows : 1
+    IsImplicitlyAsync : 1
   );
 
   SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+2,
@@ -347,11 +345,10 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
     ImplicitlyAsync : 1,
-    ImplicitlyThrows : 1,
     NoAsync : 1
   );
 
@@ -1205,7 +1202,6 @@ public:
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
     Bits.DeclRefExpr.IsImplicitlyAsync = false;
-    Bits.DeclRefExpr.IsImplicitlyThrows = false;
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -1227,22 +1223,6 @@ public:
   /// guarded by hop_to_executor
   void setImplicitlyAsync(bool isImplicitlyAsync) {
     Bits.DeclRefExpr.IsImplicitlyAsync = isImplicitlyAsync;
-  }
-
-  /// Determine whether this reference needs may implicitly throw.
-  ///
-  /// This is the case for non-throwing `distributed func` declarations,
-  /// which are cross-actor invoked, because such calls actually go over the
-  /// transport/network, and may throw from this, rather than the function
-  /// implementation itself..
-  bool isImplicitlyThrows() const { return Bits.DeclRefExpr.IsImplicitlyThrows; }
-
-  /// Set whether this reference must account for a `throw` occurring for reasons
-  /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
-  /// networking error.
-  void setImplicitlyThrows(bool isImplicitlyThrows) {
-    Bits.DeclRefExpr.IsImplicitlyThrows = isImplicitlyThrows;
   }
 
   /// Retrieve the concrete declaration reference.
@@ -1561,7 +1541,6 @@ protected:
       : Expr(Kind, Implicit), Base(base), Member(member) {
     Bits.LookupExpr.IsSuper = false;
     Bits.LookupExpr.IsImplicitlyAsync = false;
-    Bits.LookupExpr.IsImplicitlyThrows = false;
     assert(Base);
   }
 
@@ -1599,22 +1578,6 @@ public:
   /// guarded by hop_to_executor
   void setImplicitlyAsync(bool isImplicitlyAsync) {
     Bits.LookupExpr.IsImplicitlyAsync = isImplicitlyAsync;
-  }
-
-  /// Determine whether this reference needs may implicitly throw.
-  ///
-  /// This is the case for non-throwing `distributed func` declarations,
-  /// which are cross-actor invoked, because such calls actually go over the
-  /// transport/network, and may throw from this, rather than the function
-  /// implementation itself..
-  bool isImplicitlyThrows() const { return Bits.LookupExpr.IsImplicitlyThrows; }
-
-  /// Set whether this reference must account for a `throw` occurring for reasons
-  /// other than the function implementation itself throwing, e.g. an
-  /// `ActorTransport` implementing a `distributed func` call throwing a
-  /// networking error.
-  void setImplicitlyThrows(bool isImplicitlyThrows) {
-    Bits.LookupExpr.IsImplicitlyThrows = isImplicitlyThrows;
   }
 
   static bool classof(const Expr *E) {
@@ -4495,7 +4458,6 @@ protected:
     assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
     Bits.ApplyExpr.ImplicitlyAsync = false;
-    Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
   }
 
@@ -4561,19 +4523,6 @@ public:
   }
   void setImplicitlyAsync(bool flag) {
     Bits.ApplyExpr.ImplicitlyAsync = flag;
-  }
-
-  /// Is this application _implicitly_ required to be a throwing call?
-  /// This can happen if the function is actually a proxy function invocation,
-  /// which may throw, regardless of the target function throwing, e.g.
-  /// a distributed function call on a 'remote' actor, may throw due to network
-  /// issues reported by the transport, regardless if the actual target function
-  /// can throw.
-  bool implicitlyThrows() const {
-    return Bits.ApplyExpr.ImplicitlyThrows;
-  }
-  void setImplicitlyThrows(bool flag) {
-    Bits.ApplyExpr.ImplicitlyThrows = flag;
   }
 
   ValueDecl *getCalledValue() const;

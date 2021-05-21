@@ -1799,7 +1799,7 @@ public:
         E->dump(Out);
         Out << "\n";
         abort();
-      } else if (E->throws() && !FT->isThrowing() && !E->implicitlyThrows()) {
+      } else if (E->throws() && !FT->isThrowing()) {
         PolymorphicEffectKind rethrowingKind = PolymorphicEffectKind::Invalid;
         if (auto DRE = dyn_cast<DeclRefExpr>(E->getFn())) {
           if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(DRE->getDecl())) {
