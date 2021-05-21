@@ -416,11 +416,6 @@ private:
                                         const TypeToPathMap *OutputMap,
                                         StringRef workingDirectory,
                                         CommandOutput *Output) const;
-  
-  void chooseSymbolGraphOutputPath(Compilation &C,
-                                   const TypeToPathMap *OutputMap,
-                                   StringRef workingDirectory,
-                                   CommandOutput *Output) const;
 
   void chooseLoadedModuleTracePath(Compilation &C,
                                    StringRef workingDirectory,
