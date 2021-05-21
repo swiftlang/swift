@@ -1252,8 +1252,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
     if (classDecl->isActor())
       addSynthesized(KnownProtocolKind::Actor);
-    if (classDecl->isDistributedActor())
-      addSynthesized(KnownProtocolKind::DistributedActor);
   }
 }
 

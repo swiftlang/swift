@@ -417,7 +417,6 @@ void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
-void checkResultType(Type resultType, DeclContext *owner);
 
 void diagnoseDuplicateBoundVars(Pattern *pattern);
 
@@ -511,7 +510,7 @@ bool checkContextualRequirements(GenericTypeDecl *decl,
                                  DeclContext *dc);
 
 /// Add any implicitly-defined constructors required for the given
-/// struct, class or actor.
+/// struct or class.
 void addImplicitConstructors(NominalTypeDecl *typeDecl);
 
 /// Fold the given sequence expression into an (unchecked) expression

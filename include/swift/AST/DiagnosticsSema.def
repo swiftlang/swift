@@ -4362,13 +4362,6 @@ ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
         "%select{from inside the actor|on 'self'}2",
         (DescriptiveDeclKind, DeclName, bool, unsigned))
-ERROR(distributed_actor_isolated_non_self_reference,none,
-      "distributed actor-isolated %0 %1 can only be referenced "
-      "inside the distributed actor",
-      (DescriptiveDeclKind, DeclName))
-ERROR(distributed_actor_needs_explicit_distributed_import,none,
-      "'_Distributed' module not imported, required for 'distributed actor'",
-      ())
 ERROR(actor_isolated_self_independent_context,none,
         "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from a "
         "non-isolated context",
@@ -4418,8 +4411,8 @@ ERROR(actor_isolated_from_async_let,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
-      "cannot form key path to%select{| distributed}0 actor-isolated %1 %2",
-      (bool, DescriptiveDeclKind, DeclName))
+      "cannot form key path to actor-isolated %0 %1",
+      (DescriptiveDeclKind, DeclName))
 ERROR(effectful_keypath_component,none,
       "cannot form key path to %0 with 'throws' or 'async'",
       (DescriptiveDeclKind))
@@ -4434,32 +4427,6 @@ NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
-NOTE(distributed_actor_isolated_method_note,none,
-      "only 'distributed' functions can be called from outside the distributed actor",
-      ())
-ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' functions can be called from outside the distributed actor", // TODO: more like 'non-distributed' ... defined here
-      ())
-ERROR(distributed_actor_func_param_not_codable,none,
-      "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
-      (StringRef, Type))
-ERROR(distributed_actor_func_result_not_codable,none,
-      "distributed function result type %0 does not conform to 'Codable'",
-      (Type))
-ERROR(distributed_actor_func_missing_remote_func,none,
-      "distributed function is missing its remote static func implementation (%0). "
-      "You may want to use a distributed actor SwiftPM plugin to generate those, "
-      "or implement it manually.",
-      (Identifier))
-ERROR(distributed_actor_remote_func_is_not_static,none,
-      "remote function %0 must be static.",
-      (DeclName))
-ERROR(distributed_actor_remote_func_is_not_async_throws,none,
-      "remote function %0 must be 'async throws'.",
-      (DeclName))
-ERROR(distributed_actor_remote_func_must_not_be_distributed,none,
-      "remote function %0 must be 'async throws'.",
-      (DeclName))
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -4537,60 +4504,6 @@ ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
       "the actor instance; consider 'nonisolated'",
       (Identifier, Identifier))
-
-ERROR(distributed_actor_func_defined_outside_of_distributed_actor,none,
-      "distributed function %0 is declared outside of an distributed actor",
-      (DeclName))
-ERROR(distributed_actor_local_init_explicitly_defined,none,
-      "'distributed actor' local-initializer 'init(transport:)' "
-      "cannot be implemented explicitly.",
-      ())
-ERROR(distributed_actor_init_resolve_must_not_be_user_defined,none,
-      "'distributed actor' resolve-initializer 'init(resolve:using:)' "
-      "cannot be implemented explicitly.",
-      ())
-ERROR(distributed_actor_init_user_defined_must_be_convenience,none,
-      "'distributed actor' initializer %0 must be 'convenience' initializer. "
-      "Distributed actors have an implicitly synthesized designated "
-      "'init(transport:)' local-initializer, which other initializers must delegate to",
-      (DeclName))
-ERROR(distributed_actor_init_must_delegate_to_local_init,none,
-      "'distributed actor' initializer %0 must (directly or indirectly) delegate "
-      "to 'init(transport:)'",
-      (DeclName))
-ERROR(distributed_actor_init_must_not_delegate_to_resolve_init,none,
-      "'distributed actor' initializer %0 cannot delegate to resolve-initializer "
-      "'init(resolve:using:)', as it may result resolving a storageless proxy instance",
-      (DeclName))
-ERROR(distributed_actor_local_var,none,
-      "'distributed' can not be applied to local variables",
-      ())
-ERROR(distributed_actor_property,none,
-      "'distributed' can not be applied to local properties",
-      ())
-ERROR(distributed_actor_storage,none,
-      "'distributed' can not be applied to actor properties; "
-      "Only functions can be 'distributed'",
-      ())
-ERROR(distributed_actor_not_actor,none,
-      "'distributed' can only be applied to 'actor' definitions, "
-      "and distributed actor-isolated async functions",
-      ())
-ERROR(distributed_actor_not_actor_func,none,
-      "'distributed' can only be applied to distributed actor async functions",
-      ())
-ERROR(distributed_actor_func_static,none,
-      "'distributed' functions cannot be 'static'",
-      ())
-ERROR(distributed_actor_func_not_in_distributed_actor,none,
-      "'distributed' function can only be declared within 'distributed actor'",
-      ())
-ERROR(distributed_actor_independent_property_must_be_let,none,
-      "_distributedActorIndependent can be applied to properties, however they must be 'let'",
-      ())
-NOTE(distributed_actor_isolated_property,none,
-      "distributed actor state is only available within the actor instance",
-      ())
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "

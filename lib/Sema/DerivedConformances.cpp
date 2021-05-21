@@ -77,8 +77,6 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   if (*derivableKind == KnownDerivableProtocolKind::Actor)
     return canDeriveActor(DC, Nominal);
-  if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
-    return canDeriveDistributedActor(Nominal, DC);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
