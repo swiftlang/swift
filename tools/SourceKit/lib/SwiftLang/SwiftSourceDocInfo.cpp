@@ -639,7 +639,7 @@ static void mapLocToLatestSnapshot(
   }
 
   std::tie(Location.Line, Location.Column) =
-      EditorDoc->getLineAndColumnInBuffer(Location.Offset);
+      LatestSnap->getBuffer()->getLineAndColumn(Location.Offset);
 }
 
 
