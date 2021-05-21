@@ -86,6 +86,10 @@ static AsyncLetImpl *asImpl(const AsyncLet *alet) {
       const_cast<AsyncLet*>(alet));
 }
 
+static AsyncLet *asAbstract(AsyncLetImpl *alet) {
+  return reinterpret_cast<AsyncLet*>(alet);
+}
+
 // =============================================================================
 // ==== start ------------------------------------------------------------------
 
@@ -130,6 +134,7 @@ SWIFT_CC(swiftasync)
 static void swift_asyncLet_waitImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
     AsyncLet *alet, Metadata *T) {
+  auto waitingTask = swift_task_getCurrent();
   auto task = alet->getTask();
   swift_task_future_wait(result, rawContext, task, T);
 }

@@ -72,7 +72,7 @@ TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
   Item *item = new(allocation) Item();
 
   // FIXME: parent pointer must to be the parent STORAGE not just the next item.
-  auto parentHead = parent->_private().Local.head;
+  auto parentHead = parent->Local.head;
   if (parentHead) {
     if (parentHead->isEmpty()) {
       switch (parentHead->getNextLinkType()) {
@@ -189,7 +189,7 @@ TaskLocal::Item::createLink(AsyncTask *task,
   void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
   Item *item = new(allocation) Item(key, valueType);
 
-  auto next = task->_private().Local.head;
+  auto next = task->Local.head;
   item->next = reinterpret_cast<uintptr_t>(next) |
       static_cast<uintptr_t>(NextLinkType::IsNext);
 

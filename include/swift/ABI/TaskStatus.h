@@ -82,6 +82,11 @@ public:
   }
 };
 
+inline TaskStatusRecord *
+ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
+  return ptr->getParent();
+}
+
 /// A deadline for the task.  If this is reached, the task will be
 /// automatically cancelled.  The deadline can also be queried and used
 /// in other ways.

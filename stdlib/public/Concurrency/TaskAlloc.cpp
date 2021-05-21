@@ -20,12 +20,19 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
-
+#include "../runtime/StackAllocator.h"
 #include <stdlib.h>
 
 using namespace swift;
 
 namespace {
+
+/// The size of an allocator slab.
+///
+/// TODO: find the optimal value by experiment.
+static constexpr size_t SlabCapacity = 1024;
+
+using TaskAllocator = StackAllocator<SlabCapacity>;
 
 struct GlobalAllocator {
   TaskAllocator allocator;
@@ -34,17 +41,35 @@ struct GlobalAllocator {
   GlobalAllocator() : allocator(spaceForFirstSlab, sizeof(spaceForFirstSlab)) {}
 };
 
+static_assert(alignof(TaskAllocator) <= alignof(decltype(AsyncTask::AllocatorPrivate)),
+              "task allocator must not be more aligned than "
+              "allocator-private slot");
+
 } // end anonymous namespace
+
+void swift::_swift_task_alloc_initialize(AsyncTask *task) {
+  new (task->AllocatorPrivate) TaskAllocator();
+}
+
+void swift::_swift_task_alloc_initialize_with_slab(AsyncTask *task,
+                                                   void *firstSlabBuffer,
+                                                   size_t bufferCapacity) {
+  new (task->AllocatorPrivate) TaskAllocator(firstSlabBuffer, bufferCapacity);
+}
 
 static TaskAllocator &allocator(AsyncTask *task) {
   if (task)
-    return task->Private.get().Allocator;
+    return reinterpret_cast<TaskAllocator &>(task->AllocatorPrivate);
 
   // FIXME: this fall-back shouldn't be necessary, but it's useful
   // for now, since the current execution tests aren't setting up a task
   // properly.
   static GlobalAllocator global;
   return global.allocator;
+}
+
+void swift::_swift_task_alloc_destroy(AsyncTask *task) {
+  allocator(task).~TaskAllocator();
 }
 
 void *swift::swift_task_alloc(size_t size) {
