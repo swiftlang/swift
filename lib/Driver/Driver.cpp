@@ -167,16 +167,55 @@ static void validateProfilingArgs(DiagnosticEngine &diags,
 
 static void validateDependencyScanningArgs(DiagnosticEngine &diags,
                                            const ArgList &args) {
-  const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_placeholder_dependency_module_map);
+  const Arg *ExternalDependencyMap =
+      args.getLastArg(options::OPT_placeholder_dependency_module_map);
   const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
   const Arg *Prescan = args.getLastArg(options::OPT_import_prescan);
+
+  const Arg *SerializeCache =
+      args.getLastArg(options::OPT_serialize_dependency_scan_cache);
+  const Arg *ReuseCache =
+      args.getLastArg(options::OPT_reuse_dependency_scan_cache);
+  const Arg *CacheSerializationPath =
+      args.getLastArg(options::OPT_dependency_scan_cache_path);
+  const Arg *TestSerialization = args.getLastArg(
+      options::OPT_debug_test_dependency_scan_cache_serialization);
+
   if (ExternalDependencyMap && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
-                   "-placeholder-dependency-module-map-file", "-scan-dependencies");
+                   "-placeholder-dependency-module-map-file",
+                   "-scan-dependencies");
   }
   if (Prescan && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-import-prescan", "-scan-dependencies");
+  }
+  if (Prescan && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-import-prescan", "-scan-dependencies");
+  }
+  if (SerializeCache && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-serialize-dependency-scan-cache", "-scan-dependencies");
+  }
+  if (ReuseCache && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-load-dependency-scan-cache", "-scan-dependencies");
+  }
+  if (TestSerialization && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-test-dependency-scan-cache-serialization",
+                   "-scan-dependencies");
+  }
+  if (SerializeCache && !CacheSerializationPath) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-serialize-dependency-scan-cache",
+                   "-dependency-scan-cache-path");
+  }
+  if (ReuseCache && !CacheSerializationPath) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-serialize-dependency-scan-cache",
+                   "-dependency-scan-cache-path");
   }
 }
 
