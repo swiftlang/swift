@@ -38,6 +38,9 @@
 
 namespace swift {
 
+class Decl;
+class DeclAttribute;
+class DiagnosticEngine;
 class ExportContext;
 class GenericSignatureBuilder;
 class NominalTypeDecl;
@@ -1316,6 +1319,45 @@ void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 /// update the given function type to include the global actor.
 AnyFunctionType *applyGlobalActorType(
     AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc);
+
+/// Diagnose an error concerning an incorrect attribute and emit a fix-it
+/// offering to remove it.
+template<typename ...ArgTypes>
+InFlightDiagnostic
+diagnoseAttrWithRemovalFixIt(const Decl *D, const DeclAttribute *attr,
+                             ArgTypes &&...Args) {
+  assert(D);
+
+  if (D->hasClangNode() && (!attr || !attr->getAddedByAccessNote())) {
+    assert(false && "Clang importer propagated a bogus attribute");
+    return InFlightDiagnostic();
+  }
+
+  auto &Diags = D->getASTContext().Diags;
+
+  if (!attr || !attr->getLocation().isValid())
+    return Diags.diagnose(D, std::forward<ArgTypes>(Args)...);
+
+  return std::move(Diags.diagnose(attr->getLocation(),
+                                  std::forward<ArgTypes>(Args)...)
+                       .fixItRemove(attr->getRangeWithAt()));
+}
+
+/// Diagnose an error concerning an incorrect attribute, emit a fix-it offering
+/// to remove it, and mark it invalid so that it will be ignored by other parts
+/// of the compiler.
+template<typename ...ArgTypes>
+InFlightDiagnostic
+diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
+                      ArgTypes &&...Args) {
+  if (attr)
+    // FIXME: Due to problems with the design of DeclAttributes::getAttribute(),
+    // many callers try to pass us const DeclAttributes. This is a hacky
+    // workaround.
+    const_cast<DeclAttribute *>(attr)->setInvalid();
+
+  return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
+}
 
 } // end namespace swift
 
