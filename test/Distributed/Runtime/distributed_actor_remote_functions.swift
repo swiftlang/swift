@@ -11,8 +11,6 @@
 // rdar://77798215
 // UNSUPPORTED: OS=windows-msvc
 
-// REQUIRES: radar78290608
-
 import _Distributed
 import _Concurrency
 
