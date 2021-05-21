@@ -2079,6 +2079,12 @@ public:
     IncludeInstanceMembers = true;
   }
 
+  bool isHiddenModuleName(Identifier Name) {
+    return (Name.str().startswith("_") ||
+            Name == Ctx.SwiftShimsModuleName ||
+            Name.str() == SWIFT_ONONE_SUPPORT);
+  }
+
   void addSubModuleNames(std::vector<std::pair<std::string, bool>>
       &SubModuleNameVisibilityPairs) {
     for (auto &Pair : SubModuleNameVisibilityPairs) {
@@ -2143,10 +2149,7 @@ public:
 
     auto mainModuleName = CurrModule->getName();
     for (auto ModuleName : ModuleNames) {
-      if (ModuleName.str().startswith("_") ||
-          ModuleName == mainModuleName ||
-          ModuleName == Ctx.SwiftShimsModuleName ||
-          ModuleName.str() == SWIFT_ONONE_SUPPORT)
+      if (ModuleName == mainModuleName || isHiddenModuleName(ModuleName))
         continue;
 
       auto MD = ModuleDecl::create(ModuleName, Ctx);
@@ -6249,6 +6252,25 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
 
+  SmallPtrSet<ModuleDecl *, 4> explictlyImportedModules;
+  {
+    // Collect modules directly imported in this SourceFile.
+    SmallVector<ImportedModule, 4> directImport;
+    SF.getImportedModules(directImport,
+                          {ModuleDecl::ImportFilterKind::Default,
+                           ModuleDecl::ImportFilterKind::ImplementationOnly});
+    for (auto import : directImport)
+      explictlyImportedModules.insert(import.importedModule);
+
+    // Exclude modules implicitly imported in the current module.
+    auto implicitImports = SF.getParentModule()->getImplicitImports();
+    for (auto import : implicitImports.imports)
+      explictlyImportedModules.erase(import.module.importedModule);
+
+    // Consider the current module "explicit".
+    explictlyImportedModules.insert(SF.getParentModule());
+  }
+
   for (auto &Request: Lookup.RequestedCachedResults) {
     llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
     auto handleImport = [&](ImportedModule Import) {
@@ -6297,8 +6319,11 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
         RequestedModules.push_back({std::move(K), TheModule,
           Request.OnlyTypes, Request.OnlyPrecedenceGroups});
 
+        auto TheModuleName = TheModule->getName();
         if (Request.IncludeModuleQualifier &&
-            seenModuleNames.insert(TheModule->getName()).second)
+            (!Lookup.isHiddenModuleName(TheModuleName) ||
+             explictlyImportedModules.contains(TheModule)) &&
+            seenModuleNames.insert(TheModuleName).second)
           Lookup.addModuleName(TheModule);
       }
     };
