@@ -262,13 +262,17 @@ public:
   /// Construct a compilation object for a given ToolChain and command line
   /// argument vector.
   ///
+  /// If \p AllowErrors is set to \c true, this method tries to build a
+  /// compilation even if there were errors.
+  ///
   /// \return A Compilation, or nullptr if none was built for the given argument
   /// vector. A null return value does not necessarily indicate an error
   /// condition; the diagnostics should be queried to determine if an error
   /// occurred.
   std::unique_ptr<Compilation>
   buildCompilation(const ToolChain &TC,
-                   std::unique_ptr<llvm::opt::InputArgList> ArgList);
+                   std::unique_ptr<llvm::opt::InputArgList> ArgList,
+                   bool AllowErrors = false);
 
   /// Parse the given list of strings into an InputArgList.
   std::unique_ptr<llvm::opt::InputArgList>
