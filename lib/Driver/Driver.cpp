@@ -1315,9 +1315,11 @@ void Driver::buildInputs(const ToolChain &TC,
       if (Ty == file_types::TY_Swift) {
         StringRef Basename = llvm::sys::path::filename(Value);
         if (!SourceFileNames.insert({Basename, Value}).second) {
-          Diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
-                         Basename, SourceFileNames[Basename], Value);
-          Diags.diagnose(SourceLoc(), diag::note_explain_two_files_same_name);
+          if (!SuppressSameFileNameError) {
+            Diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
+                           Basename, SourceFileNames[Basename], Value);
+            Diags.diagnose(SourceLoc(), diag::note_explain_two_files_same_name);
+          }
         }
       }
     }

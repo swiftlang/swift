@@ -201,6 +201,10 @@ private:
   /// Indicates whether the driver should check that the input files exist.
   bool CheckInputFilesExist = true;
 
+  /// Indicates whether the driver should suppress the "same filename used
+  /// twice" error.
+  bool SuppressSameFileNameError = false;
+
   /// Indicates that this driver never actually executes any commands but is
   /// just set up to retrieve the swift-frontend invocation that would be
   /// executed during compilation.
@@ -231,6 +235,8 @@ public:
   bool getCheckInputFilesExist() const { return CheckInputFilesExist; }
 
   void setCheckInputFilesExist(bool Value) { CheckInputFilesExist = Value; }
+
+  void setSuppressSameFileNameError(bool Value) { SuppressSameFileNameError = Value; }
 
   bool isDummyDriverForFrontendInvocation() const {
     return IsDummyDriverForFrontendInvocation;
