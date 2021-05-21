@@ -328,11 +328,14 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // Start a context for creating type syntax.
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
                                           SyntaxContextKind::Type);
+
+  ParserStatus status;
+
   // Parse attributes.
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
   TypeAttributes attrs;
-  parseTypeAttributeList(specifier, specifierLoc, attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -360,10 +363,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
+  status |= ParserStatus(ty);
   if (ty.isNull())
-    return ty;
+    return status;
   auto tyR = ty.get();
-  auto status = ParserStatus(ty);
 
   // Parse effects specifiers.
   // Don't consume them, if there's no following '->', so we can emit a more
@@ -387,11 +390,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
+    status |= SecondHalf;
     if (SecondHalf.isNull()) {
       status.setIsParseError();
       return status;
     }
-    status |= SecondHalf;
 
     if (SyntaxContext->isEnabled()) {
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);

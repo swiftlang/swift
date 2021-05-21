@@ -76,7 +76,10 @@ public:
   iterator end() { return getArray().end(); }
   const_iterator begin() const { return getArray().begin(); }
   const_iterator end() const { return getArray().end(); }
-  
+
+  ParamDecl *front() const { return getArray().front(); }
+  ParamDecl *back() const { return getArray().back(); }
+
   MutableArrayRef<ParamDecl*> getArray() {
     return {getTrailingObjects<ParamDecl*>(), numParameters};
   }

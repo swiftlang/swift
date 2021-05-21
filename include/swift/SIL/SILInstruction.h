@@ -733,6 +733,10 @@ public:
   /// with this instruction.
   void verifyOperandOwnership() const;
 
+  /// Verify that this instruction and its associated debug information follow
+  /// all SIL debug info invariants.
+  void verifyDebugInfo() const;
+
   /// Get the number of created SILInstructions.
   static int getNumCreatedInstructions() {
     return NumCreatedInstructions;

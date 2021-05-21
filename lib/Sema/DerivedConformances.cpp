@@ -579,13 +579,8 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
   auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
     DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
-  auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto cmpExpr = new (C) BinaryExpr(cmpFuncExpr, cmpArgsTuple,
-                                    /*Implicit*/true);
+  auto *cmpExpr = BinaryExpr::create(C, lhsExpr, cmpFuncExpr, rhsExpr,
+                                     /*implicit*/ true);
   conditions.emplace_back(cmpExpr);
 
   // Build and return the complete guard statement.
@@ -619,12 +614,8 @@ GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
   auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
     DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
-  auto ltArgsTuple = TupleExpr::create(C, SourceLoc(),
-                                        { lhsExpr, rhsExpr },
-                                        { }, { }, SourceLoc(),
-                                        /*HasTrailingClosure*/false,
-                                        /*Implicit*/true);
-  auto ltExpr = new (C) BinaryExpr(ltFuncExpr, ltArgsTuple, /*Implicit*/true);
+  auto *ltExpr = BinaryExpr::create(C, lhsExpr, ltFuncExpr, rhsExpr,
+                                    /*implicit*/ true);
   return returnIfNotEqualGuard(C, lhsExpr, rhsExpr, ltExpr);
 }
 

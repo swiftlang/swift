@@ -47,6 +47,9 @@ enum {
   /// in a default actor.
   NumWords_DefaultActor = 10,
 
+  /// The number of words in a task.
+  NumWords_AsyncTask = 16,
+
   /// The number of words in a task group.
   NumWords_TaskGroup = 32,
 

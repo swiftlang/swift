@@ -2222,13 +2222,25 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     }
     TopLevelActions.push_back(LinkAction);
 
-    if (TC.getTriple().isOSDarwin() &&
-        OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
-      auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
-      TopLevelActions.push_back(dSYMAction);
-      if (Args.hasArg(options::OPT_verify_debug_info)) {
-        TopLevelActions.push_back(
-            C.createAction<VerifyDebugInfoJobAction>(dSYMAction));
+    if (TC.getTriple().isOSDarwin()) {
+      switch (OI.LinkAction) {
+      case LinkKind::Executable:
+      case LinkKind::DynamicLibrary:
+        if (OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
+          auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
+          TopLevelActions.push_back(dSYMAction);
+          if (Args.hasArg(options::OPT_verify_debug_info)) {
+            TopLevelActions.push_back(
+                C.createAction<VerifyDebugInfoJobAction>(dSYMAction));
+          }
+        }
+        break;
+
+      case LinkKind::None:
+        LLVM_FALLTHROUGH;
+      case LinkKind::StaticLibrary:
+        // Cannot build the DSYM bundle for non-image targets.
+        break;
       }
     }
   } else {
