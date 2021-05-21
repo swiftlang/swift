@@ -145,13 +145,13 @@ class SuperDerivedA : SuperBaseA {
   init (a: Float) {
     super.init#^CONSTRUCTOR_SUPER_INIT_1^#
 // CONSTRUCTOR_SUPER_INIT_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal: ()[#SuperBaseA#]; name=()
+// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#SuperBaseA#]; name=()
 // CONSTRUCTOR_SUPER_INIT_1: End completions
   }
   init (b: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions, 1 items
-// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal: ['('][')'][#SuperBaseA#]; name=
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#SuperBaseA#]; name=
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 

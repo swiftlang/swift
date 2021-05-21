@@ -125,9 +125,9 @@ func resyncParser7() {}
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2: Begin completions
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ({#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct.Type#]; name=self
 // TOP_LEVEL_VAR_INIT_2-NEXT: Keyword/CurrNominal:       .Type[#FooStruct.Type#]; name=Type
 // TOP_LEVEL_VAR_INIT_2-NEXT: End completions
@@ -327,7 +327,7 @@ func resyncParserB14() {}
 var stringInterp = "\(#^STRING_INTERP_3?check=STRING_INTERP^#)"
 _ = "" + "\(#^STRING_INTERP_4?check=STRING_INTERP^#)" + ""
 // STRING_INTERP: Begin completions
-// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: ['(']{#(value): T#}[')'][#Void#];
+// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]/IsSystem: ['(']{#(value): T#}[')'][#Void#];
 // STRING_INTERP-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: FooStruct[#FooStruct#]; name=FooStruct
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: fooFunc1()[#Void#];
 // STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];
