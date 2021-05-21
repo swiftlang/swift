@@ -112,7 +112,7 @@ func testArgument() -> MyStruct {
   foo(x: 1, #^CALLARG^#
 }
 // CALLARG: Begin completions, 1 items
-// CALLARG-DAG: Pattern/Local/Flair[ExprSpecific]:               <callarg><callarg.label>y</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>; typename=<typeid.sys>Int</typeid.sys>
+// CALLARG-DAG: Pattern/Local/Flair[ArgLabels]:               <callarg><callarg.label>y</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>; typename=<typeid.sys>Int</typeid.sys>
 // CALLARG: End completions
 
 struct TestArchetypeAnnotations<T> {

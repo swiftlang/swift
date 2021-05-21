@@ -66,16 +66,16 @@ func testDefaultArgs2() {
   freeFuncWithDefaultArgs1#^DEFAULT_ARGS_2^#
 }
 // DEFAULT_ARGS_2: Begin completions
-// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule:      ({#(a): Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#(a): Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_2: End completions
 
 func testDefaultArgs3() {
   freeFuncWithDefaultArgs3#^DEFAULT_ARGS_3^#
 }
 // DEFAULT_ARGS_3: Begin completions
-// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule:      ()[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule:      ({#a: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ()[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule/Flair[ArgLabels]:      ({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_3: End completions
 
 func testDefaultArgs4(_ x: A) {
@@ -90,8 +90,8 @@ func testDefaultArgs5(_ x: A) {
   x.methodWithDefaultArgs1#^DEFAULT_ARGS_5^#
 }
 // DEFAULT_ARGS_5: Begin completions
-// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal:      ()[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal:      ({#a: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:      ()[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:      ({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_5: End completions
 
 func testDefaultArgs6() {
@@ -107,8 +107,8 @@ func testDefaultArgs7() {
   B#^DEFAULT_ARGS_7^#
 }
 // DEFAULT_ARGS_7: Begin completions
-// DEFAULT_ARGS_7-DAG: Decl[Constructor]/CurrNominal:      ()[#B#]{{; name=.+$}}
-// DEFAULT_ARGS_7-DAG: Decl[Constructor]/CurrNominal:      ({#a: Int#})[#B#]{{; name=.+$}}
+// DEFAULT_ARGS_7-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#B#]{{; name=.+$}}
+// DEFAULT_ARGS_7-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#a: Int#})[#B#]{{; name=.+$}}
 // DEFAULT_ARGS_7: End completions
 
 func testDefaultArgs8(_ x: C1) {
