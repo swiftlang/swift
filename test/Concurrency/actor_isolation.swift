@@ -70,7 +70,7 @@ actor MyActor: MySuperActor { // expected-error{{actor types do not support inhe
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 19{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 5{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String {
     super.superState += 4
     return synchronous()
@@ -819,4 +819,18 @@ func test_conforming_actor_to_global_actor_protocol() {
   @available(SwiftStdlib 5.5, *)
   actor MyValue : GloballyIsolatedProto {}
   // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
+}
+
+func test_invalid_reference_to_actor_member_without_a_call_note() {
+  actor A {
+    func partial() { }
+  }
+
+  actor Test {
+    func returnPartial(other: A) async -> () async -> () {
+      let a = other.partial
+      // expected-error@-1 {{actor-isolated instance method 'partial()' can only be referenced from inside the actor}}
+      return a
+    }
+  }
 }
