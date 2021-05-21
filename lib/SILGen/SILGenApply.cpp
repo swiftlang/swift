@@ -1051,7 +1051,12 @@ public:
       return;
     }
 
-    auto constant = SILDeclRef(afd).asForeign(requiresForeignEntryPoint(afd));
+    SILDeclRef constant = SILDeclRef(afd);
+    if (afd->isDistributed()) {
+      constant = constant.asDistributed(true);
+    } else {
+      constant = constant.asForeign(requiresForeignEntryPoint(afd));
+    }
 
     auto subs = e->getDeclRef().getSubstitutions();
 
@@ -1108,9 +1113,14 @@ public:
     }
 
     // Otherwise, we have a statically-dispatched call.
-    auto constant = SILDeclRef(e->getDecl())
-      .asForeign(!isConstructorWithGeneratedAllocatorThunk(e->getDecl())
-                 && requiresForeignEntryPoint(e->getDecl()));
+    auto constant = SILDeclRef(e->getDecl());
+    if (e->getDecl()->getAttrs().hasAttribute<DistributedActorAttr>()) {
+      constant = constant.asDistributed(true);
+    } else {
+      constant = constant.asForeign(
+                   !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
+                   && requiresForeignEntryPoint(e->getDecl()));
+    }
 
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     if (afd->getDeclContext()->isLocalContext() &&
@@ -3652,6 +3662,7 @@ class CallEmission {
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
   Optional<ActorIsolation> implicitAsyncIsolation;
+  bool implicitlyThrows;
 
 public:
   /// Create an emission for a call of the given callee.
@@ -3659,7 +3670,8 @@ public:
                FormalEvaluationScope &&writebackScope)
       : SGF(SGF), callee(std::move(callee)),
         initialWritebackScope(std::move(writebackScope)),
-        implicitAsyncIsolation(None) {}
+        implicitAsyncIsolation(None),
+        implicitlyThrows(false) {}
 
   /// A factory method for decomposing the apply expr \p e into a call
   /// emission.
@@ -3702,6 +3714,12 @@ public:
   void setImplicitlyAsync(Optional<ActorIsolation> implicitAsyncIsolation) {
     this->implicitAsyncIsolation = implicitAsyncIsolation;
   }
+
+  /// Sets a flag that indicates whether this call be treated as being
+  /// implicitly throws, i.e., the call may be delegating to a proxy function
+  /// which actually is throwing, regardless whether or not the actual target
+  /// function can throw or not.
+  void setImplicitlyThrows(bool flag) { implicitlyThrows = flag; }
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 
@@ -4417,6 +4435,10 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
     assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
 
     switch (*implicitAsyncIsolation) {
+    case ActorIsolation::DistributedActorInstance: {
+      // TODO: if the actor is remote there is no need to hop
+      LLVM_FALLTHROUGH;
+    }
     case ActorIsolation::ActorInstance:
       breadcrumb = emitHopToTargetActor(loc, *implicitAsyncIsolation,
                                         args.back());
@@ -4983,6 +5005,11 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   // Form the reference to the method.
   auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
+
+  if (call->isDistributed()) {
+    callRef = callRef.asDistributed(true);
+  }
+
   auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);
   auto subs = declRef.getSubstitutions();
   bool throws = false;

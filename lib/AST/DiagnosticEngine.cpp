@@ -757,6 +757,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << "actor-isolated";
       break;
 
+    case ActorIsolation::DistributedActorInstance:
+      Out << "distributed actor-isolated";
+      break;
+
     case ActorIsolation::GlobalActor:
     case ActorIsolation::GlobalActorUnsafe: {
       Type globalActor = isolation.getGlobalActor();

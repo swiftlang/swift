@@ -2346,6 +2346,8 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+  bool isDistributedActorIndependent() const;
+
 private:
   bool isObjCDynamic() const {
     return isObjC() && isDynamic();
@@ -3164,6 +3166,11 @@ public:
                                           OptionSet<LookupDirectFlags> flags =
                                           OptionSet<LookupDirectFlags>());
 
+  /// Find the '_remote_<...>' counterpart function to a 'distributed func'.
+  ///
+  /// If the passed in function is not distributed this function returns null.
+  AbstractFunctionDecl* lookupDirectRemoteFunc(AbstractFunctionDecl *func);
+
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
   void getImplicitProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
@@ -3219,6 +3226,10 @@ public:
   /// either an actor type or a protocol whose `Self` type conforms to the
   /// `Actor` protocol.
   bool isActor() const;
+
+  /// Whether this nominal type qualifies as a distributed actor, meaning that
+  /// it is either a distributed actor.
+  bool isDistributedActor() const;
 
   /// Return the range of semantics attributes attached to this NominalTypeDecl.
   auto getSemanticsAttrs() const
@@ -3287,6 +3298,8 @@ public:
   /// \returns the static 'shared' property for a global actor, or \c nullptr
   /// for types that are not global actors.
   VarDecl *getGlobalActorInstance() const;
+
+  bool hasDistributedActorLocalInitializer() const;
 
   /// Whether this type is a global actor, which can be used as an
   /// attribute to decorate declarations for inclusion in the actor-isolated
@@ -4003,6 +4016,7 @@ enum class KnownDerivableProtocolKind : uint8_t {
   AdditiveArithmetic,
   Differentiable,
   Actor,
+  DistributedActor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -4195,6 +4209,10 @@ public:
   /// Determine whether this is a "marker" protocol, meaning that is indicates
   /// semantics but has no corresponding witness table.
   bool isMarkerProtocol() const;
+
+  /// Is a protocol that can only be conformed by distributed actors.
+  /// Such protocols are allowed to contain distributed functions.
+  bool inheritsFromDistributedActor() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -4714,6 +4732,8 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
+  bool isDistributedActorIndependent() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -5170,13 +5190,19 @@ public:
     return getAttrs().getAttributes<SemanticsAttr>();
   }
 
-  /// Returns true if this VarDelc has the string \p attrValue as a semantics
+  /// Returns true if this VarDecl has the string \p attrValue as a semantics
   /// attribute.
   bool hasSemanticsAttr(StringRef attrValue) const {
     return llvm::any_of(getSemanticsAttrs(), [&](const SemanticsAttr *attr) {
       return attrValue.equals(attr->Value);
     });
   }
+
+  /// Whether the given name is actorAddress, which is used for distributed actors.
+  static bool isDistributedActorAddressName(ASTContext &ctx, DeclName name);
+
+  /// Whether the given name is actorTransport, which is used for distributed actors.
+  static bool isDistributedActorTransportName(ASTContext &ctx, DeclName name);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -5854,6 +5880,9 @@ public:
 
   /// Returns if the function is 'rethrows' or 'reasync'.
   bool hasPolymorphicEffect(EffectKind kind) const;
+
+  /// Returns 'true' if the function is distributed.
+  bool isDistributed() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
@@ -6863,6 +6892,18 @@ public:
   /// @objc init(forMemory: ())
   /// \endcode
   bool isObjCZeroParameterWithLongSelector() const;
+
+  /// Checks if the initializer is a distributed actor's 'local' initializer:
+  /// ```
+  /// init(transport: ActorTransport)
+  /// ```
+  bool isDistributedActorLocalInit() const;
+
+  /// Checks if the initializer is a distributed actor's 'resolve' initializer:
+  /// ```
+  /// init(resolve address: ActorAddress, using transport: ActorTransport)
+  /// ```
+  bool isDistributedActorResolveInit() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;

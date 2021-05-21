@@ -655,6 +655,21 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(spawn, Spawn,
   APIBreakingToAdd | APIBreakingToRemove,
   117)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
+  DeclModifier | OnClass | OnFunc |
+  DistributedOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  118)
+
+SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
+  OnFunc | OnVar |
+  DistributedOnly | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  119)
+
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

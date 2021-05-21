@@ -1084,6 +1084,12 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveDecodable:
     out << "resolve Decodable.init(from:)";
     break;
+  case ImplicitMemberAction::ResolveDistributedActor:
+    out << "resolve DistributedActor[init(transport:), init(resolve:using:)]";
+    break;
+  case ImplicitMemberAction::ResolveDistributedActorAddress:
+    out << "resolve DistributedActor[actorAddress]";
+    break;
   }
 }
 
@@ -1511,6 +1517,7 @@ void CustomAttrTypeRequest::cacheResult(Type value) const {
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
+  case DistributedActorInstance:
   case Independent:
   case Unspecified:
     return false;
@@ -1525,6 +1532,7 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
+  case DistributedActorInstance:
   case Independent:
   case Unspecified:
     return *this;
@@ -1542,6 +1550,10 @@ void swift::simple_display(
   switch (state) {
     case ActorIsolation::ActorInstance:
       out << "actor-isolated to instance of " << state.getActor()->getName();
+      break;
+
+    case ActorIsolation::DistributedActorInstance:
+      out << "distributed-actor-isolated to instance of " << state.getActor()->getName();
       break;
 
     case ActorIsolation::Independent:

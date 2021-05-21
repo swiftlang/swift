@@ -347,6 +347,9 @@ public:
   /// imported.
   bool shouldImportSwiftConcurrency() const;
 
+  /// Whether the Distributed support library should be implicitly imported.
+  bool shouldImportSwiftDistributed() const;
+
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
   /// Return value includes the buffer so caller can keep it alive.

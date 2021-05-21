@@ -121,14 +121,28 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
   // If this is an actor, check conformance to the Actor protocol to
   // ensure that the actor storage will get created (if needed).
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    // If this is an actor class, check conformance to the Actor protocol to
+    // ensure that the actor storage will get created (if needed).
     if (classDecl->isActor()) {
       ASTContext &ctx = decl->getASTContext();
+
       if (auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor)) {
         SmallVector<ProtocolConformance *, 1> conformances;
         classDecl->lookupConformance(
             decl->getModuleContext(), actorProto, conformances);
         for (auto conformance : conformances)
           TypeChecker::checkConformance(conformance->getRootNormalConformance());
+      }
+
+      // If this is a distributed actor, synthesize its special stored properties.
+      if (classDecl->isDistributedActor()) {
+        if (auto actorProto = ctx.getProtocol(KnownProtocolKind::DistributedActor)) {
+          SmallVector<ProtocolConformance *, 1> conformances;
+          classDecl->lookupConformance(
+              decl->getModuleContext(), actorProto, conformances);
+          for (auto conformance : conformances)
+            TypeChecker::checkConformance(conformance->getRootNormalConformance());
+        }
       }
     }
   }
