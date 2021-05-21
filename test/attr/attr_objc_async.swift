@@ -47,13 +47,11 @@ actor MyActor {
   @objc nonisolated func synchronousGood() { }
 }
 
-// CHECK: actor class MyActor2
 actor class MyActor2 { }
-// expected-warning@-1{{'actor class' has been renamed to 'actor'}}{{7-13=}}
+// expected-error@-1 {{keyword 'class' cannot be used as an identifier here}}
 
 // CHECK: @objc actor MyObjCActor
 @objc actor MyObjCActor: NSObject { }
 
-// CHECK: @objc actor class MyObjCActor2
 @objc actor class MyObjCActor2: NSObject {}
-// expected-warning@-1{{'actor class' has been renamed to 'actor'}}{{13-19=}}
+// expected-error@-1 {{keyword 'class' cannot be used as an identifier here}}
