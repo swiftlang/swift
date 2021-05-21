@@ -803,6 +803,11 @@ public:
   /// in diagnostics.
   SourceLoc getLoc(bool SerializedOK = true) const;
 
+  /// Returns a source location for use in diagnostics. If necessary, this
+  /// method will ask the \c DiagnosticEngine to print the declaration into a
+  /// source buffer and use that rather than returning an invalid \c SourceLoc.
+  SourceLoc getLocByPrintingIfNeeded() const;
+
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
 

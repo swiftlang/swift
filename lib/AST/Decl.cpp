@@ -657,6 +657,10 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
   return Result;
 }
 
+SourceLoc Decl::getLocByPrintingIfNeeded() const {
+  return getASTContext().Diags.getDiagnosticLocForDecl(this);
+}
+
 StringRef Decl::getAlternateModuleName() const {
   for (auto *Att: Attrs) {
     if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
@@ -8342,7 +8346,7 @@ void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
-  auto loc = decl->getLoc();
+  auto loc = decl->getLocByPrintingIfNeeded();
   if (loc.isValid())
     return loc;
 

@@ -587,6 +587,10 @@ namespace swift {
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
+
+    /// Deliberately create a request cycle involving the declarations for the
+    /// types named here. Used to test the request evaluator's diagnostics.
+    std::vector<std::string> DebugCauseCycleViaDeclNames;
   };
 
   /// Options for controlling the behavior of the Clang importer.

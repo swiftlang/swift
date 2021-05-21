@@ -857,6 +857,10 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
 
+  for (const Arg *A : Args.filtered(OPT_debug_cause_cycle_via_decl)) {
+    Opts.DebugCauseCycleViaDeclNames.push_back(A->getValue());
+  }
+
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
 

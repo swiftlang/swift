@@ -1009,6 +1009,10 @@ namespace swift {
     //// \c finishProcessing.
     bool finishProcessing();
 
+    /// Gets a source location for the indicated declaration, if necessary by
+    /// pretty-printing it using ASTPrinter.
+    SourceLoc getDiagnosticLocForDecl(const Decl *decl);
+
     /// Format the given diagnostic text and place the result in the given
     /// buffer.
     static void formatDiagnosticText(

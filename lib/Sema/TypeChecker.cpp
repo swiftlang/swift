@@ -335,13 +335,63 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
     diagnoseUnintendedObjCMethodOverrides(SF);
-    return;
+    break;
   case SourceFileKind::SIL:
   case SourceFileKind::Interface:
     // SIL modules and .swiftinterface files don't benefit from whole-module
     // ObjC checking - skip it.
-    return;
+    break;
   }
+
+  // If requested, create an artificial cycle to diagnose an error at.
+  const auto &cycleViaDeclNames =
+      Ctx.TypeCheckerOpts.DebugCauseCycleViaDeclNames;
+  if (cycleViaDeclNames.empty())
+    return;
+
+  SmallVector<Decl *, 4> cycleViaDecls;
+  for (const auto &fullName : cycleViaDeclNames) {
+    SmallVector<ComponentIdentTypeRepr *, 4> components;
+    StringRef rest{fullName};
+    do {
+      StringRef first;
+      std::tie(first, rest) = rest.split('.');
+
+      auto firstIdent = Ctx.getIdentifier(first);
+      components.push_back(
+         new (Ctx) SimpleIdentTypeRepr(DeclNameLoc(), DeclNameRef(firstIdent)));
+    } while (!rest.empty());
+
+    TypeRepr *repr = components.size() == 1
+                   ? static_cast<TypeRepr*>(components.front())
+                   : CompoundIdentTypeRepr::create(Ctx, components);
+    Type ty = swift::performTypeResolution(repr, Ctx, /*isSILMode=*/false,
+                                           /*isSILType=*/false,
+                                           /*GenericEnv=*/nullptr,
+                                           /*GenericParams=*/nullptr,
+                                           &SF);
+    cycleViaDecls.push_back(ty->getNominalOrBoundGenericNominal());
+  }
+
+  (void)evaluateOrDefault(Ctx.evaluator, DebugIntentionallyCauseCycleRequest{
+                            cycleViaDecls.front(),
+                            makeArrayRef(cycleViaDecls).drop_front() },
+                          {});
+}
+
+evaluator::SideEffect
+DebugIntentionallyCauseCycleRequest::evaluate(Evaluator &evaluator, Decl *first,
+                                              ArrayRef<Decl *> rest) const {
+  if (rest.empty())
+    return evaluateOrDefault(evaluator, *this, {});
+
+  SmallVector<Decl *, 4> newRest;
+  llvm::append_range(newRest, rest.drop_front());
+  newRest.push_back(first);
+
+  return evaluateOrDefault(evaluator, DebugIntentionallyCauseCycleRequest{
+                               rest.front(), newRest },
+                           {});
 }
 
 bool swift::isAdditiveArithmeticConformanceDerivationEnabled(SourceFile &SF) {

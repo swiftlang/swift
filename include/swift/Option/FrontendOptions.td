@@ -264,6 +264,8 @@ def debug_emit_invalid_swiftinterface_syntax : Flag<["-"], "debug-emit-invalid-s
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def debug_cause_cycle_via_decl : Separate<["-"], "debug-cause-cycle-via-decl">,
+  HelpText<"Intentially creates a request cycle involving each of the declarations passed with this flag">;
 
 def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;

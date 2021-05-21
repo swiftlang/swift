@@ -981,6 +981,143 @@ static AccessLevel getBufferAccessLevel(const Decl *decl) {
   return level;
 }
 
+SourceLoc DiagnosticEngine::getDiagnosticLocForDecl(const Decl *decl) {
+  if (!decl)
+    return SourceLoc();
+
+  if (decl->getLoc().isValid())
+    return decl->getLoc();
+
+  // There is no location we can point to. Pretty-print the declaration
+  // so we can point to it.
+  SourceLoc ppLoc = PrettyPrintedDeclarations[decl];
+  if (ppLoc.isInvalid()) {
+    class TrackingPrinter : public StreamPrinter {
+      SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries;
+      AccessLevel bufferAccessLevel;
+
+    public:
+      TrackingPrinter(
+          SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries,
+          raw_ostream &OS, AccessLevel bufferAccessLevel) :
+        StreamPrinter(OS), Entries(Entries),
+        bufferAccessLevel(bufferAccessLevel) {}
+
+      void printDeclLoc(const Decl *D) override {
+        if (getBufferAccessLevel(D) == bufferAccessLevel)
+          Entries.push_back({ D, OS.tell() });
+      }
+    };
+    SmallVector<std::pair<const Decl *, uint64_t>, 8> entries;
+    llvm::SmallString<128> buffer;
+    llvm::SmallString<128> bufferName;
+    {
+      // The access level of the buffer we want to print. Declarations below
+      // this access level will be omitted from the buffer; declarations
+      // above it will be printed, but (except for Open declarations in the
+      // Public buffer) will not be recorded in PrettyPrintedDeclarations as
+      // the "true" SourceLoc for the declaration.
+      AccessLevel bufferAccessLevel = getBufferAccessLevel(decl);
+
+      // Figure out which declaration to print. It's the top-most
+      // declaration (not a module).
+      const Decl *ppDecl = decl;
+      auto dc = decl->getDeclContext();
+
+      // FIXME: Horrible, horrible hackaround. We're not getting a
+      // DeclContext everywhere we should.
+      if (!dc) {
+        return SourceLoc();
+      }
+
+      while (!dc->isModuleContext()) {
+        switch (dc->getContextKind()) {
+        case DeclContextKind::Module:
+          llvm_unreachable("Not in a module context!");
+          break;
+
+        case DeclContextKind::FileUnit:
+        case DeclContextKind::TopLevelCodeDecl:
+          break;
+
+        case DeclContextKind::ExtensionDecl:
+          ppDecl = cast<ExtensionDecl>(dc);
+          break;
+
+        case DeclContextKind::GenericTypeDecl:
+          ppDecl = cast<GenericTypeDecl>(dc);
+          break;
+
+        case DeclContextKind::SerializedLocal:
+        case DeclContextKind::Initializer:
+        case DeclContextKind::AbstractClosureExpr:
+        case DeclContextKind::AbstractFunctionDecl:
+        case DeclContextKind::SubscriptDecl:
+        case DeclContextKind::EnumElementDecl:
+          break;
+        }
+
+        dc = dc->getParent();
+      }
+
+      // Build the module name path (in reverse), which we use to
+      // build the name of the buffer.
+      SmallVector<StringRef, 4> nameComponents;
+      while (dc) {
+        nameComponents.push_back(cast<ModuleDecl>(dc)->getName().str());
+        dc = dc->getParent();
+      }
+
+      for (unsigned i = nameComponents.size(); i; --i) {
+        bufferName += nameComponents[i-1];
+        bufferName += '.';
+      }
+
+      if (auto value = dyn_cast<ValueDecl>(ppDecl)) {
+        bufferName += value->getBaseName().userFacingName();
+      } else if (auto ext = dyn_cast<ExtensionDecl>(ppDecl)) {
+        bufferName += ext->getExtendedType().getString();
+      }
+
+      // If we're using a lowered access level, give the buffer a distinct
+      // name.
+      if (bufferAccessLevel != AccessLevel::Public) {
+        assert(bufferAccessLevel < AccessLevel::Public
+               && "Above-public access levels should use public buffer");
+        bufferName += " (";
+        bufferName += getAccessLevelSpelling(bufferAccessLevel);
+        bufferName += ")";
+      }
+
+      // Pretty-print the declaration we've picked.
+      llvm::raw_svector_ostream out(buffer);
+      TrackingPrinter printer(entries, out, bufferAccessLevel);
+      llvm::SaveAndRestore<bool> isPrettyPrinting(IsPrettyPrintingDecl, true);
+      ppDecl->print(
+          printer,
+          PrintOptions::printForDiagnostics(
+              bufferAccessLevel,
+              decl->getASTContext().TypeCheckerOpts.PrintFullConvention));
+    }
+
+    // Build a buffer with the pretty-printed declaration.
+    auto bufferID = SourceMgr.addMemBufferCopy(buffer, bufferName);
+    auto memBufferStartLoc = SourceMgr.getLocForBufferStart(bufferID);
+
+    // Go through all of the pretty-printed entries and record their
+    // locations.
+    for (auto entry : entries) {
+      PrettyPrintedDeclarations[entry.first] =
+          memBufferStartLoc.getAdvancedLoc(entry.second);
+    }
+
+    // Grab the pretty-printed location.
+    ppLoc = PrettyPrintedDeclarations[decl];
+  }
+
+  return ppLoc;
+}
+
 Optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic);
@@ -992,140 +1129,9 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   if (loc.isInvalid() && diagnostic.getDecl()) {
     const Decl *decl = diagnostic.getDecl();
     // If a declaration was provided instead of a location, and that declaration
-    // has a location we can point to, use that location.
-    loc = decl->getLoc();
-
-    if (loc.isInvalid()) {
-      // There is no location we can point to. Pretty-print the declaration
-      // so we can point to it.
-      SourceLoc ppLoc = PrettyPrintedDeclarations[decl];
-      if (ppLoc.isInvalid()) {
-        class TrackingPrinter : public StreamPrinter {
-          SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries;
-          AccessLevel bufferAccessLevel;
-
-        public:
-          TrackingPrinter(
-              SmallVectorImpl<std::pair<const Decl *, uint64_t>> &Entries,
-              raw_ostream &OS, AccessLevel bufferAccessLevel) :
-            StreamPrinter(OS), Entries(Entries),
-            bufferAccessLevel(bufferAccessLevel) {}
-
-          void printDeclLoc(const Decl *D) override {
-            if (getBufferAccessLevel(D) == bufferAccessLevel)
-              Entries.push_back({ D, OS.tell() });
-          }
-        };
-        SmallVector<std::pair<const Decl *, uint64_t>, 8> entries;
-        llvm::SmallString<128> buffer;
-        llvm::SmallString<128> bufferName;
-        {
-          // The access level of the buffer we want to print. Declarations below
-          // this access level will be omitted from the buffer; declarations
-          // above it will be printed, but (except for Open declarations in the
-          // Public buffer) will not be recorded in PrettyPrintedDeclarations as
-          // the "true" SourceLoc for the declaration.
-          AccessLevel bufferAccessLevel = getBufferAccessLevel(decl);
-
-          // Figure out which declaration to print. It's the top-most
-          // declaration (not a module).
-          const Decl *ppDecl = decl;
-          auto dc = decl->getDeclContext();
-
-          // FIXME: Horrible, horrible hackaround. We're not getting a
-          // DeclContext everywhere we should.
-          if (!dc) {
-            return None;
-          }
-
-          while (!dc->isModuleContext()) {
-            switch (dc->getContextKind()) {
-            case DeclContextKind::Module:
-              llvm_unreachable("Not in a module context!");
-              break;
-
-            case DeclContextKind::FileUnit:
-            case DeclContextKind::TopLevelCodeDecl:
-              break;
-
-            case DeclContextKind::ExtensionDecl:
-              ppDecl = cast<ExtensionDecl>(dc);
-              break;
-
-            case DeclContextKind::GenericTypeDecl:
-              ppDecl = cast<GenericTypeDecl>(dc);
-              break;
-
-            case DeclContextKind::SerializedLocal:
-            case DeclContextKind::Initializer:
-            case DeclContextKind::AbstractClosureExpr:
-            case DeclContextKind::AbstractFunctionDecl:
-            case DeclContextKind::SubscriptDecl:
-            case DeclContextKind::EnumElementDecl:
-              break;
-            }
-
-            dc = dc->getParent();
-          }
-
-          // Build the module name path (in reverse), which we use to
-          // build the name of the buffer.
-          SmallVector<StringRef, 4> nameComponents;
-          while (dc) {
-            nameComponents.push_back(cast<ModuleDecl>(dc)->getName().str());
-            dc = dc->getParent();
-          }
-
-          for (unsigned i = nameComponents.size(); i; --i) {
-            bufferName += nameComponents[i-1];
-            bufferName += '.';
-          }
-
-          if (auto value = dyn_cast<ValueDecl>(ppDecl)) {
-            bufferName += value->getBaseName().userFacingName();
-          } else if (auto ext = dyn_cast<ExtensionDecl>(ppDecl)) {
-            bufferName += ext->getExtendedType().getString();
-          }
-
-          // If we're using a lowered access level, give the buffer a distinct
-          // name.
-          if (bufferAccessLevel != AccessLevel::Public) {
-            assert(bufferAccessLevel < AccessLevel::Public
-                   && "Above-public access levels should use public buffer");
-            bufferName += " (";
-            bufferName += getAccessLevelSpelling(bufferAccessLevel);
-            bufferName += ")";
-          }
-
-          // Pretty-print the declaration we've picked.
-          llvm::raw_svector_ostream out(buffer);
-          TrackingPrinter printer(entries, out, bufferAccessLevel);
-          llvm::SaveAndRestore<bool> isPrettyPrinting(
-              IsPrettyPrintingDecl, true);
-          ppDecl->print(
-              printer,
-              PrintOptions::printForDiagnostics(
-                  bufferAccessLevel,
-                  decl->getASTContext().TypeCheckerOpts.PrintFullConvention));
-        }
-
-        // Build a buffer with the pretty-printed declaration.
-        auto bufferID = SourceMgr.addMemBufferCopy(buffer, bufferName);
-        auto memBufferStartLoc = SourceMgr.getLocForBufferStart(bufferID);
-
-        // Go through all of the pretty-printed entries and record their
-        // locations.
-        for (auto entry : entries) {
-          PrettyPrintedDeclarations[entry.first] =
-              memBufferStartLoc.getAdvancedLoc(entry.second);
-        }
-
-        // Grab the pretty-printed location.
-        ppLoc = PrettyPrintedDeclarations[decl];
-      }
-
-      loc = ppLoc;
-    }
+    // has a location we can point to (or we can generate one), use that
+    // location.
+    loc = getDiagnosticLocForDecl(decl);
   }
 
   StringRef Category;

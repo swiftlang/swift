@@ -212,7 +212,7 @@ public:
   
   SourceLoc getLoc() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      return afd->getLoc();
+      return afd->getLocByPrintingIfNeeded();
     }
     if (auto ce = TheFunction.dyn_cast<AbstractClosureExpr *>()) {
       return ce->getLoc();

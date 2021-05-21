@@ -2933,6 +2933,31 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Perform a series of recursive calls with the \c first and \c rest decls that
+/// will eventually cause a cycle in the request stack.
+///
+/// This request is used to test diag::circular_reference and
+/// diag::circular_reference_through.
+class DebugIntentionallyCauseCycleRequest
+    : public SimpleRequest<
+          DebugIntentionallyCauseCycleRequest,
+          evaluator::SideEffect(Decl *, ArrayRef<Decl *>),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, Decl *first, ArrayRef<Decl *> rest) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
