@@ -6,9 +6,6 @@ actor SomeActor {}
 
 distributed actor DA {} // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
 // expected-error@-1{{class 'DA' has no initializers}}
-distributed actor class DAC {} // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
-// expected-error@-1{{class 'DAC' has no initializers}}
-// expected-warning@-2{{'actor class' has been renamed to 'actor'}}
 
 actor A {
   func normal() async {}

@@ -24,16 +24,6 @@ distributed class ClassNope {} // expected-error{{'distributed' can only be appl
 distributed enum EnumNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-distributed actor class DistributedActor_0 { // expected-warning{{'actor class' has been renamed to 'actor'}}
-  distributed func okey() {}
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension DistributedActor_0 {
-  static func _remote_okey(actor: DistributedActor_0) async throws {}
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 distributed actor DistributedActor_1 {
 
   let name: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
