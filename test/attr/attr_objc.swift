@@ -405,7 +405,7 @@ class ConcreteContext3 {
   func dynamicSelf1_() -> Self { return self }
 
   @objc // bad-access-note-move{{ConcreteContext3.genericParams()}}
-  func genericParams<T: NSObject>() -> [T] { return [] } // access-note-adjust expected-error{{method cannot be marked @objc because it has generic parameters}}
+  func genericParams<T: NSObject>() -> [T] { return [] } // access-note-adjust expected-error{{instance method cannot be marked @objc because it has generic parameters}}
 
   @objc // bad-access-note-move{{ConcreteContext3.returnObjCProtocolMetatype()}}
   func returnObjCProtocolMetatype() -> NSCoding.Protocol { return NSCoding.self } // access-note-adjust expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
@@ -2402,10 +2402,10 @@ class ThrowsObjCName {
   @objc(method5AndReturnError:x:closure:) // access-note-move{{ThrowsObjCName.method5(x:closure:)}}
   func method5(x: Int, closure: @escaping (Int) -> Int) throws { }
 
-  @objc(method6) // access-note-move{{ThrowsObjCName.method6()}} expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
+  @objc(method6) // access-note-move{{ThrowsObjCName.method6()}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
   func method6() throws { }
 
-  @objc(method7) // access-note-move{{ThrowsObjCName.method7(x:)}} expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
+  @objc(method7) // access-note-move{{ThrowsObjCName.method7(x:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
   func method7(x: Int) throws { }
 
   // CHECK-DUMP: func_decl{{.*}}"method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool

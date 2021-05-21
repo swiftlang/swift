@@ -78,7 +78,8 @@ expected_other_diag_re = re.compile(r'expected-(warning|note|remark)' +
                                     offset_re_fragment)
 
 """Matches expected-error and its offset."""
-expected_error_re = re.compile(r'expected-error' + offset_re_fragment)
+expected_error_re = re.compile(r'expected-error' + offset_re_fragment +
+                               r'\s*(\d*\s*)\{\{')
 
 """Matches the string 'marked @objc'."""
 marked_objc_re = re.compile(r'marked @objc')
@@ -91,11 +92,15 @@ def adjust_comments(offset, comment_str):
     """Replace expected-errors with expected-remarks, and make other adjustments
        to diagnostics so that they reflect access notes."""
 
+    bad_prefix = u"access note for fancy tests failed to add invalid " + \
+                 u"attribute 'objc': "
+
     adjusted = expected_other_diag_re.sub(lambda m: u"expected-" + m.group(1) +
                                                     offsetify(offset, m.group(2)),
                                           comment_str)
     adjusted = expected_error_re.sub(lambda m: u"expected-remark" +
-                                               offsetify(offset, m.group(1)),
+                                               offsetify(offset, m.group(1)) + " " +
+                                               m.group(2) + "{{" + bad_prefix,
                                      adjusted)
     adjusted = marked_objc_re.sub(u"marked @objc by an access note", adjusted)
     adjusted = fixit_re.sub(u"{{none}}", adjusted)
@@ -127,8 +132,9 @@ def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset, acces
     replacement = u"// access-note-adjust" + offsetify(offset) + u" [attr moved] "
 
     if is_bad:
-        replacement += u"expected-note{{attribute 'objc' was added by access note " + \
-                       u"for fancy tests}}"
+        pass
+#        replacement += u"expected-note{{attribute 'objc' was added by access note " + \
+#                       u"for fancy tests}}"
     else:
         replacement += u"expected-remark{{access note for fancy tests adds attribute " + \
                        u"'objc' to this }} expected-note{{add attribute explicitly to " + \

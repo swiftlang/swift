@@ -1320,8 +1320,14 @@ void bindSwitchCasePatternVars(DeclContext *dc, CaseStmt *stmt);
 AnyFunctionType *applyGlobalActorType(
     AnyFunctionType *fnType, ValueDecl *funcOrEnum, DeclContext *dc);
 
-/// Diagnose an error concerning an incorrect attribute and emit a fix-it
-/// offering to remove it.
+/// If \p attr was added by an access note, wraps the error in
+/// \c diag::wrap_invalid_attr_added_by_access_note and limits it as an access
+/// note-related diagnostic should be.
+InFlightDiagnostic softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
+                                      InFlightDiagnostic &diag);
+
+/// Diagnose an error concerning an incorrect attribute (softening it if it's
+/// caused by an access note) and emit a fix-it offering to remove it.
 template<typename ...ArgTypes>
 InFlightDiagnostic
 diagnoseAttrWithRemovalFixIt(const Decl *D, const DeclAttribute *attr,
@@ -1335,17 +1341,20 @@ diagnoseAttrWithRemovalFixIt(const Decl *D, const DeclAttribute *attr,
 
   auto &Diags = D->getASTContext().Diags;
 
+  Optional<InFlightDiagnostic> diag;
   if (!attr || !attr->getLocation().isValid())
-    return Diags.diagnose(D, std::forward<ArgTypes>(Args)...);
+    diag.emplace(Diags.diagnose(D, std::forward<ArgTypes>(Args)...));
+  else
+    diag.emplace(std::move(Diags.diagnose(attr->getLocation(),
+                                          std::forward<ArgTypes>(Args)...)
+                               .fixItRemove(attr->getRangeWithAt())));
 
-  return std::move(Diags.diagnose(attr->getLocation(),
-                                  std::forward<ArgTypes>(Args)...)
-                       .fixItRemove(attr->getRangeWithAt()));
+  return softenIfAccessNote(D, attr, *diag);
 }
 
-/// Diagnose an error concerning an incorrect attribute, emit a fix-it offering
-/// to remove it, and mark it invalid so that it will be ignored by other parts
-/// of the compiler.
+/// Diagnose an error concerning an incorrect attribute (softening it if it's
+/// caused by an access note), emit a fix-it offering to remove it, and mark the
+/// attribute invalid so that it will be ignored by other parts of the compiler.
 template<typename ...ArgTypes>
 InFlightDiagnostic
 diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
