@@ -61,7 +61,7 @@ func testGlobalLookup() {
   @TupleBuilder<String> var x5 {
     "hello: \(#^GLOBAL_LOOKUP_IN_STRING_LITERAL^#)"
 // GLOBAL_LOOKUP_IN_STRING_LITERAL: Begin completions
-// GLOBAL_LOOKUP_IN_STRING_LITERAL: Decl[GlobalVar]/CurrModule: MyConstantString[#String#];
+// GLOBAL_LOOKUP_IN_STRING_LITERAL: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: MyConstantString[#String#];
 // GLOBAL_LOOKUP_IN_STRING_LITERAL: End completions
   }
 
@@ -103,7 +103,7 @@ struct FooStruct {
 func testPatternMatching() {
   @TupleBuilder<String> var x1 {
     let x = Letters.b
-    if case .#^COMPLETE_PATTERN_MATCHING_IN_IF?check=COMPLETE_CASE;xfail=rdar78015510^# = x {
+    if case .#^COMPLETE_PATTERN_MATCHING_IN_IF?check=COMPLETE_CASE^# = x {
 // COMPLETE_CASE: Begin completions
 // COMPLETE_CASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: a[#Letters#];
 // COMPLETE_CASE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: b[#Letters#];
@@ -115,14 +115,14 @@ func testPatternMatching() {
   @TupleBuilder<String> var x2 {
     let x = Letters.a
     switch x {
-    case .#^COMPLETE_CASE_IN_SWITCH?check=COMPLETE_CASE;xfail=rdar78015510^#:
+    case .#^COMPLETE_CASE_IN_SWITCH?check=COMPLETE_CASE^#:
       break
     }
   }
 
   @TupleBuilder<String> var x3 {
     let x: FooStruct? = FooStruct()
-    guard case .#^GUARD_CASE_PATTERN_1?check=OPTIONAL_FOOSTRUCT;xfail=rdar78015510^# = x {}
+    guard case .#^GUARD_CASE_PATTERN_1?check=OPTIONAL_FOOSTRUCT^# = x {}
     // OPTIONAL_FOOSTRUCT: Begin completions, 9 items
     // OPTIONAL_FOOSTRUCT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]:         nil[#FooStruct?#]; name=nil
     // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<FooStruct>#]; name=none
@@ -141,7 +141,7 @@ func testPatternMatching() {
 
   @TupleBuilder<String> var x4 {
     let x: FooStruct? = FooStruct()
-    guard case .#^GUARD_CASE_PATTERN_2?check=OPTIONAL_FOOSTRUCT;xfail=rdar78015510^#some() = x {}
+    guard case .#^GUARD_CASE_PATTERN_2?check=OPTIONAL_FOOSTRUCT^#some() = x {}
   }
 }
 
