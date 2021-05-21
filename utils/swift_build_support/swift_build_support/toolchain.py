@@ -62,6 +62,7 @@ _register("llvm_profdata", "llvm-profdata")
 _register("llvm_cov", "llvm-cov")
 _register("lipo", "lipo")
 _register("libtool", "libtool")
+_register("ar", "ar")
 _register("sccache", "sccache")
 _register("swiftc", "swiftc")
 
