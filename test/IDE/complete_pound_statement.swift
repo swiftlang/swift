@@ -53,5 +53,5 @@ class C3 {
   }
 }
 
-// AVAILABLE: Keyword/ExprSpecific:               available({#Platform...#}, *); name=available(Platform..., *)
+// AVAILABLE: Keyword/Local/Flair[ExprSpecific]:               available({#Platform...#}, *); name=available(Platform..., *)
 // AVAILABLE1-NOT: available({#Platform...#}, *)

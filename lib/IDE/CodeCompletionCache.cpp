@@ -226,9 +226,10 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     }
 
     CodeCompletionResult *result = nullptr;
+    CodeCompletionFlair Flair;
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, /*IsArgumentLabels=*/false, numBytesToErase, string,
+          context, Flair, /*IsArgumentLabels=*/false, numBytesToErase, string,
           declKind, isSystem, moduleName, notRecommended, briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
           copyArray(*V.Sink.Allocator,
@@ -236,7 +237,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
           CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
-          CodeCompletionResult(kind, context, /*IsArgumentLabels=*/false,
+          CodeCompletionResult(kind, context, Flair, /*IsArgumentLabels=*/false,
                                numBytesToErase, string,
                                CodeCompletionResult::NotApplicable, opKind);
     }
