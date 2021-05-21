@@ -2955,6 +2955,10 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       FunctionPointer(fnType, typeFnPtr, authInfo, signature)
           .getAsFunction(IGF),
       forwardedArgs);
+  Res->setTailCall();
+  if (f->isAsync()) {
+    Res->setTailCallKind(IGF.IGM.AsyncTailCallKind);
+  }
 
   if (implFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
