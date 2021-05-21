@@ -2992,15 +2992,6 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
   }
 }
 
-/// This emits a diagnostic with a fixit to remove the attribute.
-template<typename ...ArgTypes>
-void diagnoseAndRemoveAttr(Decl *D, DeclAttribute *attr,
-                           ArgTypes &&...Args) {
-  auto &ctx = D->getASTContext();
-  ctx.Diags.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
-    .fixItRemove(attr->getRangeWithAt());
-}
-
 static void finishLazyVariableImplInfo(VarDecl *var,
                                        StorageImplInfo &info) {
   auto *attr = var->getAttrs().getAttribute<LazyAttr>();
@@ -3008,16 +2999,16 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   // It cannot currently be used on let's since we don't have a mutability model
   // that supports it.
   if (var->isLet())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_let);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_on_let);
 
   // lazy must have an initializer.
   if (!var->getParentInitializer())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_initializer);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_requires_initializer);
 
   bool invalid = false;
 
   if (isa<ProtocolDecl>(var->getDeclContext())) {
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_in_protocol);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_in_protocol);
     invalid = true;
   }
 
@@ -3025,13 +3016,13 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   if (info.getReadImpl() != ReadImplKind::Stored &&
       (info.getWriteImpl() != WriteImplKind::Stored &&
        info.getWriteImpl() != WriteImplKind::StoredWithObservers)) {
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_computed);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_not_on_computed);
     invalid = true;
   }
 
   // The pattern binding must only bind a single variable.
   if (!var->getParentPatternBinding()->getSingleVar())
-    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_single_var);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::lazy_requires_single_var);
 
   if (!invalid)
     info = StorageImplInfo::getMutableComputed();
@@ -3083,7 +3074,7 @@ static void finishNSManagedImplInfo(VarDecl *var,
   auto *attr = var->getAttrs().getAttribute<NSManagedAttr>();
 
   if (var->isLet())
-    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_let_property);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_let_property);
 
   SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
 
@@ -3095,7 +3086,7 @@ static void finishNSManagedImplInfo(VarDecl *var,
     if (parentFile && parentFile->Kind == SourceFileKind::Interface)
       return;
 
-    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_not_stored, kind);
+    diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_not_stored, kind);
   };
 
   // @NSManaged properties must be written as stored.

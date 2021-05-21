@@ -45,35 +45,6 @@
 using namespace swift;
 
 namespace {
-  /// This emits a diagnostic with a fixit to remove the attribute.
-  template<typename ...ArgTypes>
-  InFlightDiagnostic
-  diagnoseAndRemoveAttr(DiagnosticEngine &Diags, Decl *D, DeclAttribute *attr,
-                        ArgTypes &&...Args) {
-    attr->setInvalid();
-
-    assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
-    if (!D->hasClangNode()) {
-      SourceLoc loc = attr->getLocation();
-#ifndef NDEBUG
-      if (!loc.isValid() && !attr->getAddedByAccessNote()) {
-        llvm::errs() << "Attribute '";
-        attr->print(llvm::errs());
-        llvm::errs() << "' has invalid location, failed to diagnose!\n";
-        assert(false && "Diagnosing attribute with invalid location");
-      }
-#endif
-      if (loc.isInvalid()) {
-        loc = D->getLoc();
-      }
-      if (loc.isValid()) {
-        return std::move(Diags.diagnose(loc, std::forward<ArgTypes>(Args)...)
-                            .fixItRemove(attr->getRangeWithAt()));
-      }
-    }
-    return InFlightDiagnostic();
-  }
-
 /// This visits each attribute on a decl.  The visitor should return true if
 /// the attribute is invalid and should be marked as such.
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
@@ -87,8 +58,8 @@ public:
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnoseAndRemoveAttr(DeclAttribute *attr,
                                            ArgTypes &&...Args) {
-    return ::diagnoseAndRemoveAttr(Ctx.Diags, D, attr,
-                                   std::forward<ArgTypes>(Args)...);
+    return swift::diagnoseAndRemoveAttr(D, attr,
+                                        std::forward<ArgTypes>(Args)...);
   }
 
   template <typename... ArgTypes>
@@ -955,8 +926,7 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
   auto &ctx = SF->getASTContext();
 
   if (!ctx.LangOpts.EnableObjCInterop) {
-    ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-      .fixItRemove(attr->getRangeWithAt())
+    diagnoseAndRemoveAttr(decl, attr, diag::objc_interop_disabled)
       .limitBehavior(behavior);
     return;
   }
@@ -4186,8 +4156,6 @@ resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
   auto *D = attr->getOriginalDeclaration();
   assert(D &&
          "Original declaration should be resolved by parsing/deserialization");
-  auto &ctx = D->getASTContext();
-  auto &diags = ctx.Diags;
   auto *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
     // If `@differentiable` attribute is declared directly on a
@@ -4211,7 +4179,7 @@ resolveDifferentiableAttrOriginalFunction(DifferentiableAttr *attr) {
       original = nullptr;
   // Diagnose if original `AbstractFunctionDecl` could not be resolved.
   if (!original) {
-    diagnoseAndRemoveAttr(diags, D, attr, diag::invalid_decl_attribute, attr);
+    diagnoseAndRemoveAttr(D, attr, diag::invalid_decl_attribute, attr);
     attr->setInvalid();
     return nullptr;
   }
@@ -4541,8 +4509,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
         {getterDecl, resolvedDiffParamIndices}, newAttr);
     // Reject duplicate `@differentiable` attributes.
     if (!insertion.second) {
-      diagnoseAndRemoveAttr(diags, D, attr,
-                            diag::differentiable_attr_duplicate);
+      diagnoseAndRemoveAttr(D, attr, diag::differentiable_attr_duplicate);
       diags.diagnose(insertion.first->getSecond()->getLocation(),
                      diag::differentiable_attr_duplicate_note);
       return nullptr;
@@ -4558,7 +4525,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
   auto insertion =
       ctx.DifferentiableAttrs.try_emplace({D, resolvedDiffParamIndices}, attr);
   if (!insertion.second && insertion.first->getSecond() != attr) {
-    diagnoseAndRemoveAttr(diags, D, attr, diag::differentiable_attr_duplicate);
+    diagnoseAndRemoveAttr(D, attr, diag::differentiable_attr_duplicate);
     diags.diagnose(insertion.first->getSecond()->getLocation(),
                    diag::differentiable_attr_duplicate_note);
     return nullptr;

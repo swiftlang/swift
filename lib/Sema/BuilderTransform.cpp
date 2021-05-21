@@ -1587,10 +1587,7 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
     }
 
     if (attr) {
-      ctx.Diags.diagnose(
-          attr->getLocation(), diag::result_builder_remove_attr)
-        .fixItRemove(attr->getRangeWithAt());
-      attr->setInvalid();
+      diagnoseAndRemoveAttr(func, attr, diag::result_builder_remove_attr);
     }
 
     // Note that one can remove all of the return statements.
