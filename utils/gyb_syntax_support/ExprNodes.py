@@ -385,6 +385,8 @@ EXPR_NODES = [
 
     Node('ClosureSignature', kind='Syntax',
          children=[
+             Child('Attributes', kind='AttributeList', 
+                   collection_element_name='Attribute', is_optional=True),
              Child('Capture', kind='ClosureCaptureSignature',
                    is_optional=True),
              Child('Input', kind='Syntax', is_optional=True,
