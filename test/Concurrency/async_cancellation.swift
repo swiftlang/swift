@@ -27,12 +27,13 @@ struct SomeFile: Sendable {
 
 @available(SwiftStdlib 5.5, *)
 func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> PictureData {
-  let handle: Task.Handle<PictureData, Error> = detach {
+  let handle: Task<PictureData, Error> = .init {
     let file = SomeFile()
 
-    return await withTaskCancellationHandler(
-      handler: { file.close() }) {
+    return await withTaskCancellationHandler {
       await test_cancellation_guard_isCancelled(file)
+    } onCancel: {
+      file.close()
     }
   }
 
