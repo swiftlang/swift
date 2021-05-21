@@ -22,7 +22,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
+#include "swift/Option/Options.h"
 
+#include "llvm/Option/OptTable.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
@@ -970,6 +973,33 @@ bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
     return true;
   assert(FlagMatches.size() == 2);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
+  SmallVector<StringRef, 1> IgnFlagMatches;
+  // Cherry-pick supported options from the ignorable list.
+  auto IgnFlagRe = llvm::Regex("^// swift-module-flags-ignorable:(.*)$",
+                               llvm::Regex::Newline);
+  // It's OK the interface doesn't have the ignorable list, we just ignore them
+  // all.
+  if (!IgnFlagRe.match(buffer, &IgnFlagMatches))
+    return false;
+  SmallVector<const char *, 8> IgnSubArgs;
+  llvm::cl::TokenizeGNUCommandLine(IgnFlagMatches[1], ArgSaver, IgnSubArgs);
+  std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
+  unsigned missingArgIdx = 0;
+  unsigned missingArgCount = 0;
+  auto parsedIgns = table->ParseArgs(IgnSubArgs, missingArgIdx, missingArgCount);
+  for (auto parse: parsedIgns) {
+    // Check if the option is a frontend option. This will filter out unknown
+    // options and input-like options.
+    if (!parse->getOption().hasFlag(options::FrontendOption))
+      continue;
+    // Push the supported option and its value to the list.
+    // We shouldn't need to worry about cases like -tbd-install_name=Foo because
+    // the parsing function should have droped alias options already.
+    SubArgs.push_back(ArgSaver.save(parse->getSpelling()).data());
+    for (auto value: parse->getValues())
+      SubArgs.push_back(value);
+  }
+
   return false;
 }
 
