@@ -216,6 +216,16 @@
     },
     {
       key.kind: source.lang.swift.keyword,
+      key.name: "nonisolated",
+      key.sourcetext: "nonisolated",
+      key.description: "nonisolated",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.typerelation: source.codecompletion.typerelation.notapplicable,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
       key.name: "nonmutating",
       key.sourcetext: "nonmutating",
       key.description: "nonmutating",
