@@ -915,6 +915,42 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine whether the given class is an distributed actor.
+class IsDistributedActorRequest :
+    public SimpleRequest<IsDistributedActorRequest,
+        bool(NominalTypeDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
+/// Determine whether the given func is distributed.
+class IsDistributedFuncRequest :
+    public SimpleRequest<IsDistributedFuncRequest,
+        bool(FuncDecl *),
+        RequestFlags::Cached> {
+public:
+    using SimpleRequest::SimpleRequest;
+
+private:
+    friend SimpleRequest;
+
+    bool evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+    // Caching
+    bool isCached() const { return true; }
+};
+
 /// Retrieve the static "shared" property within a global actor that provides
 /// the actor instance representing the global actor.
 ///
@@ -1905,6 +1941,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether this type has a distributed actor "local" initializer.
+class HasDistributedActorLocalInitRequest
+    : public SimpleRequest<HasDistributedActorLocalInitRequest, bool(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Synthesizes a default initializer for a given type.
 class SynthesizeDefaultInitRequest
     : public SimpleRequest<SynthesizeDefaultInitRequest,
@@ -1995,6 +2049,8 @@ enum class ImplicitMemberAction : uint8_t {
   ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
+  ResolveDistributedActor,
+  ResolveDistributedActorAddress,
 };
 
 class ResolveImplicitMemberRequest

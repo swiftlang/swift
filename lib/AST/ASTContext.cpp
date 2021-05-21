@@ -1005,6 +1005,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::SerialExecutor:
     M = getLoadedModule(Id_Concurrency);
     break;
+  case KnownProtocolKind::DistributedActor:
+    M = getLoadedModule(Id_Distributed);
+    break;
   default:
     M = getStdlibModule();
     break;

@@ -1462,6 +1462,13 @@ static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getDistributedActorInitDestroy(ASTContext &ctx,
+                                                 Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_nativeObject), // TODO: no idea if to pass more here?
+                            _void);
+}
+
 static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
                                                  Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
@@ -2789,6 +2796,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDefaultActor:
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
+
+  case BuiltinValueKind::InitializeDistributedRemoteActor:
+  case BuiltinValueKind::DestroyDistributedActor:
+    return getDistributedActorInitDestroy(Context, Id);
 
   case BuiltinValueKind::StartAsyncLet:
     return getStartAsyncLet(Context, Id);

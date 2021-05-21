@@ -52,6 +52,9 @@ class Swift(product.Product):
         # Add experimental concurrency flag.
         self.cmake_options.extend(self._enable_experimental_concurrency)
 
+        # Add experimental distributed flag.
+        self.cmake_options.extend(self._enable_experimental_distributed)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -145,6 +148,11 @@ updated without updating swift.py?")
     def _enable_experimental_concurrency(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL',
                  self.args.enable_experimental_concurrency)]
+
+    @property
+    def _enable_experimental_distributed(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
+                 self.args.enable_experimental_distributed)]
 
     @classmethod
     def get_dependencies(cls):

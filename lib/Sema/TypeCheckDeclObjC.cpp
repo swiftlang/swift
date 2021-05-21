@@ -425,6 +425,9 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   case ActorIsolationRestriction::GlobalActor:
     // FIXME: Consider whether to limit @objc on global-actor-qualified
     // declarations.
+  case ActorIsolationRestriction::DistributedActorSelf:
+    // we do not allow distributed + objc actors.
+    return false;
   case ActorIsolationRestriction::Unrestricted:
   case ActorIsolationRestriction::Unsafe:
     return false;
@@ -1520,8 +1523,10 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
-  else if (isa<ClassDecl>(VD)) {
+  else if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
     // Classes can be @objc.
+
+
 
     // Protocols and enums can also be @objc, but this is covered by the
     // isObjC() check at the beginning.

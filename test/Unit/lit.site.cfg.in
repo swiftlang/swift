@@ -10,6 +10,7 @@ config.target_triple = "@TARGET_TRIPLE@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
+config.lit_site_config_folder = os.path.dirname(os.path.realpath(__file__))
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 

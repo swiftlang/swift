@@ -3541,6 +3541,7 @@ ParserStatus Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
 //      '__consuming'
 //      'convenience'
 //      'actor'
+//      'distributed'
 bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
                                    SourceLoc &StaticLoc,
                                    StaticSpellingKind &StaticSpelling) {
