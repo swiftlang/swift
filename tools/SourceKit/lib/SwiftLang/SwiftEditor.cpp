@@ -2358,6 +2358,13 @@ void SwiftLangSupport::editorOpen(
     EditorDoc->updateSemaInfo();
   }
 
+  if (!Consumer.documentStructureEnabled() &&
+      !Consumer.syntaxMapEnabled() &&
+      !Consumer.diagnosticsEnabled() &&
+      !Consumer.syntaxTreeEnabled()) {
+    return;
+  }
+
   EditorDoc->readSyntaxInfo(Consumer, /*ReportDiags=*/true);
 
   if (Consumer.syntaxTreeEnabled()) {
