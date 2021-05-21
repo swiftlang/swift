@@ -115,7 +115,8 @@ def adjust_comments(offset, inserted_attr, comment_str):
 # Writing attrs to access notes
 #
 
-def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset, access_note_name):
+def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset,
+                                access_note_name):
     """Write an @objc attribute into an access notes file, then return the
        string that will replace the attribute and trailing comment."""
 
@@ -134,7 +135,7 @@ def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset, acces
 
     inserted_attr = u"@objc"
     if arg:
-      inserted_attr += u"(" + arg + u")"
+        inserted_attr += u"(" + arg + u")"
 
     replacement = u"// access-note-adjust" + offsetify(offset) + \
                   u"{{" + inserted_attr + "}} [attr moved] "
@@ -145,6 +146,7 @@ def move_at_objc_to_access_note(access_notes_file, arg, maybe_bad, offset, acces
                        u"' explicitly to silence this warning}}"
 
     return replacement
+
 
 #
 # Matching lines
