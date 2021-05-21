@@ -2651,15 +2651,10 @@ private:
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
                                     CurContext.isWithinInterpolatedString());
-
-        auto key = uncoveredAsync.find(anchor);
-        if (key == uncoveredAsync.end()) {
-          uncoveredAsync.insert({anchor, {}});
+        if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
-        }
-        uncoveredAsync[anchor].emplace_back(
-            *expr,
-            classification.getAsyncReason());
+        uncoveredAsync[anchor].emplace_back(*expr,
+                                            classification.getAsyncReason());
       }
     }
 
