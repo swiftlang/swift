@@ -608,6 +608,14 @@ void swift_defaultActor_deallocate(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_deallocateResilient(HeapObject *actor);
 
+/// Initialize the runtime storage for a distributed remote actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_distributedActor_remote_initialize(DefaultActor *actor);
+
+/// Destroy the runtime storage for a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_distributedActor_destroy(DefaultActor *actor);
+
 /// Enqueue a job on the default actor implementation.
 ///
 /// The job must be ready to run.  Notably, if it's a task, that
@@ -622,6 +630,10 @@ void swift_defaultActor_deallocateResilient(HeapObject *actor);
 /// execution.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
+
+/// Check if the actor is a distributed 'remote' actor instance.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_distributed_actor_is_remote(DefaultActor *actor);
 
 /// Prepare a continuation in the current task.
 ///

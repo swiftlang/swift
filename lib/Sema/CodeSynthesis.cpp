@@ -35,6 +35,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "CodeSynthesisDistributedActor.cpp"
 using namespace swift;
 
 const bool IsImplicit = true;
@@ -225,6 +226,16 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                                                   ImplicitConstructorKind ICK,
                                                   ASTContext &ctx) {
   assert(!decl->hasClangNode());
+
+  // Don't synthesize for distributed actors, they're a bit special.
+  //
+  // They have their special inits, and should not get the usual
+  // default/implicit constructor (i.e. `init()` is illegal for them, as they
+  // always must have an associated transport - via `init(transport:)` or
+  // `init(resolve:using:)`).
+  if (auto clazz = dyn_cast<ClassDecl>(decl))
+    if (clazz->isDistributedActor())
+      return nullptr;
 
   SourceLoc Loc = decl->getLoc();
   auto accessLevel = AccessLevel::Internal;
@@ -1185,14 +1196,16 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
     return;
-  
+
   if (!shouldAttemptInitializerSynthesis(decl)) {
     decl->setAddedImplicitInitializers();
     return;
   }
 
-  if (auto *classDecl = dyn_cast<ClassDecl>(decl))
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     addImplicitInheritedConstructorsToClass(classDecl);
+    addImplicitDistributedActorMembersToClass(classDecl);
+  }
 
   // Force the memberwise and default initializers if the type has them.
   // FIXME: We need to be more lazy about synthesizing constructors.
@@ -1272,6 +1285,18 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     TypeChecker::addImplicitConstructors(target);
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     (void)evaluateTargetConformanceTo(decodableProto);
+  }
+    break;
+  case ImplicitMemberAction::ResolveDistributedActor:
+  case ImplicitMemberAction::ResolveDistributedActorAddress: {
+    // init(transport:) and init(resolve:using:) may be synthesized as part of
+    // derived conformance to the DistributedActor protocol.
+    // If the target should conform to the DistributedActor protocol, check the
+    // conformance here to attempt synthesis.
+    TypeChecker::addImplicitConstructors(target);
+    auto *distributedActorProto =
+        Context.getProtocol(KnownProtocolKind::DistributedActor);
+    (void)evaluateTargetConformanceTo(distributedActorProto);
   }
     break;
   }
@@ -1427,6 +1452,24 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   return areAllStoredPropertiesDefaultInitializable(evaluator, decl);
 }
 
+bool
+HasDistributedActorLocalInitRequest::evaluate(Evaluator &evaluator,
+                                                     NominalTypeDecl *nominal) const {
+  if (auto *decl = dyn_cast<ClassDecl>(nominal)) {
+    if (!decl->isDistributedActor())
+      return false;
+
+    for (auto *member : decl->getMembers())
+      if (auto ctor = dyn_cast<ConstructorDecl>(member))
+        if (ctor->isDistributedActorLocalInit())
+          return true;
+  }
+
+  // areAllStoredPropertiesDefaultInitializable(evaluator, decl);
+
+  return false;
+}
+
 /// Synthesizer callback for a function body consisting of "return".
 static std::pair<BraceStmt *, bool>
 synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
@@ -1448,16 +1491,20 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                   decl);
 
   // Create the default constructor.
-  auto ctor = createImplicitConstructor(decl,
+  if (auto ctor = createImplicitConstructor(decl,
                                         ImplicitConstructorKind::Default,
-                                        ctx);
+                                        ctx)) {
 
-  // Add the constructor.
-  decl->addMember(ctor);
+    // Add the constructor.
+    decl->addMember(ctor);
 
-  // Lazily synthesize an empty body for the default constructor.
-  ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
-  return ctor;
+    // Lazily synthesize an empty body for the default constructor.
+    ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
+    return ctor;
+  }
+
+  // no default init was synthesized
+  return nullptr;
 }
 
 ValueDecl *swift::getProtocolRequirement(ProtocolDecl *protocol,

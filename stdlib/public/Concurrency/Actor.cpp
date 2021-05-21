@@ -624,6 +624,7 @@ class DefaultActorImpl : public HeapObject {
       Status_width = 3,
 
       HasActiveInlineJob = 3,
+      IsDistributedRemote = 4,
 
       MaxPriority = 8,
       MaxPriority_width = JobFlags::Priority_width,
@@ -654,6 +655,12 @@ class DefaultActorImpl : public HeapObject {
     FLAGSET_DEFINE_FLAG_ACCESSORS(HasActiveInlineJob,
                                   hasActiveInlineJob, setHasActiveInlineJob)
 
+    /// Is the actor a distributed 'remote' actor?
+    /// I.e. it does not have storage for user-defined properties and all
+    /// function call must be transformed into $distributed_ function calls.
+    FLAGSET_DEFINE_FLAG_ACCESSORS(IsDistributedRemote,
+                                  isDistributedRemote, setIsDistributedRemote)
+
     /// What is the maximum priority of jobs that are currently running
     /// or enqueued on this actor?
     ///
@@ -681,10 +688,13 @@ class DefaultActorImpl : public HeapObject {
   };
 
 public:
-
   /// Properly construct an actor, except for the heap header.
-  void initialize() {
-    new (&CurrentState) std::atomic<State>(State{JobRef(), Flags()});
+  /// \param isDistributedRemote When true sets the IsDistributedRemote flag
+  void initialize(bool isDistributedRemote = false) {
+    // TODO: this is just a simple implementation, rather we would want to allocate a proxy
+    auto flags = Flags();
+    flags.setIsDistributedRemote(isDistributedRemote);
+    new (&CurrentState) std::atomic<State>(State{JobRef(), flags});
   }
 
   /// Properly destruct an actor, except for the heap header.
@@ -707,6 +717,12 @@ public:
   /// Claim the next job off the actor or give it up.
   Job *claimNextJobOrGiveUp(bool actorIsOwned, RunningJobInfo runner);
 
+  /// Check if the actor is actually a distributed *remote* actor.
+  ///
+  /// Note that a distributed *local* actor instance is the same as any other
+  /// ordinary default (local) actor, and no special handling is needed for them.
+  bool isDistributedRemote();
+  
 private:
   void deallocateUnconditional();
 
@@ -1740,6 +1756,29 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
                       metadata->getInstanceAlignMask());
 }
 
+// TODO: most likely where we'd need to create the "proxy instance" instead?
+void swift::swift_distributedActor_remote_initialize(DefaultActor *_actor) { // FIXME: !!!!! remove distributed C++ impl not needed?
+  auto actor = asImpl(_actor);
+  actor->initialize(/*remote=*/true);
+}
+
+void swift::swift_distributedActor_destroy(DefaultActor *_actor) { // FIXME: !!!!! remove distributed C++ impl not needed?
+  // TODO: need to resign the address before we destroy:
+  //       something like: actor.transport.resignAddress(actor.address)
+
+  // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
+  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
+}
+
+bool swift::swift_distributed_actor_is_remote(DefaultActor *_actor) {
+  return asImpl(_actor)->isDistributedRemote();
+}
+
+/// FIXME: only exists for the quick-and-dirty MainActor implementation.
+namespace swift {
+  Metadata* MainActorMetadata = nullptr;
+}
+
 /*****************************************************************************/
 /****************************** ACTOR SWITCHING ******************************/
 /*****************************************************************************/
@@ -1928,3 +1967,12 @@ static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 
 #define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE
 #include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+
+/*****************************************************************************/
+/***************************** DISTRIBUTED ACTOR *****************************/
+/*****************************************************************************/
+
+bool DefaultActorImpl::isDistributedRemote() {
+  auto state = CurrentState.load(std::memory_order_relaxed);
+  return state.Flags.isDistributedRemote() == 1;
+}

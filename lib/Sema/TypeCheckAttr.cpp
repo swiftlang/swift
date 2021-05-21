@@ -55,14 +55,6 @@ namespace {
     assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
-#ifndef NDEBUG
-      if (!loc.isValid() && !attr->getAddedByAccessNote()) {
-        llvm::errs() << "Attribute '";
-        attr->print(llvm::errs());
-        llvm::errs() << "' has invalid location, failed to diagnose!\n";
-        assert(false && "Diagnosing attribute with invalid location");
-      }
-#endif
       if (loc.isInvalid()) {
         loc = D->getLoc();
       }
@@ -280,6 +272,8 @@ public:
   void visitTransposeAttr(TransposeAttr *attr);
 
   void visitActorAttr(ActorAttr *attr);
+  void visitDistributedActorAttr(DistributedActorAttr *attr);
+  void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr);
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
   void visitSpawnAttr(SpawnAttr *attr);
@@ -2130,8 +2124,8 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
                                             GenericSignature specializedSig,
                                             ASTContext &ctx) {
   bool hadError = false;
-
   auto specializedReqs = specializedSig->requirementsNotSatisfiedBy(originalSig);
+
   for (auto specializedReq : specializedReqs) {
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
@@ -5398,6 +5392,55 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
   (void)classDecl->isActor();
 }
 
+void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
+  auto dc = D->getDeclContext();
+
+  // distributed can be applied to actor class definitions and async functions
+  if (auto varDecl = dyn_cast<VarDecl>(D)) {
+    // distributed can not be applied to stored properties
+    diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
+    return;
+  }
+
+  // distributed can only be declared on an `actor`
+  if (auto classDecl = dyn_cast<ClassDecl>(D)) {
+    if (!classDecl->isActor()) {
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_not_actor);
+      return;
+    } else {
+      // good: `distributed actor`
+      return;
+    }
+  } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
+    diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+    return;
+  }
+
+  if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
+    // distributed functions must not be static
+    if (funcDecl->isStatic()) {
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_static);
+      return;
+    }
+
+    // distributed func must be declared inside an distributed actor
+    if (dc->getSelfClassDecl() &&
+        !dc->getSelfClassDecl()->isDistributedActor()) {
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+      return;
+    } else if (auto protoDecl = dc->getSelfProtocolDecl()){
+      if (!protoDecl->inheritsFromDistributedActor()) {
+        // TODO: could suggest adding `: DistributedActor` to the protocol as well
+        diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+        return;
+      }
+    } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+      return;
+    }
+  }
+}
+
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
@@ -5430,6 +5473,16 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
 
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     (void)getActorIsolation(VD);
+  }
+}
+
+void AttributeChecker::visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr) {
+  /// user-inaccessible _distributedActorIndependent can only be applied to let properties
+  if (auto var = dyn_cast<VarDecl>(D)) {
+    if (!var->isLet()) {
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_independent_property_must_be_let);
+      return;
+    }
   }
 }
 

@@ -294,6 +294,9 @@ public:
 
     /// Whether this attribute is only valid when concurrency is enabled.
     ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
+
+    /// Whether this attribute is only valid when distributed is enabled.
+    DistributedOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
   };
 
   LLVM_READNONE
@@ -386,6 +389,10 @@ public:
 
   static bool isConcurrencyOnly(DeclAttrKind DK) {
     return getOptions(DK) & ConcurrencyOnly;
+  }
+
+  static bool isDistributedOnly(DeclAttrKind DK) {
+    return getOptions(DK) & DistributedOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {

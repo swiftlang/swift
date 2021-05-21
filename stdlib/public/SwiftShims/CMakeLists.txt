@@ -22,6 +22,7 @@ set(sources
   UnicodeShims.h
   Visibility.h
   _SwiftConcurrency.h
+  _SwiftDistributed.h
 
   CoreMediaOverlayShims.h
   DispatchOverlayShims.h

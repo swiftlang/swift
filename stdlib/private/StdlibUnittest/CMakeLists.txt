@@ -14,6 +14,9 @@ set(swift_stdlib_unittest_link_libraries "")
 if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
   list(APPEND swift_stdlib_unittest_link_libraries "swift_Concurrency")
 endif()
+if (SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+  list(APPEND swift_stdlib_unittest_link_libraries "swift_Distributed")
+endif()
 
 add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   # This file should be listed the first.  Module name is inferred from the

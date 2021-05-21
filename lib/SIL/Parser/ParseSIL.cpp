@@ -1397,7 +1397,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
+    Result = SILDeclRef(VD, Kind, IsObjC, /*distributed=*/false, DerivativeId);
     return false;
   }
 
@@ -1517,7 +1517,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
+  Result = SILDeclRef(VD, Kind, IsObjC, /*distributed=*/false, DerivativeId);
   return false;
 }
 
