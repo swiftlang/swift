@@ -51,6 +51,11 @@ def ArgumentIsPath : OptionFlag;
 // and read/parsed from there when reconstituting a .swiftmodule from it.
 def ModuleInterfaceOption : OptionFlag;
 
+// The option should be written into a .swiftinterface module interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option can be safely ignored by the older compiler.
+def ModuleInterfaceOptionIgnorable : OptionFlag;
+
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
@@ -1184,7 +1189,7 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
 def user_module_version : Separate<["-"], "user-module-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption, NewDriverOnlyOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, NewDriverOnlyOption]>,
   HelpText<"Module version specified from Swift module authors">,
   MetaVarName<"<vers>">;
 
