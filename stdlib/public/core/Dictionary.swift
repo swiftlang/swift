@@ -1223,7 +1223,7 @@ extension Dictionary {
   
   @inlinable
   public mutating func remove(
-    where predicate: (Element) throws -> Bool,
+    where predicate: (Key) throws -> Bool,
     keepCapacity: Bool = false
   ) rethrows {
     try _variant.remove(where: predicate, keepCapacity: keepCapacity)

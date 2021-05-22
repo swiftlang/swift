@@ -438,7 +438,7 @@ extension Dictionary._Variant {
   
   @inlinable
   internal mutating func remove(
-    where predicate: (Element) throws -> Bool,
+    where predicate: (Key) throws -> Bool,
     keepCapacity: Bool = false
   ) rethrows {
 #if _runtime(_ObjC)
