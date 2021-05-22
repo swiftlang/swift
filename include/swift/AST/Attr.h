@@ -854,6 +854,7 @@ public:
   /// Determine whether the name associated with this attribute was
   /// implicit.
   bool isNameImplicit() const { return Bits.ObjCAttr.ImplicitName; }
+  void setNameImplicit(bool newValue) { Bits.ObjCAttr.ImplicitName = newValue; }
 
   /// Set the name of this entity.
   void setName(ObjCSelector name, bool implicit) {
@@ -880,11 +881,6 @@ public:
   /// @objc inference rules.
   void setSwift3Inferred(bool inferred = true) {
     Bits.ObjCAttr.Swift3Inferred = inferred;
-  }
-
-  /// Clear the name of this entity.
-  void clearName() {
-    NameData = nullptr;
   }
 
   /// Retrieve the source locations for the names in a non-implicit

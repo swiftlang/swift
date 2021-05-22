@@ -319,6 +319,38 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
   return *this;
 }
 
+InFlightDiagnostic &
+InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
+  // Save current active diagnostic into WrappedDiagnostics, ignoring state
+  // so we don't get a None return or influence future diagnostics.
+  DiagnosticState tempState;
+  Engine->state.swap(tempState);
+  llvm::SaveAndRestore<DiagnosticBehavior>
+      limit(Engine->getActiveDiagnostic().BehaviorLimit,
+            DiagnosticBehavior::Unspecified);
+
+  Engine->WrappedDiagnostics.push_back(
+       *Engine->diagnosticInfoForDiagnostic(Engine->getActiveDiagnostic()));
+
+  Engine->state.swap(tempState);
+
+  auto &wrapped = Engine->WrappedDiagnostics.back();
+
+  // Copy and update its arg list.
+  Engine->WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
+  wrapped.FormatArgs = Engine->WrappedDiagnosticArgs.back();
+
+  // Overwrite the ID and argument with those from the wrapper.
+  Engine->getActiveDiagnostic().ID = wrapper.ID;
+  Engine->getActiveDiagnostic().Args = wrapper.Args;
+
+  // Set the argument to the diagnostic being wrapped.
+  assert(wrapper.getArgs().front().getKind() == DiagnosticArgumentKind::Diagnostic);
+  Engine->getActiveDiagnostic().Args.front() = &wrapped;
+
+  return *this;
+}
+
 void InFlightDiagnostic::flush() {
   if (!IsActive)
     return;
@@ -525,7 +557,7 @@ static bool isMainActor(Type type) {
 
 /// Format a single diagnostic argument and write it to the given
 /// stream.
-static void formatDiagnosticArgument(StringRef Modifier, 
+static void formatDiagnosticArgument(StringRef Modifier,
                                      StringRef ModifierArguments,
                                      ArrayRef<DiagnosticArgument> Args,
                                      unsigned ArgIndex,
@@ -752,6 +784,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
         << FormatOpts.ClosingQuotationMark;
     break;
   case DiagnosticArgumentKind::ActorIsolation:
+    assert(Modifier.empty() && "Improper modifier for ActorIsolation argument");
     switch (auto isolation = Arg.getAsActorIsolation()) {
     case ActorIsolation::ActorInstance:
       Out << "actor-isolated";
@@ -775,6 +808,15 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << "nonisolated";
       break;
     }
+    break;
+
+  case DiagnosticArgumentKind::Diagnostic: {
+    assert(Modifier.empty() && "Improper modifier for Diagnostic argument");
+    auto diagArg = Arg.getAsDiagnostic();
+    DiagnosticEngine::formatDiagnosticText(Out, diagArg->FormatString,
+                                           diagArg->FormatArgs);
+    break;
+  }
   }
 }
 
@@ -953,6 +995,8 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   assert(ActiveDiagnostic && "No active diagnostic to flush");
   if (TransactionCount == 0) {
     emitDiagnostic(*ActiveDiagnostic);
+    WrappedDiagnostics.clear();
+    WrappedDiagnosticArgs.clear();
   } else {
     onTentativeDiagnosticFlush(*ActiveDiagnostic);
     TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
@@ -965,6 +1009,8 @@ void DiagnosticEngine::emitTentativeDiagnostics() {
     emitDiagnostic(diag);
   }
   TentativeDiagnostics.clear();
+  WrappedDiagnostics.clear();
+  WrappedDiagnosticArgs.clear();
 }
 
 /// Returns the access level of the least accessible PrettyPrintedDeclarations

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LangOptions.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -389,5 +390,19 @@ llvm::StringRef swift::getFeatureName(Feature feature) {
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
   case Feature::FeatureName: return #FeatureName;
 #include "swift/Basic/Features.def"
+  }
+}
+
+DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
+  switch (AccessNoteBehavior) {
+  case AccessNoteDiagnosticBehavior::Ignore:
+    return DiagnosticBehavior::Ignore;
+
+  case AccessNoteDiagnosticBehavior::RemarkOnFailure:
+  case AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess:
+    return DiagnosticBehavior::Remark;
+
+  case AccessNoteDiagnosticBehavior::ErrorOnFailureRemarkOnSuccess:
+    return DiagnosticBehavior::Error;
   }
 }
