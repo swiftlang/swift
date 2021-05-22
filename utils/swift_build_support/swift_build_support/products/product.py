@@ -190,6 +190,31 @@ class Product(object):
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
 
+    def should_include_host_in_lipo(self, host_target):
+        if self.args.cross_compile_hosts:
+            if host_target.startswith("macosx") or \
+               host_target.startswith("iphone") or \
+               host_target.startswith("appletv") or \
+               host_target.startswith("watch"):
+                return True
+        return False
+
+    def host_install_destdir(self, host_target):
+        if self.args.cross_compile_hosts:
+            # If cross compiling tools, install into a host-specific subdirectory.
+            if self.should_include_host_in_lipo(host_target):
+                # If this is one of the hosts we should lipo,
+                # install in to a temporary subdirectory.
+                return '%s/intermediate-install/%s' % \
+                    (self.args.install_destdir, host_target)
+            elif host_target == "merged-hosts":
+                # This assumes that all hosts are merged to the lipo.
+                return self.args.install_destdir
+            else:
+                return '%s/%s' % (self.args.install_destdir, host_target)
+        else:
+            return self.args.install_destdir
+
 
 class ProductBuilder(object):
     """
