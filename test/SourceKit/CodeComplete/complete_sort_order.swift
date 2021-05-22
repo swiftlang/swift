@@ -77,7 +77,7 @@ func test5() {
 // STMT_1-LABEL: Results for filterText: ret [
 // STMT_1-NEXT:    return
 // STMT_1-NEXT:    retLocal
-// STMT_1-NEXT:    repeat
+// STMT_1:         repeat
 // STMT_1: ]
 // STMT_1-LABEL: Results for filterText: retur [
 // STMT_1-NEXT:    return
