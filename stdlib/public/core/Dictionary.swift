@@ -1220,6 +1220,14 @@ extension Dictionary {
     // native dictionary.
     _variant.removeAll(keepingCapacity: keepCapacity)
   }
+  
+  @inlinable
+  public mutating func remove(
+    where predicate: (Element) throws -> Bool,
+    keepCapacity: Bool = false
+  ) rethrows {
+    try _variant.remove(where: predicate, keepCapacity: keepCapacity)
+  }
 }
 
 extension Dictionary {

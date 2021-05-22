@@ -28,6 +28,11 @@ internal protocol _DictionaryBuffer {
   func lookup(_ index: Index) -> (key: Key, value: Value)
   func key(at index: Index) -> Key
   func value(at index: Index) -> Value
+  
+  mutating func remove(
+    where predicate: (Key) throws -> Bool,
+    keepCapacity: Bool = false
+  ) rethrows
 }
 
 extension Dictionary {
@@ -429,6 +434,20 @@ extension Dictionary._Variant {
 #endif
     let isUnique = isUniquelyReferenced()
     asNative.removeAll(isUnique: isUnique)
+  }
+  
+  @inlinable
+  internal mutating func remove(
+    where predicate: (Element) throws -> Bool,
+    keepCapacity: Bool = false
+  ) rethrows {
+#if _runtime(_ObjC)
+    if isNative else {
+      ensureUniqueNative().remove(where: predicate, keepCapacity: keepCapacity)
+      return
+    }
+#endif
+    try asNative.remove(where: predicate, keepCapacity: keepCapacity)
   }
 }
 
