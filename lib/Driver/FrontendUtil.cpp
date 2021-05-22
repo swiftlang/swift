@@ -100,6 +100,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   if (Diags.hadAnyError())
     return true;
 
+  TheDriver.setSuppressSameFileNameError(true);
   std::unique_ptr<Compilation> C =
       TheDriver.buildCompilation(*TC, std::move(ArgList));
   if (!C || C->getJobs().empty())
