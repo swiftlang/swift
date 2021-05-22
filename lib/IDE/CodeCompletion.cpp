@@ -1884,6 +1884,10 @@ public:
   bool FoundFunctionsWithoutFirstKeyword = false;
 
 private:
+  bool isForCaching() const {
+    return Kind == LookupKind::ImportFromModule;
+  }
+
   void foundFunction(const AbstractFunctionDecl *AFD) {
     FoundFunctionCalls = true;
     const DeclName Name = AFD->getName();
@@ -2589,7 +2593,8 @@ public:
     }
     bool implicitlyAsync = false;
     analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
-    if (!NotRecommended && implicitlyAsync && !CanCurrDeclContextHandleAsync) {
+    if (!isForCaching() && !NotRecommended && implicitlyAsync &&
+        !CanCurrDeclContextHandleAsync) {
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
@@ -2931,7 +2936,7 @@ public:
       else
         addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-      if (AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
+      if (!isForCaching() && AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
       }
     };
@@ -3045,7 +3050,8 @@ public:
     bool implictlyAsync = false;
     analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
-    if (!NotRecommended && !IsImplicitlyCurriedInstanceMethod &&
+    if (!isForCaching() && !NotRecommended &&
+        !IsImplicitlyCurriedInstanceMethod &&
         ((AFT && AFT->isAsync()) || implictlyAsync) &&
         !CanCurrDeclContextHandleAsync) {
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
@@ -3245,7 +3251,8 @@ public:
         addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
       }
 
-      if (ConstructorType->isAsync() && !CanCurrDeclContextHandleAsync) {
+      if (!isForCaching() && ConstructorType->isAsync() &&
+          !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
       }
     };
@@ -3296,7 +3303,8 @@ public:
     bool implictlyAsync = false;
     analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
-    if (!NotRecommended && implictlyAsync && !CanCurrDeclContextHandleAsync) {
+    if (!isForCaching() && !NotRecommended && implictlyAsync &&
+        !CanCurrDeclContextHandleAsync) {
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
@@ -7123,7 +7131,10 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
     CodeCompletionResultSink &targetSink, const ModuleDecl *module,
     ArrayRef<std::string> accessPath, bool needLeadingDot,
     const DeclContext *currDeclContext) {
-  CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);
+  // Consisitently use the SourceFile as the decl context, to avoid decl
+  // context specific behaviors.
+  auto *SF = currDeclContext->getParentSourceFile();
+  CompletionLookup Lookup(targetSink, module->getASTContext(), SF);
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
 
