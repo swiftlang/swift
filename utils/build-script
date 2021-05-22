@@ -886,11 +886,12 @@ class BuildScriptInvocation(object):
         if self.args.build_early_swift_driver:
             before_impl_product_classes.append(products.EarlySwiftDriver)
 
+        if self.args.build_cmark:
+            before_impl_product_classes.append(products.CMark)
+
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
         impl_product_classes = []
-        if self.args.build_cmark:
-            impl_product_classes.append(products.CMark)
 
         # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
