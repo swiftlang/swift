@@ -1631,6 +1631,8 @@ static bool shouldSerializeMember(Decl *D) {
     llvm_unreachable("decl should never be a member");
 
   case DeclKind::MissingMember:
+    if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
+      return false;
     llvm_unreachable("should never need to reserialize a member placeholder");
 
   case DeclKind::IfConfig:
