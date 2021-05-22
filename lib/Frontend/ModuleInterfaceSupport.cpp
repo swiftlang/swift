@@ -56,6 +56,10 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.Flags << "\n";
+  if (!Opts.IgnorableFlags.empty()) {
+    out << "// " SWIFT_MODULE_FLAGS_IGNORABLE_KEY ": "
+        << Opts.IgnorableFlags << "\n";
+  }
 }
 
 std::string
