@@ -443,7 +443,7 @@ extension Dictionary._Variant {
   ) rethrows {
 #if _runtime(_ObjC)
     if isNative else {
-      ensureUniqueNative().remove(where: predicate, keepCapacity: keepCapacity)
+      try ensureUniqueNative().remove(where: predicate, keepCapacity: keepCapacity)
       return
     }
 #endif
