@@ -21,6 +21,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
 
@@ -90,14 +91,49 @@ private:
   Kind kind;
 
   /// When the kind is \c WitnessToObjC, the requirement being witnessed.
-  ValueDecl * decl = nullptr;
+  llvm::PointerUnion<ValueDecl *, DeclAttribute *> declOrAttr =
+      static_cast<DeclAttribute *>(nullptr);
 
-  ObjCReason(Kind kind, ValueDecl *decl) : kind(kind), decl(decl) { }
+  ObjCReason(Kind kind, ValueDecl *decl) : kind(kind), declOrAttr(decl) { }
+
+  static bool requiresAttr(Kind kind) {
+    switch (kind) {
+    case ExplicitlyCDecl:
+    case ExplicitlyDynamic:
+    case ExplicitlyObjC:
+    case ExplicitlyIBOutlet:
+    case ExplicitlyIBAction:
+    case ExplicitlyIBSegueAction:
+    case ExplicitlyNSManaged:
+    case ExplicitlyIBInspectable:
+    case ExplicitlyGKInspectable:
+    case ExplicitlyObjCByAccessNote:
+      return true;
+
+    case MemberOfObjCProtocol:
+    case ImplicitlyObjC:
+    case OverridesObjC:
+    case WitnessToObjC:
+    case MemberOfObjCExtension:
+    case MemberOfObjCMembersClass:
+    case MemberOfObjCSubclass:
+    case ElementOfObjCEnum:
+    case Accessor:
+      return false;
+    }
+  }
 
 public:
   /// Implicit conversion from the trivial reason kinds.
   ObjCReason(Kind kind) : kind(kind) {
     assert(kind != WitnessToObjC && "Use ObjCReason::witnessToObjC()");
+    assert(!requiresAttr(kind) && "Use ObjCReason(Kind, DeclAttribute*)");
+  }
+
+  ObjCReason(Kind kind, const DeclAttribute *attr)
+      : kind(kind), declOrAttr(const_cast<DeclAttribute *>(attr)) {
+    // const_cast above because it's difficult to get a non-const DeclAttribute.
+    assert(requiresAttr(kind) && "Use ObjCReason(Kind)");
   }
 
   /// Retrieve the kind of requirement.
@@ -113,8 +149,20 @@ public:
   /// requirement, retrieve the requirement.
   ValueDecl *getObjCRequirement() const {
     assert(kind == WitnessToObjC);
-    return decl;
+    return declOrAttr.get<ValueDecl *>();
   }
+
+  DeclAttribute *getAttr() const {
+    if (!requiresAttr(kind))
+      return nullptr;
+    return declOrAttr.get<DeclAttribute *>();
+  }
+
+  void setAttrInvalid() const;
+
+  /// Emit an additional diagnostic describing why we are applying @objc to the
+  /// decl, if this is not obvious from the decl itself.
+  void describe(const Decl *VD) const;
 };
 
 /// Determine how to diagnose conflicts due to inferring @objc with this

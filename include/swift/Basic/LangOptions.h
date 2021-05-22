@@ -36,6 +36,8 @@
 
 namespace swift {
 
+  enum class DiagnosticBehavior : uint8_t;
+
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
@@ -67,6 +69,13 @@ namespace swift {
 
     /// The library has some other undefined distribution.
     Other
+  };
+
+  enum class AccessNoteDiagnosticBehavior : uint8_t {
+    Ignore,
+    RemarkOnFailure,
+    RemarkOnFailureOrSuccess,
+    ErrorOnFailureRemarkOnSuccess
   };
 
   /// A collection of options that affect the language dialect and
@@ -338,6 +347,17 @@ namespace swift {
     /// These are shared_ptrs so that this class remains copyable.
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
+
+    /// How should we emit diagnostics about access notes?
+    AccessNoteDiagnosticBehavior AccessNoteBehavior =
+        AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;
+
+    DiagnosticBehavior getAccessNoteFailureLimit() const;
+
+    bool shouldRemarkOnAccessNoteSuccess() const {
+      return AccessNoteBehavior >=
+          AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;
+    }
 
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;

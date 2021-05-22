@@ -241,10 +241,17 @@ public:
   /// unsatisfied, which might conflict with other Objective-C methods.
   std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
 
+  /// A selector that is used by two different declarations in the same class.
+  /// Fields: classDecl, selector, isInstanceMethod.
   using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
 
   /// List of Objective-C member conflicts we have found during type checking.
   std::vector<ObjCMethodConflict> ObjCMethodConflicts;
+
+  /// List of attributes added by access notes, used to emit remarks for valid
+  /// ones.
+  llvm::DenseMap<ValueDecl *, std::vector<DeclAttribute *>>
+      AttrsAddedByAccessNotes;
 
   /// Describes what kind of file this is, which can affect some type checking
   /// and other behavior.

@@ -1416,66 +1416,114 @@ void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
   diagnoseDuplicateDecls(captureListVars);
 }
 
-template<typename ...DiagIDAndArgs> InFlightDiagnostic
-diagnoseAtAttrOrDecl(DeclAttribute *attr, ValueDecl *VD,
-                     DiagIDAndArgs... idAndArgs) {
-  ASTContext &ctx = VD->getASTContext();
-  if (attr->getLocation().isValid())
-    return ctx.Diags.diagnose(attr->getLocation(), idAndArgs...);
-  else
-    return ctx.Diags.diagnose(VD, idAndArgs...);
+static StringRef prettyPrintAttrs(const ValueDecl *VD,
+                                  ArrayRef<const DeclAttribute *> attrs,
+                                  SmallVectorImpl<char> &out) {
+  llvm::raw_svector_ostream os(out);
+  StreamPrinter printer(os);
+
+  PrintOptions opts = PrintOptions::printEverything();
+  VD->getAttrs().print(printer, opts, attrs, VD);
+  return StringRef(out.begin(), out.size()).drop_back();
+}
+
+static void diagnoseChangesByAccessNote(
+    ValueDecl *VD,
+    ArrayRef<const DeclAttribute *> attrs,
+    Diag<StringRef, StringRef, DescriptiveDeclKind> diagID,
+    Diag<StringRef> fixItID,
+    llvm::function_ref<void(InFlightDiagnostic, StringRef)> addFixIts) {
+  if (!VD->getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess() ||
+      attrs.empty())
+    return;
+
+  // Generate string containing all attributes.
+  SmallString<64> attrString;
+  auto attrText = prettyPrintAttrs(VD, attrs, attrString);
+
+  SourceLoc fixItLoc;
+
+  auto reason = VD->getModuleContext()->getAccessNotes().Reason;
+  auto diag = VD->diagnose(diagID, reason, attrText, VD->getDescriptiveKind());
+  for (auto attr : attrs) {
+    diag.highlight(attr->getRangeWithAt());
+    if (fixItLoc.isInvalid())
+      fixItLoc = attr->getRangeWithAt().Start;
+  }
+  diag.flush();
+
+  if (!fixItLoc)
+    fixItLoc = VD->getAttributeInsertionLoc(true);
+
+  addFixIts(VD->getASTContext().Diags.diagnose(fixItLoc, fixItID, attrText),
+            attrString);
 }
 
 template <typename Attr>
 static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
                             Optional<bool> expected,
+                            SmallVectorImpl<DeclAttribute *> &removedAttrs,
                             llvm::function_ref<Attr*()> willCreate) {
   if (!expected) return;
 
   auto attr = VD->getAttrs().getAttribute<Attr>();
   if (*expected == (attr != nullptr)) return;
 
-  auto diagnoseChangeByAccessNote =
-      [&](Diag<StringRef, bool, StringRef, DescriptiveDeclKind> diagID,
-          Diag<bool> fixitID) -> InFlightDiagnostic {
-    bool isModifier = attr->isDeclModifier();
-
-    diagnoseAtAttrOrDecl(attr, VD, diagID, notes.Reason, isModifier,
-                          attr->getAttrName(), VD->getDescriptiveKind());
-    return diagnoseAtAttrOrDecl(attr, VD, fixitID, isModifier);
-  };
-
   if (*expected) {
     attr = willCreate();
     attr->setAddedByAccessNote();
     VD->getAttrs().add(attr);
 
-    SmallString<64> attrString;
-    llvm::raw_svector_ostream os(attrString);
-    attr->print(os, VD);
-
-    diagnoseChangeByAccessNote(diag::attr_added_by_access_note,
-                               diag::fixit_attr_added_by_access_note)
-      .fixItInsert(VD->getAttributeInsertionLoc(attr->isDeclModifier()),
-                   attrString);
+    // Arrange for us to emit a remark about this attribute after type checking
+    // has ensured it's valid.
+    if (auto SF = VD->getDeclContext()->getParentSourceFile())
+      SF->AttrsAddedByAccessNotes[VD].push_back(attr);
   } else {
+    removedAttrs.push_back(attr);
     VD->getAttrs().removeAttribute(attr);
-    diagnoseChangeByAccessNote(diag::attr_removed_by_access_note,
-                               diag::fixit_attr_removed_by_access_note)
-      .fixItRemove(attr->getRangeWithAt());
   }
+}
+
+InFlightDiagnostic
+swift::softenIfAccessNote(const Decl *D, const DeclAttribute *attr,
+                          InFlightDiagnostic &diag) {
+  const ValueDecl *VD = dyn_cast<ValueDecl>(D);
+  if (!VD || !attr || !attr->getAddedByAccessNote())
+    return std::move(diag);
+
+  SmallString<32> attrString;
+  auto attrText = prettyPrintAttrs(VD, makeArrayRef(attr), attrString);
+
+  ASTContext &ctx = D->getASTContext();
+  auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
+  return std::move(diag.wrapIn(diag::wrap_invalid_attr_added_by_access_note,
+                               D->getModuleContext()->getAccessNotes().Reason,
+                               ctx.AllocateCopy(attrText), D->getDescriptiveKind())
+                        .limitBehavior(behavior));
 }
 
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
                             const AccessNotesFile &notes) {
   ASTContext &ctx = VD->getASTContext();
+  SmallVector<DeclAttribute *, 2> removedAttrs;
 
-  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]{
+  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, removedAttrs, [&]{
     return ObjCAttr::create(ctx, note.ObjCName, false);
   });
 
-  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, [&]{
+  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, removedAttrs, [&]{
     return new (ctx) DynamicAttr(true);
+  });
+
+  // FIXME: If we ever have more attributes, we'll need to sort removedAttrs by
+  // SourceLoc. As it is, attrs are always before modifiers, so we're okay now.
+
+  diagnoseChangesByAccessNote(VD, removedAttrs,
+                              diag::attr_removed_by_access_note,
+                              diag::fixit_attr_removed_by_access_note,
+                              [&](InFlightDiagnostic diag, StringRef code) {
+    for (auto attr : llvm::reverse(removedAttrs))
+      diag.fixItRemove(attr->getRangeWithAt());
   });
 
   if (note.ObjCName) {
@@ -1483,32 +1531,27 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
     assert(attr && "ObjCName set, but ObjCAttr not true or did not apply???");
 
     if (!attr->hasName()) {
+      auto oldName = attr->getName();
       attr->setName(*note.ObjCName, true);
-      diagnoseAtAttrOrDecl(attr, VD,
-                           diag::attr_objc_name_changed_by_access_note,
-                           notes.Reason, VD->getDescriptiveKind(),
-                           *note.ObjCName);
 
-      SmallString<64> newNameString;
-      llvm::raw_svector_ostream os(newNameString);
-      os << "(";
-      os << *note.ObjCName;
-      os << ")";
+      if (!ctx.LangOpts.shouldRemarkOnAccessNoteSuccess())
+        return;
 
-      auto note = diagnoseAtAttrOrDecl(attr, VD,
-                            diag::fixit_attr_objc_name_changed_by_access_note);
+      VD->diagnose(diag::attr_objc_name_changed_by_access_note,
+                   notes.Reason, VD->getDescriptiveKind(), *note.ObjCName);
 
-      if (attr->getLParenLoc().isValid())
-        note.fixItReplace({ attr->getLParenLoc(), attr->getRParenLoc() },
-                          newNameString);
-      else
-        note.fixItInsertAfter(attr->getLocation(), newNameString);
+      auto fixIt =
+          VD->diagnose(diag::fixit_attr_objc_name_changed_by_access_note);
+      fixDeclarationObjCName(fixIt, VD, oldName, *note.ObjCName);
     }
     else if (attr->getName() != *note.ObjCName) {
-      diagnoseAtAttrOrDecl(attr, VD,
-                           diag::attr_objc_name_conflicts_with_access_note,
-                           notes.Reason, VD->getDescriptiveKind(),
-                           *note.ObjCName, *attr->getName());
+      auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
+
+      VD->diagnose(diag::attr_objc_name_conflicts_with_access_note,
+                   notes.Reason, VD->getDescriptiveKind(), *attr->getName(),
+                   *note.ObjCName)
+          .highlight(attr->getRangeWithAt())
+          .limitBehavior(behavior);
     }
   }
 }
@@ -1516,6 +1559,38 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
 void TypeChecker::applyAccessNote(ValueDecl *VD) {
   (void)evaluateOrDefault(VD->getASTContext().evaluator,
                           ApplyAccessNoteRequest{VD}, {});
+}
+
+void swift::diagnoseAttrsAddedByAccessNote(SourceFile &SF) {
+  if (!SF.getASTContext().LangOpts.shouldRemarkOnAccessNoteSuccess())
+    return;
+
+  for (auto declAndAttrs : SF.AttrsAddedByAccessNotes) {
+    auto D = declAndAttrs.getFirst();
+    SmallVector<DeclAttribute *, 4> sortedAttrs;
+    llvm::append_range(sortedAttrs, declAndAttrs.getSecond());
+
+    // Filter out invalid attributes.
+    sortedAttrs.erase(
+      llvm::remove_if(sortedAttrs, [](DeclAttribute *attr) {
+        assert(attr->getAddedByAccessNote());
+        return attr->isInvalid();
+      }), sortedAttrs.end());
+    if (sortedAttrs.empty()) continue;
+
+    // Sort attributes by name.
+    llvm::sort(sortedAttrs, [](DeclAttribute * first, DeclAttribute * second) {
+      return first->getAttrName() < second->getAttrName();
+    });
+    sortedAttrs.erase(std::unique(sortedAttrs.begin(), sortedAttrs.end()),
+                      sortedAttrs.end());
+
+    diagnoseChangesByAccessNote(D, sortedAttrs, diag::attr_added_by_access_note,
+                                diag::fixit_attr_added_by_access_note,
+                                [=](InFlightDiagnostic diag, StringRef code) {
+      diag.fixItInsert(D->getAttributeInsertionLoc(/*isModifier=*/true), code);
+    });
+  }
 }
 
 evaluator::SideEffect
@@ -2680,8 +2755,8 @@ public:
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
       Optional<ForeignAsyncConvention> asyncConvention;
       Optional<ForeignErrorConvention> errorConvention;
-      if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                asyncConvention, errorConvention)) {
+      ObjCReason reason(ObjCReason::ExplicitlyCDecl, CDeclAttr);
+      if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
         if (FD->hasAsync()) {
           FD->setForeignAsyncConvention(*asyncConvention);
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
@@ -2691,6 +2766,8 @@ public:
           getASTContext().Diags.diagnose(CDeclAttr->getLocation(),
                                          diag::cdecl_throws);
         }
+      } else {
+        reason.setAttrInvalid();
       }
     }
   }

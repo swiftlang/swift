@@ -115,6 +115,7 @@ namespace swift {
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
+    Diagnostic
   };
 
   namespace diag {
@@ -146,6 +147,7 @@ namespace swift {
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
+      DiagnosticInfo *DiagnosticVal;
     };
     
   public:
@@ -241,6 +243,11 @@ namespace swift {
     DiagnosticArgument(ActorIsolation AI)
       : Kind(DiagnosticArgumentKind::ActorIsolation),
         ActorIsolationVal(AI) {
+    }
+
+    DiagnosticArgument(DiagnosticInfo *D)
+      : Kind(DiagnosticArgumentKind::Diagnostic),
+        DiagnosticVal(D) {
     }
 
     /// Initializes a diagnostic argument using the underlying type of the
@@ -343,6 +350,11 @@ namespace swift {
       assert(Kind == DiagnosticArgumentKind::ActorIsolation);
       return ActorIsolationVal;
     }
+
+    DiagnosticInfo *getAsDiagnostic() const {
+      assert(Kind == DiagnosticArgumentKind::Diagnostic);
+      return DiagnosticVal;
+    }
   };
 
   /// Describes the current behavior to take with a diagnostic.
@@ -410,6 +422,7 @@ namespace swift {
     DiagnosticBehavior BehaviorLimit = DiagnosticBehavior::Unspecified;
 
     friend DiagnosticEngine;
+    friend class InFlightDiagnostic;
 
   public:
     // All constructors are intentionally implicit.
@@ -514,6 +527,42 @@ namespace swift {
     /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
     /// emitted as a warning, but a note will still be emitted as a note.
     InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
+
+    /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
+    /// emitted in place of the diagnostic that otherwise would have been
+    /// emitted.
+    ///
+    /// The first argument of \p wrapper must be of type 'Diagnostic *'.
+    ///
+    /// The emitted diagnostic will have:
+    ///
+    /// \li The ID, message, and behavior of \c wrapper.
+    /// \li The arguments of \c wrapper, with the last argument replaced by the
+    ///     diagnostic currently in \c *this.
+    /// \li The location, ranges, decl, fix-its, and behavior limit of the
+    ///     diagnostic currently in \c *this.
+    InFlightDiagnostic &wrapIn(const Diagnostic &wrapper);
+
+    /// Wraps this diagnostic in another diagnostic. That is, \p ID and
+    /// \p VArgs will be emitted in place of the diagnostic that otherwise would
+    /// have been emitted.
+    ///
+    /// The first argument of \p ID must be of type 'Diagnostic *'.
+    ///
+    /// The emitted diagnostic will have:
+    ///
+    /// \li The ID, message, and behavior of \c ID.
+    /// \li The arguments of \c VArgs, with an argument appended for the
+    ///     diagnostic currently in \c *this.
+    /// \li The location, ranges, decl, fix-its, and behavior limit of the
+    ///     diagnostic currently in \c *this.
+    template<typename ...ArgTypes>
+    InFlightDiagnostic &
+    wrapIn(Diag<DiagnosticInfo *, ArgTypes...> ID,
+           typename detail::PassArgument<ArgTypes>::type... VArgs) {
+      Diagnostic wrapper{ID, nullptr, std::move(VArgs)...};
+      return wrapIn(wrapper);
+    }
 
     /// Add a token-based range to the currently-active diagnostic.
     InFlightDiagnostic &highlight(SourceRange R);
@@ -678,6 +727,16 @@ namespace swift {
       ignoredDiagnostics[(unsigned)id] = ignored;
     }
 
+    void swap(DiagnosticState &other) {
+      std::swap(showDiagnosticsAfterFatalError, other.showDiagnosticsAfterFatalError);
+      std::swap(suppressWarnings, other.suppressWarnings);
+      std::swap(warningsAsErrors, other.warningsAsErrors);
+      std::swap(fatalErrorOccurred, other.fatalErrorOccurred);
+      std::swap(anyErrorOccurred, other.anyErrorOccurred);
+      std::swap(previousBehavior, other.previousBehavior);
+      std::swap(ignoredDiagnostics, other.ignoredDiagnostics);
+    }
+
   private:
     // Make the state movable only
     DiagnosticState(const DiagnosticState &) = delete;
@@ -705,6 +764,10 @@ namespace swift {
 
     /// The currently active diagnostic, if there is one.
     Optional<Diagnostic> ActiveDiagnostic;
+
+    /// Diagnostics wrapped by ActiveDiagnostic, if any.
+    SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
+    SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
 
     /// All diagnostics that have are no longer active but have not yet
     /// been emitted due to an open transaction.

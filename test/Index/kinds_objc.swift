@@ -1,6 +1,8 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
 // REQUIRES: objc_interop
 
+import Foundation
+
 @objc class TargetForIBAction {}
 // CHECK: [[@LINE-1]]:13 | class/Swift | TargetForIBAction | [[TargetForIBAction_USR:.*]] | Def |
 @objc class TargetForIBSegueAction {}
