@@ -2590,8 +2590,42 @@ namespace {
     }
 
     Decl *VisitNamespaceAliasDecl(const clang::NamespaceAliasDecl *decl) {
-      // FIXME: Implement once Swift has namespaces.
-      return nullptr;
+      Optional<ImportedName> correctSwiftName;
+      auto importedName = importFullName(decl, correctSwiftName);
+      auto name = importedName.getDeclName().getBaseIdentifier();
+      if (name.empty())
+        return nullptr;
+
+      if (correctSwiftName)
+        return importCompatibilityTypeAlias(decl, importedName,
+                                            *correctSwiftName);
+
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
+      if (!dc)
+        return nullptr;
+
+      auto aliasedDecl =
+          Impl.importDecl(decl->getAliasedNamespace(), getActiveSwiftVersion());
+      if (!aliasedDecl)
+        return nullptr;
+
+      Type aliasedType;
+      if (auto aliasedTypeDecl = dyn_cast<TypeDecl>(aliasedDecl))
+        aliasedType = aliasedTypeDecl->getDeclaredInterfaceType();
+      else if (auto aliasedExtDecl = dyn_cast<ExtensionDecl>(aliasedDecl))
+        // This happens if the alias points to its parent namespace.
+        aliasedType = aliasedExtDecl->getExtendedType();
+      else
+        return nullptr;
+
+      auto result = Impl.createDeclWithClangNode<TypeAliasDecl>(
+          decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
+          SourceLoc(), name, Impl.importSourceLoc(decl->getLocation()),
+          /*GenericParams=*/nullptr, dc);
+      result->setUnderlyingType(aliasedType);
+
+      return result;
     }
 
     Decl *VisitLabelDecl(const clang::LabelDecl *decl) {
