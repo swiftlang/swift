@@ -856,11 +856,12 @@ class BuildScriptInvocation(object):
 
         """
 
+        if self.args.build_cmark:
+            before_impl_product_classes.append(products.CMark)
+
         # FIXME: This is a weird division (returning a list of class objects),
         # but it matches the existing structure of the `build-script-impl`.
         impl_product_classes = []
-        if self.args.build_cmark:
-            impl_product_classes.append(products.CMark)
 
         # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
@@ -988,6 +989,17 @@ class BuildScriptInvocation(object):
         (impl_product_classes, product_classes) = self.compute_product_classes()
 
         # Execute each "pass".
+
+        # Pre-build-script-impl products...
+        # Note: currently only supports building for the host.
+        for host_target in all_host_names:
+            for product_class in before_impl_product_classes:
+                if product_class.is_build_script_impl_product():
+                    continue
+                if not product_class.is_before_build_script_impl_product():
+                    continue
+                # Execute clean, build, test, install
+                self.execute_product_build_steps(product_class, host_target)
 
         # Build...
         for host_target in all_hosts:
