@@ -228,8 +228,13 @@ struct _Deque<Element> {
       let object = _Storage._DequeBuffer.create(
         minimumCapacity: minimumCapacity,
         makingHeaderWith: {
-          _Storage._Header(
-            capacity: $0.capacity,
+#if os(OpenBSD)
+          let capacity = minimumCapacity
+#else
+          let capacity = $0.capacity
+#endif
+          return _Storage._Header(
+            capacity: capacity,
             count: count,
             startSlot: .zero)
         })
