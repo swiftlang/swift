@@ -13,6 +13,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(resilient_async)
 
 // REQUIRES: executable_test
+// REQUIRES: concurrency
 
 
 import resilient_async
