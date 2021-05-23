@@ -41,6 +41,9 @@ class EarlySwiftDriver(product.Product):
         return True
 
     def should_build(self, host_target):
+        if self.is_cross_compile_target(host_target):
+            return False
+
         if self.args.build_early_swift_driver:
             if toolchain.host_toolchain().find_tool("swift") is None:
                 warn_msg = 'Host toolchain could not locate a '\
