@@ -10,17 +10,17 @@
 #
 # ----------------------------------------------------------------------------
 
-from . import cmake_product
+from . import product
 
 
-class CMark(cmake_product.CMakeProduct):
+class CMark(product.Product):
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
 
         Whether this product is produced by build-script-impl.
         """
-        return False
+        return True
 
     @classmethod
     def is_before_build_script_impl_product(cls):
@@ -28,69 +28,9 @@ class CMark(cmake_product.CMakeProduct):
 
         Whether this product is build before any build-script-impl products.
         """
-        return True
+        return False
 
     # This is the root of the build-graph, so it doesn't have any dependencies.
     @classmethod
     def get_dependencies(cls):
         return []
-
-    def should_build(self, host_target):
-        """should_build() -> Bool
-
-        Whether or not this product should be built with the given arguments.
-        """
-        return self.args.build_cmark
-
-    def build(self, host_target):
-        """build() -> void
-
-        Perform the build, for a non-build-script-impl product.
-        """
-        self.cmake_options.define('CMAKE_BUILD_TYPE:STRING',
-                                  self.args.cmark_build_variant)
-
-        self.build_with_cmake(["all"], self.args.cmark_build_variant, [])
-
-    def should_test(self, host_target):
-        """should_test() -> Bool
-
-        Whether or not this product should be tested with the given arguments.
-        """
-        if self.args.cross_compile_hosts and \
-                host_target in self.args.cross_compile_hosts:
-            return False
-
-        return self.args.test
-
-    def test(self, host_target):
-        """
-        Perform the test phase for the product.
-
-        This phase might build and execute the product tests.
-        """
-        executable_target = 'api_test'
-        results_targets = ['test']
-        if self.args.cmake_generator == 'Xcode':
-            # Xcode generator uses "RUN_TESTS" instead of "test".
-            results_targets = ['RUN_TESTS']
-
-        self.test_with_cmake(executable_target, results_targets,
-                             self.args.cmark_build_variant, [])
-
-    def should_install(self, host_target):
-        """should_install() -> Bool
-
-        Whether or not this product should be installed with the given
-        arguments.
-        """
-        return self.args.install_all
-
-    def install(self, host_target):
-        """
-        Perform the install phase for the product.
-
-        This phase might copy the artifacts from the previous phases into a
-        destination directory.
-        """
-        self.install_with_cmake(["install"], self.host_install_destdir(host_target))
