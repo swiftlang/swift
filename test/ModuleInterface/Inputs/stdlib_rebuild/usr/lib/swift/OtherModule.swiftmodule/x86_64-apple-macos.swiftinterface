@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target x86_64-apple-macos10.9 -module-name OtherModule -O
+
+import Swift
