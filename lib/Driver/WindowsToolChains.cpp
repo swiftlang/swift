@@ -180,8 +180,9 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
                             Twine("clang_rt.profile-") +
                                 getTriple().getArchName() + ".lib");
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
+    Arguments.push_back(context.Args.MakeArgString("-Xlinker"));
     Arguments.push_back(context.Args.MakeArgString(
-        Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
+        Twine({"-include:", llvm::getInstrProfRuntimeHookVarName()})));
   }
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);

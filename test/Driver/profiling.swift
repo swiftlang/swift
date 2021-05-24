@@ -52,7 +52,7 @@
 
 // WINDOWS: clang{{(\.exe)?"? }}
 // WINDOWS: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}windows{{(\\\\|/)}}clang_rt.profile-x86_64.lib
-// WINDOWS: -u__llvm_profile_runtime
+// WINDOWS: -Xlinker -include:__llvm_profile_runtime
 
 // WASI: clang{{(\.exe)?"? }}
 // WASI: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}wasi{{(\\\\|/)}}libclang_rt.profile-wasm32.a
