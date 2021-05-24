@@ -132,7 +132,7 @@ module WinSDK [system] {
     
     // api-ms-win-core-usb-l1-1-0.dll
     module usb {
-      heaeder "winusb.h"
+      header "winusb.h"
       export *
     }
 
