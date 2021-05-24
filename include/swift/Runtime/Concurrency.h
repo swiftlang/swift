@@ -420,50 +420,62 @@ void swift_task_reportIllegalTaskLocalBindingWithinWithTaskGroup(
     const unsigned char *file, uintptr_t fileLength,
     bool fileIsASCII, uintptr_t line);
 
-/// Get a task local value from the passed in task. Its Swift signature is
+/// Get a task local value from either the current task, or fallback task-local
+/// storage.
+///
+/// Its Swift signature is
 ///
 /// \code
 /// func _taskLocalValueGet<Key>(
-///   _ task: Builtin.NativeObject,
 ///   keyType: Any.Type /*Key.Type*/
 /// ) -> UnsafeMutableRawPointer? where Key: TaskLocalKey
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
-swift_task_localValueGet(AsyncTask* task, const HeapObject *key);
+swift_task_localValueGet(const HeapObject *key);
 
-/// Add a task local value to the passed in task.
-///
-/// This must be only invoked by the task itself to avoid concurrent writes.
+/// Bind a task local key to a value in the context of either the current
+/// AsyncTask if present, or in the thread-local fallback context if no task
+/// available.
 ///
 /// Its Swift signature is
 ///
 /// \code
 ///  public func _taskLocalValuePush<Value>(
-///    _ task: Builtin.NativeObject,
 ///    keyType: Any.Type/*Key.Type*/,
 ///    value: __owned Value
 ///  )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_localValuePush(AsyncTask* task,
-                         const HeapObject *key,
-                         /* +1 */ OpaqueValue *value,
-                         const Metadata *valueType);
+void swift_task_localValuePush(const HeapObject *key,
+                                   /* +1 */ OpaqueValue *value,
+                                   const Metadata *valueType);
 
-/// Remove task a local binding from the task local values stack.
+/// Pop a single task local binding from the binding stack of the current task,
+/// or the fallback thread-local storage if no task is available.
 ///
-/// This must be only invoked by the task itself to avoid concurrent writes.
+/// This operation must be paired up with a preceding "push" operation, as otherwise
+/// it may attempt to "pop" off an empty value stuck which will lead to a crash.
+///
+/// The Swift surface API ensures proper pairing of push and pop operations.
 ///
 /// Its Swift signature is
 ///
 /// \code
-///  public func _taskLocalValuePop(
-///    _ task: Builtin.NativeObject
-///  )
+///  public func _taskLocalValuePop()
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_localValuePop(AsyncTask* task);
+void swift_task_localValuePop();
+
+/// Copy all task locals from the current context to the target task.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func _taskLocalValueGet<Key>(AsyncTask* task)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_localsCopyTo(AsyncTask* target);
 
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {

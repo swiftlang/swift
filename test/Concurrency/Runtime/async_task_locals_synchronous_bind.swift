@@ -38,16 +38,8 @@ func synchronous_bind() async {
   func synchronous() {
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
 
-    withUnsafeCurrentTask { task in
-      guard let task = task else {
-        fatalError()
-      }
-
-      task.withTaskLocal(TL.$number, boundTo: 2222) {
-        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
-      }
-
-      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
+    TL.$number.withValue(2222) {
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
     }
 
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)

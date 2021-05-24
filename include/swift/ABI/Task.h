@@ -271,7 +271,7 @@ public:
   OpaqueValue *localValueGet(const HeapObject *key);
 
   /// Returns true if storage has still more bindings.
-  void localValuePop();
+  bool localValuePop();
 
   // ==== Child Fragment -------------------------------------------------------
 

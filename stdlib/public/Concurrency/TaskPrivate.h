@@ -295,8 +295,8 @@ inline OpaqueValue *AsyncTask::localValueGet(const HeapObject *key) {
 }
 
 /// Returns true if storage has still more bindings.
-inline void AsyncTask::localValuePop() {
-  _private().Local.popValue(this);
+inline bool AsyncTask::localValuePop() {
+  return _private().Local.popValue(this);
 }
 
 } // end namespace swift
