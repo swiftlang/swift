@@ -11,7 +11,7 @@
 
 // CHECK: public actor SomeActor
 public actor SomeActor {
-  nonisolated func maine() { }
+  @actorIndependent func maine() { }
 }
 
 // CHECK: @globalActor public struct SomeGlobalActor

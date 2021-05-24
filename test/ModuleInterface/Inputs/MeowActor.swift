@@ -3,7 +3,7 @@
   public static let shared = _Impl()
   
   public actor _Impl {
-    nonisolated
+    @actorIndependent
     public func enqueue(_ job: UnownedJob) {
       // DOES NOTHING! :)
     }
