@@ -1221,12 +1221,28 @@ extension Dictionary {
     _variant.removeAll(keepingCapacity: keepCapacity)
   }
   
+  /// Removes every key-value pair such that the key satisfies the given predicate from the dictionary.
+  ///
+  /// Calling this method invalidates all indices with respect to the
+  /// dictionary.
+  ///
+  /// - Parameter isIncluded: A closure that takes a key as its
+  ///   argument and returns a Boolean value indicating whether the key and its value
+  ///   should be removed from the dictionary.
+  ///
+  /// - Parameter keepCapacity: Whether the dictionary should keep its
+  ///   underlying buffer. If you pass `true`, the operation preserves the
+  ///   buffer capacity that the collection has, otherwise the underlying
+  ///   buffer is released.  The default is `false`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the number of key-value pairs in the
+  ///   dictionary.
   @inlinable
-  public mutating func remove(
-    where predicate: (Key) throws -> Bool,
+  public mutating func removeAll(
+    where isIncluded: (Key) throws -> Bool,
     keepCapacity: Bool = false
   ) rethrows {
-    try _variant.remove(where: predicate, keepCapacity: keepCapacity)
+    try _variant.removeAll(where: isIncluded, keepCapacity: keepCapacity)
   }
 }
 
