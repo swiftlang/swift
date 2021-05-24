@@ -142,3 +142,10 @@ func testTypesConcurrencyContext() async {
   _ = await f1()
   _ = await f2()
 }
+
+// Conversion from main-actor-qualified synchronous to unqualified asynchronous.
+func test() {
+  let _: () async -> Int = { @SomeGlobalActor in
+    onSomeGlobalActor()
+  }
+}

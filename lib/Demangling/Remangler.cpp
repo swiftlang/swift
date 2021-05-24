@@ -2125,6 +2125,11 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   Buffer << "Ty";
 }
 
+void Remangler::mangleReabstractionThunkHelperWithGlobalActor(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TU";
+}
+
 void Remangler::mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op) {
   auto childIt = node->begin();
   while (childIt != node->end() &&
