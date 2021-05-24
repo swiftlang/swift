@@ -1,6 +1,3 @@
-# Failing in CI with "%cmake is not an executable" rdar://78320684
-# UNSUPPORTED: OS=linux-gnu
-
 # REQUIRES: standalone_build
 
 # RUN: %empty-directory(%t)
