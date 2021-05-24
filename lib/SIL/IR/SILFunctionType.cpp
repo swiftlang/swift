@@ -1989,6 +1989,7 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
                                           Optional<SILDeclRef> origConstant,
                                           Optional<SILDeclRef> constant,
                                           Optional<SubstitutionMap> reqtSubs,
+                                          Optional<GenericSignature> genericSig,
                                           SmallVectorImpl<SILYieldInfo> &yields,
                                           SILCoroutineKind &coroutineKind,
                                           SubstFunctionTypeCollector &subst) {
@@ -2013,12 +2014,14 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
 
   auto storage = accessor->getStorage();
   auto valueType = storage->getValueInterfaceType();
+
   if (reqtSubs) {
     valueType = valueType.subst(*reqtSubs);
   }
 
-  auto canValueType = valueType->getCanonicalType(
-    accessor->getGenericSignature());
+  auto canValueType = (genericSig
+                       ? valueType->getCanonicalType(*genericSig)
+                       : valueType->getCanonicalType());
 
   // 'modify' yields an inout of the target type.
   if (accessor->getAccessorKind() == AccessorKind::Modify) {
@@ -2179,7 +2182,8 @@ static CanSILFunctionType getSILFunctionType(
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   SmallVector<SILYieldInfo, 8> yields;
   destructureYieldsForCoroutine(TC, expansionContext, origConstant, constant,
-                                reqtSubs, yields, coroutineKind, subst);
+                                reqtSubs, genericSig, yields, coroutineKind,
+                                subst);
   
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
