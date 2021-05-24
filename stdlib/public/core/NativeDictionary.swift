@@ -707,7 +707,7 @@ extension _NativeDictionary { // Deletion
   
   @inlinable
   mutating func removeAll(
-    where predicate: (Key) throws -> Bool,
+    where predicate: (Key, Value) throws -> Bool,
     isUnique: Bool,
     keepCapacity: Bool = false
   ) rethrows {
@@ -719,7 +719,8 @@ extension _NativeDictionary { // Deletion
     let end = hashTable.endBucket
     while bucket != end {
       let key = self.uncheckedKey(at: bucket)
-      if try predicate(key) {
+      let value = self.uncheckedValue(at: bucket)
+      if try predicate(key, value) {
         hashTable.delete(at: bucket, with: self)
         removedCount += 1
       }

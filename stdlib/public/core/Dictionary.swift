@@ -1221,13 +1221,13 @@ extension Dictionary {
     _variant.removeAll(keepingCapacity: keepCapacity)
   }
   
-  /// Removes every key-value pair such that the key satisfies the given predicate from the dictionary.
+  /// Removes every key-value pair that satisfies the given predicate from the dictionary.
   ///
   /// Calling this method invalidates all indices with respect to the
   /// dictionary.
   ///
-  /// - Parameter isIncluded: A closure that takes a key as its
-  ///   argument and returns a Boolean value indicating whether the key and its value
+  /// - Parameter isIncluded: A closure that takes a key-value pair as its
+  ///   argument and returns a Boolean value indicating whether the pair
   ///   should be removed from the dictionary.
   ///
   /// - Parameter keepCapacity: Whether the dictionary should keep its
@@ -1239,7 +1239,7 @@ extension Dictionary {
   ///   dictionary.
   @inlinable
   public mutating func removeAll(
-    where isIncluded: (Key) throws -> Bool,
+    where isIncluded: (Key, Value) throws -> Bool,
     keepCapacity: Bool = false
   ) rethrows {
     try _variant.removeAll(where: isIncluded, keepCapacity: keepCapacity)

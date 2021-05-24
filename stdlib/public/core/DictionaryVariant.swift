@@ -433,7 +433,7 @@ extension Dictionary._Variant {
   
   @inlinable
   internal mutating func removeAll(
-    where predicate: (Key) throws -> Bool,
+    where predicate: (Key, Value) throws -> Bool,
     keepCapacity: Bool = false
   ) rethrows {
     let isUnique: Bool
