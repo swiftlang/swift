@@ -129,6 +129,12 @@ module WinSDK [system] {
       header "timezoneapi.h"
       export *
     }
+    
+    // api-ms-win-core-usb-l1-1-0.dll
+    module usb {
+      heaeder "winusb.h"
+      export *
+    }
 
     // api-ms-win-core-version-l1-1-0.dll
     module version {
