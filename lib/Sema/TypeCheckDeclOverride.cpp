@@ -1533,6 +1533,7 @@ namespace  {
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
+    UNINTERESTING_ATTR(ActorIndependent)
     UNINTERESTING_ATTR(GlobalActor)
     UNINTERESTING_ATTR(Async)
     UNINTERESTING_ATTR(Spawn)
