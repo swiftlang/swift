@@ -163,6 +163,7 @@ public:
   std::string mangleReabstractionThunkHelper(CanSILFunctionType ThunkType,
                                              Type FromType, Type ToType,
                                              Type SelfType,
+                                             Type GlobalActorBound,
                                              ModuleDecl *Module);
 
   /// Mangle a completion handler block implementation function, used for importing ObjC

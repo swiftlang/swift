@@ -471,6 +471,7 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::ReabstractionThunkHelperWithSelf:
+    case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
     case Node::Kind::ReadAccessor:
     case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::RetroactiveConformance:
@@ -1743,6 +1744,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(idx + 1));
     Printer << " to ";
     print(Node->getChild(idx));
+    return nullptr;
+  }
+  case Node::Kind::ReabstractionThunkHelperWithGlobalActor: {
+    print(Node->getChild(0));
+    Printer << " with global actor constraint ";
+    print(Node->getChild(1));
     return nullptr;
   }
   case Node::Kind::ReabstractionThunkHelperWithSelf: {

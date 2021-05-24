@@ -2114,8 +2114,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(), ConstraintKind::Equal, subflags, locator);
       if (result == SolutionKind::Error)
         return getTypeMatchFailure(locator);
-    } else if (func1->getGlobalActor()) {
-      // Cannot remove a global actor.
+    } else if (func1->getGlobalActor() && !func2->isAsync()) {
+      // Cannot remove a global actor from a synchronous function.
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
