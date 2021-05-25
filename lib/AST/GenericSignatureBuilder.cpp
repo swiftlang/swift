@@ -6349,8 +6349,9 @@ void
 GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericParams,
                                   bool allowConcreteGenericParams,
                                   const ProtocolDecl *requirementSignatureSelfProto) {
-  // Process any delayed requirements that we can handle now.
-  processDelayedRequirements();
+  diagnoseProtocolRefinement(requirementSignatureSelfProto);
+  diagnoseRedundantRequirements();
+  diagnoseConflictingConcreteTypeRequirements(requirementSignatureSelfProto);
 
   {
     // In various places below, we iterate over the list of equivalence classes
@@ -6382,11 +6383,6 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
       }
     }
   }
-
-  computeRedundantRequirements(requirementSignatureSelfProto);
-  diagnoseProtocolRefinement(requirementSignatureSelfProto);
-  diagnoseRedundantRequirements();
-  diagnoseConflictingConcreteTypeRequirements(requirementSignatureSelfProto);
 
   assert(!Impl->finalized && "Already finalized builder");
 #ifndef NDEBUG
@@ -7006,7 +7002,8 @@ void GenericSignatureBuilder::diagnoseProtocolRefinement(
   }
 }
 
-void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
+void GenericSignatureBuilder::diagnoseRedundantRequirements(
+    bool onlyDiagnoseExplicitConformancesImpliedByConcrete) const {
   for (const auto &req : Impl->ExplicitRequirements) {
     auto *source = req.getSource();
     auto loc = source->getLoc();
@@ -7022,6 +7019,10 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
     // Check if its actually redundant.
     auto found = Impl->RedundantRequirements.find(req);
     if (found == Impl->RedundantRequirements.end())
+      continue;
+
+    if (onlyDiagnoseExplicitConformancesImpliedByConcrete &&
+        Impl->ExplicitConformancesImpliedByConcrete.count(req) == 0)
       continue;
 
     // Don't diagnose explicit requirements that are implied by
@@ -8418,14 +8419,20 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
                                                    requirementSignatureSource);
   }
 
-  auto newSource = [&]() {
+  auto getRebuiltSource = [&](const RequirementSource *source) {
+    assert(!source->isDerivedRequirement());
+
     if (auto *proto = const_cast<ProtocolDecl *>(requirementSignatureSelfProto)) {
       return FloatingRequirementSource::viaProtocolRequirement(
-          requirementSignatureSource, proto, /*inferred=*/false);
+          requirementSignatureSource, proto, source->getLoc(),
+          source->isInferredRequirement());
     }
 
-    return FloatingRequirementSource::forAbstract();
-  }();
+    if (source->isInferredRequirement())
+      return FloatingRequirementSource::forInferred(source->getLoc());
+
+    return FloatingRequirementSource::forExplicit(source->getLoc());
+  };
 
   for (const auto &req : Impl->ExplicitRequirements) {
     assert(req.getKind() != RequirementKind::SameType &&
@@ -8449,7 +8456,7 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
         !resolvedSubjectType->isTypeParameter()) {
       newBuilder.addRequirement(Requirement(RequirementKind::SameType,
                                             subjectType, resolvedSubjectType),
-                                newSource, nullptr);
+                                getRebuiltSource(req.getSource()), nullptr);
       continue;
     }
 
@@ -8458,7 +8465,8 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
     if (auto optReq = createRequirement(req.getKind(), resolvedSubjectType,
                                         req.getRHS(), getGenericParams())) {
       auto newReq = stripBoundDependentMemberTypes(*optReq);
-      newBuilder.addRequirement(newReq, newSource, nullptr);
+      newBuilder.addRequirement(newReq, getRebuiltSource(req.getSource()),
+                                nullptr);
     }
   }
 
@@ -8491,7 +8499,8 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
         Requirement(RequirementKind::SameType,
                     subjectType, constraintType));
 
-    newBuilder.addRequirement(newReq, newSource, nullptr);
+    newBuilder.addRequirement(newReq, getRebuiltSource(req.getSource()),
+                              nullptr);
   }
 
   // Wipe out the internal state of the old builder, since we don't need it anymore.
@@ -8506,22 +8515,10 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
                                           const ProtocolDecl *requirementSignatureSelfProto) && {
-  // Finalize the builder, producing any necessary diagnostics.
-  finalize(getGenericParams(),
-           allowConcreteGenericParams,
-           requirementSignatureSelfProto);
+  // Process any delayed requirements that we can handle now.
+  processDelayedRequirements();
 
-  if (Impl->RebuildingWithoutRedundantConformances) {
-    assert(!Impl->HadAnyError &&
-           "Rebuilt signature had errors");
-
-#ifndef NDEBUG
-    for (const auto &req : Impl->ExplicitConformancesImpliedByConcrete) {
-      assert(!isRedundantExplicitRequirement(req) &&
-             "Rebuilt signature still had redundant conformance requirements");
-    }
-#endif
-  }
+  computeRedundantRequirements(requirementSignatureSelfProto);
 
   // If any of our explicit conformance requirements were implied by
   // superclass or concrete same-type requirements, we have to build the
@@ -8535,12 +8532,30 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   if (!Impl->RebuildingWithoutRedundantConformances &&
       !Impl->HadAnyError &&
       !Impl->ExplicitConformancesImpliedByConcrete.empty()) {
+    diagnoseRedundantRequirements(
+        /*onlyDiagnoseExplicitConformancesImpliedByConcrete=*/true);
+
     return std::move(*this).rebuildSignatureWithoutRedundantRequirements(
         allowConcreteGenericParams,
         requirementSignatureSelfProto);
   }
 
-  // Collect the requirements placed on the generic parameter types.
+  if (Impl->RebuildingWithoutRedundantConformances) {
+#ifndef NDEBUG
+    for (const auto &req : Impl->ExplicitConformancesImpliedByConcrete) {
+      assert(!isRedundantExplicitRequirement(req) &&
+             "Rebuilt signature still had redundant conformance requirements");
+    }
+#endif
+  }
+
+  // Diagnose redundant requirements, check for recursive concrete types
+  // and compute minimized same-type requirements.
+  finalize(getGenericParams(),
+           allowConcreteGenericParams,
+           requirementSignatureSelfProto);
+
+  // Collect all non-redundant explicit requirements.
   SmallVector<Requirement, 4> requirements;
   enumerateRequirements(getGenericParams(), requirements);
 
