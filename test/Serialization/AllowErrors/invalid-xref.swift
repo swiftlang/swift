@@ -23,6 +23,9 @@
 // situation where merge modules is run with MissingMemberDecls)
 // RUN: not --crash %target-swift-frontend -module-name errors -emit-module -o %t/mods/errors.swiftmodule %t/mods/errorsmain.partial.swiftmodule %t/mods/errorsempty.partial.swiftmodule
 
+// Needed for the "crash" test.
+// REQUIRES: asserts
+
 // BEGIN lib.swift
 public struct SomeType {
     public init() {}
