@@ -11,13 +11,6 @@
 #===----------------------------------------------------------------------===#
 include(ExternalProject)
 
-
-# Setup CMake targets and dependencies
-# for overlays built with add_overlay_xcode_project
-# that existing code expects,
-# so to minimize disruption during migration to
-# building with Xcode and allow to switch
-# between implementations
 function(add_overlay_targets overlay)
   set(options)
   set(oneValueArgs)
@@ -27,15 +20,22 @@ function(add_overlay_targets overlay)
                                 "${multiValueArgs}" ${ARGN} )
 
   foreach(sdk ${AOT_TARGET_SDKS})
+    set(sdk_name ${SWIFT_SDK_${sdk}_LIB_SUBDIR})
+    set(overlay_dylib_target swift${overlay}-${sdk_name})
+    add_library(${overlay_dylib_target} SHARED IMPORTED GLOBAL)
+    set_property(TARGET ${overlay_dylib_target}
+      PROPERTY IMPORTED_LOCATION ${SWIFT_SDK_${sdk}_PATH}/usr/lib/swift/libswift${overlay}.tbd)
+
     add_overlay_targets_single(
       ${overlay}
-      TARGET_SDK ${sdk})
+      TARGET_SDK ${sdk}
+      DYLIB_ALIAS ${overlay_dylib_target})
   endforeach()
 endfunction()
 
 function(add_overlay_targets_single overlay)
   set(options)
-  set(oneValueArgs "TARGET_SDK")
+  set(oneValueArgs "TARGET_SDK" "DYLIB_ALIAS")
   set(multiValueArgs)
 
   cmake_parse_arguments(AOT "${options}" "${oneValueArgs}"
@@ -47,30 +47,20 @@ function(add_overlay_targets_single overlay)
     ${SWIFT_SDK_${sdk}_ARCHITECTURES}
     ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
   list(REMOVE_DUPLICATES sdk_supported_archs)
-  #set(xcode_overlay_target_name ${overlay}Overlay-${sdk_name})
 
   foreach(arch ${sdk_supported_archs})
     set(variant_suffix "${sdk_name}-${arch}")
 
     set(overlay_dylib_target swift${overlay}-${variant_suffix})
-    add_library(${overlay_dylib_target} SHARED IMPORTED GLOBAL)
-    set_property(TARGET ${overlay_dylib_target}
-      PROPERTY IMPORTED_LOCATION ${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/usr/lib/swift/libswift${overlay}.tbd)
-    #add_dependencies(${overlay_dylib_target} ${xcode_overlay_target_name})
+    add_library(${overlay_dylib_target} ALIAS ${AOT_DYLIB_ALIAS})
 
     set(overlay_swiftmodule_target swift${overlay}-swiftmodule-${variant_suffix})
     add_custom_target(${overlay_swiftmodule_target})
-    #add_dependencies(${overlay_swiftmodule_target} ${xcode_overlay_target_name})
     if(SWIFT_ENABLE_MACCATALYST AND sdk STREQUAL "OSX")
       set(overlay_maccatalyst_swiftmodule_target swift${overlay}-swiftmodule-maccatalyst-${arch})
       add_custom_target(${overlay_maccatalyst_swiftmodule_target})
-      #add_dependencies(${overlay_maccatalyst_swiftmodule_target} ${xcode_overlay_target_name})
     endif()
-
-    #add_dependencies(swift-stdlib-${variant_suffix} ${xcode_overlay_target_name})
   endforeach()
-
-  #add_dependencies(sdk-overlay ${xcode_overlay_target_name})
 endfunction()
 
 function(remove_overlay_from_build overlay)
