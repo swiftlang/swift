@@ -1158,8 +1158,7 @@ const RequirementSource *RequirementSource::forExplicit(
 const RequirementSource *RequirementSource::forInferred(
                                               GenericSignatureBuilder &builder,
                                               Type rootType,
-                                              const TypeRepr *typeRepr) {
-  WrittenRequirementLoc writtenLoc = typeRepr;
+                                              WrittenRequirementLoc writtenLoc) {
   REQUIREMENT_SOURCE_FACTORY_BODY(
       (nodeID, Inferred, nullptr, rootType.getPointer(),
        writtenLoc.getOpaqueValue(), nullptr),
@@ -1646,40 +1645,34 @@ const RequirementSource *FloatingRequirementSource::getSource(
                                               ResolvedType type) const {
   switch (kind) {
   case Resolved:
-    return storage.get<const RequirementSource *>();
+    return source;
 
   case Explicit: {
     auto depType = type.getDependentType(builder);
-
-    if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
-      return RequirementSource::forExplicit(builder, depType, requirementRepr);
-    if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
-      return RequirementSource::forExplicit(builder, depType, typeRepr);
-    return RequirementSource::forAbstract(builder, depType);
+    return RequirementSource::forExplicit(builder, depType, loc);
   }
 
   case Inferred: {
     auto depType = type.getDependentType(builder);
-    return RequirementSource::forInferred(builder, depType,
-                                          storage.get<const TypeRepr *>());
+    return RequirementSource::forInferred(builder, depType, loc);
   }
 
-  case AbstractProtocol: {
+  case ProtocolRequirement:
+  case InferredProtocolRequirement: {
     auto depType = type.getDependentType();
 
     // Derive the dependent type on which this requirement was written. It is
     // the path from the requirement source on which this requirement is based
     // to the potential archetype on which the requirement is being placed.
-    auto baseSource = storage.get<const RequirementSource *>();
-    auto baseSourceType = baseSource->getAffectedType();
+    auto baseSourceType = source->getAffectedType();
 
     auto dependentType =
-      formProtocolRelativeType(protocolReq.protocol, baseSourceType, depType);
+      formProtocolRelativeType(protocol, baseSourceType, depType);
 
-    return storage.get<const RequirementSource *>()
-      ->viaProtocolRequirement(builder, dependentType,
-                               protocolReq.protocol, protocolReq.inferred,
-                               protocolReq.written);
+    return source
+      ->viaProtocolRequirement(builder, dependentType, protocol,
+                               kind == InferredProtocolRequirement,
+                               loc);
   }
 
   case NestedTypeNameMatch: {
@@ -1688,28 +1681,19 @@ const RequirementSource *FloatingRequirementSource::getSource(
   }
   }
 
-  llvm_unreachable("Unhandled FloatingPointRequirementSourceKind in switch.");
+  llvm_unreachable("unhandled kind");
 }
 
 SourceLoc FloatingRequirementSource::getLoc() const {
-  // For an explicit abstract protocol source, we can get a more accurate source
-  // location from the written protocol requirement.
-  if (kind == Kind::AbstractProtocol && isExplicit()) {
-    auto written = protocolReq.written;
-    if (auto typeRepr = written.dyn_cast<const TypeRepr *>())
+  if (kind == Inferred || isExplicit()) {
+    if (auto typeRepr = loc.dyn_cast<const TypeRepr *>())
       return typeRepr->getLoc();
-    if (auto requirementRepr = written.dyn_cast<const RequirementRepr *>())
+    if (auto requirementRepr = loc.dyn_cast<const RequirementRepr *>())
       return requirementRepr->getSeparatorLoc();
   }
 
-  if (auto source = storage.dyn_cast<const RequirementSource *>())
+  if (source)
     return source->getLoc();
-
-  if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
-    return typeRepr->getLoc();
-
-  if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
-    return requirementRepr->getSeparatorLoc();
 
   return SourceLoc();
 }
@@ -1721,8 +1705,9 @@ bool FloatingRequirementSource::isDerived() const {
   case NestedTypeNameMatch:
     return false;
 
-  case AbstractProtocol:
-    switch (storage.get<const RequirementSource *>()->kind) {
+  case ProtocolRequirement:
+  case InferredProtocolRequirement:
+    switch (source->kind) {
     case RequirementSource::RequirementSignatureSelf:
       return false;
 
@@ -1740,7 +1725,7 @@ bool FloatingRequirementSource::isDerived() const {
     }
 
   case Resolved:
-    return storage.get<const RequirementSource *>()->isDerivedRequirement();
+    return source->isDerivedRequirement();
   }
   llvm_unreachable("unhandled kind");
 }
@@ -1754,14 +1739,14 @@ bool FloatingRequirementSource::isExplicit() const {
   case NestedTypeNameMatch:
     return false;
 
-  case AbstractProtocol:
+  case ProtocolRequirement:
     // Requirements implied by other protocol conformance requirements are
     // implicit, except when computing a requirement signature, where
     // non-inferred ones are explicit, to allow flagging of redundant
     // requirements.
-    switch (storage.get<const RequirementSource *>()->kind) {
+    switch (source->kind) {
     case RequirementSource::RequirementSignatureSelf:
-      return !protocolReq.inferred;
+      return true;
 
     case RequirementSource::Concrete:
     case RequirementSource::Explicit:
@@ -1776,14 +1761,16 @@ bool FloatingRequirementSource::isExplicit() const {
       return false;
     }
 
+  case InferredProtocolRequirement:
+    return false;
+
   case Resolved:
-    switch (storage.get<const RequirementSource *>()->kind) {
+    switch (source->kind) {
     case RequirementSource::Explicit:
       return true;
 
     case RequirementSource::ProtocolRequirement:
-      return storage.get<const RequirementSource *>()->parent->kind
-        == RequirementSource::RequirementSignatureSelf;
+      return source->parent->kind == RequirementSource::RequirementSignatureSelf;
 
     case RequirementSource::Inferred:
     case RequirementSource::InferredProtocolRequirement:
@@ -1812,9 +1799,9 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
   case NestedTypeNameMatch:
     return *this;
 
-  case AbstractProtocol:
-    return viaProtocolRequirement(storage.get<const RequirementSource *>(),
-                                  protocolReq.protocol, typeRepr,
+  case ProtocolRequirement:
+  case InferredProtocolRequirement:
+    return viaProtocolRequirement(source, protocol, typeRepr,
                                   /*inferred=*/true);
   }
   llvm_unreachable("unhandled kind");
@@ -1823,8 +1810,8 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
 bool FloatingRequirementSource::isRecursive(
                                     GenericSignatureBuilder &builder) const {
   llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 32> visitedAssocReqs;
-  for (auto storedSource = storage.dyn_cast<const RequirementSource *>();
-       storedSource; storedSource = storedSource->parent) {
+  for (auto storedSource = source; storedSource;
+       storedSource = storedSource->parent) {
     // FIXME: isRecursive() is completely misnamed
     if (storedSource->kind == RequirementSource::EquivalentType)
       return true;
