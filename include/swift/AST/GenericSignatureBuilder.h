@@ -98,10 +98,6 @@ public:
   using RequirementRHS =
     llvm::PointerUnion<Type, ProtocolDecl *, LayoutConstraint>;
 
-  /// The location of a requirement as written somewhere in the source.
-  typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>
-    WrittenRequirementLoc;
-
   class RequirementSource;
 
   class FloatingRequirementSource;
@@ -843,7 +839,7 @@ public:
 class GenericSignatureBuilder::RequirementSource final
   : public llvm::FoldingSetNode,
     private llvm::TrailingObjects<RequirementSource, ProtocolDecl *,
-                                  WrittenRequirementLoc> {
+                                  SourceLoc> {
 
   friend class FloatingRequirementSource;
   friend class GenericSignature;
@@ -945,7 +941,7 @@ private:
   const StorageKind storageKind;
 
   /// Whether there is a trailing written requirement location.
-  const bool hasTrailingWrittenRequirementLoc;
+  const bool hasTrailingSourceLoc;
 
 private:
   /// The actual storage, described by \c storageKind.
@@ -985,8 +981,8 @@ private:
   }
 
   /// The trailing written requirement location, if there is one.
-  size_t numTrailingObjects(OverloadToken<WrittenRequirementLoc>) const {
-    return hasTrailingWrittenRequirementLoc ? 1 : 0;
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return hasTrailingSourceLoc ? 1 : 0;
   }
 
 #ifndef NDEBUG
@@ -1037,9 +1033,9 @@ public:
 
   RequirementSource(Kind kind, Type rootType,
                     ProtocolDecl *protocol,
-                    WrittenRequirementLoc writtenReqLoc)
+                    SourceLoc writtenReqLoc)
     : kind(kind), storageKind(StorageKind::StoredType),
-      hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
+      hasTrailingSourceLoc(writtenReqLoc.isValid()),
       parent(nullptr) {
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
@@ -1047,15 +1043,15 @@ public:
     storage.type = rootType.getPointer();
     if (kind == RequirementSignatureSelf)
       getTrailingObjects<ProtocolDecl *>()[0] = protocol;
-    if (hasTrailingWrittenRequirementLoc)
-      getTrailingObjects<WrittenRequirementLoc>()[0] = writtenReqLoc;
+    if (hasTrailingSourceLoc)
+      getTrailingObjects<SourceLoc>()[0] = writtenReqLoc;
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
                     Type type, ProtocolDecl *protocol,
-                    WrittenRequirementLoc writtenReqLoc)
+                    SourceLoc writtenReqLoc)
     : kind(kind), storageKind(StorageKind::StoredType),
-      hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
+      hasTrailingSourceLoc(writtenReqLoc.isValid()),
       parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
@@ -1065,14 +1061,14 @@ public:
     storage.type = type.getPointer();
     if (isProtocolRequirement())
       getTrailingObjects<ProtocolDecl *>()[0] = protocol;
-    if (hasTrailingWrittenRequirementLoc)
-      getTrailingObjects<WrittenRequirementLoc>()[0] = writtenReqLoc;
+    if (hasTrailingSourceLoc)
+      getTrailingObjects<SourceLoc>()[0] = writtenReqLoc;
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
                     ProtocolConformanceRef conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
-      hasTrailingWrittenRequirementLoc(false), parent(parent) {
+      hasTrailingSourceLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -1084,7 +1080,7 @@ public:
   RequirementSource(Kind kind, const RequirementSource *parent,
                     AssociatedTypeDecl *assocType)
     : kind(kind), storageKind(StorageKind::AssociatedTypeDecl),
-      hasTrailingWrittenRequirementLoc(false), parent(parent) {
+      hasTrailingSourceLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -1095,7 +1091,7 @@ public:
 
   RequirementSource(Kind kind, const RequirementSource *parent)
     : kind(kind), storageKind(StorageKind::None),
-      hasTrailingWrittenRequirementLoc(false), parent(parent) {
+      hasTrailingSourceLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -1105,7 +1101,7 @@ public:
   RequirementSource(Kind kind, const RequirementSource *parent,
                     Type newType)
     : kind(kind), storageKind(StorageKind::StoredType),
-      hasTrailingWrittenRequirementLoc(false), parent(parent) {
+      hasTrailingSourceLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -1122,14 +1118,14 @@ public:
   /// stated in an 'inheritance' or 'where' clause.
   static const RequirementSource *forExplicit(GenericSignatureBuilder &builder,
                                               Type rootType,
-                                              WrittenRequirementLoc writtenLoc);
+                                              SourceLoc writtenLoc);
 
   /// Retrieve a requirement source representing a requirement that is
   /// inferred from some part of a generic declaration's signature, e.g., the
   /// parameter or result type of a generic function.
   static const RequirementSource *forInferred(GenericSignatureBuilder &builder,
                                               Type rootType,
-                                              WrittenRequirementLoc writtenLoc);
+                                              SourceLoc writtenLoc);
 
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
@@ -1151,8 +1147,8 @@ private:
                              Type dependentType,
                              ProtocolDecl *protocol,
                              bool inferred,
-                             WrittenRequirementLoc writtenLoc =
-                               WrittenRequirementLoc()) const;
+                             SourceLoc writtenLoc =
+                               SourceLoc()) const;
 public:
   /// A requirement source that describes a conformance requirement resolved
   /// via a superclass requirement.
@@ -1285,20 +1281,9 @@ public:
   int compare(const RequirementSource *other) const;
 
   /// Retrieve the written requirement location, if there is one.
-  WrittenRequirementLoc getWrittenRequirementLoc() const {
-    if (!hasTrailingWrittenRequirementLoc) return WrittenRequirementLoc();
-    return getTrailingObjects<WrittenRequirementLoc>()[0];
-  }
-
-  /// Retrieve the type representation for this requirement, if there is one.
-  const TypeRepr *getTypeRepr() const {
-    return getWrittenRequirementLoc().dyn_cast<const TypeRepr *>();
-  }
-
-  /// Retrieve the requirement representation for this requirement, if there is
-  /// one.
-  const RequirementRepr *getRequirementRepr() const {
-    return getWrittenRequirementLoc().dyn_cast<const RequirementRepr *>();
+  SourceLoc getSourceLoc() const {
+    if (!hasTrailingSourceLoc) return SourceLoc();
+    return getTrailingObjects<SourceLoc>()[0];
   }
 
   /// Retrieve the type stored in this requirement.
@@ -1371,7 +1356,7 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   } kind;
 
   const RequirementSource *source;
-  WrittenRequirementLoc loc;
+  SourceLoc loc;
 
   // Additional storage for an abstract protocol requirement.
   union {
@@ -1391,22 +1376,15 @@ public:
     return { Explicit, nullptr };
   }
 
-  static FloatingRequirementSource forExplicit(const TypeRepr *typeRepr) {
+  static FloatingRequirementSource forExplicit(SourceLoc loc) {
     FloatingRequirementSource result{ Explicit, nullptr };
-    result.loc = typeRepr;
+    result.loc = loc;
     return result;
   }
 
-  static FloatingRequirementSource forExplicit(
-                                     const RequirementRepr *requirementRepr) {
-    FloatingRequirementSource result{ Explicit, nullptr };
-    result.loc = requirementRepr;
-    return result;
-  }
-
-  static FloatingRequirementSource forInferred(const TypeRepr *typeRepr) {
+  static FloatingRequirementSource forInferred(SourceLoc loc) {
     FloatingRequirementSource result{ Inferred, nullptr };
-    result.loc = typeRepr;
+    result.loc = loc;
     return result;
   }
 
@@ -1423,7 +1401,7 @@ public:
   static FloatingRequirementSource viaProtocolRequirement(
                                      const RequirementSource *base,
                                      ProtocolDecl *inProtocol,
-                                     WrittenRequirementLoc written,
+                                     SourceLoc written,
                                      bool inferred) {
     auto kind = (inferred ? InferredProtocolRequirement : ProtocolRequirement);
     FloatingRequirementSource result{ kind, base };

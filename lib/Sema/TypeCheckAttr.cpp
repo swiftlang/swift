@@ -2226,7 +2226,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         using FloatingRequirementSource =
           GenericSignatureBuilder::FloatingRequirementSource;
         Builder.addRequirement(req, reqRepr,
-                               FloatingRequirementSource::forExplicit(reqRepr),
+                               FloatingRequirementSource::forExplicit(
+                                 reqRepr->getSeparatorLoc()),
                                nullptr, DC->getParentModule());
         return false;
       });
@@ -4297,7 +4298,8 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
 
               // Add requirement to generic signature builder.
               builder.addRequirement(
-                  req, reqRepr, FloatingRequirementSource::forExplicit(reqRepr),
+                  req, reqRepr, FloatingRequirementSource::forExplicit(
+                    reqRepr->getSeparatorLoc()),
                   nullptr, original->getModuleContext());
               return false;
             });
