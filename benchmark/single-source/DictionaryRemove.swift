@@ -18,7 +18,7 @@ let t: [BenchmarkCategory] = [.validation, .api, .Dictionary]
 
 let size = 100
 let numberMap = Dictionary(uniqueKeysWithValues: zip(1...size, 1...size))
-var temporaryNumberMap: [Int, Int] = [:]
+var temporaryNumberMap: [Int:Int] = [:]
 let boxedNums = (1...size).lazy.map { Box($0) }
 let boxedNumMap = Dictionary(uniqueKeysWithValues: zip(boxedNums, boxedNums))
 
