@@ -1129,7 +1129,7 @@ public:
   /// parameter or result type of a generic function.
   static const RequirementSource *forInferred(GenericSignatureBuilder &builder,
                                               Type rootType,
-                                              const TypeRepr *typeRepr);
+                                              WrittenRequirementLoc writtenLoc);
 
   /// Retrieve a requirement source representing the requirement signature
   /// computation for a protocol.
@@ -1352,39 +1352,35 @@ public:
 /// The root will be supplied as soon as the appropriate dependent type is
 /// resolved.
 class GenericSignatureBuilder::FloatingRequirementSource {
-  enum Kind {
+  enum Kind : uint8_t {
     /// A fully-resolved requirement source, which does not need a root.
     Resolved,
-    /// An explicit requirement source lacking a root.
+    /// An explicit requirement in a generic signature.
     Explicit,
-    /// An inferred requirement source lacking a root.
+    /// A requirement inferred from a concrete type application in a
+    /// generic signature.
     Inferred,
-    /// A requirement source augmented by an abstract protocol requirement
-    AbstractProtocol,
+    /// An explicit requirement written inside a protocol.
+    ProtocolRequirement,
+    /// A requirement inferred from a concrete type application inside a
+    /// protocol.
+    InferredProtocolRequirement,
     /// A requirement source for a nested-type-name match introduced by
     /// the given source.
     NestedTypeNameMatch,
   } kind;
 
-  using Storage =
-    llvm::PointerUnion<const RequirementSource *, const TypeRepr *,
-                       const RequirementRepr *>;
-
-  Storage storage;
+  const RequirementSource *source;
+  WrittenRequirementLoc loc;
 
   // Additional storage for an abstract protocol requirement.
   union {
-    struct {
-      ProtocolDecl *protocol = nullptr;
-      WrittenRequirementLoc written;
-      bool inferred = false;
-    } protocolReq;
-
+    ProtocolDecl *protocol = nullptr;
     Identifier nestedName;
   };
 
-  FloatingRequirementSource(Kind kind, Storage storage)
-    : kind(kind), storage(storage) { }
+  FloatingRequirementSource(Kind kind, const RequirementSource *source)
+    : kind(kind), source(source) { }
 
 public:
   /// Implicit conversion from a resolved requirement source.
@@ -1392,30 +1388,35 @@ public:
     : FloatingRequirementSource(Resolved, source) { }
 
   static FloatingRequirementSource forAbstract() {
-    return { Explicit, Storage() };
+    return { Explicit, nullptr };
   }
 
   static FloatingRequirementSource forExplicit(const TypeRepr *typeRepr) {
-    return { Explicit, typeRepr };
+    FloatingRequirementSource result{ Explicit, nullptr };
+    result.loc = typeRepr;
+    return result;
   }
 
   static FloatingRequirementSource forExplicit(
                                      const RequirementRepr *requirementRepr) {
-    return { Explicit, requirementRepr };
+    FloatingRequirementSource result{ Explicit, nullptr };
+    result.loc = requirementRepr;
+    return result;
   }
 
   static FloatingRequirementSource forInferred(const TypeRepr *typeRepr) {
-    return { Inferred, typeRepr };
+    FloatingRequirementSource result{ Inferred, nullptr };
+    result.loc = typeRepr;
+    return result;
   }
 
   static FloatingRequirementSource viaProtocolRequirement(
                                      const RequirementSource *base,
                                      ProtocolDecl *inProtocol,
                                      bool inferred) {
-    FloatingRequirementSource result{ AbstractProtocol, base };
-    result.protocolReq.protocol = inProtocol;
-    result.protocolReq.written = WrittenRequirementLoc();
-    result.protocolReq.inferred = inferred;
+    auto kind = (inferred ? InferredProtocolRequirement : ProtocolRequirement);
+    FloatingRequirementSource result{ kind, base };
+    result.protocol = inProtocol;
     return result;
   }
 
@@ -1424,16 +1425,16 @@ public:
                                      ProtocolDecl *inProtocol,
                                      WrittenRequirementLoc written,
                                      bool inferred) {
-    FloatingRequirementSource result{ AbstractProtocol, base };
-    result.protocolReq.protocol = inProtocol;
-    result.protocolReq.written = written;
-    result.protocolReq.inferred = inferred;
+    auto kind = (inferred ? InferredProtocolRequirement : ProtocolRequirement);
+    FloatingRequirementSource result{ kind, base };
+    result.protocol = inProtocol;
+    result.loc = written;
     return result;
   }
 
   static FloatingRequirementSource forNestedTypeNameMatch(
                                      Identifier nestedName) {
-    FloatingRequirementSource result{ NestedTypeNameMatch, Storage() };
+    FloatingRequirementSource result{ NestedTypeNameMatch, nullptr };
     result.nestedName = nestedName;
     return result;
   };
