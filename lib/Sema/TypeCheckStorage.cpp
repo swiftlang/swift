@@ -2584,6 +2584,11 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
           dyn_cast_or_null<Initializer>(parentPBD->getInitContext(i))) {
     TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
+
+  auto *backingVar = wrappedVar->getPropertyWrapperBackingProperty();
+  auto *backingPBD = backingVar->getParentPatternBinding();
+  checkPropertyWrapperActorIsolation(backingPBD, initializer);
+  TypeChecker::checkPropertyWrapperEffects(backingPBD, initializer);
 }
 
 static PropertyWrapperMutability::Value
