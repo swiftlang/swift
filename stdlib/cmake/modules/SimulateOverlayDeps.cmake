@@ -100,5 +100,5 @@ function(remove_overlay_from_build_single overlay)
   set(sdk_name ${SWIFT_SDK_${sdk}_LIB_SUBDIR})
 
   file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/libswift${overlay}.dylib)
-  file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/${overlay})
+  file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/${overlay}.swiftmodule)
 endfunction()
