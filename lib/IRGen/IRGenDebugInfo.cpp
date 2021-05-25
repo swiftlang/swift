@@ -1021,12 +1021,11 @@ private:
     return getOrCreateType(BlandDbgTy);
   }
 
-  uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy) {
+  uint64_t getSizeOfBasicType(CompletedDebugTypeInfo DbgTy) {
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
     uint64_t BitWidth = 0;
-    assert(DbgTy.getSize() && "non-fixed basic type");
     if (DbgTy.getSize())
-      BitWidth = DbgTy.getSize()->getValue() * SizeOfByte;
+      BitWidth = DbgTy.getSizeValue() * SizeOfByte;
     llvm::Type *StorageType = DbgTy.getStorageType()
                                   ? DbgTy.getStorageType()
                                   : IGM.DataLayout.getSmallestLegalIntType(
@@ -1288,13 +1287,15 @@ private:
     switch (BaseTy->getKind()) {
     case TypeKind::BuiltinInteger: {
       Encoding = llvm::dwarf::DW_ATE_unsigned;
-      SizeInBits = getSizeOfBasicType(DbgTy);
+      if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+        SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
       break;
     }
 
     case TypeKind::BuiltinIntegerLiteral: {
       Encoding = llvm::dwarf::DW_ATE_unsigned; // ?
-      SizeInBits = getSizeOfBasicType(DbgTy);
+      if (auto CompletedDbgTy = CompletedDebugTypeInfo::get(DbgTy))
+        SizeInBits = getSizeOfBasicType(*CompletedDbgTy);
       break;
     }
 
