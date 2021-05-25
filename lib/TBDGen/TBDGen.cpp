@@ -1186,9 +1186,6 @@ static bool hasLinkerDirective(Decl *D) {
 }
 
 void TBDGenVisitor::visitFile(FileUnit *file) {
-  if (file == SwiftModule->getFiles()[0])
-    addFirstFileSymbols();
-
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
@@ -1202,6 +1199,9 @@ void TBDGenVisitor::visitFile(FileUnit *file) {
 }
 
 void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
+  // Add any autolinking force_load symbols.
+  addFirstFileSymbols();
+  
   if (auto *singleFile = desc.getSingleFile()) {
     assert(SwiftModule == singleFile->getParentModule() &&
            "mismatched file and module");
@@ -1230,6 +1230,7 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
     // Diagnose module name that cannot be found
     ctx.Diags.diagnose(SourceLoc(), diag::unknown_swift_module_name, Name);
   }
+
   // Collect symbols in each module.
   llvm::for_each(Modules, [&](ModuleDecl *M) {
     for (auto *file : M->getFiles()) {
