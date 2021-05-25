@@ -663,6 +663,9 @@ struct GenericSignatureBuilder::Implementation {
   /// Whether there were any errors.
   bool HadAnyError = false;
 
+  /// Set this to true to get some debug output.
+  bool DebugRedundantRequirements = false;
+
   /// All explicit non-same type requirements that were added to the builder.
   SmallSetVector<ExplicitRequirement, 2> ExplicitRequirements;
 
@@ -5770,7 +5773,12 @@ void GenericSignatureBuilder::ExplicitRequirement::dump(
     break;
   }
 
-  out << getSubjectType() << " : ";
+  out << getSubjectType();
+  if (getKind() == RequirementKind::SameType)
+    out << " : ";
+  else
+    out << " == ";
+
   if (auto type = rhs.dyn_cast<Type>())
     out << type;
   else if (auto *proto = rhs.dyn_cast<ProtocolDecl *>())
@@ -8435,12 +8443,22 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   };
 
   for (const auto &req : Impl->ExplicitRequirements) {
+    if (Impl->DebugRedundantRequirements) {
+      req.dump(llvm::dbgs(), &Context.SourceMgr);
+      llvm::dbgs() << "\n";
+    }
+
     assert(req.getKind() != RequirementKind::SameType &&
            "Should not see same-type requirement here");
 
     if (isRedundantExplicitRequirement(req) &&
-        Impl->ExplicitConformancesImpliedByConcrete.count(req))
+        Impl->ExplicitConformancesImpliedByConcrete.count(req)) {
+      if (Impl->DebugRedundantRequirements) {
+        llvm::dbgs() << "... skipping\n";
+      }
+
       continue;
+    }
 
     auto subjectType = req.getSubjectType();
     subjectType = stripBoundDependentMemberTypes(subjectType);
@@ -8471,6 +8489,11 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   }
 
   for (const auto &req : Impl->ExplicitSameTypeRequirements) {
+    if (Impl->DebugRedundantRequirements) {
+      req.dump(llvm::dbgs(), &Context.SourceMgr);
+      llvm::dbgs() << "\n";
+    }
+
     auto resolveType = [this](Type t) -> Type {
       t = stripBoundDependentMemberTypes(t);
       if (t->is<GenericTypeParamType>()) {
@@ -8499,6 +8522,11 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
         Requirement(RequirementKind::SameType,
                     subjectType, constraintType));
 
+    if (Impl->DebugRedundantRequirements) {
+      llvm::dbgs() << "=> ";
+      newReq.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
     newBuilder.addRequirement(newReq, getRebuiltSource(req.getSource()),
                               nullptr);
   }
@@ -8535,16 +8563,27 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
     diagnoseRedundantRequirements(
         /*onlyDiagnoseExplicitConformancesImpliedByConcrete=*/true);
 
+    if (Impl->DebugRedundantRequirements) {
+      llvm::dbgs() << "Going to rebuild signature\n";
+    }
     return std::move(*this).rebuildSignatureWithoutRedundantRequirements(
         allowConcreteGenericParams,
         requirementSignatureSelfProto);
   }
 
   if (Impl->RebuildingWithoutRedundantConformances) {
+    if (Impl->DebugRedundantRequirements) {
+      llvm::dbgs() << "Rebuilding signature\n";
+    }
+
 #ifndef NDEBUG
     for (const auto &req : Impl->ExplicitConformancesImpliedByConcrete) {
-      assert(!isRedundantExplicitRequirement(req) &&
-             "Rebuilt signature still had redundant conformance requirements");
+      if (isRedundantExplicitRequirement(req)) {
+        llvm::errs() << "Rebuilt signature still had redundant conformance requirement\n";
+        req.dump(llvm::errs(), &Context.SourceMgr);
+        llvm::errs() << "\n";
+        abort();
+      }
     }
 #endif
   }
