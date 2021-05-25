@@ -29,6 +29,24 @@ CHANGELOG
 Swift 5.5
 ---------
 
+* [SE-0313][]:
+
+  Declarations inside an actor that would normally by actor-isolated can
+  explicitly become non-isolated using the `nonisolated` keyword. Non-isolated
+  declarations can be used to conform to synchronous protocol requirements:
+
+  ```swift
+  actor Account: Hashable {
+    let idNumber: Int
+    let balance: Double
+
+    nonisolated func hash(into hasher: inout Hasher) { // okay, non-isolated satisfies synchronous requirement
+      hasher.combine(idNumber) // okay, can reference idNumber from outside the let
+      hasher.combine(balance) // error: cannot synchronously access actor-isolated property
+    }
+  }
+  ```
+
 * Type names are no longer allowed as an argument to a subscript parameter that expects a metatype type
 
 ```swift
@@ -8516,6 +8534,7 @@ Swift 1.0
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
+[SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
