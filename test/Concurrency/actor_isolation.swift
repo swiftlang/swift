@@ -118,7 +118,7 @@ extension MyActor {
     _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a non-isolated context}}
     _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
 
-    // nonisolated
+    // @actorIndependent
     _ = actorIndependentFunc(otherActor: self)
     _ = actorIndependentVar
 
@@ -127,7 +127,7 @@ extension MyActor {
     _ = self.actorIndependentVar
     self.actorIndependentVar = 17
 
-    // nonisolated on another actor
+    // @actorIndependent on another actor
     _ = otherActor.actorIndependentFunc(otherActor: self)
     _ = otherActor.actorIndependentVar
     otherActor.actorIndependentVar = 17
@@ -538,7 +538,7 @@ func testGlobalRestrictions(actor: MyActor) async {
   // expected-note@-1{{subscript access is 'async'}}
   _ = await actor[0]
 
-  // nonisolated declarations are permitted.
+  // @actorIndependent declarations are permitted.
   _ = actor.actorIndependentFunc(otherActor: actor)
   _ = actor.actorIndependentVar
   actor.actorIndependentVar = 5

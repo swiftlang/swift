@@ -9,29 +9,37 @@
 
 ///////////
 // This test checks for correct serialization & deserialization of
-// nonisolated
+// @actorIndependent and @actorIndependent(unsafe)
 
 // look for correct annotation after first deserialization's module print:
 
 // MODULE-CHECK:      actor UnsafeCounter {
-// MODULE-CHECK-NEXT:   var storage: Int
-// MODULE-CHECK-NEXT:   nonisolated var count: Int
+// MODULE-CHECK-NEXT:   @actorIndependent(unsafe) var storage: Int
+// MODULE-CHECK-NEXT:   @actorIndependent var count: Int
+// MODULE-CHECK-NEXT:   var actorCount: Int
 // MODULE-CHECK-NEXT:   init()
 // MODULE-CHECK-NEXT: }
 
-// and look for nonisolated
+// and look for unsafe and safe versions of decl in BC dump:
 
 // BC-CHECK-NOT: UnknownCode
-// BC-CHECK: <Nonisolated_DECL_ATTR abbrevid={{[0-9]+}} op0=0/>
+// BC-CHECK: <ActorIndependent_DECL_ATTR abbrevid={{[0-9]+}} op0=1/>
+// BC-CHECK: <ActorIndependent_DECL_ATTR abbrevid={{[0-9]+}} op0=0/>
 
 
 actor UnsafeCounter {
 
+  @actorIndependent(unsafe)
   private var storage : Int = 0
 
-  nonisolated
+  @actorIndependent
   var count : Int {
-    get { 0 }
-    set {  }
+    get { storage }
+    set { storage = newValue }
+  }
+
+  var actorCount : Int {
+    get { storage }
+    set { storage = newValue }
   }
 }
