@@ -192,6 +192,15 @@ ERROR(scanner_find_cycle, none,
 ERROR(scanner_arguments_invalid, none,
       "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
 
+WARNING(warn_scaner_deserialize_failed, none,
+        "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
+
+REMARK(remark_reuse_cache, none,
+       "Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
+
+REMARK(remark_save_cache, none,
+       "Serializing module scanning dependency cache to: '%0'.", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------

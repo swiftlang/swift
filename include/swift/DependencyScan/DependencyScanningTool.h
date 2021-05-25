@@ -57,6 +57,14 @@ public:
                   const std::vector<BatchScanInput> &BatchInput,
                   const llvm::StringSet<> &PlaceholderModules);
 
+  /// Writes the current `SharedCache` instance to a specified FileSystem path.
+  void serializeCache(llvm::StringRef path);
+  /// Loads an instance of a `ModuleDependenciesCache` to serve as the `SharedCache`
+  /// from a specified FileSystem path.
+  bool loadCache(llvm::StringRef path);
+  /// Discard the tool's current `SharedCache` and start anew.
+  void resetCache();
+
 private:
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.

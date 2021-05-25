@@ -472,7 +472,7 @@ bool swift::dependencies::module_dependency_cache_serialization::
       "loading inter-module dependency graph", path);
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
-    return false;
+    return true;
 
   return readInterModuleDependenciesCache(*buffer.get(), cache);
 }
