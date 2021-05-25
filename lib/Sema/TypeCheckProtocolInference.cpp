@@ -207,22 +207,22 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (extendedNominal == nullptr)
       return true;
 
-    // FIXME: The extension may not have a generic signature set up yet as
-    // resolving signatures may trigger associated type inference.  This cycle
-    // is now detectable and we should look into untangling it
-    // - see rdar://55263708
-    if (!extension->hasComputedGenericSignature())
-      return true;
-
-    // Retrieve the generic signature of the extension.
-    const auto extensionSig = extension->getGenericSignature();
-
     auto *proto = dyn_cast<ProtocolDecl>(extendedNominal);
 
     // If the extension is bound to the nominal the conformance is
     // declared on, it is viable for inference when its conditional
     // requirements are satisfied by those of the conformance context.
     if (!proto) {
+      // FIXME: The extension may not have a generic signature set up yet as
+      // resolving signatures may trigger associated type inference.  This cycle
+      // is now detectable and we should look into untangling it
+      // - see rdar://55263708
+      if (!extension->hasComputedGenericSignature())
+        return true;
+
+      // Retrieve the generic signature of the extension.
+      const auto extensionSig = extension->getGenericSignature();
+
       // Extensions of non-generic nominals are always viable for inference.
       if (!extensionSig)
         return true;
@@ -260,9 +260,6 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     return true;
   };
-
-  auto typeInContext =
-    conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
 
   for (auto witness :
        checker.lookupValueWitnesses(req, /*ignoringNames=*/nullptr)) {
@@ -319,6 +316,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
           if (!associatedTypesAreSameEquivalenceClass(dmt->getAssocType(),
                                                       result.first))
             return false;
+
+          auto typeInContext =
+            conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
+
           if (!dmt->getBase()->isEqual(typeInContext))
             return false;
 
