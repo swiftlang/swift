@@ -129,12 +129,6 @@ module WinSDK [system] {
       header "timezoneapi.h"
       export *
     }
-    
-    // api-ms-win-core-usb-l1-1-0.dll
-    module usb {
-      header "winusb.h"
-      export *
-    }
 
     // api-ms-win-core-version-l1-1-0.dll
     module version {
@@ -490,6 +484,13 @@ module WinSDK [system] {
     export *
 
     link "AdvAPI32.Lib"
+  }
+  
+  module WinUSB {
+    header "winusb.h"
+    export *
+    
+    link "winusb.lib"
   }
 
   // TODO(compnerd) does it make sense to implicitly export this API surface?
