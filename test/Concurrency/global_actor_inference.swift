@@ -361,6 +361,13 @@ actor WrapperActorBad2<Wrapped> {
   }
 }
 
+@propertyWrapper
+struct WrapperWithMainActorDefaultInit {
+  var wrappedValue: Int { fatalError() }
+
+  @MainActor init() {} // expected-note {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+}
+
 actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
   // expected-note@-1 3{{property declared here}}
@@ -368,6 +375,8 @@ actor ActorWithWrapper {
     _ = synced // expected-error{{'synced' isolated to global actor}}
     _ = $synced // expected-error{{'$synced' isolated to global actor}}
     _ = _synced // expected-error{{'_synced' isolated to global actor}}
+
+    @WrapperWithMainActorDefaultInit var value: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   }
 }
 
