@@ -667,7 +667,7 @@ struct GenericSignatureBuilder::Implementation {
   SmallSetVector<ExplicitRequirement, 2> ExplicitRequirements;
 
   /// All explicit same-type requirements that were added to the builder.
-  SmallVector<Requirement, 2> ExplicitSameTypeRequirements;
+  SmallVector<ExplicitRequirement, 2> ExplicitSameTypeRequirements;
 
   /// A mapping of redundant explicit requirements to the best root requirement
   /// that implies them. Built by computeRedundantRequirements().
@@ -4915,7 +4915,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   if (!source->isDerivedRequirement()) {
     Impl->ExplicitSameTypeRequirements.emplace_back(RequirementKind::SameType,
-                                                    depType1, depType2);
+                                                    source, depType1);
   }
 
   // Record the same-type constraint, and bail out if it was already known.
@@ -5142,8 +5142,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                            const RequirementSource *source) {
   if (!source->isDerivedRequirement()) {
     Impl->ExplicitSameTypeRequirements.emplace_back(RequirementKind::SameType,
-                                                    type.getDependentType(*this),
-                                                    concrete);
+                                                    source, concrete);
   }
 
   auto equivClass = type.getEquivalenceClass(*this);
@@ -8472,8 +8471,8 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
       }
     };
 
-    auto subjectType = resolveType(req.getFirstType());
-    auto constraintType = resolveType(req.getSecondType());
+    auto subjectType = resolveType(req.getSubjectType());
+    auto constraintType = resolveType(req.getRHS().get<Type>());
 
     auto newReq = stripBoundDependentMemberTypes(
         Requirement(RequirementKind::SameType,
