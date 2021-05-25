@@ -685,7 +685,8 @@ private:
   void diagnoseProtocolRefinement(
       const ProtocolDecl *requirementSignatureSelfProto);
 
-  void diagnoseRedundantRequirements() const;
+  void diagnoseRedundantRequirements(
+      bool onlyDiagnoseExplicitConformancesImpliedByConcrete=false) const;
 
   void diagnoseConflictingConcreteTypeRequirements(
       const ProtocolDecl *requirementSignatureSelfProto);
