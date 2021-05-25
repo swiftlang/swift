@@ -669,6 +669,10 @@ struct GenericSignatureBuilder::Implementation {
   /// All explicit same-type requirements that were added to the builder.
   SmallVector<ExplicitRequirement, 2> ExplicitSameTypeRequirements;
 
+  /// Whether we are rebuilding a signature without redundant conformance
+  /// requirements.
+  bool RebuildingWithoutRedundantConformances = false;
+
   /// A mapping of redundant explicit requirements to the best root requirement
   /// that implies them. Built by computeRedundantRequirements().
   using RedundantRequirementMap =
@@ -2470,6 +2474,14 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
 
 void GenericSignatureBuilder::addConditionalRequirements(
     ProtocolConformanceRef conformance, ModuleDecl *inferForModule) {
+  // When rebuilding a signature, don't add requirements inferred from conditional
+  // conformances, since we've already added them to our ExplicitRequirements list.
+  //
+  // FIXME: We need to handle conditional conformances earlier, in the same place
+  // as other forms of requirement inference, to eliminate this bit of state.
+  if (Impl->RebuildingWithoutRedundantConformances)
+    return;
+
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
@@ -8384,6 +8396,7 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   NumSignaturesRebuiltWithoutRedundantRequirements++;
 
   GenericSignatureBuilder newBuilder(Context);
+  newBuilder.Impl->RebuildingWithoutRedundantConformances = true;
 
   for (auto param : getGenericParams())
     newBuilder.addGenericParameter(param);
@@ -8487,20 +8500,18 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
   // Build a new signature using the new builder.
   return std::move(newBuilder).computeGenericSignature(
       allowConcreteGenericParams,
-      requirementSignatureSelfProto,
-      /*rebuildingWithoutRedundantConformances=*/true);
+      requirementSignatureSelfProto);
 }
 
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
-                                          const ProtocolDecl *requirementSignatureSelfProto,
-                                          bool rebuildingWithoutRedundantConformances) && {
+                                          const ProtocolDecl *requirementSignatureSelfProto) && {
   // Finalize the builder, producing any necessary diagnostics.
   finalize(getGenericParams(),
            allowConcreteGenericParams,
            requirementSignatureSelfProto);
 
-  if (rebuildingWithoutRedundantConformances) {
+  if (Impl->RebuildingWithoutRedundantConformances) {
     assert(!Impl->HadAnyError &&
            "Rebuilt signature had errors");
 
@@ -8521,7 +8532,7 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // we might end up emitting duplicate diagnostics.
   //
   // Also, don't do this when building a requirement signature.
-  if (!rebuildingWithoutRedundantConformances &&
+  if (!Impl->RebuildingWithoutRedundantConformances &&
       !Impl->HadAnyError &&
       !Impl->ExplicitConformancesImpliedByConcrete.empty()) {
     return std::move(*this).rebuildSignatureWithoutRedundantRequirements(

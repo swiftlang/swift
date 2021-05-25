@@ -624,8 +624,7 @@ public:
   /// generic signature builder no longer has valid state.
   GenericSignature computeGenericSignature(
                       bool allowConcreteGenericParams = false,
-                      const ProtocolDecl *requirementSignatureSelfProto = nullptr,
-                      bool rebuildingWithoutRedundantConformances = false) &&;
+                      const ProtocolDecl *requirementSignatureSelfProto = nullptr) &&;
 
   /// Compute the requirement signature for the given protocol.
   static GenericSignature computeRequirementSignature(ProtocolDecl *proto);
