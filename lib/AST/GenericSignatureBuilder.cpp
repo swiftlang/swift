@@ -854,16 +854,16 @@ const void *RequirementSource::getOpaqueStorage1() const {
 const void *RequirementSource::getOpaqueStorage2() const {
   if (numTrailingObjects(OverloadToken<ProtocolDecl *>()) == 1)
     return getTrailingObjects<ProtocolDecl *>()[0];
-  if (numTrailingObjects(OverloadToken<WrittenRequirementLoc>()) == 1)
-    return getTrailingObjects<WrittenRequirementLoc>()[0].getOpaqueValue();
+  if (numTrailingObjects(OverloadToken<SourceLoc>()) == 1)
+    return getTrailingObjects<SourceLoc>()[0].getOpaquePointerValue();
 
   return nullptr;
 }
 
 const void *RequirementSource::getOpaqueStorage3() const {
   if (numTrailingObjects(OverloadToken<ProtocolDecl *>()) == 1 &&
-      numTrailingObjects(OverloadToken<WrittenRequirementLoc>()) == 1)
-    return getTrailingObjects<WrittenRequirementLoc>()[0].getOpaqueValue();
+      numTrailingObjects(OverloadToken<SourceLoc>()) == 1)
+    return getTrailingObjects<SourceLoc>()[0].getOpaquePointerValue();
 
   return nullptr;
 }
@@ -1125,9 +1125,9 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     return known;                                                          \
                                                                            \
   unsigned size =                                                          \
-    totalSizeToAlloc<ProtocolDecl *, WrittenRequirementLoc>(               \
+    totalSizeToAlloc<ProtocolDecl *, SourceLoc>(               \
                                            NumProtocolDecls,               \
-                                           WrittenReq.isNull()? 0 : 1);    \
+                                           WrittenReq.isValid()? 1 : 0);   \
   void *mem =                                                              \
     builder.Impl->Allocator.Allocate(size, alignof(RequirementSource));    \
   auto result = new (mem) RequirementSource ConstructorArgs;               \
@@ -1140,17 +1140,16 @@ const RequirementSource *RequirementSource::forAbstract(
   REQUIREMENT_SOURCE_FACTORY_BODY(
                         (nodeID, Explicit, nullptr, rootType.getPointer(),
                          nullptr, nullptr),
-                        (Explicit, rootType, nullptr, WrittenRequirementLoc()),
-                        0, WrittenRequirementLoc());
+                        (Explicit, rootType, nullptr, SourceLoc()),
+                        0, SourceLoc());
 }
 
 const RequirementSource *RequirementSource::forExplicit(
                   GenericSignatureBuilder &builder,
-                  Type rootType,
-                  GenericSignatureBuilder::WrittenRequirementLoc writtenLoc) {
+                  Type rootType, SourceLoc writtenLoc) {
   REQUIREMENT_SOURCE_FACTORY_BODY(
                         (nodeID, Explicit, nullptr, rootType.getPointer(),
-                         writtenLoc.getOpaqueValue(), nullptr),
+                         writtenLoc.getOpaquePointerValue(), nullptr),
                         (Explicit, rootType, nullptr, writtenLoc),
                         0, writtenLoc);
 }
@@ -1158,10 +1157,10 @@ const RequirementSource *RequirementSource::forExplicit(
 const RequirementSource *RequirementSource::forInferred(
                                               GenericSignatureBuilder &builder,
                                               Type rootType,
-                                              WrittenRequirementLoc writtenLoc) {
+                                              SourceLoc writtenLoc) {
   REQUIREMENT_SOURCE_FACTORY_BODY(
       (nodeID, Inferred, nullptr, rootType.getPointer(),
-       writtenLoc.getOpaqueValue(), nullptr),
+       writtenLoc.getOpaquePointerValue(), nullptr),
        (Inferred, rootType, nullptr, writtenLoc),
        0, writtenLoc);
 }
@@ -1174,8 +1173,8 @@ const RequirementSource *RequirementSource::forRequirementSignature(
                         (nodeID, RequirementSignatureSelf, nullptr,
                          rootType.getPointer(), protocol, nullptr),
                         (RequirementSignatureSelf, rootType, protocol,
-                         WrittenRequirementLoc()),
-                        1, WrittenRequirementLoc());
+                         SourceLoc()),
+                        1, SourceLoc());
 
 }
 
@@ -1186,22 +1185,20 @@ const RequirementSource *RequirementSource::forNestedTypeNameMatch(
                         (nodeID, NestedTypeNameMatch, nullptr,
                          rootType.getPointer(), nullptr, nullptr),
                         (NestedTypeNameMatch, rootType, nullptr,
-                         WrittenRequirementLoc()),
-                        0, WrittenRequirementLoc());
+                         SourceLoc()),
+                        0, SourceLoc());
 }
 
 const RequirementSource *RequirementSource::viaProtocolRequirement(
             GenericSignatureBuilder &builder, Type dependentType,
-            ProtocolDecl *protocol,
-            bool inferred,
-            GenericSignatureBuilder::WrittenRequirementLoc writtenLoc) const {
+            ProtocolDecl *protocol, bool inferred, SourceLoc writtenLoc) const {
   REQUIREMENT_SOURCE_FACTORY_BODY(
                         (nodeID,
                          inferred ? InferredProtocolRequirement
                                   : ProtocolRequirement,
                          this,
                          dependentType.getPointer(), protocol,
-                         writtenLoc.getOpaqueValue()),
+                         writtenLoc.getOpaquePointerValue()),
                         (inferred ? InferredProtocolRequirement
                                   : ProtocolRequirement,
                          this, dependentType,
@@ -1216,7 +1213,7 @@ const RequirementSource *RequirementSource::viaSuperclass(
                         (nodeID, Superclass, this, conformance.getOpaqueValue(),
                          nullptr, nullptr),
                         (Superclass, this, conformance),
-                        0, WrittenRequirementLoc());
+                        0, SourceLoc());
 }
 
 const RequirementSource *RequirementSource::viaConcrete(
@@ -1226,7 +1223,7 @@ const RequirementSource *RequirementSource::viaConcrete(
                         (nodeID, Concrete, this, conformance.getOpaqueValue(),
                          nullptr, nullptr),
                         (Concrete, this, conformance),
-                        0, WrittenRequirementLoc());
+                        0, SourceLoc());
 }
 
 const RequirementSource *RequirementSource::viaConcrete(
@@ -1237,7 +1234,7 @@ const RequirementSource *RequirementSource::viaConcrete(
                         (nodeID, Concrete, this, existentialType.getPointer(),
                          nullptr, nullptr),
                         (Concrete, this, existentialType),
-                        0, WrittenRequirementLoc());
+                        0, SourceLoc());
 }
 
 const RequirementSource *RequirementSource::viaParent(
@@ -1246,7 +1243,7 @@ const RequirementSource *RequirementSource::viaParent(
   REQUIREMENT_SOURCE_FACTORY_BODY(
                         (nodeID, Parent, this, assocType, nullptr, nullptr),
                         (Parent, this, assocType),
-                        0, WrittenRequirementLoc());
+                        0, SourceLoc());
 }
 
 const RequirementSource *RequirementSource::viaLayout(
@@ -1256,7 +1253,7 @@ const RequirementSource *RequirementSource::viaLayout(
                         (nodeID, Layout, this, superclass.getPointer(),
                          nullptr, nullptr),
                         (Layout, this, superclass),
-                        0, WrittenRequirementLoc());
+                        0, SourceLoc());
 }
 
 const RequirementSource *RequirementSource::viaEquivalentType(
@@ -1266,7 +1263,7 @@ const RequirementSource *RequirementSource::viaEquivalentType(
                         (nodeID, EquivalentType, this, newType.getPointer(),
                          nullptr, nullptr),
                         (EquivalentType, this, newType),
-                        0, WrittenRequirementLoc());
+                        0, SourceLoc());
 }
 
 #undef REQUIREMENT_SOURCE_FACTORY_BODY
@@ -1303,13 +1300,13 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
     return parent->withoutRedundantSubpath(builder, start, end)
       ->viaProtocolRequirement(builder, getStoredType(),
                                getProtocolDecl(), /*inferred=*/false,
-                               getWrittenRequirementLoc());
+                               getSourceLoc());
 
   case InferredProtocolRequirement:
     return parent->withoutRedundantSubpath(builder, start, end)
       ->viaProtocolRequirement(builder, getStoredType(),
                                getProtocolDecl(), /*inferred=*/true,
-                               getWrittenRequirementLoc());
+                               getSourceLoc());
 
   case Concrete:
     if (auto existentialType = getStoredType()) {
@@ -1459,11 +1456,9 @@ SourceLoc RequirementSource::getLoc() const {
       parent->kind != RequirementSignatureSelf)
     return parent->getLoc();
 
-  if (auto typeRepr = getTypeRepr())
-    return typeRepr->getStartLoc();
-
-  if (auto requirementRepr = getRequirementRepr())
-    return requirementRepr->getSeparatorLoc();
+  auto loc = getSourceLoc();
+  if (loc.isValid())
+    return loc;
 
   if (parent)
     return parent->getLoc();
@@ -1614,8 +1609,8 @@ void RequirementSource::print(llvm::raw_ostream &out,
     break;
   }
 
-  if (getTypeRepr() || getRequirementRepr()) {
-    dumpSourceLoc(getLoc());
+  if (auto loc = getLoc()) {
+    dumpSourceLoc(loc);
   }
 }
 
@@ -1686,10 +1681,8 @@ const RequirementSource *FloatingRequirementSource::getSource(
 
 SourceLoc FloatingRequirementSource::getLoc() const {
   if (kind == Inferred || isExplicit()) {
-    if (auto typeRepr = loc.dyn_cast<const TypeRepr *>())
-      return typeRepr->getLoc();
-    if (auto requirementRepr = loc.dyn_cast<const RequirementRepr *>())
-      return requirementRepr->getSeparatorLoc();
+    if (loc.isValid())
+      return loc;
   }
 
   if (source)
@@ -1790,9 +1783,10 @@ bool FloatingRequirementSource::isExplicit() const {
 
 FloatingRequirementSource FloatingRequirementSource::asInferred(
                                           const TypeRepr *typeRepr) const {
+  auto loc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
   switch (kind) {
   case Explicit:
-    return forInferred(typeRepr);
+    return forInferred(loc);
 
   case Inferred:
   case Resolved:
@@ -1801,8 +1795,7 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
 
   case ProtocolRequirement:
   case InferredProtocolRequirement:
-    return viaProtocolRequirement(source, protocol, typeRepr,
-                                  /*inferred=*/true);
+    return viaProtocolRequirement(source, protocol, loc, /*inferred=*/true);
   }
   llvm_unreachable("unhandled kind");
 }
@@ -2480,7 +2473,7 @@ void GenericSignatureBuilder::addConditionalRequirements(
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
-    auto source = FloatingRequirementSource::forInferred(nullptr);
+    auto source = FloatingRequirementSource::forInferred(SourceLoc());
     for (auto requirement : conformance.getConditionalRequirements()) {
       addRequirement(requirement, source, inferForModule);
       ++NumConditionalRequirementsAdded;
@@ -4259,9 +4252,9 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
           return false;
 
         auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
-            source, proto, reqRepr, /*inferred=*/false);
-        addRequirement(req, reqRepr, innerSource, &protocolSubMap,
-                       nullptr);
+            source, proto, reqRepr->getSeparatorLoc(), /*inferred=*/false);
+        addRequirement(req, reqRepr, innerSource,
+                       &protocolSubMap, nullptr);
         return false;
       });
 
@@ -4371,7 +4364,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
     auto inferredSameTypeSource =
       FloatingRequirementSource::viaProtocolRequirement(
-                    source, proto, WrittenRequirementLoc(), /*inferred=*/true);
+                    source, proto, SourceLoc(), /*inferred=*/true);
 
     auto rawReq = Requirement(RequirementKind::SameType, firstType, secondType);
     if (auto req = rawReq.subst(protocolSubMap))
@@ -4401,7 +4394,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
             return false;
 
           auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
-              source, proto, reqRepr, /*inferred=*/false);
+              source, proto, reqRepr->getSeparatorLoc(), /*inferred=*/false);
           addRequirement(req, reqRepr, innerSource, &protocolSubMap,
                          /*inferForModule=*/nullptr);
           return false;
@@ -5324,29 +5317,27 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                              ModuleDecl *inferForModule) {
   // Local function to get the source.
   auto getFloatingSource = [&](const TypeRepr *typeRepr, bool forInferred) {
+    auto loc = typeRepr ? typeRepr->getStartLoc() : SourceLoc();
+
     if (parentSource) {
+      ProtocolDecl *proto;
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-        auto proto = assocType->getProtocol();
-        return FloatingRequirementSource::viaProtocolRequirement(
-          parentSource, proto, typeRepr, forInferred);
+        proto = assocType->getProtocol();
+      } else {
+        proto = cast<ProtocolDecl>(decl);
       }
 
-      auto proto = cast<ProtocolDecl>(decl);
       return FloatingRequirementSource::viaProtocolRequirement(
-        parentSource, proto, typeRepr, forInferred);
+        parentSource, proto, loc, forInferred);
     }
 
     // We are inferring requirements.
     if (forInferred) {
-      return FloatingRequirementSource::forInferred(typeRepr);
+      return FloatingRequirementSource::forInferred(loc);
     }
 
     // Explicit requirement.
-    if (typeRepr)
-      return FloatingRequirementSource::forExplicit(typeRepr);
-
-    // An abstract explicit requirement.
-    return FloatingRequirementSource::forAbstract();
+    return FloatingRequirementSource::forExplicit(loc);
   };
 
   auto visitType = [&](Type inheritedType, const TypeRepr *typeRepr) {
@@ -5576,7 +5567,8 @@ void GenericSignatureBuilder::inferRequirements(
                                           ParameterList *params) {
   for (auto P : *params) {
     inferRequirements(module, P->getInterfaceType(),
-                      FloatingRequirementSource::forInferred(P->getTypeRepr()));
+                      FloatingRequirementSource::forInferred(
+                        P->getTypeRepr()->getStartLoc()));
   }
 }
 
@@ -8839,7 +8831,8 @@ InferredGenericSignatureRequest::evaluate(
 
   const auto visitRequirement = [&](const Requirement &req,
                                     RequirementRepr *reqRepr) {
-    const auto source = FloatingRequirementSource::forExplicit(reqRepr);
+    const auto source = FloatingRequirementSource::forExplicit(
+      reqRepr->getSeparatorLoc());
 
     // If we're extending a protocol and adding a redundant requirement,
     // for example, `extension Foo where Self: Foo`, then emit a
@@ -8932,8 +8925,10 @@ InferredGenericSignatureRequest::evaluate(
       
   /// Perform any remaining requirement inference.
   for (auto sourcePair : inferenceSources) {
+    auto *typeRepr = sourcePair.getTypeRepr();
     auto source =
-      FloatingRequirementSource::forInferred(sourcePair.getTypeRepr());
+      FloatingRequirementSource::forInferred(
+        typeRepr ? typeRepr->getStartLoc() : SourceLoc());
 
     builder.inferRequirements(*parentModule,
                               sourcePair.getType(),
@@ -8942,7 +8937,7 @@ InferredGenericSignatureRequest::evaluate(
   
   // Finish by adding any remaining requirements.
   auto source =
-    FloatingRequirementSource::forInferred(nullptr);
+    FloatingRequirementSource::forInferred(SourceLoc());
       
   for (const auto &req : addedRequirements)
     builder.addRequirement(req, source, parentModule);
