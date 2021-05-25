@@ -206,6 +206,12 @@ struct DefaultInit {
   }
 }
 
+@propertyWrapper
+struct DefaultWrappedValue {
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local19DefaultWrappedValueVACycfC : $@convention(method) (@thin DefaultWrappedValue.Type) -> DefaultWrappedValue
+  var wrappedValue: Int = 10
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local20testLocalDefaultInityyF : $@convention(thin) () -> ()
 func testLocalDefaultInit() {
   // CHECK: function_ref @$s22property_wrapper_local11DefaultInitVACycfC : $@convention(method) (@thin DefaultInit.Type) -> DefaultInit
@@ -216,4 +222,7 @@ func testLocalDefaultInit() {
 
   // CHECK: function_ref @$s22property_wrapper_local11DefaultInitVACycfC : $@convention(method) (@thin DefaultInit.Type) -> DefaultInit
   @DefaultInit() var y: Int
+
+  // CHECK: function_ref @$s22property_wrapper_local19DefaultWrappedValueVACycfC : $@convention(method) (@thin DefaultWrappedValue.Type) -> DefaultWrappedValue
+  @DefaultWrappedValue var w: Int
 }

@@ -2875,10 +2875,16 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
       if (!parentPBD->isInitialized(patternNumber) && wrapperInfo.defaultInit) {
         // FIXME: Record this expression somewhere so that DI can perform the
         // initialization itself.
-        Expr *initializer = nullptr;
-        typeCheckSynthesizedWrapperInitializer(var, initializer);
-        pbd->setInit(0, initializer);
+        Expr *defaultInit = nullptr;
+        typeCheckSynthesizedWrapperInitializer(var, defaultInit);
+        pbd->setInit(0, defaultInit);
         pbd->setInitializerChecked(0);
+
+        // If a static, global, or local wrapped property has a default
+        // initializer, this is the only initializer that will be used.
+        if (var->isStatic() || !dc->isTypeContext()) {
+          initializer = defaultInit;
+        }
       } else if (var->hasObservers() && !dc->isTypeContext()) {
         var->diagnose(diag::observingprop_requires_initializer);
       }
