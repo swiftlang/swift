@@ -72,3 +72,33 @@ function(add_overlay_targets_single overlay)
 
   #add_dependencies(sdk-overlay ${xcode_overlay_target_name})
 endfunction()
+
+function(remove_overlay_from_build overlay)
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs "TARGET_SDKS")
+
+  cmake_parse_arguments(ROFB "${options}" "${oneValueArgs}"
+                                "${multiValueArgs}" ${ARGN} )
+
+  foreach(sdk ${ROFB_TARGET_SDKS})
+    remove_overlay_from_build_single(
+      ${overlay}
+      TARGET_SDK ${sdk})
+  endforeach()
+endfunction()
+
+function(remove_overlay_from_build_single overlay)
+  set(options)
+  set(oneValueArgs "TARGET_SDK")
+  set(multiValueArgs)
+
+  cmake_parse_arguments(ROFB "${options}" "${oneValueArgs}"
+                                "${multiValueArgs}" ${ARGN} )
+
+  set(sdk ${ROFB_TARGET_SDK})
+  set(sdk_name ${SWIFT_SDK_${sdk}_LIB_SUBDIR})
+
+  file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/libswift${overlay}.dylib)
+  file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/${overlay})
+endfunction()
