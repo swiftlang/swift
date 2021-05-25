@@ -790,6 +790,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
+  case DAK_ActorIndependent:
     if (DeclAttribute::isDeclModifier(getKind())) {
       Printer.printKeyword(getAttrName(), Options);
     } else if (Options.IsForSwiftInterface && getKind() == DAK_ResultBuilder) {
@@ -1176,6 +1177,15 @@ StringRef DeclAttribute::getAttrName() const {
       return "inline(__always)";
     }
     llvm_unreachable("Invalid inline kind");
+  }
+  case DAK_ActorIndependent: {
+    switch (cast<ActorIndependentAttr>(this)->getKind()) {
+    case ActorIndependentKind::Safe:
+      return "actorIndependent";
+    case ActorIndependentKind::Unsafe:
+      return "actorIndependent(unsafe)";
+    }
+    llvm_unreachable("Invalid actorIndependent kind");
   }
   case DAK_Optimize: {
     switch (cast<OptimizeAttr>(this)->getMode()) {

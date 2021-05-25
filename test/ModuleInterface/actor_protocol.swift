@@ -14,13 +14,13 @@
 // CHECK: public actor PlainActorClass {
 @available(SwiftStdlib 5.5, *)
 public actor PlainActorClass {
-  nonisolated public func enqueue(_ job: UnownedJob) { }
+  @actorIndependent public func enqueue(_ job: UnownedJob) { }
 }
 
 // CHECK: public actor ExplicitActorClass : _Concurrency.Actor {
 @available(SwiftStdlib 5.5, *)
 public actor ExplicitActorClass : Actor {
-  nonisolated public func enqueue(_ job: UnownedJob) { }
+  @actorIndependent public func enqueue(_ job: UnownedJob) { }
 }
 
 // CHECK: public actor EmptyActor {
@@ -41,7 +41,7 @@ public protocol Cat : Actor {
 @available(SwiftStdlib 5.5, *)
 public actor HouseCat : Cat {
   nonisolated public func mew() {}
-  nonisolated public func enqueue(_ job: UnownedJob) { }
+  @actorIndependent public func enqueue(_ job: UnownedJob) { }
 }
 
 // CHECK: public protocol ToothyMouth {
@@ -54,5 +54,5 @@ public protocol ToothyMouth {
 @available(SwiftStdlib 5.5, *)
 public actor Lion : ToothyMouth, Actor {
   nonisolated public func chew() {}
-  nonisolated public func enqueue(_ job: UnownedJob) { }
+  @actorIndependent public func enqueue(_ job: UnownedJob) { }
 }

@@ -9,23 +9,12 @@
 actor Page {
     let initialNumWords : Int
 
-    private let numWordsMem: UnsafeMutablePointer<Int>
-
-    nonisolated
-    var numWords : Int {
-      get { numWordsMem.pointee }
-      set { numWordsMem.pointee = newValue }
-    }
+    @actorIndependent(unsafe)
+    var numWords : Int
 
     init(_ words : Int) {
-        initialNumWords = words
-        numWordsMem = .allocate(capacity: 1)
-        numWordsMem.initialize(to: words)
         numWords = words
-    }
-
-    deinit {
-      numWordsMem.deallocate()
+        initialNumWords = words
     }
 }
 
@@ -40,7 +29,7 @@ actor Book {
         pages = stack
     }
 
-    nonisolated
+    @actorIndependent
     subscript(_ page : Int) -> Page {
         return pages[page]
     }
