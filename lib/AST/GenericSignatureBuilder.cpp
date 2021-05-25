@@ -2488,28 +2488,17 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
   llvm_unreachable("unhandled handling");
 }
 
-bool GenericSignatureBuilder::addConditionalRequirements(
-    ProtocolConformanceRef conformance, ModuleDecl *inferForModule,
-    SourceLoc loc) {
+void GenericSignatureBuilder::addConditionalRequirements(
+    ProtocolConformanceRef conformance, ModuleDecl *inferForModule) {
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
-    if (auto condReqs = conformance.getConditionalRequirementsIfAvailable()) {
-      auto source = FloatingRequirementSource::forInferred(nullptr);
-      for (auto requirement : *condReqs) {
-        addRequirement(requirement, source, inferForModule);
-        ++NumConditionalRequirementsAdded;
-      }
-    } else {
-      if (loc.isValid())
-        Diags.diagnose(loc, diag::unsupported_recursive_requirements);
-
-      Impl->HadAnyError = true;
-      return true;
+    auto source = FloatingRequirementSource::forInferred(nullptr);
+    for (auto requirement : conformance.getConditionalRequirements()) {
+      addRequirement(requirement, source, inferForModule);
+      ++NumConditionalRequirementsAdded;
     }
   }
-
-  return false;
 }
 
 const RequirementSource *
@@ -2576,9 +2565,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
       });
 
   if (hasExplicitSource) {
-    if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
-                                   concreteSource->getLoc()))
-      return nullptr;
+    addConditionalRequirements(conformance, /*inferForModule=*/nullptr);
   }
 
   return concreteSource;
@@ -2619,9 +2606,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
     });
 
   if (hasExplicitSource) {
-    if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
-                                   superclassSource->getLoc()))
-      return nullptr;
+    addConditionalRequirements(conformance, /*inferForModule=*/nullptr);
   }
 
   return superclassSource;
@@ -4833,9 +4818,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         if (conformance) {
           // Only infer conditional requirements from explicit sources.
           if (!source.isDerived()) {
-            if (addConditionalRequirements(conformance, inferForModule,
-                                           source.getLoc()))
-              return ConstraintResult::Conflicting;
+            addConditionalRequirements(conformance, inferForModule);
           }
         }
       }
