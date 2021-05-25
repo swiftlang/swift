@@ -137,6 +137,7 @@ EXPECTED_DEFAULTS = {
         defaults.DARWIN_DEPLOYMENT_VERSION_TVOS,
     'darwin_deployment_version_watchos':
         defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
+    'darwin_overlays_from_sdks': False,
     'darwin_symroot_path_filters': [],
     'darwin_xcrun_toolchain': None,
     'distcc': False,
@@ -654,6 +655,7 @@ EXPECTED_OPTIONS = [
     StrOption('--stdlib-deployment-targets'),
     StrOption('--swift-darwin-module-archs'),
     StrOption('--swift-darwin-supported-archs'),
+    EnableOption('--darwin-overlays-from-sdks'),
 
     PathOption('--android-deploy-device-path'),
     PathOption('--android-icu-i18n'),

@@ -468,6 +468,9 @@ def create_argument_parser():
            default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for watchOS')
+    option('--darwin-overlays-from-sdks', toggle_true,
+           help='Use the overlays from the SDKs instead of building '
+           'our own')
 
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
