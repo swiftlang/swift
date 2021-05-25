@@ -128,7 +128,7 @@ public:
         DebugTypeInfo::getFromTypeInfo(Ty, Info));
   }
 
-  Size::int_type getSizeValue() const { return size.getValue().getValue(); }
+  Size::int_type getSizeValue() const { return size->getValue(); }
 };
 
 }
