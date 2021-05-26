@@ -3676,10 +3676,16 @@ static bool diagnoseAmbiguity(
         assert(fn);
 
         if (fn->getNumParams() == 1) {
+          auto argExpr =
+              simplifyLocatorToAnchor(solution.Fixes.front()->getLocator());
+          assert(argExpr);
+
           const auto &param = fn->getParams()[0];
+          auto argType = solution.simplifyType(cs.getType(argExpr));
+
           DE.diagnose(noteLoc, diag::candidate_has_invalid_argument_at_position,
                       solution.simplifyType(param.getPlainType()),
-                      /*position=*/1, param.isInOut());
+                      /*position=*/1, param.isInOut(), argType);
         } else {
           DE.diagnose(noteLoc, diag::candidate_partial_match,
                       fn->getParamListAsString(fn->getParams()));

@@ -349,8 +349,8 @@ takeVoidVoidFn { () -> Void in
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
-func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1}}
-func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1}}
+func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'T')}}
+func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T')}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
