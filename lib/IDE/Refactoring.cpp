@@ -1304,7 +1304,9 @@ bool RefactoringActionExtractFunction::performChange() {
     }
     OS << ")";
 
-    if (RangeInfo.ThrowingUnhandledError)
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Async))
+      OS << " async";
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Throws))
       OS << " " << tok::kw_throws;
 
     bool InsertedReturnType = false;
@@ -1332,6 +1334,12 @@ bool RefactoringActionExtractFunction::performChange() {
     llvm::raw_svector_ostream OS(Buffer);
     if (RangeInfo.exit() == ExitState::Positive)
       OS << tok::kw_return <<" ";
+
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Throws))
+      OS << tok::kw_try << " ";
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Async))
+      OS << "await ";
+
     CallNameOffset = Buffer.size() - ReplaceBegin;
     OS << PreferredName << "(";
     for (auto &RD : Parameters) {
