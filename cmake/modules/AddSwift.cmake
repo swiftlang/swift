@@ -92,7 +92,16 @@ function(_add_host_variant_c_compile_link_flags name)
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${target}>)
+    # We always link as cxx language today using clang so we do not need to
+    # conditionalize this on target_link_options.
     target_link_options(${name} PRIVATE -target;${target})
+  endif()
+
+  if (CMAKE_Swift_COMPILER)
+    get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
+      MACCATALYST_BUILD_FLAVOR ""
+      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
   endif()
 
   set(_sysroot
