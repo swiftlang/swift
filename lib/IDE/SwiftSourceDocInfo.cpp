@@ -724,8 +724,11 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) const {
     OS << "<Entry>Multi</Entry>\n";
   }
 
-  if (ThrowingUnhandledError) {
+  if (UnhandledEffects.contains(EffectKind::Throws)) {
     OS << "<Error>Throwing</Error>\n";
+  }
+  if (UnhandledEffects.contains(EffectKind::Async)) {
+    OS << "<Effect>Async</Effect>\n";
   }
 
   if (Orphan != OrphanKind::None) {

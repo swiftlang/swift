@@ -1304,7 +1304,9 @@ bool RefactoringActionExtractFunction::performChange() {
     }
     OS << ")";
 
-    if (RangeInfo.ThrowingUnhandledError)
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Async))
+      OS << " async";
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Throws))
       OS << " " << tok::kw_throws;
 
     bool InsertedReturnType = false;
@@ -1335,6 +1337,8 @@ bool RefactoringActionExtractFunction::performChange() {
 
     if (RangeInfo.UnhandledEffects.contains(EffectKind::Throws))
       OS << tok::kw_try << " ";
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Async))
+      OS << "await ";
 
     CallNameOffset = Buffer.size() - ReplaceBegin;
     OS << PreferredName << "(";
