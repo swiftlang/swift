@@ -761,6 +761,11 @@ static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+AllowCompilerErrors("allow-compiler-errors",
+                    llvm::cl::desc("Whether to attempt to continue despite compiler errors"),
+                    llvm::cl::init(false));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -3917,6 +3922,12 @@ int main(int argc, char *argv[]) {
       options::ExplicitSwiftModuleMap;
     InitInvok.getFrontendOptions().DisableImplicitModules = true;
   }
+
+  if (options::AllowCompilerErrors) {
+    InitInvok.getFrontendOptions().AllowModuleWithCompilerErrors = true;
+    InitInvok.getLangOptions().AllowModuleWithCompilerErrors = true;
+  }
+
   // Process the clang arguments last and allow them to override previously
   // set options.
   if (!CCArgs.empty()) {
