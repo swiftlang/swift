@@ -323,6 +323,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       arguments.push_back("-enable-anonymous-context-mangled-names");
   }
 
+  if (!inputArgs.hasArg(options::OPT_skip_swifttailcc_musttail_check)) {
+    arguments.push_back("-Xllvm");
+    arguments.push_back("-enable-swifttailcc-musttail-check");
+  }
+
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
