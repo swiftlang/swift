@@ -1332,6 +1332,10 @@ bool RefactoringActionExtractFunction::performChange() {
     llvm::raw_svector_ostream OS(Buffer);
     if (RangeInfo.exit() == ExitState::Positive)
       OS << tok::kw_return <<" ";
+
+    if (RangeInfo.UnhandledEffects.contains(EffectKind::Throws))
+      OS << tok::kw_try << " ";
+
     CallNameOffset = Buffer.size() - ReplaceBegin;
     OS << PreferredName << "(";
     for (auto &RD : Parameters) {
