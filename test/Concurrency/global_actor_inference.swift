@@ -255,20 +255,20 @@ func barSync() {
 @propertyWrapper
 @OtherGlobalActor
 struct WrapperOnActor<Wrapped> {
-  private var stored: Wrapped
+  @actorIndependent(unsafe) private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
     stored = wrappedValue
   }
 
   @MainActor var wrappedValue: Wrapped {
-    get { }
-    set { }
+    get { stored }
+    set { stored = newValue }
   }
 
   @SomeGlobalActor var projectedValue: Wrapped {
-    get {  }
-    set { }
+    get { stored }
+    set { stored = newValue }
   }
 }
 
@@ -285,20 +285,20 @@ public struct WrapperOnMainActor<Wrapped> {
 
 @propertyWrapper
 actor WrapperActor<Wrapped> {
-  var storage: Wrapped
+  @actorIndependent(unsafe) var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
     storage = wrappedValue
   }
 
   nonisolated var wrappedValue: Wrapped {
-    get { }
-    set { }
+    get { storage }
+    set { storage = newValue }
   }
 
   nonisolated var projectedValue: Wrapped {
-    get { }
-    set { }
+    get { storage }
+    set { storage = newValue }
   }
 }
 
@@ -344,21 +344,28 @@ actor WrapperActorBad1<Wrapped> {
 
 @propertyWrapper
 actor WrapperActorBad2<Wrapped> {
-  var storage: Wrapped
+  @actorIndependent(unsafe) var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
     storage = wrappedValue
   }
 
   nonisolated var wrappedValue: Wrapped {
-    get { }
-    set { }
+    get { storage }
+    set { storage = newValue }
   }
 
   var projectedValue: Wrapped { // expected-error{{'projectedValue' property in property wrapper type 'WrapperActorBad2' cannot be isolated to the actor instance; consider 'nonisolated'}}
-    get {  }
-    set {  }
+    get { storage }
+    set { storage = newValue }
   }
+}
+
+@propertyWrapper
+struct WrapperWithMainActorDefaultInit {
+  var wrappedValue: Int { fatalError() }
+
+  @MainActor init() {} // expected-note {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 }
 
 actor ActorWithWrapper {
@@ -368,12 +375,14 @@ actor ActorWithWrapper {
     _ = synced // expected-error{{'synced' isolated to global actor}}
     _ = $synced // expected-error{{'$synced' isolated to global actor}}
     _ = _synced // expected-error{{'_synced' isolated to global actor}}
+
+    @WrapperWithMainActorDefaultInit var value: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   }
 }
 
 @propertyWrapper
 struct WrapperOnSomeGlobalActor<Wrapped> {
-  private var stored: Wrapped
+  @actorIndependent(unsafe) private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
     stored = wrappedValue
@@ -441,20 +450,20 @@ class UGASubclass2: UGAClass {
 @propertyWrapper
 @OtherGlobalActor(unsafe)
 struct WrapperOnUnsafeActor<Wrapped> {
-  private var stored: Wrapped
+  @actorIndependent(unsafe) private var stored: Wrapped
 
   init(wrappedValue: Wrapped) {
     stored = wrappedValue
   }
 
   @MainActor(unsafe) var wrappedValue: Wrapped {
-    get { }
-    set { }
+    get { stored }
+    set { stored = newValue }
   }
 
   @SomeGlobalActor(unsafe) var projectedValue: Wrapped {
-    get { }
-    set { }
+    get { stored }
+    set { stored = newValue }
   }
 }
 
@@ -481,13 +490,14 @@ struct HasWrapperOnUnsafeActor {
 }
 
 // ----------------------------------------------------------------------
-// Nonisolated closures
+// Actor-independent closures
 // ----------------------------------------------------------------------
-@SomeGlobalActor func getGlobal7() -> Int { 7 }
+@SomeGlobalActor func getGlobal7() -> Int { 7 } // expected-note{{calls to global function 'getGlobal7()' from outside of its actor context are implicitly asynchronous}}
 func acceptClosure<T>(_: () -> T) { }
 
 @SomeGlobalActor func someGlobalActorFunc() async {
   acceptClosure { getGlobal7() } // okay
+  acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'getGlobal7()' in a synchronous nonisolated context}}
 }
 
 // ----------------------------------------------------------------------

@@ -11,6 +11,9 @@
 // https://bugs.swift.org/browse/SR-14466
 // UNSUPPORTED: OS=windows-msvc
 
+// Race condition
+// REQUIRES: rdar78033828
+
 import _Concurrency
 import StdlibUnittest
 import Dispatch

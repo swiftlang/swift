@@ -194,12 +194,7 @@ AsyncTask::~AsyncTask() {
     futureFragment()->destroy();
   }
 
-  // Release any objects potentially held as task local values.
-  //
-  // This must be called last when destroying a task - to keep stack discipline of the allocator.
-  // because it may have created some task-locals immediately upon creation,
-  // e.g. if the task is spawned with async{} and inherited some task-locals.
-  Local.destroy(this);
+  Private.destroy();
 }
 
 SWIFT_CC(swift)
@@ -288,13 +283,7 @@ static void completeTaskImpl(AsyncTask *task,
       reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
   asyncContextPrefix->errorResult = error;
 
-  // Destroy and deallocate any remaining task local items.
-  // We need to do this before we destroy the task local deallocator.
-  task->Local.destroy(task);
-
-  // Tear down the task-local allocator immediately;
-  // there's no need to wait for the object to be destroyed.
-  _swift_task_alloc_destroy(task);
+  task->Private.complete(task);
 
 #if SWIFT_TASK_PRINTF_DEBUG
   fprintf(stderr, "[%p] task %p completed\n", pthread_self(), task);
@@ -526,6 +515,19 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   fprintf(stderr, "[%p] creating task %p with parent %p\n", pthread_self(), task, parent);
 #endif
 
+  // Initialize the task-local allocator.
+  if (isAsyncLetTask) {
+    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+                                                   &completeTask);
+    assert(parent);
+    void *initialSlab = (char*)allocation + amountToAllocate;
+    task->Private.initializeWithSlab(task, initialSlab, initialSlabSize);
+  } else {
+    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+        closureContext ? &completeTaskWithClosure : &completeTaskAndRelease);
+    task->Private.initialize(task);
+  }
+
   // Perform additional linking between parent and child task.
   if (parent) {
     // If the parent was already cancelled, we carry this flag forward to the child.
@@ -535,6 +537,9 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     // so they may have been spawned in any case still.
     if (swift_task_isCancelled(parent))
       swift_task_cancel(task);
+
+    // Initialize task locals with a link to the parent task.
+    task->_private().Local.initializeLinkParent(task, parent);
   }
 
   // Configure the initial context.
@@ -546,26 +551,6 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   initialContext->Parent = nullptr;
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
-
-  // Initialize the task-local allocator.
-  if (isAsyncLetTask) {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-                                                   &completeTask);
-    assert(parent);
-    void *initialSlab = (char*)allocation + amountToAllocate;
-    _swift_task_alloc_initialize_with_slab(task, initialSlab, initialSlabSize);
-  } else {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-        closureContext ? &completeTaskWithClosure : &completeTaskAndRelease);
-    _swift_task_alloc_initialize(task);
-  }
-
-  // TODO: if the allocator would be prepared earlier we could do this in some
-  //       other existing if-parent if rather than adding another one here.
-  if (parent) {
-    // Initialize task locals with a link to the parent task.
-    task->Local.initializeLinkParent(task, parent);
-  }
 
   return {task, initialContext};
 }

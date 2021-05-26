@@ -2622,6 +2622,11 @@ private:
     C.notifyInserted(TheInst);
 
 #ifndef NDEBUG
+    // If we are inserting into a specific function (rather than a block for a
+    // global_addr), verify that our instruction/the associated location are in
+    // sync. We don't care if an instruction is used in global_addr.
+    if (F)
+      TheInst->verifyDebugInfo();
     TheInst->verifyOperandOwnership();
 #endif
   }

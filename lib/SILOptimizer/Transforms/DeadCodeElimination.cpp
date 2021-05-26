@@ -282,10 +282,10 @@ void DCE::markLive() {
             OwnershipKind::Owned) {
           markInstructionLive(borrowInst);
           // Visit all end_borrows and mark them live
-          auto visitEndBorrow = [&](EndBorrowInst *endBorrow) {
-            markInstructionLive(endBorrow);
-          };
-          visitTransitiveEndBorrows(borrowInst, visitEndBorrow);
+          visitTransitiveEndBorrows(BorrowedValue(borrowInst),
+            [&](EndBorrowInst *endBorrow) {
+              markInstructionLive(endBorrow);
+            });
           continue;
         }
         // If not populate reborrowDependencies for this borrow

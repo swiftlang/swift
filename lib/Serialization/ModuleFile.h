@@ -478,9 +478,13 @@ public:
 
   /// Whether this module is compiled while allowing errors
   /// ('-experimental-allow-module-with-compiler-errors').
-  bool isAllowModuleWithCompilerErrorsEnabled() const {
+  bool compiledAllowingCompilerErrors() const {
     return Core->Bits.IsAllowModuleWithCompilerErrorsEnabled;
   }
+
+  /// Whether currently allowing modules with compiler errors (ie.
+  /// '-experimental-allow-module-with-compiler-errors' is currently enabled).
+  bool allowCompilerErrors() const;
 
   /// \c true if this module has incremental dependency information.
   bool hasIncrementalInfo() const { return Core->hasIncrementalInfo(); }

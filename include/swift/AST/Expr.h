@@ -4738,17 +4738,26 @@ public:
 /// BinaryExpr - Infix binary expressions like 'x+y'.  The argument is always
 /// an implicit tuple expression of the type expected by the function.
 class BinaryExpr : public ApplyExpr {
+  BinaryExpr(Expr *fn, TupleExpr *arg, bool implicit, Type ty = Type())
+      : ApplyExpr(ExprKind::Binary, fn, arg, implicit, ty) {
+    assert(arg->getNumElements() == 2);
+  }
+
 public:
-  BinaryExpr(Expr *Fn, TupleExpr *Arg, bool Implicit, Type Ty = Type())
-    : ApplyExpr(ExprKind::Binary, Fn, Arg, Implicit, Ty) {}
+  static BinaryExpr *create(ASTContext &ctx, Expr *lhs, Expr *fn, Expr *rhs,
+                            bool implicit, Type ty = Type());
+
+  /// The left-hand argument of the binary operation.
+  Expr *getLHS() const { return cast<TupleExpr>(getArg())->getElement(0); }
+
+  /// The right-hand argument of the binary operation.
+  Expr *getRHS() const { return cast<TupleExpr>(getArg())->getElement(1); }
 
   SourceLoc getLoc() const { return getFn()->getLoc(); }
 
   SourceRange getSourceRange() const { return getArg()->getSourceRange(); }
   SourceLoc getStartLoc() const { return getArg()->getStartLoc(); }
   SourceLoc getEndLoc() const { return getArg()->getEndLoc(); }
-
-  TupleExpr *getArg() const { return cast<TupleExpr>(ApplyExpr::getArg()); }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Binary;}
 };
@@ -5884,7 +5893,10 @@ public:
   /// Indicates if the key path expression is composed by a single invalid
   /// component. e.g. missing component `\Root`
   bool hasSingleInvalidComponent() const {
-    return Components.size() == 1 && !Components.front().isValid();
+    if (ParsedRoot && ParsedRoot->getKind() == ExprKind::Type) {
+      return Components.size() == 1 && !Components.front().isValid();
+    }
+    return false;
   }
 
   /// Retrieve the string literal expression, which will be \c NULL prior to

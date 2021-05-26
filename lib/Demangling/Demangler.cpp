@@ -2537,6 +2537,20 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       return createNode(Node::Kind::OutlinedBridgedMethod, Params);
     }
     case 'u': return createNode(Node::Kind::AsyncFunctionPointer);
+    case 'U': {
+      auto globalActor = popNode(Node::Kind::Type);
+      if (!globalActor)
+        return nullptr;
+      
+      auto reabstraction = popNode();
+      if (!reabstraction)
+        return nullptr;
+      
+      auto node = createNode(Node::Kind::ReabstractionThunkHelperWithGlobalActor);
+      node->addChild(reabstraction, *this);
+      node->addChild(globalActor, *this);
+      return node;
+    }
     case 'J':
       switch (peekChar()) {
       case 'S':

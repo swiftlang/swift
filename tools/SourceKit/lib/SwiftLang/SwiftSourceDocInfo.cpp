@@ -639,7 +639,7 @@ static void mapLocToLatestSnapshot(
   }
 
   std::tie(Location.Line, Location.Column) =
-      EditorDoc->getLineAndColumnInBuffer(Location.Offset);
+      LatestSnap->getBuffer()->getLineAndColumn(Location.Offset);
 }
 
 
@@ -1788,8 +1788,10 @@ void SwiftLangSupport::getCursorInfo(
   std::string Error;
   SwiftInvocationRef Invok =
       ASTMgr->getInvocation(Args, InputFile, fileSystem, Error);
+  if (!Error.empty()) {
+    LOG_WARN_FUNC("error creating ASTInvocation: " << Error);
+  }
   if (!Invok) {
-    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<CursorInfoData>::fromError(Error));
     return;
   }

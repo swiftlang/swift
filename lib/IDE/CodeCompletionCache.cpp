@@ -342,6 +342,10 @@ static void writeCachedModule(llvm::raw_ostream &out,
     endian::Writer LE(results, little);
     for (CodeCompletionResult *R : V.Sink.Results) {
       assert(!R->isArgumentLabels() && "Argument labels should not be cached");
+      assert(R->getNotRecommendedReason() !=
+             CodeCompletionResult::NotRecommendedReason::InvalidAsyncContext &&
+             "InvalidAsyncContext is decl context specific, cannot be cached");
+
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
       if (R->getKind() == CodeCompletionResult::Declaration)

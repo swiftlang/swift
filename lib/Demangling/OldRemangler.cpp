@@ -755,6 +755,10 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
 }
 
+void Remangler::mangleReabstractionThunkHelperWithGlobalActor(Node *node) {
+  Buffer << "<reabstraction-thunk-helper-with-global-actor>";
+}
+
 void Remangler::mangleAutoDiffFunction(Node *node, EntityContext &ctx) {
   Buffer << "<autodiff-function>";
 }

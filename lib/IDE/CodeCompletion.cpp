@@ -1670,6 +1670,7 @@ public:
   void completeAfterIfStmt(bool hasElse) override;
   void completeStmtLabel(StmtKind ParentKind) override;
   void completeForEachPatternBeginning(bool hasTry, bool hasAwait) override;
+  void completeTypeAttrBeginning() override;
 
   void doneParsing() override;
 
@@ -1883,6 +1884,10 @@ public:
   bool FoundFunctionsWithoutFirstKeyword = false;
 
 private:
+  bool isForCaching() const {
+    return Kind == LookupKind::ImportFromModule;
+  }
+
   void foundFunction(const AbstractFunctionDecl *AFD) {
     FoundFunctionCalls = true;
     const DeclName Name = AFD->getName();
@@ -2078,6 +2083,12 @@ public:
     IncludeInstanceMembers = true;
   }
 
+  bool isHiddenModuleName(Identifier Name) {
+    return (Name.str().startswith("_") ||
+            Name == Ctx.SwiftShimsModuleName ||
+            Name.str() == SWIFT_ONONE_SUPPORT);
+  }
+
   void addSubModuleNames(std::vector<std::pair<std::string, bool>>
       &SubModuleNameVisibilityPairs) {
     for (auto &Pair : SubModuleNameVisibilityPairs) {
@@ -2142,10 +2153,7 @@ public:
 
     auto mainModuleName = CurrModule->getName();
     for (auto ModuleName : ModuleNames) {
-      if (ModuleName.str().startswith("_") ||
-          ModuleName == mainModuleName ||
-          ModuleName == Ctx.SwiftShimsModuleName ||
-          ModuleName.str() == SWIFT_ONONE_SUPPORT)
+      if (ModuleName == mainModuleName || isHiddenModuleName(ModuleName))
         continue;
 
       auto MD = ModuleDecl::create(ModuleName, Ctx);
@@ -2589,7 +2597,8 @@ public:
     }
     bool implicitlyAsync = false;
     analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
-    if (!NotRecommended && implicitlyAsync && !CanCurrDeclContextHandleAsync) {
+    if (!isForCaching() && !NotRecommended && implicitlyAsync &&
+        !CanCurrDeclContextHandleAsync) {
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
@@ -2931,7 +2940,7 @@ public:
       else
         addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-      if (AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
+      if (!isForCaching() && AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
       }
     };
@@ -3045,7 +3054,8 @@ public:
     bool implictlyAsync = false;
     analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
-    if (!NotRecommended && !IsImplicitlyCurriedInstanceMethod &&
+    if (!isForCaching() && !NotRecommended &&
+        !IsImplicitlyCurriedInstanceMethod &&
         ((AFT && AFT->isAsync()) || implictlyAsync) &&
         !CanCurrDeclContextHandleAsync) {
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
@@ -3245,7 +3255,8 @@ public:
         addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
       }
 
-      if (ConstructorType->isAsync() && !CanCurrDeclContextHandleAsync) {
+      if (!isForCaching() && ConstructorType->isAsync() &&
+          !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(NotRecommendedReason::InvalidAsyncContext);
       }
     };
@@ -3296,7 +3307,8 @@ public:
     bool implictlyAsync = false;
     analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
-    if (!NotRecommended && implictlyAsync && !CanCurrDeclContextHandleAsync) {
+    if (!isForCaching() && !NotRecommended && implictlyAsync &&
+        !CanCurrDeclContextHandleAsync) {
       NotRecommended = NotRecommendedReason::InvalidAsyncContext;
     }
 
@@ -4714,6 +4726,22 @@ public:
     }
   }
 
+  void getTypeAttributeKeywordCompletions() {
+    auto addTypeAttr = [&](StringRef Name) {
+      CodeCompletionResultBuilder Builder(
+          Sink,
+          CodeCompletionResult::ResultKind::Keyword,
+          SemanticContextKind::None, expectedTypeContext);
+      Builder.addAttributeKeyword(Name, "Type Attribute");
+    };
+    addTypeAttr("autoclosure");
+    addTypeAttr("convention(swift)");
+    addTypeAttr("convention(block)");
+    addTypeAttr("convention(c)");
+    addTypeAttr("convention(thin)");
+    addTypeAttr("escaping");
+  }
+
   void collectPrecedenceGroups() {
     assert(CurrDeclContext);
 
@@ -5847,6 +5875,11 @@ void CodeCompletionCallbacksImpl::completeForEachPatternBeginning(
     ParsedKeywords.emplace_back("await");
 }
 
+void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::TypeAttrBeginning;
+}
+
 static bool isDynamicLookup(Type T) {
   return T->getRValueType()->isAnyObject();
 }
@@ -5987,6 +6020,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::KeyPathExprSwift:
   case CompletionKind::PrecedenceGroup:
   case CompletionKind::StmtLabel:
+  case CompletionKind::TypeAttrBeginning:
     break;
 
   case CompletionKind::EffectsSpecifier: {
@@ -6226,6 +6260,25 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
 
+  SmallPtrSet<ModuleDecl *, 4> explictlyImportedModules;
+  {
+    // Collect modules directly imported in this SourceFile.
+    SmallVector<ImportedModule, 4> directImport;
+    SF.getImportedModules(directImport,
+                          {ModuleDecl::ImportFilterKind::Default,
+                           ModuleDecl::ImportFilterKind::ImplementationOnly});
+    for (auto import : directImport)
+      explictlyImportedModules.insert(import.importedModule);
+
+    // Exclude modules implicitly imported in the current module.
+    auto implicitImports = SF.getParentModule()->getImplicitImports();
+    for (auto import : implicitImports.imports)
+      explictlyImportedModules.erase(import.module.importedModule);
+
+    // Consider the current module "explicit".
+    explictlyImportedModules.insert(SF.getParentModule());
+  }
+
   for (auto &Request: Lookup.RequestedCachedResults) {
     llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
     auto handleImport = [&](ImportedModule Import) {
@@ -6274,8 +6327,11 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
         RequestedModules.push_back({std::move(K), TheModule,
           Request.OnlyTypes, Request.OnlyPrecedenceGroups});
 
+        auto TheModuleName = TheModule->getName();
         if (Request.IncludeModuleQualifier &&
-            seenModuleNames.insert(TheModule->getName()).second)
+            (!Lookup.isHiddenModuleName(TheModuleName) ||
+             explictlyImportedModules.contains(TheModule)) &&
+            seenModuleNames.insert(TheModuleName).second)
           Lookup.addModuleName(TheModule);
       }
     };
@@ -7005,6 +7061,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.getStmtLabelCompletions(Loc, ParentStmtKind == StmtKind::Continue);
     break;
   }
+  case CompletionKind::TypeAttrBeginning: {
+    Lookup.getTypeAttributeKeywordCompletions();
+
+    // Type names at attribute position after '@'.
+    Lookup.getTypeCompletionsInDeclContext(
+      P.Context.SourceMgr.getCodeCompletionLoc());
+    break;
+
+  }
   case CompletionKind::AfterIfStmtElse:
   case CompletionKind::CaseStmtKeyword:
   case CompletionKind::EffectsSpecifier:
@@ -7083,7 +7148,10 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
     CodeCompletionResultSink &targetSink, const ModuleDecl *module,
     ArrayRef<std::string> accessPath, bool needLeadingDot,
     const DeclContext *currDeclContext) {
-  CompletionLookup Lookup(targetSink, module->getASTContext(), currDeclContext);
+  // Consisitently use the SourceFile as the decl context, to avoid decl
+  // context specific behaviors.
+  auto *SF = currDeclContext->getParentSourceFile();
+  CompletionLookup Lookup(targetSink, module->getASTContext(), SF);
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
 

@@ -27,7 +27,7 @@ class Runner {
 @available(SwiftStdlib 5.5, *)
 actor Container {
     var generation = 0
-    var runners = [Int : Task.Handle<Void, Never>]()
+    var runners = [Int : Task<Void, Never>]()
 
     func build(_ n: Int) {
         for _ in 0..<n {

@@ -1423,7 +1423,7 @@ bool ModuleDecl::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }
 
-bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+bool SourceFile::registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc) {
   assert(mainDecl);
   if (mainDecl == MainDecl)
     return false;

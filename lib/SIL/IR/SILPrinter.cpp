@@ -262,55 +262,60 @@ void SILDeclRef::print(raw_ostream &OS) const {
   }
 
   bool isDot = true;
-  if (!hasDecl()) {
+  switch (getLocKind()) {
+  case LocKind::Closure:
     OS << "<anonymous function>";
-  } else if (kind == SILDeclRef::Kind::Func) {
-    auto *FD = cast<FuncDecl>(getDecl());
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (!accessor) {
-      printValueDecl(FD, OS);
-      isDot = false;
-    } else {
-      switch (accessor->getAccessorKind()) {
-      case AccessorKind::WillSet:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!willSet";
-        break;
-      case AccessorKind::DidSet:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!didSet";
-        break;
-      case AccessorKind::Get:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!getter";
-        break;
-      case AccessorKind::Set:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!setter";
-        break;
-      case AccessorKind::Address:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!addressor";
-        break;
-      case AccessorKind::MutableAddress:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!mutableAddressor";
-        break;
-      case AccessorKind::Read:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!read";
-        break;
-      case AccessorKind::Modify:
-        printValueDecl(accessor->getStorage(), OS);
-        OS << "!modify";
-        break;
-      }
+    break;
+  case LocKind::File:
+    OS << "<file>";
+    break;
+  case LocKind::Decl: {
+    if (kind != Kind::Func) {
+      printValueDecl(getDecl(), OS);
+      break;
     }
-  } else {
-    printValueDecl(getDecl(), OS);
+
+    auto *accessor = dyn_cast<AccessorDecl>(getDecl());
+    if (!accessor) {
+      printValueDecl(getDecl(), OS);
+      isDot = false;
+      break;
+    }
+
+    printValueDecl(accessor->getStorage(), OS);
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::WillSet:
+      OS << "!willSet";
+      break;
+    case AccessorKind::DidSet:
+      OS << "!didSet";
+      break;
+    case AccessorKind::Get:
+      OS << "!getter";
+      break;
+    case AccessorKind::Set:
+      OS << "!setter";
+      break;
+    case AccessorKind::Address:
+      OS << "!addressor";
+      break;
+    case AccessorKind::MutableAddress:
+      OS << "!mutableAddressor";
+      break;
+    case AccessorKind::Read:
+      OS << "!read";
+      break;
+    case AccessorKind::Modify:
+      OS << "!modify";
+      break;
+    }
+    break;
   }
+  }
+
   switch (kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::EntryPoint:
     break;
   case SILDeclRef::Kind::Allocator:
     OS << "!allocator";

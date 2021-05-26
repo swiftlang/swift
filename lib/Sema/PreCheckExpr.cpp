@@ -1799,7 +1799,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       // The protocols we are composing
       SmallVector<TypeRepr *, 4> Types;
 
-      auto lhsExpr = binaryExpr->getArg()->getElement(0);
+      auto *lhsExpr = binaryExpr->getLHS();
       if (auto *lhs = dyn_cast<TypeExpr>(lhsExpr)) {
         Types.push_back(lhs->getTypeRepr());
       } else if (isa<BinaryExpr>(lhsExpr)) {
@@ -1819,7 +1819,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return nullptr;
 
       // Add the rhs which is just a TypeExpr
-      auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getArg()->getElement(1));
+      auto *rhs = dyn_cast<TypeExpr>(binaryExpr->getRHS());
       if (!rhs) return nullptr;
       Types.push_back(rhs->getTypeRepr());
 

@@ -29,10 +29,10 @@ sil hidden_external @globalAddressor : $@convention(thin) () -> Builtin.RawPoint
 // CHECK-LABEL: sil @hoist_access_with_conflict : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
 // CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load
 // CHECK-NEXT: br bb1
 // CHECK: apply
-// CHECK: load
-// CHECK: cond_br
+// CHECK-NEXT: cond_br
 // CHECK: bb2
 // CHECK: end_access [[BEGIN]]
 // CHECK-LABEL: } // end sil function 'hoist_access_with_conflict'
@@ -89,9 +89,9 @@ bb2:
 // CHECK-LABEL: sil @hoist_access_with_may_release : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
 // CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load
 // CHECK-NEXT: br bb1
 // CHECK: apply
-// CHECK: load
 // CHECK: cond_br
 // CHECK: bb2
 // CHECK: end_access [[BEGIN]]
@@ -153,10 +153,10 @@ bb2:
 // CHECK-LABEL: sil @hoist_access_static : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
 // CHECK: [[BEGIN:%.*]] = begin_access [read] [static] [[GLOBAL]] : $*X
+// CHECK-NEXT: load
 // CHECK-NEXT: br bb1
 // CHECK: apply
-// CHECK: load
-// CHECK: cond_br
+// CHECK-NEXT: cond_br
 // CHECK: bb2
 // CHECK: end_access [[BEGIN]]
 // CHECK-LABEL: } // end sil function 'hoist_access_static'

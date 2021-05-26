@@ -9,7 +9,7 @@
 // other things.)
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: -sdk %/S/Inputs/BadStdlib.sdk -module-cache-path %/t/module-cache -resource-dir %/S/Inputs/BadStdlib.sdk) -compile-module-from-interface -o %/t/BadStdlib.swiftmodule %s -verify -verify-additional-file %/S/Inputs/BadStdlib.sdk/usr/lib/swift/Swift.swiftmodule/x86_64-apple-macos.swiftinterface
+// RUN: %target-swift-frontend(mock-sdk: -sdk %/S/Inputs/BadStdlib.sdk -module-cache-path %/t/module-cache -resource-dir %/S/Inputs/BadStdlib.sdk) -compile-module-from-interface -o %/t/BadStdlib.swiftmodule %s -verify -verify-additional-file %/S/Inputs/BadStdlib.sdk/usr/lib/swift/Swift.swiftmodule/x86_64-apple-macos.swiftinterface -verify-ignore-unknown
 
 import ClangMod
 

@@ -36,9 +36,9 @@ func test(s: ValidType) {
 // Check SIL diagnostics are still output (no reason not to output SIL since
 // there were no errors)
 func other() -> Int {}
-// CHECK-VALID: valid-uses.swift:10:22: error: missing return in global function expected to return 'Int'
+// CHECK-VALID: valid-uses.swift:10:22: error: missing return
 func other2() -> Bool {}
-// CHECK-VALID: valid-uses.swift:12:24: error: missing return in global function expected to return 'Bool'
+// CHECK-VALID: valid-uses.swift:12:24: error: missing return
 
 
 // BEGIN invalid-uses.swift

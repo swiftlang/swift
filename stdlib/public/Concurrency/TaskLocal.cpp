@@ -140,7 +140,7 @@ static void swift_task_localsCopyToImpl(AsyncTask *task) {
   TaskLocal::Storage *Local = nullptr;
 
   if (AsyncTask *task = swift_task_getCurrent()) {
-    Local = &task->Local;
+    Local = &task->_private().Local;
   } else if (auto *storage = FallbackTaskLocalStorage::get()) {
     Local = storage;
   } else {
@@ -169,7 +169,7 @@ TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
   Item *item = new(allocation) Item();
 
   // FIXME: parent pointer must to be the parent STORAGE not just the next item.
-  auto parentHead = parent->Local.head;
+  auto parentHead = parent->_private().Local.head;
   if (parentHead) {
     if (parentHead->isEmpty()) {
       switch (parentHead->getNextLinkType()) {
@@ -211,7 +211,8 @@ TaskLocal::Item::createLink(AsyncTask *task,
                           : malloc(amountToAllocate);
   Item *item = new (allocation) Item(key, valueType);
 
-  auto next = task ? task->Local.head : FallbackTaskLocalStorage::get()->head;
+  auto next = task ? task->_private().Local.head
+                   : FallbackTaskLocalStorage::get()->head;
   item->next = reinterpret_cast<uintptr_t>(next) |
       static_cast<uintptr_t>(NextLinkType::IsNext);
 
@@ -228,7 +229,7 @@ void TaskLocal::Item::copyTo(AsyncTask *target) {
   /// A `copyTo` may ONLY be invoked BEFORE the task is actually scheduled,
   /// so right now we can safely copy the value into the task without additional
   /// synchronization.
-  target->Local.head = item;
+  target->_private().Local.head = item;
 }
 
 // =============================================================================
@@ -386,10 +387,8 @@ OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
 
 void TaskLocal::Storage::copyTo(AsyncTask *target) {
   assert(target && "task must not be null when copying values into it");
-  assert(!(target->Local.head) &&
+  assert(!(target->_private().Local.head) &&
       "Task must not have any task-local values bound before copying into it");
-
-  AsyncTask *task = swift_task_getCurrent();
 
   // Set of keys for which we already have copied to the new task.
   // We only ever need to copy the *first* encounter of any given key,

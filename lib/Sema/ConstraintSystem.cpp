@@ -3200,8 +3200,8 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
 
   const auto &solution = solutions.front();
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
-    auto *lhs = binaryOp->getArg()->getElement(0);
-    auto *rhs = binaryOp->getArg()->getElement(1);
+    auto *lhs = binaryOp->getLHS();
+    auto *rhs = binaryOp->getRHS();
 
     auto lhsType =
         solution.simplifyType(solution.getType(lhs))->getRValueType();

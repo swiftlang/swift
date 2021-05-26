@@ -162,6 +162,10 @@ protected:
       kind : NumInlineKindBits
     );
 
+    SWIFT_INLINE_BITFIELD(ActorIndependentAttr, DeclAttribute, NumActorIndependentKindBits,
+      kind : NumActorIndependentKindBits
+    );
+
     SWIFT_INLINE_BITFIELD(OptimizeAttr, DeclAttribute, NumOptimizationModeBits,
       mode : NumOptimizationModeBits
     );
@@ -861,6 +865,7 @@ public:
   /// Determine whether the name associated with this attribute was
   /// implicit.
   bool isNameImplicit() const { return Bits.ObjCAttr.ImplicitName; }
+  void setNameImplicit(bool newValue) { Bits.ObjCAttr.ImplicitName = newValue; }
 
   /// Set the name of this entity.
   void setName(ObjCSelector name, bool implicit) {
@@ -887,11 +892,6 @@ public:
   /// @objc inference rules.
   void setSwift3Inferred(bool inferred = true) {
     Bits.ObjCAttr.Swift3Inferred = inferred;
-  }
-
-  /// Clear the name of this entity.
-  void clearName() {
-    NameData = nullptr;
   }
 
   /// Retrieve the source locations for the names in a non-implicit
@@ -1220,6 +1220,25 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ReferenceOwnership;
+  }
+};
+
+/// Represents an actorIndependent/actorIndependent(unsafe) decl attribute.
+class ActorIndependentAttr : public DeclAttribute {
+public:
+  ActorIndependentAttr(SourceLoc atLoc, SourceRange range, ActorIndependentKind kind)
+      : DeclAttribute(DAK_ActorIndependent, atLoc, range, /*Implicit=*/false) {
+    Bits.ActorIndependentAttr.kind = unsigned(kind);
+  }
+
+  ActorIndependentAttr(ActorIndependentKind kind, bool IsImplicit=false)
+    : ActorIndependentAttr(SourceLoc(), SourceRange(), kind) {
+      setImplicit(IsImplicit);
+    }
+
+  ActorIndependentKind getKind() const { return ActorIndependentKind(Bits.ActorIndependentAttr.kind); }
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ActorIndependent;
   }
 };
 

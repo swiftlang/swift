@@ -4,8 +4,6 @@ set(SWIFT_GYB_FLAGS
 add_gyb_target(generated_sorted_cf_database
     SortedCFDatabase.def.gyb)
 
-set_swift_llvm_is_available()
-
 add_swift_host_library(swiftClangImporter STATIC
   CFTypeInfo.cpp
   ClangAdapter.cpp
@@ -37,3 +35,5 @@ get_property(CLANG_TABLEGEN_TARGETS GLOBAL PROPERTY CLANG_TABLEGEN_TARGETS)
 add_dependencies(swiftClangImporter
   generated_sorted_cf_database
   ${CLANG_TABLEGEN_TARGETS})
+
+set_swift_llvm_is_available(swiftClangImporter)

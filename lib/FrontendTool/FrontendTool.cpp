@@ -816,6 +816,7 @@ static void emitIndexData(const CompilerInstance &Instance) {
 /// anything past type-checking.
 static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     CompilerInstance &Instance) {
+  const auto &Context = Instance.getASTContext();
   const auto &Invocation = Instance.getInvocation();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
@@ -834,7 +835,8 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   // failure does not mean skipping the rest.
   bool hadAnyError = false;
 
-  if (opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+  if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
+      opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
     std::string BridgingHeaderPathForPrint;
     if (!opts.ImplicitObjCHeaderPath.empty()) {
       if (opts.BridgingHeaderDirForPrint.hasValue()) {
@@ -853,6 +855,11 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         Instance.getMainModule(), BridgingHeaderPathForPrint,
         Invocation.isModuleExternallyConsumed(Instance.getMainModule()));
   }
+
+  // Only want the header if there's been any errors, ie. there's not much
+  // point outputting a swiftinterface for an invalid module
+  if (Context.hadError())
+    return hadAnyError;
 
   if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
     hadAnyError |= printModuleInterfaceIfNeeded(
@@ -996,9 +1003,10 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
     dumpAPIIfNeeded(Instance);
   }
-  if (!ctx.hadError() || opts.AllowModuleWithCompilerErrors) {
-    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
-  }
+
+  // Contains the hadError checks internally, we still want to output the
+  // Objective-C header when there's errors and currently allowing them
+  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
 
   // Verify reference dependencies of the current compilation job. Note this
   // must be run *before* verifying diagnostics so that the former can be tested
@@ -2037,6 +2045,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                            MainExecutablePath)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
+
+  Optional<llvm::PrettyStackTraceString> allowErrorsStackTrace;
+  if (Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
+    allowErrorsStackTrace.emplace("While allowing modules with compiler errors "
+                                  "enabled");
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
   // we used to parse the arguments. These are RAII objects, so they and the
