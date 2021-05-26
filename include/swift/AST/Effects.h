@@ -26,6 +26,7 @@
 #define SWIFT_EFFECTS_H
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/OptionSet.h"
 
 #include <utility>
 
@@ -34,11 +35,14 @@ class raw_ostream;
 }
 
 namespace swift {
+class AbstractFunctionDecl;
+class ProtocolDecl;
 
 enum class EffectKind : uint8_t {
-  Throws,
-  Async
+  Throws = 1 << 0,
+  Async  = 1 << 1
 };
+using PossibleEffects = OptionSet<EffectKind>;
 
 void simple_display(llvm::raw_ostream &out, const EffectKind kind);
 
