@@ -18,6 +18,6 @@ func foo2() throws {
   do {
     try foo1()
   } catch {}
-  new_name()
+  try new_name()
 }
 
