@@ -125,16 +125,6 @@ StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
     return It->second;
 }
 
-void InstallNameStore::remark(ASTContext &Ctx, StringRef ModuleName) const {
-  Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
-                     ModuleName, InstallName);
-  for (auto Pair: PlatformInstallName) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
-                       ModuleName, getLinkerPlatformName(Pair.first),
-                       Pair.second);
-  }
-}
-
 static std::string getScalaNodeText(Node *N) {
   SmallString<32> Buffer;
   return cast<ScalarNode>(N)->getValue(Buffer).str();
@@ -214,11 +204,6 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
   std::unique_ptr<std::map<std::string, InstallNameStore>> pResult(
     new std::map<std::string, InstallNameStore>());
   auto &AllInstallNames = *pResult;
-  SWIFT_DEFER {
-    for (auto Pair: AllInstallNames) {
-      Pair.second.remark(Ctx, Pair.first);
-    }
-  };
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

@@ -288,12 +288,6 @@ ERROR(batch_scan_input_file_corrupted,none,
       "batch dependencies scan input file from %0 is malformed",
       (StringRef))
 
-REMARK(default_previous_install_name, none,
-      "default previous install name for %0 is %1", (StringRef, StringRef))
-
-REMARK(platform_previous_install_name, none,
-       "previous install name for %0 in %1 is %2", (StringRef, StringRef, StringRef))
-
 ERROR(unknown_platform_name, none,
       "unkown platform name %0", (StringRef))
 
