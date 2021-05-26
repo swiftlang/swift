@@ -117,6 +117,10 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Identifiers, core->Identifiers);
 }
 
+bool ModuleFile::allowCompilerErrors() const {
+  return getContext().LangOpts.AllowModuleWithCompilerErrors;
+}
+
 Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                             bool recoverFromIncompatibility) {
   PrettyStackTraceModuleFile stackEntry(*this);

@@ -169,8 +169,9 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Core->Name);
-    getContext().Diags.diagnose(SourceLoc(), diag::serialization_misc_version,
-      Core->Name, Core->MiscVersion);
+    getContext().Diags.diagnose(
+        SourceLoc(), diag::serialization_misc_version, Core->Name,
+        Core->MiscVersion, allowCompilerErrors());
 
     if (!Core->CompatibilityVersion.empty()) {
       if (getContext().LangOpts.EffectiveLanguageVersion
@@ -2512,7 +2513,7 @@ public:
         name = VD->getName();
       }
 
-      auto diagId = ctx.LangOpts.AllowModuleWithCompilerErrors
+      auto diagId = MF.allowCompilerErrors()
                         ? diag::serialization_allowing_invalid_decl
                         : diag::serialization_invalid_decl;
       ctx.Diags.diagnose(SourceLoc(), diagId, name,
@@ -3092,7 +3093,7 @@ public:
     declOrOffset = param;
 
     auto paramTy = MF.getType(interfaceTypeID);
-    if (paramTy->hasError() && !MF.isAllowModuleWithCompilerErrorsEnabled()) {
+    if (paramTy->hasError() && !MF.allowCompilerErrors()) {
       // FIXME: This should never happen, because we don't serialize
       // error types.
       DC->printContext(llvm::errs());
@@ -5872,7 +5873,7 @@ public:
       return origTyOrError.takeError();
 
     auto origTy = *origTyOrError;
-    auto diagId = ctx.LangOpts.AllowModuleWithCompilerErrors
+    auto diagId = MF.allowCompilerErrors()
                       ? diag::serialization_allowing_error_type
                       : diag::serialization_error_type;
     // Generally not a super useful diagnostic, so only output once if there
@@ -5910,8 +5911,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError() &&
-      !isAllowModuleWithCompilerErrorsEnabled()) {
+  if (typeOrOffset.get()->hasError() && !allowCompilerErrors()) {
     typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
@@ -6372,7 +6372,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto isConformanceReq = [](const Requirement &req) {
       return req.getKind() == RequirementKind::Conformance;
     };
-    if (!isAllowModuleWithCompilerErrorsEnabled() &&
+    if (!allowCompilerErrors() &&
         conformanceCount != llvm::count_if(proto->getRequirementSignature(),
                                            isConformanceReq)) {
       fatal(llvm::make_error<llvm::StringError>(
@@ -6714,4 +6714,10 @@ Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
       completionHandlerErrorParamIndex,
       completionHandlerErrorFlagParamIndex,
       errorFlagPolarity);
+}
+
+void serialization::PrettyStackTraceModuleFile::outputModuleBuildInfo(
+    raw_ostream &os) const {
+  if (MF.compiledAllowingCompilerErrors())
+    os << " (built while allowing compiler errors)";
 }
