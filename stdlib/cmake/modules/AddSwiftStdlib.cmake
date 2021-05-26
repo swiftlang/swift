@@ -1343,6 +1343,16 @@ function(_add_swift_target_library_single target name)
       ${library_search_directories})
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+
+    # Force executables linker language to be CXX so that we do not link using the
+    # host toolchain swiftc.
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "C")
+    else()
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "CXX")
+    endif()
   endif()
 
   # Do not add code here.
