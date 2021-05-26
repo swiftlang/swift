@@ -23,16 +23,7 @@ set(all_overlays
 
 if(SWIFT_DARWIN_USE_OVERLAYS_FROM_SDKS)
   include(SimulateOverlayDeps)
-  message(STATUS "Cleaning up stale overlays in build folder: ${all_overlays}")
-  foreach(overlay IN LISTS all_overlays)
-    remove_overlay_from_build(${overlay} TARGET_SDKS ${SWIFT_SDKS})
-  endforeach()
-    
-  set("${OVERLAYS_TO_FAKE}" "Foundation;ObjectiveC")
-  message(STATUS "Overlays to add fake dependencies for: ${OVERLAYS_TO_FAKE}")
-  foreach(overlay IN LISTS OVERLAYS_TO_FAKE)
-    add_overlay_targets(${overlay} TARGET_SDKS ${SWIFT_SDKS})
-  endforeach()
+  setup_use_of_overlays_from_sdks("${all_overlays}" "Foundation;ObjectiveC")
 else()
   if(DEFINED SWIFT_OVERLAY_TARGETS)
     set(overlays_to_build ${SWIFT_OVERLAY_TARGETS})

@@ -9,7 +9,18 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 #===----------------------------------------------------------------------===#
-include(ExternalProject)
+
+function(setup_use_of_overlays_from_sdks all_overlays overlays_to_fake)
+  message(STATUS "Cleaning up stale overlays in build folder: ${all_overlays}")
+  foreach(overlay IN LISTS all_overlays)
+    remove_overlay_from_build(${overlay} TARGET_SDKS ${SWIFT_SDKS})
+  endforeach()
+    
+  message(STATUS "Overlays to add fake dependencies for: ${overlays_to_fake}")
+  foreach(overlay IN LISTS overlays_to_fake)
+    add_overlay_targets(${overlay} TARGET_SDKS ${SWIFT_SDKS})
+  endforeach()
+endfunction()
 
 function(add_overlay_targets overlay)
   set(options)
@@ -89,6 +100,8 @@ function(remove_overlay_from_build_single overlay)
   set(sdk ${ROFB_TARGET_SDK})
   set(sdk_name ${SWIFT_SDK_${sdk}_LIB_SUBDIR})
 
-  file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/libswift${overlay}.dylib)
+  file(GLOB dylibs LIST_DIRECTORIES false ${SWIFTLIB_DIR}/${sdk_name}/*/libswift${overlay}.dylib
+    ${SWIFTLIB_DIR}/${sdk_name}/libswift${overlay}.dylib)
+  file(REMOVE_RECURSE ${dylibs})
   file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/${overlay}.swiftmodule)
 endfunction()

@@ -1,0 +1,30 @@
+# REQUIRES: standalone_build
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t/build
+# RUN: mkdir -p %t/source
+# RUN: split-file %s %t/source
+# RUN: mkdir -p %t/build/macosx/arm64
+# RUN: mkdir -p %t/build/macosx/x86_64
+# RUN: touch %t/build/macosx/arm64/libswiftTest.dylib
+# RUN: touch %t/build/macosx/x86_64/libswiftTest.dylib
+# RUN: touch %t/build/macosx/libswiftTest.dylib
+# RUN: mkdir -p %t/build/macosx/Test.swiftmodule
+# RUN: touch %t/build/macosx/Test.swiftmodule/Test.swiftinterface
+# RUN: %{cmake-generate} -DSWIFTLIB_DIR:STRING=%t/build -DCMAKE_MODULE_PATH=%swift_src_root/stdlib/cmake/modules -S %t/source -B %t/build --trace-expand
+# RUN: find %t/build/ -name libswiftTest.dylib | wc -l | %FileCheck %s
+# RUN: find %t/build/ -name Test.swiftmodule | wc -l | %FileCheck %s
+
+# CHECK: 0
+
+#--- CMakeLists.txt
+cmake_minimum_required(VERSION 3.12.4)
+
+project(remove)
+
+include(SimulateOverlayDeps)
+set(SWIFT_SDK_macosx_LIB_SUBDIR "macosx")
+remove_overlay_from_build("Test" TARGET_SDKS "macosx")
+
+#--- hello.c
+int main(){}
