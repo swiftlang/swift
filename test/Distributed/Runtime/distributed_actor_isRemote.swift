@@ -13,14 +13,14 @@
 
 import _Distributed
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor SomeSpecificDistributedActor {
   distributed func hello() async throws -> String {
     "local impl"
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension SomeSpecificDistributedActor {
   static func _remote_hello(actor: SomeSpecificDistributedActor) async throws -> String {
     return "remote impl (address: \(actor.actorAddress))"
@@ -29,7 +29,7 @@ extension SomeSpecificDistributedActor {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
@@ -62,7 +62,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_remote() async {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
@@ -80,7 +80,7 @@ func test_remote() async {
   print("done") // CHECK: done
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_remote()

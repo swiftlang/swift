@@ -4,7 +4,7 @@
 
 import _Distributed
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 actor LocalActor_1 {
   let name: String = "alice"
   var mutable: String = ""
@@ -16,24 +16,14 @@ actor LocalActor_1 {
 
 struct NotCodableValue { }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed struct StructNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed class ClassNope {} // expected-error{{'distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed enum EnumNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-distributed actor class DistributedActor_0 { // expected-warning{{'actor class' has been renamed to 'actor'}}
-  distributed func okey() {}
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension DistributedActor_0 {
-  static func _remote_okey(actor: DistributedActor_0) async throws {}
-}
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor DistributedActor_1 {
 
   let name: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
@@ -115,7 +105,7 @@ distributed actor DistributedActor_1 {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension DistributedActor_1 {
   static func _remote_distHello(actor: DistributedActor_1) async throws { }
   static func _remote_distHelloAsync(actor: DistributedActor_1) async throws  { }
@@ -140,7 +130,7 @@ extension DistributedActor_1 {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_outside(
   local: LocalActor_1,
   distributed: DistributedActor_1
@@ -165,20 +155,20 @@ func test_outside(
   _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor DistributedActor_2 {
   // TODO: should report the error on the remote function instead?
   distributed func okey() {} // expected-error{{remote function '_remote_okey()' must be static.}}
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension DistributedActor_2 {
   func _remote_okey() {}
 }
 
 // ==== Codable parameters and return types ------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_params(
   distributed: DistributedActor_1
 ) async throws {

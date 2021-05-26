@@ -23,7 +23,7 @@ import _Concurrency
 /// distributed actor, which involves transforming actor
 /// which involves enqueuing new partial tasks to be executed at some
 /// point.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol DistributedActor: Actor, Codable {
 
     /// Creates new (local) distributed actor instance, bound to the passed transport.
@@ -68,11 +68,11 @@ public protocol DistributedActor: Actor, Codable {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-    @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
     static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_trans")!
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension DistributedActor {
     nonisolated public init(from decoder: Decoder) throws {
 //        guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
@@ -95,7 +95,7 @@ extension DistributedActor {
 /***************************** Actor Transport ********************************/
 /******************************************************************************/
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol ActorTransport: Sendable {
     /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
     /// The returned value is either a local actor or proxy to a remote actor.
@@ -128,7 +128,7 @@ public protocol ActorTransport: Sendable {
 
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public enum ActorResolved<Act: DistributedActor> {
     case resolved(Act)
     case makeProxy
@@ -171,7 +171,7 @@ public enum ActorResolved<Act: DistributedActor> {
 ///
 /// For example: `sact://human-readable-name@127.0.0.1:7337/user/wallet/id-121242`.
 /// Note that the `ActorIncarnation` is not printed by default in the String representation of a path, yet may be inspected on demand.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
     /// Uniquely specifies the actor transport and the protocol used by it.
     ///
@@ -198,7 +198,7 @@ public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
 }
 
 // TODO: naive impl, bring in a real one
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension ActorAddress: CustomStringConvertible {
     public var description: String {
         var result = `protocol`
@@ -225,10 +225,10 @@ extension ActorAddress: CustomStringConvertible {
 /******************************************************************************/
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol ActorTransportError: Error {}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public struct DistributedActorCodingError: ActorTransportError {
     public let message: String
 

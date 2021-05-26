@@ -4,11 +4,13 @@
 
 actor SomeActor {}
 
+@available(SwiftStdlib 5.5, *)
 distributed actor DA {} // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
 // expected-error@-1{{class 'DA' has no initializers}}
-distributed actor class DAC {} // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
-// expected-error@-1{{class 'DAC' has no initializers}}
-// expected-warning@-2{{'actor class' has been renamed to 'actor'}}
+
+@available(SwiftStdlib 5.5, *)
+distributed actor class DAC {} // expected-error{{distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
+// expected-error@-1{{keyword 'class' cannot be used as an identifier here}}
 
 actor A {
   func normal() async {}
@@ -20,6 +22,7 @@ actor A {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 distributed actor DA2 { // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
   // expected-error@-1{{class 'DA2' has no initializers}}
   func normal() async {}
@@ -31,6 +34,7 @@ distributed actor DA2 { // expected-error{{'_Distributed' module not imported, r
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 extension DA2 {
   static func _remote_dist(actor: DA2) async throws {}
   static func _remote_distAsync(actor: DA2) async throws {}

@@ -10,7 +10,7 @@
 
 import _Distributed
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor SomeSpecificDistributedActor {
 
   distributed func hello() async throws {
@@ -18,7 +18,7 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension SomeSpecificDistributedActor {
   static func _remote_hello(actor: SomeSpecificDistributedActor) async throws {
     print("Remote invocation")
@@ -37,7 +37,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
@@ -60,7 +60,7 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_initializers() {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
@@ -69,7 +69,7 @@ func test_initializers() {
   _ = try! SomeSpecificDistributedActor(resolve: address, using: transport)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_address() {
   let transport = FakeTransport()
 
@@ -77,7 +77,7 @@ func test_address() {
   _ = actor.actorAddress
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_run(transport: FakeTransport) async {
   let actor = SomeSpecificDistributedActor(transport: transport)
 
@@ -86,7 +86,7 @@ func test_run(transport: FakeTransport) async {
   print("after") // CHECK: after
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_run(transport: FakeTransport())

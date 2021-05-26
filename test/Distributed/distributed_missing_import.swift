@@ -4,7 +4,7 @@
 
 actor SomeActor { }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor MissingImportDistributedActor_0 { } // expected-error{{'_Distributed' module not imported, required for 'distributed actor'}}
 // expected-error@-1{{class 'MissingImportDistributedActor_0' has no initializers}}
 

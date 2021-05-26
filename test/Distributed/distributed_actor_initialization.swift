@@ -4,10 +4,10 @@
 
 import _Distributed
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor OK0 { }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor OK1 {
   var x: Int = 1
   // ok, since all fields are initialized, the constructors can be synthesized
@@ -15,7 +15,7 @@ distributed actor OK1 {
 
 // TODO: test all the FIXITs in this file (!!!)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor Bad1 {
   init() {
     // expected-error@-1 {{'distributed actor' initializer 'init()' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local-initializer, which other initializers must delegate to}}
@@ -23,14 +23,14 @@ distributed actor Bad1 {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor Bad11 {
   convenience init() {
     // expected-error@-1 {{'distributed actor' initializer 'init()' must (directly or indirectly) delegate to 'init(transport:)'}}
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor Bad12 {
   init(x: String) {
     // expected-error@-1 {{'distributed actor' initializer 'init(x:)' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local-initializer, which other initializers must delegate to}}
@@ -38,7 +38,7 @@ distributed actor Bad12 {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor OK2 {
   var x: Int
 
@@ -48,7 +48,7 @@ distributed actor OK2 {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor Bad2 {
   var x: Int
 
@@ -58,7 +58,7 @@ distributed actor Bad2 {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor Bad3 {
   var x: Int
 
@@ -69,7 +69,7 @@ distributed actor Bad3 {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor OKMulti {
   // @derived init(transport:)
 
@@ -83,7 +83,7 @@ distributed actor OKMulti {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor BadMulti {
   // @derived init(transport:)
 
@@ -103,7 +103,7 @@ distributed actor BadMulti {
 // because it may result in "not a real instance" i.e. a proxy
 // and a proxy does not have any storage, so it would be wrong to allow other
 // initializers to keep running while we actually created a proxy with no storage.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor BadResolveInitCall {
   convenience init(any: Any, address: ActorAddress, transport: ActorTransport) throws {
     // expected-error@-1 {{'distributed actor' initializer 'init(any:address:transport:)' cannot delegate to resolve-initializer 'init(resolve:using:)', as it may result resolving a storageless proxy instance}}
@@ -112,7 +112,7 @@ distributed actor BadResolveInitCall {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare1 { // expected-error {{type 'BadRedeclare1' does not conform to protocol 'DistributedActor'}}
   convenience init(transport: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' local-initializer 'init(transport:)' cannot be implemented explicitly}}
@@ -121,7 +121,7 @@ distributed actor BadRedeclare1 { // expected-error {{type 'BadRedeclare1' does 
   // expected-note@-4 {{candidate exactly matches}}
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare11 { // expected-error {{type 'BadRedeclare11' does not conform to protocol 'DistributedActor'}}
   convenience init(transport xxx: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' local-initializer 'init(transport:)' cannot be implemented explicitly}}
@@ -130,7 +130,7 @@ distributed actor BadRedeclare11 { // expected-error {{type 'BadRedeclare11' doe
   // expected-note@-4 {{candidate exactly matches}}
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare2 { // expected-error {{type 'BadRedeclare2' does not conform to protocol 'DistributedActor'}}
   convenience init(resolve address: ActorAddress, using transport: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
@@ -139,7 +139,7 @@ distributed actor BadRedeclare2 { // expected-error {{type 'BadRedeclare2' does 
   // expected-error@-4 {{invalid redeclaration of synthesized initializer 'init(resolve:using:)'}}
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare21 { //expected-error {{type 'BadRedeclare21' does not conform to protocol 'DistributedActor'}}
   convenience init(resolve xxx: ActorAddress, using yyy: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
@@ -148,7 +148,7 @@ distributed actor BadRedeclare21 { //expected-error {{type 'BadRedeclare21' does
   // expected-error@-4 {{invalid redeclaration of synthesized initializer 'init(resolve:using:)'}}
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor BadRedeclare22 { //expected-error {{type 'BadRedeclare22' does not conform to protocol 'DistributedActor'}}
   convenience init(resolve: ActorAddress, using yyy: ActorTransport) throws {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}

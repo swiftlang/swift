@@ -16,7 +16,7 @@ import _Concurrency
 
 struct Boom: Error {}
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 distributed actor SomeSpecificDistributedActor {
   let state: String = "hi there"
 
@@ -48,7 +48,7 @@ distributed actor SomeSpecificDistributedActor {
 
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension SomeSpecificDistributedActor {
 
   static func _remote_helloAsyncThrows(actor: SomeSpecificDistributedActor) async throws -> String {
@@ -89,7 +89,7 @@ func __isLocalActor(_ actor: AnyObject) -> Bool {
 
 // ==== Fake Transport ---------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 struct FakeTransport: ActorTransport {
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
     throws -> ActorResolved<Act> where Act: DistributedActor {
@@ -113,7 +113,7 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async {
   func check(actor: SomeSpecificDistributedActor) async {
     let personality = __isRemoteActor(actor) ? "remote" : "local"
@@ -177,7 +177,7 @@ func test_remote_invoke(address: ActorAddress, transport: ActorTransport) async 
   print(remote)
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     let address = ActorAddress(parse: "")
