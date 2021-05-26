@@ -1,0 +1,24 @@
+# REQUIRES: standalone_build
+
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t/build
+# RUN: mkdir -p %t/source
+# RUN: split-file %s %t/source
+# RUN: %{cmake-generate} -DCMAKE_MODULE_PATH=%swift_src_root/stdlib/cmake/modules -S %t/source -B %t/build --trace-source=SimulateOverlayDeps.cmake --trace-expand 2>&1 | %FileCheck %s
+
+# CHECK-DAG: add_{{.*}}swiftTest-swiftmodule-macosx-x86_64
+# CHECK-DAG: add_{{.*}}swiftTest-macosx
+# CHECK-DAG: add_{{.*}}swiftTest-macosx-x86_64
+
+#--- CMakeLists.txt
+cmake_minimum_required(VERSION 3.12.4)
+
+project(add)
+
+include(SimulateOverlayDeps)
+set(SWIFT_SDK_macosx_LIB_SUBDIR "macosx")
+set(SWIFT_SDK_macosx_ARCHITECTURES "x86_64")
+add_overlay_targets("Test" TARGET_SDKS "macosx")
+
+#--- hello.c
+int main(){}

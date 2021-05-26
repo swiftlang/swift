@@ -11,7 +11,7 @@
 # RUN: touch %t/build/macosx/libswiftTest.dylib
 # RUN: mkdir -p %t/build/macosx/Test.swiftmodule
 # RUN: touch %t/build/macosx/Test.swiftmodule/Test.swiftinterface
-# RUN: %{cmake-generate} -DSWIFTLIB_DIR:STRING=%t/build -DCMAKE_MODULE_PATH=%swift_src_root/stdlib/cmake/modules -S %t/source -B %t/build --trace-expand
+# RUN: %{cmake-generate} -DSWIFTLIB_DIR:STRING=%t/build -DCMAKE_MODULE_PATH=%swift_src_root/stdlib/cmake/modules -S %t/source -B %t/build
 # RUN: find %t/build/ -name libswiftTest.dylib | wc -l | %FileCheck %s
 # RUN: find %t/build/ -name Test.swiftmodule | wc -l | %FileCheck %s
 
