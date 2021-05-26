@@ -28,11 +28,9 @@ public let DictionaryRemove = [
   BenchmarkInfo(name: "DictionaryRemoveOfObjects",
     runFunction: removeObjects, tags: t, legacyFactor: 100),
   BenchmarkInfo(name: "DictionaryRemoveWhere",
-    setUpFunction: setup_removeWhere(),
-    runFunction: removeWhere, tags: t),
+    runFunction: removeWhere, tags: t, setUpFunction: setup_removeWhere),
   BenchmarkInfo(name: "DictionaryRemoveWhereKeepingCapacity",
-    setUpFunction: setup_removeWhere(),
-    runFunction: removeWhereKeepingCapacity, tags: t)
+    runFunction: removeWhereKeepingCapacity, tags: t, setUpFunction: setup_removeWhere)
 ]
 
 class Box<T : Hashable> : Hashable {
@@ -73,10 +71,10 @@ func setup_removeWhere() {
 }
 
 func _removeWhere(N: Int, keepCapacity: Bool) {
-  let map = temporaryNumberMap
+  var map = temporaryNumberMap
   temporaryNumberMap = [:] //let map be unique
   for i in 1...N {
-    map.removeAll(where: { $0.0 == i }, keepingCapacity: keepCapacity)
+    map.removeAll(where: { $0 == i }, keepCapacity: keepCapacity)
   }
 }
 

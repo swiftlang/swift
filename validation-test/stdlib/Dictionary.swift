@@ -1351,7 +1351,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllWhereDoesNotReallocate") {
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
-    d.removeAll(where: { $0.0 == 10 })
+    d.removeAll(where: { $0 == 10 })
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     let identity1 = d._rawIdentifier()
@@ -1359,7 +1359,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllWhereDoesNotReallocate") {
     assert(d.count == 2)
     assert(d[10] == nil)
 
-    d.removeAll(where: { $0.0 == 10 })
+    d.removeAll(where: { $0 == 10 })
     assert(identity1 == d._rawIdentifier())
     assert(d.count == 2)
     assert(d[10] == nil)
@@ -1372,13 +1372,13 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllWhereDoesNotReallocate") {
     assert(d.count == 3)
     assert(d[10]! == 1010)
 
-    d.removeAll(where: { $0.0 == 10 }, keepingCapacity: true)
+    d.removeAll(where: { $0 == 10 }, keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
     assert(d.capacity == originalCapacity)
     assert(d.count == 2)
     assert(d[10] == nil)
 
-    d.removeAll(where: { $0.0 == 10 }, keepingCapacity: true)
+    d.removeAll(where: { $0 == 10 }, keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
     assert(d.capacity == originalCapacity)
     assert(d.count == 2)
@@ -1392,7 +1392,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllWhereDoesNotReallocate") {
     assert(d1[10]! == 1010)
 
     var d2 = d1
-    d2.removeAll(where: { $0.0 == 10 })
+    d2.removeAll(where: { $0 == 10 })
     let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
@@ -1414,7 +1414,7 @@ DictionaryTestSuite.test("COW.Fast.RemoveAllWhereDoesNotReallocate") {
     assert(d1[10] == 1010)
 
     var d2 = d1
-    d2.removeAll(where: { $0.0 == 10 }, keepingCapacity: true)
+    d2.removeAll(where: { $0 == 10 }, keepingCapacity: true)
     let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
@@ -1437,7 +1437,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllWhereDoesNotReallocate") {
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
-    d.removeAll(where: { $0.0 == 10 })
+    d.removeAll(where: { $0 == 10 })
     // We cannot assert that identity changed, since the new buffer of smaller
     // size can be allocated at the same address as the old one.
     let identity1 = d._rawIdentifier()
@@ -1445,7 +1445,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllWhereDoesNotReallocate") {
     assert(d.count == 2)
     assert(d[TestKeyTy(10)] == nil)
 
-    d.removeAll(where: { $0.0 == 10 })
+    d.removeAll(where: { $0 == 10 })
     assert(identity1 == d._rawIdentifier())
     assert(d.count == 2)
     assert(d[TestKeyTy(10)] == nil)
@@ -1458,13 +1458,13 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllWhereDoesNotReallocate") {
     assert(d.count == 3)
     assert(d[TestKeyTy(10)]!.value == 1010)
 
-    d.removeAll(where: { $0.0 == 10 }, keepingCapacity: true)
+    d.removeAll(where: { $0 == 10 }, keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
     assert(d.capacity == originalCapacity)
     assert(d.count == 2)
     assert(d[TestKeyTy(10)] == nil)
 
-    d.removeAll(where: { $0.0 == 10 }, keepingCapacity: true)
+    d.removeAll(where: { $0 == 10 }, keepingCapacity: true)
     assert(identity1 == d._rawIdentifier())
     assert(d.capacity == originalCapacity)
     assert(d.count == 2)
@@ -1478,7 +1478,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllWhereDoesNotReallocate") {
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
     var d2 = d1
-    d2.removeAll(where: { $0.0 == 10 })
+    d2.removeAll(where: { $0 == 10 })
     let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
@@ -1500,7 +1500,7 @@ DictionaryTestSuite.test("COW.Slow.RemoveAllWhereDoesNotReallocate") {
     assert(d1[TestKeyTy(10)]!.value == 1010)
 
     var d2 = d1
-    d2.removeAll(where: { $0.0 == 10 }, keepingCapacity: true)
+    d2.removeAll(where: { $0 == 10 }, keepingCapacity: true)
     let identity2 = d2._rawIdentifier()
     assert(identity1 == d1._rawIdentifier())
     assert(identity2 != identity1)
@@ -1948,7 +1948,7 @@ DictionaryTestSuite.test("deleteAllWhereCollision") {
   d1[k1] = 1010
   d1[k2] = 1020
   d1[k3] = 1030
-  d1.removeAll(where: { $0.0 == 20 })
+  d1.removeAll(where: { $0 == 20 })
   assert(d1[k1] == 1010)
   assert(d1[k2] == nil)
   assert(d1[k3] == 1030)
@@ -1971,7 +1971,7 @@ DictionaryTestSuite.test("deleteAllWhereNoCollision") {
   d1[k1] = 1010
   d1[k2] = 1020
   d1[k3] = 1030
-  d1.removeAll(where: { $0.0 == 20 })
+  d1.removeAll(where: { $0 == 20 })
   assert(d1[k1] == 1010)
   assert(d1[k2] == nil)
   assert(d1[k3] == 1030)
@@ -2021,7 +2021,7 @@ DictionaryTestSuite.test("deleteAllCollision2") {
   d[k5_2] = TestValueTy(1050) // in bucket 4
   d[k6_0] = TestValueTy(1060) // in bucket 5
 
-  d.removeAll(where: { $0.1.value == 1030 })
+  d.removeAll(where: { $1.value == 1030 })
 
   assert(d[k1_0]!.value == 1010)
   assert(d[k2_0]!.value == 1020)
@@ -3325,7 +3325,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAllWhere") {
   assert((d[foundIndex1].1 as! TestObjCValueTy).value == 1010)
   assert(identity1 == d._rawIdentifier())
 
-  d.removeAll(where: { $0.0 == TestObjCKeyTy(10) })
+  d.removeAll(where: { $0 == TestObjCKeyTy(10) })
   assert(identity1 != d._rawIdentifier())
   assert(isNativeDictionary(d))
   assert(d.count == 2)
@@ -3343,7 +3343,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAllWhere")
   assert(d[foundIndex1].1.value == 1010)
   assert(identity1 == d._rawIdentifier())
 
-  d.removeAll(where: { $0.0 == TestObjCKeyTy(10) })
+  d.removeAll(where: { $0 == TestObjCKeyTy(10) })
   assert(identity1 == d._rawIdentifier())
   assert(isNativeDictionary(d))
   assert(d.count == 2)
@@ -5231,7 +5231,7 @@ DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAllWhere,keepingCapacity=false") {
   var dict = getDerivedAPIsDictionary()
   let iter = dict.makeIterator()
-  dict.removeAll(where: { $0.0 == 10 }, keepingCapacity: false)
+  dict.removeAll(where: { $0 == 10 }, keepingCapacity: false)
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -5242,7 +5242,7 @@ DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAllWhere,keepingCapacity=true") {
   var dict = getDerivedAPIsDictionary()
   let iter = dict.makeIterator()
-  dict.removeAll(where: { $0.0 == 10 }, keepingCapacity: true)
+  dict.removeAll(where: { $0 == 10 }, keepingCapacity: true)
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
@@ -5673,7 +5673,7 @@ DictionaryTestSuite.test("RemoveAllWhere.InvalidatesIndices") {
   let i = d.index(forKey: 20)!
   expectEqual(d[i], (key: 20, value: 1020))
 
-  d.removeAll(where: { $0.0 == 20 }, keepingCapacity: true)
+  d.removeAll(where: { $0 == 20 }, keepingCapacity: true)
 
   expectCrashLater()
   _ = d[i]
