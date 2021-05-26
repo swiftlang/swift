@@ -58,7 +58,6 @@ struct InstallNameStore {
   // the default install name.
   std::map<uint8_t, std::string> PlatformInstallName;
   StringRef getInstallName(LinkerPlatformId Id) const;
-  void remark(ASTContext &Ctx, StringRef ModuleName) const;
 };
 
 /// A set of callbacks for recording APIs.
