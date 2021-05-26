@@ -393,6 +393,10 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
       return !Throwing;
     }
     bool walkToExprPre(Expr *E) override {
+      // Don't walk into closures, they only produce effects when called.
+      if (isa<ClosureExpr>(E))
+        return false;
+      
       if (isa<TryExpr>(E)) {
         Throwing = true;
       }
