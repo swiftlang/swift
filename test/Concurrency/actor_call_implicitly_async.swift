@@ -33,11 +33,9 @@ actor BankAccount {
     curBalance = initialDeposit
   }
 
-  // NOTE: this func is accessed through both async and sync calls.
-  // expected-note@+1 {{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   func balance() -> Int { return curBalance }
 
-  // expected-note@+1 2{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
   func deposit(_ amount : Int) -> Int {
     guard amount >= 0 else { return 0 }
 
