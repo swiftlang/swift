@@ -25,16 +25,6 @@
 
 using namespace swift;
 
-// The MemoryBehavior Cache must not grow beyond this size.
-// We limit the size of the MB cache to 2**14 because we want to limit the
-// memory usage of this cache.
-static const int MemoryBehaviorAnalysisMaxCacheSize = 16384;
-
-// The maximum size of instsInImmutableScopes.
-// Usually more than enough. But in corner cases it can grow quadratically (in
-// case of many large nested immutable scopes).
-static const int ImmutableScopeInstsMaxSize = 18384;
-
 //===----------------------------------------------------------------------===//
 //                       Memory Behavior Implementation
 //===----------------------------------------------------------------------===//
@@ -525,16 +515,11 @@ visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI) {
 
 MemBehavior
 AliasAnalysis::computeMemoryBehavior(SILInstruction *Inst, SILValue V) {
-  MemBehaviorKeyTy Key = toMemoryBehaviorKey(Inst, V);
+  MemBehaviorCacheKey Key = {V, Inst};
   // Check if we've already computed this result.
   auto It = MemoryBehaviorCache.find(Key);
   if (It != MemoryBehaviorCache.end()) {
     return It->second;
-  }
-
-  // Flush the cache if the size of the cache is too large.
-  if (MemoryBehaviorCache.size() > MemoryBehaviorAnalysisMaxCacheSize) {
-    MemoryBehaviorCache.clear();
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -586,8 +571,7 @@ static SILValue getBeginScopeInst(SILValue V) {
 /// The \p beginScopeInst is either a ``begin_access [read]`` or the begin of a
 /// borrow scope (begin_borrow, load_borrow) of an immutable copy-on-write
 /// buffer.
-void AliasAnalysis::computeImmutableScope(SingleValueInstruction *beginScopeInst,
-                                          ValueIndexTy beginIdx) {
+void AliasAnalysis::computeImmutableScope(SingleValueInstruction *beginScopeInst) {
   BasicBlockSet visitedBlocks(beginScopeInst->getFunction());
   llvm::SmallVector<std::pair<SILInstruction *, SILBasicBlock *>, 16> workList;
   
@@ -636,8 +620,7 @@ void AliasAnalysis::computeImmutableScope(SingleValueInstruction *beginScopeInst
         break;
       }
       if (inst->mayWriteToMemory()) {
-        instsInImmutableScopes.insert({beginIdx,
-                                       InstructionToIndex.getIndex(inst)});
+        instsInImmutableScopes.insert({beginScopeInst, inst});
       }
     }
   }
@@ -668,20 +651,11 @@ bool AliasAnalysis::isInImmutableScope(SILInstruction *inst, SILValue V) {
   if (!beginScopeInst)
     return false;
 
-  ValueIndexTy beginIdx = InstructionToIndex.getIndex(beginScopeInst);
-  
   // Recompute the scope if not done yet.
-  if (immutableScopeComputed.insert(beginIdx).second) {
-    // In practice this will never happen. Just be be sure to not run into
-    // quadratic complexity in obscure corner cases.
-    if (instsInImmutableScopes.size() > ImmutableScopeInstsMaxSize)
-      return false;
-
-    computeImmutableScope(beginScopeInst, beginIdx);
+  if (immutableScopeComputed.insert(beginScopeInst).second) {
+    computeImmutableScope(beginScopeInst);
   }
-
-  ValueIndexTy instIdx = InstructionToIndex.getIndex(inst);
-  return instsInImmutableScopes.contains({beginIdx, instIdx});
+  return instsInImmutableScopes.contains({beginScopeInst, inst});
 }
 
 MemBehavior
@@ -699,15 +673,4 @@ AliasAnalysis::computeMemoryBehaviorInner(SILInstruction *Inst, SILValue V) {
                                              : MemBehavior::MayRead;
   }
   return result;
-}
-
-MemBehaviorKeyTy AliasAnalysis::toMemoryBehaviorKey(SILInstruction *V1,
-                                                    SILValue V2) {
-  ValueIndexTy idx1 = InstructionToIndex.getIndex(V1);
-  assert(idx1 != std::numeric_limits<ValueIndexTy>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  ValueIndexTy idx2 = ValueToIndex.getIndex(V2);
-  assert(idx2 != std::numeric_limits<ValueIndexTy>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  return {idx1, idx2};
 }

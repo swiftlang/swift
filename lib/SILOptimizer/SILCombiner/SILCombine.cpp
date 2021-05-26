@@ -387,7 +387,7 @@ class SILCombine : public SILFunctionTransform {
   
   /// The entry point to the transformation.
   void run() override {
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *AA = PM->getAnalysis<AliasAnalysis>(getFunction());
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
     auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();

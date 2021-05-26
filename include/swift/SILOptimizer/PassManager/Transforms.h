@@ -86,6 +86,9 @@ namespace swift {
     template<typename T>
     T* getAnalysis() { return PM->getAnalysis<T>(); }
 
+    template<typename T>
+    T* getAnalysis(SILFunction *f) { return PM->getAnalysis<T>(f); }
+
     const SILOptions &getOptions() { return PM->getOptions(); }
   };
 

@@ -273,18 +273,17 @@ public:
 };
 
 class EpilogueARCAnalysis : public FunctionAnalysisBase<EpilogueARCFunctionInfo> {
+  /// Backlink to the pass manager.
+  SILPassManager *passManager = nullptr;
   /// Current post order analysis we are using.
-  PostOrderAnalysis *PO;
-  /// Current alias analysis we are using.
-  AliasAnalysis *AA;
+  PostOrderAnalysis *PO = nullptr;
   /// Current RC Identity analysis we are using.
-  RCIdentityAnalysis *RC;
-
+  RCIdentityAnalysis *RC = nullptr;
+  
 public:
   EpilogueARCAnalysis(SILModule *)
       : FunctionAnalysisBase<EpilogueARCFunctionInfo>(
-            SILAnalysisKind::EpilogueARC),
-        PO(nullptr), AA(nullptr), RC(nullptr) {}
+            SILAnalysisKind::EpilogueARC) {}
 
   EpilogueARCAnalysis(const EpilogueARCAnalysis &) = delete;
   EpilogueARCAnalysis &operator=(const EpilogueARCAnalysis &) = delete;
@@ -312,9 +311,7 @@ public:
   virtual void initialize(SILPassManager *PM) override;
   
   virtual std::unique_ptr<EpilogueARCFunctionInfo>
-  newFunctionAnalysis(SILFunction *F) override {
-    return std::make_unique<EpilogueARCFunctionInfo>(F, PO, AA, RC);
-  }
+  newFunctionAnalysis(SILFunction *F) override;
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
     return true;
