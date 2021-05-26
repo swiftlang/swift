@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/DeclNameLoc.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -345,7 +346,7 @@ struct ResolvedRangeInfo {
   ArrayRef<Token> TokensInRange;
   CharSourceRange ContentRange;
   bool HasSingleEntry;
-  bool ThrowingUnhandledError;
+  PossibleEffects UnhandledEffects;
   OrphanKind Orphan;
 
   // The topmost ast nodes contained in the given range.
@@ -359,7 +360,7 @@ struct ResolvedRangeInfo {
                     ArrayRef<Token> TokensInRange,
                     DeclContext* RangeContext,
                     Expr *CommonExprParent, bool HasSingleEntry,
-                    bool ThrowingUnhandledError,
+                    PossibleEffects UnhandledEffects,
                     OrphanKind Orphan, ArrayRef<ASTNode> ContainedNodes,
                     ArrayRef<DeclaredDecl> DeclaredDecls,
                     ArrayRef<ReferencedDecl> ReferencedDecls): Kind(Kind),
@@ -367,7 +368,7 @@ struct ResolvedRangeInfo {
                       TokensInRange(TokensInRange),
                       ContentRange(calculateContentRange(TokensInRange)),
                       HasSingleEntry(HasSingleEntry),
-                      ThrowingUnhandledError(ThrowingUnhandledError),
+                      UnhandledEffects(UnhandledEffects),
                       Orphan(Orphan), ContainedNodes(ContainedNodes),
                       DeclaredDecls(DeclaredDecls),
                       ReferencedDecls(ReferencedDecls),
@@ -376,7 +377,7 @@ struct ResolvedRangeInfo {
   ResolvedRangeInfo(ArrayRef<Token> TokensInRange) :
   ResolvedRangeInfo(RangeKind::Invalid, {nullptr, ExitState::Unsure},
                     TokensInRange, nullptr, /*Commom Expr Parent*/nullptr,
-                    /*Single entry*/true, /*unhandled error*/false,
+                    /*Single entry*/true, /*UnhandledEffects*/{},
                     OrphanKind::None, {}, {}, {}) {}
   ResolvedRangeInfo(): ResolvedRangeInfo(ArrayRef<Token>()) {}
   void print(llvm::raw_ostream &OS) const;
