@@ -8,8 +8,7 @@
 # RUN: %empty-directory(%t)
 # RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --darwin-overlays-from-sdks=0 --cmake %cmake  2>&1 | %FileCheck --check-prefix=OPTION-OFF-CHECK %s
 
-# OPTION-OFF-CHECK-NOT: -DSWIFT_OVERLAY_TARGETS
-# OPTION-OFF-CHECK: -USWIFT_OVERLAY_TARGETS
+# OPTION-OFF-CHECK: -DSWIFT_DARWIN_USE_OVERLAYS_FROM_SDKS:BOOL=OFF
 
 
 # Ensure the CMake variable is properly set when we want to pick up overlays from the SDKs
@@ -19,5 +18,4 @@
 # RUN: %empty-directory(%t)
 # RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --darwin-overlays-from-sdks --cmake %cmake  2>&1 | %FileCheck --check-prefix=OPTION-ON-CHECK %s
 
-# OPTION-ON-CHECK: -DSWIFT_OVERLAY_TARGETS:STRING={{ |$}}
-# OPTION-ON-CHECK-NOT: -USWIFT_OVERLAY_TARGETS
+# OPTION-ON-CHECK: -DSWIFT_DARWIN_USE_OVERLAYS_FROM_SDKS:BOOL=ON
