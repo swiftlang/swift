@@ -22,7 +22,7 @@ namespace swift {
   class PrettyStackTraceSILFunctionTransform;
 
   /// The base class for all SIL-level transformations.
-  class SILTransform : public DeleteNotificationHandler {
+  class SILTransform {
   public:
     /// The kind of transformation passes we use.
     enum class TransformKind {

@@ -69,20 +69,6 @@ public:
   /// intermediate array.
   void visitRCUses(SILValue V, function_ref<void(Operand *)> Visitor);
 
-  void handleDeleteNotification(SILNode *node) {
-    auto value = dyn_cast<ValueBase>(node);
-    if (!value)
-      return;
-
-    // Check the cache. If we don't find it, there is nothing to do.
-    auto Iter = RCCache.find(SILValue(value));
-    if (Iter == RCCache.end())
-      return;
-
-    // Then erase Iter from the cache.
-    RCCache.erase(Iter);
-  }
-
 private:
   SILValue getRCIdentityRootInner(SILValue V, unsigned RecursionDepth);
   SILValue stripRCIdentityPreservingOps(SILValue V, unsigned RecursionDepth);
@@ -103,18 +89,6 @@ public:
 
   RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
   RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
-
-  virtual void handleDeleteNotification(SILNode *node) override {
-    // If the parent function of this instruction was just turned into an
-    // external declaration, bail. This happens during SILFunction destruction.
-    SILFunction *F = node->getFunction();
-    if (F->isExternalDeclaration()) {
-      return;
-    }
-    get(F)->handleDeleteNotification(node);
-  }
-
-  virtual bool needsNotifications() override { return true; }
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::RCIdentity;

@@ -158,9 +158,6 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old arg!");
 
-  // Notify the delete handlers that this argument is being deleted.
-  M.notifyDeleteHandlers(ArgumentList[i]);
-
   SILFunctionArgument *NewArg = new (M) SILFunctionArgument(Ty, Kind, D);
   NewArg->setParent(this);
 
@@ -183,9 +180,6 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
     Kind = OwnershipKind::None;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
-
-  // Notify the delete handlers that this argument is being deleted.
-  M.notifyDeleteHandlers(ArgumentList[i]);
 
   SILPhiArgument *NewArg = new (M) SILPhiArgument(Ty, Kind, D);
   NewArg->setParent(this);
@@ -246,8 +240,6 @@ SILPhiArgument *SILBasicBlock::insertPhiArgument(unsigned AtArgPos, SILType Ty,
 void SILBasicBlock::eraseArgument(int Index) {
   assert(getArgument(Index)->use_empty() &&
          "Erasing block argument that has uses!");
-  // Notify the delete handlers that this BB argument is going away.
-  getModule().notifyDeleteHandlers(getArgument(Index));
   ArgumentList.erase(ArgumentList.begin() + Index);
 }
 

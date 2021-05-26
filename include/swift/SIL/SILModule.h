@@ -345,10 +345,6 @@ private:
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
 
-  /// A list of clients that need to be notified when an instruction
-  /// invalidation message is sent.
-  llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
-
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options);
 
@@ -423,16 +419,6 @@ public:
 
   /// Called after an instruction is moved from one function to another.
   void notifyMovedInstruction(SILInstruction *inst, SILFunction *fromFunction);
-
-  /// Add a delete notification handler \p Handler to the module context.
-  void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
-
-  /// Remove the delete notification handler \p Handler from the module context.
-  void removeDeleteNotificationHandler(DeleteNotificationHandler* Handler);
-
-  /// Send the invalidation message that \p V is being deleted to all
-  /// registered handlers. The order of handlers is deterministic but arbitrary.
-  void notifyDeleteHandlers(SILNode *node);
 
   /// Set a serialization action.
   void setSerializeSILAction(ActionCallback SerializeSILAction);

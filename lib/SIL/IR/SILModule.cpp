@@ -808,36 +808,6 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
   }
 }
 
-void SILModule::registerDeleteNotificationHandler(
-    DeleteNotificationHandler *handler) {
-  // Ask the handler (that can be an analysis, a pass, or some other data
-  // structure) if it wants to receive delete notifications.
-  if (handler->needsNotifications()) {
-    NotificationHandlers.insert(handler);
-  }
-}
-
-void SILModule::
-removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
-  NotificationHandlers.remove(Handler);
-}
-
-void SILModule::notifyDeleteHandlers(SILNode *node) {
-  // Update openedArchetypeDefs.
-  if (auto *svi = dyn_cast<SingleValueInstruction>(node)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
-      OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      assert(openedArchetypeDefs.lookup(key) == svi &&
-             "archetype def was not registered");
-      openedArchetypeDefs.erase(key);
-    }
-  }
-
-  for (auto *Handler : NotificationHandlers) {
-    Handler->handleDeleteNotification(node);
-  }
-}
-
 // TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
 // now, let's recognize noreturn intrinsics and builtins specially here.
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
