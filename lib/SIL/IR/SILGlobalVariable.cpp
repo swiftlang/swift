@@ -58,8 +58,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
 }
 
 SILGlobalVariable::~SILGlobalVariable() {
-  StaticInitializerBlock.dropAllReferences();
-  StaticInitializerBlock.clearStaticInitializerBlock(Module);
+  clear();
 }
 
 bool SILGlobalVariable::isPossiblyUsedExternally() const {

@@ -981,6 +981,10 @@ public:
 
   void clear();
 
+  /// Like `clear`, but does not call `dropAllReferences`, which is the
+  /// responsibility of the caller.
+  void eraseAllBlocks();
+
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
   SubstitutionMap getForwardingSubstitutionMap();

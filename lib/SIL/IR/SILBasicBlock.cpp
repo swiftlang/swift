@@ -41,35 +41,8 @@ SILBasicBlock::~SILBasicBlock() {
     return;
   }
     
-  SILModule &M = getModule();
-
-  // Invalidate all of the basic block arguments.
-  for (auto *Arg : ArgumentList) {
-    M.notifyDeleteHandlers(Arg);
-  }
-
   dropAllReferences();
-
-  for (auto I = begin(), E = end(); I != E;) {
-    auto Inst = &*I;
-    ++I;
-    erase(Inst);
-  }
-  assert(InstList.empty());
-}
-
-void SILBasicBlock::clearStaticInitializerBlock(SILModule &module) {
-  assert(!getParent() && "not a global variable's static initializer block");
-  assert(ArgumentList.empty() &&
-         "a static initializer block must not have arguments");
-
-  for (auto I = begin(), E = end(); I != E;) {
-    SILInstruction *Inst = &*I;
-    ++I;
-    InstList.erase(Inst);
-    module.deallocateInst(Inst);
-  }
-  assert(InstList.empty());
+  eraseAllInstructions(getModule());
 }
 
 int SILBasicBlock::getDebugID() const {
@@ -104,22 +77,21 @@ void SILBasicBlock::remove(SILInstruction *I) {
   InstList.remove(I);
 }
 
-void SILBasicBlock::eraseInstructions() {
- for (auto It = begin(); It != end();) {
-    auto *Inst = &*It++;
-    Inst->replaceAllUsesOfAllResultsWithUndef();
-    Inst->eraseFromParent();
+void SILBasicBlock::eraseAllInstructions(SILModule &module) {
+  while (!empty()) {
+    erase(&*begin(), module);
   }
 }
 
 /// Returns the iterator following the erased instruction.
-SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
-  // Notify the delete handlers that this instruction is going away.
-  SILModule &module = getModule();
-  module.notifyDeleteHandlers(I->asSILNode());
-  auto nextIter = InstList.erase(I);
-  module.deallocateInst(I);
-  return nextIter;
+void SILBasicBlock::erase(SILInstruction *I) {
+  erase(I, getModule());
+}
+
+void SILBasicBlock::erase(SILInstruction *I, SILModule &module) {
+  module.willDeleteInstruction(I);
+  InstList.remove(I);
+  module.scheduleForDeletion(I);
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.

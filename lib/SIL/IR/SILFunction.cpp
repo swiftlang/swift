@@ -201,16 +201,7 @@ SILFunction::~SILFunction() {
 
   auto &M = getModule();
   for (auto &BB : *this) {
-    for (auto I = BB.begin(), E = BB.end(); I != E;) {
-      auto Inst = &*I;
-      ++I;
-      SILInstruction::destroy(Inst);
-      // TODO: It is only safe to directly deallocate an
-      // instruction if this BB is being removed in scope
-      // of destructing a SILFunction.
-      M.deallocateInst(Inst);
-    }
-    BB.InstList.clearAndLeakNodesUnsafely();
+    BB.eraseAllInstructions(M);
   }
 
   assert(RefCount == 0 &&
@@ -689,6 +680,10 @@ bool SILFunction::isExternallyUsedSymbol() const {
 
 void SILFunction::clear() {
   dropAllReferences();
+  eraseAllBlocks();
+}
+
+void SILFunction::eraseAllBlocks() {
   BlockList.clear();
 }
 
