@@ -1277,8 +1277,7 @@ swift::canonicalizeOSSALifetimes(CanonicalizeOSSALifetime &canonicalizer,
   // We use our canonicalizers inst mod callbacks.
   InstructionDeleter deleter(canonicalizer.getInstModCallbacks());
   for (auto *copy : deadCopies) {
-    deleter.recursivelyDeleteUsersIfDead(copy);
+    deleter.deleteIfDead(copy);
   }
-
   return SILAnalysis::InvalidationKind::Instructions;
 }

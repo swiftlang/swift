@@ -264,8 +264,16 @@ static  bool fixupReferenceCounts(
   return invalidatedStackNesting;
 }
 
-static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
-  auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
+// Handle the case where the callee of the apply is either a load or a
+// project_box that was used by a deleted load. If we fail to optimize,
+// return an invalid SILValue.
+static SILValue cleanupLoadedCalleeValue(SILValue calleeValue) {
+  auto calleeSource = calleeValue;
+  auto *li = dyn_cast<LoadInst>(calleeValue);
+  if (li) {
+    calleeSource = li->getOperand();
+  }
+  auto *pbi = dyn_cast<ProjectBoxInst>(calleeSource);
   if (!pbi)
     return SILValue();
   auto *abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
@@ -274,17 +282,18 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
 
   // The load instruction must have no more uses or a single destroy left to
   // erase it.
-  if (li->getFunction()->hasOwnership()) {
-    // TODO: What if we have multiple destroy_value? That should be ok as well.
-    auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
-    if (!dvi)
+  if (li) {
+    if (li->getFunction()->hasOwnership()) {
+      // TODO: What if we have multiple destroy_value? That should be ok.
+      auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
+      if (!dvi)
+        return SILValue();
+      dvi->eraseFromParent();
+    } else if (!li->use_empty()) {
       return SILValue();
-    dvi->eraseFromParent();
-  } else if (!li->use_empty()) {
-    return SILValue();
+    }
+    li->eraseFromParent();
   }
-  li->eraseFromParent();
-
   // Look through uses of the alloc box the load is loading from to find up to
   // one store and up to one strong release.
   PointerUnion<StrongReleaseInst *, DestroyValueInst *> destroy;
@@ -356,15 +365,8 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
 /// longer necessary after inlining.
 static void cleanupCalleeValue(SILValue calleeValue,
                                bool &invalidatedStackNesting) {
-  // Handle the case where the callee of the apply is a load instruction. If we
-  // fail to optimize, return. Otherwise, see if we can look through other
-  // abstractions on our callee.
-  if (auto *li = dyn_cast<LoadInst>(calleeValue)) {
-    calleeValue = cleanupLoadedCalleeValue(calleeValue, li);
-    if (!calleeValue) {
-      return;
-    }
-  }
+  if (auto loadedValue = cleanupLoadedCalleeValue(calleeValue))
+    calleeValue = loadedValue;
 
   calleeValue = stripCopiesAndBorrows(calleeValue);
 

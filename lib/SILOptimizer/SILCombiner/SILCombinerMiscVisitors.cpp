@@ -1599,9 +1599,11 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
                         StoreOwnershipQualifier::Unqualified);
     // Cleanup.
-    eraseUsesOfInstruction(DataAddrInst);
-    recursivelyDeleteTriviallyDeadInstructions(DataAddrInst, true);
-    return eraseInstFromFunction(*IEAI);
+    instModCallbacks.notifyWillBeDeleted(DataAddrInst);
+    deleter.forceDeleteWithUsers(DataAddrInst);
+    deleter.forceDelete(IEAI);
+    deleter.cleanupDeadInstructions();
+    return nullptr;
   }
 
   // Check whether we have an apply initializing the enum.

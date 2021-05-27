@@ -68,6 +68,9 @@ class SILCombiner :
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
+  /// Utility for dead code removal.
+  InstructionDeleter deleter;
+
   /// A cache of "dead end blocks" through which all paths it is known that the
   /// program will terminate. This means that we are allowed to leak
   /// objects.
@@ -144,6 +147,7 @@ public:
               use->set(newValue);
               Worklist.add(use->getUser());
             });
+    deleter = InstructionDeleter(instModCallbacks);
   }
 
   bool runOnFunction(SILFunction &F);
