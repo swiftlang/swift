@@ -6135,10 +6135,10 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 bool ArgumentMismatchFailure::diagnoseAsNote() {
   auto *locator = getLocator();
   if (auto *callee = getCallee()) {
-    emitDiagnosticAt(
-        callee, diag::candidate_has_invalid_argument_at_position, getToType(),
-        getParamPosition(),
-        locator->isLastElement<LocatorPathElt::LValueConversion>());
+    emitDiagnosticAt(callee, diag::candidate_has_invalid_argument_at_position,
+                     getToType(), getParamPosition(),
+                     locator->isLastElement<LocatorPathElt::LValueConversion>(),
+                     getFromType());
     return true;
   }
 
@@ -7034,9 +7034,9 @@ bool AbstractRawRepresentableFailure::diagnoseAsNote() {
     }
   } else if (auto argConv =
                  locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()) {
-    diagnostic.emplace(
-        emitDiagnostic(diag::candidate_has_invalid_argument_at_position,
-                       RawReprType, argConv->getParamIdx(), /*inOut=*/false));
+    diagnostic.emplace(emitDiagnostic(
+        diag::candidate_has_invalid_argument_at_position, RawReprType,
+        argConv->getParamIdx(), /*inOut=*/false, ExpectedType));
   }
 
   if (diagnostic) {

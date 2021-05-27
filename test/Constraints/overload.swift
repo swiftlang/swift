@@ -3,9 +3,9 @@
 func markUsed<T>(_ t: T) {}
 
 func f0(_: Float) -> Float {}
-// expected-note@-1 {{candidate expects value of type 'Float' for parameter #1}}
+// expected-note@-1 {{candidate expects value of type 'Float' for parameter #1 (got 'X')}}
 func f0(_: Int) -> Int {}
-// expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
+// expected-note@-1 {{candidate expects value of type 'Int' for parameter #1 (got 'X')}}
 
 func f1(_: Int) {}
 
