@@ -41,6 +41,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -410,6 +411,10 @@ struct ASTContext::Implementation {
     /// Stored generic signature builders for canonical generic signatures.
     llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
       GenericSignatureBuilders;
+
+    /// Stored requirement machines for canonical generic signatures.
+    llvm::DenseMap<GenericSignature, std::unique_ptr<RequirementMachine>>
+      RequirementMachines;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -1748,6 +1753,10 @@ void ASTContext::registerGenericSignatureBuilder(
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig) {
+  if (LangOpts.EnableRequirementMachine) {
+    (void) getOrCreateRequirementMachine(sig);
+  }
+
   // Check whether we already have a generic signature builder for this
   // signature and module.
   auto arena = getArena(sig);
@@ -1826,6 +1835,36 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 #endif
 
   return builder;
+}
+
+RequirementMachine *ASTContext::getOrCreateRequirementMachine(
+    CanGenericSignature sig) {
+  // Check whether we already have a requirement machine for this
+  // signature.
+  auto arena = getArena(sig);
+  auto &machines = getImpl().getArena(arena).RequirementMachines;
+  auto known = machines.find(sig);
+  if (known != machines.end()) {
+    auto *machine = known->second.get();
+    if (!machine->isComplete()) {
+      llvm::errs() << "Re-entrant construction of requirement "
+                   << "machine for " << sig << "\n";
+      abort();
+    }
+
+    return machine;
+  }
+
+  // Create a new requirement machine with the given signature.
+  auto machine = new RequirementMachine(*this);
+
+  // Store this requirement machine before adding the signature,
+  // to catch re-entrant construction.
+  machines[sig] = std::unique_ptr<RequirementMachine>(machine);
+
+  machine->addGenericSignature(sig);
+
+  return machine;
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>

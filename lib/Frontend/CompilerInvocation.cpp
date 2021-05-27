@@ -791,6 +791,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.EnableRequirementMachine = Args.hasFlag(
+      OPT_enable_requirement_machine,
+      OPT_disable_requirement_machine, /*default=*/false);
+
+  Opts.DebugRequirementMachine = Args.hasArg(
+      OPT_debug_requirement_machine);
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -876,7 +883,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_experimental_print_full_convention);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
     unsigned line;
@@ -896,6 +902,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
+
+  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   return HadError;
 }
