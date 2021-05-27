@@ -326,17 +326,8 @@ BridgedLocation SILInstruction_getLocation(BridgedInstruction inst) {
   return *reinterpret_cast<BridgedLocation *>(&loc);
 }
 
-int SILInstruction_mayHaveSideEffects(BridgedInstruction inst) {
-  return castToInst(inst)->mayHaveSideEffects();
-}
-int SILInstruction_mayReadFromMemory(BridgedInstruction inst) {
-  return castToInst(inst)->mayReadFromMemory();
-}
-int SILInstruction_mayWriteToMemory(BridgedInstruction inst) {
-  return castToInst(inst)->mayWriteToMemory();
-}
-int SILInstruction_mayReadOrWriteMemory(BridgedInstruction inst) {
-  return castToInst(inst)->mayReadOrWriteMemory();
+BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst) {
+  return (BridgedMemoryBehavior)castToInst(inst)->getMemoryBehavior();
 }
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result) {

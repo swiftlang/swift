@@ -46,17 +46,38 @@ public class Instruction : ListNode, CustomStringConvertible {
     return Location(bridgedLocation: SILInstruction_getLocation(bridged))
   }
 
+  public var mayTrap: Bool { false }
+
   final public var mayHaveSideEffects: Bool {
-    return SILInstruction_mayHaveSideEffects(bridged) != 0
+    return mayTrap || mayWriteToMemory
   }
+
   final public var mayReadFromMemory: Bool {
-    return SILInstruction_mayReadFromMemory(bridged) != 0
+    switch SILInstruction_getMemBehavior(bridged) {
+      case MayReadBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+        return true
+      default:
+        return false
+    }
   }
+
   final public var mayWriteToMemory: Bool {
-    return SILInstruction_mayWriteToMemory(bridged) != 0
+    switch SILInstruction_getMemBehavior(bridged) {
+      case MayWriteBehavior, MayReadWriteBehavior, MayHaveSideEffectsBehavior:
+        return true
+      default:
+        return false
+    }
   }
+
   final public var mayReadOrWriteMemory: Bool {
-    return SILInstruction_mayReadOrWriteMemory(bridged) != 0
+    switch SILInstruction_getMemBehavior(bridged) {
+      case MayReadBehavior, MayWriteBehavior, MayReadWriteBehavior,
+           MayHaveSideEffectsBehavior:
+        return true
+      default:
+        return false
+    }
   }
 
   public var bridged: BridgedInstruction {
@@ -143,6 +164,8 @@ final public class UnimplementedInstruction : Instruction {
 final public class CondFailInst : Instruction {
   public var condition: Value { operands[0].value }
   
+  public override var mayTrap: Bool { true }
+
   public var message: String { CondFailInst_getMessage(bridged).string }
 }
 

@@ -119,6 +119,16 @@ typedef struct {
   SwiftObject obj;
 } BridgedMultiValueResult;
 
+// Must be in sync with SILInstruction::MemoryBehavior
+// TODO: do this less hacky.
+typedef enum {
+  NoneBehavior,
+  MayReadBehavior,
+  MayWriteBehavior,
+  MayReadWriteBehavior,
+  MayHaveSideEffectsBehavior
+} BridgedMemoryBehavior;
+
 typedef long SwiftInt;
 
 void registerBridgedClass(BridgedStringRef className, SwiftMetatype metatype);
@@ -166,10 +176,7 @@ OptionalBridgedInstruction SILInstruction_previous(BridgedInstruction inst);
 BridgedBasicBlock SILInstruction_getParent(BridgedInstruction inst);
 BridgedOperandArray SILInstruction_getOperands(BridgedInstruction inst);
 BridgedLocation SILInstruction_getLocation(BridgedInstruction inst);
-int SILInstruction_mayHaveSideEffects(BridgedInstruction inst);
-int SILInstruction_mayReadFromMemory(BridgedInstruction inst);
-int SILInstruction_mayWriteToMemory(BridgedInstruction inst);
-int SILInstruction_mayReadOrWriteMemory(BridgedInstruction inst);
+BridgedMemoryBehavior SILInstruction_getMemBehavior(BridgedInstruction inst);
 
 BridgedInstruction MultiValueInstResult_getParent(BridgedMultiValueResult result);
 SwiftInt MultipleValueInstruction_getNumResults(BridgedInstruction inst);
