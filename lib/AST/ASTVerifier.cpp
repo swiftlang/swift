@@ -3674,6 +3674,11 @@ public:
 } // end anonymous namespace
 
 static bool shouldVerifyGivenContext(const ASTContext &ctx) {
+  // Never verify when allowing errors, since the AST can necessarily be
+  // invalid
+  if (ctx.LangOpts.AllowModuleWithCompilerErrors)
+    return false;
+
   using ASTVerifierOverrideKind = LangOptions::ASTVerifierOverrideKind;
   switch (ctx.LangOpts.ASTVerifierOverride) {
   case ASTVerifierOverrideKind::EnableVerifier:
