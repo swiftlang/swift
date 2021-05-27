@@ -74,14 +74,15 @@ import Swift
 @available(SwiftStdlib 5.5, *)
 @rethrows
 public protocol AsyncSequence {
-  /// The type of element produced by this asynchronous sequence.
+    /// The type of asynchronous iterator produced by this asynchronous sequence.
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
-  /// Creates the asynchronous iterator that produces elements of this
-  /// asynchronous sequence.
-  ///
-  /// - Returns: An instance of the `AsyncIterator` type used to produce
-  /// elements of the asynchronous sequence.
+    /// The type of element produced by this asynchronous sequence.
   associatedtype Element
+    /// Creates the asynchronous iterator that produces elements of this
+    /// asynchronous sequence.
+    ///
+    /// - Returns: An instance of the `AsyncIterator` type used to produce
+    /// elements of the asynchronous sequence.
   __consuming func makeAsyncIterator() -> AsyncIterator
 }
 
