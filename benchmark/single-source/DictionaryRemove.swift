@@ -74,7 +74,7 @@ func _removeWhere(N: Int, keepCapacity: Bool) {
   var map = temporaryNumberMap
   temporaryNumberMap = [:] //let map be unique
   for i in 1...N {
-    map.removeAll(where: { $0 == i }, keepCapacity: keepCapacity)
+    map.removeAll(where: { $0 == i }, keepingCapacity: keepCapacity)
   }
 }
 

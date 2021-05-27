@@ -1240,9 +1240,9 @@ extension Dictionary {
   @inlinable
   public mutating func removeAll(
     where isIncluded: (Key, Value) throws -> Bool,
-    keepCapacity: Bool = false
+    keepingCapacity: Bool = false
   ) rethrows {
-    try _variant.removeAll(where: isIncluded, keepCapacity: keepCapacity)
+    try _variant.removeAll(where: isIncluded, keepCapacity: keepingCapacity)
   }
   
   /// Removes every key-value pair that satisfies the given predicate from the dictionary.
@@ -1264,12 +1264,12 @@ extension Dictionary {
   @inlinable
   public mutating func removeAll(
     where isIncluded: (Key) throws -> Bool,
-    keepCapacity: Bool = false
+    keepingCapacity: Bool = false
   ) rethrows {
     try removeAll(
       where: { (key: Key, _) in
         return try isIncluded(key)
-      }, keepCapacity: keepCapacity
+      }, keepingCapacity: keepingCapacity
     )
   }
 }
