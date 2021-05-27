@@ -15,7 +15,7 @@ import Swift
 
 /// Common protocol to which all actors conform.
 ///
-/// The Actor protocol generalizes over all actor types. Actor types
+/// The `Actor` protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.
 @available(SwiftStdlib 5.5, *)
 public protocol Actor: AnyObject, Sendable {
@@ -53,7 +53,7 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 internal func _enqueueOnMain(_ job: UnownedJob)
 
 /// A singleton actor whose executor is equivalent to 
-/// DispatchQueue.main, which is the main dispatch queue.
+/// `DispatchQueue.main`, which is the main dispatch queue.
 @available(SwiftStdlib 5.5, *)
 @globalActor public final actor MainActor: SerialExecutor {
   public static let shared = MainActor()
