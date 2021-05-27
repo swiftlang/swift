@@ -1189,7 +1189,7 @@ public:
       POA->invalidateFunction(F);
 
     auto *PO = POA->get(F);
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *AA = PM->getAnalysis<AliasAnalysis>(F);
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
 
     llvm::SpecificBumpPtrAllocator<BlockState> BPA;

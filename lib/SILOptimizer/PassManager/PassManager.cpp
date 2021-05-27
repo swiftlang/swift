@@ -326,7 +326,6 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
 
   for (SILAnalysis *A : Analyses) {
     A->initialize(this);
-    M->registerDeleteNotificationHandler(A);
   }
 
   std::unique_ptr<DeserializationNotificationHandler> handler(
@@ -455,7 +454,6 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   }
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
-  Mod->registerDeleteNotificationHandler(SFT);
   if (breakBeforeRunning(F->getName(), SFT))
     LLVM_BUILTIN_DEBUGTRAP;
   if (SILForceVerifyAll ||
@@ -472,7 +470,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     verifyAnalyses(F);
   }
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  Mod->removeDeleteNotificationHandler(SFT);
+  Mod->flushDeletedInsts();
 
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
@@ -615,10 +613,9 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  Mod->registerDeleteNotificationHandler(SMT);
   SMT->run();
-  Mod->removeDeleteNotificationHandler(SMT);
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
+  Mod->flushDeletedInsts();
 
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
@@ -731,7 +728,6 @@ SILPassManager::~SILPassManager() {
 
   // delete the analysis.
   for (auto *A : Analyses) {
-    Mod->removeDeleteNotificationHandler(A);
     assert(!A->isLocked() &&
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;

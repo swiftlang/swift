@@ -1271,15 +1271,6 @@ bool EscapeAnalysis::ConnectionGraph::forwardTraverseDefer(
   return true;
 }
 
-void EscapeAnalysis::ConnectionGraph::removeFromGraph(ValueBase *V) {
-  CGNode *node = Values2Nodes.lookup(V);
-  if (!node)
-    return;
-  Values2Nodes.erase(V);
-  if (node->mappedValue == V)
-    node->mappedValue = nullptr;
-}
-
 //===----------------------------------------------------------------------===//
 //                      Dumping, Viewing and Verification
 //===----------------------------------------------------------------------===//
@@ -2919,21 +2910,6 @@ void EscapeAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
     LLVM_DEBUG(llvm::dbgs() << "  invalidate "
                             << FInfo->Graph.F->getName() << '\n');
     invalidateIncludingAllCallers(FInfo);
-  }
-}
-
-void EscapeAnalysis::handleDeleteNotification(SILNode *node) {
-  auto value = dyn_cast<ValueBase>(node);
-  if (!value) return;
-
-  if (SILBasicBlock *Parent = node->getParentBlock()) {
-    SILFunction *F = Parent->getParent();
-    if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
-      if (FInfo->isValid()) {
-        FInfo->Graph.removeFromGraph(value);
-        FInfo->SummaryGraph.removeFromGraph(value);
-      }
-    }
   }
 }
 

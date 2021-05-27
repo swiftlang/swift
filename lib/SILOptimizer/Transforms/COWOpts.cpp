@@ -89,7 +89,7 @@ void COWOptsPass::run() {
   LLVM_DEBUG(llvm::dbgs() << "*** RedundantPhiElimination on function: "
                           << F->getName() << " ***\n");
 
-  AA = PM->getAnalysis<AliasAnalysis>();
+  AA = PM->getAnalysis<AliasAnalysis>(F);
 
   bool changed = false;
   for (SILBasicBlock &block : *F) {

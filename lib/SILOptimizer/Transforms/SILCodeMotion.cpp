@@ -1778,7 +1778,7 @@ public:
     if (F->hasOwnership())
       return;
 
-    auto *AA = getAnalysis<AliasAnalysis>();
+    auto *AA = getAnalysis<AliasAnalysis>(F);
     auto *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
 

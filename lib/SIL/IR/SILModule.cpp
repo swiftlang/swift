@@ -126,8 +126,9 @@ SILModule::~SILModule() {
   assert(!hasUnresolvedOpenedArchetypeDefinitions());
 
   // Decrement ref count for each SILGlobalVariable with static initializers.
-  for (SILGlobalVariable &v : silGlobals)
-    v.dropAllReferences();
+  for (SILGlobalVariable &v : silGlobals) {
+    v.clear();
+  }
 
   for (auto vt : vtables)
     vt->~SILVTable();
@@ -143,10 +144,16 @@ SILModule::~SILModule() {
     F.dropDynamicallyReplacedFunction();
     F.clearSpecializeAttrs();
   }
+
+  for (SILFunction &F : *this) {
+    F.eraseAllBlocks();
+  }
+  flushDeletedInsts();
 }
 
 void SILModule::checkForLeaks() const {
-  int instsInModule = 0;
+  int instsInModule = std::distance(scheduledForDeletion.begin(),
+                                    scheduledForDeletion.end());
   for (const SILFunction &F : *this) {
     for (const SILBasicBlock &block : F) {
       instsInModule += std::distance(block.begin(), block.end());
@@ -231,8 +238,30 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
   return AlignedAlloc(Size, Align);
 }
 
-void SILModule::deallocateInst(SILInstruction *I) {
-  AlignedFree(I);
+void SILModule::willDeleteInstruction(SILInstruction *I) {
+  // Update openedArchetypeDefs.
+  if (auto *svi = dyn_cast<SingleValueInstruction>(I)) {
+    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
+      OpenedArchetypeKey key = {archeTy, svi->getFunction()};
+      assert(openedArchetypeDefs.lookup(key) == svi &&
+             "archetype def was not registered");
+      openedArchetypeDefs.erase(key);
+    }
+  }
+}
+
+void SILModule::scheduleForDeletion(SILInstruction *I) {
+  I->dropAllReferences();
+  scheduledForDeletion.push_back(I);
+  I->ParentBB = nullptr;
+}
+
+void SILModule::flushDeletedInsts() {
+  while (!scheduledForDeletion.empty()) {
+    SILInstruction *inst = &*scheduledForDeletion.begin();
+    scheduledForDeletion.erase(inst);
+    AlignedFree(inst);
+  }
 }
 
 SILWitnessTable *
@@ -776,36 +805,6 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
       openedArchetypeDefs.erase(key);
       openedArchetypeDefs[{archeTy, svi->getFunction()}] = svi;
     }
-  }
-}
-
-void SILModule::registerDeleteNotificationHandler(
-    DeleteNotificationHandler *handler) {
-  // Ask the handler (that can be an analysis, a pass, or some other data
-  // structure) if it wants to receive delete notifications.
-  if (handler->needsNotifications()) {
-    NotificationHandlers.insert(handler);
-  }
-}
-
-void SILModule::
-removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
-  NotificationHandlers.remove(Handler);
-}
-
-void SILModule::notifyDeleteHandlers(SILNode *node) {
-  // Update openedArchetypeDefs.
-  if (auto *svi = dyn_cast<SingleValueInstruction>(node)) {
-    if (CanArchetypeType archeTy = svi->getOpenedArchetype()) {
-      OpenedArchetypeKey key = {archeTy, svi->getFunction()};
-      assert(openedArchetypeDefs.lookup(key) == svi &&
-             "archetype def was not registered");
-      openedArchetypeDefs.erase(key);
-    }
-  }
-
-  for (auto *Handler : NotificationHandlers) {
-    Handler->handleDeleteNotification(node);
   }
 }
 

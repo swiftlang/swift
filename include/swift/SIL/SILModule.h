@@ -189,6 +189,17 @@ private:
   /// For consistency checking.
   size_t numAllocatedSlabs = 0;
 
+  /// When an instruction is "deleted" from the SIL, it is put into this list.
+  /// The instructions in this list are eventually deleted for real in
+  /// flushDeletedInsts(), which is called by the pass manager after each pass
+  /// run.
+  /// In other words: instruction deletion is deferred to the end of a pass.
+  ///
+  /// This avoids dangling instruction pointers within the run of a pass and in
+  /// analysis caches. Note that the analysis invalidation mechanism ensures
+  /// that analysis caches are invalidated before flushDeletedInsts().
+  llvm::iplist<SILInstruction> scheduledForDeletion;
+
   /// The swift Module associated with this SILModule.
   ModuleDecl *TheSwiftModule;
 
@@ -334,10 +345,6 @@ private:
   /// Action to be executed for serializing the SILModule.
   ActionCallback SerializeSILAction;
 
-  /// A list of clients that need to be notified when an instruction
-  /// invalidation message is sent.
-  llvm::SetVector<DeleteNotificationHandler*> NotificationHandlers;
-
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options);
 
@@ -412,16 +419,6 @@ public:
 
   /// Called after an instruction is moved from one function to another.
   void notifyMovedInstruction(SILInstruction *inst, SILFunction *fromFunction);
-
-  /// Add a delete notification handler \p Handler to the module context.
-  void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
-
-  /// Remove the delete notification handler \p Handler from the module context.
-  void removeDeleteNotificationHandler(DeleteNotificationHandler* Handler);
-
-  /// Send the invalidation message that \p V is being deleted to all
-  /// registered handlers. The order of handlers is deterministic but arbitrary.
-  void notifyDeleteHandlers(SILNode *node);
 
   /// Set a serialization action.
   void setSerializeSILAction(ActionCallback SerializeSILAction);
@@ -849,8 +846,17 @@ public:
   /// Allocate memory for an instruction using the module's internal allocator.
   void *allocateInst(unsigned Size, unsigned Align) const;
 
-  /// Deallocate memory of an instruction.
-  void deallocateInst(SILInstruction *I);
+  /// Called before \p I is removed from its basic block and scheduled for
+  /// deletion.
+  void willDeleteInstruction(SILInstruction *I);
+
+  /// Schedules the (already removed) instruction \p I for deletion.
+  /// See scheduledForDeletion for details.
+  void scheduleForDeletion(SILInstruction *I);
+
+  /// Deletes all scheuled instructions for real.
+  /// See scheduledForDeletion for details.
+  void flushDeletedInsts();
 
   /// Looks up the llvm intrinsic ID and type for the builtin function.
   ///

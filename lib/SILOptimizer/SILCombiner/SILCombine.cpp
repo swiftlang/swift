@@ -317,9 +317,11 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     if (TrackingList.size() && Builder.hasOwnership()) {
       SmallSetVector<SILValue, 16> defsToCanonicalize;
       for (auto *trackedInst : TrackingList) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(trackedInst)) {
-          defsToCanonicalize.insert(
-              CanonicalizeOSSALifetime::getCanonicalCopiedDef(cvi));
+        if (!trackedInst->isDeleted()) {
+          if (auto *cvi = dyn_cast<CopyValueInst>(trackedInst)) {
+            defsToCanonicalize.insert(
+                CanonicalizeOSSALifetime::getCanonicalCopiedDef(cvi));
+          }
         }
       }
       if (defsToCanonicalize.size()) {
@@ -336,9 +338,11 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       }
     }
     for (SILInstruction *I : TrackingList) {
-      LLVM_DEBUG(llvm::dbgs() << "SC: add " << *I
-                              << " from tracking list to worklist\n");
-      Worklist.add(I);
+      if (!I->isDeleted()) {
+        LLVM_DEBUG(llvm::dbgs() << "SC: add " << *I
+                                << " from tracking list to worklist\n");
+        Worklist.add(I);
+      }
     }
     TrackingList.clear();
   }
@@ -387,7 +391,7 @@ class SILCombine : public SILFunctionTransform {
   
   /// The entry point to the transformation.
   void run() override {
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *AA = PM->getAnalysis<AliasAnalysis>(getFunction());
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
     auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
@@ -408,20 +412,6 @@ class SILCombine : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
-  
-  void handleDeleteNotification(SILNode *node) override {
-    auto I = dyn_cast<SILInstruction>(node);
-    if (!I) return;
-
-    // Linear searching the tracking list doesn't hurt because usually it only
-    // contains a few elements.
-    auto Iter = std::find(TrackingList.begin(), TrackingList.end(), I);
-    if (Iter != TrackingList.end())
-      TrackingList.erase(Iter);      
-  }
-  
-  bool needsNotifications() override { return true; }
-
 };
 
 } // end anonymous namespace
