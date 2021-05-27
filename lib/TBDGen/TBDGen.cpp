@@ -717,6 +717,10 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
+  if (AFD->isDistributed()) {
+    addSymbol(SILDeclRef(AFD).asDistributed());
+  }
+
   // Add derivative function symbols.
   for (const auto *differentiableAttr :
        AFD->getAttrs().getAttributes<DifferentiableAttr>())

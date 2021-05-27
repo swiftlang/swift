@@ -1678,6 +1678,22 @@ FUNCTION(DefaultActorDeallocateResilient,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_distributedActor_remote_initialize(DefaultActor *actor);
+FUNCTION(DistributedActorInitializeRemote,
+         swift_distributedActor_remote_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy), // TODO also address and transport?
+         ATTRS(NoUnwind))
+
+// void swift_distributedActor_destroy(DefaultActor *actor); // TODO: ProxyActor *proxy?
+FUNCTION(DistributedActorDestroy,
+         swift_distributedActor_destroy, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 /// void swift_asyncLet_start(
 ///     AsyncLet *alet,
 ///     const Metadata *futureResultType,

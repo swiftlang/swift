@@ -104,6 +104,10 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
 static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                   llvm::cl::desc("Enable experimental distributed actors."));
+
+static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
 

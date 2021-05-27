@@ -279,6 +279,9 @@ namespace swift {
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
+    /// Enable experimental 'distributed' actors and functions.
+    bool EnableExperimentalDistributed = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY;

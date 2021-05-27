@@ -724,6 +724,14 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
+/// Initialize a "proxy" for a distributed remote actor.
+BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
+                       "initializeDistributedRemoteActor", "", Special)
+
+/// Destroy the distributed-actor instance in a "proxy" actor object.
+BUILTIN_MISC_OPERATION(DestroyDistributedActor,
+                       "destroyDistributedActor", "", Special)
+
 /// Resume a non-throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
                        "resumeNonThrowingContinuationReturning", "", Special)
