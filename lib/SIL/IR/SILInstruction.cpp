@@ -145,13 +145,15 @@ void SILInstruction::dropAllReferences() {
             OpE = PossiblyDeadOps.end(); OpI != OpE; ++OpI) {
     OpI->drop();
   }
+  dropNonOperandReferences();
+}
 
+void SILInstruction::dropNonOperandReferences() {
   if (auto *termInst = dyn_cast<TermInst>(this)) {
     for (SILSuccessor &succ : termInst->getSuccessors()) {
       succ = nullptr;
     }
   }
-
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(this)) {
