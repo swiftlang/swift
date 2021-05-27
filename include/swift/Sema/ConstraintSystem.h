@@ -356,6 +356,10 @@ public:
   /// Determine whether this type variable represents a closure result type.
   bool isClosureResultType() const;
 
+  /// Determine whether this type variable represents
+  /// a type of a key path expression.
+  bool isKeyPathType() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///

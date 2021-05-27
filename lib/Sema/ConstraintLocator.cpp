@@ -121,7 +121,7 @@ bool ConstraintLocator::isKeyPathType() const {
   // The format of locator should be `<keypath expr> -> key path type`
   if (!anchor || !isExpr<KeyPathExpr>(anchor) || path.size() != 1)
     return false;
-  return path.back().getKind() == ConstraintLocator::KeyPathType;
+  return path.back().is<LocatorPathElt::KeyPathType>();
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
