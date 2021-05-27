@@ -60,7 +60,7 @@ class CMakeProduct(product.Product):
             if self.args.cmake_generator == "Xcode":
                 # Xcode generator uses "ALL_BUILD" instead of "all".
                 # Also, xcodebuild uses -target instead of bare names.
-                build_targets = build_targets.copy()
+                build_targets = build_targets[:]
                 build_targets = [val for target in build_targets
                                  for val in ["-target",
                                              target if target != "all"
