@@ -52,8 +52,8 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)
 
-/// A singleton actor whose executor is equivalent to 
-/// DispatchQueue.main, which is the main dispatch queue.
+/// A singleton actor whose executor is equivalent to the main
+/// dispatch queue.
 @available(SwiftStdlib 5.5, *)
 @globalActor public final actor MainActor: SerialExecutor {
   public static let shared = MainActor()
