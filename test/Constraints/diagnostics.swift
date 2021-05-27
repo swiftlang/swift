@@ -399,9 +399,9 @@ enum Color {
   static func rainbow() -> Color {}
   
   static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
-  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
   static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
-  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1}}
+  // expected-note@-1 {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }

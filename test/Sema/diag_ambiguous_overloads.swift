@@ -147,8 +147,8 @@ array.withUnsafeBufferPointer {
   // expected-note@-5 {{found candidate with type '(UnsafeMutableRawPointer) -> UnsafeRawPointer'}}
 }
 
-func SR12689_1(_ u: Int) -> String { "" } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1}}
-func SR12689_1(_ u: String) -> Double { 0 } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'String' for parameter #1}}
+func SR12689_1(_ u: Int) -> String { "" } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+func SR12689_1(_ u: String) -> Double { 0 } // expected-note {{found this candidate}} expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
 func SR12689_2(_ u: Int) {}
 
 SR12689_2(SR12689_1(1 as Double)) // expected-error {{no exact matches in call to global function 'SR12689_1'}}
