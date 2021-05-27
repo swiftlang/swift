@@ -657,12 +657,26 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   B.createReturn(ImplicitReturnLocation(Loc), initedSelfValue);
 }
 
-static void emitDefaultActorInitialization(SILGenFunction &SGF,
-                                           SILLocation loc,
-                                           ManagedValue self) {
+static void emitDefaultActorInitialization(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue self) {
   auto &ctx = SGF.getASTContext();
   auto builtinName = ctx.getIdentifier(
     getBuiltinName(BuiltinValueKind::InitializeDefaultActor));
+  auto resultTy = SGF.SGM.Types.getEmptyTupleType();
+
+  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
+  SGF.B.createBuiltin(loc, builtinName, resultTy, /*subs*/{},
+                      { self.borrow(SGF, loc).getValue() });
+}
+
+static void emitDistributedRemoteActorInitialization(
+    SILGenFunction &SGF, SILLocation loc,
+    ManagedValue self,
+    bool addressArg, bool transportArg // FIXME: make those real arguments
+    ) {
+  auto &ctx = SGF.getASTContext();
+  auto builtinName = ctx.getIdentifier(
+    getBuiltinName(BuiltinValueKind::InitializeDistributedRemoteActor));
   auto resultTy = SGF.SGM.Types.getEmptyTupleType();
 
   FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
@@ -762,7 +776,17 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   if (selfClassDecl->isRootDefaultActor() && !isDelegating) {
     SILLocation PrologueLoc(selfDecl);
     PrologueLoc.markAsPrologue();
-    emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
+
+    if (selfClassDecl->isDistributedActor() &&
+        ctor->isDistributedActorResolveInit()) {
+      auto addressArg  = false; // TODO: get the address argument
+      auto transportArg  = false; // TODO: get the transport argument
+      emitDistributedRemoteActorInitialization(*this, PrologueLoc,
+          selfArg, addressArg, transportArg);
+    } else {
+      // is normal (default) actor
+      emitDefaultActorInitialization(*this, PrologueLoc, selfArg);
+    }
   }
 
   if (!ctor->hasStubImplementation()) {

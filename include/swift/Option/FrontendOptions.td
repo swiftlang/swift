@@ -232,6 +232,10 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
+def enable_experimental_distributed :
+  Flag<["-"], "enable-experimental-distributed">,
+  HelpText<"Enable experimental 'distributed' actors and functions">;
+
 def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;
@@ -295,6 +299,10 @@ def disable_clangimporter_source_import : Flag<["-"],
 def disable_implicit_concurrency_module_import : Flag<["-"],
   "disable-implicit-concurrency-module-import">,
   HelpText<"Disable the implicit import of the _Concurrency module.">;
+
+def disable_implicit_distributed_module_import : Flag<["-"],
+  "disable-implicit-distributed-module-import">,
+  HelpText<"Disable the implicit import of the _Distributed module.">;
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;

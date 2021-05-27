@@ -97,6 +97,10 @@ if(SWIFT_BUILD_STDLIB)
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     add_subdirectory(Concurrency)
   endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    add_subdirectory(Distributed)
+  endif()
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

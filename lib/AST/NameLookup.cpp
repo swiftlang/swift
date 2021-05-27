@@ -1401,6 +1401,30 @@ NominalTypeDecl::lookupDirect(DeclName name,
                            DirectLookupRequest({this, name, flags}), {});
 }
 
+AbstractFunctionDecl*
+NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
+  auto &C = func->getASTContext();
+  auto *selfTyDecl = func->getParent()->getSelfNominalTypeDecl();
+
+  // _remote functions only exist as counterparts to a distributed function.
+  if (!func->isDistributed())
+    return nullptr;
+
+  auto localFuncName = func->getBaseIdentifier().str().str();
+  auto remoteFuncId = C.getIdentifier("_remote_" + localFuncName);
+
+  auto remoteFuncDecls = selfTyDecl->lookupDirect(DeclName(remoteFuncId));
+  if (remoteFuncDecls.empty())
+    return nullptr;
+
+  if (auto remoteDecl = dyn_cast<AbstractFunctionDecl>(remoteFuncDecls.front())) {
+    // TODO: implement more checks here, it has to be the exact right signature.
+    return remoteDecl;
+  }
+
+  return nullptr;
+}
+
 TinyPtrVector<ValueDecl *>
 DirectLookupRequest::evaluate(Evaluator &evaluator,
                               DirectLookupDescriptor desc) const {

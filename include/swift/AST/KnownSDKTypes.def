@@ -43,4 +43,9 @@ KNOWN_SDK_TYPE_DECL(Concurrency, UnownedSerialExecutor, NominalTypeDecl, 0)
 
 KNOWN_SDK_TYPE_DECL(Concurrency, TaskLocal, ClassDecl, 1)
 
+// Distributed actors
+KNOWN_SDK_TYPE_DECL(Distributed, DistributedActor, ProtocolDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, ActorTransport, ProtocolDecl, 0)
+KNOWN_SDK_TYPE_DECL(Distributed, ActorAddress, StructDecl, 0)
+
 #undef KNOWN_SDK_TYPE_DECL

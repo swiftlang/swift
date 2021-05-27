@@ -1655,6 +1655,12 @@ function(add_swift_target_library name)
                       "-Xfrontend;-disable-implicit-concurrency-module-import")
   endif()
 
+  # Turn off implicit import of _Distributed when building libraries
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
+                      "-Xfrontend;-disable-implicit-distributed-module-import")
+  endif()
+
   # If we are building this library for targets, loop through the various
   # SDKs building the variants of this library.
   list_intersect(
