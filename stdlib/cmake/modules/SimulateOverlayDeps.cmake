@@ -102,6 +102,8 @@ function(remove_overlay_from_build_single overlay)
 
   file(GLOB dylibs LIST_DIRECTORIES false ${SWIFTLIB_DIR}/${sdk_name}/*/libswift${overlay}.dylib
     ${SWIFTLIB_DIR}/${sdk_name}/libswift${overlay}.dylib)
-  file(REMOVE_RECURSE ${dylibs})
+  if(dylibs)
+    file(REMOVE_RECURSE ${dylibs})
+  endif()
   file(REMOVE_RECURSE ${SWIFTLIB_DIR}/${sdk_name}/${overlay}.swiftmodule)
 endfunction()
