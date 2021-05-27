@@ -1275,7 +1275,7 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName()
                             << " ***\n");
 
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
+    auto *AA = PM->getAnalysis<AliasAnalysis>(F);
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();
     auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
 

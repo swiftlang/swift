@@ -127,7 +127,10 @@ public:
   void push_back(SILInstruction *I);
   void push_front(SILInstruction *I);
   void remove(SILInstruction *I);
-  iterator erase(SILInstruction *I);
+  void erase(SILInstruction *I);
+  void erase(SILInstruction *I, SILModule &module);
+
+  void eraseAllInstructions(SILModule &module);
 
   SILInstruction &back() { return InstList.back(); }
   const SILInstruction &back() const {
@@ -438,8 +441,6 @@ public:
     for (SILInstruction &I : *this)
       I.dropAllReferences();
   }
-
-  void eraseInstructions();
 
 private:
   friend class SILArgument;

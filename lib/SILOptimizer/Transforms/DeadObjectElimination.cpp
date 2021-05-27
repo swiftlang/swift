@@ -785,34 +785,6 @@ namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
 
-  // This is not a SILBasicBlock::iterator because we need a null value and we
-  // don't have a specific block whose end() we could use.
-  SILInstruction *nextInstToProcess = nullptr;
-
-  /// Advance nextInstToProcess to the next instruction in its block.
-  /// If nextInstToProcess is the last instruction in its block, it is set to
-  /// null.
-  void advance() {
-    if (!nextInstToProcess)
-      return;
-    SILBasicBlock *block = nextInstToProcess->getParent();
-    auto nextIter = std::next(nextInstToProcess->getIterator());
-    if (nextIter == block->end()) {
-      nextInstToProcess = nullptr;
-    } else {
-      nextInstToProcess = &*nextIter;
-    }
-  }
-
-  void handleDeleteNotification(SILNode *node) override {
-    if (auto *inst = dyn_cast<SILInstruction>(node)) {
-      if (inst == nextInstToProcess)
-        advance();
-    }
-  }
-
-  bool needsNotifications() override { return true; }
-
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
   bool processKeyPath(KeyPathInst *KPI);
@@ -826,13 +798,19 @@ class DeadObjectElimination : public SILFunctionTransform {
     bool Changed = false;
 
     for (auto &BB : Fn) {
-      nextInstToProcess = &BB.front();
-      
-      // We cannot just iterate over the instructions, because the processing
-      // functions might deleted instruction before or after the current
-      // instruction - and also inst itself.
-      while (SILInstruction *inst = nextInstToProcess) {
-        advance();
+
+      llvm::SmallVector<SILInstruction*, 64> instsToProcess;
+      for (SILInstruction &inst : BB) {
+        if (isa<AllocationInst>(&inst) ||
+            isAllocatingApply(&inst) ||
+            isa<KeyPathInst>(&inst)) {
+          instsToProcess.push_back(&inst);
+        }
+      }
+
+      for (SILInstruction *inst : instsToProcess) {
+        if (inst->isDeleted())
+          continue;
 
         if (auto *A = dyn_cast<AllocRefInst>(inst))
           Changed |= processAllocRef(A);

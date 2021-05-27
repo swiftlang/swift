@@ -181,6 +181,11 @@ public:
     StaticInitializerBlock.dropAllReferences();
   }
 
+  void clear() {
+    dropAllReferences();
+    StaticInitializerBlock.eraseAllInstructions(Module);
+  }
+
   /// Return whether this variable corresponds to a Clang node.
   bool hasClangNode() const;
 

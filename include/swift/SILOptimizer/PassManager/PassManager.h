@@ -132,6 +132,15 @@ public:
     llvm_unreachable("Unable to find analysis for requested type.");
   }
 
+  template<typename T>
+  T *getAnalysis(SILFunction *f) {
+    for (SILAnalysis *A : Analyses) {
+      if (A->getKind() == T::getAnalysisKind())
+        return static_cast<FunctionAnalysisBase<T> *>(A)->get(f);
+    }
+    llvm_unreachable("Unable to find analysis for requested type.");
+  }
+
   /// \returns the module that the pass manager owns.
   SILModule *getModule() { return Mod; }
 

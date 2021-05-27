@@ -1767,7 +1767,9 @@ SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
       op->set(beginAccess->getSource());
     }
   }
-  return beginAccess->getParent()->erase(beginAccess);
+  auto nextIter = std::next(beginAccess->getIterator());
+  beginAccess->getParent()->erase(beginAccess);
+  return nextIter;
 }
 
 //===----------------------------------------------------------------------===//

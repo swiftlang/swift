@@ -296,6 +296,9 @@ bool MandatoryCombiner::doOneIteration(SILFunction &function,
     // its contents to the worklist and then clear said list in preparation
     // for the next iteration.
     for (SILInstruction *instruction : createdInstructions) {
+      if (instruction->isDeleted())
+        continue;
+
       LLVM_DEBUG(llvm::dbgs() << "MC: add " << *instruction
                               << " from tracking list to worklist\n");
       worklist.add(instruction);
@@ -400,26 +403,6 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
-
-protected:
-  void handleDeleteNotification(SILNode *node) override {
-    // Remove instructions that were both created and deleted from the list of
-    // created instructions which will eventually be added to the worklist.
-
-    auto *instruction = dyn_cast<SILInstruction>(node);
-    if (instruction == nullptr) {
-      return;
-    }
-
-    // Linear searching the tracking list doesn't hurt because usually it only
-    // contains a few elements.
-    auto iterator = find(createdInstructions, instruction);
-    if (createdInstructions.end() != iterator) {
-      createdInstructions.erase(iterator);
-    }
-  }
-
-  bool needsNotifications() override { return true; }
 };
 
 } // end anonymous namespace

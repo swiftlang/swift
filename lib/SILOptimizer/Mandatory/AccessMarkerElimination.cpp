@@ -53,8 +53,9 @@ struct AccessMarkerElimination {
   }
 
   SILBasicBlock::iterator eraseInst(SILInstruction *inst) {
+    auto nextIter = std::next(inst->getIterator());
     notifyErased(inst);
-    return inst->getParent()->erase(inst);
+    return nextIter;
   };
 
   bool shouldPreserveAccess(SILAccessEnforcement enforcement);

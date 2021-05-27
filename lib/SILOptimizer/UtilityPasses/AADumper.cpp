@@ -64,7 +64,7 @@ class SILAADumper : public SILModuleTransform {
       if (!gatherValues(Fn, Values))
         continue;
 
-      AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+      AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>(&Fn);
 
       // A cache
       llvm::DenseMap<uint64_t, AliasAnalysis::AliasResult> Results;
