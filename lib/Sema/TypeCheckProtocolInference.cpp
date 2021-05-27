@@ -213,13 +213,6 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // declared on, it is viable for inference when its conditional
     // requirements are satisfied by those of the conformance context.
     if (!proto) {
-      // FIXME: The extension may not have a generic signature set up yet as
-      // resolving signatures may trigger associated type inference.  This cycle
-      // is now detectable and we should look into untangling it
-      // - see rdar://55263708
-      if (!extension->hasComputedGenericSignature())
-        return true;
-
       // Retrieve the generic signature of the extension.
       const auto extensionSig = extension->getGenericSignature();
 

@@ -996,11 +996,17 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
   if (auto unbound = ty->getAs<UnboundGenericType>()) {
     auto *decl = unbound->getDecl();
     {
-      InFlightDiagnostic diag = ctx.Diags.diagnose(loc,
-          diag::generic_type_requires_arguments, ty);
+      // Compute the string before creating a new diagnostic, since
+      // getDefaultGenericArgumentsString() might emit its own
+      // diagnostics.
       SmallString<64> genericArgsToAdd;
-      if (TypeChecker::getDefaultGenericArgumentsString(genericArgsToAdd,
-                                                        decl))
+      bool hasGenericArgsToAdd =
+          TypeChecker::getDefaultGenericArgumentsString(genericArgsToAdd,
+                                                        decl);
+
+      auto diag = ctx.Diags.diagnose(loc,
+          diag::generic_type_requires_arguments, ty);
+      if (hasGenericArgsToAdd)
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
 
