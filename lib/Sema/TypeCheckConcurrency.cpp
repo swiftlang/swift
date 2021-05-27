@@ -2875,8 +2875,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
       if (onlyGlobal)
         return ActorIsolation::forUnspecified();
 
-      value->getAttrs().add(new (ctx) ActorIndependentAttr(
-                              ActorIndependentKind::Safe, /*IsImplicit=*/true));
+      if (auto varDecl = dyn_cast<VarDecl>(value)) {
+        // only set the @actorIndependent on values where it is legal to do so
+        if (!varDecl->isLet()) {
+          value->getAttrs().add(new (ctx) ActorIndependentAttr(
+              ActorIndependentKind::Safe, /*IsImplicit=*/true));
+        }
+      }
       break;
 
     case ActorIsolation::GlobalActorUnsafe:
