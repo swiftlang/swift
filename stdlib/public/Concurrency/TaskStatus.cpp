@@ -411,6 +411,11 @@ SWIFT_CC(swift)
 static bool swift_task_hasTaskGroupStatusRecordImpl() {
   auto task = swift_task_getCurrent();
 
+  // a group must be in a task, so if we're not in a task...
+  // then, we certainly are not in a group either!
+  if (!task)
+    return false;
+
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
