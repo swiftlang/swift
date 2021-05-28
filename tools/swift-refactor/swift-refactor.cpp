@@ -124,6 +124,13 @@ static llvm::cl::opt<bool> EnableExperimentalConcurrency(
     "enable-experimental-concurrency",
     llvm::cl::desc("Whether to enable experimental concurrency or not"));
 
+static llvm::cl::opt<std::string>
+    SDK("sdk", llvm::cl::desc("Path to the SDK to build against"));
+
+static llvm::cl::list<std::string>
+    ImportPaths("I",
+                llvm::cl::desc("Add a directory to the import search path"));
+
 enum class DumpType {
   REWRITTEN,
   JSON,
@@ -274,6 +281,10 @@ int main(int argc, char *argv[]) {
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(argv[0],
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+
+  Invocation.setSDKPath(options::SDK);
+  Invocation.setImportSearchPaths(options::ImportPaths);
+
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
