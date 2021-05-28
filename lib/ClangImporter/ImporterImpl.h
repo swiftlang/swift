@@ -321,12 +321,36 @@ public:
   explicit operator bool() const { return type.getPointer() != nullptr; }
 };
 
+enum class ImportReason : uint8_t {
+  Unspecified,          ///< Default; also used for successful imports.
+  AlreadyDecided,       ///< A previous ImportRemark should describe the decision. Not a real failure.
+  ForwardDeclaration,
+  InstanceVariable,
+  ContextImportFailure,
+  TypeImportFailure,
+  InitMethodWithAccessorInfo,
+  NameFailure,
+  PrintLikeMethodName,
+  PropertyImportFailure,
+  MethodWithAccessorInfoButNoProperty,
+  ParameterListImportFailure,
+  UnderlyingTypeImportFailure,
+  PropertyRedeclarationIgnored,
+  OverridingMethodWithProperty,
+  ImportedAsAccessorMethods,
+  AtImplmentationBlocksUnimportable,
+  GenericSignatureImportFailure,
+  NSObjectNotFound,
+  ExtendedClassImportFailure,
+  BetterInitializer
+};
+
 struct ImportRemark {
   const clang::Decl *clangDecl;
   importer::ImportNameVersion version;
   Decl *swiftDecl = nullptr;
   TinyPtrVector<Decl *> alternateSwiftDecls;
-  bool alreadyDecided = false;
+  ImportReason reason = ImportReason::Unspecified;
 
   ImportRemark(const clang::Decl *clangDecl,
                importer::ImportNameVersion version)
@@ -1590,7 +1614,8 @@ public:
   ImportDecision &operator=(const ImportDecision &&other) = delete;
 
   ~ImportDecision() {
-    impl.addImportRemark(remark);
+    if (kind == Kind::Normal)
+      impl.addImportRemark(remark);
   }
 
 public:
@@ -1617,8 +1642,12 @@ public:
     impl.addAlternateDecl(mainDecl, altDecl);
   }
 
+  void dontImport(ImportReason newReason) {
+    remark.reason = newReason;
+  }
+
   void alreadyDecided() {
-    remark.alreadyDecided = true;
+    remark.reason = ImportReason::AlreadyDecided;
   }
 };
 

@@ -4316,7 +4316,8 @@ shouldEmitImportRemark(const ImportRemark &remark) {
   if (remark.version != CurrentVersion)
     return false;
 
-  bool success = remark.swiftDecl != nullptr || remark.alreadyDecided;
+  bool success = remark.swiftDecl != nullptr
+              || remark.reason == ImportReason::AlreadyDecided;
   auto &opts = SwiftContext.ClangImporterOpts;
 
   // FIXME: String comparison is a pretty silly way to check for membership in a
@@ -4398,22 +4399,34 @@ static std::string getDeclName(Decl *decl) {
 }
 
 void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
-  if (swiftDecl) {
-    auto name = getDeclName(swiftDecl);
-    if (!name.empty())
-      ::diagnose(impl, clangDecl, version, diag::imported_clang_decl_as,
-                 swiftDecl->getAttrs().isUnavailable(impl.SwiftContext),
-                 swiftDecl->getDescriptiveKind(), name);
-  }
-  else if (!alreadyDecided) {
-    ::diagnose(impl, clangDecl, version, diag::did_not_import_clang_decl);
-  }
+  switch (reason) {
+  case ImportReason::Unspecified:
+    if (swiftDecl) {
+      auto name = getDeclName(swiftDecl);
+      if (!name.empty())
+        ::diagnose(impl, clangDecl, version, diag::imported_clang_decl_as,
+                   swiftDecl->getAttrs().isUnavailable(impl.SwiftContext),
+                   swiftDecl->getDescriptiveKind(), name);
 
-  for (auto *altDecl : alternateSwiftDecls) {
-    auto name = getDeclName(altDecl);
-    if (!name.empty())
-      ::diagnose(impl, clangDecl, version, diag::also_imported_clang_decl_as,
-                 altDecl->getAttrs().isUnavailable(impl.SwiftContext),
-                 altDecl->getDescriptiveKind(), name);
+      for (auto *altDecl : alternateSwiftDecls) {
+        auto name = getDeclName(altDecl);
+        if (!name.empty())
+          ::diagnose(impl, clangDecl, version,
+                     diag::also_imported_clang_decl_as,
+                     altDecl->getAttrs().isUnavailable(impl.SwiftContext),
+                     altDecl->getDescriptiveKind(), name);
+      }
+    } else {
+      ::diagnose(impl, clangDecl, version, diag::did_not_import_clang_decl);
+    }
+    break;
+
+  case ImportReason::AlreadyDecided:
+    // Emit nothing.
+    break;
+
+  default:
+    ::diagnose(impl, clangDecl, version,
+               diag::did_not_import_clang_decl_because, (uint8_t)reason);
   }
 }
