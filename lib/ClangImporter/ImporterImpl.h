@@ -30,6 +30,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
@@ -417,6 +418,20 @@ private:
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
+
+  void cacheImportedDecl(Decl *swiftDecl, const clang::Decl *clangDecl,
+                         Version version) {
+    assert(clangDecl && "can't cache swift decl for null clang decl!");
+    assert(swiftDecl && "can't cache null swift decl!");
+
+    // I believe this invariant holds, and want to exploit it in the future if
+    // it does.
+    assert(isa<clang::ObjCCategoryDecl>(clangDecl)
+              || clangDecl->isCanonicalDecl()
+           && "all imported clang decls except for categories are canonical");
+
+    ImportedDecls[{clangDecl, version}] = swiftDecl;
+  }
 
   /// The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
