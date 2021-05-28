@@ -445,15 +445,6 @@ extension Task where Failure == Never {
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
 
-    // Copy all task locals to the newly created task.
-    // We must copy them rather than point to the current task since the new task
-    // is not structured and may out-live the current task.
-    //
-    // WARNING: This MUST be done BEFORE we enqueue the task,
-    // because it acts as-if it was running inside the task and thus does not
-    // take any extra steps to synchronize the task-local operations.
-    _taskLocalsCopy(to: task)
-
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
@@ -489,15 +480,6 @@ extension Task where Failure == Error {
 
     // Create the asynchronous task future.
     let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
-
-    // Copy all task locals to the newly created task.
-    // We must copy them rather than point to the current task since the new task
-    // is not structured and may out-live the current task.
-    //
-    // WARNING: This MUST be done BEFORE we enqueue the task,
-    // because it acts as-if it was running inside the task and thus does not
-    // take any extra steps to synchronize the task-local operations.
-    _taskLocalsCopy(to: task)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -746,16 +728,6 @@ public struct UnsafeCurrentTask {
     self._task = task
   }
 
-  /// The current task,
-  /// represented in a way that's safe to store for later use.
-  ///
-  /// Operations on an instance of `Task` are safe to call from any other task,
-  /// unlike `UnsafeCurrentTask`.
-  @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon.")
-  public var task: Task {
-    Task(_task)
-  }
-
   /// A Boolean value that indicates whether the current task was canceled.
   ///
   /// After the value of this property is `true`, it remains `true` indefinitely.
@@ -861,7 +833,7 @@ public func _runChildTask<T>(
   let currentTask = Builtin.getCurrentAsyncTask()
 
   // Set up the job flags for a new task.
-  var flags = Task.JobFlags()
+  var flags = JobFlags()
   flags.kind = .task
   flags.priority = getJobFlags(currentTask).priority ?? .unspecified
   flags.isFuture = true
@@ -869,7 +841,7 @@ public func _runChildTask<T>(
 
   // Create the asynchronous task future.
   let (task, _) = Builtin.createAsyncTaskFuture(
-      flags.bits, operation)
+    Int(flags.bits), operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
