@@ -18,7 +18,7 @@
 using namespace swift;
 using namespace rewriting;
 
-int Atom::compare(Atom other) const {
+int Atom::compare(Atom other, ProtocolOrder protocolOrder) const {
   auto kind = getKind();
   auto otherKind = other.getKind();
 
@@ -30,10 +30,10 @@ int Atom::compare(Atom other) const {
     return getName().compare(other.getName());
 
   case Kind::Protocol:
-    return TypeDecl::compare(getProtocol(), other.getProtocol());
+    return protocolOrder(getProtocol(), other.getProtocol());
 
   case Kind::AssociatedType: {
-    int result = TypeDecl::compare(getProtocol(), other.getProtocol());
+    int result = protocolOrder(getProtocol(), other.getProtocol());
     if (result)
       return result;
 
@@ -81,7 +81,7 @@ void Atom::dump(llvm::raw_ostream &out) const {
   llvm_unreachable("Bad atom kind");
 }
 
-int Term::compare(const Term &other) const {
+int Term::compare(const Term &other, ProtocolOrder protocolOrder) const {
   if (size() != other.size())
     return size() < other.size() ? -1 : 1;
 
@@ -89,7 +89,7 @@ int Term::compare(const Term &other) const {
     auto lhs = (*this)[i];
     auto rhs = other[i];
 
-    int result = lhs.compare(rhs);
+    int result = lhs.compare(rhs, protocolOrder);
     if (result != 0)
       return result;
   }
@@ -120,7 +120,6 @@ bool Term::rewriteSubTerm(const Term &lhs, const Term &rhs) {
 
   auto oldSize = size();
 
-  assert(rhs.compare(lhs) < 0);
   assert(rhs.size() <= lhs.size());
 
   auto newIter = std::copy(rhs.begin(), rhs.end(), found);
@@ -196,7 +195,7 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
   simplify(lhs);
   simplify(rhs);
 
-  int result = lhs.compare(rhs);
+  int result = lhs.compare(rhs, Order);
   if (result == 0)
     return false;
   if (result < 0)

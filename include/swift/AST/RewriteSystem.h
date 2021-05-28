@@ -27,6 +27,9 @@ namespace swift {
 
 namespace rewriting {
 
+using ProtocolOrder = std::function<int (const ProtocolDecl *,
+                                         const ProtocolDecl *)>;
+
 class Atom final {
   using Storage = llvm::PointerUnion<Identifier, GenericTypeParamType *>;
 
@@ -103,7 +106,7 @@ public:
     return Value.get<GenericTypeParamType *>();
   }
 
-  int compare(Atom other) const;
+  int compare(Atom other, ProtocolOrder compare) const;
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -129,7 +132,7 @@ public:
     Atoms.push_back(atom);
   }
 
-  int compare(const Term &other) const;
+  int compare(const Term &other, ProtocolOrder order) const;
 
   size_t size() const { return Atoms.size(); }
 
@@ -165,9 +168,7 @@ class Rule final {
 
 public:
   Rule(const Term &lhs, const Term &rhs)
-      : LHS(lhs), RHS(rhs), deleted(false) {
-    assert(LHS.compare(RHS) > 0);
-  }
+      : LHS(lhs), RHS(rhs), deleted(false) {}
 
   bool apply(Term &term) const {
     assert(!deleted);
@@ -196,9 +197,17 @@ public:
 
 class RewriteSystem final {
   std::vector<Rule> Rules;
+  ProtocolOrder Order;
   bool Debug = false;
 
 public:
+  explicit RewriteSystem(ProtocolOrder order) : Order(order) {}
+
+  RewriteSystem(const RewriteSystem &) = delete;
+  RewriteSystem(RewriteSystem &&) = delete;
+  RewriteSystem &operator=(const RewriteSystem &) = delete;
+  RewriteSystem &operator=(RewriteSystem &&) = delete;
+
   bool addRule(Term lhs, Term rhs);
 
   bool simplify(Term &term) const;

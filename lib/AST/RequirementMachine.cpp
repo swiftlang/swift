@@ -72,6 +72,13 @@ struct ProtocolGraph {
     }
   }
 
+  const ProtocolInfo &getProtocolInfo(
+      const ProtocolDecl *proto) const {
+    auto found = Info.find(proto);
+    assert(found != Info.end());
+    return found->second;
+  }
+
   void addProtocol(const ProtocolDecl *proto) {
     if (Info.count(proto) > 0)
       return;
@@ -86,7 +93,7 @@ struct ProtocolGraph {
     unsigned i = 0;
     while (i < Protocols.size()) {
       auto *proto = Protocols[i++];
-      visitRequirements(Info[proto].Requirements);
+      visitRequirements(getProtocolInfo(proto).Requirements);
     }
   }
 
@@ -99,8 +106,8 @@ struct ProtocolGraph {
         Protocols.begin(), Protocols.end(),
         [&](const ProtocolDecl *lhs,
             const ProtocolDecl *rhs) -> int {
-          const auto &lhsInfo = Info[lhs];
-          const auto &rhsInfo = Info[rhs];
+          const auto &lhsInfo = getProtocolInfo(lhs);
+          const auto &rhsInfo = getProtocolInfo(rhs);
 
           // protocol Base {} // depth 1
           // protocol Derived : Base {} // depth 2
@@ -126,7 +133,7 @@ struct ProtocolGraph {
         if (inherited == proto)
           continue;
 
-        for (auto *inheritedType : Info[inherited].AssociatedTypes) {
+        for (auto *inheritedType : getProtocolInfo(inherited).AssociatedTypes) {
           if (!visited.insert(inheritedType).second)
             continue;
 
@@ -164,12 +171,12 @@ private:
   }
 };
 
-class RewriteSystemBuilder {
+struct RewriteSystemBuilder {
   ASTContext &Context;
 
+  ProtocolGraph Protocols;
   std::vector<std::pair<Term, Term>> Rules;
 
-public:
   RewriteSystemBuilder(ASTContext &ctx) : Context(ctx) {}
   void addGenericSignature(CanGenericSignature sig);
   void addAssociatedType(const AssociatedTypeDecl *type,
@@ -179,31 +186,25 @@ public:
                                   const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
                       const ProtocolDecl *proto);
-
-  void addRulesToRewriteSystem(RewriteSystem &system);
 };
 
 } // end namespace
 
 void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
-  ProtocolGraph graph;
-  graph.visitRequirements(sig->getRequirements());
-  graph.computeTransitiveClosure();
-  graph.computeLinearOrder();
-  graph.computeInheritedAssociatedTypes();
+  Protocols.visitRequirements(sig->getRequirements());
+  Protocols.computeTransitiveClosure();
+  Protocols.computeLinearOrder();
+  Protocols.computeInheritedAssociatedTypes();
 
-  for (auto *proto : graph.Protocols) {
-    if (Context.LangOpts.DebugRequirementMachine) {
-      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
-    }
-
-    const auto &info = graph.Info[proto];
+  for (auto *proto : Protocols.Protocols) {
+    const auto &info = Protocols.getProtocolInfo(proto);
 
     for (auto *type : info.AssociatedTypes)
       addAssociatedType(type, proto);
 
     for (auto *inherited : info.Inherited) {
-      for (auto *inheritedType : graph.Info[inherited].AssociatedTypes) {
+      auto inheritedTypes = Protocols.getProtocolInfo(inherited).AssociatedTypes;
+      for (auto *inheritedType : inheritedTypes) {
         addInheritedAssociatedType(inheritedType, inherited, proto);
       }
     }
@@ -286,12 +287,6 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   }
 }
 
-void RewriteSystemBuilder::addRulesToRewriteSystem(RewriteSystem &system) {
-  for (auto rule : Rules) {
-    system.addRule(rule.first, rule.second);
-  }
-}
-
 Term swift::rewriting::getTermForType(CanType paramType,
                                       const ProtocolDecl *proto) {
   assert(paramType->isTypeParameter());
@@ -314,8 +309,22 @@ Term swift::rewriting::getTermForType(CanType paramType,
 }
 
 struct RequirementMachine::Implementation {
+  ProtocolGraph Protocols;
+  ProtocolOrder Order;
   RewriteSystem System;
   bool Complete = false;
+
+  Implementation()
+      : Order([&](const ProtocolDecl *lhs,
+                  const ProtocolDecl *rhs) -> int {
+          auto infoLHS = Protocols.Info.find(lhs);
+          assert(infoLHS != Protocols.Info.end());
+          auto infoRHS = Protocols.Info.find(rhs);
+          assert(infoRHS != Protocols.Info.end());
+
+          return infoRHS->second.Index - infoLHS->second.Index;
+        }),
+        System(Order) {}
 };
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
@@ -336,10 +345,13 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   RewriteSystemBuilder builder(Context);
   builder.addGenericSignature(sig);
 
-  builder.addRulesToRewriteSystem(Impl->System);
+  Impl->Protocols = builder.Protocols;
+
+  for (const auto &rule : builder.Rules)
+    Impl->System.addRule(rule.first, rule.second);
 
   // FIXME: Add command line flag
-  Impl->System.computeConfluentCompletion(1000);
+  Impl->System.computeConfluentCompletion(10000);
 
   markComplete();
 
