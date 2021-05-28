@@ -33,7 +33,7 @@ func printTaskLocal<V>(
 // ==== ------------------------------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
-func synchronous_bind() async {
+func synchronous_bind() {
 
   func synchronous() {
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
@@ -45,14 +45,14 @@ func synchronous_bind() async {
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
   }
 
-  await TL.$number.withValue(1111) {
+  TL.$number.withValue(1111) {
     synchronous()
   }
 }
 
 @available(SwiftStdlib 5.5, *)
 @main struct Main {
-  static func main() async {
-    await synchronous_bind()
+  static func main() {
+    synchronous_bind()
   }
 }
