@@ -4410,12 +4410,12 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
   }
 };
 
-enum class ConditionType { INVALID, NIL, NOT_NIL };
+enum class ConditionType { NIL, NOT_NIL };
 
 /// Finds the `Subject` being compared to in various conditions. Also finds any
 /// pattern that may have a bound name.
 struct CallbackCondition {
-  ConditionType Type = ConditionType::INVALID;
+  Optional<ConditionType> Type;
   const Decl *Subject = nullptr;
   const Pattern *BindPattern = nullptr;
   // Bit of a hack. When the `Subject` is a `Result` type we use this to
@@ -4487,7 +4487,7 @@ struct CallbackCondition {
     }
   }
 
-  bool isValid() const { return Type != ConditionType::INVALID; }
+  bool isValid() const { return Type.hasValue(); }
 
   /// Given an `if` condition `Cond` and a set of `Decls`, find any
   /// `CallbackCondition`s in `Cond` that use one of those `Decls` and add them
@@ -4886,10 +4886,10 @@ private:
       ThenBlock = ElseBlock;
       ElseBlock = TempBlock;
     } else {
-      ConditionType CondType = ConditionType::INVALID;
+      Optional<ConditionType> CondType;
       for (auto &Entry : CallbackConditions) {
         if (IsResultParam || Entry.second.Subject != ErrParam) {
-          if (CondType == ConditionType::INVALID) {
+          if (!CondType) {
             CondType = Entry.second.Type;
           } else if (CondType != Entry.second.Type) {
             // Similar to the unknown conditions case. Add the whole if unless
