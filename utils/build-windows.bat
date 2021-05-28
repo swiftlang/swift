@@ -180,6 +180,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DEFAULT_TARGET_TRIPLE=x86_64-unknown-windows-msvc^
     -DLLVM_ENABLE_PDB:BOOL=YES^
@@ -222,6 +223,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
     -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
@@ -245,6 +247,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
     -DSWIFT_PATH_TO_CMARK_BUILD:PATH=%build_root%\cmark^
@@ -301,6 +304,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=cl^
     -DCMAKE_CXX_COMPILER=cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
@@ -333,6 +337,7 @@ cmake^
     -DCMAKE_BUILD_TYPE=%CMAKE_BUILD_TYPE%^
     -DCMAKE_C_COMPILER=clang-cl^
     -DCMAKE_CXX_COMPILER=clang-cl^
+    -DCMAKE_MT=mt^
     -DCMAKE_Swift_COMPILER=swiftc^
     -DSwift_DIR:PATH=%build_root%\swift\lib\cmake\swift^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
