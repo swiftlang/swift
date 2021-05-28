@@ -1522,13 +1522,26 @@ tryCastToClassExistentialViaSwiftValue(
     // class existentials; it makes no sense to wrap them.
     return DynamicCastResult::Failure;
 
-  /*
-  // I suspect metatypes should also never get boxed here,
-  // but the current test suite fails with this, so this needs
-  // more research.
-  case MetadataKind::Metatype:
-    return DynamicCastResult::Failure;
-  */
+  case MetadataKind::Metatype: {
+#if SWIFT_OBJC_INTEROP
+    auto metatypePtr = reinterpret_cast<const Metadata **>(srcValue);
+    auto metatype = *metatypePtr;
+    switch (metatype->getKind()) {
+    case MetadataKind::Class:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass:
+      // Exclude class metatypes on Darwin, since those are object types and can
+      // be stored directly.
+      return DynamicCastResult::Failure;
+    default:
+      break;
+    }
+#endif
+    // Non-class metatypes are never objects, and
+    // metatypes on non-Darwin are never objects, so
+    // fall through to box those.
+    SWIFT_FALLTHROUGH;
+  }
 
   default: {
     if (destExistentialType->NumProtocols != 0) {
