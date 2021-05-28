@@ -15,7 +15,7 @@ Swift 5.5
   ```swift
   actor Account: Hashable {
     let idNumber: Int
-    let balance: Double
+    var balance: Double
 
     nonisolated func hash(into hasher: inout Hasher) { // okay, non-isolated satisfies synchronous requirement
       hasher.combine(idNumber) // okay, can reference idNumber from outside the let
