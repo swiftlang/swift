@@ -91,22 +91,22 @@ func test_unsafeThrowingContinuations() async throws {
 
 @available(SwiftStdlib 5.5, *)
 func test_detached() async throws {
-  let handle = detach() {
+  let handle = Task.detached {
     await someAsyncFunc() // able to call async functions
   }
 
-  let result: String = await handle.get()
+  let result: String = await handle.value
   _ = result
 }
 
 @available(SwiftStdlib 5.5, *)
 func test_detached_throwing() async -> String {
-  let handle: Task.Handle<String, Error> = detach() {
+  let handle: Task<String, Error> = Task.detached {
     try await someThrowingAsyncFunc() // able to call async functions
   }
 
   do {
-    return try await handle.get()
+    return try await handle.value
   } catch {
     print("caught: \(error)")
   }
