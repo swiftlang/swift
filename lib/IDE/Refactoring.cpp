@@ -4410,7 +4410,30 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
   }
 };
 
-enum class ConditionType { NIL, NOT_NIL };
+/// The type of a condition in a conditional statement.
+enum class ConditionType {
+  NIL,             // == nil
+  NOT_NIL,         // != nil
+  SUCCESS_PATTERN, // case .success
+  FAILURE_PATTEN   // case .failure
+};
+
+/// Indicates whether a condition describes a success or failure path. For
+/// example, a check for whether an error parameter is present is a failure
+/// path. A check for a nil error parameter is a success path. This is distinct
+/// from ConditionType, as it relies on contextual information about what values
+/// need to be checked for success or failure.
+enum class ConditionPath { SUCCESS, FAILURE };
+
+static ConditionPath flippedConditionPath(ConditionPath Path) {
+  switch (Path) {
+  case ConditionPath::SUCCESS:
+    return ConditionPath::FAILURE;
+  case ConditionPath::FAILURE:
+    return ConditionPath::SUCCESS;
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
 
 /// Finds the `Subject` being compared to in various conditions. Also finds any
 /// pattern that may have a bound name.
@@ -4418,12 +4441,6 @@ struct CallbackCondition {
   Optional<ConditionType> Type;
   const Decl *Subject = nullptr;
   const Pattern *BindPattern = nullptr;
-  // Bit of a hack. When the `Subject` is a `Result` type we use this to
-  // distinguish between the `.success` and `.failure` case (as opposed to just
-  // checking whether `Subject` == `TheErrDecl`)
-  bool ErrorCase = false;
-
-  CallbackCondition() = default;
 
   /// Initializes a `CallbackCondition` with a `!=` or `==` comparison of
   /// an `Optional` typed `Subject` to `nil`, ie.
@@ -4489,65 +4506,17 @@ struct CallbackCondition {
 
   bool isValid() const { return Type.hasValue(); }
 
-  /// Given an `if` condition `Cond` and a set of `Decls`, find any
-  /// `CallbackCondition`s in `Cond` that use one of those `Decls` and add them
-  /// to the map `AddTo`. Return `true` if all elements in the condition are
-  /// "handled", ie. every condition can be mapped to a single `Decl` in
-  /// `Decls`.
-  static bool all(StmtCondition Cond, llvm::DenseSet<const Decl *> Decls,
-                  llvm::DenseMap<const Decl *, CallbackCondition> &AddTo) {
-    bool Handled = true;
-    for (auto &CondElement : Cond) {
-      if (auto *BoolExpr = CondElement.getBooleanOrNull()) {
-        SmallVector<Expr *, 1> Exprs;
-        Exprs.push_back(BoolExpr);
-
-        while (!Exprs.empty()) {
-          auto *Next = Exprs.pop_back_val();
-          if (auto *ACE = dyn_cast<AutoClosureExpr>(Next))
-            Next = ACE->getSingleExpressionBody();
-
-          if (auto *BE = dyn_cast_or_null<BinaryExpr>(Next)) {
-            auto *Operator = isOperator(BE);
-            if (Operator) {
-              if (Operator->getBaseName() == "&&") {
-                Exprs.push_back(BE->getLHS());
-                Exprs.push_back(BE->getRHS());
-              } else {
-                addCond(CallbackCondition(BE, Operator), Decls, AddTo, Handled);
-              }
-              continue;
-            }
-          }
-
-          Handled = false;
-        }
-      } else if (auto *P = CondElement.getPatternOrNull()) {
-        addCond(CallbackCondition(P, CondElement.getInitializer()), Decls,
-                AddTo, Handled);
-      }
-    }
-    return Handled && !AddTo.empty();
-  }
-
 private:
-  static void addCond(const CallbackCondition &CC,
-                      llvm::DenseSet<const Decl *> Decls,
-                      llvm::DenseMap<const Decl *, CallbackCondition> &AddTo,
-                      bool &Handled) {
-    if (!CC.isValid() || !Decls.count(CC.Subject) ||
-        !AddTo.try_emplace(CC.Subject, CC).second)
-      Handled = false;
-  }
-
   void initFromEnumPattern(const Decl *D, const EnumElementPattern *EEP) {
     if (auto *EED = EEP->getElementDecl()) {
       auto eedTy = EED->getParentEnum()->getDeclaredType();
       if (!eedTy || !eedTy->isResult())
         return;
-      if (EED->getNameStr() == StringRef("failure"))
-        ErrorCase = true;
-      Type = ConditionType::NOT_NIL;
+      if (EED->getNameStr() == StringRef("failure")) {
+        Type = ConditionType::FAILURE_PATTEN;
+      } else {
+        Type = ConditionType::SUCCESS_PATTERN;
+      }
       Subject = D;
       BindPattern = EEP->getSubPattern();
     }
@@ -4578,6 +4547,27 @@ private:
     Type = ConditionType::NOT_NIL;
     Subject = BaseDRE->getDecl();
     BindPattern = P;
+  }
+};
+
+/// A CallbackCondition with additional semantic information about whether it
+/// is for a success path or failure path.
+struct ClassifiedCondition : public CallbackCondition {
+  ConditionPath Path;
+
+  explicit ClassifiedCondition(CallbackCondition Cond, ConditionPath Path)
+      : CallbackCondition(Cond), Path(Path) {}
+};
+
+/// A wrapper for a map of parameter decls to their classified conditions, or
+/// \c None if they are not present in any conditions.
+struct ClassifiedCallbackConditions final
+    : llvm::MapVector<const Decl *, ClassifiedCondition> {
+  Optional<ClassifiedCondition> lookup(const Decl *D) const {
+    auto Res = find(D);
+    if (Res == end())
+      return None;
+    return Res->second;
   }
 };
 
@@ -4726,7 +4716,7 @@ public:
     Nodes.addNode(Node);
   }
 
-  void addBinding(const CallbackCondition &FromCondition,
+  void addBinding(const ClassifiedCondition &FromCondition,
                   DiagnosticEngine &DiagEngine) {
     if (!FromCondition.BindPattern)
       return;
@@ -4750,9 +4740,8 @@ public:
     BoundNames.try_emplace(FromCondition.Subject, Name);
   }
 
-  void addAllBindings(
-      const llvm::DenseMap<const Decl *, CallbackCondition> &FromConditions,
-      DiagnosticEngine &DiagEngine) {
+  void addAllBindings(const ClassifiedCallbackConditions &FromConditions,
+                      DiagnosticEngine &DiagEngine) {
     for (auto &Entry : FromConditions) {
       addBinding(Entry.second, DiagEngine);
       if (DiagEngine.hadAnyError())
@@ -4841,12 +4830,108 @@ private:
     CurrentBlock->addPossibleCommentLoc(endCommentLoc);
   }
 
+  /// Given a callback condition, classify it as a success or failure path, or
+  /// \c None if it cannot be classified.
+  Optional<ClassifiedCondition>
+  classifyCallbackCondition(const CallbackCondition &Cond) {
+    if (!Cond.isValid())
+      return None;
+
+    // For certain types of condition, they need to appear in certain lists.
+    auto CondType = *Cond.Type;
+    switch (CondType) {
+    case ConditionType::NOT_NIL:
+    case ConditionType::NIL:
+      if (!UnwrapParams.count(Cond.Subject))
+        return None;
+      break;
+    case ConditionType::SUCCESS_PATTERN:
+    case ConditionType::FAILURE_PATTEN:
+      if (!IsResultParam || Cond.Subject != ErrParam)
+        return None;
+      break;
+    }
+
+    // Let's start with a success path, and flip any negative conditions.
+    auto Path = ConditionPath::SUCCESS;
+
+    // If it's an error param, that's a flip.
+    if (Cond.Subject == ErrParam && !IsResultParam)
+      Path = flippedConditionPath(Path);
+
+    // If we have a nil or failure condition, that's a flip.
+    switch (CondType) {
+    case ConditionType::NIL:
+    case ConditionType::FAILURE_PATTEN:
+      Path = flippedConditionPath(Path);
+      break;
+    case ConditionType::NOT_NIL:
+    case ConditionType::SUCCESS_PATTERN:
+      break;
+    }
+    return ClassifiedCondition(Cond, Path);
+  }
+
+  /// Classifies all the conditions present in a given StmtCondition. Returns
+  /// \c true if there were any conditions that couldn't be classified,
+  /// \c false otherwise.
+  bool classifyConditionsOf(StmtCondition Cond,
+                            ClassifiedCallbackConditions &Conditions) {
+    bool UnhandledConditions = false;
+    auto TryAddCond = [&](CallbackCondition CC) {
+      auto Classified = classifyCallbackCondition(CC);
+      if (!Classified) {
+        UnhandledConditions = true;
+        return;
+      }
+      // If we've seen multiple conditions for the same subject, don't handle
+      // this.
+      if (!Conditions.insert({CC.Subject, *Classified}).second)
+        UnhandledConditions = true;
+    };
+
+    for (auto &CondElement : Cond) {
+      if (auto *BoolExpr = CondElement.getBooleanOrNull()) {
+        SmallVector<Expr *, 1> Exprs;
+        Exprs.push_back(BoolExpr);
+
+        while (!Exprs.empty()) {
+          auto *Next = Exprs.pop_back_val();
+          if (auto *ACE = dyn_cast<AutoClosureExpr>(Next))
+            Next = ACE->getSingleExpressionBody();
+
+          if (auto *BE = dyn_cast_or_null<BinaryExpr>(Next)) {
+            auto *Operator = isOperator(BE);
+            if (Operator) {
+              // If we have an && operator, decompose its arguments.
+              if (Operator->getBaseName() == "&&") {
+                Exprs.push_back(BE->getLHS());
+                Exprs.push_back(BE->getRHS());
+              } else {
+                // Otherwise check to see if we have an == nil or != nil
+                // condition.
+                TryAddCond(CallbackCondition(BE, Operator));
+              }
+              continue;
+            }
+          }
+          UnhandledConditions = true;
+        }
+      } else if (auto *P = CondElement.getPatternOrNull()) {
+        TryAddCond(CallbackCondition(P, CondElement.getInitializer()));
+      }
+    }
+    return UnhandledConditions || Conditions.empty();
+  }
+
+  /// Classifies the conditions of a conditional statement, and adds the
+  /// necessary nodes to either the success or failure block.
   void classifyConditional(Stmt *Statement, StmtCondition Condition,
                            NodesToPrint ThenNodesToPrint, Stmt *ElseStmt) {
-    llvm::DenseMap<const Decl *, CallbackCondition> CallbackConditions;
-    bool UnhandledConditions =
-        !CallbackCondition::all(Condition, UnwrapParams, CallbackConditions);
-    CallbackCondition ErrCondition = CallbackConditions.lookup(ErrParam);
+    ClassifiedCallbackConditions CallbackConditions;
+    bool UnhandledConditions = classifyConditionsOf(
+        Condition, CallbackConditions);
+    auto ErrCondition = CallbackConditions.lookup(ErrParam);
 
     if (UnhandledConditions) {
       // Some unknown conditions. If there's an else, assume we can't handle
@@ -4862,12 +4947,11 @@ private:
       } else if (ElseStmt) {
         DiagEngine.diagnose(Statement->getStartLoc(),
                             diag::unknown_callback_conditions);
-      } else if (ErrCondition.isValid() &&
-                 ErrCondition.Type == ConditionType::NOT_NIL) {
+      } else if (ErrCondition && ErrCondition->Path == ConditionPath::FAILURE) {
         Blocks.ErrorBlock.addNode(Statement);
       } else {
         for (auto &Entry : CallbackConditions) {
-          if (Entry.second.Type == ConditionType::NIL) {
+          if (Entry.second.Path == ConditionPath::FAILURE) {
             Blocks.ErrorBlock.addNode(Statement);
             return;
           }
@@ -4877,42 +4961,36 @@ private:
       return;
     }
 
-    ClassifiedBlock *ThenBlock = &Blocks.SuccessBlock;
-    ClassifiedBlock *ElseBlock = &Blocks.ErrorBlock;
+    // If all the conditions were classified, make sure they're all consistently
+    // on the success or failure path.
+    Optional<ConditionPath> Path;
+    for (auto &Entry : CallbackConditions) {
+      auto &Cond = Entry.second;
+      if (!Path) {
+        Path = Cond.Path;
+      } else if (*Path != Cond.Path) {
+        // Similar to the unknown conditions case. Add the whole if unless
+        // there's an else, in which case use the fallback instead.
+        // TODO: Split the `if` statement
 
-    if (ErrCondition.isValid() && (!IsResultParam || ErrCondition.ErrorCase) &&
-        ErrCondition.Type == ConditionType::NOT_NIL) {
-      ClassifiedBlock *TempBlock = ThenBlock;
-      ThenBlock = ElseBlock;
-      ElseBlock = TempBlock;
-    } else {
-      Optional<ConditionType> CondType;
-      for (auto &Entry : CallbackConditions) {
-        if (IsResultParam || Entry.second.Subject != ErrParam) {
-          if (!CondType) {
-            CondType = Entry.second.Type;
-          } else if (CondType != Entry.second.Type) {
-            // Similar to the unknown conditions case. Add the whole if unless
-            // there's an else, in which case use the fallback instead.
-            // TODO: Split the `if` statement
-
-            if (ElseStmt) {
-              DiagEngine.diagnose(Statement->getStartLoc(),
-                                  diag::mixed_callback_conditions);
-            } else {
-              CurrentBlock->addNode(Statement);
-            }
-            return;
-          }
+        if (ElseStmt) {
+          DiagEngine.diagnose(Statement->getStartLoc(),
+                              diag::mixed_callback_conditions);
+        } else {
+          CurrentBlock->addNode(Statement);
         }
-      }
-
-      if (CondType == ConditionType::NIL) {
-        ClassifiedBlock *TempBlock = ThenBlock;
-        ThenBlock = ElseBlock;
-        ElseBlock = TempBlock;
+        return;
       }
     }
+    assert(Path && "Didn't classify a path?");
+
+    auto *ThenBlock = &Blocks.SuccessBlock;
+    auto *ElseBlock = &Blocks.ErrorBlock;
+
+    // If the condition is for a failure path, the error block is ThenBlock, and
+    // the success block is ElseBlock.
+    if (*Path == ConditionPath::FAILURE)
+      std::swap(ThenBlock, ElseBlock);
 
     // We'll be dropping the statement, but make sure to keep any attached
     // comments.
@@ -4983,13 +5061,15 @@ private:
         return;
       }
 
-      CallbackCondition CC(ErrParam, &Items[0]);
-      ClassifiedBlock *Block = &Blocks.SuccessBlock;
-      ClassifiedBlock *OtherBlock = &Blocks.ErrorBlock;
-      if (CC.ErrorCase) {
-        Block = &Blocks.ErrorBlock;
-        OtherBlock = &Blocks.SuccessBlock;
-      }
+      auto *Block = &Blocks.SuccessBlock;
+      auto *OtherBlock = &Blocks.ErrorBlock;
+      auto SuccessNodes = NodesToPrint::inBraceStmt(CS->getBody());
+
+      // Classify the case pattern.
+      auto CC = classifyCallbackCondition(
+          CallbackCondition(ErrParam, &Items[0]));
+      if (CC && CC->Path == ConditionPath::FAILURE)
+        std::swap(Block, OtherBlock);
 
       // We'll be dropping the case, but make sure to keep any attached
       // comments. Because these comments will effectively be part of the
@@ -5000,8 +5080,9 @@ private:
       if (CS == Cases.back())
         Block->addPossibleCommentLoc(SS->getRBraceLoc());
 
-      setNodes(Block, OtherBlock, NodesToPrint::inBraceStmt(CS->getBody()));
-      Block->addBinding(CC, DiagEngine);
+      setNodes(Block, OtherBlock, std::move(SuccessNodes));
+      if (CC)
+        Block->addBinding(*CC, DiagEngine);
       if (DiagEngine.hadAnyError())
         return;
     }
