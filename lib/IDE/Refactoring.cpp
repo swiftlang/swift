@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsRefactoring.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
@@ -4414,6 +4415,8 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
 enum class ConditionType {
   NIL,             // == nil
   NOT_NIL,         // != nil
+  IS_TRUE,         // if b
+  IS_FALSE,        // if !b
   SUCCESS_PATTERN, // case .success
   FAILURE_PATTEN   // case .failure
 };
@@ -4443,27 +4446,77 @@ struct CallbackCondition {
   const Pattern *BindPattern = nullptr;
 
   /// Initializes a `CallbackCondition` with a `!=` or `==` comparison of
-  /// an `Optional` typed `Subject` to `nil`, ie.
+  /// an `Optional` typed `Subject` to `nil`, or a `Bool` typed `Subject` to a
+  /// boolean literal, ie.
   ///   - `<Subject> != nil`
   ///   - `<Subject> == nil`
+  ///   - `<Subject> != true`
+  ///   - `<Subject> == false`
   CallbackCondition(const BinaryExpr *BE, const FuncDecl *Operator) {
     bool FoundNil = false;
+    BooleanLiteralExpr *FoundBool = nullptr;
+    bool DidUnwrapOptional = false;
+
     for (auto *Operand : {BE->getLHS(), BE->getRHS()}) {
       Operand = Operand->getSemanticsProvidingExpr();
+      if (auto *IIOE = dyn_cast<InjectIntoOptionalExpr>(Operand)) {
+        Operand = IIOE->getSubExpr()->getSemanticsProvidingExpr();
+        DidUnwrapOptional = true;
+      }
       if (isa<NilLiteralExpr>(Operand)) {
         FoundNil = true;
+      } else if (auto *BLE = dyn_cast<BooleanLiteralExpr>(Operand)) {
+        FoundBool = BLE;
       } else if (auto *DRE = dyn_cast<DeclRefExpr>(Operand)) {
         Subject = DRE->getDecl();
       }
     }
 
-    if (Subject && FoundNil) {
+    if (!Subject)
+      return;
+
+    if (FoundNil) {
       if (Operator->getBaseName() == "==") {
         Type = ConditionType::NIL;
       } else if (Operator->getBaseName() == "!=") {
         Type = ConditionType::NOT_NIL;
       }
+    } else if (FoundBool) {
+      if (Operator->getBaseName() == "==") {
+        Type = FoundBool->getValue() ? ConditionType::IS_TRUE
+                                     : ConditionType::IS_FALSE;
+      } else if (Operator->getBaseName() == "!=" && !DidUnwrapOptional) {
+        // Note that we don't consider this case if we unwrapped an optional,
+        // as e.g optBool != false is a check for true *or* nil.
+        Type = FoundBool->getValue() ? ConditionType::IS_FALSE
+                                     : ConditionType::IS_TRUE;
+      }
     }
+  }
+
+  /// A bool condition expression.
+  explicit CallbackCondition(const Expr *E) {
+    if (!E->getType()->isBool())
+      return;
+
+    auto CondType = ConditionType::IS_TRUE;
+    E = E->getSemanticsProvidingExpr();
+
+    // If we have a prefix negation operator, this is a check for false.
+    if (auto *PrefixOp = dyn_cast<PrefixUnaryExpr>(E)) {
+      auto *Callee = PrefixOp->getCalledValue();
+      if (Callee && Callee->isOperator() && Callee->getBaseName() == "!") {
+        CondType = ConditionType::IS_FALSE;
+        E = PrefixOp->getArg()->getSemanticsProvidingExpr();
+      }
+    }
+
+    auto *DRE = dyn_cast<DeclRefExpr>(E);
+    if (!DRE)
+      return;
+
+    Subject = DRE->getDecl();
+    Type = CondType;
   }
 
   /// Initializes a `CallbackCondition` with binding of an `Optional` or
@@ -4556,8 +4609,13 @@ private:
 struct ClassifiedCondition : public CallbackCondition {
   ConditionPath Path;
 
-  explicit ClassifiedCondition(CallbackCondition Cond, ConditionPath Path)
-      : CallbackCondition(Cond), Path(Path) {}
+  /// Whether this represents an Obj-C style boolean flag check for success.
+  bool IsObjCStyleFlagCheck;
+
+  explicit ClassifiedCondition(CallbackCondition Cond, ConditionPath Path,
+                               bool IsObjCStyleFlagCheck)
+      : CallbackCondition(Cond), Path(Path),
+        IsObjCStyleFlagCheck(IsObjCStyleFlagCheck) {}
 };
 
 /// A wrapper for a map of parameter decls to their classified conditions, or
@@ -4751,6 +4809,23 @@ public:
   }
 };
 
+/// Whether or not the given statement starts a new scope. Note that most
+/// statements are handled by the \c BraceStmt check. The others listed are
+/// a somewhat special case since they can also declare variables in their
+/// condition.
+static bool startsNewScope(Stmt *S) {
+  switch (S->getKind()) {
+  case StmtKind::Brace:
+  case StmtKind::If:
+  case StmtKind::While:
+  case StmtKind::ForEach:
+  case StmtKind::Case:
+    return true;
+  default:
+    return false;
+  }
+}
+
 struct ClassifiedBlocks {
   ClassifiedBlock SuccessBlock;
   ClassifiedBlock ErrorBlock;
@@ -4771,21 +4846,24 @@ struct CallbackClassifier {
   /// Updates the success and error block of `Blocks` with nodes and bound
   /// names from `Body`. Errors are added through `DiagEngine`, possibly
   /// resulting in partially filled out blocks.
-  static void classifyInto(ClassifiedBlocks &Blocks,
+  static void classifyInto(ClassifiedBlocks &Blocks, const FuncDecl *Callee,
+                           ArrayRef<const ParamDecl *> SuccessParams,
                            llvm::DenseSet<SwitchStmt *> &HandledSwitches,
                            DiagnosticEngine &DiagEngine,
                            llvm::DenseSet<const Decl *> UnwrapParams,
                            const ParamDecl *ErrParam, HandlerType ResultType,
                            BraceStmt *Body) {
     assert(!Body->getElements().empty() && "Cannot classify empty body");
-    CallbackClassifier Classifier(Blocks, HandledSwitches, DiagEngine,
-                                  UnwrapParams, ErrParam,
-                                  ResultType == HandlerType::RESULT);
+    CallbackClassifier Classifier(Blocks, Callee, SuccessParams,
+                                  HandledSwitches, DiagEngine, UnwrapParams,
+                                  ErrParam, ResultType == HandlerType::RESULT);
     Classifier.classifyNodes(Body->getElements(), Body->getRBraceLoc());
   }
 
 private:
   ClassifiedBlocks &Blocks;
+  const FuncDecl *Callee;
+  ArrayRef<const ParamDecl *> SuccessParams;
   llvm::DenseSet<SwitchStmt *> &HandledSwitches;
   DiagnosticEngine &DiagEngine;
   ClassifiedBlock *CurrentBlock;
@@ -4793,15 +4871,16 @@ private:
   const ParamDecl *ErrParam;
   bool IsResultParam;
 
-  CallbackClassifier(ClassifiedBlocks &Blocks,
+  CallbackClassifier(ClassifiedBlocks &Blocks, const FuncDecl *Callee,
+                     ArrayRef<const ParamDecl *> SuccessParams,
                      llvm::DenseSet<SwitchStmt *> &HandledSwitches,
                      DiagnosticEngine &DiagEngine,
                      llvm::DenseSet<const Decl *> UnwrapParams,
                      const ParamDecl *ErrParam, bool IsResultParam)
-      : Blocks(Blocks), HandledSwitches(HandledSwitches),
-        DiagEngine(DiagEngine), CurrentBlock(&Blocks.SuccessBlock),
-        UnwrapParams(UnwrapParams), ErrParam(ErrParam),
-        IsResultParam(IsResultParam) {}
+      : Blocks(Blocks), Callee(Callee), SuccessParams(SuccessParams),
+        HandledSwitches(HandledSwitches), DiagEngine(DiagEngine),
+        CurrentBlock(&Blocks.SuccessBlock), UnwrapParams(UnwrapParams),
+        ErrParam(ErrParam), IsResultParam(IsResultParam) {}
 
   void classifyNodes(ArrayRef<ASTNode> Nodes, SourceLoc endCommentLoc) {
     for (auto I = Nodes.begin(), E = Nodes.end(); I < E; ++I) {
@@ -4831,10 +4910,70 @@ private:
     CurrentBlock->addPossibleCommentLoc(endCommentLoc);
   }
 
-  /// Given a callback condition, classify it as a success or failure path, or
-  /// \c None if it cannot be classified.
+  /// Whether any of the provided ASTNodes have a child expression that force
+  /// unwraps the error parameter. Note that this doesn't walk into new scopes.
+  bool hasForceUnwrappedErrorParam(ArrayRef<ASTNode> Nodes) {
+    if (IsResultParam || !ErrParam)
+      return false;
+
+    class ErrUnwrapFinder : public ASTWalker {
+      const ParamDecl *ErrParam;
+      bool FoundUnwrap = false;
+
+    public:
+      explicit ErrUnwrapFinder(const ParamDecl *ErrParam)
+          : ErrParam(ErrParam) {}
+      bool foundUnwrap() const { return FoundUnwrap; }
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+        // Don't walk into ternary conditionals as they may have additional
+        // conditions such as err != nil that make a force unwrap now valid.
+        if (isa<IfExpr>(E))
+          return {false, E};
+
+        auto *FVE = dyn_cast<ForceValueExpr>(E);
+        if (!FVE)
+          return {true, E};
+
+        auto *DRE = dyn_cast<DeclRefExpr>(FVE->getSubExpr());
+        if (!DRE)
+          return {true, E};
+
+        if (DRE->getDecl() != ErrParam)
+          return {true, E};
+
+        // If we find the node we're looking for, make a note of it, and abort
+        // the walk.
+        FoundUnwrap = true;
+        return {false, nullptr};
+      }
+
+      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+        // Don't walk into new explicit scopes, we only want to consider force
+        // unwraps in the immediate conditional body.
+        if (!S->isImplicit() && startsNewScope(S))
+          return {false, S};
+        return {true, S};
+      }
+
+      bool walkToDeclPre(Decl *D) override {
+        // Don't walk into new explicit DeclContexts.
+        return D->isImplicit() || !isa<DeclContext>(D);
+      }
+    };
+    for (auto Node : Nodes) {
+      ErrUnwrapFinder walker(ErrParam);
+      Node.walk(walker);
+      if (walker.foundUnwrap())
+        return true;
+    }
+    return false;
+  }
+
+  /// Given a callback condition, classify it as a success or failure path.
   Optional<ClassifiedCondition>
-  classifyCallbackCondition(const CallbackCondition &Cond) {
+  classifyCallbackCondition(const CallbackCondition &Cond,
+                            const NodesToPrint &SuccessNodes, Stmt *ElseStmt) {
     if (!Cond.isValid())
       return None;
 
@@ -4844,6 +4983,11 @@ private:
     case ConditionType::NOT_NIL:
     case ConditionType::NIL:
       if (!UnwrapParams.count(Cond.Subject))
+        return None;
+      break;
+    case ConditionType::IS_TRUE:
+    case ConditionType::IS_FALSE:
+      if (!llvm::is_contained(SuccessParams, Cond.Subject))
         return None;
       break;
     case ConditionType::SUCCESS_PATTERN:
@@ -4860,35 +5004,129 @@ private:
     if (Cond.Subject == ErrParam && !IsResultParam)
       Path = flippedConditionPath(Path);
 
-    // If we have a nil or failure condition, that's a flip.
+    // If we have a nil, false, or failure condition, that's a flip.
     switch (CondType) {
     case ConditionType::NIL:
+    case ConditionType::IS_FALSE:
     case ConditionType::FAILURE_PATTEN:
       Path = flippedConditionPath(Path);
       break;
+    case ConditionType::IS_TRUE:
     case ConditionType::NOT_NIL:
     case ConditionType::SUCCESS_PATTERN:
       break;
     }
-    return ClassifiedCondition(Cond, Path);
+
+    // If we have a bool condition, it could be an Obj-C style flag check, which
+    // we do some extra checking for. Otherwise, we're done.
+    if (CondType != ConditionType::IS_TRUE &&
+        CondType != ConditionType::IS_FALSE) {
+      return ClassifiedCondition(Cond, Path, /*ObjCFlagCheck*/ false);
+    }
+
+    // Check to see if the async alternative function has a convention that
+    // specifies where the flag is and what it indicates.
+    Optional<std::pair</*Idx*/ unsigned, /*SuccessFlag*/ bool>> CustomFlag;
+    if (auto *AsyncAlt = Callee->getAsyncAlternative()) {
+      if (auto Conv = AsyncAlt->getForeignAsyncConvention()) {
+        if (auto Idx = Conv->completionHandlerFlagParamIndex()) {
+          auto IsSuccessFlag = Conv->completionHandlerFlagIsErrorOnZero();
+          CustomFlag = std::make_pair(*Idx, IsSuccessFlag);
+        }
+      }
+    }
+    if (CustomFlag) {
+      auto Idx = CustomFlag->first;
+      if (Idx < 0 || Idx >= SuccessParams.size())
+        return None;
+
+      if (SuccessParams[Idx] != Cond.Subject)
+        return None;
+
+      // The path may need to be flipped depending on whether the flag indicates
+      // success.
+      auto IsSuccessFlag = CustomFlag->second;
+      if (!IsSuccessFlag)
+        Path = flippedConditionPath(Path);
+
+      return ClassifiedCondition(Cond, Path, /*ObjCStyleFlagCheck*/ true);
+    }
+
+    // If we've reached here, we have a bool flag check that isn't specified in
+    // the async convention. We apply a heuristic to see if the error param is
+    // force unwrapped in the conditional body. In that case, the user is
+    // expecting it to be the error path, and it's more likely than not that the
+    // flag value conveys no more useful information in the error block.
+
+    // First check the success block.
+    auto FoundInSuccessBlock =
+        hasForceUnwrappedErrorParam(SuccessNodes.getNodes());
+
+    // Then check the else block if we have it.
+    if (ASTNode ElseNode = ElseStmt) {
+      // Unwrap the BraceStmt of the else clause if needed. This is needed as
+      // we won't walk into BraceStmts by default as they introduce new
+      // scopes.
+      ArrayRef<ASTNode> Nodes;
+      if (auto *BS = dyn_cast<BraceStmt>(ElseStmt)) {
+        Nodes = BS->getElements();
+      } else {
+        Nodes = llvm::makeArrayRef(ElseNode);
+      }
+      if (hasForceUnwrappedErrorParam(Nodes)) {
+        // If we also found an unwrap in the success block, we don't know what's
+        // happening here.
+        if (FoundInSuccessBlock)
+          return None;
+
+        // Otherwise we can determine this as a success condition. Note this is
+        // flipped as if the error is present in the else block, this condition
+        // is for success.
+        return ClassifiedCondition(Cond, ConditionPath::SUCCESS,
+                                   /*ObjCStyleFlagCheck*/ true);
+      }
+    }
+
+    if (FoundInSuccessBlock) {
+      // Note that the path is flipped as if the error is present in the success
+      // block, this condition is for failure.
+      return ClassifiedCondition(Cond, ConditionPath::FAILURE,
+                                 /*ObjCStyleFlagCheck*/ true);
+    }
+
+    // Otherwise we can't classify this.
+    return None;
   }
 
-  /// Classifies all the conditions present in a given StmtCondition. Returns
-  /// \c true if there were any conditions that couldn't be classified,
-  /// \c false otherwise.
+  /// Classifies all the conditions present in a given StmtCondition, taking
+  /// into account its success body and failure body. Returns \c true if there
+  /// were any conditions that couldn't be classified, \c false otherwise.
   bool classifyConditionsOf(StmtCondition Cond,
+                            const NodesToPrint &ThenNodesToPrint,
+                            Stmt *ElseStmt,
                             ClassifiedCallbackConditions &Conditions) {
     bool UnhandledConditions = false;
+    Optional<ClassifiedCondition> ObjCFlagCheck;
     auto TryAddCond = [&](CallbackCondition CC) {
-      auto Classified = classifyCallbackCondition(CC);
-      if (!Classified) {
+      auto Classified =
+          classifyCallbackCondition(CC, ThenNodesToPrint, ElseStmt);
+
+      // If we couldn't classify this, or if there are multiple Obj-C style flag
+      // checks, this is unhandled.
+      if (!Classified || (ObjCFlagCheck && Classified->IsObjCStyleFlagCheck)) {
         UnhandledConditions = true;
         return;
       }
+
       // If we've seen multiple conditions for the same subject, don't handle
       // this.
-      if (!Conditions.insert({CC.Subject, *Classified}).second)
+      if (!Conditions.insert({CC.Subject, *Classified}).second) {
         UnhandledConditions = true;
+        return;
+      }
+
+      if (Classified->IsObjCStyleFlagCheck)
+        ObjCFlagCheck = Classified;
     };
 
     for (auto &CondElement : Cond) {
@@ -4916,7 +5154,9 @@ private:
               continue;
             }
           }
-          UnhandledConditions = true;
+
+          // Check to see if we have a lone bool condition.
+          TryAddCond(CallbackCondition(Next));
         }
       } else if (auto *P = CondElement.getPatternOrNull()) {
         TryAddCond(CallbackCondition(P, CondElement.getInitializer()));
@@ -4931,7 +5171,7 @@ private:
                            NodesToPrint ThenNodesToPrint, Stmt *ElseStmt) {
     ClassifiedCallbackConditions CallbackConditions;
     bool UnhandledConditions = classifyConditionsOf(
-        Condition, CallbackConditions);
+        Condition, ThenNodesToPrint, ElseStmt, CallbackConditions);
     auto ErrCondition = CallbackConditions.lookup(ErrParam);
 
     if (UnhandledConditions) {
@@ -5068,7 +5308,8 @@ private:
 
       // Classify the case pattern.
       auto CC = classifyCallbackCondition(
-          CallbackCondition(ErrParam, &Items[0]));
+          CallbackCondition(ErrParam, &Items[0]), SuccessNodes,
+          /*elseStmt*/ nullptr);
       if (CC && CC->Path == ConditionPath::FAILURE)
         std::swap(Block, OtherBlock);
 
@@ -5091,23 +5332,6 @@ private:
     HandledSwitches.insert(SS);
   }
 };
-
-/// Whether or not the given statement starts a new scope. Note that most
-/// statements are handled by the \c BraceStmt check. The others listed are
-/// a somewhat special case since they can also declare variables in their
-/// condition.
-static bool startsNewScope(Stmt *S) {
-  switch (S->getKind()) {
-  case StmtKind::Brace:
-  case StmtKind::If:
-  case StmtKind::While:
-  case StmtKind::ForEach:
-  case StmtKind::Case:
-    return true;
-  default:
-    return false;
-  }
-}
 
 /// Name of a decl if it has one, an empty \c Identifier otherwise.
 static Identifier getDeclName(const Decl *D) {
@@ -6144,6 +6368,9 @@ private:
                                  const AsyncHandlerDesc &HandlerDesc,
                                  const ClosureExpr *Callback,
                                  PtrArrayRef<Expr *> ArgList) {
+    auto *Callee = getUnderlyingFunc(CE->getFn());
+    assert(Callee);
+
     ArrayRef<const ParamDecl *> CallbackParams =
         Callback->getParameters()->getArray();
     auto CallbackBody = Callback->getBody();
@@ -6175,9 +6402,9 @@ private:
       }
       if (ErrParam)
         UnwrapParams.insert(ErrParam);
-      CallbackClassifier::classifyInto(Blocks, HandledSwitches, DiagEngine,
-                                       UnwrapParams, ErrParam, HandlerDesc.Type,
-                                       CallbackBody);
+      CallbackClassifier::classifyInto(
+          Blocks, Callee, SuccessParams, HandledSwitches, DiagEngine,
+          UnwrapParams, ErrParam, HandlerDesc.Type, CallbackBody);
     }
 
     if (DiagEngine.hadAnyError()) {
