@@ -32,8 +32,13 @@ int Atom::compare(Atom other) const {
   case Kind::Protocol:
     return TypeDecl::compare(getProtocol(), other.getProtocol());
 
-  case Kind::AssociatedType:
-    return TypeDecl::compare(getAssociatedType(), other.getAssociatedType());
+  case Kind::AssociatedType: {
+    int result = TypeDecl::compare(getProtocol(), other.getProtocol());
+    if (result)
+      return result;
+
+    return getName().compare(other.getName());
+  }
 
   case Kind::GenericParam: {
     auto *param = getGenericParam();
@@ -63,9 +68,8 @@ void Atom::dump(llvm::raw_ostream &out) const {
     return;
 
   case Kind::AssociatedType: {
-    auto *type = getAssociatedType();
-    out << "[" << type->getProtocol()->getName()
-        << ":" << type->getName() << "]";
+    out << "[" << getProtocol()->getName()
+        << ":" << getName() << "]";
     return;
   }
 
@@ -206,13 +210,31 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
 bool RewriteSystem::simplify(Term &term) const {
   bool changed = false;
 
+  if (Debug) {
+    llvm::dbgs() << "= Term ";
+    term.dump(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  }
+
   while (true) {
     bool tryAgain = false;
     for (const auto &rule : Rules) {
       if (rule.isDeleted())
         continue;
 
+      if (Debug) {
+        llvm::dbgs() << "== Rule ";
+        rule.dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
+
       if (rule.apply(term)) {
+        if (Debug) {
+          llvm::dbgs() << "=== Result ";
+          term.dump(llvm::dbgs());
+          llvm::dbgs() << "\n";
+        }
+
         changed = true;
         tryAgain = true;
       }

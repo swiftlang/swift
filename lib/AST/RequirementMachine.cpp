@@ -30,6 +30,34 @@ struct ProtocolInfo {
   ArrayRef<ProtocolDecl *> Inherited;
   llvm::TinyPtrVector<AssociatedTypeDecl *> AssociatedTypes;
   ArrayRef<Requirement> Requirements;
+
+  // Used by computeDepth() to detect circularity.
+  unsigned Mark : 1;
+
+  // Longest chain of protocol refinements, including this one.
+  // Greater than zero on valid code, might be zero if there's
+  // a cycle.
+  unsigned Depth : 31;
+
+  // Index of the protocol in the linear order.
+  unsigned Index : 32;
+
+  ProtocolInfo() {
+    Mark = 0;
+    Depth = 0;
+    Index = 0;
+  }
+
+  ProtocolInfo(ArrayRef<ProtocolDecl *> inherited,
+               llvm::TinyPtrVector<AssociatedTypeDecl *> &&types,
+               ArrayRef<Requirement> reqs)
+    : Inherited(inherited),
+      AssociatedTypes(types),
+      Requirements(reqs) {
+    Mark = 0;
+    Depth = 0;
+    Index = 0;
+  }
 };
 
 struct ProtocolGraph {
@@ -61,6 +89,79 @@ struct ProtocolGraph {
       visitRequirements(Info[proto].Requirements);
     }
   }
+
+  void computeLinearOrder() {
+    for (const auto *proto : Protocols) {
+      (void) computeProtocolDepth(proto);
+    }
+
+    std::sort(
+        Protocols.begin(), Protocols.end(),
+        [&](const ProtocolDecl *lhs,
+            const ProtocolDecl *rhs) -> int {
+          const auto &lhsInfo = Info[lhs];
+          const auto &rhsInfo = Info[rhs];
+
+          // protocol Base {} // depth 1
+          // protocol Derived : Base {} // depth 2
+          //
+          // Derived < Base in the linear order.
+          if (lhsInfo.Depth != rhsInfo.Depth)
+            return lhsInfo.Depth - rhsInfo.Depth;
+
+          return TypeDecl::compare(lhs, rhs);
+        });
+
+    for (unsigned i : indices(Protocols)) {
+      Info[Protocols[i]].Index = i;
+    }
+  }
+
+  void computeInheritedAssociatedTypes() {
+    for (const auto *proto : Protocols) {
+      auto &info = Info[proto];
+
+      llvm::SmallDenseSet<const AssociatedTypeDecl *, 4> visited;
+      for (const auto *inherited : info.Inherited) {
+        if (inherited == proto)
+          continue;
+
+        for (auto *inheritedType : Info[inherited].AssociatedTypes) {
+          if (!visited.insert(inheritedType).second)
+            continue;
+
+          // The 'if (inherited == proto)' above avoids a potential
+          // iterator invalidation here.
+          info.AssociatedTypes.push_back(inheritedType);
+        }
+      }
+    }
+  }
+
+private:
+  unsigned computeProtocolDepth(const ProtocolDecl *proto) {
+    auto &info = Info[proto];
+
+    if (info.Mark) {
+      // Already computed, or we have a cycle. Cycles are diagnosed
+      // elsewhere in the type checker, so we don't have to do
+      // anything here.
+      return info.Depth;
+    }
+
+    info.Mark = true;
+    unsigned depth = 0;
+
+    for (auto *inherited : info.Inherited) {
+      unsigned inheritedDepth = computeProtocolDepth(inherited);
+      depth = std::max(inheritedDepth, depth);
+    }
+
+    depth++;
+
+    info.Depth = depth;
+    return depth;
+  }
 };
 
 class RewriteSystemBuilder {
@@ -73,6 +174,9 @@ public:
   void addGenericSignature(CanGenericSignature sig);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
+  void addInheritedAssociatedType(const AssociatedTypeDecl *type,
+                                  const ProtocolDecl *inherited,
+                                  const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
                       const ProtocolDecl *proto);
 
@@ -85,6 +189,8 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   ProtocolGraph graph;
   graph.visitRequirements(sig->getRequirements());
   graph.computeTransitiveClosure();
+  graph.computeLinearOrder();
+  graph.computeInheritedAssociatedTypes();
 
   for (auto *proto : graph.Protocols) {
     if (Context.LangOpts.DebugRequirementMachine) {
@@ -95,6 +201,12 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 
     for (auto *type : info.AssociatedTypes)
       addAssociatedType(type, proto);
+
+    for (auto *inherited : info.Inherited) {
+      for (auto *inheritedType : graph.Info[inherited].AssociatedTypes) {
+        addInheritedAssociatedType(inheritedType, inherited, proto);
+      }
+    }
 
     for (auto req : info.Requirements)
       addRequirement(req.getCanonical(), proto);
@@ -115,7 +227,21 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   lhs.add(Atom::forName(type->getName()));
 
   Term rhs;
-  rhs.add(Atom::forAssociatedType(type));
+  rhs.add(Atom::forAssociatedType(proto, type->getName()));
+
+  Rules.emplace_back(lhs, rhs);
+}
+
+void RewriteSystemBuilder::addInheritedAssociatedType(
+                                                const AssociatedTypeDecl *type,
+                                                const ProtocolDecl *inherited,
+                                                const ProtocolDecl *proto) {
+  Term lhs;
+  lhs.add(Atom::forProtocol(proto));
+  lhs.add(Atom::forAssociatedType(inherited, type->getName()));
+
+  Term rhs;
+  rhs.add(Atom::forAssociatedType(proto, type->getName()));
 
   Rules.emplace_back(lhs, rhs);
 }

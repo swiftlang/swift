@@ -28,32 +28,35 @@ namespace swift {
 namespace rewriting {
 
 class Atom final {
-  using Storage = llvm::PointerUnion<Identifier,
-                                     const ProtocolDecl *,
-                                     const AssociatedTypeDecl *,
-                                     GenericTypeParamType *>;
+  using Storage = llvm::PointerUnion<Identifier, GenericTypeParamType *>;
+
+  const ProtocolDecl *Proto;
   Storage Value;
 
-  explicit Atom(Storage value) : Value(value) {}
+  explicit Atom(const ProtocolDecl *proto, Storage value)
+      : Proto(proto), Value(value) {
+    // Triggers assertion if the atom is not valid.
+    (void) getKind();
+  }
 
 public:
   static Atom forName(Identifier name) {
-    return Atom(name);
+    return Atom(nullptr, name);
   }
 
   static Atom forProtocol(const ProtocolDecl *proto) {
-    assert(proto != nullptr);
-    return Atom(proto);
+    return Atom(proto, Storage());
   }
 
-  static Atom forAssociatedType(const AssociatedTypeDecl *type) {
-    assert(type != nullptr);
-    return Atom(type);
+  static Atom forAssociatedType(const ProtocolDecl *proto,
+                                Identifier name) {
+    assert(proto != nullptr);
+    return Atom(proto, name);
   }
 
   static Atom forGenericParam(GenericTypeParamType *param) {
     assert(param->isCanonical());
-    return Atom(param);
+    return Atom(nullptr, param);
   }
 
   enum class Kind : uint8_t {
@@ -64,30 +67,39 @@ public:
   };
 
   Kind getKind() const {
-    if (Value.is<Identifier>())
-      return Kind::Name;
-    if (Value.is<const ProtocolDecl *>())
+    if (!Value) {
+      assert(Proto != nullptr);
       return Kind::Protocol;
-    if (Value.is<const AssociatedTypeDecl *>())
-      return Kind::AssociatedType;
-    if (Value.is<GenericTypeParamType *>())
+    }
+
+    if (Value.is<Identifier>()) {
+      if (Proto != nullptr)
+        return Kind::AssociatedType;
+      return Kind::Name;
+    }
+
+    if (Value.is<GenericTypeParamType *>()) {
+      assert(Proto == nullptr);
       return Kind::GenericParam;
+    }
+
     llvm_unreachable("Bad term rewriting atom");
   }
 
   Identifier getName() const {
+    assert(getKind() == Kind::Name ||
+           getKind() == Kind::AssociatedType);
     return Value.get<Identifier>();
   }
 
   const ProtocolDecl *getProtocol() const {
-    return Value.get<const ProtocolDecl *>();
-  }
-
-  const AssociatedTypeDecl *getAssociatedType() const {
-    return Value.get<const AssociatedTypeDecl *>();
+    assert(getKind() == Kind::Protocol ||
+           getKind() == Kind::AssociatedType);
+    return Proto;
   }
 
   GenericTypeParamType *getGenericParam() const {
+    assert(getKind() == Kind::GenericParam);
     return Value.get<GenericTypeParamType *>();
   }
 
@@ -96,7 +108,8 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
   friend bool operator==(Atom lhs, Atom rhs) {
-    return lhs.Value == rhs.Value;
+    return (lhs.Proto == rhs.Proto &&
+            lhs.Value == rhs.Value);
   }
 };
 
@@ -183,6 +196,7 @@ public:
 
 class RewriteSystem final {
   std::vector<Rule> Rules;
+  bool Debug = false;
 
 public:
   bool addRule(Term lhs, Term rhs);
