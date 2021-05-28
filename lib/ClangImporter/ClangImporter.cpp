@@ -4304,3 +4304,67 @@ ClangImporter::instantiateCXXClassTemplate(
   return dyn_cast_or_null<StructDecl>(
       Impl.importDecl(ctsd, Impl.CurrentVersion));
 }
+
+void
+ClangImporter::Implementation::addImportRemark(const ImportRemark &remark) {
+  ImportRemarks.push_back(remark);
+}
+
+void ClangImporter::Implementation::emitImportRemarks() {
+  // Move list to a local variable so that, if emitting these remarks somehow
+  // causes additional imports, they don't affect us.
+  std::vector<ImportRemark> remarks;
+  std::swap(remarks, ImportRemarks);
+
+  // Emit.
+  for (auto &remark : remarks)
+    remark.diagnose(*this);
+}
+
+void ClangImporter::emitImportRemarks() {
+  Impl.emitImportRemarks();
+}
+
+template<typename ...ArgTypes>
+static void diagnose(ClangImporter::Implementation &impl,
+                     const clang::Decl *clangDecl,
+                     importer::ImportNameVersion version,
+                     Diag<llvm::VersionTuple, ArgTypes...> id,
+                     typename detail::PassArgument<ArgTypes>::type... args) {
+  if (version == importer::ImportNameVersion::raw()) return;
+
+  SourceLoc loc = impl.getBufferImporterForDiagnostics()
+      .resolveSourceLocation(impl.getClangASTContext().getSourceManager(),
+                             clangDecl->getLocation());
+  if (!loc.isValid()) return;
+
+  impl.SwiftContext.Diags.diagnose(loc, id, version.asClangVersionTuple(),
+                                   std::move(args)...);
+}
+
+static std::string getDeclName(Decl *decl) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  if (auto *VD = dyn_cast<ValueDecl>(decl))
+    VD->getName().printPretty(os);        // FIXME: do better
+  return str;
+}
+
+void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
+  if (swiftDecl) {
+    auto name = getDeclName(swiftDecl);
+    if (!name.empty())
+      ::diagnose(impl, clangDecl, version, diag::imported_clang_decl_as,
+                 swiftDecl->getDescriptiveKind(), name);
+  }
+  else if (!alreadyDecided) {
+    ::diagnose(impl, clangDecl, version, diag::did_not_import_clang_decl);
+  }
+
+  for (auto *altDecl : alternateSwiftDecls) {
+    auto name = getDeclName(altDecl);
+    if (!name.empty())
+      ::diagnose(impl, clangDecl, version, diag::also_imported_clang_decl_as,
+                 altDecl->getDescriptiveKind(), name);
+  }
+}

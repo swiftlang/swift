@@ -25,6 +25,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
@@ -277,6 +278,8 @@ private:
 };
 }
 
+class ImportDecision;
+
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
 
@@ -318,12 +321,27 @@ public:
   explicit operator bool() const { return type.getPointer() != nullptr; }
 };
 
+struct ImportRemark {
+  const clang::Decl *clangDecl;
+  importer::ImportNameVersion version;
+  Decl *swiftDecl = nullptr;
+  TinyPtrVector<Decl *> alternateSwiftDecls;
+  bool alreadyDecided = false;
+
+  ImportRemark(const clang::Decl *clangDecl,
+               importer::ImportNameVersion version)
+    : clangDecl(clangDecl), version(version) { }
+
+  void diagnose(ClangImporter::Implementation &impl);
+};
+
 /// Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader,
     public LazyConformanceLoader
 {
   friend class ClangImporter;
+  friend class ImportDecision;
   using Version = importer::ImportNameVersion;
 
 public:
@@ -415,6 +433,9 @@ private:
   /// used when parsing the attribute text.
   llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
+  /// Remarks to emit about import decisions.
+  std::vector<ImportRemark> ImportRemarks;
+
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
@@ -480,6 +501,10 @@ public:
 
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
+
+  void addImportRemark(const ImportRemark &remark);
+
+  void emitImportRemarks();
 
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
@@ -870,7 +895,8 @@ public:
                          bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
-                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
+                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration,
+                       ImportDecision &decision);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
                                Version version,
@@ -1528,6 +1554,66 @@ public:
     if (SinglePCHImport.hasValue())
       return *SinglePCHImport;
     return StringRef();
+  }
+};
+
+class ImportDecision {
+public:
+  enum class Kind : uint8_t { Normal, Mirrored, Inherited };
+
+private:
+  ClangImporter::Implementation &impl;
+  Kind kind;
+
+  ImportRemark remark;
+
+public:
+  ImportDecision(ClangImporter::Implementation &impl,
+                 const clang::Decl *clangDecl,
+                 importer::ImportNameVersion version,
+                 Kind kind = Kind::Normal)
+    : impl(impl), kind(kind), remark(clangDecl, version)
+  { }
+
+  // Uncopyable. Each decision is unique.
+  ImportDecision(const ImportDecision &other) = delete;
+  ImportDecision &operator=(const ImportDecision &other) = delete;
+
+  // Unmovable. (These could be implemented by setting the moved-from instance
+  // to AlreadyDecided.)
+  ImportDecision(const ImportDecision &&other) = delete;
+  ImportDecision &operator=(const ImportDecision &&other) = delete;
+
+  ~ImportDecision() {
+    impl.addImportRemark(remark);
+  }
+
+public:
+  void import(Decl *decl) {
+    assert(decl);
+    assert(!remark.swiftDecl || remark.swiftDecl == decl);
+    remark.swiftDecl = decl;
+  }
+
+  void importAndCache(Decl *decl) {
+    import(decl);
+    if (kind == Kind::Normal)
+      impl.cacheImportedDecl(decl, remark.clangDecl, remark.version);
+  }
+
+  void importAlternate(Decl *mainDecl, ValueDecl *altDecl) {
+    assert(mainDecl && altDecl);
+    // FIXME: assert(mainDecl == remark.swiftDecl);
+    remark.alternateSwiftDecls.push_back(altDecl);
+  }
+
+  void importAndCacheAlternate(Decl *mainDecl, ValueDecl *altDecl) {
+    importAlternate(mainDecl, altDecl);
+    impl.addAlternateDecl(mainDecl, altDecl);
+  }
+
+  void alreadyDecided() {
+    remark.alreadyDecided = true;
   }
 };
 
