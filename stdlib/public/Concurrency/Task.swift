@@ -848,7 +848,7 @@ public func _runChildTask<T>(
   let currentTask = Builtin.getCurrentAsyncTask()
 
   // Set up the job flags for a new task.
-  var flags = Task.JobFlags()
+  var flags = JobFlags()
   flags.kind = .task
   flags.priority = getJobFlags(currentTask).priority ?? .unspecified
   flags.isFuture = true
