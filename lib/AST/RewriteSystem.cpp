@@ -212,8 +212,10 @@ bool RewriteSystem::simplify(Term &term) const {
       if (rule.isDeleted())
         continue;
 
-      if (rule.apply(term))
+      if (rule.apply(term)) {
+        changed = true;
         tryAgain = true;
+      }
     }
 
     if (!tryAgain)
@@ -297,7 +299,7 @@ void RewriteSystem::computeConfluentCompletion(
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
-  out << "Rewrite system: {";
+  out << "Rewrite system: {\n";
   for (const auto &rule : Rules) {
     out << "- ";
     rule.dump(out);

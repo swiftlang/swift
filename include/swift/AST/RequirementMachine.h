@@ -24,8 +24,12 @@ class ProtocolDecl;
 class Requirement;
 
 namespace rewriting {
-  class Term;
-}
+
+class Term;
+
+Term getTermForType(CanType paramType, const ProtocolDecl *proto);
+
+} // end namespace rewriting
 
 class RequirementMachine final {
   friend class ASTContext;
@@ -43,17 +47,9 @@ class RequirementMachine final {
   RequirementMachine &operator=(RequirementMachine &&) = delete;
 
   void addGenericSignature(CanGenericSignature sig);
-  void addProtocolRequirementSignature(const ProtocolDecl *proto);
-  void addRequirement(const Requirement &req, const ProtocolDecl *proto);
-  void addAssociatedType(const AssociatedTypeDecl *type,
-                         const ProtocolDecl *proto);
-  void processWorklist();
 
   bool isComplete() const;
   void markComplete();
-
-  rewriting::Term getTermForType(CanType paramType,
-                                 const ProtocolDecl *proto) const;
 
 public:
   ~RequirementMachine();
