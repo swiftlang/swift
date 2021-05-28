@@ -104,6 +104,7 @@ extension Task where Success == Never, Failure == Never {
 ///
 /// This error is also thrown automatically by `Task.checkCancellation()`,
 /// if the current task has been cancelled.
+@available(SwiftStdlib 5.5, *)
 public struct CancellationError: Error {
   // no extra information, cancellation is intended to be light-weight
   public init() {}
