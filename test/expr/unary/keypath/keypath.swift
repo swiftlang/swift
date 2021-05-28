@@ -180,14 +180,10 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   var m = [\A.property, \A.[sub], \A.optProperty!]
   expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`
-  // expected-error@+2 {{key path value type 'Prop?' cannot be converted to contextual type 'Prop'}}
-  // expected-error@+1 {{key path value type 'A' cannot be converted to contextual type 'Prop'}}
+  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`, all this unifies into `[PartialKeyPath<A>]`
   var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
   expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
   let _: [PartialKeyPath<A>] = [\.property, \.optProperty, \.[sub], \.optProperty!]
 
   var o = [\A.property, \C<A>.value]
