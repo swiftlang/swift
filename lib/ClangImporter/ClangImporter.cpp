@@ -4355,7 +4355,7 @@ template<typename ...ArgTypes>
 static void diagnose(ClangImporter::Implementation &impl,
                      const clang::Decl *clangDecl,
                      importer::ImportNameVersion version,
-                     Diag<llvm::VersionTuple, ArgTypes...> id,
+                     Diag<ArgTypes...> id,
                      typename detail::PassArgument<ArgTypes>::type... args) {
   if (version == importer::ImportNameVersion::raw()) return;
 
@@ -4364,8 +4364,7 @@ static void diagnose(ClangImporter::Implementation &impl,
                              clangDecl->getLocation());
   if (!loc.isValid()) return;
 
-  impl.SwiftContext.Diags.diagnose(loc, id, version.asClangVersionTuple(),
-                                   std::move(args)...);
+  impl.SwiftContext.Diags.diagnose(loc, id, std::move(args)...);
 }
 
 static std::string getDeclName(Decl *decl) {
@@ -4381,6 +4380,7 @@ void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
     auto name = getDeclName(swiftDecl);
     if (!name.empty())
       ::diagnose(impl, clangDecl, version, diag::imported_clang_decl_as,
+                 swiftDecl->getAttrs().isUnavailable(impl.SwiftContext),
                  swiftDecl->getDescriptiveKind(), name);
   }
   else if (!alreadyDecided) {
@@ -4391,6 +4391,7 @@ void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
     auto name = getDeclName(altDecl);
     if (!name.empty())
       ::diagnose(impl, clangDecl, version, diag::also_imported_clang_decl_as,
+                 altDecl->getAttrs().isUnavailable(impl.SwiftContext),
                  altDecl->getDescriptiveKind(), name);
   }
 }

@@ -89,17 +89,15 @@ WARNING(import_multiple_mainactor_attr,none,
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
-// Note the unusual order in these remarks: version is %0 even though it's
-// printed at the end.
 REMARK(imported_clang_decl_as,none,
-       "imported as %1 '%2' in Swift %0",
-       (llvm::VersionTuple, DescriptiveDeclKind, StringRef))
+       "imported as %select{|unavailable }0%1 '%2'",
+       (bool, DescriptiveDeclKind, StringRef))
 REMARK(also_imported_clang_decl_as,none,
-       "also imported as %1 '%2' in Swift %0",
-       (llvm::VersionTuple, DescriptiveDeclKind, StringRef))
+       "also imported as %select{|unavailable }0%1 '%2",
+       (bool, DescriptiveDeclKind, StringRef))
 REMARK(did_not_import_clang_decl,none,
-       "did not import in Swift %0",
-       (llvm::VersionTuple))
+       "did not import",
+       ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
