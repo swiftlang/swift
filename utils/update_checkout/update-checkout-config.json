@@ -124,7 +124,7 @@
                  "swift-argument-parser": "0.4.1",
                  "swift-crypto": "1.1.5",
                  "swift-driver": "release/5.5-05142021",
-                 "swift-syntax": "release/5.5",
+                 "swift-syntax": "release/5.5-05142021",
                  "swift-stress-tester": "release/5.5",
                  "swift-corelibs-xctest": "release/5.5",
                  "swift-corelibs-foundation": "release/5.5",
