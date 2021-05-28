@@ -502,7 +502,12 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
-  void addImportRemark(const ImportRemark &remark);
+  bool shouldEmitImportRemark(const ImportRemark &remark);
+
+  void addImportRemark(const ImportRemark &remark) {
+    if (shouldEmitImportRemark(remark))
+      ImportRemarks.push_back(remark);
+  }
 
   void emitImportRemarks();
 

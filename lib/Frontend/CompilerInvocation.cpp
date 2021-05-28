@@ -900,6 +900,14 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   return HadError;
 }
 
+static void ParseRImportArg(std::vector<std::tuple<std::string, bool>> &list,
+                            bool value,
+                            ArgList &Args,
+                            OptSpecifier id) {
+  for (const Arg *A : Args.filtered(id))
+    list.emplace_back(A->getValue(), value);
+}
+
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                                    ArgList &Args,
                                    DiagnosticEngine &Diags,
@@ -919,6 +927,11 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     Opts.ExtraArgs.push_back(A->getValue());
   }
+
+  ParseRImportArg(Opts.EmitImportDecisionRemarks, true, Args,
+                  OPT_Robjc_imports);
+  ParseRImportArg(Opts.EmitImportDecisionRemarks, false, Args,
+                  OPT_Robjc_import_failures);
 
   for (auto A : Args.getAllArgValues(OPT_debug_prefix_map)) {
     // Forward -debug-prefix-map arguments from Swift to Clang as

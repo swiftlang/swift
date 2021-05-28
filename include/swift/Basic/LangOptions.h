@@ -23,6 +23,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Config.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -642,6 +643,10 @@ namespace swift {
     /// The optimizaton setting.  This doesn't typically matter for
     /// import, but it can affect Clang's IR generation of static functions.
     std::string Optimization;
+
+    /// Swift should emit remarks describing import decisions in these modules.
+    /// If true, emit for all decisions; if false, emit only for failures.
+    std::vector<std::tuple<std::string, bool>> EmitImportDecisionRemarks;
 
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;

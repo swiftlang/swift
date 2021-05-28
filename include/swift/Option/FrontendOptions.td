@@ -151,6 +151,16 @@ def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 
+def Robjc_imports : Separate<["-"], "Robjc-imports">,
+  MetaVarName<"<module-or-submodule-name>">,
+  HelpText<"Emit remarks describing whether, why, and how Objective-C "
+           "declarations from this module can be imported">;
+
+def Robjc_import_failures : Separate<["-"], "Robjc-import-failures">,
+  MetaVarName<"<module-or-submodule-name>">,
+  HelpText<"Emit remarks describing which Objective-C declarations in this "
+           "module cannot be imported and why">;
+
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
 def no_serialize_debugging_options :
