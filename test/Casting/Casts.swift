@@ -955,15 +955,13 @@ CastsTests.test("Recursive AnyHashable") {
 }
 
 // SR-14635 (aka rdar://78224322)
+#if _runtime(_ObjC)
 CastsTests.test("Do not overuse __SwiftValue") {
   struct Bar {}
   // This used to succeed because of overeager __SwiftValue
   // boxing (and __SwiftValue does satisfy NSCopying)
   expectFalse(Bar() is NSCopying)
   expectFalse(Bar() as Any is NSCopying)
-  // This should succeed because this is what __SwiftValue boxing is for
-  expectTrue(Bar() is AnyObject)
-  expectTrue(Bar() as Any is AnyObject)
 
   // This seems unavoidable?
   // `Bar() as! AnyObject` gets boxed as a __SwiftValue,
@@ -975,8 +973,6 @@ CastsTests.test("Do not overuse __SwiftValue") {
   // (This used to succeed due to over-eager __SwiftValue boxing)
   expectFalse(Foo() is NSCopying)
   expectFalse(Foo() as Any is NSCopying)
-  // Any class type can be cast to AnyObject
-  expectTrue(Foo() is AnyObject)
 
   // A type that really does conform should cast to NSCopying
   class Foo2: NSCopying {
@@ -984,6 +980,18 @@ CastsTests.test("Do not overuse __SwiftValue") {
   }
   expectTrue(Foo2() is NSCopying)
   expectTrue(Foo2() is AnyObject)
+}
+#endif
+
+CastsTests.test("Do not overuse __SwiftValue (non-ObjC)") {
+  struct Bar {}
+  // This should succeed because this is what __SwiftValue boxing is for
+  expectTrue(Bar() is AnyObject)
+  expectTrue(Bar() as Any is AnyObject)
+
+  class Foo {}
+  // Any class type can be cast to AnyObject
+  expectTrue(Foo() is AnyObject)
 }
 
 runAllTests()
