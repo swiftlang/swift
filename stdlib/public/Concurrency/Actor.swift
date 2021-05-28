@@ -15,7 +15,7 @@ import Swift
 
 /// Common protocol to which all actors conform.
 ///
-/// The Actor protocol generalizes over all actor types. Actor types
+/// The `Actor` protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.
 @available(SwiftStdlib 5.5, *)
 public protocol Actor: AnyObject, Sendable {
