@@ -34,6 +34,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 
@@ -555,6 +558,41 @@ static bool isMainActor(Type type) {
   return false;
 }
 
+void swift::printClangDeclName(const clang::NamedDecl *D, llvm::raw_ostream &os) {
+  if (auto *category = dyn_cast<clang::ObjCCategoryDecl>(D)) {
+    printClangDeclName(category->getClassInterface(), os);
+    os << '(';
+    category->printName(os);
+    os << ')';
+    return;
+  }
+
+  if (auto *method = dyn_cast<clang::ObjCMethodDecl>(D)) {
+    os << (method->isClassMethod() ? '+' : '-');
+    os << '[';
+    printClangDeclName(cast<clang::NamedDecl>(method->getDeclContext()), os);
+    os << ' ';
+    method->printName(os);
+    os << ']';
+    return;
+  }
+
+  if (auto *prop = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+    os << (prop->isClassProperty() ? '+' : '-');
+    printClangDeclName(cast<clang::NamedDecl>(prop->getDeclContext()), os);
+    os << '.';
+    prop->printName(os);
+    return;
+  }
+
+  // If this is an anonymous tag declaration with a typedef name, use that.
+  if (auto tag = dyn_cast<clang::TagDecl>(D))
+    if (auto typedefName = tag->getTypedefNameForAnonDecl())
+      D = typedefName;
+
+  D->getNameForDiagnostic(os, D->getASTContext().getPrintingPolicy(), true);
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier,
@@ -821,6 +859,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
                                            diagArg->FormatArgs);
     break;
   }
+
+  case DiagnosticArgumentKind::ClangDecl:
+    assert(Modifier.empty() && "Improper modifier for Diagnostic argument");
+    Out << FormatOpts.OpeningQuotationMark;
+    printClangDeclName(Arg.getAsClangDecl(), Out);
+    Out << FormatOpts.ClosingQuotationMark;
+    break;
   }
 }
 
