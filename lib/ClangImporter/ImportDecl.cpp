@@ -3197,8 +3197,7 @@ namespace {
       }
       }
 
-      const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
-      Impl.cacheImportedDecl(result, canonicalClangDecl, getVersion());
+      Impl.cacheImportedDecl(result, decl, getVersion());
 
       // Import each of the enumerators.
       
@@ -3229,6 +3228,7 @@ namespace {
         }
       }
 
+      const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
       auto contextIsEnum = [&](const ImportedName &name) -> bool {
         EffectiveClangContext importContext = name.getEffectiveContext();
         switch (importContext.getKind()) {
@@ -3486,7 +3486,7 @@ namespace {
       result = Impl.createDeclWithClangNode<StructDecl>(
           decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
           name, Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
-      Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
+      Impl.cacheImportedDecl(result, decl, getVersion());
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -3891,7 +3891,7 @@ namespace {
             enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
                                           : ConstantConvertKind::None,
             isStatic, decl);
-        Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
+        Impl.cacheImportedDecl(result, decl, getVersion());
 
         // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
@@ -5079,8 +5079,7 @@ namespace {
       if (!forceClassMethod) {
         if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()) &&
             !Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}])
-          Impl.cacheImportedDecl(result, decl->getCanonicalDecl(),
-                                 getVersion());
+          Impl.cacheImportedDecl(result, decl, getVersion());
 
         if (importedName.isSubscriptAccessor()) {
           // If this was a subscript accessor, try to create a
@@ -5361,8 +5360,7 @@ namespace {
       }
 
       if (found)
-        Impl.cacheImportedDecl(found, decl->getCanonicalDecl(),
-                               getActiveSwiftVersion());
+        Impl.cacheImportedDecl(found, decl, getActiveSwiftVersion());
 
       return found;
     }
@@ -5461,7 +5459,7 @@ namespace {
       if (declaredNative)
         markMissingSwiftDecl(result);
 
-      Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
+      Impl.cacheImportedDecl(result, decl, getVersion());
 
       // Import protocols this protocol conforms to.
       SmallVector<TypeLoc, 4> inheritedTypes;
@@ -5498,7 +5496,7 @@ namespace {
                                                         SourceLoc(), None,
                                                         nullptr, dc,
                                                         /*isActor*/false);
-        Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
+        Impl.cacheImportedDecl(result, decl, getVersion());
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
         result->setHasMissingVTableEntries(false);
@@ -5604,7 +5602,7 @@ namespace {
         return nullptr;
       }
 
-      Impl.cacheImportedDecl(result, decl->getCanonicalDecl(), getVersion());
+      Impl.cacheImportedDecl(result, decl, getVersion());
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
@@ -6130,7 +6128,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
   
   // Record that this is the official version of this declaration.
-  Impl.cacheImportedDecl(alias, decl->getCanonicalDecl(), getVersion());
+  Impl.cacheImportedDecl(alias, decl, getVersion());
   markAsVariant(alias, correctSwiftName);
   return alias;
 }
@@ -6336,7 +6334,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                             storedUnderlyingType);
   }
 
-  Impl.cacheImportedDecl(structDecl, decl->getCanonicalDecl(), getVersion());
+  Impl.cacheImportedDecl(structDecl, decl, getVersion());
   return structDecl;
 }
 
@@ -6746,6 +6744,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   Impl.importAttributes(getter, swiftGetter);
+  assert(getter->isCanonicalDecl() && "getter not canonical?");
   Impl.cacheImportedDecl(swiftGetter, getter, getVersion());
   if (swift3GetterName)
     markAsVariant(swiftGetter, *swift3GetterName);
@@ -6760,6 +6759,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       return nullptr;
 
     Impl.importAttributes(setter, swiftSetter);
+    assert(setter->isCanonicalDecl() && "setter not canonical?");
     Impl.cacheImportedDecl(swiftSetter, setter, getVersion());
     if (swift3SetterName)
       markAsVariant(swiftSetter, *swift3SetterName);
@@ -9101,6 +9101,8 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
                                     Instance->getSourceManager(), "importing");
 
+  assert((UseCanonicalDecl || isa<clang::ObjCCategoryDecl>(ClangDecl)) &&
+         "should always UseCanonicalDecl for non-categories");
   auto Canon = cast<clang::NamedDecl>(UseCanonicalDecl? ClangDecl->getCanonicalDecl(): ClangDecl);
 
   if (auto Known = importDeclCached(Canon, version, UseCanonicalDecl)) {
