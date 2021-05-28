@@ -324,7 +324,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
 
   Mangle::ASTMangler mangler;
   std::string name = mangler.mangleReabstractionThunkHelper(
-      thunkType, fromInterfaceType, toInterfaceType, Type(),
+      thunkType, fromInterfaceType, toInterfaceType, Type(), Type(),
       module.getSwiftModule());
 
   auto *thunk = fb.getOrCreateSharedFunction(
