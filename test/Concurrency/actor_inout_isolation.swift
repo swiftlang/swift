@@ -208,7 +208,7 @@ struct MyGlobalActor {
 // expected-error@+3{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
 // expected-error@+2{{var 'number' isolated to global actor 'MyGlobalActor' can not be used 'inout' from a non-isolated context}}
 if #available(SwiftStdlib 5.5, *) {
-let _ = detach { await { (_ foo: inout Int) async in foo += 1 }(&number) }
+let _ = Task.detached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
 }
 
 // attempt to pass global state owned by the global actor to another async function
