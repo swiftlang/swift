@@ -1118,6 +1118,29 @@ func test_kp_as_function_mismatch() {
 
 }
 
+func test_partial_keypath_inference() {
+  // rdar://problem/34144827
+
+  struct S { var i: Int = 0 }
+  enum E { case A(pkp: PartialKeyPath<S>) }
+
+  _ = E.A(pkp: \.i) // Ok
+
+  // rdar://problem/36472188
+
+  class ThePath {
+    var isWinding:Bool?
+  }
+
+  func walk<T>(aPath: T, forKey: PartialKeyPath<T>) {}
+  func walkThePath(aPath: ThePath, forKey: PartialKeyPath<ThePath>) {}
+
+  func test(path: ThePath) {
+    walkThePath(aPath: path, forKey: \.isWinding) // Ok
+    walk(aPath: path, forKey: \.isWinding) // Ok
+  }
+}
+
 // SR-14499
 struct SR14499_A { }
 struct SR14499_B { }
