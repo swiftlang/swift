@@ -313,7 +313,7 @@ withError { res, err in
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNBOUND %s
 withError { res, err in
   print("before")
-  if res != nil && err == nil {
+  if ((res != (nil)) && err == nil) {
     print("got result \(res!)")
   } else {
     print("got error \(err!)")
