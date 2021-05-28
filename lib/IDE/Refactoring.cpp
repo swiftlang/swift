@@ -4449,6 +4449,7 @@ struct CallbackCondition {
   CallbackCondition(const BinaryExpr *BE, const FuncDecl *Operator) {
     bool FoundNil = false;
     for (auto *Operand : {BE->getLHS(), BE->getRHS()}) {
+      Operand = Operand->getSemanticsProvidingExpr();
       if (isa<NilLiteralExpr>(Operand)) {
         FoundNil = true;
       } else if (auto *DRE = dyn_cast<DeclRefExpr>(Operand)) {
@@ -4896,9 +4897,9 @@ private:
         Exprs.push_back(BoolExpr);
 
         while (!Exprs.empty()) {
-          auto *Next = Exprs.pop_back_val();
+          auto *Next = Exprs.pop_back_val()->getSemanticsProvidingExpr();
           if (auto *ACE = dyn_cast<AutoClosureExpr>(Next))
-            Next = ACE->getSingleExpressionBody();
+            Next = ACE->getSingleExpressionBody()->getSemanticsProvidingExpr();
 
           if (auto *BE = dyn_cast_or_null<BinaryExpr>(Next)) {
             auto *Operator = isOperator(BE);
