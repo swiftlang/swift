@@ -284,7 +284,7 @@ namespace swift {
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
-        !SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY;
+        !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?

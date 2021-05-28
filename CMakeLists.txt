@@ -414,8 +414,12 @@ option(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING
   "Enable experimental Swift differentiable programming features"
   FALSE)
 
+option(SWIFT_IMPLICIT_CONCURRENCY_IMPORT
+  "Implicitly import the Swift concurrency module"
+  TRUE)
+
 option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
-  "Enable experimental Swift concurrency model"
+  "Enable build of the Swift concurrency module"
   FALSE)
 
 option(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED
