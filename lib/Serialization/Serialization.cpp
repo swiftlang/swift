@@ -3913,6 +3913,9 @@ public:
     using namespace decls_block;
     verifyAttrSerializable(dtor);
 
+    if (S.allowCompilerErrors() && dtor->isInvalid())
+      return;
+
     auto contextID = S.addDeclContextRef(dtor->getDeclContext());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[DestructorLayout::Code];
