@@ -778,6 +778,9 @@ class BuildScriptInvocation(object):
         if args.dry_run:
             impl_args += ["--dry-run"]
 
+        if args.reconfigure:
+            impl_args += ["--reconfigure"]
+
         if args.clang_profile_instr_use:
             impl_args += [
                 "--clang-profile-instr-use=%s" %
