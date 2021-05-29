@@ -42,7 +42,7 @@ function(add_swift_unittest test_dirname)
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     # Add an @rpath to the swift library directory.
     set_target_properties(${test_dirname} PROPERTIES
-      BUILD_RPATH ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx)
+      BUILD_RPATH "${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx;${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
     # Force all the swift libraries to be found via rpath.
     add_custom_command(TARGET "${test_dirname}" POST_BUILD
       COMMAND "${SWIFT_SOURCE_DIR}/utils/swift-rpathize.py"
