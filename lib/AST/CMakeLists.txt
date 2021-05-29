@@ -74,6 +74,7 @@ add_swift_host_library(swiftAST STATIC
   RawComment.cpp
   RequirementEnvironment.cpp
   RequirementMachine/EquivalenceClassMap.cpp
+  RequirementMachine/GenericSignatureQueries.cpp
   RequirementMachine/ProtocolGraph.cpp
   RequirementMachine/RequirementMachine.cpp
   RequirementMachine/RewriteContext.cpp

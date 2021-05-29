@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-requirement-machine -debug-requirement-machine 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -requirement-machine=verify -debug-requirement-machine 2>&1 | %FileCheck %s
 
 protocol P1 {
   associatedtype T : P1

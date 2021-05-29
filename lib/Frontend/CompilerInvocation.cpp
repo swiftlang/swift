@@ -812,9 +812,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.EnableRequirementMachine = Args.hasFlag(
-      OPT_enable_requirement_machine,
-      OPT_disable_requirement_machine, /*default=*/false);
+  if (auto A =
+          Args.getLastArg(OPT_requirement_machine_EQ)) {
+    auto value = llvm::StringSwitch<Optional<RequirementMachineMode>>(A->getValue())
+      .Case("off", RequirementMachineMode::Disabled)
+      .Case("on", RequirementMachineMode::Enabled)
+      .Case("verify", RequirementMachineMode::Verify)
+      .Default(None);
+
+    if (value)
+      Opts.EnableRequirementMachine = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
 
   Opts.DebugRequirementMachine = Args.hasArg(
       OPT_debug_requirement_machine);

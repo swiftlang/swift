@@ -308,10 +308,15 @@ GenericSignatureImpl::getLocalRequirements(Type depType) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     auto typesEqual = [&](Type lhs, Type rhs) {
@@ -380,11 +385,9 @@ GenericSignatureImpl::getLocalRequirements(Type depType) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -437,11 +440,16 @@ bool GenericSignatureImpl::requiresClass(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    bool rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
-    bool gsbResult = computeViaGSB();
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
+    auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
       llvm::errs() << "RequirementMachine::requiresClass() is broken\n";
@@ -452,11 +460,9 @@ bool GenericSignatureImpl::requiresClass(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -487,10 +493,15 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     auto check = [&]() {
@@ -514,11 +525,9 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -557,10 +566,15 @@ GenericSignatureImpl::getRequiredProtocols(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
@@ -578,11 +592,9 @@ GenericSignatureImpl::getRequiredProtocols(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -615,11 +627,16 @@ bool GenericSignatureImpl::requiresProtocol(Type type,
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    bool rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
-    bool gsbResult = computeViaGSB();
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
+    auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
       llvm::errs() << "RequirementMachine::requiresProtocol() is broken\n";
@@ -632,11 +649,9 @@ bool GenericSignatureImpl::requiresProtocol(Type type,
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -661,11 +676,16 @@ bool GenericSignatureImpl::isConcreteType(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    bool rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
-    bool gsbResult = computeViaGSB();
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
+    auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
       llvm::errs() << "RequirementMachine::isConcreteType() is broken\n";
@@ -677,11 +697,9 @@ bool GenericSignatureImpl::isConcreteType(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -708,10 +726,15 @@ Type GenericSignatureImpl::getConcreteType(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     auto check = [&]() {
@@ -735,11 +758,9 @@ Type GenericSignatureImpl::getConcreteType(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -764,10 +785,15 @@ LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
@@ -780,11 +806,9 @@ LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -807,10 +831,15 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
@@ -824,11 +853,9 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -931,10 +958,15 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
@@ -947,11 +979,9 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -1002,10 +1032,15 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
@@ -1020,11 +1055,9 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -1050,10 +1083,15 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     auto compare = [&]() {
@@ -1095,11 +1133,9 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
@@ -1125,10 +1161,15 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
   };
 
   auto &ctx = getASTContext();
-  if (ctx.LangOpts.EnableRequirementMachine) {
-    auto rqmResult = computeViaRQM();
+  switch (ctx.LangOpts.EnableRequirementMachine) {
+  case RequirementMachineMode::Disabled:
+    return computeViaGSB();
 
-#ifndef NDEBUG
+  case RequirementMachineMode::Enabled:
+    return computeViaRQM();
+
+  case RequirementMachineMode::Verify: {
+    auto rqmResult = computeViaRQM();
     auto gsbResult = computeViaGSB();
 
     if (gsbResult != rqmResult) {
@@ -1150,11 +1191,9 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
       getRequirementMachine()->dump(llvm::errs());
       abort();
     }
-#endif
 
     return rqmResult;
-  } else {
-    return computeViaGSB();
+  }
   }
 }
 
