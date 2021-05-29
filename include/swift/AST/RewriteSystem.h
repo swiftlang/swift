@@ -192,6 +192,10 @@ public:
     deleted = true;
   }
 
+  unsigned getDepth() const {
+    return LHS.size();
+  }
+
   void dump(llvm::raw_ostream &out) const;
 };
 
@@ -212,7 +216,15 @@ public:
 
   bool simplify(Term &term) const;
 
-  void computeConfluentCompletion(unsigned maxIterations);
+  enum class CompletionResult {
+    Success,
+    MaxIterations,
+    MaxDepth
+  };
+
+  CompletionResult computeConfluentCompletion(
+      unsigned maxIterations,
+      unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
 };

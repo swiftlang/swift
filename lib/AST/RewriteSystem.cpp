@@ -246,8 +246,10 @@ bool RewriteSystem::simplify(Term &term) const {
   return changed;
 }
 
-void RewriteSystem::computeConfluentCompletion(
-    unsigned maxIterations) {
+RewriteSystem::CompletionResult
+RewriteSystem::computeConfluentCompletion(
+    unsigned maxIterations,
+    unsigned maxDepth) {
   SmallVector<std::pair<unsigned, unsigned>, 16> worklist;
 
   for (unsigned i : indices(Rules)) {
@@ -286,15 +288,14 @@ void RewriteSystem::computeConfluentCompletion(
     if (!addRule(first, second))
       continue;
 
-    if (maxIterations == 0) {
-      dump(llvm::errs());
-      llvm::errs() << "Completion procedure exceeded max iteration count\n";
-      abort();
-    }
+    if (maxIterations == 0)
+      return CompletionResult::MaxIterations;
 
     maxIterations--;
 
     const auto &newRule = Rules[i];
+    if (newRule.getDepth() > maxDepth)
+      return CompletionResult::MaxDepth;
 
     for (unsigned j : indices(Rules)) {
       if (i == j)
@@ -317,6 +318,8 @@ void RewriteSystem::computeConfluentCompletion(
         rule.markDeleted();
     }
   }
+
+  return CompletionResult::Success;
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {

@@ -338,6 +338,10 @@ RequirementMachine::~RequirementMachine() {
 void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
 
+  auto *Stats = Context.Stats;
+
+  FrontendStatsTracer(Stats, "build-rewrite-system");
+
   if (Context.LangOpts.DebugRequirementMachine) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
@@ -351,7 +355,24 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
     Impl->System.addRule(rule.first, rule.second);
 
   // FIXME: Add command line flag
-  Impl->System.computeConfluentCompletion(10000);
+  auto result = Impl->System.computeConfluentCompletion(5000, 10);
+
+  switch (result) {
+  case RewriteSystem::CompletionResult::Success:
+    break;
+
+  case RewriteSystem::CompletionResult::MaxIterations:
+    llvm::errs() << "Generic signature " << sig
+                 << " exceeds maximum completion step count\n";
+    break;
+    // abort();
+
+  case RewriteSystem::CompletionResult::MaxDepth:
+    llvm::errs() << "Generic signature " << sig
+                 << " exceeds maximum completion depth\n";
+    break;
+    // abort();
+  }
 
   markComplete();
 
