@@ -927,6 +927,11 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
   if (attr->isImplicit())
     return;
 
+  // @objc enums do not require -enable-objc-interop or Foundation be have been
+  // imported.
+  if (isa<EnumDecl>(decl))
+    return;
+
   auto &ctx = SF->getASTContext();
 
   if (!ctx.LangOpts.EnableObjCInterop) {
