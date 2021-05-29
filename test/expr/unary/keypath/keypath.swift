@@ -180,14 +180,10 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   var m = [\A.property, \A.[sub], \A.optProperty!]
   expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`
-  // expected-error@+2 {{key path value type 'Prop?' cannot be converted to contextual type 'Prop'}}
-  // expected-error@+1 {{key path value type 'A' cannot be converted to contextual type 'Prop'}}
+  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`, all this unifies into `[PartialKeyPath<A>]`
   var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
   expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
   let _: [PartialKeyPath<A>] = [\.property, \.optProperty, \.[sub], \.optProperty!]
 
   var o = [\A.property, \C<A>.value]
@@ -1120,6 +1116,29 @@ func test_kp_as_function_mismatch() {
   let _ : (String) ->  Bool = \String.filterOut // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
   _ = a.filter(\String.filterOut) // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
 
+}
+
+func test_partial_keypath_inference() {
+  // rdar://problem/34144827
+
+  struct S { var i: Int = 0 }
+  enum E { case A(pkp: PartialKeyPath<S>) }
+
+  _ = E.A(pkp: \.i) // Ok
+
+  // rdar://problem/36472188
+
+  class ThePath {
+    var isWinding:Bool?
+  }
+
+  func walk<T>(aPath: T, forKey: PartialKeyPath<T>) {}
+  func walkThePath(aPath: ThePath, forKey: PartialKeyPath<ThePath>) {}
+
+  func test(path: ThePath) {
+    walkThePath(aPath: path, forKey: \.isWinding) // Ok
+    walk(aPath: path, forKey: \.isWinding) // Ok
+  }
 }
 
 // SR-14499

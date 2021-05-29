@@ -114,7 +114,7 @@ CUSTOM_LOCATOR_PATH_ELT(KeyPathDynamicMember)
 SIMPLE_LOCATOR_PATH_ELT(KeyPathRoot)
 
 /// The type of the key path expression.
-SIMPLE_LOCATOR_PATH_ELT(KeyPathType)
+CUSTOM_LOCATOR_PATH_ELT(KeyPathType)
 
 /// The value of a key path.
 SIMPLE_LOCATOR_PATH_ELT(KeyPathValue)
