@@ -1992,6 +1992,8 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
 # define DECL(KIND, PARENT)\
 LLVM_ATTRIBUTE_UNUSED \
 static void verifyAttrSerializable(const KIND ## Decl *D) {\
+  if (D->Decl::getASTContext().LangOpts.AllowModuleWithCompilerErrors)\
+    return;\
   for (auto Attr : D->getAttrs()) {\
     assert(Attr->canAppearOnDecl(D) && "attribute cannot appear on a " #KIND);\
   }\
