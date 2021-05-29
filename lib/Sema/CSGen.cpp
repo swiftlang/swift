@@ -3258,10 +3258,11 @@ namespace {
       // The result is a KeyPath from the root to the end component.
       // The type of key path depends on the overloads chosen for the key
       // path components.
-      auto typeLoc =
-          CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+      auto typeLoc = CS.getConstraintLocator(
+          locator, LocatorPathElt::KeyPathType(rvalueBase));
+
       Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape |
-                                        TVO_CanBindToHole);
+                                                     TVO_CanBindToHole);
       CS.addKeyPathConstraint(kpTy, root, rvalueBase, componentTypeVars,
                               locator);
       return kpTy;

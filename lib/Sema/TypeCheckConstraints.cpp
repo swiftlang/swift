@@ -111,6 +111,10 @@ bool TypeVariableType::Implementation::isClosureResultType() const {
          locator->isLastElement<LocatorPathElt::ClosureResult>();
 }
 
+bool TypeVariableType::Implementation::isKeyPathType() const {
+  return locator && locator->isKeyPathType();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
