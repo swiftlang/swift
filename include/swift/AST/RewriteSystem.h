@@ -114,6 +114,10 @@ public:
     return (lhs.Proto == rhs.Proto &&
             lhs.Value == rhs.Value);
   }
+
+  friend bool operator!=(Atom lhs, Atom rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 class Term final {
@@ -196,16 +200,26 @@ public:
     return LHS.size();
   }
 
+  int compare(const Rule &other,
+              ProtocolOrder protocolOrder) const {
+    return LHS.compare(other.LHS, protocolOrder);
+  }
+
   void dump(llvm::raw_ostream &out) const;
 };
 
 class RewriteSystem final {
   std::vector<Rule> Rules;
   ProtocolOrder Order;
-  bool Debug = false;
+
+  unsigned DebugSimplify : 1;
+  unsigned DebugAdd : 1;
 
 public:
-  explicit RewriteSystem(ProtocolOrder order) : Order(order) {}
+  explicit RewriteSystem(ProtocolOrder order) : Order(order) {
+    DebugSimplify = false;
+    DebugAdd = false;
+  }
 
   RewriteSystem(const RewriteSystem &) = delete;
   RewriteSystem(RewriteSystem &&) = delete;

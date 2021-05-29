@@ -63,6 +63,7 @@ struct ProtocolInfo {
 struct ProtocolGraph {
   llvm::DenseMap<const ProtocolDecl *, ProtocolInfo> Info;
   std::vector<const ProtocolDecl *> Protocols;
+  bool Debug = false;
 
   void visitRequirements(ArrayRef<Requirement> reqs) {
     for (auto req : reqs) {
@@ -105,7 +106,7 @@ struct ProtocolGraph {
     std::sort(
         Protocols.begin(), Protocols.end(),
         [&](const ProtocolDecl *lhs,
-            const ProtocolDecl *rhs) -> int {
+            const ProtocolDecl *rhs) -> bool {
           const auto &lhsInfo = getProtocolInfo(lhs);
           const auto &rhsInfo = getProtocolInfo(rhs);
 
@@ -114,13 +115,22 @@ struct ProtocolGraph {
           //
           // Derived < Base in the linear order.
           if (lhsInfo.Depth != rhsInfo.Depth)
-            return lhsInfo.Depth - rhsInfo.Depth;
+            return lhsInfo.Depth > rhsInfo.Depth;
 
-          return TypeDecl::compare(lhs, rhs);
+          return TypeDecl::compare(lhs, rhs) < 0;
         });
 
     for (unsigned i : indices(Protocols)) {
       Info[Protocols[i]].Index = i;
+    }
+
+    if (Debug) {
+      for (const auto *proto : Protocols) {
+        const auto &info = getProtocolInfo(proto);
+        llvm::dbgs() << "@ Protocol " << proto->getName()
+                     << " Depth=" << info.Depth
+                     << " Index=" << info.Index << "\n";
+      }
     }
   }
 
@@ -197,6 +207,10 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   Protocols.computeInheritedAssociatedTypes();
 
   for (auto *proto : Protocols.Protocols) {
+    if (Context.LangOpts.DebugRequirementMachine) {
+      llvm::dbgs() << "protocol " << proto->getName() << " {\n";
+    }
+
     const auto &info = Protocols.getProtocolInfo(proto);
 
     for (auto *type : info.AssociatedTypes)
@@ -317,12 +331,10 @@ struct RequirementMachine::Implementation {
   Implementation()
       : Order([&](const ProtocolDecl *lhs,
                   const ProtocolDecl *rhs) -> int {
-          auto infoLHS = Protocols.Info.find(lhs);
-          assert(infoLHS != Protocols.Info.end());
-          auto infoRHS = Protocols.Info.find(rhs);
-          assert(infoRHS != Protocols.Info.end());
+          const auto &infoLHS = Protocols.getProtocolInfo(lhs);
+          const auto &infoRHS = Protocols.getProtocolInfo(rhs);
 
-          return infoRHS->second.Index - infoLHS->second.Index;
+          return infoLHS.Index - infoRHS.Index;
         }),
         System(Order) {}
 };
@@ -351,6 +363,11 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
   Impl->Protocols = builder.Protocols;
 
+  std::sort(builder.Rules.begin(), builder.Rules.end(),
+            [&](std::pair<Term, Term> lhs,
+                std::pair<Term, Term> rhs) -> int {
+              return lhs.first.compare(rhs.first, Impl->Order) < 0;
+            });
   for (const auto &rule : builder.Rules)
     Impl->System.addRule(rule.first, rule.second);
 
@@ -364,14 +381,14 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   case RewriteSystem::CompletionResult::MaxIterations:
     llvm::errs() << "Generic signature " << sig
                  << " exceeds maximum completion step count\n";
-    break;
-    // abort();
+    Impl->System.dump(llvm::errs());
+    abort();
 
   case RewriteSystem::CompletionResult::MaxDepth:
     llvm::errs() << "Generic signature " << sig
                  << " exceeds maximum completion depth\n";
-    break;
-    // abort();
+    Impl->System.dump(llvm::errs());
+    abort();
   }
 
   markComplete();

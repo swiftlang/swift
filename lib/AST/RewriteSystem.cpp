@@ -13,6 +13,7 @@
 #include "swift/AST/RewriteSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <deque>
 #include <vector>
 
 using namespace swift;
@@ -42,7 +43,7 @@ int Atom::compare(Atom other, ProtocolOrder protocolOrder) const {
 
   case Kind::GenericParam: {
     auto *param = getGenericParam();
-    auto *otherParam = getGenericParam();
+    auto *otherParam = other.getGenericParam();
 
     if (param->getDepth() != otherParam->getDepth())
       return param->getDepth() < otherParam->getDepth() ? -1 : 1;
@@ -90,8 +91,12 @@ int Term::compare(const Term &other, ProtocolOrder protocolOrder) const {
     auto rhs = other[i];
 
     int result = lhs.compare(rhs, protocolOrder);
-    if (result != 0)
+    if (result != 0) {
+      assert(lhs != rhs);
       return result;
+    }
+
+    assert(lhs == rhs);
   }
 
   return 0;
@@ -201,6 +206,15 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
   if (result < 0)
     std::swap(lhs, rhs);
 
+  assert(lhs.compare(rhs, Order) > 0);
+
+  if (DebugAdd) {
+    llvm::dbgs() << "# Adding rule ";
+    lhs.dump(llvm::dbgs());
+    llvm::dbgs() << " => ";
+    rhs.dump(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  }
   Rules.emplace_back(lhs, rhs);
 
   return true;
@@ -209,7 +223,7 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
 bool RewriteSystem::simplify(Term &term) const {
   bool changed = false;
 
-  if (Debug) {
+  if (DebugSimplify) {
     llvm::dbgs() << "= Term ";
     term.dump(llvm::dbgs());
     llvm::dbgs() << "\n";
@@ -221,14 +235,14 @@ bool RewriteSystem::simplify(Term &term) const {
       if (rule.isDeleted())
         continue;
 
-      if (Debug) {
+      if (DebugSimplify) {
         llvm::dbgs() << "== Rule ";
         rule.dump(llvm::dbgs());
         llvm::dbgs() << "\n";
       }
 
       if (rule.apply(term)) {
-        if (Debug) {
+        if (DebugSimplify) {
           llvm::dbgs() << "=== Result ";
           term.dump(llvm::dbgs());
           llvm::dbgs() << "\n";
@@ -250,7 +264,7 @@ RewriteSystem::CompletionResult
 RewriteSystem::computeConfluentCompletion(
     unsigned maxIterations,
     unsigned maxDepth) {
-  SmallVector<std::pair<unsigned, unsigned>, 16> worklist;
+  std::deque<std::pair<unsigned, unsigned>> worklist;
 
   for (unsigned i : indices(Rules)) {
     for (unsigned j : indices(Rules)) {
@@ -262,8 +276,8 @@ RewriteSystem::computeConfluentCompletion(
   }
 
   while (!worklist.empty()) {
-    auto pair = worklist.back();
-    worklist.pop_back();
+    auto pair = worklist.front();
+    worklist.pop_front();
 
     Term first;
 
