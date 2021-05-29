@@ -352,7 +352,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
   auto *Stats = Context.Stats;
 
-  FrontendStatsTracer(Stats, "build-rewrite-system");
+  FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 
   if (Context.LangOpts.DebugRequirementMachine) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
