@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: rdar78638858
 
 // https://bugs.swift.org/browse/SR-14333
 // UNSUPPORTED: OS=windows-msvc
