@@ -372,7 +372,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
     Impl->System.addRule(rule.first, rule.second);
 
   // FIXME: Add command line flag
-  auto result = Impl->System.computeConfluentCompletion(5000, 10);
+  auto result = Impl->System.computeConfluentCompletion(1000, 10);
 
   switch (result) {
   case RewriteSystem::CompletionResult::Success:
