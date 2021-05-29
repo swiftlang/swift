@@ -4505,6 +4505,9 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             skipAttr = true;
           } else
             return deserialized.takeError();
+        } else if (!deserialized.get() && MF.allowCompilerErrors()) {
+          // Serialized an invalid attribute, just skip it when allowing errors
+          skipAttr = true;
         } else {
           auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
           auto custom = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
