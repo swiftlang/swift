@@ -154,6 +154,7 @@ void SILInstruction::dropNonOperandReferences() {
       succ = nullptr;
     }
   }
+
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(this)) {

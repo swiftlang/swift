@@ -85,8 +85,10 @@ class InstModCallbacks {
   /// immediately remove all references to the instruction, including the parent
   /// block list.
   ///
-  /// TODO: When zombie instructions are implemented at the module level, we
-  /// should move the eraseFromParent() functionality out of the callback.
+  /// TODO: Now that instructions deletion can be delayed via
+  /// SILModule::scheduleForDeletion(); there's no longer a good use case for
+  /// calling eraseFromParent() within this callback. Rewrite all clients
+  /// without doing the instruction deletion within the callback.
   std::function<void(SILInstruction *instToDelete)> deleteInstFunc;
 
   /// If non-null, called before a salient instruction is deleted or has its
@@ -385,8 +387,13 @@ bool tryCheckedCastBrJumpThreading(
 
 /// A utility for deleting one or more instructions belonging to a function, and
 /// cleaning up any dead code resulting from deleting those instructions. Use
-/// this utility instead of
-/// \c recursivelyDeleteTriviallyDeadInstruction.
+/// this utility instead of \p recursivelyDeleteTriviallyDeadInstruction
+/// as follows:
+///   InstructionDeleter deleter;
+///   deleter.deleteIfDead(instruction);
+///   deleter.cleanupDeadInstructions();
+///
+///
 ///
 /// This is designed to be used with a single 'onDelete' callback, which is
 /// invoked consistently just before deleting each instruction. It's usually
@@ -446,28 +453,27 @@ public:
   /// Calls callbacks.notifyWillBeDeleted().
   bool trackIfDead(SILInstruction *inst);
 
-  /// Force track this instruction as dead. Used to enable the deletion of a
-  /// bunch of instructions at the same time.
+  /// Track this instruction as dead even if it has side effects. Used to enable
+  /// the deletion of a bunch of instructions at the same time.
   ///
   /// Calls callbacks.notifyWillBeDeleted().
   void forceTrackAsDead(SILInstruction *inst);
 
   /// If the instruction \p inst is dead, delete it immediately along with its
-  /// destroys and scope-ending uses, and record its operands so that they can
-  /// be cleaned up later.
+  /// destroys and scope-ending uses. If any operand definitions will become
+  /// dead after deleting this instruction, track them so they can be deleted
+  /// later during cleanUpDeadInstructions().
   ///
   /// Calls callbacks.notifyWillBeDeleted().
   bool deleteIfDead(SILInstruction *inst);
 
-  /// Delete the instruction \p inst and record instructions that may become
-  /// dead because of the removal of \c inst. This function will add necessary
-  /// ownership instructions to fix the lifetimes of the operands of \c inst to
-  /// compensate for its deletion. This function will not clean up dead code
-  /// resulting from the instruction's removal. To do so, invoke the method \c
-  /// cleanupDeadCode of this instance, once the SIL of the contaning function
-  /// is made consistent.
+  /// Delete the instruction \p inst, ignoring its side effects. If any operand
+  /// definitions will become dead after deleting this instruction, track them
+  /// so they can be deleted later during cleanUpDeadInstructions(). This
+  /// function will add necessary ownership instructions to fix the lifetimes of
+  /// the operands of \p inst to compensate for its deletion.
   ///
-  /// \pre the function containing \c inst must be using ownership SIL.
+  /// \pre the function containing \p inst must be using ownership SIL.
   /// \pre the instruction to be deleted must not have any use other than
   /// incidental uses.
   ///
