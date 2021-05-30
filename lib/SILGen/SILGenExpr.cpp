@@ -5685,7 +5685,7 @@ RValue SILGenFunction::emitPlusZeroRValue(Expr *E) {
 }
 
 // Evaluate the expression as an lvalue or rvalue, discarding the result.
-void SILGenFunction::emitIgnoredExpr(Expr *E) {
+void SILGenFunction::emitIgnoredExpr(Expr *E, bool isAssignment) {
   // If this is a tuple expression, recursively ignore its elements.
   // This may let us recursively avoid work.
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
@@ -5714,7 +5714,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 
     // If loading from the lvalue is guaranteed to have no side effects, we
     // don't need to drill into it.
-    if (lv.isLoadingPure())
+    if (lv.isLoadingPure() && !isAssignment)
       return;
 
     // If the last component is physical, then we just need to drill through

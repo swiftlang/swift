@@ -381,7 +381,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       if (isa<ThrowStmt>(S))
         StmtType = ThrowStmtType;
     } else if (auto *E = ESD.dyn_cast<Expr*>()) {
-      SGF.emitIgnoredExpr(E);
+      SGF.emitIgnoredExpr(E, true);
     } else {
       auto *D = ESD.get<Decl*>();
 
