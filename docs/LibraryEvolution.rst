@@ -147,7 +147,7 @@ The following changes are permitted:
 - Adding a default argument expression to a parameter.
 - Adding, changing, reordering, or removing property wrappers that either are 
   implementation-detail or in a composition where the outermost wrapper is
-  implementation-detail (``@ImplementationDetail @MyWrapper``).
+  implementation-detail.
 - Changing or removing a default argument is a `binary-compatible source-breaking change`.
 - Adding or removing the ``@discardableResult`` and ``@warn_unqualified_access``
   attributes.
@@ -156,8 +156,8 @@ No other changes are permitted; the following are particularly of note:
 
 - An ABI-public function may not change its parameters or return type.
 - An ABI-public function may not, in any way, change API-level property 
-  wrappers (``@API``) or compositions where the outermost wrapper is 
-  API-level (``@API @MyWrapper``).
+  wrappers or compositions where the outermost wrapper is 
+  API-level.
 - An ABI-public function may not change an API-level property-wrapper attribute
   to an implementation-detail one and vice versa, if it is the only wrapper
   applied to a given parameter or the outermost wrapper in a composition.
@@ -423,7 +423,7 @@ stored subscripts. This means that the following changes are permitted:
 - Adding a default argument expression to an index parameter.
 - Adding, changing, reordering, or removing property wrappers that either are 
   implementation-detail or in a composition where the outermost wrapper is
-  implementation-detail (``@ImplementationDetail @MyWrapper``).
+  implementation-detail.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
 
@@ -791,7 +791,7 @@ counterparts with a few small changes:
   is permitted.
 - Adding, changing, reordering, or removing property wrappers that either are 
   implementation-detail or in a composition where the outermost wrapper is
-  implementation-detail (``@ImplementationDetail @MyWrapper``).
+  implementation-detail.
 - Adding a default argument expression to an index parameter is permitted.
 - Changing or removing a default argument is a `binary-compatible
   source-breaking change`.
