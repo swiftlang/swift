@@ -589,3 +589,20 @@ class SR14120 {
     }
   }
 }
+
+// SR-14678
+func call<T>(_ : Int, _ f: () -> (T, Int)) -> (T, Int) {
+  f()
+}
+
+func testSR14678() -> (Int, Int) {
+  call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
+     (print("hello"), 0)
+  }
+}
+
+func testSR14678_Optional() -> (Int, Int)? {
+  call(1) { // expected-error {{cannot convert return expression of type '((), Int)' to return type '(Int, Int)'}}
+     (print("hello"), 0)
+  }
+}

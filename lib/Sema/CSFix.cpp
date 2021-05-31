@@ -403,9 +403,21 @@ getStructuralTypeContext(const Solution &solution, ConstraintLocator *locator) {
     return std::make_tuple(contextualTypeElt->getPurpose(), exprType,
                            contextualType);
   } else if (auto argApplyInfo = solution.getFunctionArgApplyInfo(locator)) {
-    return std::make_tuple(CTP_CallArgument,
-                           argApplyInfo->getArgType(),
-                           argApplyInfo->getParamType());
+    Type fromType = argApplyInfo->getArgType();
+    Type toType = argApplyInfo->getParamType();
+    // In case locator points to the function result we want the
+    // argument and param function types result.
+    if (locator->isLastElement<LocatorPathElt::FunctionResult>()) {
+      auto fromFnType = fromType->getAs<FunctionType>();
+      auto toFnType = toType->getAs<FunctionType>();
+      if (fromFnType && toFnType) {
+        auto &cs = solution.getConstraintSystem();
+        return std::make_tuple(
+            cs.getContextualTypePurpose(locator->getAnchor()),
+            fromFnType->getResult(), toFnType->getResult());
+      }
+    }
+    return std::make_tuple(CTP_CallArgument, fromType, toType);
   } else if (auto *coerceExpr = getAsExpr<CoerceExpr>(locator->getAnchor())) {
     return std::make_tuple(CTP_CoerceOperand,
                            solution.getType(coerceExpr->getSubExpr()),
