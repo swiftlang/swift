@@ -90,45 +90,112 @@ WARNING(import_multiple_mainactor_attr,none,
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
 
 REMARK(imported_clang_decl_as,none,
-       "%0%select{| %1}1 imported as "
-       "%select{|unavailable }2%3 '%4'",
-       (StringRef, const clang::NamedDecl *, bool, DescriptiveDeclKind,
-        StringRef))
-REMARK(also_imported_clang_decl_as,none,
-       "%0%select{| %1}1 also imported as "
-       "%select{|unavailable }2%3 '%4",
-       (StringRef, const clang::NamedDecl *, bool, DescriptiveDeclKind,
-        StringRef))
+       "%0%select{| %1}1"
+       "%select{| also}2 imported as %select{|unavailable }3"
+       "%4%select{| %5}5",
+       (/*clangDescriptiveKind=*/StringRef, const clang::NamedDecl *,
+        /*isAlternative=*/bool, /*isUnavailable=*/bool,
+        DescriptiveDeclKind, ValueDecl *))
+REMARK(imported_clang_decl_as_accessor,none,
+       "%0%select{| %1}1"
+       "%select{| also}2 imported as %select{|unavailable }3"
+       "%4 for %5 %6",
+       (/*clangDescriptiveKind=*/StringRef, const clang::NamedDecl *,
+        /*isAlternative=*/bool, /*isUnavailable=*/bool,
+        DescriptiveDeclKind, DescriptiveDeclKind, ValueDecl *))
+REMARK(imported_clang_decl_as_extension,none,
+       "%0%select{| %1}1"
+       "%select{| also}2 imported as %select{|unavailable }3"
+       "extension of %4",
+       (/*clangDescriptiveKind=*/StringRef, const clang::NamedDecl *,
+        /*isAlternative=*/bool, /*isUnavailable=*/bool,
+        Type))
+       
 REMARK(did_not_import_clang_decl,none,
        "could not import %0%select{| %1}1",
        (StringRef, const clang::NamedDecl *))
-REMARK(did_not_import_clang_decl_because,none,
-       "could not import %0%select{| %1}1: %select{%error|%error|"
-       "Swift cannot import forward declarations|"
-       "Swift cannot import instance variables|"
-       "the declaration it belongs to cannot be imported|"
-       "it uses a type that can't be imported|"
-       "Swift can't import an '-init' method as an accessor|"
-       "its name can't be imported; it may have an invalid Swift name "
-           "attribute|"
-       "methods with the name 'print()' in older language versions are not "
-           "imported|"
-       "could not find the property corresponding to this accessor|"
-       "the method is marked as an accessor, but a matching property wasn't "
-            "found|"
-       "the parameter list could not be imported|"
-       "the raw type could not be imported|"
-       "property is being redeclared in a potentially invalid way|"
-       "overriding a method with a property is not valid in Swift|"
-       "property will not be imported, but its accessors will be imported as "
-           "methods|"
-       "Swift cannot import '@implementation' blocks|"
-       "its Objective-C generic signature could not be imported|"
-       "the 'NSObject' type could not be found|"
-       "the class being extended could not be imported|"
-       "a different initializer with the same Swift name is being imported "
-           "instead}2",
-       (StringRef, const clang::NamedDecl *, uint8_t))
+
+NOTE(note_cannot_import_forward_declaration,none,
+     "found only forward declarations of %0 %1; incomplete types cannot be "
+     "imported into Swift",
+     (StringRef, const clang::NamedDecl *))
+NOTE(note_cannot_import_objc_ivars,none,
+     "use a property to access this instance variable",
+     ())
+NOTE(note_cannot_import_context,none,
+     "its context could not be imported",                       // FIXME improve
+     ())
+NOTE(note_cannot_import_type,none,
+     "type could not be imported",                              // FIXME improve
+     ())
+NOTE(note_cannot_import_name,none,
+     "could not import Swift name",                             // FIXME improve
+     ())
+NOTE(note_cannot_import_parameter_list,none,
+     "its parameter list could not be imported",                // FIXME improve
+     ())
+NOTE(note_cannot_import_init_as_accessor,none,
+     "methods starting with '-init' cannot be imported as accessors because "
+     "they have special memory management behavior",
+     ())
+NOTE(note_cannot_import_method_named_print_into_old_version,none,
+     "methods with the name 'print' are not imported in inactive language "
+     "versions to avoid conflicting with the 'print()' function",
+     ())
+NOTE(note_cannot_import_clang_ast_inconsistent,none,
+     "clang AST is in an inconsistent state; please file a compiler bug report "
+     "with your code and this message: '%0'",
+     (StringRef))
+NOTE(note_cannot_import_not_an_accessor,none,
+     "%0 %1 cannot be imported as an accessor because it doesn't belong to a "
+     "property in Objective-C",
+     (StringRef, const clang::NamedDecl *))
+NOTE(note_cannot_import_raw_type,none,
+     "its raw value type could not be imported",
+     ())
+NOTE(note_cannot_import_property_redeclaration_merged,none,
+     "its attributes have been merged with previous declaration imported as "
+     "%0 %1",
+     (DescriptiveDeclKind, ValueDecl *))
+NOTE(note_cannot_import_property_redeclaration,none,
+     "it is declared elsewhere with different accessors",
+     ())
+NOTE(note_cannot_import_property_overriding_method,none,
+     "property overrides %0 %1; this is valid in Objective-C, but not in Swift",
+     (StringRef, const clang::NamedDecl *))
+NOTE(note_cannot_import_property_broken_up,none,
+     "the maintainer of %0 %1 has chosen to import this property's accessors "
+     "as methods instead",
+     (StringRef, const clang::NamedDecl *))
+NOTE(note_cannot_import_at_implementation,none,
+     "header files should not include '@implementation' declarations",
+     ())
+NOTE(note_cannot_import_generic_signature,none,
+     "its Objective-C generic signature could not be imported",
+     ())
+NOTE(note_cannot_import_known_type_not_found,none,
+     "importing this %0 requires the type '%1', but it could not be found",
+     (StringRef, StringRef))
+NOTE(note_cannot_import_class_of_category,none,
+     "the class it extends could not be imported",
+     ())
+NOTE(note_cannot_import_property_accessor,none,
+     "its %select{getter|setter}0 could not be imported",
+     (bool))
+NOTE(note_cannot_import_see_other_decl,none,
+     "%0 %1 may have remarks describing why it could not be imported",
+     (StringRef, const clang::NamedDecl *))
+NOTE(note_cannot_import_is_worse_than_named_alternative,none,
+     "a better candidate, %0 %1, is already being imported with the name %2 "
+     "and the same signature",
+     (StringRef, const clang::NamedDecl *, ValueDecl *))
+NOTE(note_cannot_import_is_worse_than_alternative,none,
+     "a better candidate is already being imported with the name %2 and the "
+     "same signature",
+     (ValueDecl *))
+NOTE(note_cannot_import_alias_for_unavailable_case,none,
+     "cannot import alias %0 for %1 %2 because it is unavailable",
+     (Identifier, DescriptiveDeclKind, ValueDecl *))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
