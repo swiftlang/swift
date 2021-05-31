@@ -215,6 +215,15 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
     }
     return true;
   }
+  case SILInstructionKind::YieldInst: {
+    auto *yield = cast<YieldInst>(user);
+    auto convention = yield->getArgumentConventionForOperand(*addressUse);
+    if (!convention.isGuaranteedConvention())
+      return false;
+
+    loadInsts.insert(user);
+    return true;
+  }
   case SILInstructionKind::OpenExistentialAddrInst: {
     // We only support open existential addr if the access is immutable.
     auto *oeai = cast<OpenExistentialAddrInst>(user);
@@ -331,8 +340,10 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
     if (numLoadsFound == useInsts.size()) {
       // Function calls are an exception: in a called function a potential
       // modification of copySrc could occur _before_ the read of the temporary.
-      if (FullApplySite::isa(inst) && aa->mayWriteToMemory(inst, copySrc))
+      if ((FullApplySite::isa(inst) || isa<YieldInst>(inst)) &&
+          aa->mayWriteToMemory(inst, copySrc)) {
         return nullptr;
+      }
 
       return inst;
     }
