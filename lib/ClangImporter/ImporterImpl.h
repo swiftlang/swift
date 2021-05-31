@@ -396,6 +396,11 @@ public:
   /// Generate and emit the diagnostics. Only ClangImporter::Implementation
   /// should call this method.
   void diagnose(ClangImporter::Implementation &impl);
+
+  SWIFT_DEBUG_DUMP {
+    dump(llvm::errs());
+  }
+  SWIFT_DEBUG_DUMPER(dump(llvm::raw_ostream &os));
 };
 
 /// Implementation of the Clang importer.
@@ -1812,6 +1817,8 @@ public:
   void alreadyDecided() {
     remark.setShouldEmit(false);
   }
+
+  SWIFT_DEBUG_DUMP;
 };
 
 namespace importer {

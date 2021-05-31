@@ -102,6 +102,20 @@ public:
     return result;
   }
 
+  void dump(llvm::raw_ostream &os) const {
+    if (*this == ImportNameVersion::raw()) {
+      os << "raw";
+      return;
+    }
+
+    os << asClangVersionTuple()
+       << (supportsConcurrency() ? " (concurrency)" : "");
+  }
+
+  SWIFT_DEBUG_DUMP {
+    dump(llvm::errs());
+  }
+
   bool operator==(ImportNameVersion other) const {
     return rawValue == other.rawValue && concurrency == other.concurrency;
   }

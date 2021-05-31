@@ -4373,6 +4373,76 @@ void ClangImporter::emitImportRemarks() {
   Impl.emitImportRemarks();
 }
 
+void swift::ImportDecision::dump() const {
+  llvm::errs() << "ImportDecision kind: ";
+  switch (kind) {
+  case ImportDecision::Kind::Normal:
+    llvm::errs() << "Normal";
+    break;
+  case ImportDecision::Kind::Inherited:
+    llvm::errs() << "Inherited";
+    break;
+  case ImportDecision::Kind::Mirrored:
+    llvm::errs() << "Mirrored";
+    break;
+  }
+  llvm::errs() << "\n";
+
+  llvm::errs() << "clangDecl: " << getClangDecl() << "\n";
+  if (getClangDecl()) getClangDecl()->dump(llvm::errs());
+
+  llvm::errs() << "remark: --";
+  remark.dump(llvm::errs());
+}
+
+void swift::ImportRemark::dump(llvm::raw_ostream &os) const {
+  switch (getOutcome()) {
+  case ImportRemark::Outcome::Imported:
+    os << "Imported";
+    break;
+  case ImportRemark::Outcome::NotImported:
+    os << "NotImported";
+    break;
+  }
+
+  if (!getShouldEmit())
+    os << " (should not emit)";
+
+  os << "\nversion: ";
+  version.dump(os);
+
+  os << "\nclangDecl: " << clangDecl << "\n";
+  clangDecl->dump(os);
+
+  os << "\nswiftDecl: " << getSwiftDecl() << "\n";
+  getSwiftDecl()->dump(os);
+
+  os << "\nalternateSwiftDecls: " << alternateSwiftDecls.size() << "\n";
+  for (auto altDecl : alternateSwiftDecls) {
+    os << "- " << altDecl << "\n";
+    altDecl->dump(os);
+  }
+
+  os << "\nnotes: " << notes.size();
+  for (auto &note : notes) {
+    os << "\n- conditions: {";
+    if (note.conditions.contains(Outcome::Imported))
+      os << "Imported ";
+    if (note.conditions.contains(Outcome::NotImported))
+      os << "NotImported";
+
+    os << "}\n  diagnostic: "
+       << DiagnosticEngine::diagnosticIDStringFor(note.diagnostic.getID());
+
+    os << "\n  location: ";
+    if (note.location)
+      note.location->print(os, clangDecl->getASTContext().getSourceManager());
+    else
+      os << "(none)";
+  }
+  os << "\n";
+}
+
 StringRef swift::importer::getClangDescriptiveKind(const clang::Decl *D) {
   switch (D->getKind()) {
   case clang::Decl::Kind::Record:
