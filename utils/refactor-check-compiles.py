@@ -85,23 +85,13 @@ def main():
         extra_refactor_args.append('-enable-experimental-concurrency')
         extra_frontend_args.append('-enable-experimental-concurrency')
 
-    # FIXME: `refactor-check-compiles` should generate both `-dump-text` and
-    # `dump-rewritten` from a single `swift-refactor` invocation (SR-14587).
     dump_text_output = run_cmd([
         args.swift_refactor,
         '-dump-text',
         '-source-filename', args.source_filename,
+        '-rewritten-output-file', temp_file_path,
         '-pos', args.pos
     ] + extra_refactor_args, desc='producing edit').decode("utf-8")
-
-    dump_rewritten_output = run_cmd([
-        args.swift_refactor,
-        '-dump-rewritten',
-        '-source-filename', args.source_filename,
-        '-pos', args.pos
-    ] + extra_refactor_args, desc='producing rewritten file')
-    with open(temp_file_path, 'wb') as f:
-        f.write(dump_rewritten_output)
 
     run_cmd([
         args.swift_frontend,

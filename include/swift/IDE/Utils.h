@@ -544,6 +544,17 @@ public:
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
 
+class DuplicatingSourceEditConsumer : public SourceEditConsumer {
+  SourceEditConsumer *ConsumerA;
+  SourceEditConsumer *ConsumerB;
+
+public:
+  DuplicatingSourceEditConsumer(SourceEditConsumer *ConsumerA,
+                                SourceEditConsumer *ConsumerB);
+  void accept(SourceManager &SM, RegionType RegionType,
+              ArrayRef<Replacement> Replacements) override;
+};
+
 enum class LabelRangeEndAt: int8_t {
   BeforeElemStart,
   LabelNameOnly,
