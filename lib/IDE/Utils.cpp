@@ -1116,6 +1116,17 @@ accept(SourceManager &SM, RegionType RegionType,
   }
 }
 
+swift::ide::DuplicatingSourceEditConsumer::DuplicatingSourceEditConsumer(
+    SourceEditConsumer *ConsumerA, SourceEditConsumer *ConsumerB)
+    : ConsumerA(ConsumerA), ConsumerB(ConsumerB) {}
+
+void swift::ide::DuplicatingSourceEditConsumer::accept(
+    SourceManager &SM, RegionType RegionType,
+    ArrayRef<Replacement> Replacements) {
+  ConsumerA->accept(SM, RegionType, Replacements);
+  ConsumerB->accept(SM, RegionType, Replacements);
+}
+
 bool swift::ide::isFromClang(const Decl *D) {
   if (getEffectiveClangNode(D))
     return true;
