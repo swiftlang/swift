@@ -4845,7 +4845,8 @@ namespace {
     /// (where the handler may have an NSError argument).
     Decl *importObjCMethodAsEffectfulProp(const clang::ObjCMethodDecl *decl,
                                          DeclContext *dc,
-                                         ImportedName name) {
+                                         ImportedName name,
+                                         ImportDecision &decision) {
       assert(name.getAsyncInfo() && "expected to be for an effectful prop!");
 
       if (name.getAccessorKind() != ImportedAccessorKind::PropertyGetter) {
@@ -4853,12 +4854,16 @@ namespace {
          // NOTE: to handle setters, we would need to search for an existing
          // VarDecl corresponding to the one we might have already created
          // for the 'get' accessor, and tack this accessor onto it.
+        decision.note(None, diag::note_cannot_import_effectful_accessor_kind,
+                      (unsigned)name.getAccessorKind());
          return nullptr;
       }
 
       auto importedType = Impl.importEffectfulPropertyType(decl, dc, name,
-                                                  isInSystemModule(dc));
+                                                           isInSystemModule(dc),
+                                                           decision);
       if (!importedType)
+        // problem noted by importEffectfulPropertyType().
         return nullptr;
 
       auto type = importedType.getType();
@@ -4873,13 +4878,11 @@ namespace {
 
       ////
       // Build the getter
-      AccessorInfo info{propDecl, AccessorKind::Get};
-      auto *getter = cast_or_null<AccessorDecl>(
-                      importObjCMethodDecl(decl, dc, info));
+      auto *getter = importAccessor(decl, propDecl, AccessorKind::Get, dc,
+                                    getVersion());
       if (!getter)
+        // problem noted by importAccessor()
         return nullptr;
-
-      Impl.importAttributes(decl, getter);
 
       ////
       // Combine the getter and the VarDecl into a computed property.
@@ -4906,6 +4909,8 @@ namespace {
 
       if (getter->getParameters()->size() != 0) {
         assert(false && "this should not happen!");
+        decision.note(None, diag::note_cannot_import_async_getter_with_params,
+                      /*isVarargs=*/false);
         return nullptr;
       }
 
@@ -5317,7 +5322,18 @@ namespace {
     AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
                                  AbstractStorageDecl *storage,
                                  AccessorKind accessorKind,
-                                 DeclContext *dc);
+                                 DeclContext *dc) {
+      return importAccessor(clangAccessor, storage, accessorKind, dc,
+                            getActiveSwiftVersion());
+    }
+
+    // FIXME: Should be static, as it uses a separate decision.
+    /// Import the accessor and its attributes.
+    AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
+                                 AbstractStorageDecl *storage,
+                                 AccessorKind accessorKind,
+                                 DeclContext *dc,
+                                 ImportNameVersion version);
 
     /// Recursively add the given protocol and its inherited protocols to the
     /// given vector, guarded by the known set of protocols.
@@ -7948,9 +7964,10 @@ AccessorDecl *
 SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
                                    AbstractStorageDecl *storage,
                                    AccessorKind accessorKind,
-                                   DeclContext *dc) {
-  ImportDecision accessorDecision(Impl, clangAccessor, getActiveSwiftVersion());
-  SwiftDeclConverter converter(Impl, getActiveSwiftVersion(), accessorDecision);
+                                   DeclContext *dc,
+                                   ImportNameVersion version) {
+  ImportDecision accessorDecision(Impl, clangAccessor, version);
+  SwiftDeclConverter converter(Impl, version, accessorDecision);
   auto *accessor = cast_or_null<AccessorDecl>(
     converter.importObjCMethodDecl(clangAccessor, dc,
                                    AccessorInfo{storage, accessorKind},

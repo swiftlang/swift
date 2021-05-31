@@ -1316,9 +1316,10 @@ public:
   /// Determines what the type of an effectful, computed read-only property
   /// would be, if the given method were imported as such a property.
   ImportedType importEffectfulPropertyType(const clang::ObjCMethodDecl *decl,
-                                            DeclContext *dc,
-                                            importer::ImportedName name,
-                                            bool isFromSystemModule);
+                                           DeclContext *dc,
+                                           importer::ImportedName name,
+                                           bool isFromSystemModule,
+                                           ImportDecision &decision);
 
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.

@@ -203,6 +203,21 @@ NOTE(note_cannot_import_subscript_setter_type_mismatch,none,
      (/*setterInfo=*/StringRef, const clang::NamedDecl *, Type,
       /*getterInfo=*/StringRef, const clang::NamedDecl *, Type,
       /*isParamType=*/bool))
+NOTE(note_cannot_import_sync_method_as_async_getter,none,
+     "could not import method as an async getter because it is synchronous",
+     ())
+NOTE(note_cannot_import_async_getter_with_params,none,
+     "could not import method as an async getter because it has "
+     "%select{|variadic }0parameters",
+     (/*isVariadic=*/bool))
+NOTE(note_cannot_import_async_getter_wrong_effects,none,
+     "could not import method as an async getter because it is "
+     "%select{synchronous|async}0 and %select{does not throw|throws}1",
+     (/*isAsync=*/bool, /*isThrowing=*/bool))
+NOTE(note_cannot_import_effectful_accessor_kind,none,
+     "could not import %select{ordinary method|%error|property setter|"
+     "subscript getter|subscript setter}0 as an async property getter",
+     (unsigned))
 
 NOTE(note_imported_from_swift_part,none,
      "replaced by definition for %0 %1 from the Swift %select{part of|overlay "
