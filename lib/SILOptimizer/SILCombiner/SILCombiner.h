@@ -95,9 +95,6 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
-  /// Centralized InstModCallback that we use for certain utility methods.
-  InstModCallbacks instModCallbacks;
-
   /// Dead end blocks cache. SILCombine is already not allowed to mess with CFG
   /// edges so it is safe to use this here.
   DeadEndBlocks deBlocks;
@@ -112,7 +109,28 @@ public:
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails)
       : parentTransform(parentTransform), AA(AA), DA(DA), PCA(PCA), CHA(CHA),
-        NLABA(NLABA), Worklist("SC"), deadEndBlocks(&B.getFunction()),
+        NLABA(NLABA), Worklist("SC"),
+        deleter(InstModCallbacks()
+                .onDelete([&](SILInstruction *instToDelete) {
+                  // We allow for users in SILCombine to perform 2 stage
+                  // deletion, so we need to split the erasing of instructions
+                  // from adding operands to the worklist.
+                  eraseInstFromFunction(*instToDelete,
+                                        false /* don't add operands */);
+                })
+                .onNotifyWillBeDeleted(
+                  [&](SILInstruction *instThatWillBeDeleted) {
+                          Worklist.addOperandsToWorklist(
+                            *instThatWillBeDeleted);
+                  })
+                .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
+                  Worklist.add(newlyCreatedInst);
+                })
+                .onSetUseValue([&](Operand *use, SILValue newValue) {
+                  use->set(newValue);
+                  Worklist.add(use->getUser());
+                })),
+        deadEndBlocks(&B.getFunction()),
         MadeChange(false), RemoveCondFails(removeCondFails), Iteration(0),
         Builder(B), CastOpt(
                         FuncBuilder, nullptr /*SILBuilderContext*/,
@@ -126,29 +144,8 @@ public:
                         },
                         /* EraseAction */
                         [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
-        instModCallbacks(), deBlocks(&B.getFunction()),
-        ownershipFixupContext(instModCallbacks, deBlocks) {
-    instModCallbacks =
-        InstModCallbacks()
-            .onDelete([&](SILInstruction *instToDelete) {
-              // We allow for users in SILCombine to perform 2 stage deletion,
-              // so we need to split the erasing of instructions from adding
-              // operands to the worklist.
-              eraseInstFromFunction(
-                  *instToDelete, false /*do not add operands to the worklist*/);
-            })
-            .onNotifyWillBeDeleted([&](SILInstruction *instThatWillBeDeleted) {
-              Worklist.addOperandsToWorklist(*instThatWillBeDeleted);
-            })
-            .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
-              Worklist.add(newlyCreatedInst);
-            })
-            .onSetUseValue([&](Operand *use, SILValue newValue) {
-              use->set(newValue);
-              Worklist.add(use->getUser());
-            });
-    deleter = InstructionDeleter(instModCallbacks);
-  }
+        deBlocks(&B.getFunction()),
+        ownershipFixupContext(getInstModCallbacks(), deBlocks) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -385,7 +382,7 @@ public:
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
 
-  InstModCallbacks &getInstModCallbacks() { return instModCallbacks; }
+  InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 
 private:
   // Build concrete existential information using findInitExistential.

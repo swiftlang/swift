@@ -68,7 +68,7 @@ namespace swift {
 /// default operation inline. What is nice about this from a perf perspective is
 /// that in a loop this property should predict well since you have a single
 /// branch that is going to go the same way everytime.
-class InstModCallbacks {
+struct InstModCallbacks {
   /// A function that is called to notify that a new function was created.
   ///
   /// Default implementation is a no-op, but we still mark madeChange.
@@ -135,7 +135,6 @@ class InstModCallbacks {
   /// A boolean that tracks if any of our callbacks were ever called.
   bool wereAnyCallbacksInvoked = false;
 
-public:
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;

@@ -2850,13 +2850,12 @@ static bool optimizeMemoryAccesses(SILFunction &fn) {
   bool changed = false;
   DeadEndBlocks deadEndBlocks(&fn);
 
+  InstructionDeleter deleter;
   for (auto &bb : fn) {
-    auto i = bb.begin(), e = bb.end();
-    while (i != e) {
+    for (SILInstruction *inst : deleter.updatingRange(&bb)) {
       // First see if i is an allocation that we can optimize. If not, skip it.
-      AllocationInst *alloc = getOptimizableAllocation(&*i);
+      AllocationInst *alloc = getOptimizableAllocation(inst);
       if (!alloc) {
-        ++i;
         continue;
       }
 
@@ -2874,12 +2873,8 @@ static bool optimizeMemoryAccesses(SILFunction &fn) {
       if (!collectPMOElementUsesFrom(memInfo, uses, destroys)) {
         // Avoid advancing this iterator until after collectPMOElementUsesFrom()
         // runs. It creates and deletes instructions other than alloc.
-        ++i;
         continue;
       }
-      // Advance this iterator before allowing the deleter to advance it.
-      ++i;
-      auto deleter = InstructionDeleter::updatingIterator(i);
       AllocOptimize allocOptimize(alloc, uses, destroys, deadEndBlocks,
                                   deleter);
       changed |= allocOptimize.optimizeMemoryAccesses();
@@ -2897,12 +2892,10 @@ static bool eliminateDeadAllocations(SILFunction &fn) {
   DeadEndBlocks deadEndBlocks(&fn);
 
   for (auto &bb : fn) {
-    auto i = bb.begin(), e = bb.end();
-    auto deleter = InstructionDeleter::updatingIterator(i);
-    while (i != e) {
+    InstructionDeleter deleter;
+    for (SILInstruction *inst : deleter.updatingRange(&bb)) {
       // First see if i is an allocation that we can optimize. If not, skip it.
-      AllocationInst *alloc = getOptimizableAllocation(&*i);
-      ++i;
+      AllocationInst *alloc = getOptimizableAllocation(inst);
       if (!alloc) {
         continue;
       }

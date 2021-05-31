@@ -1105,11 +1105,7 @@ bool MemoryToRegisters::run() {
     f.verifyCriticalEdges();
 
   for (auto &block : f) {
-    auto ii = block.begin(), ie = block.end();
-    this->deleter = InstructionDeleter::updatingIterator(ii);
-    while (ii != ie) {
-      SILInstruction *inst = &*ii;
-      ++ii;
+    for (SILInstruction *inst : deleter.updatingReverseRange(&block)) {
       auto *asi = dyn_cast<AllocStackInst>(inst);
       if (!asi)
         continue;

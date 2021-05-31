@@ -20,7 +20,6 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_INSTOPTUTILS_H
 
-#include "swift/SILOptimizer/Utils/InstModCallbacks.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -28,6 +27,8 @@
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Utils/InstModCallbacks.h"
+#include "swift/SILOptimizer/Utils/UpdatingInstructionIterator.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
@@ -208,8 +209,6 @@ bool tryCheckedCastBrJumpThreading(
 ///   deleter.deleteIfDead(instruction);
 ///   deleter.cleanupDeadInstructions();
 ///
-///
-///
 /// This is designed to be used with a single 'onDelete' callback, which is
 /// invoked consistently just before deleting each instruction. It's usually
 /// used to avoid iterator invalidation (see the updatingIterator() factory
@@ -230,37 +229,36 @@ bool tryCheckedCastBrJumpThreading(
 /// Note that the forceDelete* APIs only invoke notifyWillBeDeletedFunc() when
 /// an operand's definition will become dead after force-deleting the specified
 /// instruction. Some clients force-delete related instructions one at a
-/// time. They may not force-deleted. It's the client's responsiblity to invoke
-/// notifyWillBeDeletedFunc() on those explicitly deleted instructions if
-/// needed.
-///
+/// time. It is the client's responsiblity to invoke notifyWillBeDeletedFunc()
+/// on those explicitly deleted instructions if needed.
 class InstructionDeleter {
-public:
-  static InstructionDeleter updatingIterator(SILBasicBlock::iterator &iter) {
-    auto onDelete = InstModCallbacks().onDelete([&](SILInstruction *deadInst) {
-      if (deadInst->getIterator() == iter)
-        ++iter;
-      deadInst->eraseFromParent();
-    });
-    return InstructionDeleter(onDelete);
-  }
-
-private:
   /// A set vector of instructions that are found to be dead. The ordering of
   /// instructions in this set is important as when a dead instruction is
   /// removed, new instructions will be generated to fix the lifetime of the
   /// instruction's operands. This has to be deterministic.
   SmallSetVector<SILInstruction *, 8> deadInstructions;
 
-  /// Callbacks used when adding/deleting instructions.
-  InstModCallbacks callbacks;
+  UpdatingInstructionIteratorRegistry iteratorRegistry;
 
 public:
-  InstructionDeleter() : deadInstructions(), callbacks() {}
-  InstructionDeleter(InstModCallbacks callbacks)
-      : deadInstructions(), callbacks(callbacks) {}
+  InstructionDeleter(InstModCallbacks chainedCallbacks = InstModCallbacks())
+      : deadInstructions(), iteratorRegistry(chainedCallbacks) {}
 
-  InstModCallbacks &getCallbacks() { return callbacks; }
+  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
+
+  UpdatingInstructionIteratorRegistry &getIteratorRegistry() {
+    return iteratorRegistry;
+  }
+
+  llvm::iterator_range<UpdatingInstructionIterator>
+  updatingRange(SILBasicBlock *bb) {
+    return iteratorRegistry.makeIteratorRange(bb);
+  }
+
+  llvm::iterator_range<UpdatingReverseInstructionIterator>
+  updatingReverseRange(SILBasicBlock *bb) {
+    return iteratorRegistry.makeReverseIteratorRange(bb);
+  }
 
   /// If the instruction \p inst is dead, record it so that it can be cleaned
   /// up.

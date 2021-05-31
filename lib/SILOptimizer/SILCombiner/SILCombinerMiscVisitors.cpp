@@ -1599,7 +1599,7 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
     Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand(),
                         StoreOwnershipQualifier::Unqualified);
     // Cleanup.
-    instModCallbacks.notifyWillBeDeleted(DataAddrInst);
+    getInstModCallbacks().notifyWillBeDeleted(DataAddrInst);
     deleter.forceDeleteWithUsers(DataAddrInst);
     deleter.forceDelete(IEAI);
     deleter.cleanupDeadInstructions();
@@ -2210,7 +2210,8 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
                                              use, eiBase->getOperand());
       if (helper) {
         helper.perform();
-        tryEliminateOnlyOwnershipUsedForwardingInst(eiBase, instModCallbacks);
+        tryEliminateOnlyOwnershipUsedForwardingInst(eiBase,
+                                                    getInstModCallbacks());
         return mdi;
       }
     }
@@ -2224,7 +2225,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
                                            use, ier->getOperand());
     if (helper) {
       helper.perform();
-      tryEliminateOnlyOwnershipUsedForwardingInst(ier, instModCallbacks);
+      tryEliminateOnlyOwnershipUsedForwardingInst(ier, getInstModCallbacks());
       return mdi;
     }
   }
@@ -2237,7 +2238,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
                                            use, oeri->getOperand());
     if (helper) {
       helper.perform();
-      tryEliminateOnlyOwnershipUsedForwardingInst(oeri, instModCallbacks);
+      tryEliminateOnlyOwnershipUsedForwardingInst(oeri, getInstModCallbacks());
       return mdi;
     }
   }

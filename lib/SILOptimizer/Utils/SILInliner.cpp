@@ -586,7 +586,7 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
           DeletionCallback(toDeleteInst);
         });
   }
-  auto deleter = InstructionDeleter(callbacks);
+  InstructionDeleter deleter(callbacks);
   callbacks.notifyWillBeDeleted(Apply.getInstruction());
   deleter.forceDelete(Apply.getInstruction());
   deleter.cleanupDeadInstructions();

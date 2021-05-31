@@ -25,9 +25,9 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
@@ -412,7 +412,7 @@ bool InstructionDeleter::trackIfDead(SILInstruction *inst) {
     assert(!isIncidentalUse(inst) && !isa<DestroyValueInst>(inst) &&
            "Incidental uses cannot be removed in isolation. "
            "They would be removed iff the operand is dead");
-    callbacks.notifyWillBeDeleted(inst);
+    getCallbacks().notifyWillBeDeleted(inst);
     deadInstructions.insert(inst);
     return true;
   }
@@ -423,7 +423,7 @@ void InstructionDeleter::forceTrackAsDead(SILInstruction *inst) {
   bool disallowDebugUses = inst->getFunction()->getEffectiveOptimizationMode()
                            <= OptimizationMode::NoOptimization;
   assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
-  callbacks.notifyWillBeDeleted(inst);
+  getCallbacks().notifyWillBeDeleted(inst);
   deadInstructions.insert(inst);
 }
 
@@ -484,7 +484,7 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
       if (fixLifetimes && operand.isConsuming()) {
         SILBuilderWithScope builder(inst);
         auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
-        callbacks.createdNewInst(dvi);
+        getCallbacks().createdNewInst(dvi);
       }
       auto *operDef = operandValue->getDefiningInstruction();
       operand.drop();
@@ -494,7 +494,7 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
     }
     inst->dropNonOperandReferences();
     deadInstructions.remove(inst);
-    callbacks.deleteInst(inst, false /*notify when deleting*/);
+    getCallbacks().deleteInst(inst, false /*notify when deleting*/);
   }
 }
 
@@ -522,7 +522,7 @@ bool InstructionDeleter::deleteIfDead(SILInstruction *inst) {
   bool fixLifetime = inst->getFunction()->hasOwnership();
   if (isInstructionTriviallyDead(inst)
       || isScopeAffectingInstructionDead(inst, fixLifetime)) {
-    callbacks.notifyWillBeDeleted(inst);
+    getCallbacks().notifyWillBeDeleted(inst);
     deleteWithUses(inst, fixLifetime);
     return true;
   }
