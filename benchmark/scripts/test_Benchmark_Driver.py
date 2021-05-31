@@ -186,6 +186,7 @@ class SubprocessMock(Mock):
             stderr=None,
             shell=False,
             universal_newlines=False,
+            env=None
         ):
             return self.record_and_respond(args, stdin, stdout, stderr, shell)
 
