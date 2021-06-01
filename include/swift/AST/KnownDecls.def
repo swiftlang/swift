@@ -88,4 +88,7 @@ FUNC_DECL(Swap, "swap")
 FUNC_DECL(UnimplementedInitializer, "_unimplementedInitializer")
 FUNC_DECL(Undefined, "_undefined")
 
+// TODO: move to _Distributed
+FUNC_DECL(MissingDistributedActorTransport, "_missingDistributedActorTransport")
+
 #undef FUNC_DECL

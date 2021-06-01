@@ -30,7 +30,6 @@ bool DerivedConformance::canDeriveDistributedActor(
 }
 // ==== ------------------------------------------------------------------------
 
-// TODO: remove, this is not actually used nowadays, we do this in CodeSynthesisDistributedActor
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
  return nullptr;
 }

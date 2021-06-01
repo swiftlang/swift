@@ -64,8 +64,31 @@ distributed actor SomeDistributedActor_6 {
 }
 
 @available(SwiftStdlib 5.5, *)
-extension SomeDistributedActor_6 {
-  static func _remote_yay(actor: SomeDistributedActor_6) async throws -> Int {
+distributed actor SomeDistributedActor_7 {
+  distributed func dont_1() async throws -> Int { 42 } // expected-error{{Distributed function's 'dont_1' remote counterpart '_remote_dont_1' cannot not be implemented manually.}}
+  distributed func dont_2() async throws -> Int { 42 } // expected-error{{Distributed function's 'dont_2' remote counterpart '_remote_dont_2' cannot not be implemented manually.}}
+  distributed func dont_3() async throws -> Int { 42 } // expected-error{{Distributed function's 'dont_3' remote counterpart '_remote_dont_3' cannot not be implemented manually.}}
+}
+
+@available(SwiftStdlib 5.5, *)
+extension SomeDistributedActor_7 {
+
+  // TODO: we should diagnose a bit more precisely here
+
+  static func _remote_dont_1(actor: SomeDistributedActor_6) async throws -> Int {
+    fatalError()
+  }
+  static func _remote_dont_2(actor: SomeDistributedActor_6) -> Int {
+    fatalError()
+  }
+  static func _remote_dont_3(actor: SomeDistributedActor_6) -> Int {
+    fatalError()
+  }
+
+  func _remote_dont_3(actor: SomeDistributedActor_6) -> Int {
+    fatalError()
+  }
+  func _remote_dont_4() -> Int {
     fatalError()
   }
 }

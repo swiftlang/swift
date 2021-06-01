@@ -5265,7 +5265,10 @@ public:
 
   /// Create a new ParamDecl identical to the first except without the interface type.
   static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
-  
+
+  /// Create a an identical copy of this ParamDecl.
+  static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
+
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
     return ArgumentNameAndDestructured.getPointer();

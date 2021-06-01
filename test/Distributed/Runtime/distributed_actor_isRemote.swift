@@ -24,7 +24,9 @@ distributed actor SomeSpecificDistributedActor {
 
 @available(SwiftStdlib 5.5, *)
 extension SomeSpecificDistributedActor {
-  static func _remote_hello(actor: SomeSpecificDistributedActor) async throws -> String {
+
+  @_dynamicReplacement(for: hello())
+  nonisolated func _remote_hello() async throws -> String {
     return "remote impl (address: \(actor.actorAddress))"
   }
 }

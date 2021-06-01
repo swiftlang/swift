@@ -34,8 +34,3 @@ distributed actor DA2 { // expected-error{{'_Distributed' module not imported, r
   }
 }
 
-@available(SwiftStdlib 5.5, *)
-extension DA2 {
-  static func _remote_dist(actor: DA2) async throws {}
-  static func _remote_distAsync(actor: DA2) async throws {}
-}

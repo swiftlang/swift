@@ -222,6 +222,36 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
+/// Prints a fatal error message when a distributed remote actor function is invoked
+/// without a transport having dynamically replaced its _remote_ function implementation.
+@_transparent
+public // COMPILER_INTRINSIC
+func _missingDistributedActorTransport(className: StaticString,
+                                       functionName: StaticString = #function,
+                                       file: StaticString = #file,
+                                       line: UInt = #line,
+                                       column: UInt = #column
+) -> Never {
+  // This function is marked @_transparent so that it is inlined into the caller
+  // (the initializer stub), and, depending on the build configuration,
+  // redundant parameter values (#file etc.) are eliminated, and don't leak
+  // information about the user's source.
+  className.withUTF8Buffer { className in
+    functionName.withUTF8Buffer { functionName in
+      file.withUTF8Buffer { file in
+        _swift_stdlib_reportMissingDistributedActorTransport(
+          className.baseAddress!, CInt(className.count),
+          functionName.baseAddress!, CInt(functionName.count),
+          file.baseAddress!, CInt(file.count),
+          UInt32(line), UInt32(column),
+          /*flags:*/ 0)
+      }
+    }
+  }
+
+  Builtin.int_trap()
+}
+
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
