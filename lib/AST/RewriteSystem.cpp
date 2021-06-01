@@ -1,4 +1,4 @@
-//===--- RewriteSystem.cpp - Generics with term rewriting -------*- C++ -*-===//
+//===--- RewriteSystem.cpp - Generics with term rewriting -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

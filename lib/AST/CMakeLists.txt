@@ -71,6 +71,7 @@ add_swift_host_library(swiftAST STATIC
   PlatformKind.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
+  ProtocolGraph.cpp
   RawComment.cpp
   RequirementEnvironment.cpp
   RequirementMachine.cpp
