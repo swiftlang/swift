@@ -960,11 +960,13 @@ class BuildScriptInvocation(object):
         # infer dependencies, infer the dependencies now and then re-split the
         # list.
         if self.args.infer_dependencies:
-            combined = impl_product_classes + product_classes
+            combined_classes = before_impl_product_classes +\
+                impl_product_classes +\
+                product_classes
             if self.args.verbose_build:
                 print("-- Build Graph Inference --")
                 print("Initial Product List:")
-                for p in combined:
+                for p in combined_classes:
                     print("    {}".format(p.product_name()))
 
             # Now that we have produced the schedule, resplit. We require our
@@ -977,17 +979,18 @@ class BuildScriptInvocation(object):
             impl_product_classes = []
             product_classes = []
             is_darwin = platform.system() == 'Darwin'
-            final_schedule = build_graph.produce_scheduled_build(combined)[0]
+            final_schedule =\
+                build_graph.produce_scheduled_build(combined_classes)[0]
             for p in final_schedule:
                 if is_darwin and p.is_nondarwin_only_build_product():
                     continue
-
                 if p.is_build_script_impl_product():
                     impl_product_classes.append(p)
                 elif p.is_before_build_script_impl_product():
                     before_impl_product_classes.append(p)
                 else:
                     product_classes.append(p)
+
             if self.args.verbose_build:
                 print("Final Build Order:")
                 for p in before_impl_product_classes:
@@ -1151,8 +1154,14 @@ class BuildScriptInvocation(object):
             print("--- Running tests for %s ---" % product_name)
             product.test(host_target)
             print("--- Finished tests for %s ---" % product_name)
+        # Install the product if it should be installed specifically, or
+        # if it should be built and `install_all` is set to True.
+        # The exception is select before_build_script_impl products
+        # which set `is_ignore_install_all_product` to True, ensuring
+        # they are never installed. (e.g. earlySwiftDriver).
         if product.should_install(host_target) or \
-           (self.install_all and product.should_build(host_target)):
+           (self.install_all and product.should_build(host_target) and
+           not product.is_ignore_install_all_product()):
             print("--- Installing %s ---" % product_name)
             product.install(host_target)
 

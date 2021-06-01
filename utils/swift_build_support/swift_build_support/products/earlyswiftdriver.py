@@ -83,6 +83,16 @@ class EarlySwiftDriver(product.Product):
         # product with `--swift-driver --install-swift-driver`.
         return False
 
+    @classmethod
+    def is_ignore_install_all_product(cls):
+        # Ensures that `install_all` setting triggered by `--infer` does not
+        # affect products which specify `is_ignore_install_all_product` as
+        # True. This is useful for products which should not be installed into the
+        # toolchain (corresponding build products that use the just-built
+        # toolchain are the products that get installed, e.g. `swiftdriver` to
+        # `earlyswiftdriver`).
+        return True
+
     def install(self, host_target):
         run_build_script_helper('install', host_target, self, self.args)
 
