@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 namespace clang {
   class Module;
@@ -189,10 +190,7 @@ private:
 
   /// Utility that lets us keep track of an ASTWalker when walking.
   bool performWalk(ASTWalker &W, llvm::function_ref<bool(void)> DoWalk) {
-    Walker = &W;
-    SWIFT_DEFER {
-      Walker = nullptr;
-    };
+    llvm::SaveAndRestore<ASTWalker *> SV(Walker, &W);
     return DoWalk();
   }
 };
