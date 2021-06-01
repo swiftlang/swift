@@ -34,9 +34,17 @@ int Atom::compare(Atom other, ProtocolOrder protocolOrder) const {
     return protocolOrder(getProtocol(), other.getProtocol());
 
   case Kind::AssociatedType: {
-    int result = protocolOrder(getProtocol(), other.getProtocol());
-    if (result)
-      return result;
+    auto protos = getProtocols();
+    auto otherProtos = other.getProtocols();
+
+    if (protos.size() != otherProtos.size())
+      return otherProtos.size() > protos.size() ? -1 : 1;
+
+    for (unsigned i : indices(protos)) {
+      int result = protocolOrder(protos[i], otherProtos[i]);
+      if (result)
+        return result;
+    }
 
     return getName().compare(other.getName());
   }
@@ -73,8 +81,17 @@ void Atom::dump(llvm::raw_ostream &out) const {
     return;
 
   case Kind::AssociatedType: {
-    out << "[" << getProtocol()->getName()
-        << ":" << getName() << "]";
+    out << "[";
+    bool first = true;
+    for (const auto *proto : getProtocols()) {
+      if (first) {
+        first = false;
+      } else {
+        out << "&";
+      }
+      out << proto->getName();
+    }
+    out << ":" << getName() << "]";
     return;
   }
 

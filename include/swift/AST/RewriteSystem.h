@@ -19,6 +19,8 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
+#include <algorithm>
 
 namespace llvm {
   class raw_ostream;
@@ -36,38 +38,46 @@ class Atom final {
                                      GenericTypeParamType *,
                                      LayoutConstraint>;
 
-  const ProtocolDecl *Proto;
+  llvm::TinyPtrVector<const ProtocolDecl *> Protos;
   Storage Value;
 
-  explicit Atom(const ProtocolDecl *proto, Storage value)
-      : Proto(proto), Value(value) {
+  explicit Atom(llvm::TinyPtrVector<const ProtocolDecl *> protos,
+                Storage value)
+      : Protos(protos), Value(value) {
     // Triggers assertion if the atom is not valid.
     (void) getKind();
   }
 
 public:
   static Atom forName(Identifier name) {
-    return Atom(nullptr, name);
+    return Atom({}, name);
   }
 
   static Atom forProtocol(const ProtocolDecl *proto) {
-    return Atom(proto, Storage());
+    return Atom({proto}, Storage());
   }
 
   static Atom forAssociatedType(const ProtocolDecl *proto,
                                 Identifier name) {
     assert(proto != nullptr);
-    return Atom(proto, name);
+    return Atom({proto}, name);
+  }
+
+  static Atom forAssociatedType(
+      llvm::TinyPtrVector<const ProtocolDecl *>protos,
+      Identifier name) {
+    assert(!protos.empty());
+    return Atom(protos, name);
   }
 
   static Atom forGenericParam(GenericTypeParamType *param) {
     assert(param->isCanonical());
-    return Atom(nullptr, param);
+    return Atom({}, param);
   }
 
   static Atom forLayout(LayoutConstraint layout) {
     assert(layout->isKnownLayout());
-    return Atom(nullptr, layout);
+    return Atom({}, layout);
   }
 
   enum class Kind : uint8_t {
@@ -80,23 +90,23 @@ public:
 
   Kind getKind() const {
     if (!Value) {
-      assert(Proto != nullptr);
+      assert(Protos.size() == 1);
       return Kind::Protocol;
     }
 
     if (Value.is<Identifier>()) {
-      if (Proto != nullptr)
+      if (!Protos.empty())
         return Kind::AssociatedType;
       return Kind::Name;
     }
 
     if (Value.is<GenericTypeParamType *>()) {
-      assert(Proto == nullptr);
+      assert(Protos.empty());
       return Kind::GenericParam;
     }
 
     if (Value.is<LayoutConstraint>()) {
-      assert(Proto == nullptr);
+      assert(Protos.empty());
       return Kind::Layout;
     }
 
@@ -110,9 +120,16 @@ public:
   }
 
   const ProtocolDecl *getProtocol() const {
+    assert(getKind() == Kind::Protocol);
+    assert(Protos.size() == 1);
+    return Protos.front();
+  }
+
+  llvm::TinyPtrVector<const ProtocolDecl *> getProtocols() const {
     assert(getKind() == Kind::Protocol ||
            getKind() == Kind::AssociatedType);
-    return Proto;
+    assert(!Protos.empty());
+    return Protos;
   }
 
   GenericTypeParamType *getGenericParam() const {
@@ -130,7 +147,9 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
   friend bool operator==(Atom lhs, Atom rhs) {
-    return (lhs.Proto == rhs.Proto &&
+    return (lhs.Protos.size() == rhs.Protos.size() &&
+            std::equal(lhs.Protos.begin(), lhs.Protos.end(),
+                       rhs.Protos.begin()) &&
             lhs.Value == rhs.Value);
   }
 
