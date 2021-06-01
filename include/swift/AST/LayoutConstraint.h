@@ -313,12 +313,6 @@ public:
 
   bool isError() const;
 
-  // FIXME: We generally shouldn't need to build LayoutConstraintLoc without
-  // a location.
-  static LayoutConstraintLoc withoutLoc(LayoutConstraint Layout) {
-    return LayoutConstraintLoc(Layout, SourceLoc());
-  }
-
   /// Get the representative location of this type, for diagnostic
   /// purposes.
   SourceLoc getLoc() const { return Loc; }
@@ -328,13 +322,7 @@ public:
   bool hasLocation() const { return Loc.isValid(); }
   LayoutConstraint getLayoutConstraint() const { return Layout; }
 
-  void setLayoutConstraint(LayoutConstraint value) {
-    Layout = value;
-  }
-
   bool isNull() const { return Layout.isNull(); }
-
-  LayoutConstraintLoc clone(ASTContext &ctx) const { return *this; }
 };
 
 /// Checks if ID is a name of a layout constraint and returns this
