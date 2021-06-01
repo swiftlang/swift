@@ -1514,41 +1514,62 @@ tryCastToClassExistentialViaSwiftValue(
   auto destExistentialLocation
     = reinterpret_cast<ClassExistentialContainer *>(destLocation);
 
-  // Fail if the target has constraints that make it unsuitable for
-  // a __SwiftValue box.
-  // FIXME: We should not have different checks here for
-  // Obj-C vs non-Obj-C.  The _SwiftValue boxes should conform
-  // to the exact same protocols on both platforms.
-  bool destIsConstrained = destExistentialType->NumProtocols != 0;
-  if (destIsConstrained) {
-#if SWIFT_OBJC_INTEROP // __SwiftValue is an Obj-C class
-    if (!findSwiftValueConformances(
-          destExistentialType, destExistentialLocation->getWitnessTables())) {
+  switch (srcType->getKind()) {
+  case MetadataKind::Class:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
+    // Class references always go directly into
+    // class existentials; it makes no sense to wrap them.
+    return DynamicCastResult::Failure;
+
+  case MetadataKind::Metatype: {
+#if SWIFT_OBJC_INTEROP
+    auto metatypePtr = reinterpret_cast<const Metadata **>(srcValue);
+    auto metatype = *metatypePtr;
+    switch (metatype->getKind()) {
+    case MetadataKind::Class:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass:
+      // Exclude class metatypes on Darwin, since those are object types and can
+      // be stored directly.
       return DynamicCastResult::Failure;
-    }
-#else // __SwiftValue is a native class
-    if (!swift_swiftValueConformsTo(destType, destType)) {
-      return DynamicCastResult::Failure;
+    default:
+      break;
     }
 #endif
+    // Non-class metatypes are never objects, and
+    // metatypes on non-Darwin are never objects, so
+    // fall through to box those.
+    SWIFT_FALLTHROUGH;
   }
 
+  default: {
+    if (destExistentialType->NumProtocols != 0) {
+      // The destination is a class-constrained protocol type
+      // and the source is not a class, so....
+      return DynamicCastResult::Failure;
+    } else {
+      // This is a simple (unconstrained) `AnyObject` so we can populate
+      // it by stuffing a non-class instance into a __SwiftValue box
 #if SWIFT_OBJC_INTEROP
-  auto object = bridgeAnythingToSwiftValueObject(
-    srcValue, srcType, takeOnSuccess);
-  destExistentialLocation->Value = object;
-  if (takeOnSuccess) {
-    return DynamicCastResult::SuccessViaTake;
-  } else {
-    return DynamicCastResult::SuccessViaCopy;
-  }
+      auto object = bridgeAnythingToSwiftValueObject(
+        srcValue, srcType, takeOnSuccess);
+      destExistentialLocation->Value = object;
+      if (takeOnSuccess) {
+        return DynamicCastResult::SuccessViaTake;
+      } else {
+        return DynamicCastResult::SuccessViaCopy;
+      }
 # else
-  // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
-  // but the code above is slightly faster on Obj-C platforms.
-  auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
-  destExistentialLocation->Value = object;
-  return DynamicCastResult::SuccessViaCopy;
+      // Note: Code below works correctly on both Obj-C and non-Obj-C platforms,
+      // but the code above is slightly faster on Obj-C platforms.
+      auto object = _bridgeAnythingToObjectiveC(srcValue, srcType);
+      destExistentialLocation->Value = object;
+      return DynamicCastResult::SuccessViaCopy;
 #endif
+    }
+  }
+  }
 }
 
 static DynamicCastResult
