@@ -741,6 +741,8 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     PRINT_FLAIR(ExpressionSpecific, "ExprSpecific");
     PRINT_FLAIR(SuperChain, "SuperChain");
     PRINT_FLAIR(ArgumentLabels, "ArgLabels");
+    PRINT_FLAIR(CommonKeywordAtCurrentPosition, "CommonKeyword")
+    PRINT_FLAIR(RareKeywordAtCurrentPosition, "RareKeyword")
     Prefix.append("]");
   }
   if (NotRecommended)
@@ -1540,6 +1542,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
                                         CodeCompletionResult::ResultKind::Keyword,
                                         SemanticContextKind::CurrentNominal,
                                         {});
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
+      if (AFD->getOverriddenDecl() != nullptr) {
+        Builder.addFlair(CodeCompletionFlairBit::CommonKeywordAtCurrentPosition);
+      }
+    }
+
     Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
     Builder.addKeyword("super");
     Builder.addTypeAnnotation(ST, PrintOptions());
@@ -1820,6 +1828,71 @@ static bool canDeclContextHandleAsync(const DeclContext *DC) {
   }
 
   return false;
+}
+
+/// Returns \c true only if the completion is happening for top-level
+/// declrarations. i.e.:
+///
+///     if condition {
+///       #false#
+///     }
+///     expr.#false#
+///
+///     #true#
+///
+///     struct S {
+///       #false#
+///       func foo() {
+///         #false#
+///       }
+///     }
+static bool isCodeCompletionAtTopLevel(DeclContext *DC) {
+  if (DC->isModuleScopeContext())
+    return true;
+
+  // CC token at top-level is parsed as an expression. If the only element
+  // body of the TopLevelCodeDecl is a CodeCompletionExpr without a base
+  // expression, the user might be writing a top-level declaration.
+  if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
+    auto body = TLCD->getBody();
+    if (!body || body->empty())
+      return true;
+    if (body->getElements().size() > 1)
+      return false;
+    auto expr = body->getFirstElement().dyn_cast<Expr *>();
+    if (!expr)
+      return false;
+    if (CodeCompletionExpr *CCExpr = dyn_cast<CodeCompletionExpr>(expr)) {
+      if (CCExpr->getBase() == nullptr)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/// Returns \c true if the completion is happening in local context such as
+/// inside function bodies. i.e.:
+///
+///     if condition {
+///       #true#
+///     }
+///     expr.#true#
+///
+///     #false#
+///
+///     struct S {
+///       #false#
+///       func foo() {
+///         #true#
+///       }
+///     }
+static bool isCompletionDeclContextLocalContext(DeclContext *DC) {
+  if (!DC->isLocalContext())
+    return false;
+  if (isCodeCompletionAtTopLevel(DC))
+    return false;
+  return true;
 }
 
 /// Build completions by doing visible decl lookup from a context.
@@ -5925,22 +5998,127 @@ static void
 addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
            CodeCompletionKeywordKind Kind, StringRef TypeAnnotation = "",
            CodeCompletionResult::ExpectedTypeRelation TypeRelation =
-               CodeCompletionResult::ExpectedTypeRelation::NotApplicable) {
+               CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
+           CodeCompletionFlair Flair = {}) {
   CodeCompletionResultBuilder Builder(Sink,
                                       CodeCompletionResult::ResultKind::Keyword,
                                       SemanticContextKind::None, {});
   Builder.setKeywordKind(Kind);
   Builder.addKeyword(Name);
+  Builder.addFlair(Flair);
   if (!TypeAnnotation.empty())
     Builder.addTypeAnnotation(TypeAnnotation);
   Builder.setExpectedTypeRelation(TypeRelation);
 }
 
-static void addDeclKeywords(CodeCompletionResultSink &Sink,
+static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
                             bool IsConcurrencyEnabled,
                             bool IsDistributedEnabled) {
+  auto isTypeDeclIntroducer = [](CodeCompletionKeywordKind Kind,
+                                 Optional<DeclAttrKind> DAK) -> bool {
+    switch (Kind) {
+    case CodeCompletionKeywordKind::kw_protocol:
+    case CodeCompletionKeywordKind::kw_class:
+    case CodeCompletionKeywordKind::kw_struct:
+    case CodeCompletionKeywordKind::kw_enum:
+    case CodeCompletionKeywordKind::kw_extension:
+      return true;
+    case CodeCompletionKeywordKind::None:
+      if (DAK && *DAK == DeclAttrKind::DAK_Actor) {
+        return true;
+      }
+      break;
+    default:
+      break;
+    }
+    return false;
+  };
+  auto isTopLevelOnlyDeclIntroducer = [](CodeCompletionKeywordKind Kind,
+                                         Optional<DeclAttrKind> DAK) -> bool {
+    switch (Kind) {
+    case CodeCompletionKeywordKind::kw_operator:
+    case CodeCompletionKeywordKind::kw_precedencegroup:
+    case CodeCompletionKeywordKind::kw_import:
+    case CodeCompletionKeywordKind::kw_protocol:
+    case CodeCompletionKeywordKind::kw_extension:
+      return true;
+    default:
+      return false;
+    }
+  };
+
+  auto getFlair = [&](CodeCompletionKeywordKind Kind,
+                      Optional<DeclAttrKind> DAK) -> CodeCompletionFlair {
+    if (isCodeCompletionAtTopLevel(DC) &&
+        !DC->getParentSourceFile()->isScriptMode()) {
+      // Type decls are common in library file top-level.
+      if (isTypeDeclIntroducer(Kind, DAK))
+        return CodeCompletionFlairBit::CommonKeywordAtCurrentPosition;
+    }
+    if (isa<ProtocolDecl>(DC)) {
+      // Protocols cannot have nested type decls (other than 'typealias').
+      if (isTypeDeclIntroducer(Kind, DAK))
+        return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
+    }
+    if (DC->isTypeContext()) {
+      // Top-level only decls are invalid in type context.
+      if (isTopLevelOnlyDeclIntroducer(Kind, DAK))
+        return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
+    }
+    if (isCompletionDeclContextLocalContext(DC)) {
+      // Local type decl are valid, but not common.
+      if (isTypeDeclIntroducer(Kind, DAK))
+        return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
+
+      // Top-level only decls are invalid in function body.
+      if (isTopLevelOnlyDeclIntroducer(Kind, DAK))
+        return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
+
+      // 'init', 'deinit' and 'subscript' are invalid in function body.
+      // Access control modifiers are invalid in function body.
+      switch (Kind) {
+      case CodeCompletionKeywordKind::kw_init:
+      case CodeCompletionKeywordKind::kw_deinit:
+      case CodeCompletionKeywordKind::kw_subscript:
+      case CodeCompletionKeywordKind::kw_private:
+      case CodeCompletionKeywordKind::kw_fileprivate:
+      case CodeCompletionKeywordKind::kw_internal:
+      case CodeCompletionKeywordKind::kw_public:
+      case CodeCompletionKeywordKind::kw_static:
+        return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
+
+      default:
+        break;
+      }
+
+      // These modifiers are invalid for decls in function body.
+      if (DAK) {
+        switch (*DAK) {
+        case DeclAttrKind::DAK_Lazy:
+        case DeclAttrKind::DAK_Final:
+        case DeclAttrKind::DAK_Infix:
+        case DeclAttrKind::DAK_Frozen:
+        case DeclAttrKind::DAK_Prefix:
+        case DeclAttrKind::DAK_Postfix:
+        case DeclAttrKind::DAK_Dynamic:
+        case DeclAttrKind::DAK_Override:
+        case DeclAttrKind::DAK_Optional:
+        case DeclAttrKind::DAK_Required:
+        case DeclAttrKind::DAK_Convenience:
+        case DeclAttrKind::DAK_AccessControl:
+        case DeclAttrKind::DAK_Nonisolated:
+          return CodeCompletionFlairBit::RareKeywordAtCurrentPosition;
+
+        default:
+          break;
+        }
+      }
+    }
+    return None;
+  };
+
   auto AddDeclKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind,
-                        Optional<DeclAttrKind> DAK) {
+                            Optional<DeclAttrKind> DAK) {
     if (Name == "let" || Name == "var") {
       // Treat keywords that could be the start of a pattern specially.
       return;
@@ -5949,7 +6127,8 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink,
     // FIXME: This should use canUseAttributeOnDecl.
 
     // Remove user inaccessible keywords.
-    if (DAK.hasValue() && DeclAttribute::isUserInaccessible(*DAK)) return;
+    if (DAK.hasValue() && DeclAttribute::isUserInaccessible(*DAK))
+      return;
 
     // Remove keywords only available when concurrency is enabled.
     if (DAK.hasValue() && !IsConcurrencyEnabled &&
@@ -5961,10 +6140,14 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink,
         DeclAttribute::isDistributedOnly(*DAK))
       return;
 
-    addKeyword(Sink, Name, Kind);
+    addKeyword(
+        Sink, Name, Kind, /*TypeAnnotation=*/"",
+        /*TypeRelation=*/CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
+        getFlair(Kind, DAK));
   };
 
-#define DECL_KEYWORD(kw) AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, None);
+#define DECL_KEYWORD(kw)                                                       \
+  AddDeclKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, None);
 #include "swift/Syntax/TokenKinds.def"
 
   // Context-sensitive keywords.
@@ -5978,7 +6161,6 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink,
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
 #include <swift/AST/Attr.def>
 #undef CONTEXTUAL_CASE
-
 }
 
 static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) {
@@ -6082,7 +6264,9 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   }
   case CompletionKind::StmtOrExpr:
-    addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
+    addDeclKeywords(Sink, CurDeclContext,
+                    Context.LangOpts.EnableExperimentalConcurrency,
+                    Context.LangOpts.EnableExperimentalDistributed);
     addStmtKeywords(Sink, MaybeFuncBody);
     LLVM_FALLTHROUGH;
   case CompletionKind::ReturnStmtExpr:
@@ -6150,7 +6334,9 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
         .Default(false);
     }) != ParsedKeywords.end();
     if (!HasDeclIntroducer) {
-      addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
+      addDeclKeywords(Sink, CurDeclContext,
+                      Context.LangOpts.EnableExperimentalConcurrency,
+                      Context.LangOpts.EnableExperimentalDistributed);
       addLetVarKeywords(Sink);
     }
     break;
@@ -6966,7 +7152,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
         if (CurDeclContext->isTypeContext()) {
           // Override completion (CompletionKind::NominalMemberBeginning).
-          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
+          addDeclKeywords(Sink, CurDeclContext,
+                          Context.LangOpts.EnableExperimentalConcurrency,
+                          Context.LangOpts.EnableExperimentalDistributed);
           addLetVarKeywords(Sink);
           SmallVector<StringRef, 0> ParsedKeywords;
           CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
@@ -6974,7 +7162,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           OverrideLookup.getOverrideCompletions(SourceLoc());
         } else {
           // Global completion (CompletionKind::PostfixExprBeginning).
-          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
+          addDeclKeywords(Sink, CurDeclContext,
+                          Context.LangOpts.EnableExperimentalConcurrency,
+                          Context.LangOpts.EnableExperimentalDistributed);
           addStmtKeywords(Sink, MaybeFuncBody);
           addSuperKeyword(Sink);
           addLetVarKeywords(Sink);

@@ -63,7 +63,7 @@ func testMethod(value: MyStruct) {
 
 // METHOD_NEWLINE: Begin completions
 // FIXME-METHOD_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: (() -> String)? {|}#}[#(() -> String)?#];
-// METHOD_NEWLINE-DAG: Keyword[class]/None:                class;
+// METHOD_NEWLINE-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // METHOD_NEWLINE-DAG: Keyword[if]/None:                   if;
 // METHOD_NEWLINE-DAG: Keyword[try]/None:                  try;
 // METHOD_NEWLINE-DAG: Decl[LocalVar]/Local:               value[#MyStruct#]; name=value
@@ -95,7 +95,7 @@ func testOverloadedInit() {
 // INIT_OVERLOADED_NEWLINE: Begin completions
 // FIXME-INIT_OVERLOADED_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: () -> String {|}#}[#() -> String#];
 // FIXME-INIT_OVERLOADED_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn3: () -> String {|}#}[#() -> String#];
-// INIT_OVERLOADED_NEWLINE-DAG: Keyword[class]/None:                class;
+// INIT_OVERLOADED_NEWLINE-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // INIT_OVERLOADED_NEWLINE-DAG: Keyword[if]/None:                   if;
 // INIT_OVERLOADED_NEWLINE-DAG: Keyword[try]/None:                  try;
 // INIT_OVERLOADED_NEWLINE-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -122,7 +122,7 @@ func testOptionalInit() {
 // INIT_OPTIONAL_NEWLINE: Begin completions
 // FIXME-INIT_OPTIONAL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: () -> String {|}#}[#() -> String#];
 // FIXME-INIT_OPTIONAL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn3: () -> String {|}#}[#() -> String#];
-// INIT_OPTIONAL_NEWLINE-DAG: Keyword[class]/None:                class;
+// INIT_OPTIONAL_NEWLINE-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // INIT_OPTIONAL_NEWLINE-DAG: Keyword[if]/None:                   if;
 // INIT_OPTIONAL_NEWLINE-DAG: Keyword[try]/None:                  try;
 // INIT_OPTIONAL_NEWLINE-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -182,7 +182,7 @@ func testOptionalInit() {
 // INIT_REQUIRED_NEWLINE_3: Begin completions
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn2
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn3
-// INIT_REQUIRED_NEWLINE_3-DAG: Keyword[class]/None:                class;
+// INIT_REQUIRED_NEWLINE_3-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // INIT_REQUIRED_NEWLINE_3-DAG: Keyword[if]/None:                   if;
 // INIT_REQUIRED_NEWLINE_3-DAG: Keyword[try]/None:                  try;
 // INIT_REQUIRED_NEWLINE_3-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
