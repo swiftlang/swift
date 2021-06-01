@@ -131,3 +131,11 @@ unsigned ProtocolGraph::computeProtocolDepth(const ProtocolDecl *proto) {
   info.Depth = depth;
   return depth;
 }
+
+int ProtocolGraph::compareProtocols(const ProtocolDecl *lhs,
+                                    const ProtocolDecl *rhs) const {
+  const auto &infoLHS = getProtocolInfo(lhs);
+  const auto &infoRHS = getProtocolInfo(rhs);
+
+  return infoLHS.Index - infoRHS.Index;
+}

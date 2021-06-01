@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/ProtocolGraph.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
@@ -29,9 +30,6 @@ namespace llvm {
 namespace swift {
 
 namespace rewriting {
-
-using ProtocolOrder = std::function<int (const ProtocolDecl *,
-                                         const ProtocolDecl *)>;
 
 class Atom final {
   using Storage = llvm::PointerUnion<Identifier,
@@ -142,7 +140,7 @@ public:
     return Value.get<LayoutConstraint>();
   }
 
-  int compare(Atom other, ProtocolOrder compare) const;
+  int compare(Atom other, const ProtocolGraph &protos) const;
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -174,7 +172,7 @@ public:
     Atoms.push_back(atom);
   }
 
-  int compare(const Term &other, ProtocolOrder order) const;
+  int compare(const Term &other, const ProtocolGraph &protos) const;
 
   size_t size() const { return Atoms.size(); }
 
@@ -239,8 +237,8 @@ public:
   }
 
   int compare(const Rule &other,
-              ProtocolOrder protocolOrder) const {
-    return LHS.compare(other.LHS, protocolOrder);
+              const ProtocolGraph &protos) const {
+    return LHS.compare(other.LHS, protos);
   }
 
   void dump(llvm::raw_ostream &out) const;
@@ -248,13 +246,13 @@ public:
 
 class RewriteSystem final {
   std::vector<Rule> Rules;
-  ProtocolOrder Order;
+  ProtocolGraph Protos;
 
   unsigned DebugSimplify : 1;
   unsigned DebugAdd : 1;
 
 public:
-  explicit RewriteSystem(ProtocolOrder order) : Order(order) {
+  explicit RewriteSystem() {
     DebugSimplify = false;
     DebugAdd = false;
   }
@@ -263,6 +261,11 @@ public:
   RewriteSystem(RewriteSystem &&) = delete;
   RewriteSystem &operator=(const RewriteSystem &) = delete;
   RewriteSystem &operator=(RewriteSystem &&) = delete;
+
+  const ProtocolGraph &getProtocols() const { return Protos; }
+
+  void initialize(std::vector<std::pair<Term, Term>> &&rules,
+                  ProtocolGraph &&protos);
 
   bool addRule(Term lhs, Term rhs);
 

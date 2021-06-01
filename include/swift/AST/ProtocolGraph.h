@@ -77,6 +77,9 @@ struct ProtocolGraph {
 
   void computeInheritedAssociatedTypes();
 
+  int compareProtocols(const ProtocolDecl *lhs,
+                       const ProtocolDecl *rhs) const;
+
 private:
   unsigned computeProtocolDepth(const ProtocolDecl *proto);
 };

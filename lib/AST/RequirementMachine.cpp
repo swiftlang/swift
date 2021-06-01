@@ -174,20 +174,10 @@ Term swift::rewriting::getTermForType(CanType paramType,
 }
 
 struct RequirementMachine::Implementation {
-  ProtocolGraph Protocols;
-  ProtocolOrder Order;
   RewriteSystem System;
   bool Complete = false;
 
-  Implementation()
-      : Order([&](const ProtocolDecl *lhs,
-                  const ProtocolDecl *rhs) -> int {
-          const auto &infoLHS = Protocols.getProtocolInfo(lhs);
-          const auto &infoRHS = Protocols.getProtocolInfo(rhs);
-
-          return infoLHS.Index - infoRHS.Index;
-        }),
-        System(Order) {}
+  Implementation() {}
 };
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
@@ -212,15 +202,8 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   RewriteSystemBuilder builder(Context);
   builder.addGenericSignature(sig);
 
-  Impl->Protocols = builder.Protocols;
-
-  std::sort(builder.Rules.begin(), builder.Rules.end(),
-            [&](std::pair<Term, Term> lhs,
-                std::pair<Term, Term> rhs) -> int {
-              return lhs.first.compare(rhs.first, Impl->Order) < 0;
-            });
-  for (const auto &rule : builder.Rules)
-    Impl->System.addRule(rule.first, rule.second);
+  Impl->System.initialize(std::move(builder.Rules),
+                          std::move(builder.Protocols));
 
   // FIXME: Add command line flag
   auto result = Impl->System.computeConfluentCompletion(1000, 10);

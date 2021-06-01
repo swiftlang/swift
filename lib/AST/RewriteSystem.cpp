@@ -19,7 +19,7 @@
 using namespace swift;
 using namespace rewriting;
 
-int Atom::compare(Atom other, ProtocolOrder protocolOrder) const {
+int Atom::compare(Atom other, const ProtocolGraph &graph) const {
   auto kind = getKind();
   auto otherKind = other.getKind();
 
@@ -31,17 +31,18 @@ int Atom::compare(Atom other, ProtocolOrder protocolOrder) const {
     return getName().compare(other.getName());
 
   case Kind::Protocol:
-    return protocolOrder(getProtocol(), other.getProtocol());
+    return graph.compareProtocols(getProtocol(), other.getProtocol());
 
   case Kind::AssociatedType: {
     auto protos = getProtocols();
     auto otherProtos = other.getProtocols();
 
+    // Atoms with more protocols are 'smaller' than those with fewer.
     if (protos.size() != otherProtos.size())
-      return otherProtos.size() > protos.size() ? -1 : 1;
+      return protos.size() > otherProtos.size() ? -1 : 1;
 
     for (unsigned i : indices(protos)) {
-      int result = protocolOrder(protos[i], otherProtos[i]);
+      int result = graph.compareProtocols(protos[i], otherProtos[i]);
       if (result)
         return result;
     }
@@ -108,7 +109,7 @@ void Atom::dump(llvm::raw_ostream &out) const {
   llvm_unreachable("Bad atom kind");
 }
 
-int Term::compare(const Term &other, ProtocolOrder protocolOrder) const {
+int Term::compare(const Term &other, const ProtocolGraph &graph) const {
   if (size() != other.size())
     return size() < other.size() ? -1 : 1;
 
@@ -116,7 +117,7 @@ int Term::compare(const Term &other, ProtocolOrder protocolOrder) const {
     auto lhs = (*this)[i];
     auto rhs = other[i];
 
-    int result = lhs.compare(rhs, protocolOrder);
+    int result = lhs.compare(rhs, graph);
     if (result != 0) {
       assert(lhs != rhs);
       return result;
@@ -222,17 +223,30 @@ void Rule::dump(llvm::raw_ostream &out) const {
     out << " [deleted]";
 }
 
+void RewriteSystem::initialize(std::vector<std::pair<Term, Term>> &&rules,
+                               ProtocolGraph &&graph) {
+  Protos = graph;
+
+  std::sort(rules.begin(), rules.end(),
+            [&](std::pair<Term, Term> lhs,
+                std::pair<Term, Term> rhs) -> int {
+              return lhs.first.compare(rhs.first, graph) < 0;
+            });
+  for (const auto &rule : rules)
+    addRule(rule.first, rule.second);
+}
+
 bool RewriteSystem::addRule(Term lhs, Term rhs) {
   simplify(lhs);
   simplify(rhs);
 
-  int result = lhs.compare(rhs, Order);
+  int result = lhs.compare(rhs, Protos);
   if (result == 0)
     return false;
   if (result < 0)
     std::swap(lhs, rhs);
 
-  assert(lhs.compare(rhs, Order) > 0);
+  assert(lhs.compare(rhs, Protos) > 0);
 
   if (DebugAdd) {
     llvm::dbgs() << "# Adding rule ";
