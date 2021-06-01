@@ -1192,8 +1192,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     if (!bindingTypeVar)
       return None;
 
-    AdjacentVars.insert({bindingTypeVar, constraint});
-
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
     // to be resolved to anything, so let's note that fact in the potential
@@ -1215,14 +1213,24 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         assert(kind == AllowedBindingKind::Supertypes);
         SupertypeOf.insert({bindingTypeVar, constraint});
       }
+
+      AdjacentVars.insert({bindingTypeVar, constraint});
       break;
     }
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
-    case ConstraintKind::Equal:
+    case ConstraintKind::Equal: {
+      EquivalentTo.insert({bindingTypeVar, constraint});
+      AdjacentVars.insert({bindingTypeVar, constraint});
+      break;
+    }
+
     case ConstraintKind::UnresolvedMemberChainBase: {
       EquivalentTo.insert({bindingTypeVar, constraint});
+
+      // Don't record adjacency between base and result types,
+      // this is just an auxiliary contraint to enforce ordering.
       break;
     }
 
