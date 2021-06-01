@@ -284,6 +284,10 @@ class LayoutConstraint {
   bool operator!=(LayoutConstraint rhs) const {
     return !(*this == rhs);
   }
+
+  /// Defines a somewhat arbitrary linear order on layout constraints.
+  /// -1 if this < rhs, 0 if this == rhs, 1 if this > rhs.
+  int compare(LayoutConstraint rhs) const;
 };
 
 // Permit direct uses of isa/cast/dyn_cast on LayoutConstraint.

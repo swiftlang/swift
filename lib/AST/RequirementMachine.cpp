@@ -284,8 +284,13 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   }
   case RequirementKind::Superclass:
     break;
-  case RequirementKind::Layout:
+  case RequirementKind::Layout: {
+    auto constraintTerm = subjectTerm;
+    constraintTerm.add(Atom::forLayout(req.getLayoutConstraint()));
+
+    Rules.emplace_back(subjectTerm, constraintTerm);
     break;
+  }
   case RequirementKind::SameType: {
     auto otherType = CanType(req.getSecondType());
 

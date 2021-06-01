@@ -15,6 +15,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,7 +32,9 @@ using ProtocolOrder = std::function<int (const ProtocolDecl *,
                                          const ProtocolDecl *)>;
 
 class Atom final {
-  using Storage = llvm::PointerUnion<Identifier, GenericTypeParamType *>;
+  using Storage = llvm::PointerUnion<Identifier,
+                                     GenericTypeParamType *,
+                                     LayoutConstraint>;
 
   const ProtocolDecl *Proto;
   Storage Value;
@@ -62,11 +65,17 @@ public:
     return Atom(nullptr, param);
   }
 
+  static Atom forLayout(LayoutConstraint layout) {
+    assert(layout->isKnownLayout());
+    return Atom(nullptr, layout);
+  }
+
   enum class Kind : uint8_t {
     AssociatedType,
     GenericParam,
     Name,
     Protocol,
+    Layout
   };
 
   Kind getKind() const {
@@ -84,6 +93,11 @@ public:
     if (Value.is<GenericTypeParamType *>()) {
       assert(Proto == nullptr);
       return Kind::GenericParam;
+    }
+
+    if (Value.is<LayoutConstraint>()) {
+      assert(Proto == nullptr);
+      return Kind::Layout;
     }
 
     llvm_unreachable("Bad term rewriting atom");
@@ -104,6 +118,11 @@ public:
   GenericTypeParamType *getGenericParam() const {
     assert(getKind() == Kind::GenericParam);
     return Value.get<GenericTypeParamType *>();
+  }
+
+  LayoutConstraint getLayoutConstraint() const {
+    assert(getKind() == Kind::Layout);
+    return Value.get<LayoutConstraint>();
   }
 
   int compare(Atom other, ProtocolOrder compare) const;

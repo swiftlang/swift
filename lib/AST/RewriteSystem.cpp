@@ -53,6 +53,10 @@ int Atom::compare(Atom other, ProtocolOrder protocolOrder) const {
 
     return 0;
   }
+
+  case Kind::Layout: {
+    return getLayoutConstraint().compare(other.getLayoutConstraint());
+  }
   }
 
   llvm_unreachable("Bad atom kind");
@@ -77,6 +81,11 @@ void Atom::dump(llvm::raw_ostream &out) const {
   case Kind::GenericParam:
     out << Type(getGenericParam());
     return;
+
+  case Kind::Layout:
+    out << "[layout: ";
+    getLayoutConstraint()->print(out);
+    out << "]";
   }
 
   llvm_unreachable("Bad atom kind");
