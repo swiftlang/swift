@@ -257,6 +257,8 @@ bool ModuleInterfaceBuilder::buildSwiftModuleInternal(
     if (!getRelativeDepPath(InPath, SDKPath))
       SerializationOpts.ModuleInterface = InPath;
 
+    SerializationOpts.SDKName = SubInstance.getASTContext().LangOpts.SDKName;
+
     SmallVector<FileDependency, 16> Deps;
     bool serializeHashes = FEOpts.SerializeModuleInterfaceDependencyHashes;
     if (collectDepsForSerialization(SubInstance, Deps, serializeHashes)) {
