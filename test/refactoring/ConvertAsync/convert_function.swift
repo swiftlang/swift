@@ -289,3 +289,23 @@ func testReturnHandling3(_ completion: (String?, Error?) -> Void) {
 // RETURN-HANDLING3:      func testReturnHandling3() async throws -> String {
 // RETURN-HANDLING3-NEXT:   {{^}} return (<#completion#>("", nil)){{$}}
 // RETURN-HANDLING3-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RDAR78693050 %s
+func rdar78693050(_ completion: () -> Void) {
+  simple { str in
+    print(str)
+  }
+  if .random() {
+    return completion()
+  }
+  completion()
+}
+
+// RDAR78693050:      func rdar78693050() async {
+// RDAR78693050-NEXT:   let str = await simple()
+// RDAR78693050-NEXT:   print(str)
+// RDAR78693050-NEXT:   if .random() {
+// RDAR78693050-NEXT:     return
+// RDAR78693050-NEXT:   }
+// RDAR78693050-NEXT:   return
+// RDAR78693050-NEXT: }
