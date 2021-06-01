@@ -31,8 +31,8 @@ func testGlobal() {
 }
 // GLOBAL_EXPR: Begin completions
 // GLOBAL_EXPR-DAG: Decl[Struct]/CurrModule:            <name>MyStruct</name>; typename=<typeid.user>MyStruct</typeid.user>;
-// GLOBAL_EXPR-DAG: Keyword[class]/None:                <keyword>class</keyword>; typename=;
-// GLOBAL_EXPR-DAG: Keyword[enum]/None:                 <keyword>enum</keyword>; typename=;
+// GLOBAL_EXPR-DAG: Keyword[class]/None/Flair[RareKeyword]: <keyword>class</keyword>; typename=;
+// GLOBAL_EXPR-DAG: Keyword[enum]/None/Flair[RareKeyword]: <keyword>enum</keyword>; typename=;
 // GLOBAL_EXPR-DAG: Keyword[if]/None:                   <keyword>if</keyword>; typename=;
 // GLOBAL_EXPR-DAG: Keyword[guard]/None:                <keyword>guard</keyword>; typename=;
 // GLOBAL_EXPR-DAG: Keyword[try]/None:                  <keyword>try</keyword>; typename=;

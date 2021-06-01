@@ -417,6 +417,13 @@ enum class CodeCompletionFlairBit: uint8_t {
 
   /// Argument label and type. i.e. 'label: <#Ty#>'.
   ArgumentLabels = 1 << 2,
+
+  /// E.g. decl introducer or modifiers ('enum', 'protocol', 'public', etc.) at
+  /// top-level.
+  CommonKeywordAtCurrentPosition = 1 << 3,
+
+  /// E.g. type decl introducer ('enum', 'class', etc.) in a function body.
+  RareKeywordAtCurrentPosition = 1 << 4,
 };
 
 using CodeCompletionFlair = OptionSet<CodeCompletionFlairBit>;
