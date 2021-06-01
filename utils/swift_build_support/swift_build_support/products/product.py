@@ -70,6 +70,18 @@ class Product(object):
         raise NotImplementedError
 
     @classmethod
+    def is_ignore_install_all_product(cls):
+        """is_ignore_install_all_product -> bool
+
+        Whether this product is to ignore the install-all directive
+        and insted always respect its own should_install.
+        This is useful when we run -install-all but have products
+        which should never be installed into the toolchain
+        (e.g. earlyswiftdriver)
+        """
+        return False
+
+    @classmethod
     def is_swiftpm_unified_build_product(cls):
         """is_swiftpm_unified_build_product -> bool
 

@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 from . import cmark
+from . import earlyswiftdriver
 from . import libcxx
 from . import libicu
 from . import llvm
@@ -157,6 +158,7 @@ updated without updating swift.py?")
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
+                earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
                 libcxx.LibCXX,
                 libicu.LibICU]
