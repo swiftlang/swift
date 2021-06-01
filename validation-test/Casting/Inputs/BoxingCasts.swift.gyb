@@ -173,6 +173,11 @@ contents = [
     extra_targets=["StructInt.Type"],
     roundtrips=False, # Compiler bug rejects roundtrip cast T? => Any => T?
   ),
+  Contents(name="ClassInt.Type",
+    constructor="ClassInt.self",
+    hashable=False,
+    protocols=[],
+  ),
   Contents(name="PublicProtocol.Protocol",
     constructor="PublicProtocol.self",
     hashable=False,
