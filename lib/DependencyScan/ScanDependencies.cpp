@@ -11,10 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/DependencyScan/ScanDependencies.h"
+#include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
@@ -733,8 +735,13 @@ generateFullDependencyGraph(CompilerInstance &instance,
   for (size_t i = 0; i < allModules.size(); ++i) {
     const auto &module = allModules[i];
     // Grab the completed module dependencies.
-    auto moduleDeps = *cache.findDependencies(module.first, module.second);
+    auto moduleDepsQuery = cache.findDependencies(module.first, module.second);
+    if (!moduleDepsQuery) {
+      std::string err = "Module Dependency Cache missing module" + module.first;
+      llvm::report_fatal_error(err);
+    }
 
+    auto moduleDeps = *moduleDepsQuery;
     // Collect all the required pieces to build a ModuleInfo
     auto swiftPlaceholderDeps = moduleDeps.getAsPlaceholderDependencyModule();
     auto swiftTextualDeps = moduleDeps.getAsSwiftTextualModule();
@@ -1093,12 +1100,26 @@ identifyMainModuleDependencies(CompilerInstance &instance) {
 
 } // namespace
 
+static void serializeDependencyCache(DiagnosticEngine &diags,
+                                     const std::string &path,
+                                     const ModuleDependenciesCache &cache) {
+  module_dependency_cache_serialization::writeInterModuleDependenciesCache(
+      diags, path, cache);
+}
+
+static void deserializeDependencyCache(const std::string &path,
+                                       ModuleDependenciesCache &cache) {
+  module_dependency_cache_serialization::readInterModuleDependenciesCache(
+      path, cache);
+}
+
 bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   ASTContext &Context = instance.getASTContext();
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   ModuleDependenciesCache cache;
@@ -1229,8 +1250,7 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   // Add the main module.
   StringRef mainModuleName = mainModule->getNameStr();
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
-                  std::set<ModuleDependencyID>>
-      allModules;
+                  std::set<ModuleDependencyID>> allModules;
 
   allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
   cache.recordDependencies(mainModuleName, std::move(mainDependencies));
@@ -1268,12 +1288,32 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   if (diagnoseCycle(instance, cache, /*MainModule*/ allModules.front(),
                     ASTDelegate))
     return std::make_error_code(std::errc::not_supported);
+
+  // Test dependency cache serialization/deserialization if
+  // `-test-dependency-scan-cache-serialization` is specified.
+  auto *resultCache = &cache;
+  ModuleDependenciesCache loadedCache;
+  if (FEOpts.TestDependencyScannerCacheSerialization) {
+    llvm::SmallString<128> buffer;
+    auto EC = llvm::sys::fs::createTemporaryFile("depscan_cache", "moddepcache", buffer);
+    if (EC) {
+      instance.getDiags().diagnose(SourceLoc(),
+                                   diag::error_unable_to_make_temporary_file,
+                                   EC.message());
+    } else {
+      std::string path = buffer.str().str();
+      serializeDependencyCache(instance.getDiags(), path, cache);
+      deserializeDependencyCache(path, loadedCache);
+      resultCache = &loadedCache;
+    }
+  }
+
   auto dependencyGraph = generateFullDependencyGraph(
-      instance, cache, ASTDelegate, allModules.getArrayRef());
+      instance, *resultCache, ASTDelegate, allModules.getArrayRef());
   // Update the dependency tracker.
   if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {
-      auto deps = cache.findDependencies(module.first, module.second);
+      auto deps = resultCache->findDependencies(module.first, module.second);
       if (!deps)
         continue;
 

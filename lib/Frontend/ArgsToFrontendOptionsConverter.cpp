@@ -117,6 +117,13 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
 
+  Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
+  Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);
+  Opts.TestDependencyScannerCacheSerialization |= Args.hasArg(OPT_debug_test_dependency_scan_cache_serialization);
+  if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
+    Opts.SerializedDependencyScannerCachePath = A->getValue();
+  }
+
   Opts.DisableCrossModuleIncrementalBuild |=
       Args.hasArg(OPT_disable_incremental_imports);
 
