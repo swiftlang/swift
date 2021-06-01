@@ -275,8 +275,8 @@ public:
 
   /// Describe the module dependencies for a Swift module that can be
   /// built from a Swift interface file (\c .swiftinterface).
-  static ModuleDependencies forSwiftInterface(
-      const std::string &swiftInterfaceFile,
+  static ModuleDependencies forSwiftTextualModule(
+      const Optional<std::string> &swiftInterfaceFile,
       ArrayRef<std::string> compiledCandidates,
       ArrayRef<StringRef> buildCommands,
       ArrayRef<StringRef> extraPCMArgs,
@@ -385,6 +385,9 @@ public:
 
   /// Add a bridging header to a Swift module's dependencies.
   void addBridgingHeader(StringRef bridgingHeader);
+
+  /// Add source files
+  void addSourceFile(StringRef sourceFile);
 
   /// Add source files that the bridging header depends on.
   void addBridgingSourceFile(StringRef bridgingSourceFile);
