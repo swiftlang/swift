@@ -630,7 +630,7 @@ public:
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
     
-  std::string normalizeReflectionName(RemoteRef<char> name);
+  llvm::Optional<std::string> normalizeReflectionName(RemoteRef<char> name);
   bool reflectionNameMatches(RemoteRef<char> reflectionName,
                              StringRef searchName);
 
@@ -654,7 +654,7 @@ private:
   // TypeRefBuilder struct, to isolate its template-ness from the rest of
   // TypeRefBuilder.
   unsigned PointerSize;
-  std::function<Demangle::Node * (RemoteRef<char>)>
+  std::function<Demangle::Node * (RemoteRef<char>, bool)>
     TypeRefDemangler;
   std::function<const TypeRef* (uint64_t, unsigned)>
     OpaqueUnderlyingTypeReader;
@@ -665,10 +665,10 @@ public:
     : TC(*this),
       PointerSize(sizeof(typename Runtime::StoredPointer)),
       TypeRefDemangler(
-      [this, &reader](RemoteRef<char> string) -> Demangle::Node * {
+      [this, &reader](RemoteRef<char> string, bool useOpaqueTypeSymbolicReferences) -> Demangle::Node * {
         return reader.demangle(string,
                                remote::MangledNameKind::Type,
-                               Dem, /*useOpaqueTypeSymbolicReferences*/ true);
+                               Dem, useOpaqueTypeSymbolicReferences);
       }),
       OpaqueUnderlyingTypeReader(
       [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
@@ -677,8 +677,9 @@ public:
       })
   {}
 
-  Demangle::Node *demangleTypeRef(RemoteRef<char> string) {
-    return TypeRefDemangler(string);
+  Demangle::Node *demangleTypeRef(RemoteRef<char> string,
+                                  bool useOpaqueTypeSymbolicReferences = true) {
+    return TypeRefDemangler(string, useOpaqueTypeSymbolicReferences);
   }
 
   TypeConverter &getTypeConverter() { return TC; }
