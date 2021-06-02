@@ -673,6 +673,10 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
   extern "C" const ContextDescriptor DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
 
+// FIXME: When the _Concurrency library gets merged into the Standard Library,
+// we will be able to reference those symbols directly as well.
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
+
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
@@ -703,6 +707,9 @@ _findContextDescriptor(Demangle::NodePointer node,
     if (name.equals(#TYPENAME)) { \
       return &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)); \
     }
+  // FIXME: When the _Concurrency library gets merged into the Standard Library,
+  // we will be able to reference those symbols directly as well.
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif

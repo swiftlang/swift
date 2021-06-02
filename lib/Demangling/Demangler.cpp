@@ -949,7 +949,9 @@ NodePointer Demangler::demangleStandardSubstitution() {
       int RepeatCount = demangleNatural();
       if (RepeatCount > SubstitutionMerging::MaxRepeatCount)
         return nullptr;
-      if (NodePointer Nd = createStandardSubstitution(nextChar())) {
+      bool secondLevelSubstitution = nextIf('c');
+      if (NodePointer Nd = createStandardSubstitution(
+              nextChar(), secondLevelSubstitution)) {
         while (RepeatCount-- > 1) {
           pushNode(Nd);
         }
@@ -960,10 +962,16 @@ NodePointer Demangler::demangleStandardSubstitution() {
   }
 }
 
-NodePointer Demangler::createStandardSubstitution(char Subst) {
+NodePointer Demangler::createStandardSubstitution(
+    char Subst, bool SecondLevel) {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                   \
-  if (Subst == #MANGLING[0]) {                                    \
-    return createSwiftType(Node::Kind::KIND, #TYPENAME);      \
+  if (!SecondLevel && Subst == #MANGLING[0]) {                    \
+    return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
+  }
+
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)                   \
+  if (SecondLevel && Subst == #MANGLING[0]) {                    \
+    return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
   }
 
 #include "swift/Demangling/StandardTypesMangling.def"
