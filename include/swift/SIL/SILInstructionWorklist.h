@@ -128,13 +128,15 @@ public:
     }
   }
 
-  /// All operands of \p instruction to the worklist when performing 2 stage
-  /// instruction deletion. Meant to be used right before deleting an
-  /// instruction in callbacks like InstModCallback::onNotifyWillBeDeleted().
+  /// Add operands of \p instruction to the worklist. Meant to be used once it
+  /// is certain that \p instruction will be deleted but may have operands that
+  /// are still alive. With fewer uses, the operand definition may be
+  /// optimizable.
+  ///
+  /// \p instruction may still have uses because this is called before
+  /// InstructionDeleter begins deleting it and some instructions are deleted at
+  /// the same time as their uses.
   void addOperandsToWorklist(SILInstruction &instruction) {
-    assert(!instruction.hasUsesOfAnyResult() &&
-           "Cannot erase instruction that is used!");
-
     // Make sure that we reprocess all operands now that we reduced their
     // use counts.
     if (instruction.getNumOperands() < 8) {

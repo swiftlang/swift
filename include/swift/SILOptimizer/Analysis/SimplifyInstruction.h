@@ -25,7 +25,7 @@
 namespace swift {
 
 class SILInstruction;
-class InstModCallbacks;
+struct InstModCallbacks;
 
 /// Replace an instruction with a simplified result and erase it. If the
 /// instruction initiates a scope, do not replace the end of its scope; it will

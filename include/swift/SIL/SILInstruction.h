@@ -469,6 +469,9 @@ public:
   /// Drops all uses that belong to this instruction.
   void dropAllReferences();
 
+  /// Drops all references that aren't represented by operands.
+  void dropNonOperandReferences();
+
   /// Replace all uses of all results of this instruction with undef.
   void replaceAllUsesOfAllResultsWithUndef();
 

@@ -25,9 +25,9 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
@@ -290,7 +290,10 @@ static bool isNonGenericReadOnlyConstantEvaluableCall(FullApplySite applySite) {
 /// of non-trivial results.
 ///
 /// \param inst instruction that checked for liveness.
-static bool isScopeAffectingInstructionDead(SILInstruction *inst) {
+///
+/// TODO: Handle partial_apply [stack] which has a dealloc_stack user.
+static bool isScopeAffectingInstructionDead(SILInstruction *inst,
+                                            bool fixLifetime) {
   SILFunction *fun = inst->getFunction();
   assert(fun && "Instruction has no function.");
   // Only support ownership SIL for scoped instructions.
@@ -324,10 +327,31 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst) {
     // say this for load.
   }
   case SILInstructionKind::PartialApplyInst: {
+    bool onlyTrivialArgs = true;
+    for (auto &arg : cast<PartialApplyInst>(inst)->getArgumentOperands()) {
+      auto argTy = arg.get()->getType();
+      // Non-stack partial apply captures that are passed by address are always
+      // captured at +1 by the closure contrext, regardless of the calling
+      // convention.
+      //
+      // TODO: When on-stack partial applies are also handled, then their +0
+      // address arguments can be ignored.
+      //
+      // FIXME: Even with fixLifetimes enabled, InstructionDeleter does not know
+      // how to cleanup arguments captured by address. This should be as simple
+      // as inserting a destroy_addr. But the analagous code in
+      // tryDeleteDeadClosure() and keepArgsOfPartialApplyAlive() mysteriously
+      // creates new alloc_stack's and invalidates stack nesting. So we
+      // conservatively bail-out until we understand why that hack exists.
+      if (argTy.isAddress())
+        return false;
+
+      onlyTrivialArgs &= argTy.isTrivial(*fun);
+    }
     // Partial applies that are only used in destroys cannot have any effect on
     // the program state, provided the values they capture are explicitly
-    // destroyed.
-    return true;
+    // destroyed, which only happens when fixLifetime is true.
+    return onlyTrivialArgs || fixLifetime;
   }
   case SILInstructionKind::StructInst:
   case SILInstructionKind::EnumInst:
@@ -367,130 +391,6 @@ static bool isScopeAffectingInstructionDead(SILInstruction *inst) {
   }
 }
 
-void InstructionDeleter::trackIfDead(SILInstruction *inst) {
-  if (isInstructionTriviallyDead(inst) ||
-      isScopeAffectingInstructionDead(inst)) {
-    assert(!isIncidentalUse(inst) && !isa<DestroyValueInst>(inst) &&
-           "Incidental uses cannot be removed in isolation. "
-           "They would be removed iff the operand is dead");
-    deadInstructions.insert(inst);
-  }
-}
-
-/// Given an \p operand that belongs to an instruction that will be removed,
-/// destroy the operand just before the instruction, if the instruction consumes
-/// \p operand. This function will result in a double consume, which is expected
-/// to be resolved when the caller deletes the original instruction. This
-/// function works only on ownership SIL.
-static void destroyConsumedOperandOfDeadInst(Operand &operand,
-                                             InstModCallbacks callbacks) {
-  assert(operand.get() && operand.getUser());
-  SILInstruction *deadInst = operand.getUser();
-  SILFunction *fun = deadInst->getFunction();
-  assert(fun->hasOwnership());
-
-  SILValue operandValue = operand.get();
-  if (operandValue->getType().isTrivial(*fun))
-    return;
-  // Ignore type-dependent operands which are not real operands but are just
-  // there to create use-def dependencies.
-  if (deadInst->isTypeDependentOperand(operand))
-    return;
-  // A scope ending instruction cannot be deleted in isolation without removing
-  // the instruction defining its operand as well.
-  assert(!isEndOfScopeMarker(deadInst) && !isa<DestroyValueInst>(deadInst) &&
-         !isa<DestroyAddrInst>(deadInst) &&
-         "lifetime ending instruction is deleted without its operand");
-  if (operand.isLifetimeEnding()) {
-    // Since deadInst cannot be an end-of-scope instruction (asserted above),
-    // this must be a consuming use of an owned value.
-    assert(operandValue.getOwnershipKind() == OwnershipKind::Owned);
-    SILBuilderWithScope builder(deadInst);
-    auto *dvi = builder.createDestroyValue(deadInst->getLoc(), operandValue);
-    callbacks.createdNewInst(dvi);
-  }
-}
-
-void InstructionDeleter::deleteInstruction(SILInstruction *inst,
-                                           bool fixOperandLifetimes) {
-  // We cannot fix operand lifetimes in non-ownership SIL.
-  assert(!fixOperandLifetimes || inst->getFunction()->hasOwnership());
-  // Collect instruction and its immediate uses and check if they are all
-  // incidental uses. Also, invoke the callback on the instruction and its uses.
-  // Note that the Callback is invoked before deleting anything to ensure that
-  // the SIL is valid at the time of the callback.
-  SmallVector<SILInstruction *, 4> toDeleteInsts;
-  toDeleteInsts.push_back(inst);
-  instModCallbacks.notifyWillBeDeleted(inst);
-  for (SILValue result : inst->getResults()) {
-    for (Operand *use : result->getUses()) {
-      SILInstruction *user = use->getUser();
-      assert(isIncidentalUse(user) || isa<DestroyValueInst>(user));
-      instModCallbacks.notifyWillBeDeleted(user);
-      toDeleteInsts.push_back(user);
-    }
-  }
-  // Record definitions of instruction's operands. Also, in case an operand is
-  // consumed by inst, emit necessary compensation code.
-  SmallVector<SILInstruction *, 4> operandDefinitions;
-  for (Operand &operand : inst->getAllOperands()) {
-    SILValue operandValue = operand.get();
-    assert(operandValue &&
-           "Instruction's operand are deleted before the instruction");
-    SILInstruction *defInst = operandValue->getDefiningInstruction();
-    // If the operand has a defining instruction, it could be potentially
-    // dead. Therefore, record the definition.
-    if (defInst)
-      operandDefinitions.push_back(defInst);
-    // The scope of the operand could be ended by inst. Therefore, emit
-    // any compensating code needed to end the scope of the operand value
-    // once inst is deleted.
-    if (fixOperandLifetimes)
-      destroyConsumedOperandOfDeadInst(operand, instModCallbacks);
-  }
-  // First drop all references from all instructions to be deleted and then
-  // erase the instruction. Note that this is done in this order so that when an
-  // instruction is deleted, its uses would have dropped their references.
-  // Note that the toDeleteInsts must also be removed from the tracked
-  // deadInstructions.
-  for (SILInstruction *inst : toDeleteInsts) {
-    deadInstructions.remove(inst);
-    inst->dropAllReferences();
-  }
-  for (SILInstruction *inst : toDeleteInsts) {
-    // We do not notify when deleting since we already called the notify
-    // callback earlier for all toDeleteInsts.
-    instModCallbacks.deleteInst(inst, false /*notify when deleting*/);
-  }
-  // Record operand definitions that become dead now.
-  for (SILInstruction *operandValInst : operandDefinitions) {
-    trackIfDead(operandValInst);
-  }
-}
-
-void InstructionDeleter::cleanUpDeadInstructions() {
-  SILFunction *fun = nullptr;
-  if (!deadInstructions.empty())
-    fun = deadInstructions.front()->getFunction();
-  while (!deadInstructions.empty()) {
-    SmallVector<SILInstruction *, 8> currentDeadInsts(deadInstructions.begin(),
-                                                      deadInstructions.end());
-    // Though deadInstructions is cleared here, calls to deleteInstruction may
-    // append to deadInstructions. So we need to iterate until this it is empty.
-    deadInstructions.clear();
-    for (SILInstruction *deadInst : currentDeadInsts) {
-      // deadInst will not have been deleted in the previous iterations,
-      // because, by definition, deleteInstruction will only delete an earlier
-      // instruction and its incidental/destroy uses. The former cannot be
-      // deadInst as deadInstructions is a set vector, and the latter cannot be
-      // in deadInstructions as they are incidental uses which are never added
-      // to deadInstructions.
-      deleteInstruction(deadInst, /*Fix lifetime of operands*/
-                        fun->hasOwnership());
-    }
-  }
-}
-
 static bool hasOnlyIncidentalUses(SILInstruction *inst,
                                   bool disallowDebugUses = false) {
   for (SILValue result : inst->getResults()) {
@@ -505,13 +405,128 @@ static bool hasOnlyIncidentalUses(SILInstruction *inst,
   return true;
 }
 
-void InstructionDeleter::deleteIfDead(SILInstruction *inst) {
-  if (isInstructionTriviallyDead(inst) ||
-      isScopeAffectingInstructionDead(inst)) {
-    deleteInstruction(
-        inst,
-        /*Fix lifetime of operands*/ inst->getFunction()->hasOwnership());
+bool InstructionDeleter::trackIfDead(SILInstruction *inst) {
+  bool fixLifetime = inst->getFunction()->hasOwnership();
+  if (isInstructionTriviallyDead(inst)
+      || isScopeAffectingInstructionDead(inst, fixLifetime)) {
+    assert(!isIncidentalUse(inst) && !isa<DestroyValueInst>(inst) &&
+           "Incidental uses cannot be removed in isolation. "
+           "They would be removed iff the operand is dead");
+    getCallbacks().notifyWillBeDeleted(inst);
+    deadInstructions.insert(inst);
+    return true;
   }
+  return false;
+}
+
+void InstructionDeleter::forceTrackAsDead(SILInstruction *inst) {
+  bool disallowDebugUses = inst->getFunction()->getEffectiveOptimizationMode()
+                           <= OptimizationMode::NoOptimization;
+  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  getCallbacks().notifyWillBeDeleted(inst);
+  deadInstructions.insert(inst);
+}
+
+/// Force-delete \p inst and all its uses.
+///
+/// \p fixLifetimes causes new destroys to be inserted after dropping
+/// operands.
+///
+/// \p forceDeleteUsers allows deleting an instruction with non-incidental,
+/// non-destoy uses, such as a store.
+///
+/// Does not call callbacks.notifyWillBeDeleted for \p inst. But does
+/// for any other instructions that become dead as a result.
+///
+/// Carefully orchestrated steps for deleting an instruction with its uses:
+///
+/// Recursively gather the instruction's uses into the toDeleteInsts set and
+/// dropping the operand for each use traversed.
+///
+/// For the remaining operands, insert destroys for consuming operands and track
+/// newly dead operand definitions.
+///
+/// Finally, erase the instruction.
+void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
+                                        bool forceDeleteUsers) {
+  // Cannot fix operand lifetimes in non-ownership SIL.
+  assert(!fixLifetimes || inst->getFunction()->hasOwnership());
+
+  // Recursively visit all uses while growing toDeleteInsts in def-use order and
+  // dropping dead operands.
+  SmallVector<SILInstruction *, 4> toDeleteInsts;
+
+  toDeleteInsts.push_back(inst);
+  for (unsigned idx = 0; idx < toDeleteInsts.size(); ++idx) {
+    for (SILValue result : toDeleteInsts[idx]->getResults()) {
+      // Temporary use vector to avoid iterator invalidation.
+      auto uses = llvm::to_vector<4>(result->getUses());
+      for (Operand *use : uses) {
+        SILInstruction *user = use->getUser();
+        assert(forceDeleteUsers || isIncidentalUse(user)
+               || isa<DestroyValueInst>(user));
+        assert(!isa<BranchInst>(user) && "can't delete phis");
+
+        toDeleteInsts.push_back(user);
+        use->drop();
+      }
+    }
+  }
+  // Process the remaining operands. Insert destroys for consuming
+  // operands. Track newly dead operand values.
+  for (auto *inst : toDeleteInsts) {
+    for (Operand &operand : inst->getAllOperands()) {
+      SILValue operandValue = operand.get();
+      // Check for dead operands, which are dropped above.
+      if (!operandValue)
+        continue;
+
+      if (fixLifetimes && operand.isConsuming()) {
+        SILBuilderWithScope builder(inst);
+        auto *dvi = builder.createDestroyValue(inst->getLoc(), operandValue);
+        getCallbacks().createdNewInst(dvi);
+      }
+      auto *operDef = operandValue->getDefiningInstruction();
+      operand.drop();
+      if (operDef) {
+        trackIfDead(operDef);
+      }
+    }
+    inst->dropNonOperandReferences();
+    deadInstructions.remove(inst);
+    getCallbacks().deleteInst(inst, false /*notify when deleting*/);
+  }
+}
+
+void InstructionDeleter::cleanupDeadInstructions() {
+  while (!deadInstructions.empty()) {
+    SmallVector<SILInstruction *, 8> currentDeadInsts(deadInstructions.begin(),
+                                                      deadInstructions.end());
+    // Though deadInstructions is cleared here, calls to deleteInstruction may
+    // append to deadInstructions. So we need to iterate until this it is empty.
+    deadInstructions.clear();
+    for (SILInstruction *deadInst : currentDeadInsts) {
+      // deadInst will not have been deleted in the previous iterations,
+      // because, by definition, deleteInstruction will only delete an earlier
+      // instruction and its incidental/destroy uses. The former cannot be
+      // deadInst as deadInstructions is a set vector, and the latter cannot be
+      // in deadInstructions as they are incidental uses which are never added
+      // to deadInstructions.
+      deleteWithUses(deadInst,
+                     /*fixLifetimes*/ deadInst->getFunction()->hasOwnership());
+    }
+  }
+}
+
+bool InstructionDeleter::deleteIfDead(SILInstruction *inst) {
+  bool fixLifetime = inst->getFunction()->hasOwnership();
+  if (isInstructionTriviallyDead(inst)
+      || isScopeAffectingInstructionDead(inst, fixLifetime)) {
+    getCallbacks().notifyWillBeDeleted(inst);
+    deleteWithUses(inst, fixLifetime);
+    return true;
+  }
+  return false;
 }
 
 void InstructionDeleter::forceDeleteAndFixLifetimes(SILInstruction *inst) {
@@ -520,7 +535,7 @@ void InstructionDeleter::forceDeleteAndFixLifetimes(SILInstruction *inst) {
   bool disallowDebugUses =
       fun->getEffectiveOptimizationMode() <= OptimizationMode::NoOptimization;
   assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
-  deleteInstruction(inst, /*Fix lifetime of operands*/ true);
+  deleteWithUses(inst, /*fixLifetimes*/ true);
 }
 
 void InstructionDeleter::forceDelete(SILInstruction *inst) {
@@ -528,15 +543,7 @@ void InstructionDeleter::forceDelete(SILInstruction *inst) {
       inst->getFunction()->getEffectiveOptimizationMode() <=
       OptimizationMode::NoOptimization;
   assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
-  deleteInstruction(inst, /*Fix lifetime of operands*/ false);
-}
-
-void InstructionDeleter::forceTrackAsDead(SILInstruction *inst) {
-  bool disallowDebugUses =
-      inst->getFunction()->getEffectiveOptimizationMode() <=
-      OptimizationMode::NoOptimization;
-  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
-  deadInstructions.insert(inst);
+  deleteWithUses(inst, /*fixLifetimes*/ false);
 }
 
 void InstructionDeleter::recursivelyDeleteUsersIfDead(SILInstruction *inst) {
@@ -569,7 +576,7 @@ void swift::eliminateDeadInstruction(SILInstruction *inst,
                                      InstModCallbacks callbacks) {
   InstructionDeleter deleter(callbacks);
   deleter.trackIfDead(inst);
-  deleter.cleanUpDeadInstructions();
+  deleter.cleanupDeadInstructions();
 }
 
 void swift::recursivelyDeleteTriviallyDeadInstructions(
@@ -633,37 +640,6 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
     SILInstruction *inst, bool force, InstModCallbacks callbacks) {
   ArrayRef<SILInstruction *> ai = ArrayRef<SILInstruction *>(inst);
   recursivelyDeleteTriviallyDeadInstructions(ai, force, callbacks);
-}
-
-void swift::eraseUsesOfInstruction(SILInstruction *inst,
-                                   InstModCallbacks callbacks) {
-  for (auto result : inst->getResults()) {
-    while (!result->use_empty()) {
-      auto ui = result->use_begin();
-      auto *user = ui->getUser();
-      assert(user && "User should never be NULL!");
-
-      // If the instruction itself has any uses, recursively zap them so that
-      // nothing uses this instruction.
-      eraseUsesOfInstruction(user, callbacks);
-
-      // Walk through the operand list and delete any random instructions that
-      // will become trivially dead when this instruction is removed.
-
-      for (auto &operand : user->getAllOperands()) {
-        if (auto *operandI = operand.get()->getDefiningInstruction()) {
-          // Don't recursively delete the instruction we're working on.
-          // FIXME: what if we're being recursively invoked?
-          if (operandI != inst) {
-            operand.drop();
-            recursivelyDeleteTriviallyDeadInstructions(operandI, false,
-                                                       callbacks);
-          }
-        }
-      }
-      callbacks.deleteInst(user);
-    }
-  }
 }
 
 void swift::collectUsesOfValue(SILValue v,

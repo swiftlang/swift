@@ -434,9 +434,9 @@ bb3:
 // CHECK-LABEL: sil [ossa] @multi_asi_basic_block_with_phiarg :
 // CHECK-NOT: alloc_stack
 // CHECK-LABEL: bb1:
-// CHECK: br bb3(%1 : $Klass, %0 : $Klass)
-// CHECK-LABEL: bb2:
 // CHECK: br bb3(%0 : $Klass, %1 : $Klass)
+// CHECK-LABEL: bb2:
+// CHECK: br bb3(%1 : $Klass, %0 : $Klass)
 // CHECK-LABEL: } // end sil function 'multi_asi_basic_block_with_phiarg'
 sil [ossa] @multi_asi_basic_block_with_phiarg : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):

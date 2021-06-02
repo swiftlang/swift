@@ -2,10 +2,10 @@
   return x
 }
 
-@_transparent public func testBuiltin() -> Int32 {
+@_transparent public func testBuiltin() -> (Int32, String) {
   var y: Int32 = 300
   var z = "foo"
-  return y
+  return (y, z)
 }
 
 @_transparent public func standalone_function(x x: Int32, y: Int32) -> Int32 {

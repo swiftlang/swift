@@ -791,6 +791,35 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.EnableRequirementMachine = Args.hasFlag(
+      OPT_enable_requirement_machine,
+      OPT_disable_requirement_machine, /*default=*/false);
+
+  Opts.DebugRequirementMachine = Args.hasArg(
+      OPT_debug_requirement_machine);
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_step_limit)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineStepLimit = limit;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_depth_limit)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineDepthLimit = limit;
+    }
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -876,7 +905,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_experimental_print_full_convention);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
     unsigned line;
@@ -896,6 +924,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
+
+  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   return HadError;
 }

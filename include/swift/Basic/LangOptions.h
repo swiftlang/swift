@@ -427,6 +427,20 @@ namespace swift {
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
 
+    /// Whether the new experimental generics implementation is enabled.
+    bool EnableRequirementMachine = false;
+
+    /// Enables debugging output from the requirement machine.
+    bool DebugRequirementMachine = false;
+
+    /// Maximum iteration count for requirement machine confluent completion
+    /// algorithm.
+    unsigned RequirementMachineStepLimit = 1000;
+
+    /// Maximum term length for requirement machine confluent completion
+    /// algorithm.
+    unsigned RequirementMachineDepthLimit = 10;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
@@ -563,6 +577,9 @@ namespace swift {
     /// Flags for developers
     ///
 
+    /// Debug the generic signatures computed by the generic signature builder.
+    bool DebugGenericSignatures = false;
+
     /// Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
@@ -576,9 +593,6 @@ namespace swift {
     /// Line numbers to activate the constraint solver debugger.
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
-
-    /// Debug the generic signatures computed by the generic signature builder.
-    bool DebugGenericSignatures = false;
 
     /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
     /// identifier reference with the provided prefix name.

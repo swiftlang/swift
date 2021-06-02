@@ -4026,7 +4026,7 @@ GenericSignatureBuilder::getConformanceAccessPath(Type type,
 
   auto *Stats = Context.Stats;
 
-  FrontendStatsTracer(Stats, "get-conformance-access-path");
+  FrontendStatsTracer tracer(Stats, "get-conformance-access-path");
 
   auto recordPath = [&](CanType type, ProtocolDecl *proto,
                         ConformanceAccessPath path) {

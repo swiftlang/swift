@@ -635,7 +635,7 @@ class ForEachLoopUnroller : public SILFunctionTransform {
     }
 
     if (changed) {
-      deleter.cleanUpDeadInstructions();
+      deleter.cleanupDeadInstructions();
       PM->invalidateAnalysis(&fun,
                   SILAnalysis::InvalidationKind::FunctionBody);
     }
