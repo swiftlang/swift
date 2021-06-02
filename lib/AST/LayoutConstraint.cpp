@@ -358,4 +358,18 @@ LayoutConstraintInfo LayoutConstraintInfo::NativeClassConstraintInfo(
 LayoutConstraintInfo LayoutConstraintInfo::TrivialConstraintInfo(
     LayoutConstraintKind::Trivial);
 
+int LayoutConstraint::compare(LayoutConstraint rhs) const {
+  if (Ptr->getKind() != rhs->getKind())
+    return int(rhs->getKind()) - int(Ptr->getKind());
+
+  if (Ptr->SizeInBits != rhs->SizeInBits)
+    return int(rhs->SizeInBits) - int(Ptr->SizeInBits);
+
+  if (Ptr->Alignment != rhs->Alignment)
+    return int(rhs->Alignment) - int(Ptr->Alignment);
+
+  assert(*this == rhs);
+  return 0;
+}
+
 } // end namespace swift

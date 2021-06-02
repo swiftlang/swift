@@ -111,6 +111,7 @@ namespace swift {
   class TupleTypeElt;
   class EnumElementDecl;
   class ProtocolDecl;
+  class RequirementMachine;
   class SubstitutableType;
   class SourceManager;
   class ValueDecl;
@@ -1131,6 +1132,11 @@ public:
   /// canonical generic signature and module.
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
                                                      CanGenericSignature sig);
+
+  /// Retrieve or create a term rewriting system for answering queries on
+  /// type parameters written against the given generic signature.
+  RequirementMachine *getOrCreateRequirementMachine(
+      CanGenericSignature sig);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
