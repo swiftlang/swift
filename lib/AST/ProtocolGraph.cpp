@@ -88,7 +88,7 @@ void ProtocolGraph::computeLinearOrder() {
 }
 
 void ProtocolGraph::computeInheritedAssociatedTypes() {
-  for (const auto *proto : Protocols) {
+  for (const auto *proto : llvm::reverse(Protocols)) {
     auto &info = Info[proto];
 
     llvm::SmallDenseSet<const AssociatedTypeDecl *, 4> visited;
@@ -103,6 +103,28 @@ void ProtocolGraph::computeInheritedAssociatedTypes() {
         // The 'if (inherited == proto)' above avoids a potential
         // iterator invalidation here.
         info.AssociatedTypes.push_back(inheritedType);
+      }
+    }
+  }
+}
+
+void ProtocolGraph::computeInheritedProtocols() {
+  for (const auto *proto : llvm::reverse(Protocols)) {
+    auto &info = Info[proto];
+
+    llvm::SmallDenseSet<const ProtocolDecl *, 4> visited;
+    visited.insert(proto);
+
+    for (const auto *inherited : info.Inherited) {
+      if (!visited.insert(inherited).second)
+        continue;
+      info.AllInherited.push_back(inherited);
+
+      for (auto *inheritedType : getProtocolInfo(inherited).AllInherited) {
+        if (!visited.insert(inheritedType).second)
+          continue;
+
+        info.AllInherited.push_back(inheritedType);
       }
     }
   }
@@ -138,4 +160,12 @@ int ProtocolGraph::compareProtocols(const ProtocolDecl *lhs,
   const auto &infoRHS = getProtocolInfo(rhs);
 
   return infoLHS.Index - infoRHS.Index;
+}
+
+bool ProtocolGraph::inheritsFrom(const ProtocolDecl *thisProto,
+                                 const ProtocolDecl *otherProto) const {
+  const auto &info = getProtocolInfo(thisProto);
+  return std::find(info.AllInherited.begin(),
+                   info.AllInherited.end(),
+                   otherProto) != info.AllInherited.end();
 }

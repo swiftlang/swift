@@ -182,7 +182,19 @@ public:
   decltype(Atoms)::iterator begin() { return Atoms.begin(); }
   decltype(Atoms)::iterator end() { return Atoms.end(); }
 
+  const Atom &back() const {
+    return Atoms.back();
+  }
+
+  Atom &back() {
+    return Atoms.back();
+  }
+
   const Atom &operator[](size_t index) const {
+    return Atoms[index];
+  }
+
+  Atom &operator[](size_t index) {
     return Atoms[index];
   }
 
@@ -209,6 +221,9 @@ class Rule final {
 public:
   Rule(const Term &lhs, const Term &rhs)
       : LHS(lhs), RHS(rhs), deleted(false) {}
+
+  const Term &getLHS() const { return LHS; }
+  const Term &getRHS() const { return RHS; }
 
   bool apply(Term &term) const {
     assert(!deleted);
@@ -247,15 +262,18 @@ public:
 class RewriteSystem final {
   std::vector<Rule> Rules;
   ProtocolGraph Protos;
+  std::vector<std::pair<Term, Term>> MergedAssociatedTypes;
   std::deque<std::pair<unsigned, unsigned>> Worklist;
 
   unsigned DebugSimplify : 1;
   unsigned DebugAdd : 1;
+  unsigned DebugMerge : 1;
 
 public:
   explicit RewriteSystem() {
     DebugSimplify = false;
     DebugAdd = false;
+    DebugMerge = false;
   }
 
   RewriteSystem(const RewriteSystem &) = delete;
@@ -283,6 +301,10 @@ public:
       unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
+
+private:
+  Atom mergeAssociatedTypes(Atom lhs, Atom rhs) const;
+  void processMergedAssociatedTypes();
 };
 
 } // end namespace rewriting

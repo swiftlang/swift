@@ -27,6 +27,7 @@ namespace rewriting {
 
 struct ProtocolInfo {
   ArrayRef<ProtocolDecl *> Inherited;
+  llvm::TinyPtrVector<const ProtocolDecl *> AllInherited;
   llvm::TinyPtrVector<AssociatedTypeDecl *> AssociatedTypes;
   ArrayRef<Requirement> Requirements;
 
@@ -77,8 +78,13 @@ struct ProtocolGraph {
 
   void computeInheritedAssociatedTypes();
 
+  void computeInheritedProtocols();
+
   int compareProtocols(const ProtocolDecl *lhs,
                        const ProtocolDecl *rhs) const;
+
+  bool inheritsFrom(const ProtocolDecl *thisProto,
+                    const ProtocolDecl *otherProto) const;
 
 private:
   unsigned computeProtocolDepth(const ProtocolDecl *proto);

@@ -227,6 +227,7 @@ void RewriteSystem::initialize(std::vector<std::pair<Term, Term>> &&rules,
                                ProtocolGraph &&graph) {
   Protos = graph;
 
+  // FIXME: Probably this sort is not necessary
   std::sort(rules.begin(), rules.end(),
             [&](std::pair<Term, Term> lhs,
                 std::pair<Term, Term> rhs) -> int {
@@ -258,6 +259,14 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
 
   unsigned i = Rules.size();
   Rules.emplace_back(lhs, rhs);
+
+  if (lhs.size() == rhs.size() &&
+      std::equal(lhs.begin(), lhs.end() - 1, rhs.begin()) &&
+      lhs.back().getKind() == Atom::Kind::AssociatedType &&
+      rhs.back().getKind() == Atom::Kind::AssociatedType &&
+      lhs.back().getName() == rhs.back().getName()) {
+    MergedAssociatedTypes.emplace_back(lhs, rhs);
+  }
 
   for (unsigned j : indices(Rules)) {
     if (i == j)
@@ -308,6 +317,110 @@ bool RewriteSystem::simplify(Term &term) const {
   }
 
   return changed;
+}
+
+Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
+  assert(lhs.getKind() == Atom::Kind::AssociatedType);
+  assert(rhs.getKind() == Atom::Kind::AssociatedType);
+  assert(lhs.getName() == rhs.getName());
+  assert(lhs.compare(rhs, Protos) > 0);
+
+  auto protos = lhs.getProtocols();
+  auto otherProtos = rhs.getProtocols();
+
+  // Follows from lhs > rhs
+  assert(protos.size() <= otherProtos.size());
+
+  llvm::TinyPtrVector<const ProtocolDecl *> newProtos;
+  std::merge(protos.begin(), protos.end(),
+             otherProtos.begin(), otherProtos.end(),
+             std::back_inserter(newProtos),
+             [&](const ProtocolDecl *lhs,
+                 const ProtocolDecl *rhs) -> int {
+               return Protos.compareProtocols(lhs, rhs) < 0;
+             });
+
+  llvm::TinyPtrVector<const ProtocolDecl *> minimalProtos;
+  for (const auto *newProto : newProtos) {
+    auto inheritsFrom = [&](const ProtocolDecl *thisProto) {
+      return (thisProto == newProto ||
+              Protos.inheritsFrom(thisProto, newProto));
+    };
+
+    if (std::find_if(protos.begin(), protos.end(), inheritsFrom)
+        == protos.end()) {
+      minimalProtos.push_back(newProto);
+    }
+  }
+
+  assert(minimalProtos.size() >= protos.size());
+  assert(minimalProtos.size() >= otherProtos.size());
+
+  return Atom::forAssociatedType(minimalProtos, lhs.getName());
+}
+
+void RewriteSystem::processMergedAssociatedTypes() {
+  if (MergedAssociatedTypes.empty())
+    return;
+
+  unsigned i = 0;
+  while (i < MergedAssociatedTypes.size()) {
+    auto pair = MergedAssociatedTypes[i++];
+    const auto &lhs = pair.first;
+    const auto &rhs = pair.second;
+
+    // If we have ...[P1:T] => ...[P2:T], add a new pair of rules:
+    // ...[P1:T] => ...[P1&P2:T]
+    // ...[P2:T] => ...[P1&P2:T]
+    if (DebugMerge) {
+      llvm::dbgs() << "## Associated type merge candidate ";
+      lhs.dump(llvm::dbgs());
+      llvm::dbgs() << " => ";
+      rhs.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
+    auto mergedAtom = mergeAssociatedTypes(lhs.back(), rhs.back());
+    if (DebugMerge) {
+      llvm::dbgs() << "### Merged atom ";
+      mergedAtom.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+
+    Term mergedTerm = lhs;
+    mergedTerm.back() = mergedAtom;
+
+    addRule(lhs, mergedTerm);
+    addRule(rhs, mergedTerm);
+
+    for (const auto &otherRule : Rules) {
+      const auto &otherLHS = otherRule.getLHS();
+      if (otherLHS.size() == 2 &&
+          otherLHS[1].getKind() == Atom::Kind::Protocol) {
+        if (otherLHS[0] == lhs.back() ||
+            otherLHS[0] == rhs.back()) {
+          if (DebugMerge) {
+            llvm::dbgs() << "### Lifting conformance rule ";
+            otherRule.dump(llvm::dbgs());
+            llvm::dbgs() << "\n";
+          }
+
+          auto otherRHS = otherRule.getRHS();
+          assert(otherRHS.size() == 1);
+          assert(otherRHS[0] == otherLHS[0]);
+
+          otherRHS.back() = mergedAtom;
+
+          auto newLHS = otherRHS;
+          newLHS.add(Atom::forProtocol(otherLHS[1].getProtocol()));
+
+          addRule(newLHS, otherRHS);
+        }
+      }
+    }
+  }
+
+  MergedAssociatedTypes.clear();
 }
 
 RewriteSystem::CompletionResult
@@ -361,7 +474,22 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       if (rule.canReduceLeftHandSide(newRule))
         rule.markDeleted();
     }
+
+    processMergedAssociatedTypes();
   }
+
+  // This isn't necessary for correctness, it's just an optimization.
+  for (auto &rule : Rules) {
+    auto rhs = rule.getRHS();
+    simplify(rhs);
+    rule = Rule(rule.getLHS(), rhs);
+  }
+
+  // Just for aesthetics in dump().
+  std::sort(Rules.begin(), Rules.end(),
+            [&](Rule lhs, Rule rhs) -> int {
+              return lhs.getLHS().compare(rhs.getLHS(), Protos) < 0;
+            });
 
   return CompletionResult::Success;
 }
