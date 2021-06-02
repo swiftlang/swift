@@ -194,6 +194,9 @@ def reuse_dependency_scan_cache : Flag<["-"], "load-dependency-scan-cache">,
 def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
   HelpText<"The path to output the dependency scanner's internal state.">;
 
+def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
+  HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
+
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Run SIL copy propagation to shorten object lifetime.">;
 def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
