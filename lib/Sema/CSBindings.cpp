@@ -1549,6 +1549,9 @@ void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
 }
 
 void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+
   out.indent(indent);
   if (isDirectHole())
     out << "hole ";
@@ -1561,15 +1564,17 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   auto literalKind = getLiteralKind();
   if (literalKind != LiteralBindingKind::None)
     out << "literal=" << static_cast<int>(literalKind) << " ";
-  if (involvesTypeVariables())
-    out << "involves_type_vars ";
+  if (involvesTypeVariables()) {
+    out << "involves_type_vars=[";
+    interleave(AdjacentVars,
+               [&](const auto *typeVar) { out << typeVar->getString(PO); },
+               [&out]() { out << " "; });
+    out << "] ";
+  }
 
   auto numDefaultable = getNumViableDefaultableBindings();
   if (numDefaultable > 0)
     out << "#defaultable_bindings=" << numDefaultable << " ";
-
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
 
   auto printBinding = [&](const PotentialBinding &binding) {
     auto type = binding.BindingType;
