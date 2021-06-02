@@ -73,7 +73,7 @@ bb0:
 // CHECK:   unreachable
 
 // CHECK: await.async.resume:
-// CHECK:   call { i8* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async{{.*}}({{.*}} @__swift_async_resume_project_context
+// CHECK:   call { i8* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async{{.*}}({{.*}} @__swift_async_resume_project_context{{.*}}@__swift_suspend_dispatch_1
 // CHECK:   [[result_addr_addr:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[cont_context]], i32 0, i32 3
 // CHECK:   [[result_addr:%.*]] = load %swift.opaque*, %swift.opaque** [[result_addr_addr]]
 // CHECK:   [[typed_result_addr:%.*]] = bitcast %swift.opaque* [[result_addr]] to i32*
@@ -82,6 +82,12 @@ bb0:
 
 // CHECK: [[result_bb]]:
 // CHECK:   phi i32 [ [[result_value]], %await.async.resume ]
+
+
+// CHECK: define {{.*}} void @__swift_suspend_dispatch_1(i8* %0, i8* %1)
+// CHECK-NOT: define
+// CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(i8* swiftasync %1)
+// CHECK-NEXT:  ret void
 
 sil @async_continuation : $@async () -> () {
 entry:
