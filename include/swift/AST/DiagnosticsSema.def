@@ -792,14 +792,6 @@ ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
       SWIFT_BUG_REPORT_MESSAGE,
       (StringRef))
-NOTE(serialization_misc_version,none,
-     "module '%0' full misc version is '%1'"
-     "%select{ (built while allowing compiler errors)|}2",
-     (StringRef, StringRef, bool))
-NOTE(serialization_compatibility_version_mismatch,none,
-     "compiling as Swift %0, with '%1' built as Swift %2 "
-     "(this is supported but may expose additional compiler issues)",
-     (StringRef, StringRef, StringRef))
 
 ERROR(serialization_invalid_decl,Fatal,
       "deserialized invalid declaration %0 (%1) in module '%2'",
