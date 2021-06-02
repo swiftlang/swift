@@ -64,7 +64,6 @@ set(LLVM_TOOLCHAIN_TOOLS
       llvm-lib
       llvm-lipo
       llvm-mt
-      llvm-mt
       llvm-nm
       llvm-objcopy
       llvm-objdump
