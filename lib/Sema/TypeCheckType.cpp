@@ -1261,18 +1261,17 @@ static Type diagnoseUnknownType(TypeResolution resolution,
                    comp->getNameRef(), moduleType->getModule()->getName());
   } else {
     LookupResult memberLookup;
-    // Let's try to lookup given identifier as a member of the parent type,
-    // this allows for more precise diagnostic, which distinguishes between
-    // identifier not found as a member type vs. not found at all.
-    NameLookupOptions memberLookupOptions = lookupOptions;
-    memberLookupOptions |= NameLookupFlags::IgnoreAccessControl;
-    memberLookup = TypeChecker::lookupMember(dc, parentType,
-                                             comp->getNameRef(),
-                                             memberLookupOptions);
+    // Let's try to look any member of the parent type with the given name,
+    // even if it is not a type, allowing for a more precise diagnostic.
+    NLOptions memberLookupOptions = (NL_QualifiedDefault |
+                                     NL_IgnoreAccessControl);
+    SmallVector<ValueDecl *, 2> results;
+    dc->lookupQualified(parentType, comp->getNameRef(), memberLookupOptions,
+                        results);
 
     // Looks like this is not a member type, but simply a member of parent type.
-    if (!memberLookup.empty()) {
-      auto member = memberLookup[0].getValueDecl();
+    if (!results.empty()) {
+      auto member = results[0];
       diags.diagnose(comp->getNameLoc(), diag::invalid_member_reference,
                      member->getDescriptiveKind(), member->getName(),
                      parentType)
