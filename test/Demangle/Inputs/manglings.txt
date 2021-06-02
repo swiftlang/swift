@@ -403,3 +403,5 @@ $s4test3fooyyS2f_SfYkztYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Floa
 $s4test3fooyyS2f_SfYkntYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, __owned @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float, @noDerivative Swift.Float) -> Swift.Float) -> ()
 $s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> ()
+$sScA ---> Swift.Actor
+$sScGySiG ---> Swift.TaskGroup<Swift.Int>
