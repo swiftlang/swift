@@ -68,7 +68,7 @@ class CMakeProduct(product.Product):
 
                 # Xcode can't restart itself if it turns out we need to reconfigure.
                 # Do an advance build to handle that.
-                shell.call(cmake_build + [self.build_dir, build_type])
+                shell.call(cmake_build + [self.build_dir, "--config", build_type])
 
             shell.call(cmake_build + [self.build_dir, "--config", build_type, "--"]
                        + build_args + build_targets)
