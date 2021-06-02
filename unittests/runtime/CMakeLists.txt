@@ -138,12 +138,4 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     )
-
-  # Check that the tests are using the async calling convention
-  # correctly, and that musttail isn't missed by Clang/LLVM.
-  if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    target_compile_options(SwiftRuntimeTests
-      PUBLIC "-mllvm;-enable-swifttailcc-musttail-check")
-  endif()
-
 endif()
