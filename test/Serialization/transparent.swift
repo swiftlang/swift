@@ -15,21 +15,25 @@ import def_transparent
 // SIL: store [[BOOL]] to [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
 
-// SIL: [[TMP:%.+]] = global_addr @$s11transparent3tmps5Int32Vvp : $*Int32
+// SIL: [[TMP:%.+]] = global_addr @$s11transparent3tmps5Int32V_SStvp : $*(Int32, String)
+// SIL: [[TMP1:%.+]] = tuple_element_addr [[TMP]] : $*(Int32, String), 0
+// SIL: [[TMP2:%.+]] = tuple_element_addr [[TMP]] : $*(Int32, String), 1
 // SIL: [[VALUE:%.+]] = integer_literal $Builtin.Int32, 300
 // SIL: [[INT:%.+]] = struct $Int32 ([[VALUE]] : $Builtin.Int32)
-// SIL: store [[INT]] to [[TMP]] : $*Int32
+// SIL: [[STR:%.*]] = apply %{{.*}} : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+// SIL: store [[INT]] to [[TMP1]] : $*Int32
+// SIL: store [[STR]] to [[TMP2]] : $*String
 var tmp = testBuiltin()
 
 // SIL-LABEL: sil public_external [transparent] @$s15def_transparent15testTransparent1xS2b_tF : $@convention(thin) (Bool) -> Bool {
 // SIL: bb0(%0 : $Bool):
 // SIL: return %0 : $Bool
 
-// SIL-LABEL: sil public_external [transparent] @$s15def_transparent11testBuiltins5Int32VyF : $@convention(thin) () -> Int32 {
+// SIL-LABEL: sil public_external [transparent] @$s15def_transparent11testBuiltins5Int32V_SStyF : $@convention(thin) () -> (Int32, @owned String) {
 // SIL: bb0:
 // SIL: integer_literal $Builtin.Int32, 300
 // SIL: string_literal utf8 "foo"
-// SIL: return %{{.*}} : $Int32
+// SIL: return %{{.*}} : $(Int32, String)
 
 // SIL-LABEL: sil public_external [transparent] @$s15def_transparent7test_bryyF : $@convention(thin) () -> () {
 // SIL: bb{{.*}}:

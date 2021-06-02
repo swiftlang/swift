@@ -145,7 +145,10 @@ void SILInstruction::dropAllReferences() {
             OpE = PossiblyDeadOps.end(); OpI != OpE; ++OpI) {
     OpI->drop();
   }
+  dropNonOperandReferences();
+}
 
+void SILInstruction::dropNonOperandReferences() {
   if (auto *termInst = dyn_cast<TermInst>(this)) {
     for (SILSuccessor &succ : termInst->getSuccessors()) {
       succ = nullptr;

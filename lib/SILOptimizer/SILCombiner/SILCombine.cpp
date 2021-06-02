@@ -175,7 +175,7 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
 
     // Otherwise, delete all of the debug uses so we don't have to sink them as
     // well and then return true so we process svi in its new position.
-    deleteAllDebugUses(svi, instModCallbacks);
+    deleteAllDebugUses(svi, getInstModCallbacks());
     svi->moveBefore(consumingUser);
     MadeChange = true;
 
@@ -327,7 +327,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       if (defsToCanonicalize.size()) {
         CanonicalizeOSSALifetime canonicalizer(
             false /*prune debug*/, false /*canonicalize borrows*/,
-            false /*poison refs*/, NLABA, DA, instModCallbacks);
+            false /*poison refs*/, NLABA, DA, getInstModCallbacks());
         auto analysisInvalidation = canonicalizeOSSALifetimes(
             canonicalizer, defsToCanonicalize.getArrayRef());
         if (bool(analysisInvalidation)) {

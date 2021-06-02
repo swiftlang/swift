@@ -273,6 +273,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     return;
   }
 
+  InstructionDeleter deleter;
+
   auto &Loads = AccessMap[Property];
 
   unsigned NumReplaced = 0;
@@ -302,12 +304,12 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
         continue;
 
       replaceLoadSequence(User, clonedInit);
-      eraseUsesOfInstruction(User);
-      User->eraseFromParent();
+      deleter.forceDeleteWithUsers(User);
       ++NumReplaced;
     }
     ChangedFunctions.insert(F);
   }
+  deleter.cleanupDeadInstructions();
 
   LLVM_DEBUG(llvm::dbgs() << "Access to " << *Property << " was replaced "
                           << NumReplaced << " time(s)\n");

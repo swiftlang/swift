@@ -989,13 +989,13 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
-  eraseUsesOfInstruction(AI);
-  assert(AI->use_empty() && "All users should have been removed.");
-  recursivelyDeleteTriviallyDeadInstructions(AI, true);
-  if (instsDeadAfterInitializerRemoved.size()) {
-    recursivelyDeleteTriviallyDeadInstructions(instsDeadAfterInitializerRemoved,
-                                               true);
+  InstructionDeleter deleter;
+  deleter.forceDeleteWithUsers(AI);
+  for (auto *toDelete : instsDeadAfterInitializerRemoved) {
+    deleter.trackIfDead(toDelete);
   }
+  deleter.cleanupDeadInstructions();
+
   ++DeadAllocApplyEliminated;
   return true;
 }

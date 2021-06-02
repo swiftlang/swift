@@ -1037,6 +1037,9 @@ public:
   /// guaranteed scope.
   bool isLifetimeEnding() const;
 
+  /// Returns true if this ends the lifetime of an owned operand.
+  bool isConsuming() const;
+
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 

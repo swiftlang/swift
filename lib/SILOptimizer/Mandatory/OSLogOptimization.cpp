@@ -1200,6 +1200,8 @@ static void forceDeleteAllocStack(SingleValueInstruction *inst,
       forceDeleteAllocStack(cast<BeginAccessInst>(user), deleter);
       continue;
     }
+    // Notify the deletion worklist in case user's other operands become dead.
+    deleter.getCallbacks().notifyWillBeDeleted(user);
     deleter.forceDeleteAndFixLifetimes(user);
   }
   deleter.forceDelete(inst);
@@ -1252,8 +1254,11 @@ static bool tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
     if (deletedInstructions.count(inst))
       continue;
     deleteInstructionWithUsersAndFixLifetimes(inst, deleter);
+    // Call cleanupDeadInstructions incrementally because it may expose a dead
+    // alloc_stack, which will only be deleted by this pass via
+    // deleteInstructionWithUsersAndFixLifetimes().
+    deleter.cleanupDeadInstructions();
   }
-  deleter.cleanUpDeadInstructions();
 
   // If the OSLogMessage instance is not deleted, either we couldn't see the
   // body of the log call or there is a bug in the library implementation.
@@ -1478,7 +1483,7 @@ suppressGlobalStringTablePointerError(SingleValueInstruction *oslogMessage) {
     // many instructions, do the cleanup at the end.
     deleter.trackIfDead(bi);
   }
-  deleter.cleanUpDeadInstructions();
+  deleter.cleanupDeadInstructions();
 }
 
 /// If the SILInstruction is an initialization of OSLogMessage, return the

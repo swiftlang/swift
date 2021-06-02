@@ -339,6 +339,13 @@ bool Operand::isLifetimeEnding() const {
   return get().getOwnershipKind() != OwnershipKind::None;
 }
 
+bool Operand::isConsuming() const {
+  if (!getOwnershipConstraint().isConsuming())
+    return false;
+
+  return get().getOwnershipKind() != OwnershipKind::None;
+}
+
 //===----------------------------------------------------------------------===//
 //                             OperandConstraint
 //===----------------------------------------------------------------------===//

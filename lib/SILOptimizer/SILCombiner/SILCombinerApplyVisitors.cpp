@@ -1199,11 +1199,16 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     // apply. Since the apply was never rewritten, if they aren't removed here,
     // they will be removed later as dead when visited by SILCombine, causing
     // SILCombine to loop infinitely, creating and destroying the casts.
+    //
+    // Use a new deleter with no callbacks so we can pretend this never
+    // happened. Otherwise SILCombine will infinitely iterate. This works as
+    // long as the instructions in this tracking list were never added to the
+    // SILCombine Worklist.
     InstructionDeleter deleter;
     for (SILInstruction *inst : *Builder.getTrackingList()) {
       deleter.trackIfDead(inst);
     }
-    deleter.cleanUpDeadInstructions();
+    deleter.cleanupDeadInstructions();
     Builder.getTrackingList()->clear();
     return nullptr;
   }
