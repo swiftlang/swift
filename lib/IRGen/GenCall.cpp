@@ -4915,8 +4915,11 @@ IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
   auto *fnTy = llvm::FunctionType::get(
       IGM.VoidTy, {IGM.Int8PtrTy},
       false /*vaargs*/);
+  auto attrs = IGM.constructInitialAttributes();
+  attrs = attrs.addParamAttribute(IGM.getLLVMContext(), 0,
+                                  llvm::Attribute::SwiftAsync);
   auto signature =
-      Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftAsyncCC);
+      Signature(fnTy, attrs, IGM.SwiftAsyncCC);
   auto fnPtr = FunctionPointer(
       FunctionPointer::Kind::Function,
       Builder.CreateBitOrPointerCast(resume, fnTy->getPointerTo()),
