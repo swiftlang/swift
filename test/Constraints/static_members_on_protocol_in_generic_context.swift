@@ -316,3 +316,30 @@ func test_no_warning_about_optional_base() {
 
   test(.warnTest) // Ok and no warning even though the `warnTest` name is shadowed
 }
+
+// rdar://78425221 - invalid defaulting of literal argument when base is inferred from protocol
+
+protocol Style {}
+
+struct FormatString : ExpressibleByStringInterpolation {
+  init(stringLiteral: String) {}
+}
+
+struct Number : ExpressibleByIntegerLiteral {
+  init(integerLiteral: Int) {}
+}
+
+struct TestStyle: Style {
+  public init(format: FormatString)  {
+  }
+}
+
+extension Style where Self == TestStyle {
+  static func formattedString(format: FormatString) -> TestStyle { fatalError() }
+  static func number(_: Number) -> TestStyle { fatalError() }
+}
+
+func acceptStyle<S: Style>(_: S) {}
+
+acceptStyle(.formattedString(format: "hi")) // Ok
+acceptStyle(.number(42)) // Ok
