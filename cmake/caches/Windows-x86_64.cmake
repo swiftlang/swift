@@ -10,6 +10,10 @@ set(LLVM_EXTERNAL_PROJECTS
       swift
     CACHE STRING "")
 
+set(LLVM_ENABLE_RUNTIMES
+      compiler-rt
+    CACHE STRING "")
+
 # NOTE(compnerd) always enable assertions, the toolchain will not provide enough
 # context to resolve issues otherwise and may silently generate invalid output.
 set(LLVM_ENABLE_ASSERTIONS YES CACHE BOOL "")
@@ -17,7 +21,24 @@ set(LLVM_ENABLE_ASSERTIONS YES CACHE BOOL "")
 set(ENABLE_X86_RELAX_RELOCATIONS YES CACHE BOOL "")
 
 set(LLVM_APPEND_VC_REV NO CACHE BOOL "")
+set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR YES CACHE BOOL "")
 set(LLVM_ENABLE_PYTHON YES CACHE BOOL "")
+set(LLVM_RUNTIME_TARGETS
+      x86_64-unknown-windows-msvc
+    CACHE STRING "")
+foreach(target ${LLVM_RUNTIME_TARGETS})
+  set(RUNTIMES_${target}_LLVM_ENABLE_RUNTIMES
+        compiler-rt
+      CACHE STRING "")
+  set(RUNTIMES_${target}_CMAKE_MT mt CACHE STRING "")
+  set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
+  set(RUNTIMES_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_CRT NO CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE YES CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
+endforeach()
 set(LLVM_TARGETS_TO_BUILD AArch64 ARM WebAssembly X86 CACHE STRING "")
 
 # Disable certain targets to reduce the configure time or to avoid configuration
@@ -129,6 +150,7 @@ set(LLVM_DISTRIBUTION_COMPONENTS
       libclang
       libclang-headers
       LTO
+      runtimes
       ${LLVM_TOOLCHAIN_TOOLS}
       ${CLANG_TOOLS}
       ${LLD_TOOLS}
