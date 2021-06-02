@@ -350,7 +350,8 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
     mangleIndex(Idx - 26);
     return true;
   }
-  char Subst = Idx + 'A';
+  char SubstChar = Idx + 'A';
+  StringRef Subst(&SubstChar, 1);
   if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ false)) {
     Buffer << 'A' << Subst;
   }
@@ -371,6 +372,7 @@ void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
 
 bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getKind() != Node::Kind::Structure
+      && node->getKind() != Node::Kind::Class
       && node->getKind() != Node::Kind::Enum
       && node->getKind() != Node::Kind::Protocol)
     return false;
@@ -384,9 +386,9 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getChild(1)->getKind() != Node::Kind::Identifier)
     return false;
 
-  if (char Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
-    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
-      Buffer << 'S' << Subst;
+  if (auto Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
+    if (!SubstMerging.tryMergeSubst(*this, *Subst, /*isStandardSubst*/ true)) {
+      Buffer << 'S' << *Subst;
     }
     return true;
   }

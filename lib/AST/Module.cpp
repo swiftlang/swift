@@ -1407,6 +1407,12 @@ bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool ModuleDecl::hasStandardSubstitutions() const {
+  return !getParent() &&
+      (getName() == getASTContext().StdlibModuleName ||
+       getName() == getASTContext().Id_Concurrency);
+}
+
 bool ModuleDecl::isSwiftShimsModule() const {
   return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
 }

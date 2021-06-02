@@ -99,7 +99,7 @@ char translateOperatorChar(char op);
 std::string translateOperator(StringRef Op);
 
 /// Returns the standard type kind for an 'S' substitution, e.g. 'i' for "Int".
-char getStandardTypeSubst(StringRef TypeName);
+llvm::Optional<StringRef> getStandardTypeSubst(StringRef TypeName);
 
 /// Mangles an identifier using a generic Mangler class.
 ///
@@ -274,8 +274,9 @@ public:
   /// *) getBufferStr(): Returns a StringRef of the current content of Buffer.
   /// *) resetBuffer(size_t): Resets the buffer to an old position.
   template <typename Mangler>
-  bool tryMergeSubst(Mangler &M, char Subst, bool isStandardSubst) {
-    assert(isUpperLetter(Subst) || (isStandardSubst && isLowerLetter(Subst)));
+  bool tryMergeSubst(Mangler &M, StringRef Subst, bool isStandardSubst) {
+    assert(isUpperLetter(Subst.back()) ||
+           (isStandardSubst && isLowerLetter(Subst.back())));
     StringRef BufferStr = M.getBufferStr();
     if (lastNumSubsts > 0 && lastNumSubsts < MaxRepeatCount
         && BufferStr.size() == lastSubstPosition + lastSubstSize
@@ -284,17 +285,20 @@ public:
       // The last mangled thing is a substitution.
       assert(lastSubstPosition > 0 && lastSubstPosition < BufferStr.size());
       assert(lastSubstSize > 0);
-      char lastSubst = BufferStr.back();
-      assert(isUpperLetter(lastSubst)
-             || (isStandardSubst && isLowerLetter(lastSubst)));
+      StringRef lastSubst = BufferStr.take_back(lastSubstSize)
+            .drop_while([](char c) {
+        return isDigit(c);
+      });
+      assert(isUpperLetter(lastSubst.back())
+             || (isStandardSubst && isLowerLetter(lastSubst.back())));
       if (lastSubst != Subst && !isStandardSubst) {
         // We can merge with a different 'A' substitution,
         // e.g. 'AB' -> 'AbC'.
         lastSubstPosition = BufferStr.size();
         lastNumSubsts = 1;
         M.resetBuffer(BufferStr.size() - 1);
-        assert(isUpperLetter(lastSubst));
-        M.Buffer << (char)(lastSubst - 'A' + 'a') << Subst;
+        assert(isUpperLetter(lastSubst.back()));
+        M.Buffer << (char)(lastSubst.back() - 'A' + 'a') << Subst;
         lastSubstSize = 1;
         return true;
       }
@@ -312,7 +316,7 @@ public:
     // We can't merge with the previous substitution, but let's remember this
     // substitution which will be mangled by the caller.
     lastSubstPosition = BufferStr.size() + 1;
-    lastSubstSize = 1;
+    lastSubstSize = Subst.size();
     lastNumSubsts = 1;
     lastSubstIsStandardSubst = isStandardSubst;
     return false;

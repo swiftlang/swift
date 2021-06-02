@@ -12,7 +12,12 @@
 
 /// STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 ///   The 1-character MANGLING for a known TYPENAME of KIND.
-
+///
+/// STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
+///   The 1-character MANGLING for a known TYPENAME of KIND that is in the
+///   second level of standard types, all of which are mangled with the form
+///   Sc<MANGLING>.
+///
 /// OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 ///   The 1-character MANGLING for a known TYPENAME of KIND, for a type that's
 ///   only available with ObjC interop enabled.
@@ -21,6 +26,7 @@
 #define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
   STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
+
 
 OBJC_INTEROP_STANDARD_TYPE(Structure, A, AutoreleasingUnsafeMutablePointer)
 STANDARD_TYPE(Structure, a, Array)
@@ -73,5 +79,25 @@ STANDARD_TYPE(Protocol, y, StringProtocol)
 STANDARD_TYPE(Protocol, Z, SignedInteger)
 STANDARD_TYPE(Protocol, z, BinaryInteger)
 
+STANDARD_TYPE_2(Protocol, A, Actor)
+STANDARD_TYPE_2(Structure, C, CheckedContinuation)
+STANDARD_TYPE_2(Structure, c, UnsafeContinuation)
+STANDARD_TYPE_2(Structure, E, CancellationError)
+STANDARD_TYPE_2(Structure, e, UnownedSerialExecutor)
+STANDARD_TYPE_2(Protocol, F, Executor)
+STANDARD_TYPE_2(Protocol, f, SerialExecutor)
+STANDARD_TYPE_2(Structure, G, TaskGroup)
+STANDARD_TYPE_2(Structure, g, ThrowingTaskGroup)
+STANDARD_TYPE_2(Protocol, I, AsyncIteratorProtocol)
+STANDARD_TYPE_2(Protocol, i, AsyncSequence)
+STANDARD_TYPE_2(Structure, J, UnownedJob)
+STANDARD_TYPE_2(Class, M, MainActor)
+STANDARD_TYPE_2(Structure, P, TaskPriority)
+STANDARD_TYPE_2(Structure, S, AsyncStream)
+STANDARD_TYPE_2(Structure, s, AsyncThrowingStream)
+STANDARD_TYPE_2(Structure, T, Task)
+STANDARD_TYPE_2(Structure, t, UnsafeCurrentTask)
+
 #undef STANDARD_TYPE
 #undef OBJC_INTEROP_STANDARD_TYPE
+#undef STANDARD_TYPE_2
