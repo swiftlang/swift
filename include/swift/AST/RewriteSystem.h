@@ -95,7 +95,6 @@ public:
 
   /// Creates a layout atom, representing a layout constraint.
   static Atom forLayout(LayoutConstraint layout) {
-    assert(layout->isKnownLayout());
     return Atom({}, layout);
   }
 
