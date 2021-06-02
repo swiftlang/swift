@@ -466,6 +466,7 @@ Types
   KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
   KNOWN-TYPE-KIND ::= 'B'                    // Swift.BinaryFloatingPoint
   KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
+  KNOWN-TYPE-KIND ::= 'c' KNOWN-TYPE-KIND-2  // Second set of standard types
   KNOWN-TYPE-KIND ::= 'D'                    // Swift.Dictionary
   KNOWN-TYPE-KIND ::= 'd'                    // Swift.Float64
   KNOWN-TYPE-KIND ::= 'E'                    // Swift.Encodable
@@ -510,6 +511,25 @@ Types
   KNOWN-TYPE-KIND ::= 'y'                    // Swift.StringProtocol
   KNOWN-TYPE-KIND ::= 'Z'                    // Swift.SignedInteger
   KNOWN-TYPE-KIND ::= 'z'                    // Swift.BinaryInteger
+
+  KNOWN-TYPE-KIND-2 ::= 'A'        // Swift.Actor
+  KNOWN-TYPE-KIND-2 ::= 'C'        // Swift.CheckedContinuation
+  KNOWN-TYPE-KIND-2 ::= 'c'        // Swift.UnsafeContinuation
+  KNOWN-TYPE-KIND-2 ::= 'E'        // Swift.CancellationError
+  KNOWN-TYPE-KIND-2 ::= 'e'        // Swift.UnownedSerialExecutor
+  KNOWN-TYPE-KIND-2 ::= 'F'        // Swift.Executor
+  KNOWN-TYPE-KIND-2 ::= 'f'        // Swift.SerialExecutor
+  KNOWN-TYPE-KIND-2 ::= 'G'        // Swift.TaskGroup
+  KNOWN-TYPE-KIND-2 ::= 'g'        // Swift.ThrowingTaskGroup
+  KNOWN-TYPE-KIND-2 ::= 'I'        // Swift.AsyncIteratorProtocol
+  KNOWN-TYPE-KIND-2 ::= 'i'        // Swift.AsyncSequence
+  KNOWN-TYPE-KIND-2 ::= 'J'        // Swift.UnownedJob
+  KNOWN-TYPE-KIND-2 ::= 'M'        // Swift.MainActor
+  KNOWN-TYPE-KIND-2 ::= 'P'        // Swift.TaskPriority
+  KNOWN-TYPE-KIND-2 ::= 'S'        // Swift.AsyncStream
+  KNOWN-TYPE-KIND-2 ::= 's'        // Swift.AsyncThrowingStream
+  KNOWN-TYPE-KIND-2 ::= 'T'        // Swift.Task
+  KNOWN-TYPE-KIND-2 ::= 't'        // Swift.UnsafeCurrentTask
 
   protocol ::= context decl-name
   protocol ::= standard-substitutions

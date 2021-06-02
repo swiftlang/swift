@@ -1060,6 +1060,15 @@ ASTBuilder::findTypeDecl(DeclContext *dc,
     result = candidate;
   }
 
+  // If we looked into the standard library module, but didn't find anything,
+  // try the _Concurrency module, which is also mangled into the Swift module.
+  if (!result && !dc->getParent() && module->isStdlibModule()) {
+    ASTContext &ctx = module->getASTContext();
+    if (auto concurrencyModule = ctx.getLoadedModule(ctx.Id_Concurrency)) {
+      return findTypeDecl(concurrencyModule, name, privateDiscriminator, kind);
+    }
+  }
+
   return result;
 }
 

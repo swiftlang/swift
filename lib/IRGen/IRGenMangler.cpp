@@ -97,7 +97,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // The short-substitution types in the standard library have compact
       // manglings already, and the runtime ought to have a lookup table for
       // them. Symbolic referencing would be wasteful.
-      if (type->getModuleContext()->isStdlibModule()
+      if (type->getModuleContext()->hasStandardSubstitutions()
           && Mangle::getStandardTypeSubst(type->getName().str())) {
         return false;
       }
