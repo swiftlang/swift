@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/RewriteSystem.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <deque>
@@ -18,6 +19,129 @@
 
 using namespace swift;
 using namespace rewriting;
+
+/// Creates a new name atom.
+Atom Atom::forName(Identifier name,
+                   RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Name));
+  id.AddPointer(name.get());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
+  auto *atom = new (mem) Atom::Storage(name);
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a new protocol atom.
+Atom Atom::forProtocol(const ProtocolDecl *proto,
+                       RewriteContext &ctx) {
+  assert(proto != nullptr);
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Protocol));
+  id.AddPointer(proto);
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
+  auto *atom = new (mem) Atom::Storage(proto);
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a new associated type atom for a single protocol.
+Atom Atom::forAssociatedType(const ProtocolDecl *proto,
+                             Identifier name,
+                             RewriteContext &ctx) {
+  SmallVector<const ProtocolDecl *, 1> protos;
+  protos.push_back(proto);
+
+  return forAssociatedType(protos, name, ctx);
+}
+
+/// Creates a merged associated type atom to represent a nested
+/// type that conforms to multiple protocols, all of which have
+/// an associated type with the same name.
+Atom Atom::forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
+                             Identifier name,
+                             RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::AssociatedType));
+  id.AddInteger(protos.size());
+  for (const auto *proto : protos)
+    id.AddPointer(proto);
+  id.AddPointer(name.get());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(
+      protos.size());
+  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
+  auto *atom = new (mem) Atom::Storage(protos, name);
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a generic parameter atom, representing a generic
+/// parameter in the top-level generic signature from which the
+/// rewrite system is built.
+Atom Atom::forGenericParam(GenericTypeParamType *param,
+                           RewriteContext &ctx) {
+  assert(param->isCanonical());
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::GenericParam));
+  id.AddPointer(param);
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
+  auto *atom = new (mem) Atom::Storage(param);
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a layout atom, representing a layout constraint.
+Atom Atom::forLayout(LayoutConstraint layout,
+                     RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Layout));
+  id.AddPointer(layout.getPointer());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
+  auto *atom = new (mem) Atom::Storage(layout);
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
 
 /// Linear order on atoms.
 ///
@@ -308,6 +432,43 @@ void Term::dump(llvm::raw_ostream &out) const {
   }
 }
 
+/// Map an interface type to a term.
+///
+/// If \p proto is null, this is a term relative to a generic
+/// parameter in a top-level signature. The term is rooted in a generic
+/// parameter atom.
+///
+/// If \p proto is non-null, this is a term relative to a protocol's
+/// 'Self' type. The term is rooted in a protocol atom.
+///
+/// The bound associated types in the interface type are ignored; the
+/// resulting term consists entirely of a root atom followed by zero
+/// or more name atoms.
+Term RewriteContext::getTermForType(CanType paramType,
+                                    const ProtocolDecl *proto) {
+  assert(paramType->isTypeParameter());
+
+  // Collect zero or more nested type names in reverse order.
+  SmallVector<Atom, 3> atoms;
+  while (auto memberType = dyn_cast<DependentMemberType>(paramType)) {
+    atoms.push_back(Atom::forName(memberType->getName(), *this));
+    paramType = memberType.getBase();
+  }
+
+  // Add the root atom at the end.
+  if (proto) {
+    assert(proto->getSelfInterfaceType()->isEqual(paramType));
+    atoms.push_back(Atom::forProtocol(proto, *this));
+  } else {
+    atoms.push_back(Atom::forGenericParam(
+        cast<GenericTypeParamType>(paramType), *this));
+  }
+
+  std::reverse(atoms.begin(), atoms.end());
+
+  return Term(atoms);
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   LHS.dump(out);
   out << " => ";
@@ -485,7 +646,7 @@ Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
   // of the two sets.
   assert(minimalProtos.size() <= protos.size() + otherProtos.size());
 
-  return Atom::forAssociatedType(minimalProtos, lhs.getName());
+  return Atom::forAssociatedType(minimalProtos, lhs.getName(), Context);
 }
 
 /// Consider the following example:
@@ -625,7 +786,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
           otherRHS.back() = mergedAtom;
 
           auto newLHS = otherRHS;
-          newLHS.add(Atom::forProtocol(otherLHS[1].getProtocol()));
+          newLHS.add(Atom::forProtocol(otherLHS[1].getProtocol(), Context));
 
           addRule(newLHS, otherRHS);
         }
