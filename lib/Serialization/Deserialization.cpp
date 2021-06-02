@@ -57,10 +57,6 @@ using namespace swift;
 using namespace swift::serialization;
 using llvm::Expected;
 
-StringRef swift::getNameOfModule(const ModuleFile *MF) {
-  return MF->getName();
-}
-
 namespace {
   struct DeclAndOffset {
     const Decl *D;
@@ -111,7 +107,7 @@ namespace {
           os << DeclAndOffset{DeclOrOffset.get(), offset};
         }
       }
-      os << " in '" << getNameOfModule(MF) << "'\n";
+      os << " in '" << MF->getName() << "'\n";
     }
   };
 
@@ -166,33 +162,15 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
   (void)kind;
 }
 
-void ModuleFile::fatal(llvm::Error error) {
-  if (FileContext) {
-    getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Core->Name);
-    getContext().Diags.diagnose(
-        SourceLoc(), diag::serialization_misc_version, Core->Name,
-        Core->MiscVersion, allowCompilerErrors());
+void ModuleFile::fatal(llvm::Error error) const {
+  if (FileContext)
+    getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal,
+                                Core->Name);
+  Core->fatal(std::move(error));
+}
 
-    if (!Core->CompatibilityVersion.empty()) {
-      if (getContext().LangOpts.EffectiveLanguageVersion
-            != Core->CompatibilityVersion) {
-        SmallString<16> effectiveVersionBuffer, compatVersionBuffer;
-        {
-          llvm::raw_svector_ostream out(effectiveVersionBuffer);
-          out << getContext().LangOpts.EffectiveLanguageVersion;
-        }
-        {
-          llvm::raw_svector_ostream out(compatVersionBuffer);
-          out << Core->CompatibilityVersion;
-        }
-        getContext().Diags.diagnose(
-            SourceLoc(), diag::serialization_compatibility_version_mismatch,
-            effectiveVersionBuffer, Core->Name, compatVersionBuffer);
-      }
-    }
-  }
-
-  ModuleFileSharedCore::fatal(std::move(error));
+void ModuleFile::outputDiagnosticInfo(llvm::raw_ostream &os) const {
+  Core->outputDiagnosticInfo(os);
 }
 
 static Optional<swift::AccessorKind>
@@ -6302,7 +6280,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                          uint64_t contextData) {
   using namespace decls_block;
 
-  PrettyStackTraceModuleFile traceModule("While reading from", *this);
+  PrettyStackTraceModuleFile traceModule(*this);
   PrettyStackTraceConformance trace("finishing conformance for",
                                     conformance);
   ++NumNormalProtocolConformancesCompleted;
@@ -6717,10 +6695,4 @@ Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
       completionHandlerErrorParamIndex,
       completionHandlerErrorFlagParamIndex,
       errorFlagPolarity);
-}
-
-void serialization::PrettyStackTraceModuleFile::outputModuleBuildInfo(
-    raw_ostream &os) const {
-  if (MF.compiledAllowingCompilerErrors())
-    os << " (built while allowing compiler errors)";
 }
