@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -9,6 +9,7 @@
 
 import Swift
 import StdlibUnittest
+import _Concurrency
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadata")
 
@@ -489,6 +490,11 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   }
 }
 
+if #available(SwiftStdlib 5.5, *) {
+  DemangleToMetadataTests.test("Concurrency standard substitutions") {
+    expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
+  }
+}
 
 runAllTests()
 
