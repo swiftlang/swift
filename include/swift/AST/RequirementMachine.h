@@ -23,14 +23,6 @@ class GenericSignature;
 class ProtocolDecl;
 class Requirement;
 
-namespace rewriting {
-
-class Term;
-
-Term getTermForType(CanType paramType, const ProtocolDecl *proto);
-
-} // end namespace rewriting
-
 /// Wraps a rewrite system with higher-level operations in terms of
 /// generic signatures and interface types.
 class RequirementMachine final {

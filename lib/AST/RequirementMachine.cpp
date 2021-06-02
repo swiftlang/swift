@@ -31,12 +31,14 @@ namespace {
 /// of a generic signature, and all protocol requirement signatures from all
 /// transitively-referenced protocols.
 struct RewriteSystemBuilder {
-  ASTContext &Context;
+  RewriteContext &Context;
+  bool Debug;
 
   ProtocolGraph Protocols;
   std::vector<std::pair<Term, Term>> Rules;
 
-  RewriteSystemBuilder(ASTContext &ctx) : Context(ctx) {}
+  RewriteSystemBuilder(RewriteContext &ctx, bool debug)
+    : Context(ctx), Debug(debug) {}
   void addGenericSignature(CanGenericSignature sig);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
@@ -59,7 +61,7 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 
   // Add rewrite rules for each protocol.
   for (auto *proto : Protocols.Protocols) {
-    if (Context.LangOpts.DebugRequirementMachine) {
+    if (Debug) {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
     }
 
@@ -78,7 +80,7 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
     for (auto req : info.Requirements)
       addRequirement(req.getCanonical(), proto);
 
-    if (Context.LangOpts.DebugRequirementMachine) {
+    if (Debug) {
       llvm::dbgs() << "}\n";
     }
   }
@@ -97,11 +99,11 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
                                              const ProtocolDecl *proto) {
   Term lhs;
-  lhs.add(Atom::forProtocol(proto));
-  lhs.add(Atom::forName(type->getName()));
+  lhs.add(Atom::forProtocol(proto, Context));
+  lhs.add(Atom::forName(type->getName(), Context));
 
   Term rhs;
-  rhs.add(Atom::forAssociatedType(proto, type->getName()));
+  rhs.add(Atom::forAssociatedType(proto, type->getName(), Context));
 
   Rules.emplace_back(lhs, rhs);
 }
@@ -117,12 +119,14 @@ void RewriteSystemBuilder::addInheritedAssociatedType(
                                                 const AssociatedTypeDecl *type,
                                                 const ProtocolDecl *inherited,
                                                 const ProtocolDecl *proto) {
+  assert(inherited != proto);
+
   Term lhs;
-  lhs.add(Atom::forProtocol(proto));
-  lhs.add(Atom::forAssociatedType(inherited, type->getName()));
+  lhs.add(Atom::forProtocol(proto, Context));
+  lhs.add(Atom::forAssociatedType(inherited, type->getName(), Context));
 
   Term rhs;
-  rhs.add(Atom::forAssociatedType(proto, type->getName()));
+  rhs.add(Atom::forAssociatedType(proto, type->getName(), Context));
 
   Rules.emplace_back(lhs, rhs);
 }
@@ -138,14 +142,14 @@ void RewriteSystemBuilder::addInheritedAssociatedType(
 /// protocol atom.
 void RewriteSystemBuilder::addRequirement(const Requirement &req,
                                           const ProtocolDecl *proto) {
-  if (Context.LangOpts.DebugRequirementMachine) {
+  if (Debug) {
     llvm::dbgs() << "+ ";
     req.dump(llvm::dbgs());
     llvm::dbgs() << "\n";
   }
 
   auto subjectType = CanType(req.getFirstType());
-  auto subjectTerm = getTermForType(subjectType, proto);
+  auto subjectTerm = Context.getTermForType(subjectType, proto);
 
   switch (req.getKind()) {
   case RequirementKind::Conformance: {
@@ -157,7 +161,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     auto *proto = req.getProtocolDecl();
 
     auto constraintTerm = subjectTerm;
-    constraintTerm.add(Atom::forProtocol(proto));
+    constraintTerm.add(Atom::forProtocol(proto, Context));
 
     Rules.emplace_back(subjectTerm, constraintTerm);
     break;
@@ -172,7 +176,8 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     //
     //   T.[L] == T
     auto constraintTerm = subjectTerm;
-    constraintTerm.add(Atom::forLayout(req.getLayoutConstraint()));
+    constraintTerm.add(Atom::forLayout(req.getLayoutConstraint(),
+                                       Context));
 
     Rules.emplace_back(subjectTerm, constraintTerm);
     break;
@@ -188,7 +193,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     if (!otherType->isTypeParameter())
       break;
 
-    auto otherTerm = getTermForType(otherType, proto);
+    auto otherTerm = Context.getTermForType(otherType, proto);
 
     Rules.emplace_back(subjectTerm, otherTerm);
     break;
@@ -196,48 +201,13 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   }
 }
 
-/// Map an interface type to a term.
-///
-/// If \p proto is null, this is a term relative to a generic
-/// parameter in a top-level signature. The term is rooted in a generic
-/// parameter atom.
-///
-/// If \p proto is non-null, this is a term relative to a protocol's
-/// 'Self' type. The term is rooted in a protocol atom.
-///
-/// The bound associated types in the interface type are ignored; the
-/// resulting term consists entirely of a root atom followed by zero
-/// or more name atoms.
-Term swift::rewriting::getTermForType(CanType paramType,
-                                      const ProtocolDecl *proto) {
-  assert(paramType->isTypeParameter());
-
-  // Collect zero or more nested type names in reverse order.
-  SmallVector<Atom, 3> atoms;
-  while (auto memberType = dyn_cast<DependentMemberType>(paramType)) {
-    atoms.push_back(Atom::forName(memberType->getName()));
-    paramType = memberType.getBase();
-  }
-
-  // Add the root atom at the end.
-  if (proto) {
-    assert(proto->getSelfInterfaceType()->isEqual(paramType));
-    atoms.push_back(Atom::forProtocol(proto));
-  } else {
-    atoms.push_back(Atom::forGenericParam(cast<GenericTypeParamType>(paramType)));
-  }
-
-  std::reverse(atoms.begin(), atoms.end());
-
-  return Term(atoms);
-}
-
 /// We use the PIMPL pattern to avoid creeping header dependencies.
 struct RequirementMachine::Implementation {
+  RewriteContext Context;
   RewriteSystem System;
   bool Complete = false;
 
-  Implementation() {}
+  Implementation() : System(Context) {}
 };
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
@@ -261,7 +231,8 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
   // Collect the top-level requirements, and all transtively-referenced
   // protocol requirement signatures.
-  RewriteSystemBuilder builder(Context);
+  RewriteSystemBuilder builder(Impl->Context,
+                               Context.LangOpts.DebugRequirementMachine);
   builder.addGenericSignature(sig);
 
   // Add the initial set of rewrite rules to the rewrite system, also
