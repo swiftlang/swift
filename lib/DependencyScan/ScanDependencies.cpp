@@ -282,7 +282,16 @@ static void discoverCrosssImportOverlayDependencies(
 
   // Record the dummy main module's direct dependencies. The dummy main module
   // only directly depend on these newly discovered overlay modules.
-  cache.recordDependencies(dummyMainName, dummyMainDependencies);
+  if (cache.findDependencies(dummyMainName,
+                             ModuleDependenciesKind::SwiftTextual)) {
+    cache.updateDependencies(
+        std::make_pair(dummyMainName.str(),
+                       ModuleDependenciesKind::SwiftTextual),
+        dummyMainDependencies);
+  } else {
+    cache.recordDependencies(dummyMainName, dummyMainDependencies);
+  }
+
   llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
                   std::set<ModuleDependencyID>>
       allModules;
@@ -1100,17 +1109,30 @@ identifyMainModuleDependencies(CompilerInstance &instance) {
 
 } // namespace
 
-static void serializeDependencyCache(DiagnosticEngine &diags,
-                                     const std::string &path,
+static void serializeDependencyCache(CompilerInstance &instance,
                                      const ModuleDependenciesCache &cache) {
+  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
+  ASTContext &Context = instance.getASTContext();
+  auto savePath = opts.SerializedDependencyScannerCachePath;
   module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      diags, path, cache);
+      Context.Diags, savePath, cache);
+  if (opts.EmitDependencyScannerCacheRemarks) {
+    Context.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
+  }
 }
 
-static void deserializeDependencyCache(const std::string &path,
+static void deserializeDependencyCache(CompilerInstance &instance,
                                        ModuleDependenciesCache &cache) {
-  module_dependency_cache_serialization::readInterModuleDependenciesCache(
-      path, cache);
+  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
+  ASTContext &Context = instance.getASTContext();
+  auto loadPath = opts.SerializedDependencyScannerCachePath;
+  if (module_dependency_cache_serialization::readInterModuleDependenciesCache(
+          loadPath, cache)) {
+    Context.Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed,
+                           loadPath);
+  } else if (opts.EmitDependencyScannerCacheRemarks) {
+    Context.Diags.diagnose(SourceLoc(), diag::remark_reuse_cache, loadPath);
+  }
 }
 
 bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
@@ -1119,10 +1141,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
   llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
-
-  // `-scan-dependencies` invocations use a single new instance
-  // of a module cache
-  ModuleDependenciesCache cache;
   if (out.has_error() || EC) {
     Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
                            EC.message());
@@ -1130,11 +1148,25 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
     return true;
   }
 
-  // Execute scan, and write JSON output to the output stream
+  // `-scan-dependencies` invocations use a single new instance
+  // of a module cache
+  ModuleDependenciesCache cache;
+
+  if (opts.ReuseDependencyScannerCache)
+    deserializeDependencyCache(instance, cache);
+
+  // Execute scan
   auto dependenciesOrErr = performModuleScan(instance, cache);
+
+  // Serialize the dependency cache if -serialize-dependency-scan-cache
+  // is specified
+  if (opts.SerializeDependencyScannerCache)
+    serializeDependencyCache(instance, cache);
+  
   if (dependenciesOrErr.getError())
     return true;
   auto dependencies = std::move(*dependenciesOrErr);
+
   // Write out the JSON description.
   writeJSON(out, dependencies);
   // This process succeeds regardless of whether any errors occurred.
@@ -1253,7 +1285,19 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
                   std::set<ModuleDependencyID>> allModules;
 
   allModules.insert({mainModuleName.str(), mainDependencies.getKind()});
-  cache.recordDependencies(mainModuleName, std::move(mainDependencies));
+
+  // We may be re-using an instance of the cache which already contains
+  // an entry for this module.
+  if (cache.findDependencies(mainModuleName,
+                             ModuleDependenciesKind::SwiftTextual)) {
+    cache.updateDependencies(
+        std::make_pair(mainModuleName.str(),
+                       ModuleDependenciesKind::SwiftTextual),
+        std::move(mainDependencies));
+  } else {
+    cache.recordDependencies(mainModuleName, std::move(mainDependencies));
+  }
+
   auto &ctx = instance.getASTContext();
   auto ModuleCachePath = getModuleCachePathFromClang(
       ctx.getClangModuleLoader()->getClangInstance());
@@ -1295,15 +1339,17 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
   ModuleDependenciesCache loadedCache;
   if (FEOpts.TestDependencyScannerCacheSerialization) {
     llvm::SmallString<128> buffer;
-    auto EC = llvm::sys::fs::createTemporaryFile("depscan_cache", "moddepcache", buffer);
+    auto EC = llvm::sys::fs::createTemporaryFile("depscan_cache", "moddepcache",
+                                                 buffer);
     if (EC) {
-      instance.getDiags().diagnose(SourceLoc(),
-                                   diag::error_unable_to_make_temporary_file,
-                                   EC.message());
+      instance.getDiags().diagnose(
+          SourceLoc(), diag::error_unable_to_make_temporary_file, EC.message());
     } else {
       std::string path = buffer.str().str();
-      serializeDependencyCache(instance.getDiags(), path, cache);
-      deserializeDependencyCache(path, loadedCache);
+      module_dependency_cache_serialization::writeInterModuleDependenciesCache(
+          instance.getDiags(), path, cache);
+      module_dependency_cache_serialization::readInterModuleDependenciesCache(
+          path, loadedCache);
       resultCache = &loadedCache;
     }
   }
