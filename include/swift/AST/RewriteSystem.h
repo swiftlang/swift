@@ -216,7 +216,7 @@ public:
   Term() {}
 
   explicit Term(llvm::SmallVector<Atom, 3> &&atoms)
-    : Atoms(atoms) {}
+    : Atoms(std::move(atoms)) {}
 
   explicit Term(ArrayRef<Atom> atoms)
     : Atoms(atoms.begin(), atoms.end()) {}

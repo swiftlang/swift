@@ -1843,9 +1843,10 @@ RequirementMachine *ASTContext::getOrCreateRequirementMachine(
   // signature.
   auto arena = getArena(sig);
   auto &machines = getImpl().getArena(arena).RequirementMachines;
-  auto known = machines.find(sig);
-  if (known != machines.end()) {
-    auto *machine = known->second.get();
+
+  auto &machinePtr = machines[sig];
+  if (machinePtr) {
+    auto *machine = machinePtr.get();
     if (!machine->isComplete()) {
       llvm::errs() << "Re-entrant construction of requirement "
                    << "machine for " << sig << "\n";
@@ -1855,12 +1856,12 @@ RequirementMachine *ASTContext::getOrCreateRequirementMachine(
     return machine;
   }
 
-  // Create a new requirement machine with the given signature.
-  auto machine = new RequirementMachine(*this);
+  auto *machine = new RequirementMachine(*this);
 
   // Store this requirement machine before adding the signature,
-  // to catch re-entrant construction.
-  machines[sig] = std::unique_ptr<RequirementMachine>(machine);
+  // to catch re-entrant construction via addGenericSignature()
+  // below.
+  machinePtr = std::unique_ptr<RequirementMachine>(machine);
 
   machine->addGenericSignature(sig);
 
