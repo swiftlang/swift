@@ -798,6 +798,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DebugRequirementMachine = Args.hasArg(
       OPT_debug_requirement_machine);
 
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_step_limit)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineStepLimit = limit;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_depth_limit)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineDepthLimit = limit;
+    }
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 

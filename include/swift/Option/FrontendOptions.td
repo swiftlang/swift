@@ -283,6 +283,14 @@ def disable_requirement_machine : Flag<["-"], "disable-requirement-machine">,
 def debug_requirement_machine : Flag<["-"], "debug-requirement-machine">,
   HelpText<"Enables debugging output from the generics implementation">;
 
+def requirement_machine_step_limit : Separate<["-"], "requirement-machine-step-limit">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum steps before we give up on confluent completion">;
+
+def requirement_machine_depth_limit : Separate<["-"], "requirement-machine-depth-limit">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum depth before we give up on confluent completion">;
+
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
 

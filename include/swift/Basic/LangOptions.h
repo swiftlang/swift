@@ -433,6 +433,14 @@ namespace swift {
     /// Enables debugging output from the requirement machine.
     bool DebugRequirementMachine = false;
 
+    /// Maximum iteration count for requirement machine confluent completion
+    /// algorithm.
+    unsigned RequirementMachineStepLimit = 1000;
+
+    /// Maximum term length for requirement machine confluent completion
+    /// algorithm.
+    unsigned RequirementMachineDepthLimit = 10;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

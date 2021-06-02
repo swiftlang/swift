@@ -205,8 +205,9 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   Impl->System.initialize(std::move(builder.Rules),
                           std::move(builder.Protocols));
 
-  // FIXME: Add command line flag
-  auto result = Impl->System.computeConfluentCompletion(1000, 10);
+  auto result = Impl->System.computeConfluentCompletion(
+      Context.LangOpts.RequirementMachineStepLimit,
+      Context.LangOpts.RequirementMachineDepthLimit);
 
   switch (result) {
   case RewriteSystem::CompletionResult::Success:
