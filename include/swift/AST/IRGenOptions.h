@@ -250,9 +250,6 @@ public:
   /// Whether we should run swift specific LLVM optimizations after IRGen.
   unsigned DisableSwiftSpecificLLVMOptzns : 1;
 
-  /// Whether we should run LLVM SLP vectorizer.
-  unsigned DisableLLVMSLPVectorizer : 1;
-
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 
@@ -384,7 +381,7 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        DisableLLVMSLPVectorizer(false), Playground(false),
+        Playground(false),
         EmitStackPromotionChecks(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
