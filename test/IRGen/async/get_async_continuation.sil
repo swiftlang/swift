@@ -84,9 +84,9 @@ bb0:
 // CHECK:   phi i32 [ [[result_value]], %await.async.resume ]
 
 
-// CHECK: define internal swifttailcc void @__swift_suspend_dispatch_1(i8* %0, i8* %1)
+// CHECK: define {{.*}} void @__swift_suspend_dispatch_1(i8* %0, i8* %1)
 // CHECK-NOT: define
-// CHECK:  musttail call swifttailcc void %{{.*}}(i8* swiftasync %1)
+// CHECK:  tail call swift{{(tail)?}}cc void %{{.*}}(i8* swiftasync %1)
 // CHECK-NEXT:  ret void
 
 sil @async_continuation : $@async () -> () {
