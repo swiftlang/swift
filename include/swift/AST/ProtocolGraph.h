@@ -25,21 +25,33 @@ class AssociatedTypeDecl;
 
 namespace rewriting {
 
+/// Stores cached information about a protocol.
 struct ProtocolInfo {
+  /// All immediately-inherited protocols.
   ArrayRef<ProtocolDecl *> Inherited;
+
+  /// Transitive closure of inherited protocols; does not include the protocol
+  /// itself. Computed by ProtocolGraph::computeInheritedProtocols().
   llvm::TinyPtrVector<const ProtocolDecl *> AllInherited;
+
+  /// Transitive closure of inherited associated types together with all
+  /// associated types from the protocol itself. Computed by
+  /// ProtocolGraph::computeInheritedAssociatedTypes().
   llvm::TinyPtrVector<AssociatedTypeDecl *> AssociatedTypes;
+
+  /// The protocol's requirement signature.
   ArrayRef<Requirement> Requirements;
 
-  // Used by computeDepth() to detect circularity.
+  /// Used by ProtocolGraph::computeProtocolDepth() to detect circularity.
   unsigned Mark : 1;
 
-  // Longest chain of protocol refinements, including this one.
-  // Greater than zero on valid code, might be zero if there's
-  // a cycle.
+  /// Longest chain of protocol refinements, including this one. Greater than
+  /// zero on valid code, might be zero if there's a cycle. Computed by
+  /// ProtocolGraph::computeLinearOrder().
   unsigned Depth : 31;
 
-  // Index of the protocol in the linear order.
+  /// Index of the protocol in the linear order. Computed by
+  /// ProtocolGraph::computeLinearOrder().
   unsigned Index : 32;
 
   ProtocolInfo() {
@@ -60,6 +72,10 @@ struct ProtocolInfo {
   }
 };
 
+/// Stores cached information about all protocols transtively
+/// referenced from a set of generic requirements.
+///
+/// Out-of-line methods are documented in ProtocolGraph.cpp.
 struct ProtocolGraph {
   llvm::DenseMap<const ProtocolDecl *, ProtocolInfo> Info;
   std::vector<const ProtocolDecl *> Protocols;
@@ -93,4 +109,5 @@ private:
 } // end namespace rewriting
 
 } // end namespace swift
+
 #endif

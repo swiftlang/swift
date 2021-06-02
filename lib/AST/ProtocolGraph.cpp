@@ -18,6 +18,8 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Adds information about all protocols transitvely referenced from
+/// \p reqs.
 void ProtocolGraph::visitRequirements(ArrayRef<Requirement> reqs) {
   for (auto req : reqs) {
     if (req.getKind() == RequirementKind::Conformance) {
@@ -26,6 +28,7 @@ void ProtocolGraph::visitRequirements(ArrayRef<Requirement> reqs) {
   }
 }
 
+/// Look up information about a known protocol.
 const ProtocolInfo &ProtocolGraph::getProtocolInfo(
     const ProtocolDecl *proto) const {
   auto found = Info.find(proto);
@@ -33,6 +36,7 @@ const ProtocolInfo &ProtocolGraph::getProtocolInfo(
   return found->second;
 }
 
+/// Record information about a protocol if we have no seen it yet.
 void ProtocolGraph::addProtocol(const ProtocolDecl *proto) {
   if (Info.count(proto) > 0)
     return;
@@ -43,6 +47,8 @@ void ProtocolGraph::addProtocol(const ProtocolDecl *proto) {
   Protocols.push_back(proto);
 }
 
+/// Record information about all protocols transtively referenced
+/// from protocol requirement signatures.
 void ProtocolGraph::computeTransitiveClosure() {
   unsigned i = 0;
   while (i < Protocols.size()) {
@@ -51,6 +57,8 @@ void ProtocolGraph::computeTransitiveClosure() {
   }
 }
 
+/// See ProtocolGraph::compareProtocols() for the definition of this linear
+/// order.
 void ProtocolGraph::computeLinearOrder() {
   for (const auto *proto : Protocols) {
     (void) computeProtocolDepth(proto);
@@ -87,11 +95,20 @@ void ProtocolGraph::computeLinearOrder() {
   }
 }
 
+/// Update each ProtocolInfo's AssociatedTypes vector to add all associated
+/// types from all transitively inherited protocols.
 void ProtocolGraph::computeInheritedAssociatedTypes() {
+  // Visit protocols in reverse order, so that if P inherits from Q and
+  // Q inherits from R, we first visit R, then Q, then P, ensuring that
+  // R's associated types are added to P's list, etc.
   for (const auto *proto : llvm::reverse(Protocols)) {
     auto &info = Info[proto];
 
+    // We might inherit the same associated type multiple times due to
+    // diamond inheritance, so make sure we only add each associated
+    // type once.
     llvm::SmallDenseSet<const AssociatedTypeDecl *, 4> visited;
+
     for (const auto *inherited : info.Inherited) {
       if (inherited == proto)
         continue;
@@ -101,25 +118,36 @@ void ProtocolGraph::computeInheritedAssociatedTypes() {
           continue;
 
         // The 'if (inherited == proto)' above avoids a potential
-        // iterator invalidation here.
+        // iterator invalidation here, because we're updating
+        // getProtocolInfo(proto).AssociatedTypes while iterating over
+        // getProtocolInfo(inherited).AssociatedTypes.
         info.AssociatedTypes.push_back(inheritedType);
       }
     }
   }
 }
 
+// Update each protocol's AllInherited vector to add all transitively
+// inherited protocols.
 void ProtocolGraph::computeInheritedProtocols() {
+  // Visit protocols in reverse order, so that if P inherits from Q and
+  // Q inherits from R, we first visit R, then Q, then P, ensuring that
+  // R's associated types are added to P's list, etc.
   for (const auto *proto : llvm::reverse(Protocols)) {
     auto &info = Info[proto];
 
+    // We might inherit the same protocol multiple times due to diamond
+    // inheritance, so make sure we only add each protocol once.
     llvm::SmallDenseSet<const ProtocolDecl *, 4> visited;
     visited.insert(proto);
 
     for (const auto *inherited : info.Inherited) {
+      // Add directly-inherited protocols.
       if (!visited.insert(inherited).second)
         continue;
       info.AllInherited.push_back(inherited);
 
+      // Add indirectly-inherited protocols.
       for (auto *inheritedType : getProtocolInfo(inherited).AllInherited) {
         if (!visited.insert(inheritedType).second)
           continue;
@@ -130,6 +158,9 @@ void ProtocolGraph::computeInheritedProtocols() {
   }
 }
 
+/// Recursively compute the 'depth' of e protocol, which is inductively defined
+/// as one greater than the depth of all inherited protocols, with a protocol
+/// that does not inherit any other protocol having a depth of one.
 unsigned ProtocolGraph::computeProtocolDepth(const ProtocolDecl *proto) {
   auto &info = Info[proto];
 
@@ -154,6 +185,15 @@ unsigned ProtocolGraph::computeProtocolDepth(const ProtocolDecl *proto) {
   return depth;
 }
 
+/// Defines a linear order with the property that if a protocol P inherits
+/// from another protocol Q, then P < Q. (The converse cannot be true, since
+/// this is a linear order.)
+///
+/// We first compare the 'depth' of a protocol, which is defined in
+/// ProtocolGraph::computeProtocolDepth() above.
+///
+/// If two protocols have the same depth, the tie is broken by the standard
+/// TypeDecl::compare().
 int ProtocolGraph::compareProtocols(const ProtocolDecl *lhs,
                                     const ProtocolDecl *rhs) const {
   const auto &infoLHS = getProtocolInfo(lhs);
@@ -162,6 +202,9 @@ int ProtocolGraph::compareProtocols(const ProtocolDecl *lhs,
   return infoLHS.Index - infoRHS.Index;
 }
 
+/// Returns if \p thisProto transitively inherits from \p otherProto.
+///
+/// The result is false if the two protocols are equal.
 bool ProtocolGraph::inheritsFrom(const ProtocolDecl *thisProto,
                                  const ProtocolDecl *otherProto) const {
   const auto &info = getProtocolInfo(thisProto);

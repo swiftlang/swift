@@ -31,6 +31,17 @@ namespace swift {
 
 namespace rewriting {
 
+/// The most primitive term in the rewrite system.
+///
+/// enum Atom {
+///   case name(Identifier)
+///   case protocol(Protocol)
+///   case type([Protocol], Identifier)
+///   case genericParam(index: Int, depth: Int)
+///   case layout(LayoutConstraint)
+/// }
+///
+/// Out-of-line methods are documented in RewriteSystem.cpp.
 class Atom final {
   using Storage = llvm::PointerUnion<Identifier,
                                      GenericTypeParamType *,
@@ -47,20 +58,26 @@ class Atom final {
   }
 
 public:
+  /// Creates a new name atom.
   static Atom forName(Identifier name) {
     return Atom({}, name);
   }
 
+  /// Creates a new protocol atom.
   static Atom forProtocol(const ProtocolDecl *proto) {
     return Atom({proto}, Storage());
   }
 
+  /// Creates a new associated type atom for a single protocol.
   static Atom forAssociatedType(const ProtocolDecl *proto,
                                 Identifier name) {
     assert(proto != nullptr);
     return Atom({proto}, name);
   }
 
+  /// Creates a merged associated type atom to represent a nested
+  /// type that conforms to multiple protocols, all of which have
+  /// an associated type with the same name.
   static Atom forAssociatedType(
       llvm::TinyPtrVector<const ProtocolDecl *>protos,
       Identifier name) {
@@ -68,21 +85,43 @@ public:
     return Atom(protos, name);
   }
 
+  /// Creates a generic parameter atom, representing a generic
+  /// parameter in the top-level generic signature from which the
+  /// rewrite system is built.
   static Atom forGenericParam(GenericTypeParamType *param) {
     assert(param->isCanonical());
     return Atom({}, param);
   }
 
+  /// Creates a layout atom, representing a layout constraint.
   static Atom forLayout(LayoutConstraint layout) {
     assert(layout->isKnownLayout());
     return Atom({}, layout);
   }
 
   enum class Kind : uint8_t {
+    /// An associated type [P:T] or [P&Q&...:T]. The parent term
+    /// must be known to conform to P (or P, Q, ...).
     AssociatedType,
+
+    /// A generic parameter, uniquely identified by depth and
+    /// index. Can only appear at the beginning of a term, where
+    /// it represents a generic parameter of the top-level generic
+    /// signature.
     GenericParam,
+
+    /// An unbound identifier name.
     Name,
+
+    /// When appearing at the start of a term, represents a nested
+    /// type of a protocol 'Self' type.
+    ///
+    /// When appearing at the end of a term, represents that the
+    /// term conforms to the protocol.
     Protocol,
+
+    /// When appearring at the end of a term, represents that the
+    /// term conforms to the layout.
     Layout
   };
 
@@ -111,18 +150,23 @@ public:
     llvm_unreachable("Bad term rewriting atom");
   }
 
+  /// Get the identifier associated with an unbound name atom or an
+  /// associated type atom.
   Identifier getName() const {
     assert(getKind() == Kind::Name ||
            getKind() == Kind::AssociatedType);
     return Value.get<Identifier>();
   }
 
+  /// Get the single protocol declaration associate with a protocol atom.
   const ProtocolDecl *getProtocol() const {
     assert(getKind() == Kind::Protocol);
     assert(Protos.size() == 1);
     return Protos.front();
   }
 
+  /// Get the list of protocols associated with a protocol or associated
+  /// type atom.
   llvm::TinyPtrVector<const ProtocolDecl *> getProtocols() const {
     assert(getKind() == Kind::Protocol ||
            getKind() == Kind::AssociatedType);
@@ -130,11 +174,13 @@ public:
     return Protos;
   }
 
+  /// Get the generic parameter associated with a generic parameter atom.
   GenericTypeParamType *getGenericParam() const {
     assert(getKind() == Kind::GenericParam);
     return Value.get<GenericTypeParamType *>();
   }
 
+  /// Get the layout constraint associated with a layout constraint atom.
   LayoutConstraint getLayoutConstraint() const {
     assert(getKind() == Kind::Layout);
     return Value.get<LayoutConstraint>();
@@ -156,6 +202,14 @@ public:
   }
 };
 
+/// A term is a sequence of one or more atoms.
+///
+/// The first atom in the term must be a protocol, generic parameter, or
+/// associated type atom.
+///
+/// A layout constraint atom must only appear at the end of a term.
+///
+/// Out-of-line methods are documented in RewriteSystem.cpp.
 class Term final {
   llvm::SmallVector<Atom, 3> Atoms;
 
@@ -202,6 +256,7 @@ public:
 
   decltype(Atoms)::iterator findSubTerm(const Term &other);
 
+  /// Returns true if this term contains, or is equal to, \p other.
   bool containsSubTerm(const Term &other) const {
     return findSubTerm(other) != end();
   }
@@ -213,6 +268,11 @@ public:
   void dump(llvm::raw_ostream &out) const;
 };
 
+/// A rewrite rule that replaces occurrences of LHS with RHS.
+///
+/// LHS must be greater than RHS in the linear order over terms.
+///
+/// Out-of-line methods are documented in RewriteSystem.cpp.
 class Rule final {
   Term LHS;
   Term RHS;
@@ -238,19 +298,27 @@ public:
     return LHS.containsSubTerm(other.LHS);
   }
 
+  /// Returns if the rule was deleted.
   bool isDeleted() const {
     return deleted;
   }
 
+  /// Deletes the rule, which removes it from consideration in term
+  /// simplification and completion. Deleted rules are simply marked as
+  /// such instead of being physically removed from the rules vector
+  /// in the rewrite system, to ensure that indices remain valid across
+  /// deletion.
   void markDeleted() {
     assert(!deleted);
     deleted = true;
   }
 
+  /// Returns the length of the left hand side.
   unsigned getDepth() const {
     return LHS.size();
   }
 
+  /// Partial order on rules orders rules by their left hand side.
   int compare(const Rule &other,
               const ProtocolGraph &protos) const {
     return LHS.compare(other.LHS, protos);
@@ -259,12 +327,35 @@ public:
   void dump(llvm::raw_ostream &out) const;
 };
 
+/// A term rewrite system for working with types in a generic signature.
+///
+/// Out-of-line methods are documented in RewriteSystem.cpp.
 class RewriteSystem final {
+  /// The rules added so far, including rules from our client, as well
+  /// as rules introduced by the completion procedure.
   std::vector<Rule> Rules;
+
+  /// The graph of all protocols transitively referenced via our set of
+  /// rewrite rules, used for the linear order on atoms.
   ProtocolGraph Protos;
+
+  /// A list of pending terms for the associated type merging completion
+  /// heuristic.
+  ///
+  /// The pair (lhs, rhs) satisfies the following conditions:
+  /// - lhs > rhs
+  /// - all atoms but the last are pair-wise equal in lhs and rhs
+  /// - the last atom in both lhs and rhs is an associated type atom
+  /// - the last atom in both lhs and rhs has the same name
+  ///
+  /// See RewriteSystem::processMergedAssociatedTypes() for details.
   std::vector<std::pair<Term, Term>> MergedAssociatedTypes;
+
+  /// A list of pending pairs for checking overlap in the completion
+  /// procedure.
   std::deque<std::pair<unsigned, unsigned>> Worklist;
 
+  /// Set these to true to enable debugging output.
   unsigned DebugSimplify : 1;
   unsigned DebugAdd : 1;
   unsigned DebugMerge : 1;
@@ -291,8 +382,14 @@ public:
   bool simplify(Term &term) const;
 
   enum class CompletionResult {
+    /// Confluent completion was computed successfully.
     Success,
+
+    /// Maximum number of iterations reached.
     MaxIterations,
+
+    /// Completion produced a rewrite rule whose left hand side has a length
+    /// exceeding the limit.
     MaxDepth
   };
 

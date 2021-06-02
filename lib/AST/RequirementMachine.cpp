@@ -27,6 +27,9 @@ using namespace rewriting;
 
 namespace {
 
+/// A utility class for bulding a rewrite system from the top-level requirements
+/// of a generic signature, and all protocol requirement signatures from all
+/// transitively-referenced protocols.
 struct RewriteSystemBuilder {
   ASTContext &Context;
 
@@ -47,11 +50,14 @@ struct RewriteSystemBuilder {
 } // end namespace
 
 void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
+  // Collect all protocols transitively referenced from the generic signature's
+  // requirements.
   Protocols.visitRequirements(sig->getRequirements());
   Protocols.computeTransitiveClosure();
   Protocols.computeLinearOrder();
   Protocols.computeInheritedAssociatedTypes();
 
+  // Add rewrite rules for each protocol.
   for (auto *proto : Protocols.Protocols) {
     if (Context.LangOpts.DebugRequirementMachine) {
       llvm::dbgs() << "protocol " << proto->getName() << " {\n";
@@ -77,10 +83,17 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
     }
   }
 
+  // Add rewrite rules for all requirements in the top-level signature.
   for (const auto &req : sig->getRequirements())
     addRequirement(req, /*proto=*/nullptr);
 }
 
+/// For an associated type T in a protocol P, we add a rewrite rule:
+///
+///   [P].T => [P:T]
+///
+/// Intuitively, this means "if a type conforms to P, it has a nested type
+/// named T".
 void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
                                              const ProtocolDecl *proto) {
   Term lhs;
@@ -93,6 +106,13 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   Rules.emplace_back(lhs, rhs);
 }
 
+/// For an associated type T in a protocol Q that is inherited by another
+/// protocol P, we add a rewrite rule:
+///
+///   [P].[Q:T] => [P:T]
+///
+/// Intuitively this means, "if a type conforms to P, then the associated type
+/// T of Q is inherited by P".
 void RewriteSystemBuilder::addInheritedAssociatedType(
                                                 const AssociatedTypeDecl *type,
                                                 const ProtocolDecl *inherited,
@@ -107,6 +127,15 @@ void RewriteSystemBuilder::addInheritedAssociatedType(
   Rules.emplace_back(lhs, rhs);
 }
 
+/// Lowers a generic requirement to a rewrite rule.
+///
+/// If \p proto is null, this is a generic requirement from the top-level
+/// generic signature. The added rewrite rule will be rooted in a generic
+/// parameter atom.
+///
+/// If \p proto is non-null, this is a generic requirement in the protocol's
+/// requirement signature. The added rewrite rule will be rooted in a
+/// protocol atom.
 void RewriteSystemBuilder::addRequirement(const Requirement &req,
                                           const ProtocolDecl *proto) {
   if (Context.LangOpts.DebugRequirementMachine) {
@@ -120,6 +149,11 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
 
   switch (req.getKind()) {
   case RequirementKind::Conformance: {
+    // A conformance requirement T : P becomes a rewrite rule
+    //
+    //   T.[P] == T
+    //
+    // Intuitively, this means "any type ending with T conforms to P".
     auto *proto = req.getProtocolDecl();
 
     auto constraintTerm = subjectTerm;
@@ -128,16 +162,26 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     Rules.emplace_back(subjectTerm, constraintTerm);
     break;
   }
+
   case RequirementKind::Superclass:
+    // FIXME: Implement
     break;
+
   case RequirementKind::Layout: {
+    // A layout requirement T : L becomes a rewrite rule
+    //
+    //   T.[L] == T
     auto constraintTerm = subjectTerm;
     constraintTerm.add(Atom::forLayout(req.getLayoutConstraint()));
 
     Rules.emplace_back(subjectTerm, constraintTerm);
     break;
   }
+
   case RequirementKind::SameType: {
+    // A same-type requirement T == U becomes a rewrite rule
+    //
+    //   T == U
     auto otherType = CanType(req.getSecondType());
 
     // FIXME: Handle concrete types
@@ -152,16 +196,30 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   }
 }
 
+/// Map an interface type to a term.
+///
+/// If \p proto is null, this is a term relative to a generic
+/// parameter in a top-level signature. The term is rooted in a generic
+/// parameter atom.
+///
+/// If \p proto is non-null, this is a term relative to a protocol's
+/// 'Self' type. The term is rooted in a protocol atom.
+///
+/// The bound associated types in the interface type are ignored; the
+/// resulting term consists entirely of a root atom followed by zero
+/// or more name atoms.
 Term swift::rewriting::getTermForType(CanType paramType,
                                       const ProtocolDecl *proto) {
   assert(paramType->isTypeParameter());
 
+  // Collect zero or more nested type names in reverse order.
   SmallVector<Atom, 3> atoms;
   while (auto memberType = dyn_cast<DependentMemberType>(paramType)) {
     atoms.push_back(Atom::forName(memberType->getName()));
     paramType = memberType.getBase();
   }
 
+  // Add the root atom at the end.
   if (proto) {
     assert(proto->getSelfInterfaceType()->isEqual(paramType));
     atoms.push_back(Atom::forProtocol(proto));
@@ -170,9 +228,11 @@ Term swift::rewriting::getTermForType(CanType paramType,
   }
 
   std::reverse(atoms.begin(), atoms.end());
+
   return Term(atoms);
 }
 
+/// We use the PIMPL pattern to avoid creeping header dependencies.
 struct RequirementMachine::Implementation {
   RewriteSystem System;
   bool Complete = false;
@@ -199,16 +259,23 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
     llvm::dbgs() << "Adding generic signature " << sig << " {\n";
   }
 
+  // Collect the top-level requirements, and all transtively-referenced
+  // protocol requirement signatures.
   RewriteSystemBuilder builder(Context);
   builder.addGenericSignature(sig);
 
+  // Add the initial set of rewrite rules to the rewrite system, also
+  // providing the protocol graph to use for the linear order on terms.
   Impl->System.initialize(std::move(builder.Rules),
                           std::move(builder.Protocols));
 
+  // Attempt to obtain a confluent rewrite system using the completion
+  // procedure.
   auto result = Impl->System.computeConfluentCompletion(
       Context.LangOpts.RequirementMachineStepLimit,
       Context.LangOpts.RequirementMachineDepthLimit);
 
+  // Check for failure.
   switch (result) {
   case RewriteSystem::CompletionResult::Success:
     break;
