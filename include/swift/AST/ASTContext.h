@@ -520,6 +520,11 @@ public:
   FuncDecl *get##Name() const;
 #include "swift/AST/KnownDecls.def"
 
+  // Declare accessors for the known declarations.
+#define KNOWN_SDK_FUNC_DECL(Module, Name, Id) \
+  FuncDecl *get##Name() const;
+#include "swift/AST/KnownSDKDecls.def"
+
   /// Get the '+' function on two RangeReplaceableCollection.
   FuncDecl *getPlusFunctionOnRangeReplaceableCollection() const;
 
@@ -590,6 +595,11 @@ public:
 
   // Retrieve the declaration of Swift._stdlib_isOSVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastDecl() const;
+
+  /// Look for the declaration with the given name within the
+  /// passed in module.
+  void lookupInModule(ModuleDecl *M, StringRef name,
+                      SmallVectorImpl<ValueDecl *> &results) const;
 
   /// Look for the declaration with the given name within the
   /// Swift module.
