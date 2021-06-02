@@ -337,7 +337,7 @@ static void swift_task_enqueueGlobalImpl(Job *job) {
 
 void swift::swift_task_enqueueGlobal(Job *job) {
   if (swift_task_enqueueGlobal_hook)
-    swift_task_enqueueGlobal_hook(job, swift_task_enqueueGlobal);
+    swift_task_enqueueGlobal_hook(job, swift_task_enqueueGlobalImpl);
   else
     swift_task_enqueueGlobalImpl(job);
 }
