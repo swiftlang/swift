@@ -180,7 +180,8 @@ function(_add_host_variant_c_compile_flags target)
         target_compile_options(${target} PRIVATE -g)
       endif()
     else()
-      target_compile_options(${target} PRIVATE -g0)
+      target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-g0>)
+      target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-gnone>)
     endif()
   endif()
 
@@ -633,6 +634,19 @@ function(add_swift_host_tool executable)
       JOB_POOL_LINK swift_link_job_pool)
   endif()
   if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
+    # If we found a swift compiler and are going to use swift code in swift
+    # host side tools but link with clang, add the appropriate -L paths so we
+    # find all of the necessary swift libraries on Darwin.
+    if (CMAKE_Swift_COMPILER)
+      # Add in the SDK directory for the host platform and add an rpath.
+      target_link_directories(${executable} PRIVATE
+        ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
+      # Add in the toolchain directory so we can grab compatibility libraries
+      get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
+      target_link_directories(${executable} PUBLIC ${TOOLCHAIN_LIB_DIR})
+    endif()
+
     # Lists of rpaths that we are going to add to our executables.
     #
     # Please add each rpath separately below to the list, explaining why you are
@@ -644,8 +658,8 @@ function(add_swift_host_tool executable)
     # contain swift content.
     list(APPEND RPATH_LIST "@executable_path/../lib")
 
-    # Also include the swift specific resource dir in our rpath.
-    list(APPEND RPATH_LIST "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    # Also include the abi stable system stdlib in our rpath.
+    list(APPEND RPATH_LIST "/usr/lib/swift")
 
     set_target_properties(${executable} PROPERTIES
       BUILD_WITH_INSTALL_RPATH YES
