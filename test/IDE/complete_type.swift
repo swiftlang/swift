@@ -790,3 +790,24 @@ struct ContainExtension {
 // EXTENSION_INHERITANCE-DAG: Decl[TypeAlias]/CurrNominal:        ProtoAlias[#FooProtocol#];
 // EXTENSION_INHERITANCE-DAG: Keyword/None:                       Type[#HasProtoAlias.Type#];
 // EXTENSION_INHERITANCE: End completions
+
+var _: (() -> #^IN_POSTFIX_BASE_1?check=WITH_GLOBAL_TYPES^#)?
+var _: (() -> #^IN_POSTFIX_BASE_2?check=WITH_GLOBAL_TYPES^#)!
+var _: (() -> #^IN_POSTFIX_BASE_3?check=WITH_GLOBAL_TYPES^#)[1]
+var _: (() -> #^IN_POSTFIX_BASE_4?check=WITH_GLOBAL_TYPES^#).Protocol
+var _: (() -> #^IN_POSTFIX_BASE_5?check=WITH_GLOBAL_TYPES^#).Type
+
+struct HaveNested {
+    struct Nested {}
+}
+
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_1?check=POSTFIX_BASE_MEMBER^#?
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_2?check=POSTFIX_BASE_MEMBER^#!
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_3?check=POSTFIX_BASE_MEMBER^#[1]
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_4?check=POSTFIX_BASE_MEMBER^#.Protocol
+var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_5?check=POSTFIX_BASE_MEMBER^#.Type
+
+// POSTFIX_BASE_MEMBER: Begin completions, 2 items
+// POSTFIX_BASE_MEMBER-DAG: Decl[Struct]/CurrNominal:           Nested[#HaveNested.Nested#];
+// POSTFIX_BASE_MEMBER-DAG: Keyword/None:                       Type[#HaveNested.Type#];
+// POSTFIX_BASE_MEMBER: End completions
