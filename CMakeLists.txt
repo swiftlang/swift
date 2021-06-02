@@ -1061,6 +1061,7 @@ endif()
 
 if(SWIFT_INCLUDE_TESTS)
   add_subdirectory(test)
+  add_subdirectory(validation-test)
   add_subdirectory(unittests)
 endif()
 if(SWIFT_INCLUDE_DOCS)
