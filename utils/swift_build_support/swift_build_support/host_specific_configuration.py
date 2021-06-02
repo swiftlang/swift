@@ -21,9 +21,8 @@ class HostSpecificConfiguration(object):
 
     """Configuration information for an individual host."""
 
-    def __init__(self, host_target, args):
-        """Initialize for the given `host_target`."""
-
+    @staticmethod
+    def _compute_stdlib_targets(host_target, args):
         # Compute the set of deployment targets to configure/build.
         if host_target == args.host_target:
             # This host is the user's desired product, so honor the requested
@@ -53,6 +52,14 @@ class HostSpecificConfiguration(object):
                 args.stdlib_deployment_targets == []):
             stdlib_targets_to_configure = []
             stdlib_targets_to_build = []
+
+        return (stdlib_targets_to_configure, stdlib_targets_to_build)
+
+    def __init__(self, host_target, args):
+        """Initialize for the given `host_target`."""
+
+        (stdlib_targets_to_configure, stdlib_targets_to_build) = \
+            HostSpecificConfiguration._compute_stdlib_targets(host_target, args)
 
         # Compute derived information from the arguments.
         #
