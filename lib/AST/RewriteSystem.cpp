@@ -255,7 +255,17 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
     rhs.dump(llvm::dbgs());
     llvm::dbgs() << "\n";
   }
+
+  unsigned i = Rules.size();
   Rules.emplace_back(lhs, rhs);
+
+  for (unsigned j : indices(Rules)) {
+    if (i == j)
+      continue;
+
+    Worklist.emplace_back(i, j);
+    Worklist.emplace_back(j, i);
+  }
 
   return true;
 }
@@ -301,23 +311,11 @@ bool RewriteSystem::simplify(Term &term) const {
 }
 
 RewriteSystem::CompletionResult
-RewriteSystem::computeConfluentCompletion(
-    unsigned maxIterations,
-    unsigned maxDepth) {
-  std::deque<std::pair<unsigned, unsigned>> worklist;
-
-  for (unsigned i : indices(Rules)) {
-    for (unsigned j : indices(Rules)) {
-      if (i == j)
-        continue;
-
-      worklist.emplace_back(i, j);
-    }
-  }
-
-  while (!worklist.empty()) {
-    auto pair = worklist.front();
-    worklist.pop_front();
+RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
+                                          unsigned maxDepth) {
+  while (!Worklist.empty()) {
+    auto pair = Worklist.front();
+    Worklist.pop_front();
 
     Term first;
 
@@ -350,14 +348,6 @@ RewriteSystem::computeConfluentCompletion(
     const auto &newRule = Rules[i];
     if (newRule.getDepth() > maxDepth)
       return CompletionResult::MaxDepth;
-
-    for (unsigned j : indices(Rules)) {
-      if (i == j)
-        continue;
-
-      worklist.emplace_back(i, j);
-      worklist.emplace_back(j, i);
-    }
 
     for (unsigned j : indices(Rules)) {
       if (i == j)

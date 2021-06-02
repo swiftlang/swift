@@ -247,6 +247,7 @@ public:
 class RewriteSystem final {
   std::vector<Rule> Rules;
   ProtocolGraph Protos;
+  std::deque<std::pair<unsigned, unsigned>> Worklist;
 
   unsigned DebugSimplify : 1;
   unsigned DebugAdd : 1;
