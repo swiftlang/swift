@@ -173,18 +173,26 @@ Atom Atom::forLayout(LayoutConstraint layout,
 ///
 /// * For layout atoms, we use LayoutConstraint::compare().
 int Atom::compare(Atom other, const ProtocolGraph &graph) const {
+  // Exit early if the atoms are equal.
+  if (Ptr == other.Ptr)
+    return 0;
+
   auto kind = getKind();
   auto otherKind = other.getKind();
 
   if (kind != otherKind)
     return int(kind) < int(otherKind) ? -1 : 1;
 
+  int result = 0;
+
   switch (kind) {
   case Kind::Name:
-    return getName().compare(other.getName());
+    result = getName().compare(other.getName());
+    break;
 
   case Kind::Protocol:
-    return graph.compareProtocols(getProtocol(), other.getProtocol());
+    result = graph.compareProtocols(getProtocol(), other.getProtocol());
+    break;
 
   case Kind::AssociatedType: {
     auto protos = getProtocols();
@@ -200,7 +208,8 @@ int Atom::compare(Atom other, const ProtocolGraph &graph) const {
         return result;
     }
 
-    return getName().compare(other.getName());
+    result = getName().compare(other.getName());
+    break;
   }
 
   case Kind::GenericParam: {
@@ -213,15 +222,16 @@ int Atom::compare(Atom other, const ProtocolGraph &graph) const {
     if (param->getIndex() != otherParam->getIndex())
       return param->getIndex() < otherParam->getIndex() ? -1 : 1;
 
-    return 0;
+    break;
   }
 
-  case Kind::Layout: {
-    return getLayoutConstraint().compare(other.getLayoutConstraint());
-  }
+  case Kind::Layout:
+    result = getLayoutConstraint().compare(other.getLayoutConstraint());
+    break;
   }
 
-  llvm_unreachable("Bad atom kind");
+  assert(result != 0 && "Two distinct atoms should not compare equal");
+  return result;
 }
 
 /// Print the atom using our mnemonic representation.
