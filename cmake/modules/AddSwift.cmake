@@ -371,7 +371,11 @@ function(_add_host_variant_link_flags target)
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     if(SWIFT_USE_LINKER)
       target_link_options(${target} PRIVATE
-        -fuse-ld=${SWIFT_USE_LINKER}$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>)
+        $<$<LINK_LANGUAGE:CXX>:-fuse-ld=${SWIFT_USE_LINKER}$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>>)
+      if (CMAKE_Swift_COMPILER)
+        target_link_options(${target} PRIVATE
+          $<$<LINK_LANGUAGE:Swift>:-use-ld=${SWIFT_USE_LINKER}$<$<STREQUAL:${CMAKE_HOST_SYSTEM_NAME},Windows>:.exe>>)
+      endif()
     endif()
   endif()
 
