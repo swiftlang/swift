@@ -1453,9 +1453,8 @@ namespace {
       llvm::Value *diffKindVal = nullptr;
       if (type->isDifferentiable()) {
         assert(metadataDifferentiabilityKind.isDifferentiable());
-        // FIXME: Shouldn't this use metadataDifferentiabilityKind?
-        diffKindVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                             flags.getIntValue());
+        diffKindVal = llvm::ConstantInt::get(
+            IGF.IGM.SizeTy, metadataDifferentiabilityKind.getIntValue());
       } else if (type->getGlobalActor()) {
         diffKindVal = llvm::ConstantInt::get(
             IGF.IGM.SizeTy,
