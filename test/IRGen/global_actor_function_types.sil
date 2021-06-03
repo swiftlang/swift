@@ -9,7 +9,7 @@ func globalActorMetatype<T>(_: T.Type) -> Any.Type {
   return Fn.self
 }
 
-// CHECK-LABEL: define swiftcc %swift.type* @"$s4test19globalActorMetatypeyypXpxmlF"
+// CHECK-LABEL: define {{protected |}}swiftcc %swift.type* @"$s4test19globalActorMetatypeyypXpxmlF"
 // CHECK: [[MAIN_ACTOR_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @"$sScMMa"(i{{32|64}} 255)
 // CHECK-NEXT: [[MAIN_ACTOR_METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[MAIN_ACTOR_RESPONSE]], 0
 // CHECK: call %swift.type* @swift_getFunctionTypeMetadataGlobalActor(i{{32|64}} 335544320, i{{32|64}} 0, %swift.type** null, i32* null, %swift.type* %T, %swift.type* [[MAIN_ACTOR_METADATA]])
