@@ -183,15 +183,6 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
   return false;
 }
 
-void static
-removeInstructions(ArrayRef<SILInstruction*> UsersToRemove) {
-  for (auto *I : UsersToRemove) {
-    I->replaceAllUsesOfAllResultsWithUndef();
-    // Now we know that I should not have any uses... erase it from its parent.
-    I->eraseFromParent();
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                             Use Graph Analysis
 //===----------------------------------------------------------------------===//
@@ -682,93 +673,6 @@ static void insertReleases(ArrayRef<StoreInst*> Stores,
   }
 }
 
-// Attempt to remove the array allocated at NewAddrValue and release its
-// refcounted elements.
-//
-// This is tightly coupled with the implementation of array.uninitialized.
-// The call to allocate an uninitialized array returns two values:
-// (Array<E> ArrayBase, UnsafeMutable<E> ArrayElementStorage)
-//
-// TODO: This relies on the lowest level array.uninitialized not being
-// inlined. To do better we could either run this pass before semantic inlining,
-// or we could also handle calls to array.init.
-static bool removeAndReleaseArray(SingleValueInstruction *NewArrayValue,
-                                  DeadEndBlocks &DEBlocks) {
-  TupleExtractInst *ArrayDef = nullptr;
-  TupleExtractInst *StorageAddress = nullptr;
-  for (auto *Op : NewArrayValue->getUses()) {
-    auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
-    if (!TupleElt)
-      return false;
-    if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
-      ArrayDef = TupleElt;
-    } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
-      StorageAddress = TupleElt;
-    } else {
-      return false;
-    }
-  }
-  if (!ArrayDef)
-    return false; // No Array object to delete.
-
-  assert(!ArrayDef->getType().isTrivial(*ArrayDef->getFunction()) &&
-         "Array initialization should produce the proper tuple type.");
-
-  // Analyze the array object uses.
-  DeadObjectAnalysis DeadArray(ArrayDef);
-  if (!DeadArray.analyze())
-    return false;
-
-  // Require all stores to be into the array storage not the array object,
-  // otherwise bail.
-  bool HasStores = false;
-  DeadArray.visitStoreLocations([&](ArrayRef<StoreInst*>){ HasStores = true; });
-  if (HasStores)
-    return false;
-
-  // Remove references to empty arrays.
-  if (!StorageAddress) {
-    removeInstructions(DeadArray.getAllUsers());
-    return true;
-  }
-  assert(StorageAddress->getType().isTrivial(*ArrayDef->getFunction()) &&
-         "Array initialization should produce the proper tuple type.");
-
-  // Analyze the array storage uses.
-  DeadObjectAnalysis DeadStorage(StorageAddress);
-  if (!DeadStorage.analyze())
-    return false;
-
-  // Find array object lifetime.
-  ValueLifetimeAnalysis VLA(NewArrayValue, DeadArray.getAllUsers());
-
-  // Check that all storage users are in the Array's live blocks.
-  for (auto *User : DeadStorage.getAllUsers()) {
-    if (!VLA.isWithinLifetime(User))
-      return false;
-  }
-  // For each store location, insert releases.
-  SILSSAUpdater SSAUp;
-  ValueLifetimeAnalysis::Frontier ArrayFrontier;
-  if (!VLA.computeFrontier(ArrayFrontier,
-                           ValueLifetimeAnalysis::UsersMustPostDomDef,
-                           &DEBlocks)) {
-    // In theory the allocated object must be released on all paths in which
-    // some object initialization occurs. If not (for some reason) we bail.
-    return false;
-  }
-
-  DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
-      insertReleases(Stores, ArrayFrontier, SSAUp);
-    });
-
-  // Delete all uses of the dead array and its storage address.
-  removeInstructions(DeadArray.getAllUsers());
-  removeInstructions(DeadStorage.getAllUsers());
-
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 //                            Function Processing
 //===----------------------------------------------------------------------===//
@@ -785,11 +689,20 @@ namespace {
 class DeadObjectElimination : public SILFunctionTransform {
   llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
 
+  InstructionDeleter deleter;
+
+  void removeInstructions(ArrayRef<SILInstruction*> toRemove);
+
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
   bool processKeyPath(KeyPathInst *KPI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
+
+  bool getDeadInstsAfterInitializerRemoved(
+    ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy);
+  bool removeAndReleaseArray(
+    SingleValueInstruction *NewArrayValue, DeadEndBlocks &DEBlocks);
 
   bool processFunction(SILFunction &Fn) {
     DeadEndBlocks DEBlocks(&Fn);
@@ -799,19 +712,7 @@ class DeadObjectElimination : public SILFunctionTransform {
 
     for (auto &BB : Fn) {
 
-      llvm::SmallVector<SILInstruction*, 64> instsToProcess;
-      for (SILInstruction &inst : BB) {
-        if (isa<AllocationInst>(&inst) ||
-            isAllocatingApply(&inst) ||
-            isa<KeyPathInst>(&inst)) {
-          instsToProcess.push_back(&inst);
-        }
-      }
-
-      for (SILInstruction *inst : instsToProcess) {
-        if (inst->isDeleted())
-          continue;
-
+      for (SILInstruction *inst : deleter.updatingRange(&BB)) {
         if (auto *A = dyn_cast<AllocRefInst>(inst))
           Changed |= processAllocRef(A);
         else if (auto *A = dyn_cast<AllocStackInst>(inst))
@@ -823,6 +724,7 @@ class DeadObjectElimination : public SILFunctionTransform {
         else if (auto *A = dyn_cast<ApplyInst>(inst))
           Changed |= processAllocApply(A, DEBlocks);
       }
+      deleter.cleanupDeadInstructions();
     }
     return Changed;
   }
@@ -839,6 +741,15 @@ class DeadObjectElimination : public SILFunctionTransform {
 
 };
 } // end anonymous namespace
+
+void
+DeadObjectElimination::removeInstructions(ArrayRef<SILInstruction*> toRemove) {
+  for (auto *I : toRemove) {
+    I->replaceAllUsesOfAllResultsWithUndef();
+    // Now we know that I should not have any uses... erase it from its parent.
+    deleter.forceDelete(I);
+  }
+}
 
 bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // Ok, we have an alloc_ref. Check the cache to see if we have already
@@ -932,7 +843,7 @@ bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
 /// If AI is the version of an initializer where we pass in either an apply or
 /// an alloc_ref to initialize in place, validate that we are able to continue
 /// optimizing and return To
-static bool getDeadInstsAfterInitializerRemoved(
+bool DeadObjectElimination::getDeadInstsAfterInitializerRemoved(
     ApplyInst *AI, llvm::SmallVectorImpl<SILInstruction *> &ToDestroy) {
   assert(ToDestroy.empty() && "We assume that ToDestroy is empty, so on "
                               "failure we can clear without worrying about the "
@@ -973,6 +884,93 @@ static bool getDeadInstsAfterInitializerRemoved(
   return true;
 }
 
+// Attempt to remove the array allocated at NewAddrValue and release its
+// refcounted elements.
+//
+// This is tightly coupled with the implementation of array.uninitialized.
+// The call to allocate an uninitialized array returns two values:
+// (Array<E> ArrayBase, UnsafeMutable<E> ArrayElementStorage)
+//
+// TODO: This relies on the lowest level array.uninitialized not being
+// inlined. To do better we could either run this pass before semantic inlining,
+// or we could also handle calls to array.init.
+bool DeadObjectElimination::removeAndReleaseArray(
+    SingleValueInstruction *NewArrayValue, DeadEndBlocks &DEBlocks) {
+  TupleExtractInst *ArrayDef = nullptr;
+  TupleExtractInst *StorageAddress = nullptr;
+  for (auto *Op : NewArrayValue->getUses()) {
+    auto *TupleElt = dyn_cast<TupleExtractInst>(Op->getUser());
+    if (!TupleElt)
+      return false;
+    if (TupleElt->getFieldIndex() == 0 && !ArrayDef) {
+      ArrayDef = TupleElt;
+    } else if (TupleElt->getFieldIndex() == 1 && !StorageAddress) {
+      StorageAddress = TupleElt;
+    } else {
+      return false;
+    }
+  }
+  if (!ArrayDef)
+    return false; // No Array object to delete.
+
+  assert(!ArrayDef->getType().isTrivial(*ArrayDef->getFunction()) &&
+         "Array initialization should produce the proper tuple type.");
+
+  // Analyze the array object uses.
+  DeadObjectAnalysis DeadArray(ArrayDef);
+  if (!DeadArray.analyze())
+    return false;
+
+  // Require all stores to be into the array storage not the array object,
+  // otherwise bail.
+  bool HasStores = false;
+  DeadArray.visitStoreLocations([&](ArrayRef<StoreInst*>){ HasStores = true; });
+  if (HasStores)
+    return false;
+
+  // Remove references to empty arrays.
+  if (!StorageAddress) {
+    removeInstructions(DeadArray.getAllUsers());
+    return true;
+  }
+  assert(StorageAddress->getType().isTrivial(*ArrayDef->getFunction()) &&
+         "Array initialization should produce the proper tuple type.");
+
+  // Analyze the array storage uses.
+  DeadObjectAnalysis DeadStorage(StorageAddress);
+  if (!DeadStorage.analyze())
+    return false;
+
+  // Find array object lifetime.
+  ValueLifetimeAnalysis VLA(NewArrayValue, DeadArray.getAllUsers());
+
+  // Check that all storage users are in the Array's live blocks.
+  for (auto *User : DeadStorage.getAllUsers()) {
+    if (!VLA.isWithinLifetime(User))
+      return false;
+  }
+  // For each store location, insert releases.
+  SILSSAUpdater SSAUp;
+  ValueLifetimeAnalysis::Frontier ArrayFrontier;
+  if (!VLA.computeFrontier(ArrayFrontier,
+                           ValueLifetimeAnalysis::UsersMustPostDomDef,
+                           &DEBlocks)) {
+    // In theory the allocated object must be released on all paths in which
+    // some object initialization occurs. If not (for some reason) we bail.
+    return false;
+  }
+
+  DeadStorage.visitStoreLocations([&] (ArrayRef<StoreInst*> Stores) {
+      insertReleases(Stores, ArrayFrontier, SSAUp);
+    });
+
+  // Delete all uses of the dead array and its storage address.
+  removeInstructions(DeadArray.getAllUsers());
+  removeInstructions(DeadStorage.getAllUsers());
+
+  return true;
+}
+
 bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
                                               DeadEndBlocks &DEBlocks) {
   // Currently only handle array.uninitialized
@@ -989,12 +987,10 @@ bool DeadObjectElimination::processAllocApply(ApplyInst *AI,
 
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating apply allocate(...).\n");
 
-  InstructionDeleter deleter;
   deleter.forceDeleteWithUsers(AI);
   for (auto *toDelete : instsDeadAfterInitializerRemoved) {
     deleter.trackIfDead(toDelete);
   }
-  deleter.cleanupDeadInstructions();
 
   ++DeadAllocApplyEliminated;
   return true;
