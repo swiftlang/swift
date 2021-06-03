@@ -415,8 +415,10 @@ public:
   const FunctionTypeRef *createFunctionType(
       llvm::ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags,
-      FunctionMetadataDifferentiabilityKind diffKind) {
-    return FunctionTypeRef::create(*this, params, result, flags, diffKind);
+      FunctionMetadataDifferentiabilityKind diffKind,
+      const TypeRef *globalActor) {
+    return FunctionTypeRef::create(
+        *this, params, result, flags, diffKind, globalActor);
   }
 
   const FunctionTypeRef *createImplFunctionType(
@@ -472,7 +474,8 @@ public:
     }
 
     auto result = createTupleType({}, "");
-    return FunctionTypeRef::create(*this, {}, result, funcFlags, diffKind);
+    return FunctionTypeRef::create(
+        *this, {}, result, funcFlags, diffKind, nullptr);
   }
 
   const ProtocolCompositionTypeRef *
