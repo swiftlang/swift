@@ -147,6 +147,90 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
 }
 #endif
 
+static MetadataState
+tryGetCompleteMetadataNonblocking(const Metadata *metadata) {
+  return swift_checkMetadataState(
+             MetadataRequest(MetadataState::Complete, /*isNonBlocking*/ true),
+             metadata)
+      .State;
+}
+
+/// Get the superclass of metadata, which may be incomplete. When the metadata
+/// is not sufficiently complete, then we fall back to demangling the superclass
+/// in the nominal type descriptor, which is slow but works. Return NULL if the
+/// metadata is not a class.
+///
+/// If the metadata's current state is known, it may be passed in as
+/// knownMetadataState. This saves the cost of retrieving that info separately.
+static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
+    const Metadata *metadata,
+    llvm::Optional<MetadataState> knownMetadataState) {
+  const ClassMetadata *classMetadata = dyn_cast<ClassMetadata>(metadata);
+  if (!classMetadata)
+    return {_swift_class_getSuperclass(metadata), MetadataState::Complete};
+
+  MetadataState metadataState;
+  if (knownMetadataState)
+    metadataState = *knownMetadataState;
+  else
+    metadataState = tryGetCompleteMetadataNonblocking(classMetadata);
+
+  if (metadataState == MetadataState::Complete) {
+    // The subclass metadata is complete. Fetch and return the superclass.
+    auto *superMetadata = getMetadataForClass(classMetadata->Superclass);
+    return {superMetadata, MetadataState::Complete};
+  }
+  if (metadataState == MetadataState::NonTransitiveComplete) {
+    // The subclass metadata is complete, but, unlike above, not transitively.
+    // Its Superclass field is valid, so just read that field to get to the
+    // superclass to proceed to the next step.
+    auto *superMetadata = getMetadataForClass(classMetadata->Superclass);
+    auto superState = tryGetCompleteMetadataNonblocking(superMetadata);
+    return {superMetadata, superState};
+  } else {
+    // The subclass metadata is either LayoutComplete or Abstract, so the
+    // Superclass field is not valid.  To get to the superclass, make the
+    // expensive call to getSuperclassMetadata which demangles the superclass
+    // name from the nominal type descriptor to get the metadata for the
+    // superclass.
+    MetadataRequest request(MetadataState::Complete,
+                            /*non-blocking*/ true);
+    return getSuperclassMetadata(request, classMetadata);
+  }
+}
+
+class MaybeIncompleteSuperclassIterator {
+  const Metadata *metadata;
+  llvm::Optional<MetadataState> state;
+
+public:
+  MaybeIncompleteSuperclassIterator(const Metadata *metadata)
+      : metadata(metadata), state(llvm::None) {}
+
+  MaybeIncompleteSuperclassIterator &operator++() {
+    auto response = getSuperclassForMaybeIncompleteMetadata(metadata, state);
+    metadata = response.Value;
+    state = response.State;
+    return *this;
+  }
+
+  const Metadata *operator*() const { return metadata; }
+
+  bool operator!=(const MaybeIncompleteSuperclassIterator rhs) const {
+    return metadata != rhs.metadata;
+  }
+};
+
+/// Return a range that will iterate over the given metadata and all its
+/// superclasses in order. If the metadata is not a class, iteration will
+/// provide that metadata and then stop.
+iterator_range<MaybeIncompleteSuperclassIterator>
+iterateMaybeIncompleteSuperclasses(const Metadata *metadata) {
+  return iterator_range<MaybeIncompleteSuperclassIterator>(
+      MaybeIncompleteSuperclassIterator(metadata),
+      MaybeIncompleteSuperclassIterator(nullptr));
+}
+
 /// Take the type reference inside a protocol conformance record and fetch the
 /// canonical metadata pointer for the type it refers to.
 /// Returns nil for universal or generic type references.
@@ -470,13 +554,10 @@ searchInConformanceCache(const Metadata *type,
   auto origType = type;
   auto snapshot = C.Cache.snapshot();
 
-  while (type) {
+  for (auto type : iterateMaybeIncompleteSuperclasses(type)) {
     if (auto *Value = snapshot.find(ConformanceCacheKey(type, protocol))) {
       return {type == origType, Value->getWitnessTable()};
     }
-
-    // If there is a superclass, look there.
-    type = _swift_class_getSuperclass(type);
   }
 
   // We did not find a cache entry.
@@ -562,13 +643,10 @@ namespace {
     /// be a superclass of the given type. Returns null if this type does not
     /// match this conformance.
     const Metadata *getMatchingType(const Metadata *conformingType) const {
-      while (conformingType) {
-        // Check for a match.
+      for (auto conformingType :
+           iterateMaybeIncompleteSuperclasses(conformingType)) {
         if (matches(conformingType))
           return conformingType;
-
-        // Look for a superclass.
-        conformingType = _swift_class_getSuperclass(conformingType);
       }
 
       return nullptr;
@@ -739,8 +817,7 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   // Search the shared cache tables for a conformance for this type, and for
   // superclasses (if it's a class).
   if (C.sharedCacheOptimizationsActive()) {
-    const Metadata *dyldSearchType = type;
-    do {
+    for (auto dyldSearchType : iterateMaybeIncompleteSuperclasses(type)) {
       bool definitiveFailure;
       std::tie(dyldCachedWitnessTable, dyldCachedConformanceDescriptor,
                definitiveFailure) =
@@ -749,9 +826,9 @@ swift_conformsToProtocolImpl(const Metadata *const type,
       if (definitiveFailure)
         return nullptr;
 
-      dyldSearchType = _swift_class_getSuperclass(dyldSearchType);
-    } while (dyldSearchType && !dyldCachedWitnessTable &&
-             !dyldCachedConformanceDescriptor);
+      if (dyldCachedWitnessTable || dyldCachedConformanceDescriptor)
+        break;
+    }
 
     validateSharedCacheResults(C, type, protocol, dyldCachedWitnessTable,
                                dyldCachedConformanceDescriptor);
@@ -827,18 +904,18 @@ swift_conformsToProtocolImpl(const Metadata *const type,
 
   // Find the most specific conformance that was scanned.
   const WitnessTable *foundWitness = nullptr;
-  const Metadata *searchType = type;
-  while (!foundWitness && searchType) {
+  const Metadata *foundType = nullptr;
+  for (auto searchType : iterateMaybeIncompleteSuperclasses(type)) {
     foundWitness = foundWitnesses.lookup(searchType);
-
-    // If there's no entry here, move up to the superclass (if any).
-    if (!foundWitness)
-      searchType = _swift_class_getSuperclass(searchType);
+    if (foundWitness) {
+      foundType = searchType;
+      break;
+    }
   }
 
   // If it's for a superclass or if we didn't find anything, then add an
   // authoritative entry for this type.
-  if (searchType != type)
+  if (foundType != type)
     C.cacheResult(type, protocol, foundWitness, snapshot.count());
 
   // A negative result can be overridden by a result from dyld.
@@ -864,14 +941,6 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   return nullptr;
 }
 
-static MetadataState
-tryGetCompleteMetadataNonblocking(const Metadata *metadata) {
-  return swift_checkMetadataState(
-             MetadataRequest(MetadataState::Complete, /*isNonBlocking*/ true),
-             metadata)
-      .State;
-}
-
 template <typename HandleObjc>
 bool isSwiftClassMetadataSubclass(const ClassMetadata *subclass,
                                   const ClassMetadata *superclass,
@@ -879,52 +948,19 @@ bool isSwiftClassMetadataSubclass(const ClassMetadata *subclass,
   assert(subclass);
   assert(superclass);
 
-  MetadataState subclassState = tryGetCompleteMetadataNonblocking(subclass);
-
-  do {
-    if (subclassState == MetadataState::Complete) {
-      // The subclass metadata is complete.  That means not just that its
-      // Superclass field is valid, but that the Superclass field of the
-      // referenced class metadata is valid, and the Superclass field of the
-      // class metadata referenced there, and so on transitively.
-      //
-      // Scan the superclass chains in the ClassMetadata looking for a match.
-      while ((subclass = subclass->Superclass)) {
-        if (subclass == superclass)
-          return true;
-      }
-      return false;
-    }
-    if (subclassState == MetadataState::NonTransitiveComplete) {
-      // The subclass metadata is complete, but, unlike above, not transitively.
-      // Its Superclass field is valid, so just read that field to get to the
-      // superclass to proceed to the next step.
-      subclass = subclass->Superclass;
-      if (subclass->isPureObjC()) {
-        return handleObjc(subclass, superclass);
-      }
-      subclassState = tryGetCompleteMetadataNonblocking(subclass);
-    } else {
-      // The subclass metadata is either LayoutComplete or Abstract, so the
-      // Superclass field is not valid.  To get to the superclass, make the
-      // expensive call to getSuperclassMetadata which demangles the superclass
-      // name from the nominal type descriptor to get the metadata for the
-      // superclass.
-      MetadataRequest request(MetadataState::Complete,
-                              /*non-blocking*/ true);
-      auto response = getSuperclassMetadata(request, subclass);
-      auto newMetadata = response.Value;
-      if (auto newSubclass = dyn_cast<ClassMetadata>(newMetadata)) {
-        subclass = newSubclass;
-        subclassState = response.State;
-      } else {
-        return handleObjc(newMetadata, superclass);
-      }
-    }
-    if (subclass == superclass)
+  llvm::Optional<MetadataState> subclassState = llvm::None;
+  while (true) {
+    auto response =
+        getSuperclassForMaybeIncompleteMetadata(subclass, subclassState);
+    if (response.Value == superclass)
       return true;
-  } while (subclass);
-  return false;
+    if (!response.Value)
+      return false;
+
+    subclass = dyn_cast<ClassMetadata>(response.Value);
+    if (!subclass || subclass->isPureObjC())
+      return handleObjc(response.Value, superclass);
+  }
 }
 
 // Whether the provided `subclass` is metadata for a subclass* of the superclass
