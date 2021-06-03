@@ -79,10 +79,9 @@ void Edge::serialize(llvm::json::OStream &OS) const {
     }
     
     const ValueDecl *InheritingDecl = nullptr;
-    if (const auto *ID = Source.getDeclInheritingDocs()) {
-      if (Target.getSymbolDecl() == ID || Source.getSynthesizedBaseTypeDecl())
-        InheritingDecl = ID;
-    }
+    if (const auto *ID = Source.getDeclInheritingDocs())
+      InheritingDecl = ID;
+
 
     if (!InheritingDecl && Source.getSynthesizedBaseTypeDecl())
       InheritingDecl = Source.getSymbolDecl();
