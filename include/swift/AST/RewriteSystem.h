@@ -376,7 +376,6 @@ public:
   const Term &getRHS() const { return RHS; }
 
   bool apply(Term &term) const {
-    assert(!deleted);
     return term.rewriteSubTerm(LHS, RHS);
   }
 
@@ -451,12 +450,14 @@ class RewriteSystem final {
   unsigned DebugSimplify : 1;
   unsigned DebugAdd : 1;
   unsigned DebugMerge : 1;
+  unsigned DebugCompletion : 1;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx) : Context(ctx) {
     DebugSimplify = false;
     DebugAdd = false;
     DebugMerge = false;
+    DebugCompletion = false;
   }
 
   RewriteSystem(const RewriteSystem &) = delete;
