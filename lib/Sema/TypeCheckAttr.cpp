@@ -5444,14 +5444,8 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // that do not have storage.
   auto dc = D->getDeclContext();
   if (auto var = dyn_cast<VarDecl>(D)) {
-    // 'nonisolated' is meaningless on a `let`.
-    if (var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_let);
-      return;
-    }
-
-    // 'nonisolated' can not be applied to stored properties.
-    if (var->hasStorage()) {
+    // 'nonisolated' can not be applied to mutable stored properties.
+    if (var->hasStorage() && var->supportsMutation()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
       return;
     }
