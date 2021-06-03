@@ -589,7 +589,7 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? global-actor? // results and parameters
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -599,6 +599,7 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 5.5
     async ::= 'Ya'                             // 'async' annotation on function types
     sendable ::= 'Yb'                          // @Sendable on function types
+    global-actor :: = type 'Yc'                // Global actor on function type
   #endif
   throws ::= 'K'                             // 'throws' annotation on function types
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type

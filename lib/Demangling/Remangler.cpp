@@ -2485,6 +2485,11 @@ void Remangler::mangleDifferentiableFunctionType(Node *node) {
   Buffer << "Yj" << (char)node->getIndex(); // differentiability kind
 }
 
+void Remangler::mangleGlobalActorFunctionType(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Yc";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }
