@@ -42,9 +42,6 @@ struct RewriteSystemBuilder {
   void addGenericSignature(CanGenericSignature sig);
   void addAssociatedType(const AssociatedTypeDecl *type,
                          const ProtocolDecl *proto);
-  void addInheritedAssociatedType(const AssociatedTypeDecl *type,
-                                  const ProtocolDecl *inherited,
-                                  const ProtocolDecl *proto);
   void addRequirement(const Requirement &req,
                       const ProtocolDecl *proto);
 };
@@ -70,13 +67,6 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
     for (auto *type : info.AssociatedTypes)
       addAssociatedType(type, proto);
 
-    for (auto *inherited : info.Inherited) {
-      auto inheritedTypes = Protocols.getProtocolInfo(inherited).AssociatedTypes;
-      for (auto *inheritedType : inheritedTypes) {
-        addInheritedAssociatedType(inheritedType, inherited, proto);
-      }
-    }
-
     for (auto req : info.Requirements)
       addRequirement(req.getCanonical(), proto);
 
@@ -101,29 +91,6 @@ void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
   Term lhs;
   lhs.add(Atom::forProtocol(proto, Context));
   lhs.add(Atom::forName(type->getName(), Context));
-
-  Term rhs;
-  rhs.add(Atom::forAssociatedType(proto, type->getName(), Context));
-
-  Rules.emplace_back(lhs, rhs);
-}
-
-/// For an associated type T in a protocol Q that is inherited by another
-/// protocol P, we add a rewrite rule:
-///
-///   [P].[Q:T] => [P:T]
-///
-/// Intuitively this means, "if a type conforms to P, then the associated type
-/// T of Q is inherited by P".
-void RewriteSystemBuilder::addInheritedAssociatedType(
-                                                const AssociatedTypeDecl *type,
-                                                const ProtocolDecl *inherited,
-                                                const ProtocolDecl *proto) {
-  assert(inherited != proto);
-
-  Term lhs;
-  lhs.add(Atom::forProtocol(proto, Context));
-  lhs.add(Atom::forAssociatedType(inherited, type->getName(), Context));
 
   Term rhs;
   rhs.add(Atom::forAssociatedType(proto, type->getName(), Context));
