@@ -5174,7 +5174,9 @@ bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   if (Tok.is(tok::r_brace)) {
     RBLoc = consumeToken();
   } else {
-    RBLoc = Tok.getLoc();
+    // Non-delayed parsing would set the RB location to the LB if it is missing,
+    // match that behaviour here
+    RBLoc = LBLoc;
     error = true;
   }
   return error;
