@@ -1440,7 +1440,8 @@ void Serializer::writeASTBlockEntity(
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
       assert(witness.getDecl() || req->getAttrs().hasAttribute<OptionalAttr>()
-             || req->getAttrs().isUnavailable(req->getASTContext()));
+             || req->getAttrs().isUnavailable(req->getASTContext())
+             || allowCompilerErrors());
 
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
@@ -1992,6 +1993,8 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
 # define DECL(KIND, PARENT)\
 LLVM_ATTRIBUTE_UNUSED \
 static void verifyAttrSerializable(const KIND ## Decl *D) {\
+  if (D->Decl::getASTContext().LangOpts.AllowModuleWithCompilerErrors)\
+    return;\
   for (auto Attr : D->getAttrs()) {\
     assert(Attr->canAppearOnDecl(D) && "attribute cannot appear on a " #KIND);\
   }\
@@ -3913,6 +3916,9 @@ public:
     using namespace decls_block;
     verifyAttrSerializable(dtor);
 
+    if (S.allowCompilerErrors() && dtor->isInvalid())
+      return;
+
     auto contextID = S.addDeclContextRef(dtor->getDeclContext());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[DestructorLayout::Code];
@@ -4143,6 +4149,13 @@ public:
   }
 
   void visitUnresolvedType(const UnresolvedType *) {
+    // If for some reason we have an unresolved type while compiling with
+    // errors, just serialize an ErrorType and continue.
+    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      visitErrorType(
+          cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
+      return;
+    }
     llvm_unreachable("should not serialize an UnresolvedType");
   }
 
