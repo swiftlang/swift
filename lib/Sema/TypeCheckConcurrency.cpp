@@ -1149,22 +1149,22 @@ namespace {
     }
 
     /// Searches the applyStack from back to front for the inner-most CallExpr
-    /// and marks that CallExpr as implicitly async. 
+    /// and marks that CallExpr as implicitly async.
     ///
     /// NOTE: Crashes if no CallExpr was found.
-    /// 
+    ///
     /// For example, for global actor function `curryAdd`, if we have:
     ///     ((curryAdd 1) 2)
     /// then we want to mark the inner-most CallExpr, `(curryAdd 1)`.
     ///
     /// The same goes for calls to member functions, such as calc.add(1, 2),
     /// aka ((add calc) 1 2), looks like this:
-    /// 
+    ///
     ///  (call_expr
     ///    (dot_syntax_call_expr
     ///      (declref_expr add)
     ///      (declref_expr calc))
-    ///    (tuple_expr 
+    ///    (tuple_expr
     ///      ...))
     ///
     /// and we reach up to mark the CallExpr.
@@ -1252,7 +1252,7 @@ namespace {
         if (auto partialApply = decomposePartialApplyThunk(
                 apply, Parent.getAsExpr())) {
           if (auto memberRef = findMemberReference(partialApply->fn)) {
-            // NOTE: partially-applied thunks are never annotated as 
+            // NOTE: partially-applied thunks are never annotated as
             // implicitly async, regardless of whether they are escaping.
             checkMemberReference(
                 partialApply->base, memberRef->first, memberRef->second,
@@ -1541,7 +1541,7 @@ namespace {
       // FIXME: Make this diagnostic more sensitive to the isolation context
       // of the declaration.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        func->diagnose(diag::actor_isolated_sync_func, 
+        func->diagnose(diag::actor_isolated_sync_func,
           decl->getDescriptiveKind(),
           decl->getName());
 
@@ -2213,12 +2213,14 @@ namespace {
     }
 
     /// Check whether we are in an actor's initializer or deinitializer.
-    static bool isActorInitOrDeInitContext(const DeclContext *dc) {
+    /// \returns nullptr iff we are not in such a declaration. Otherwise,
+    ///          returns a pointer to the declaration.
+    static AbstractFunctionDecl const* isActorInitOrDeInitContext(const DeclContext *dc) {
       while (true) {
         // Non-Sendable closures are considered part of the enclosing context.
         if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
           if (isSendableClosure(closure, /*forActorIsolation=*/false))
-            return false;
+            return nullptr;
 
           dc = dc->getParent();
           continue;
@@ -2228,7 +2230,7 @@ namespace {
           // If this is an initializer or deinitializer of an actor, we're done.
           if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
               getSelfActorDecl(dc->getParent()))
-            return true;
+            return func;
 
           // Non-Sendable local functions are considered part of the enclosing
           // context.
@@ -2236,7 +2238,7 @@ namespace {
             if (auto fnType =
                     func->getInterfaceType()->getAs<AnyFunctionType>()) {
               if (fnType->isSendable())
-                return false;
+                return nullptr;
 
               dc = dc->getParent();
               continue;
@@ -2244,8 +2246,15 @@ namespace {
           }
         }
 
-        return false;
+        return nullptr;
       }
+    }
+
+    static bool isConvenienceInit(AbstractFunctionDecl const* fn) {
+      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(fn))
+        return ctor->isConvenienceInit();
+
+      return false;
     }
 
     /// Check a reference to a local or global.
@@ -2291,7 +2300,7 @@ namespace {
     /// in an invalid or unsafe way such that a diagnostic was emitted.
     bool checkMemberReference(
         Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
-        bool isEscapingPartialApply = false, 
+        bool isEscapingPartialApply = false,
         Expr *context = nullptr) {
       if (!base || !memberRef)
         return false;
@@ -2320,14 +2329,12 @@ namespace {
         if (isolatedActor)
           return false;
 
-        // An instance member of an actor can be referenced from an initializer
-        // or deinitializer.
-        // FIXME: We likely want to narrow this down to only stored properties,
-        // but this matches existing behavior.
-        if (isolatedActor.isActorSelf() &&
-            member->isInstanceMember() &&
-            isActorInitOrDeInitContext(getDeclContext()))
-          return false;
+        // An instance member of an actor can be referenced from an actor's
+        // designated initializer or deinitializer.
+        if (isolatedActor.isActorSelf() && member->isInstanceMember())
+          if (auto fn = isActorInitOrDeInitContext(getDeclContext()))
+            if (!isConvenienceInit(fn))
+              return false;
 
         // An escaping partial application of something that is part of
         // the actor's isolated state is never permitted.
@@ -2875,8 +2882,10 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
-  case DeclKind::Constructor:
     return MemberIsolationPropagation::GlobalActor;
+
+  case DeclKind::Constructor:
+    return MemberIsolationPropagation::AnyIsolation;
 
   case DeclKind::Func:
   case DeclKind::Accessor:
@@ -2957,6 +2966,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
       defaultIsolation = ActorIsolation::forIndependent();
     }
   }
+
+  // An actor's convenience init is assumed to be actor-independent.
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
+    if (nominal->isActor())
+      if (auto ctor = dyn_cast<ConstructorDecl>(value))
+        if (ctor->isConvenienceInit())
+          defaultIsolation = ActorIsolation::forIndependent();
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](
@@ -3115,10 +3131,6 @@ bool HasIsolatedSelfRequest::evaluate(
 
   switch (*memberIsolation) {
   case MemberIsolationPropagation::GlobalActor:
-    // Treat constructors as being actor-isolated... for now.
-    if (isa<ConstructorDecl>(value))
-      break;
-
     return false;
 
   case MemberIsolationPropagation::AnyIsolation:
@@ -3152,6 +3164,13 @@ bool HasIsolatedSelfRequest::evaluate(
       if (isolation.getActor() != selfTypeDecl)
         return false;
       break;
+    }
+  }
+
+  // In an actor's convenience init, self is not isolated.
+  if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
+    if (ctor->isConvenienceInit()) {
+      return false;
     }
   }
 
