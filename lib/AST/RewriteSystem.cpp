@@ -21,6 +21,44 @@
 using namespace swift;
 using namespace rewriting;
 
+Atom::Kind Atom::getKind() const {
+  return Kind(Ptr->Kind);
+}
+
+/// Get the identifier associated with an unbound name atom or an
+/// associated type atom.
+Identifier Atom::getName() const {
+  assert(getKind() == Kind::Name ||
+         getKind() == Kind::AssociatedType);
+  return Ptr->Name;
+}
+
+/// Get the single protocol declaration associate with a protocol atom.
+const ProtocolDecl *Atom::getProtocol() const {
+  assert(getKind() == Kind::Protocol);
+  return Ptr->Proto;
+}
+
+/// Get the list of protocols associated with an associated type atom.
+ArrayRef<const ProtocolDecl *> Atom::getProtocols() const {
+  assert(getKind() == Kind::AssociatedType);
+  auto protos = Ptr->getProtocols();
+  assert(!protos.empty());
+  return protos;
+}
+
+/// Get the generic parameter associated with a generic parameter atom.
+GenericTypeParamType *Atom::getGenericParam() const {
+  assert(getKind() == Kind::GenericParam);
+  return Ptr->GenericParam;
+}
+
+/// Get the layout constraint associated with a layout constraint atom.
+LayoutConstraint Atom::getLayoutConstraint() const {
+  assert(getKind() == Kind::Layout);
+  return Ptr->Layout;
+}
+
 /// Creates a new name atom.
 Atom Atom::forName(Identifier name,
                    RewriteContext &ctx) {
@@ -32,9 +70,9 @@ Atom Atom::forName(Identifier name,
   if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
     return atom;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
-  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
-  auto *atom = new (mem) Atom::Storage(name);
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(name);
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -54,9 +92,9 @@ Atom Atom::forProtocol(const ProtocolDecl *proto,
   if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
     return atom;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
-  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
-  auto *atom = new (mem) Atom::Storage(proto);
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(proto);
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -90,10 +128,10 @@ Atom Atom::forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
   if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
     return atom;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(
-      protos.size());
-  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
-  auto *atom = new (mem) Atom::Storage(protos, name);
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
+      protos.size(), 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(protos, name);
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -115,9 +153,9 @@ Atom Atom::forGenericParam(GenericTypeParamType *param,
   if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
     return atom;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
-  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
-  auto *atom = new (mem) Atom::Storage(param);
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(param);
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -135,9 +173,9 @@ Atom Atom::forLayout(LayoutConstraint layout,
   if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
     return atom;
 
-  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *>(0);
-  void *mem = ctx.Allocator.Allocate(size, alignof(Atom::Storage));
-  auto *atom = new (mem) Atom::Storage(layout);
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(layout);
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -271,6 +309,53 @@ void Atom::dump(llvm::raw_ostream &out) const {
   }
 
   llvm_unreachable("Bad atom kind");
+}
+
+size_t Term::size() const { return Ptr->Size; }
+
+ArrayRef<Atom>::const_iterator Term::begin() const {
+  return Ptr->getElements().begin();
+}
+
+ArrayRef<Atom>::const_iterator Term::end() const {
+  return Ptr->getElements().end();
+}
+
+Atom Term::back() const {
+  return Ptr->getElements().back();
+}
+
+Atom Term::operator[](size_t index) const {
+  return Ptr->getElements()[index];
+}
+
+void Term::dump(llvm::raw_ostream &out) const {
+  MutableTerm(*this).dump(out);
+}
+
+Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
+  unsigned size = mutableTerm.size();
+  assert(size > 0 && "Term must have at least one atom");
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(size);
+  for (auto atom : mutableTerm)
+    id.AddPointer(atom.getOpaquePointer());
+
+  void *insertPos = nullptr;
+  if (auto *term = ctx.Terms.FindNodeOrInsertPos(id, insertPos))
+    return term;
+
+  void *mem = ctx.Allocator.Allocate(
+      Storage::totalSizeToAlloc<Atom>(size),
+      alignof(Storage));
+  auto *term = new (mem) Storage(size);
+  for (unsigned i = 0; i < size; ++i)
+    term->getElements()[i] = mutableTerm[i];
+
+  ctx.Terms.InsertNode(term, insertPos);
+
+  return term;
 }
 
 /// Linear order on terms.

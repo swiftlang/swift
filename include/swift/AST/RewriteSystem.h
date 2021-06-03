@@ -36,6 +36,7 @@ namespace swift {
 namespace rewriting {
 
 class RewriteContext;
+class MutableTerm;
 
 /// The smallest element in the rewrite system.
 ///
@@ -79,105 +80,7 @@ public:
 private:
   friend class RewriteContext;
 
-  /// Atoms are uniqued and immutable, stored as a single pointer;
-  /// the Storage type is the allocated backing storage.
-  struct Storage final
-    : public llvm::FoldingSetNode,
-      public llvm::TrailingObjects<Storage, const ProtocolDecl *> {
-    friend class Atom;
-
-    unsigned Kind : 16;
-    unsigned NumProtocols : 16;
-
-    union {
-      Identifier Name;
-      LayoutConstraint Layout;
-      const ProtocolDecl *Proto;
-      GenericTypeParamType *GenericParam;
-    };
-
-    explicit Storage(Identifier name) {
-      Kind = unsigned(Atom::Kind::Name);
-      NumProtocols = 0;
-      Name = name;
-    }
-
-    explicit Storage(LayoutConstraint layout) {
-      Kind = unsigned(Atom::Kind::Layout);
-      NumProtocols = 0;
-      Layout = layout;
-    }
-
-    explicit Storage(const ProtocolDecl *proto) {
-      Kind = unsigned(Atom::Kind::Protocol);
-      NumProtocols = 0;
-      Proto = proto;
-    }
-
-    explicit Storage(GenericTypeParamType *param) {
-      Kind = unsigned(Atom::Kind::GenericParam);
-      NumProtocols = 0;
-      GenericParam = param;
-    }
-
-    Storage(ArrayRef<const ProtocolDecl *> protos, Identifier name) {
-      assert(!protos.empty());
-
-      Kind = unsigned(Atom::Kind::AssociatedType);
-      NumProtocols = protos.size();
-      Name = name;
-
-      for (unsigned i : indices(protos))
-        getProtocols()[i] = protos[i];
-    }
-
-    size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
-      return NumProtocols;
-    }
-
-    MutableArrayRef<const ProtocolDecl *> getProtocols() {
-      return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
-    }
-
-    ArrayRef<const ProtocolDecl *> getProtocols() const {
-      return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
-    }
-
-    void Profile(llvm::FoldingSetNodeID &id) {
-      id.AddInteger(Kind);
-
-      switch (Atom::Kind(Kind)) {
-      case Atom::Kind::Name:
-        id.AddPointer(Name.get());
-        return;
-
-      case Atom::Kind::Layout:
-        id.AddPointer(Layout.getPointer());
-        return;
-
-      case Atom::Kind::Protocol:
-        id.AddPointer(Proto);
-        return;
-
-      case Atom::Kind::GenericParam:
-        id.AddPointer(GenericParam);
-        return;
-
-      case Atom::Kind::AssociatedType: {
-        auto protos = getProtocols();
-        id.AddInteger(protos.size());
-
-        for (const auto *proto : protos)
-          id.AddPointer(proto);
-
-        id.AddPointer(Name.get());
-        return;
-      }
-      }
-
-      llvm_unreachable("Bad atom kind");
-    }
-  };
+  struct Storage;
 
 private:
   const Storage *Ptr;
@@ -185,72 +88,40 @@ private:
   Atom(const Storage *ptr) : Ptr(ptr) {}
 
 public:
-  Kind getKind() const {
-    return Kind(Ptr->Kind);
+  Kind getKind() const;
+
+  Identifier getName() const;
+
+  const ProtocolDecl *getProtocol() const;
+
+  ArrayRef<const ProtocolDecl *> getProtocols() const;
+
+  GenericTypeParamType *getGenericParam() const;
+
+  LayoutConstraint getLayoutConstraint() const;
+
+  /// Returns an opaque pointer that uniquely identifies this atom.
+  const void *getOpaquePointer() const {
+    return Ptr;
   }
 
-  /// Get the identifier associated with an unbound name atom or an
-  /// associated type atom.
-  Identifier getName() const {
-    assert(getKind() == Kind::Name ||
-           getKind() == Kind::AssociatedType);
-    return Ptr->Name;
-  }
-
-  /// Get the single protocol declaration associate with a protocol atom.
-  const ProtocolDecl *getProtocol() const {
-    assert(getKind() == Kind::Protocol);
-    return Ptr->Proto;
-  }
-
-  /// Get the list of protocols associated with a protocol or associated
-  /// type atom.
-  ArrayRef<const ProtocolDecl *> getProtocols() const {
-    assert(getKind() == Kind::AssociatedType);
-    auto protos = Ptr->getProtocols();
-    assert(!protos.empty());
-    return protos;
-  }
-
-  /// Get the generic parameter associated with a generic parameter atom.
-  GenericTypeParamType *getGenericParam() const {
-    assert(getKind() == Kind::GenericParam);
-    return Ptr->GenericParam;
-  }
-
-  /// Get the layout constraint associated with a layout constraint atom.
-  LayoutConstraint getLayoutConstraint() const {
-    assert(getKind() == Kind::Layout);
-    return Ptr->Layout;
-  }
-
-  /// Creates a new name atom.
   static Atom forName(Identifier name,
                       RewriteContext &ctx);
 
-  /// Creates a new protocol atom.
   static Atom forProtocol(const ProtocolDecl *proto,
                           RewriteContext &ctx);
 
-  /// Creates a new associated type atom for a single protocol.
   static Atom forAssociatedType(const ProtocolDecl *proto,
                                 Identifier name,
                                 RewriteContext &ctx);
 
-  /// Creates a merged associated type atom to represent a nested
-  /// type that conforms to multiple protocols, all of which have
-  /// an associated type with the same name.
   static Atom forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
                                 Identifier name,
                                 RewriteContext &ctx);
 
-  /// Creates a generic parameter atom, representing a generic
-  /// parameter in the top-level generic signature from which the
-  /// rewrite system is built.
   static Atom forGenericParam(GenericTypeParamType *param,
                               RewriteContext &ctx);
 
-  /// Creates a layout atom, representing a layout constraint.
   static Atom forLayout(LayoutConstraint layout,
                         RewriteContext &ctx);
 
@@ -269,8 +140,188 @@ public:
 
 /// A term is a sequence of one or more atoms.
 ///
+/// The Term type is a uniqued, permanently-allocated representation,
+/// used to represent terms in the rewrite rules themselves. See also
+/// MutableTerm for the other representation.
+///
+/// The first atom in the term must be a protocol, generic parameter, or
+/// associated type atom.
+///
+/// A layout constraint atom must only appear at the end of a term.
+///
+/// Out-of-line methods are documented in RewriteSystem.cpp.
+class Term final {
+  friend class RewriteContext;
+
+  struct Storage;
+
+  const Storage *Ptr;
+
+  Term(const Storage *ptr) : Ptr(ptr) {}
+
+public:
+  size_t size() const;
+
+  ArrayRef<Atom>::const_iterator begin() const;
+
+  ArrayRef<Atom>::const_iterator end() const;
+
+  Atom back() const;
+
+  Atom operator[](size_t index) const;
+
+  static Term get(const MutableTerm &term, RewriteContext &ctx);
+
+  void dump(llvm::raw_ostream &out) const;
+};
+
+/// Atoms are uniqued and immutable, stored as a single pointer;
+/// the Storage type is the allocated backing storage.
+struct Atom::Storage final
+  : public llvm::FoldingSetNode,
+    public llvm::TrailingObjects<Storage, const ProtocolDecl *, Term> {
+  friend class Atom;
+
+  unsigned Kind : 3;
+  unsigned NumProtocols : 15;
+  unsigned NumSubstitutions : 14;
+
+  union {
+    Identifier Name;
+    LayoutConstraint Layout;
+    const ProtocolDecl *Proto;
+    GenericTypeParamType *GenericParam;
+  };
+
+  explicit Storage(Identifier name) {
+    Kind = unsigned(Atom::Kind::Name);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Name = name;
+  }
+
+  explicit Storage(LayoutConstraint layout) {
+    Kind = unsigned(Atom::Kind::Layout);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Layout = layout;
+  }
+
+  explicit Storage(const ProtocolDecl *proto) {
+    Kind = unsigned(Atom::Kind::Protocol);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Proto = proto;
+  }
+
+  explicit Storage(GenericTypeParamType *param) {
+    Kind = unsigned(Atom::Kind::GenericParam);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    GenericParam = param;
+  }
+
+  Storage(ArrayRef<const ProtocolDecl *> protos, Identifier name) {
+    assert(!protos.empty());
+
+    Kind = unsigned(Atom::Kind::AssociatedType);
+    NumProtocols = protos.size();
+    assert(NumProtocols == protos.size() && "Overflow");
+    NumSubstitutions = 0;
+    Name = name;
+
+    for (unsigned i : indices(protos))
+      getProtocols()[i] = protos[i];
+  }
+
+  size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
+    return NumProtocols;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Term>) const {
+    return NumSubstitutions;
+  }
+
+  MutableArrayRef<const ProtocolDecl *> getProtocols() {
+    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
+  }
+
+  ArrayRef<const ProtocolDecl *> getProtocols() const {
+    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) {
+    id.AddInteger(Kind);
+
+    switch (Atom::Kind(Kind)) {
+    case Atom::Kind::Name:
+      id.AddPointer(Name.get());
+      return;
+
+    case Atom::Kind::Layout:
+      id.AddPointer(Layout.getPointer());
+      return;
+
+    case Atom::Kind::Protocol:
+      id.AddPointer(Proto);
+      return;
+
+    case Atom::Kind::GenericParam:
+      id.AddPointer(GenericParam);
+      return;
+
+    case Atom::Kind::AssociatedType: {
+      auto protos = getProtocols();
+      id.AddInteger(protos.size());
+
+      for (const auto *proto : protos)
+        id.AddPointer(proto);
+
+      id.AddPointer(Name.get());
+      return;
+    }
+    }
+
+    llvm_unreachable("Bad atom kind");
+  }
+};
+
+/// Terms are uniqued and immutable, stored as a single pointer;
+/// the Storage type is the allocated backing storage.
+struct Term::Storage final
+  : public llvm::FoldingSetNode,
+    public llvm::TrailingObjects<Storage, Atom> {
+  friend class Atom;
+
+  unsigned Size;
+
+  explicit Storage(unsigned size) : Size(size) {}
+
+  size_t numTrailingObjects(OverloadToken<Atom>) const {
+    return Size;
+  }
+
+  MutableArrayRef<Atom> getElements() {
+    return {getTrailingObjects<Atom>(), Size};
+  }
+
+  ArrayRef<Atom> getElements() const {
+    return {getTrailingObjects<Atom>(), Size};
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) {
+    id.AddInteger(Size);
+
+    for (auto atom : getElements())
+      id.AddPointer(atom.getOpaquePointer());
+  }
+};
+
+/// A term is a sequence of one or more atoms.
+///
 /// The MutableTerm type is a dynamically-allocated representation,
 /// used to represent temporary values in simplification and completion.
+/// See also Term for the other representation.
 ///
 /// The first atom in the term must be a protocol, generic parameter, or
 /// associated type atom.
@@ -282,6 +333,8 @@ class MutableTerm final {
   llvm::SmallVector<Atom, 3> Atoms;
 
 public:
+  /// Creates an empty term. At least one atom must be added for the term
+  /// to become valid.
   MutableTerm() {}
 
   explicit MutableTerm(llvm::SmallVector<Atom, 3> &&atoms)
@@ -289,6 +342,9 @@ public:
 
   explicit MutableTerm(ArrayRef<Atom> atoms)
     : Atoms(atoms.begin(), atoms.end()) {}
+
+  explicit MutableTerm(Term term)
+    : Atoms(term.begin(), term.end()) {}
 
   void add(Atom atom) {
     Atoms.push_back(atom);
@@ -304,7 +360,7 @@ public:
   decltype(Atoms)::iterator begin() { return Atoms.begin(); }
   decltype(Atoms)::iterator end() { return Atoms.end(); }
 
-  const Atom &back() const {
+  Atom back() const {
     return Atoms.back();
   }
 
@@ -312,7 +368,7 @@ public:
     return Atoms.back();
   }
 
-  const Atom &operator[](size_t index) const {
+  Atom operator[](size_t index) const {
     return Atoms[index];
   }
 
@@ -345,12 +401,16 @@ public:
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class RewriteContext final {
   friend class Atom;
+  friend class Term;
 
   /// Allocator for uniquing atoms and terms.
   llvm::BumpPtrAllocator Allocator;
 
   /// Folding set for uniquing atoms.
   llvm::FoldingSet<Atom::Storage> Atoms;
+
+  /// Folding set for uniquing terms.
+  llvm::FoldingSet<Term::Storage> Terms;
 
   RewriteContext(const RewriteContext &) = delete;
   RewriteContext(RewriteContext &&) = delete;
