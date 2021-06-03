@@ -2021,6 +2021,14 @@ public:
       SGM.visit(TD);
     }
 
+    if (auto *SSF = sf->getSynthesizedFile()) {
+      for (Decl *D : SSF->getTopLevelDecls()) {
+        FrontendStatsTracer StatsTracer(SGM.getASTContext().Stats,
+                                        "SILgen-synthesized-decl", D);
+        SGM.visit(D);
+      }
+    }
+
     // If the source file contains an artificial main, emit the implicit
     // top-level code.
     if (auto *mainDecl = sf->getMainDecl())
