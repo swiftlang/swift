@@ -2055,13 +2055,20 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
+  entity.mangle(result.Name);
 
   bool isKnownLocal = entity.isAlwaysSharedLinkage();
-  if (const auto *DC = entity.getDeclContextForEmission())
+  if (const auto *DC = entity.getDeclContextForEmission()) {
     if (const auto *MD = DC->getParentModule())
       isKnownLocal = MD == swiftModule || MD->isStaticLibrary();
+  } else if (entity.hasSILFunction()) {
+    // SIL serialized entitites (functions, witness tables, vtables) do not have
+    // an associated DeclContext and are serialized into the current module.  As
+    // a result, we explicitly handle SIL Functions here. We do not expect other
+    // types to be referenced directly.
+    isKnownLocal = entity.getSILFunction()->isStaticallyLinked();
+  }
 
-  entity.mangle(result.Name);
   bool weakImported = entity.isWeakImported(swiftModule);
   result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
                             isDefinition, weakImported, isKnownLocal);

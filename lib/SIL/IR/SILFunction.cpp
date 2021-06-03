@@ -178,6 +178,7 @@ void SILFunction::init(SILLinkage Linkage, StringRef Name,
   this->Zombie = false;
   this->HasOwnership = true,
   this->WasDeserializedCanonical = false;
+  this->IsStaticallyLinked = false;
   this->IsWithoutActuallyEscapingThunk = false;
   this->OptMode = unsigned(OptimizationMode::NotSet);
   this->EffectsKindAttr = unsigned(E);
