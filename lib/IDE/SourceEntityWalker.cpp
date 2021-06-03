@@ -234,6 +234,65 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
       // Already walked children.
       return { false, Continue ? DeferS : nullptr };
     }
+
+    auto doSkipChildren = [&]() -> std::pair<bool, Stmt *> {
+      if (!walkToStmtPost(S))
+        return {false, nullptr};
+      return {false, S};
+    };
+
+    auto doStopTraversal = [&]() -> std::pair<bool, Stmt *> {
+      Cancelled = true;
+      return {false, nullptr};
+    };
+
+    // Make sure to walk a ForEachStmt in source order. Note this is a narrow
+    // fix for release/5.5. On main, this is fixed in the ASTWalker itself.
+    // rdar://78781061
+    if (auto *FE = dyn_cast<ForEachStmt>(S)) {
+      if (auto *P = FE->getPattern()) {
+        auto *NewP = P->walk(*this);
+        if (!NewP)
+          return doStopTraversal();
+        assert(NewP == P);
+      }
+      if (auto *SE = FE->getSequence()) {
+        auto *NewSE = SE->walk(*this);
+        if (!NewSE)
+          return doStopTraversal();
+        assert(NewSE == SE);
+      }
+      if (auto *Where = FE->getWhere()) {
+        auto *NewWhere = Where->walk(*this);
+        if (!NewWhere)
+          return doStopTraversal();
+        assert(NewWhere == Where);
+      }
+      if (auto *IteratorNext = FE->getConvertElementExpr()) {
+        auto *NewIteratorNext = IteratorNext->walk(*this);
+        if (!NewIteratorNext)
+          return doStopTraversal();
+        assert(NewIteratorNext == IteratorNext);
+      }
+      if (auto *IteratorVar = FE->getIteratorVar()) {
+        if (IteratorVar->walk(*this))
+          return doStopTraversal();
+      }
+      if (auto *IteratorVarRef = FE->getIteratorVarRef()) {
+        auto *NewIteratorVarRef = IteratorVarRef->walk(*this);
+        if (!NewIteratorVarRef)
+          return doStopTraversal();
+        assert(NewIteratorVarRef == IteratorVarRef);
+      }
+      if (auto *Body = FE->getBody()) {
+        auto *NewBody = Body->walk(*this);
+        if (!NewBody)
+          return doStopTraversal();
+        assert(NewBody == Body);
+      }
+      // Already visited.
+      return doSkipChildren();
+    }
   }
   return { TraverseChildren, S };
 }
