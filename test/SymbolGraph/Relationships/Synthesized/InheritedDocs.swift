@@ -7,6 +7,7 @@
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS-DOCS
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes EXTRA
+// RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes LOCAL
 
 // RUN: %target-swift-symbolgraph-extract -module-name InheritedDocs -I %t -pretty-print -output-dir %t -skip-inherited-docs
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes CHECK,SKIP
@@ -14,6 +15,7 @@
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS-SKIP
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes EXTRA
+// RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes LOCAL
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name InheritedDocs -emit-module -emit-module-path %t/InheritedDocs.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/ -skip-inherited-docs
@@ -56,10 +58,21 @@
 // EXTRA-NEXT:        "identifier": "s:13InheritedDocs1PPAAE9extraFuncyyF"
 // EXTRA-NEXT:        "displayName": "P.extraFunc()"
 
+// local implementations of a local protocol still need to a relation to that protocol
+
+// LOCAL:      "source": "s:13InheritedDocs1SV9localFuncyyF"
+// LOCAL-NEXT:      "target": "s:13InheritedDocs1SV"
+// LOCAL-NEXT:      "sourceOrigin"
+// LOCAL-NEXT:        "identifier": "s:13InheritedDocs1PP9localFuncyyF"
+// LOCAL-NEXT:        "displayName": "P.localFunc()"
+
 /// Protocol P
 public protocol P {
     /// Some Function
     func someFunc()
+
+    /// It's a local function!
+    func localFunc()
 }
 
 public extension P {
@@ -72,4 +85,5 @@ public extension P {
 }
 
 public struct S: P {
+    public func localFunc() {}
 }
