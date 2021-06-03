@@ -137,6 +137,19 @@ public:
       break;
     }
 
+    if (auto globalActor = F->getGlobalActor()) {
+      fprintf(file, "\n");
+      Indent += 2;
+      printHeader("global-actor");
+      {
+        Indent += 2;
+        printRec(globalActor);
+        fprintf(file, ")");
+        Indent -= 2;
+      }
+      Indent += 2;
+    }
+
     fprintf(file, "\n");
     Indent += 2;
     printHeader("parameters");
