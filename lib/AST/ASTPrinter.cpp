@@ -2601,6 +2601,10 @@ static bool usesFeatureConcurrentFunctions(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureActors2(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureSendable(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (func->isSendable())
