@@ -207,11 +207,12 @@ struct RequirementMachine::Implementation {
   RewriteSystem System;
   bool Complete = false;
 
-  Implementation() : System(Context) {}
+  Implementation(ASTContext &ctx)
+    : Context(ctx.Stats), System(Context) {}
 };
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
-  Impl = new Implementation();
+  Impl = new Implementation(ctx);
 }
 
 RequirementMachine::~RequirementMachine() {
@@ -222,6 +223,9 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
 
   auto *Stats = Context.Stats;
+
+  if (Stats)
+    ++Stats->getFrontendCounters().NumRequirementMachines;
 
   FrontendStatsTracer tracer(Stats, "build-rewrite-system");
 

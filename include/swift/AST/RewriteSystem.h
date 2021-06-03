@@ -18,6 +18,7 @@
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/ProtocolGraph.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
@@ -352,7 +353,10 @@ class RewriteContext final {
   RewriteContext &operator=(RewriteContext &&) = delete;
 
 public:
-  RewriteContext() {}
+  /// Statistical counters.
+  UnifiedStatsReporter *Stats;
+
+  RewriteContext(UnifiedStatsReporter *stats) : Stats(stats) {}
 
   Term getTermForType(CanType paramType,
                       const ProtocolDecl *proto);
@@ -420,6 +424,7 @@ public:
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class RewriteSystem final {
+  /// Rewrite context for memory allocation.
   RewriteContext &Context;
 
   /// The rules added so far, including rules from our client, as well
