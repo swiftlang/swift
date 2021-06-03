@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/RewriteSystem.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -815,6 +816,15 @@ void RewriteSystem::processMergedAssociatedTypes() {
 RewriteSystem::CompletionResult
 RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
+  unsigned steps = 0;
+
+  SWIFT_DEFER {
+    if (Context.Stats) {
+      Context.Stats->getFrontendCounters()
+        .NumRequirementMachineCompletionSteps += steps;
+    }
+  };
+
   // The worklist must be processed in first-in-first-out order, to ensure
   // that we resolve all overlaps among the initial set of rules before
   // moving on to overlaps between rules introduced by completion.
@@ -881,7 +891,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       continue;
 
     // Check if we've already done too much work.
-    if (--maxIterations == 0)
+    if (++steps >= maxIterations)
       return CompletionResult::MaxIterations;
 
     const auto &newRule = Rules[i];
