@@ -543,10 +543,19 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
     if (i == j)
       continue;
 
+    // We don't have to check for overlap with deleted rules.
+    if (Rules[j].isDeleted())
+      continue;
+
     // The overlap check is not commutative so we have to check both
     // directions.
     Worklist.emplace_back(i, j);
     Worklist.emplace_back(j, i);
+
+    if (DebugCompletion) {
+      llvm::dbgs() << "$ Queued up (" << i << ", " << j << ") and ";
+      llvm::dbgs() << "(" << j << ", " << i << ")\n";
+    }
   }
 
   // Tell the caller that we added a new rule.
@@ -779,16 +788,14 @@ void RewriteSystem::processMergedAssociatedTypes() {
           //
           //   [P1&P2].[Q] => [P1&P2]
           //
-          auto otherRHS = otherRule.getRHS();
-          assert(otherRHS.size() == 1);
-          assert(otherRHS[0] == otherLHS[0]);
+          Term newLHS;
+          newLHS.add(mergedAtom);
+          newLHS.add(otherLHS[1]);
 
-          otherRHS.back() = mergedAtom;
+          Term newRHS;
+          newRHS.add(mergedAtom);
 
-          auto newLHS = otherRHS;
-          newLHS.add(Atom::forProtocol(otherLHS[1].getProtocol(), Context));
-
-          addRule(newLHS, otherRHS);
+          addRule(newLHS, newRHS);
         }
       }
     }
@@ -820,12 +827,28 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     const auto &lhs = Rules[pair.first];
     const auto &rhs = Rules[pair.second];
 
-    // If either rule was deleted since, we don't have to check for overlap.
-    if (lhs.isDeleted() || rhs.isDeleted())
-      continue;
+    if (DebugCompletion) {
+      llvm::dbgs() << "$ Check for overlap: (#" << pair.first << ") ";
+      lhs.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "                -vs- (#" << pair.second << ") ";
+      rhs.dump(llvm::dbgs());
+      llvm::dbgs() << ":";
+    }
 
-    if (!lhs.checkForOverlap(rhs, first))
+    if (!lhs.checkForOverlap(rhs, first)) {
+      if (DebugCompletion) {
+        llvm::dbgs() << " no overlap\n\n";
+      }
       continue;
+    }
+
+    if (DebugCompletion) {
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "$$ Overlapping term is ";
+      first.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
 
     assert(first.size() > 0);
 
@@ -841,6 +864,15 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     lhs.apply(first);
     rhs.apply(second);
 
+    if (DebugCompletion) {
+      llvm::dbgs() << "$$ First term of critical pair is ";
+      first.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+
+      llvm::dbgs() << "$$ Second term of critical pair is ";
+      second.dump(llvm::dbgs());
+      llvm::dbgs() << "\n\n";
+    }
     unsigned i = Rules.size();
 
     // Try to repair the confluence violation by adding a new rule
@@ -869,8 +901,14 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
         continue;
 
       // If this rule reduces some existing rule, delete the existing rule.
-      if (rule.canReduceLeftHandSide(newRule))
+      if (rule.canReduceLeftHandSide(newRule)) {
+        if (DebugCompletion) {
+          llvm::dbgs() << "$ Deleting rule ";
+          rule.dump(llvm::dbgs());
+          llvm::dbgs() << "\n";
+        }
         rule.markDeleted();
+      }
     }
 
     // If this new rule merges any associated types, process the merge now
@@ -882,16 +920,13 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
   // This isn't necessary for correctness, it's just an optimization.
   for (auto &rule : Rules) {
+    if (rule.isDeleted())
+      continue;
+
     auto rhs = rule.getRHS();
     simplify(rhs);
     rule = Rule(rule.getLHS(), rhs);
   }
-
-  // Just for aesthetics in dump().
-  std::sort(Rules.begin(), Rules.end(),
-            [&](Rule lhs, Rule rhs) -> int {
-              return lhs.getLHS().compare(rhs.getLHS(), Protos) < 0;
-            });
 
   return CompletionResult::Success;
 }
