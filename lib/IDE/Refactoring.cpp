@@ -5349,13 +5349,13 @@ private:
   }
 };
 
-/// Name of a decl if it has one, an empty \c Identifier otherwise.
-static Identifier getDeclName(const Decl *D) {
+/// Base name of a decl if it has one, an empty \c DeclBaseName otherwise.
+static DeclBaseName getDeclName(const Decl *D) {
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (VD->hasName())
-      return VD->getBaseIdentifier();
+      return VD->getBaseName();
   }
-  return Identifier();
+  return DeclBaseName();
 }
 
 class DeclCollector : private SourceEntityWalker {
@@ -5630,7 +5630,7 @@ class AsyncConverter : private SourceEntityWalker {
   llvm::DenseMap<const Decl *, Identifier> Names;
   // Names of decls in each scope, where the first element is the initial scope
   // and the last is the current scope.
-  llvm::SmallVector<llvm::DenseSet<Identifier>, 4> ScopedNames;
+  llvm::SmallVector<llvm::DenseSet<DeclBaseName>, 4> ScopedNames;
   // Mapping of \c BraceStmt -> declarations referenced in that statement
   // without first being declared. These are used to fill the \c ScopeNames
   // map on entering that scope.
@@ -6705,7 +6705,7 @@ private:
   Identifier assignUniqueName(const Decl *D, StringRef BoundName) {
     Identifier Ident;
     if (BoundName.empty()) {
-      BoundName = getDeclName(D).str();
+      BoundName = getDeclName(D).userFacingName();
       if (BoundName.empty())
         return Ident;
     }
