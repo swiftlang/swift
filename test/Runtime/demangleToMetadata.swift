@@ -55,6 +55,11 @@ func f1_autoclosure(_: @autoclosure () -> Float) { }
 func f1_escaping_autoclosure(_: @autoclosure @escaping () -> Float) { }
 func f1_mainactor(_: @MainActor () -> Float) { }
 
+func globalActorMetatypeFn<T>(_: T.Type) -> Any.Type {
+  typealias Fn = @MainActor () -> T
+  return Fn.self
+}
+
 DemangleToMetadataTests.test("function types") {
   // Conventions
   expectEqual(type(of: f0), _typeByName("yyc")!)
@@ -106,6 +111,9 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(
     "(@MainActor () -> Float) -> ()",
     String(describing: _typeByName("ySfyScMYcXEc")!))
+  typealias MainActorFn = @MainActor () -> Float
+  expectEqual(MainActorFn.self, _typeByName("SfyScMYcc")!)
+  expectEqual(MainActorFn.self, globalActorMetatypeFn(Float.self))
 }
 
 DemangleToMetadataTests.test("metatype types") {
