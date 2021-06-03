@@ -738,6 +738,23 @@ public:
         ++firstChildIdx;
       }
 
+      BuiltType globalActorType = BuiltType();
+      if (Node->getChild(firstChildIdx)->getKind() ==
+          NodeKind::GlobalActorFunctionType) {
+        auto child = Node->getChild(firstChildIdx);
+        if (child->getNumChildren() < 1) {
+          return MAKE_NODE_TYPE_ERROR0(child,
+                                       "Global actor node is missing child");
+        }
+
+        auto globalActorResult = decodeMangledType(child->getChild(0));
+        if (globalActorResult.isError())
+          return globalActorResult;
+
+        globalActorType = globalActorResult.getType();
+        ++firstChildIdx;
+      }
+
       FunctionMetadataDifferentiabilityKind diffKind;
       if (Node->getChild(firstChildIdx)->getKind() ==
             NodeKind::DifferentiableFunctionType) {
@@ -811,7 +828,7 @@ public:
       if (result.isError())
         return result;
       return Builder.createFunctionType(
-          parameters, result.getType(), flags, diffKind);
+          parameters, result.getType(), flags, diffKind, globalActorType);
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;

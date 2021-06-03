@@ -1665,6 +1665,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   bool isDifferentiable() const { return Flags.isDifferentiable(); }
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
   bool isEscaping() const { return Flags.isEscaping(); }
+  bool hasGlobalActor() const { return Flags.hasGlobalActor(); }
 
   static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 
@@ -1701,6 +1702,31 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
     }
     return TargetFunctionMetadataDifferentiabilityKind<StoredSize>
         ::NonDifferentiable;
+  }
+
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *
+  getGlobalActorAddr() {
+    assert(hasGlobalActor());
+    
+    void *endAddr =
+        isDifferentiable()
+          ? reinterpret_cast<void *>(getDifferentiabilityKindAddress() + 1) :
+        hasParameterFlags()
+          ? reinterpret_cast<void *>(getParameterFlags() + getNumParameters()) :
+        reinterpret_cast<void *>(getParameters() + getNumParameters());
+    return reinterpret_cast<
+        ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *>(
+          llvm::alignAddr(
+              endAddr, llvm::Align(alignof(typename Runtime::StoredPointer))));
+  }
+
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>
+  getGlobalActor() const {
+    if (!hasGlobalActor())
+      return ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>();
+
+    return *const_cast<TargetFunctionTypeMetadata<Runtime> *>(this)
+      ->getGlobalActorAddr();
   }
 };
 using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;

@@ -663,6 +663,14 @@ public:
     result->addChild(resultTy, Dem);
 
     auto funcNode = Dem.createNode(kind);
+    if (auto globalActor = F->getGlobalActor()) {
+      auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
+      auto globalActorNode = visit(globalActor);
+      node->addChild(globalActorNode, Dem);
+      funcNode->addChild(node, Dem);
+    }
+
+    // FIXME: Differentiability is missing
     if (F->getFlags().isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
     if (F->getFlags().isSendable()) {
@@ -992,11 +1000,16 @@ public:
       SubstitutedParams.push_back(Param.withType(visit(typeRef)));
     }
 
+    const TypeRef *globalActorType = nullptr;
+    if (F->getGlobalActor())
+      globalActorType = visit(F->getGlobalActor());
+
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
                                    SubstitutedResult, F->getFlags(),
-                                   F->getDifferentiabilityKind());
+                                   F->getDifferentiabilityKind(),
+                                   globalActorType);
   }
 
   const TypeRef *
@@ -1114,9 +1127,14 @@ public:
 
     auto SubstitutedResult = visit(F->getResult());
 
+    const TypeRef *globalActorType = nullptr;
+    if (F->getGlobalActor())
+      globalActorType = visit(F->getGlobalActor());
+
     return FunctionTypeRef::create(Builder, SubstitutedParams,
                                    SubstitutedResult, F->getFlags(),
-                                   F->getDifferentiabilityKind());
+                                   F->getDifferentiabilityKind(),
+                                   globalActorType);
   }
 
   const TypeRef *

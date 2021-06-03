@@ -1767,6 +1767,7 @@ private:
   NodePointer demangleFunctionType(Node::Kind kind) {
     bool throws = false, concurrent = false, async = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    NodePointer globalActorType = nullptr;
     if (Mangled) {
       throws = Mangled.nextIf('z');
       concurrent = Mangled.nextIf('y');
@@ -1782,6 +1783,11 @@ private:
         case MangledDifferentiabilityKind::NonDifferentiable:
           assert(false && "Impossible case 'NonDifferentiable'");
         }
+      }
+      if (Mangled.nextIf('Y')) {
+        globalActorType = demangleType();
+        if (!globalActorType)
+          return nullptr;
       }
     }
     NodePointer in_args = demangleType();
@@ -1806,6 +1812,12 @@ private:
       block->addChild(
           Factory.createNode(
               Node::Kind::DifferentiableFunctionType, (char)diffKind), Factory);
+    }
+    if (globalActorType) {
+      auto globalActorNode =
+          Factory.createNode(Node::Kind::GlobalActorFunctionType);
+      globalActorNode->addChild(globalActorType, Factory);
+      block->addChild(globalActorNode, Factory);
     }
 
     NodePointer in_node = Factory.createNode(Node::Kind::ArgumentTuple);

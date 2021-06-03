@@ -344,7 +344,7 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, StringRef labels) {
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags,
-    FunctionMetadataDifferentiabilityKind diffKind) {
+    FunctionMetadataDifferentiabilityKind diffKind, Type globalActor) {
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -407,14 +407,12 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
-  Type globalActor;
-  // FIXME: Demangle global actors.
-
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
                                    resultDiffKind, clangFunctionType,
                                    globalActor)
           .withAsync(flags.isAsync())
+          .withConcurrent(flags.isSendable())
           .build();
 
   return FunctionType::get(funcParams, output, einfo);

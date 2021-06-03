@@ -98,7 +98,7 @@ public:
   Type createFunctionType(
       ArrayRef<Demangle::FunctionParam<Type>> params,
       Type output, FunctionTypeFlags flags,
-      FunctionMetadataDifferentiabilityKind diffKind);
+      FunctionMetadataDifferentiabilityKind diffKind, Type globalActor);
 
   Type createImplFunctionType(
     Demangle::ImplParameterConvention calleeConvention,

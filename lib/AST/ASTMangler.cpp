@@ -2477,6 +2477,11 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("Yjl");
     break;
   }
+
+  if (Type globalActor = fn->getGlobalActor()) {
+    appendType(globalActor);
+    appendOperator("Yc");
+  }
 }
 
 void ASTMangler::appendFunctionInputType(
@@ -2875,18 +2880,6 @@ CanType ASTMangler::getDeclTypeForMangling(
   }
 
   Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
-
-  // Strip the global actor out of the mangling.
-  ty = ty.transform([](Type type) {
-    if (auto fnType = type->getAs<AnyFunctionType>()) {
-      if (fnType->getGlobalActor()) {
-        return Type(fnType->withExtInfo(
-            fnType->getExtInfo().withGlobalActor(Type())));
-      }
-    }
-
-    return type;
-  });
 
   auto canTy = ty->getCanonicalType();
 
