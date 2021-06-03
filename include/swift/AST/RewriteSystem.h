@@ -269,29 +269,32 @@ public:
 
 /// A term is a sequence of one or more atoms.
 ///
+/// The MutableTerm type is a dynamically-allocated representation,
+/// used to represent temporary values in simplification and completion.
+///
 /// The first atom in the term must be a protocol, generic parameter, or
 /// associated type atom.
 ///
 /// A layout constraint atom must only appear at the end of a term.
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
-class Term final {
+class MutableTerm final {
   llvm::SmallVector<Atom, 3> Atoms;
 
 public:
-  Term() {}
+  MutableTerm() {}
 
-  explicit Term(llvm::SmallVector<Atom, 3> &&atoms)
+  explicit MutableTerm(llvm::SmallVector<Atom, 3> &&atoms)
     : Atoms(std::move(atoms)) {}
 
-  explicit Term(ArrayRef<Atom> atoms)
+  explicit MutableTerm(ArrayRef<Atom> atoms)
     : Atoms(atoms.begin(), atoms.end()) {}
 
   void add(Atom atom) {
     Atoms.push_back(atom);
   }
 
-  int compare(const Term &other, const ProtocolGraph &protos) const;
+  int compare(const MutableTerm &other, const ProtocolGraph &protos) const;
 
   size_t size() const { return Atoms.size(); }
 
@@ -317,18 +320,20 @@ public:
     return Atoms[index];
   }
 
-  decltype(Atoms)::const_iterator findSubTerm(const Term &other) const;
+  decltype(Atoms)::const_iterator findSubTerm(
+      const MutableTerm &other) const;
 
-  decltype(Atoms)::iterator findSubTerm(const Term &other);
+  decltype(Atoms)::iterator findSubTerm(
+      const MutableTerm &other);
 
   /// Returns true if this term contains, or is equal to, \p other.
-  bool containsSubTerm(const Term &other) const {
+  bool containsSubTerm(const MutableTerm &other) const {
     return findSubTerm(other) != end();
   }
 
-  bool rewriteSubTerm(const Term &lhs, const Term &rhs);
+  bool rewriteSubTerm(const MutableTerm &lhs, const MutableTerm &rhs);
 
-  bool checkForOverlap(const Term &other, Term &result) const;
+  bool checkForOverlap(const MutableTerm &other, MutableTerm &result) const;
 
   void dump(llvm::raw_ostream &out) const;
 };
@@ -358,8 +363,8 @@ public:
 
   RewriteContext(UnifiedStatsReporter *stats) : Stats(stats) {}
 
-  Term getTermForType(CanType paramType,
-                      const ProtocolDecl *proto);
+  MutableTerm getTermForType(CanType paramType,
+                             const ProtocolDecl *proto);
 };
 
 /// A rewrite rule that replaces occurrences of LHS with RHS.
@@ -368,22 +373,22 @@ public:
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class Rule final {
-  Term LHS;
-  Term RHS;
+  MutableTerm LHS;
+  MutableTerm RHS;
   bool deleted;
 
 public:
-  Rule(const Term &lhs, const Term &rhs)
+  Rule(const MutableTerm &lhs, const MutableTerm &rhs)
       : LHS(lhs), RHS(rhs), deleted(false) {}
 
-  const Term &getLHS() const { return LHS; }
-  const Term &getRHS() const { return RHS; }
+  const MutableTerm &getLHS() const { return LHS; }
+  const MutableTerm &getRHS() const { return RHS; }
 
-  bool apply(Term &term) const {
+  bool apply(MutableTerm &term) const {
     return term.rewriteSubTerm(LHS, RHS);
   }
 
-  bool checkForOverlap(const Rule &other, Term &result) const {
+  bool checkForOverlap(const Rule &other, MutableTerm &result) const {
     return LHS.checkForOverlap(other.LHS, result);
   }
 
@@ -445,7 +450,7 @@ class RewriteSystem final {
   /// - the last atom in both lhs and rhs has the same name
   ///
   /// See RewriteSystem::processMergedAssociatedTypes() for details.
-  std::vector<std::pair<Term, Term>> MergedAssociatedTypes;
+  std::vector<std::pair<MutableTerm, MutableTerm>> MergedAssociatedTypes;
 
   /// A list of pending pairs for checking overlap in the completion
   /// procedure.
@@ -476,12 +481,12 @@ public:
   /// Return the object recording information about known protocols.
   const ProtocolGraph &getProtocols() const { return Protos; }
 
-  void initialize(std::vector<std::pair<Term, Term>> &&rules,
+  void initialize(std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
                   ProtocolGraph &&protos);
 
-  bool addRule(Term lhs, Term rhs);
+  bool addRule(MutableTerm lhs, MutableTerm rhs);
 
-  bool simplify(Term &term) const;
+  bool simplify(MutableTerm &term) const;
 
   enum class CompletionResult {
     /// Confluent completion was computed successfully.

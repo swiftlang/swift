@@ -267,7 +267,8 @@ void Atom::dump(llvm::raw_ostream &out) const {
 ///
 /// First we compare length, then perform a lexicographic comparison
 /// on atoms if the two terms have the same length.
-int Term::compare(const Term &other, const ProtocolGraph &graph) const {
+int MutableTerm::compare(const MutableTerm &other,
+                         const ProtocolGraph &graph) const {
   if (size() != other.size())
     return size() < other.size() ? -1 : 1;
 
@@ -289,8 +290,8 @@ int Term::compare(const Term &other, const ProtocolGraph &graph) const {
 
 /// Find the start of \p other in this term, returning end() if
 /// \p other does not occur as a subterm of this term.
-decltype(Term::Atoms)::const_iterator
-Term::findSubTerm(const Term &other) const {
+decltype(MutableTerm::Atoms)::const_iterator
+MutableTerm::findSubTerm(const MutableTerm &other) const {
   if (other.size() > size())
     return end();
 
@@ -298,8 +299,8 @@ Term::findSubTerm(const Term &other) const {
 }
 
 /// Non-const variant of the above.
-decltype(Term::Atoms)::iterator
-Term::findSubTerm(const Term &other) {
+decltype(MutableTerm::Atoms)::iterator
+MutableTerm::findSubTerm(const MutableTerm &other) {
   if (other.size() > size())
     return end();
 
@@ -311,7 +312,8 @@ Term::findSubTerm(const Term &other) {
 /// order on terms. Returns true if the term contained \p lhs;
 /// otherwise returns false, in which case the term remains
 /// unchanged.
-bool Term::rewriteSubTerm(const Term &lhs, const Term &rhs) {
+bool MutableTerm::rewriteSubTerm(const MutableTerm &lhs,
+                                 const MutableTerm &rhs) {
   // Find the start of lhs in this term.
   auto found = findSubTerm(lhs);
 
@@ -362,7 +364,8 @@ bool Term::rewriteSubTerm(const Term &lhs, const Term &rhs) {
 ///
 /// Note that this relation is not commutative; we need to check
 /// for overlap between both (X and Y) and (Y and X).
-bool Term::checkForOverlap(const Term &other, Term &result) const {
+bool MutableTerm::checkForOverlap(const MutableTerm &other,
+                                  MutableTerm &result) const {
   assert(result.size() == 0);
 
   // If the other term is longer than this term, there's no way
@@ -420,7 +423,7 @@ bool Term::checkForOverlap(const Term &other, Term &result) const {
   return false;
 }
 
-void Term::dump(llvm::raw_ostream &out) const {
+void MutableTerm::dump(llvm::raw_ostream &out) const {
   bool first = true;
 
   for (auto atom : Atoms) {
@@ -445,8 +448,8 @@ void Term::dump(llvm::raw_ostream &out) const {
 /// The bound associated types in the interface type are ignored; the
 /// resulting term consists entirely of a root atom followed by zero
 /// or more name atoms.
-Term RewriteContext::getTermForType(CanType paramType,
-                                    const ProtocolDecl *proto) {
+MutableTerm RewriteContext::getTermForType(CanType paramType,
+                                           const ProtocolDecl *proto) {
   assert(paramType->isTypeParameter());
 
   // Collect zero or more nested type names in reverse order.
@@ -467,7 +470,7 @@ Term RewriteContext::getTermForType(CanType paramType,
 
   std::reverse(atoms.begin(), atoms.end());
 
-  return Term(atoms);
+  return MutableTerm(atoms);
 }
 
 void Rule::dump(llvm::raw_ostream &out) const {
@@ -478,21 +481,22 @@ void Rule::dump(llvm::raw_ostream &out) const {
     out << " [deleted]";
 }
 
-void RewriteSystem::initialize(std::vector<std::pair<Term, Term>> &&rules,
-                               ProtocolGraph &&graph) {
+void RewriteSystem::initialize(
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
+    ProtocolGraph &&graph) {
   Protos = graph;
 
   // FIXME: Probably this sort is not necessary
   std::sort(rules.begin(), rules.end(),
-            [&](std::pair<Term, Term> lhs,
-                std::pair<Term, Term> rhs) -> int {
+            [&](std::pair<MutableTerm, MutableTerm> lhs,
+                std::pair<MutableTerm, MutableTerm> rhs) -> int {
               return lhs.first.compare(rhs.first, graph) < 0;
             });
   for (const auto &rule : rules)
     addRule(rule.first, rule.second);
 }
 
-bool RewriteSystem::addRule(Term lhs, Term rhs) {
+bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   // Simplify the rule as much as possible with the rules we have so far.
   //
   // This avoids unnecessary work in the completion algorithm.
@@ -564,7 +568,7 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
-bool RewriteSystem::simplify(Term &term) const {
+bool RewriteSystem::simplify(MutableTerm &term) const {
   bool changed = false;
 
   if (DebugSimplify) {
@@ -754,7 +758,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
     }
 
     // Build the term X.[P1&P2:T].
-    Term mergedTerm = lhs;
+    MutableTerm mergedTerm = lhs;
     mergedTerm.back() = mergedAtom;
 
     // Add the rule X.[P1:T] => X.[P1&P2:T].
@@ -789,11 +793,11 @@ void RewriteSystem::processMergedAssociatedTypes() {
           //
           //   [P1&P2].[Q] => [P1&P2]
           //
-          Term newLHS;
+          MutableTerm newLHS;
           newLHS.add(mergedAtom);
           newLHS.add(otherLHS[1]);
 
-          Term newRHS;
+          MutableTerm newRHS;
           newRHS.add(mergedAtom);
 
           addRule(newLHS, newRHS);
@@ -832,7 +836,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     auto pair = Worklist.front();
     Worklist.pop_front();
 
-    Term first;
+    MutableTerm first;
 
     const auto &lhs = Rules[pair.first];
     const auto &rhs = Rules[pair.second];
@@ -867,7 +871,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     //
     // 1) lhs == TUV and rhs == U
     // 2) lhs == TU and rhs == UV
-    Term second = first;
+    MutableTerm second = first;
 
     // In both cases, rewrite the term TUV using both rules to
     // produce two new terms X and Y.

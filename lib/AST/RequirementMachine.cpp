@@ -35,7 +35,7 @@ struct RewriteSystemBuilder {
   bool Debug;
 
   ProtocolGraph Protocols;
-  std::vector<std::pair<Term, Term>> Rules;
+  std::vector<std::pair<MutableTerm, MutableTerm>> Rules;
 
   RewriteSystemBuilder(RewriteContext &ctx, bool debug)
     : Context(ctx), Debug(debug) {}
@@ -88,11 +88,11 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
 /// named T".
 void RewriteSystemBuilder::addAssociatedType(const AssociatedTypeDecl *type,
                                              const ProtocolDecl *proto) {
-  Term lhs;
+  MutableTerm lhs;
   lhs.add(Atom::forProtocol(proto, Context));
   lhs.add(Atom::forName(type->getName(), Context));
 
-  Term rhs;
+  MutableTerm rhs;
   rhs.add(Atom::forAssociatedType(proto, type->getName(), Context));
 
   Rules.emplace_back(lhs, rhs);
