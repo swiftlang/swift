@@ -181,11 +181,22 @@ static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
 
 #define FUNC_DECL(NAME, ID)                             \
   FuncDecl *SILGenModule::get##NAME(SILLocation loc) {  \
-    if (auto fn = getASTContext().get##NAME())   \
+    if (auto fn = getASTContext().get##NAME())          \
       return fn;                                        \
     return diagnoseMissingIntrinsic(*this, loc, ID);    \
   }
 #include "swift/AST/KnownDecls.def"
+
+#define KNOWN_SDK_FUNC_DECL(MODULE, NAME, ID)                                  \
+  FuncDecl *SILGenModule::get##NAME(SILLocation loc) {                         \
+    if (ModuleDecl *M = getASTContext().getLoadedModule(                       \
+            getASTContext().Id_##MODULE)) {                                    \
+      if (auto fn = getASTContext().get##NAME())                               \
+        return fn;                                                             \
+    }                                                                          \
+    return diagnoseMissingIntrinsic(*this, loc, ID);                           \
+  }
+#include "swift/AST/KnownSDKDecls.def"
 
 ProtocolDecl *SILGenModule::getObjectiveCBridgeable(SILLocation loc) {
   if (ObjectiveCBridgeable)
