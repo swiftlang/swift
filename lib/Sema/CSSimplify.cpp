@@ -6086,7 +6086,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   auto *typeVar = type->getAs<TypeVariableType>();
 
   // Dig out the fixed type to which this type refers.
-  type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
+  type = simplifyType(type)->getWithoutSpecifierType();
   if (shouldAttemptFixes() && type->isPlaceholder()) {
     // If the type associated with this conformance check is a "hole" in the
     // constraint system, let's consider this check a success without recording
