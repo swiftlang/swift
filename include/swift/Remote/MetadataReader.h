@@ -811,6 +811,13 @@ public:
                        .withEscaping(Function->isEscaping())
                        .withDifferentiable(Function->isDifferentiable());
 
+      BuiltType globalActor = BuiltType();
+      if (Function->hasGlobalActor()) {
+        globalActor = readTypeFromMetadata(Function->getGlobalActor());
+        if (globalActor)
+          flags = flags.withGlobalActor(true);
+      }
+
       FunctionMetadataDifferentiabilityKind diffKind;
       switch (Function->getDifferentiabilityKind().Value) {
       #define CASE(X) \
@@ -827,7 +834,7 @@ public:
       }
 
       auto BuiltFunction = Builder.createFunctionType(
-          Parameters, Result, flags, diffKind);
+          Parameters, Result, flags, diffKind, globalActor);
       TypeCache[MetadataAddress] = BuiltFunction;
       return BuiltFunction;
     }

@@ -238,7 +238,7 @@ func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
   await red.hello(12);
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test0A20GlobalActorFuncValueyyyyXEYaF
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A20GlobalActorFuncValueyyyyAA03RedC0VYcXEYaF
 // CHECK: function_ref @$s4test8RedActorV6sharedAA0bC4ImplCvgZ
 // CHECK: hop_to_executor [[RED:%[0-9]+]] : $RedActorImpl
 // CHECK-NEXT: apply

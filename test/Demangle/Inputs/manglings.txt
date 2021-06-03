@@ -405,3 +405,4 @@ $s4test3fooyyS2f_SfYktYjrXEF ---> test.foo(@differentiable(reverse) (Swift.Float
 $s4test3fooyyS2f_SfYktYaYbYjrXEF ---> test.foo(@differentiable(reverse) @Sendable (Swift.Float, @noDerivative Swift.Float) async -> Swift.Float) -> ()
 $sScA ---> Swift.Actor
 $sScGySiG ---> Swift.TaskGroup<Swift.Int>
+$s4test10returnsOptyxycSgxyScMYccSglF ---> test.returnsOpt<A>(@Swift.MainActor () -> A?) -> () -> A?

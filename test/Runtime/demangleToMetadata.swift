@@ -53,6 +53,7 @@ func f2_variadic_inout(x: ()..., y: inout ()) { }
 func f1_escaping(_: @escaping (Int) -> Float) { }
 func f1_autoclosure(_: @autoclosure () -> Float) { }
 func f1_escaping_autoclosure(_: @autoclosure @escaping () -> Float) { }
+func f1_mainactor(_: @MainActor () -> Float) { }
 
 DemangleToMetadataTests.test("function types") {
   // Conventions
@@ -99,6 +100,12 @@ DemangleToMetadataTests.test("function types") {
   // Autoclosure
   expectEqual(type(of: f1_autoclosure), _typeByName("ySfyXKc")!)
   expectEqual(type(of: f1_escaping_autoclosure), _typeByName("ySfyXAc")!)
+
+  // MainActor
+  expectEqual(type(of: f1_mainactor), _typeByName("ySfyScMYcXEc")!)
+  expectEqual(
+    "(@MainActor () -> Float) -> ()",
+    String(describing: _typeByName("ySfyScMYcXEc")!))
 }
 
 DemangleToMetadataTests.test("metatype types") {
