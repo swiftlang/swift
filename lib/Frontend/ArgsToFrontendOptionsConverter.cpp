@@ -250,6 +250,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
   
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
+  Opts.IncludeSPISymbolsInSymbolGraph = Args.hasArg(OPT_include_spi_symbols);
 
   return false;
 }
