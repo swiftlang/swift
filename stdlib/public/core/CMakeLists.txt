@@ -70,6 +70,7 @@ set(SWIFTLIB_ESSENTIAL
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
+  GraphemeWalker.swift
   Hashable.swift
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
@@ -177,6 +178,7 @@ set(SWIFTLIB_ESSENTIAL
   UnavailableStringAPIs.swift
   UnicodeData.swift
   UnicodeEncoding.swift
+  UnicodeGraphemeBreakProperty.swift
   UnicodeHelpers.swift
   UnicodeParser.swift
   UnicodeScalarProperties.swift
