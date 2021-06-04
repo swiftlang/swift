@@ -292,7 +292,7 @@ private:
   /// or `nullptr` if no task is currently waiting.
   std::atomic<AsyncTask *> waitQueue;
 
-  friend class AsyncTask;
+  friend class ::swift::AsyncTask;
 
 public:
   explicit TaskGroupImpl()
