@@ -13,6 +13,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// This test fails in recent Swift CI runs
+// REQUIRES: radar78882565
+
 import C
 import E
 import G
