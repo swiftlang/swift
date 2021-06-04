@@ -480,9 +480,15 @@ ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
   if (!n)
     return parent;
 
+  // HACK: LLDB creates implicit pattern bindings that... contain user
+  // expressions. We need to actually honor lookups through those bindings
+  // in case they contain closures that bind additional variables in further
+  // scopes.
   if (auto *d = n.dyn_cast<Decl *>())
     if (d->isImplicit())
-      return parent;
+      if (!isa<PatternBindingDecl>(d)
+          || !cast<PatternBindingDecl>(d)->isDebuggerBinding())
+        return parent;
 
   NodeAdder adder(endLoc);
   if (auto *p = n.dyn_cast<Decl *>())
@@ -733,6 +739,23 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
             this, decl, patternEntryIndex);
   }
 
+  // If this pattern binding entry was created by the debugger, it will always
+  // have a synthesized init that is created from user code. We special-case
+  // lookups into these scopes to look through the debugger's chicanery to the
+  // underlying user-defined scopes, if any.
+  if (patternEntry.isFromDebugger() && patternEntry.getInit()) {
+    ASTScopeAssert(
+        patternEntry.getInit()->getSourceRange().isValid(),
+        "pattern initializer has invalid source range");
+    ASTScopeAssert(
+        !getSourceManager().isBeforeInBuffer(
+            patternEntry.getInit()->getStartLoc(), decl->getStartLoc()),
+        "inits are always after the '='");
+    scopeCreator
+        .constructExpandAndInsert<PatternEntryInitializerScope>(
+            this, decl, patternEntryIndex);
+  }
+
   // Add accessors for the variables in this pattern.
   patternEntry.getPattern()->forEachVariable([&](VarDecl *var) {
     scopeCreator.addChildrenForParsedAccessors(var, this);
@@ -751,8 +774,7 @@ void
 PatternEntryInitializerScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Create a child for the initializer expression.
-  scopeCreator.addToScopeTree(ASTNode(getPatternEntry().getOriginalInit()),
-                              this);
+  scopeCreator.addToScopeTree(ASTNode(initAsWrittenWhenCreated), this);
 }
 
 
