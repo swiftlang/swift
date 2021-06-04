@@ -44,7 +44,7 @@ public struct UnownedJob {
 /// `resume(with:)`,
 /// or `resume()` method.
 ///
-/// - Important: You must call a resume methods exactly once
+/// - Important: You must call a resume method exactly once
 ///   on every execution path throughout the program.
 ///   Resuming from a continuation more than once is undefined behavior.
 ///   Never resuming leaves the task in a suspended state indefinitely,
