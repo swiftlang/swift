@@ -3,8 +3,6 @@
 // RUN:    | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 
-// UNSUPPORTED: CPU=arm64e
-
 func getString() async -> String {
   return ""
 }

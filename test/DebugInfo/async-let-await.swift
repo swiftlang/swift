@@ -2,7 +2,6 @@
 // RUN:    -module-name M -enable-experimental-concurrency \
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: concurrency
-// UNSUPPORTED: CPU=arm64e
 
 public func getVegetables() async -> [String] {
   return ["leek", "carrot"]  
