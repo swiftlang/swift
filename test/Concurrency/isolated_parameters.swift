@@ -24,3 +24,13 @@ func testA<T: Actor>(
 
 @available(SwiftStdlib 5.5, *)
 typealias Fn = (isolated A) -> Void
+
+@available(SwiftStdlib 5.5, *)
+func globalFunc(_: A) { }
+
+@available(SwiftStdlib 5.5, *)
+func globalFuncIsolated(_: isolated A) {
+  let _: Int = globalFuncIsolated // expected-error{{cannot convert value of type '(isolated A) -> ()' to specified type 'Int'}}
+  let _: (A) -> Void = globalFuncIsolated // expected-error{{cannot convert value of type '(isolated A) -> ()' to specified type '(A) -> Void'}}
+  let _: Fn = globalFunc // okay
+}

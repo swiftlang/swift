@@ -2461,6 +2461,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       hasLabelingFailures = true;
     }
 
+    // "isolated" can be added as a subtype relation, but otherwise must match.
+    if (func1Param.isIsolated() != func2Param.isIsolated() &&
+        !(func2Param.isIsolated() && subKind >= ConstraintKind::Subtype)) {
+      return getTypeMatchFailure(argumentLocator);
+    }
+
     // FIXME: We should check value ownership too, but it's not completely
     // trivial because of inout-to-pointer conversions.
 
