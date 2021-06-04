@@ -92,6 +92,7 @@ def main():
         '-rewritten-output-file', temp_file_path,
         '-pos', args.pos
     ] + extra_refactor_args, desc='producing edit').decode("utf-8")
+    sys.stdout.write(dump_text_output)
 
     run_cmd([
         args.swift_frontend,
@@ -99,7 +100,6 @@ def main():
         temp_file_path,
         '-disable-availability-checking'
     ] + extra_frontend_args, desc='checking that rewritten file compiles')
-    sys.stdout.write(dump_text_output)
 
 
 if __name__ == '__main__':

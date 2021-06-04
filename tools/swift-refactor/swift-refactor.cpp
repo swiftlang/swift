@@ -413,34 +413,36 @@ int main(int argc, char *argv[]) {
   RefactoringConfig.Range = Range;
   RefactoringConfig.PreferredName = options::NewName;
   std::string Error;
-  std::unique_ptr<SourceEditConsumer> pConsumer;
+
+  StringRef RewrittenOutputFile = options::RewrittenOutputFile;
+  if (RewrittenOutputFile.empty())
+    RewrittenOutputFile = "-";
+  std::error_code EC;
+  llvm::raw_fd_ostream RewriteStream(RewrittenOutputFile, EC);
+  if (RewriteStream.has_error()) {
+    llvm::errs() << "Could not open rewritten output file";
+    return 1;
+  }
+
+  SmallVector<std::unique_ptr<SourceEditConsumer>> Consumers;
+  if (!options::RewrittenOutputFile.empty() ||
+      options::DumpIn == options::DumpType::REWRITTEN) {
+    Consumers.emplace_back(new SourceEditOutputConsumer(
+        SF->getASTContext().SourceMgr, BufferID, RewriteStream));
+  }
   switch (options::DumpIn) {
   case options::DumpType::REWRITTEN:
-    pConsumer.reset(new SourceEditOutputConsumer(SF->getASTContext().SourceMgr,
-                                                 BufferID, llvm::outs()));
+    // Already added
     break;
   case options::DumpType::JSON:
-    pConsumer.reset(new SourceEditJsonConsumer(llvm::outs()));
+    Consumers.emplace_back(new SourceEditJsonConsumer(llvm::outs()));
     break;
   case options::DumpType::TEXT:
-    if (options::RewrittenOutputFile.empty()) {
-      pConsumer.reset(new SourceEditTextConsumer(llvm::outs()));
-    } else {
-      std::error_code EC;
-      static llvm::raw_fd_ostream FileStream(options::RewrittenOutputFile, EC,
-                                             llvm::sys::fs::OF_None);
-      if (FileStream.has_error() || EC) {
-        llvm::errs() << "Could not open rewritten output file";
-        return 1;
-      }
-      pConsumer.reset(new DuplicatingSourceEditConsumer(
-          new SourceEditTextConsumer(llvm::outs()),
-          new SourceEditOutputConsumer(SF->getASTContext().SourceMgr, BufferID,
-                                       FileStream)));
-    }
+    Consumers.emplace_back(new SourceEditTextConsumer(llvm::outs()));
     break;
   }
 
-  return refactorSwiftModule(CI.getMainModule(), RefactoringConfig, *pConsumer,
-                             PrintDiags);
+  BroadcastingSourceEditConsumer BroadcastConsumer(Consumers);
+  return refactorSwiftModule(CI.getMainModule(), RefactoringConfig,
+                             BroadcastConsumer, PrintDiags);
 }
