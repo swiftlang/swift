@@ -416,6 +416,7 @@ private:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
+    case Node::Kind::Isolated:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -1421,6 +1422,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
 #include "swift/AST/ReferenceStorage.def"
   case Node::Kind::InOut:
     Printer << "inout ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::Isolated:
+    Printer << "isolated ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::Shared:

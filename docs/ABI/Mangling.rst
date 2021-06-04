@@ -611,7 +611,7 @@ Types
   type-list ::= empty-list
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
-  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, and variadic specifier
+  list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
