@@ -1563,18 +1563,18 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
-  if (Expr *Where = S->getWhere()) {
-    if ((Where = doIt(Where)))
-      S->setWhere(Where);
-    else
-      return nullptr;
-  }
-
   // The iterator decl is built directly on top of the sequence
   // expression, so don't visit both.
   if (Expr *Sequence = S->getSequence()) {
     if ((Sequence = doIt(Sequence)))
       S->setSequence(Sequence);
+    else
+      return nullptr;
+  }
+
+  if (Expr *Where = S->getWhere()) {
+    if ((Where = doIt(Where)))
+      S->setWhere(Where);
     else
       return nullptr;
   }
