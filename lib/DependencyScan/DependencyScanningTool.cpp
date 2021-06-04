@@ -98,13 +98,13 @@ bool DependencyScanningTool::loadCache(llvm::StringRef path) {
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
   SharedCache = std::make_unique<ModuleDependenciesCache>();
-  bool Success =
+  bool readFailed =
       module_dependency_cache_serialization::readInterModuleDependenciesCache(
           path, *SharedCache);
-  if (!Success) {
+  if (readFailed) {
     Diags.diagnose(SourceLoc(), diag::warn_scaner_deserialize_failed, path);
   }
-  return Success;
+  return readFailed;
 }
 
 void DependencyScanningTool::resetCache() {
