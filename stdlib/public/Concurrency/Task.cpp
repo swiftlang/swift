@@ -503,7 +503,6 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 
     // Set up the context for the future so there is no error, and a successful
     // result will be written into the future fragment's storage.
-    auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
     auto futureAsyncContextPrefix =
         reinterpret_cast<FutureAsyncContextPrefix *>(
             reinterpret_cast<char *>(allocation) + headerSize -
