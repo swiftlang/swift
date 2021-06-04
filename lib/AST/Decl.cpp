@@ -8093,7 +8093,7 @@ bool ClassDecl::hasExplicitCustomActorMethods() const {
 }
 
 bool ClassDecl::isRootDefaultActor() const {
-  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Minimal);
+  return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
 }
 
 bool ClassDecl::isRootDefaultActor(ModuleDecl *M,
