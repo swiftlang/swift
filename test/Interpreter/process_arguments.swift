@@ -1,7 +1,7 @@
-// RUN: %swift -interpret %s | %FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -Onone -g | %FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -Onone -g -- | %FileCheck %s -check-prefix=CHECK-NONE
-// RUN: %swift -interpret %s -Onone -g -- a b c | %FileCheck %s -check-prefix=CHECK-THREE
+// RUN: %target-jit-run -interpret %s | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %target-jit-run -interpret %s -Onone -g | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %target-jit-run -interpret %s -Onone -g -- | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %target-jit-run -interpret %s -Onone -g -- a b c | %FileCheck %s -check-prefix=CHECK-THREE
 
 // REQUIRES: swift_interpreter
 

@@ -1017,9 +1017,6 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   }
 }
 
-swift::ide::SourceEditTextConsumer::
-SourceEditTextConsumer(llvm::raw_ostream &OS) : OS(OS) { }
-
 void swift::ide::SourceEditTextConsumer::
 accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   for (const auto &Replacement: Replacements) {
@@ -1116,15 +1113,12 @@ accept(SourceManager &SM, RegionType RegionType,
   }
 }
 
-swift::ide::DuplicatingSourceEditConsumer::DuplicatingSourceEditConsumer(
-    SourceEditConsumer *ConsumerA, SourceEditConsumer *ConsumerB)
-    : ConsumerA(ConsumerA), ConsumerB(ConsumerB) {}
-
-void swift::ide::DuplicatingSourceEditConsumer::accept(
+void swift::ide::BroadcastingSourceEditConsumer::accept(
     SourceManager &SM, RegionType RegionType,
     ArrayRef<Replacement> Replacements) {
-  ConsumerA->accept(SM, RegionType, Replacements);
-  ConsumerB->accept(SM, RegionType, Replacements);
+  for (auto &Consumer : Consumers) {
+    Consumer->accept(SM, RegionType, Replacements);
+  }
 }
 
 bool swift::ide::isFromClang(const Decl *D) {

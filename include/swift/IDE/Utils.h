@@ -527,8 +527,7 @@ class SourceEditTextConsumer : public SourceEditConsumer {
   llvm::raw_ostream &OS;
 
 public:
-  SourceEditTextConsumer(llvm::raw_ostream &OS);
-
+  SourceEditTextConsumer(llvm::raw_ostream &OS) : OS(OS) {}
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<Replacement> Replacements) override;
 };
@@ -544,13 +543,14 @@ public:
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
 
-class DuplicatingSourceEditConsumer : public SourceEditConsumer {
-  SourceEditConsumer *ConsumerA;
-  SourceEditConsumer *ConsumerB;
+/// Broadcasts `accept` to all `Consumers`
+class BroadcastingSourceEditConsumer : public SourceEditConsumer {
+  ArrayRef<std::unique_ptr<SourceEditConsumer>> Consumers;
 
 public:
-  DuplicatingSourceEditConsumer(SourceEditConsumer *ConsumerA,
-                                SourceEditConsumer *ConsumerB);
+  BroadcastingSourceEditConsumer(
+      ArrayRef<std::unique_ptr<SourceEditConsumer>> Consumers)
+      : Consumers(Consumers) {}
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<Replacement> Replacements) override;
 };
