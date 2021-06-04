@@ -574,16 +574,33 @@ mapParsedParameters(Parser &parser,
 
       param->setTypeRepr(type);
 
-      // If there is `@autoclosure` attribute associated with the type
-      // let's mark that in the declaration as well, because it
-      // belongs to both type flags and declaration.
-      if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
-        auto &attrs = ATR->getAttrs();
-        // At this point we actually don't know if that's valid to mark
-        // this parameter declaration as `autoclosure` because type has
-        // not been resolved yet - it should either be a function type
-        // or typealias with underlying function type.
-        param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+      // Dig through the type to find any attributes or modifiers that are
+      // associated with the type but should also be reflected on the
+      // declaration.
+      {
+        auto unwrappedType = type;
+        while (true) {
+          if (auto *ATR = dyn_cast<AttributedTypeRepr>(unwrappedType)) {
+            auto &attrs = ATR->getAttrs();
+            // At this point we actually don't know if that's valid to mark
+            // this parameter declaration as `autoclosure` because type has
+            // not been resolved yet - it should either be a function type
+            // or typealias with underlying function type.
+            param->setAutoClosure(attrs.has(TypeAttrKind::TAK_autoclosure));
+
+            unwrappedType = ATR->getTypeRepr();
+            continue;
+          }
+
+          if (auto *STR = dyn_cast<SpecifierTypeRepr>(unwrappedType)) {
+            if (isa<IsolatedTypeRepr>(STR))
+              param->setIsolated(true);
+            unwrappedType = STR->getBase();
+            continue;;
+          }
+
+          break;
+        }
       }
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
