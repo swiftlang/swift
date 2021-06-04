@@ -1784,45 +1784,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_ActorIndependent: {
-    // if no option is provided, then it's the 'safe' version.
-    if (!consumeIf(tok::l_paren)) {
-      if (!DiscardAttribute) {
-        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-        Attributes.add(new (Context) ActorIndependentAttr(AtLoc, AttrRange, 
-                                                  ActorIndependentKind::Safe));
-      }
-      break;
-    }
-
-    // otherwise, make sure it looks like an identifier.
-    if (Tok.isNot(tok::identifier)) {
-      diagnose(Loc, diag::attr_expected_option_such_as, AttrName, "unsafe");
-      return false;
-    }
-
-    // make sure the identifier is 'unsafe'
-    if (Tok.getText() != "unsafe") {
-      diagnose(Loc, diag::attr_unknown_option, Tok.getText(), AttrName);
-      return false;
-    }
-
-    consumeToken(tok::identifier);
-    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(Loc, diag::attr_expected_rparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return false;
-    }
-
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) ActorIndependentAttr(AtLoc, AttrRange, 
-                                                ActorIndependentKind::Unsafe));
-
-    break;
-  }
-
   case DAK_Optimize: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -2745,7 +2706,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       .highlight(DuplicateAttribute->getRange());
   }
 
-    // If this is a decl modifier spelled with an @, emit an error and remove it
+  // If this is a decl modifier spelled with an @, emit an error and remove it
   // with a fixit.
   if (AtLoc.isValid() && DeclAttribute::isDeclModifier(DK))
     diagnose(AtLoc, diag::cskeyword_not_attribute, AttrName).fixItRemove(AtLoc);
@@ -3027,6 +2988,16 @@ ParserStatus Parser::parseDeclAttribute(
   // Historical name for @Sendable.
   checkInvalidAttrName(
       "concurrent", "Sendable", DAK_Sendable, diag::attr_renamed_warning);
+
+  // Historical name for 'nonisolated'.
+  if (DK == DAK_Count && Tok.getText() == "actorIndependent") {
+    diagnose(
+        Tok, diag::attr_renamed_to_modifier_warning, "actorIndependent", 
+        "nonisolated")
+      .fixItReplace(SourceRange(AtLoc, Tok.getLoc()), "nonisolated");
+    DK = DAK_Nonisolated;
+    AtLoc = SourceLoc();
+  }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a

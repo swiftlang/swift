@@ -8706,6 +8706,14 @@ void ClangImporter::Implementation::importAttributes(
         continue;
       }
 
+      // Hard-code @actorIndependent, until Objective-C clients start
+      // using nonisolated.
+      if (swiftAttr->getAttribute() == "@actorIndependent") {
+        auto attr = new (SwiftContext) NonisolatedAttr(/*isImplicit=*/true);
+        MappedDecl->getAttrs().add(attr);
+        continue;
+      }
+
       // Dig out a buffer with the attribute text.
       unsigned bufferID = getClangSwiftAttrSourceBuffer(
           swiftAttr->getAttribute());
@@ -9630,9 +9638,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  auto actorIndependentAttr = new (C) ActorIndependentAttr(
-      ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
-  var->getAttrs().add(actorIndependentAttr);
+  auto nonisolatedAttr = new (C) NonisolatedAttr(/*IsImplicit=*/true);
+  var->getAttrs().add(nonisolatedAttr);
 
   // Set the function up as the getter.
   makeComputed(var, func, nullptr);

@@ -2278,9 +2278,6 @@ namespace {
         AbstractClosureExpr *closure) {
       // If the closure specifies a global actor, use it.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-        if (explicitClosure->getAttrs().hasAttribute<ActorIndependentAttr>())
-          return ClosureActorIsolation::forIndependent();
-
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
           return ClosureActorIsolation::forGlobalActor(globalActorType);
 
@@ -2504,14 +2501,11 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     const Decl *decl, bool shouldDiagnose = true, bool onlyExplicit = false) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
-  auto independentAttr = decl->getAttrs().getAttribute<ActorIndependentAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
 
   // Remove implicit attributes if we only care about explicit ones.
   if (onlyExplicit) {
-    if (independentAttr && independentAttr->isImplicit())
-      independentAttr = nullptr;
     if (nonisolatedAttr && nonisolatedAttr->isImplicit())
       nonisolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
@@ -2519,8 +2513,7 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   }
 
   unsigned numIsolationAttrs =
-    (nonisolatedAttr ? 1 : 0) + (independentAttr ? 1 : 0) +
-    (globalActorAttr ? 1 : 0);
+    (nonisolatedAttr ? 1 : 0) + (globalActorAttr ? 1 : 0);
   if (numIsolationAttrs == 0)
     return None;
 
@@ -2536,22 +2529,12 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     }
 
     if (globalActorAttr) {
-      StringRef nonisolatedAttrName;
-      SourceRange nonisolatedRange;
-      if (independentAttr) {
-        nonisolatedAttrName = independentAttr->getAttrName();
-        nonisolatedRange = independentAttr->getRangeWithAt();
-      } else {
-        nonisolatedAttrName = nonisolatedAttr->getAttrName();
-        nonisolatedRange = nonisolatedAttr->getRangeWithAt();
-      }
-
       if (shouldDiagnose) {
         decl->diagnose(
             diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-            name, nonisolatedAttrName,
+            name, nonisolatedAttr->getAttrName(),
             globalActorAttr->second->getName().str())
-          .highlight(nonisolatedRange)
+          .highlight(nonisolatedAttr->getRangeWithAt())
           .highlight(globalActorAttr->first->getRangeWithAt());
       }
     }
@@ -2560,12 +2543,6 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
-    return ActorIsolation::forIndependent();
-  }
-
-  // If the declaration is explicitly marked @actorIndependent, report it as
-  // independent.
-  if (independentAttr) {
     return ActorIsolation::forIndependent();
   }
 
@@ -2660,7 +2637,7 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
         llvm_unreachable("protocol requirements cannot be actor instances");
 
       case ActorIsolation::Independent:
-        // We only need one @actorIndependent.
+        // We only need one nonisolated.
         if (sawActorIndependent)
           return true;
 
@@ -2880,13 +2857,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       if (onlyGlobal)
         return ActorIsolation::forUnspecified();
 
-      if (auto varDecl = dyn_cast<VarDecl>(value)) {
-        // only set the @actorIndependent on values where it is legal to do so
-        if (!varDecl->isLet()) {
-          value->getAttrs().add(new (ctx) ActorIndependentAttr(
-              ActorIndependentKind::Safe, /*IsImplicit=*/true));
-        }
-      }
+      value->getAttrs().add(new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
       break;
 
     case ActorIsolation::GlobalActorUnsafe:
@@ -3144,12 +3115,9 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      // A closure with an explicit global actor or @actorIndependent
+      // A closure with an explicit global actor or nonindependent
       // uses concurrency features.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
-        if (explicitClosure->getAttrs().hasAttribute<ActorIndependentAttr>())
-          return true;
-
         if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
           return true;
       }

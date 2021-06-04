@@ -252,7 +252,6 @@ public:
 
   void visitActorAttr(ActorAttr *attr);
   void visitDistributedActorAttr(DistributedActorAttr *attr);
-  void visitActorIndependentAttr(ActorIndependentAttr *attr);
   void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr);
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
@@ -5391,7 +5390,6 @@ void AttributeChecker::visitActorAttr(ActorAttr *attr) {
   (void)classDecl->isActor();
 }
 
-
 void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   auto dc = D->getDeclContext();
 
@@ -5441,66 +5439,18 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
   }
 }
 
-void AttributeChecker::visitActorIndependentAttr(ActorIndependentAttr *attr) {
-  // @actorIndependent can be applied to global and static/class variables
-  // that do not have storage.
-  auto dc = D->getDeclContext();
-  if (auto var = dyn_cast<VarDecl>(D)) {
-    // @actorIndependent is meaningless on a `let`.
-    if (var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_let);
-      return;
-    }
-
-    // @actorIndependent can not be applied to stored properties, unless if
-    // the 'unsafe' option was specified
-    if (var->hasStorage()) {
-      switch (attr->getKind()) {
-        case ActorIndependentKind::Safe:
-          diagnoseAndRemoveAttr(attr, diag::actorindependent_mutable_storage);
-          return;
-
-        case ActorIndependentKind::Unsafe:
-          break;
-      }
-    }
-
-    // @actorIndependent can not be applied to local properties.
-    if (dc->isLocalContext()) {
-      diagnoseAndRemoveAttr(attr, diag::actorindependent_local_var);
-      return;
-    }
-
-    // If this is a static or global variable, we're all set.
-    if (dc->isModuleScopeContext() ||
-        (dc->isTypeContext() && var->isStatic())) {
-      return;
-    }
-  }
-
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    (void)getActorIsolation(VD);
-  }
-}
-
 void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
   // 'nonisolated' can be applied to global and static/class variables
   // that do not have storage.
   auto dc = D->getDeclContext();
   if (auto var = dyn_cast<VarDecl>(D)) {
-    // 'nonisolated' is meaningless on a `let`.
-    if (var->isLet()) {
-      diagnoseAndRemoveAttr(attr, diag::nonisolated_let);
-      return;
-    }
-
-    // 'nonisolated' can not be applied to stored properties.
-    if (var->hasStorage()) {
+    // 'nonisolated' can not be applied to mutable stored properties.
+    if (var->hasStorage() && var->supportsMutation()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
       return;
     }
 
-    // @actorIndependent can not be applied to local properties.
+    // nonisolated can not be applied to local properties.
     if (dc->isLocalContext()) {
       diagnoseAndRemoveAttr(attr, diag::nonisolated_local_var);
       return;
@@ -5660,10 +5610,6 @@ public:
   }
 
   void visitSendableAttr(SendableAttr *attr) {
-    // Nothing else to check.
-  }
-
-  void visitActorIndependentAttr(ActorIndependentAttr *attr) {
     // Nothing else to check.
   }
 
