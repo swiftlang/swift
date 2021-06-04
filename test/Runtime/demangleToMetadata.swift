@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -9,6 +9,7 @@
 
 import Swift
 import StdlibUnittest
+import _Concurrency
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadata")
 
@@ -52,6 +53,12 @@ func f2_variadic_inout(x: ()..., y: inout ()) { }
 func f1_escaping(_: @escaping (Int) -> Float) { }
 func f1_autoclosure(_: @autoclosure () -> Float) { }
 func f1_escaping_autoclosure(_: @autoclosure @escaping () -> Float) { }
+func f1_mainactor(_: @MainActor () -> Float) { }
+
+func globalActorMetatypeFn<T>(_: T.Type) -> Any.Type {
+  typealias Fn = @MainActor () -> T
+  return Fn.self
+}
 
 DemangleToMetadataTests.test("function types") {
   // Conventions
@@ -98,6 +105,15 @@ DemangleToMetadataTests.test("function types") {
   // Autoclosure
   expectEqual(type(of: f1_autoclosure), _typeByName("ySfyXKc")!)
   expectEqual(type(of: f1_escaping_autoclosure), _typeByName("ySfyXAc")!)
+
+  // MainActor
+  expectEqual(type(of: f1_mainactor), _typeByName("ySfyScMYcXEc")!)
+  expectEqual(
+    "(@MainActor () -> Float) -> ()",
+    String(describing: _typeByName("ySfyScMYcXEc")!))
+  typealias MainActorFn = @MainActor () -> Float
+  expectEqual(MainActorFn.self, _typeByName("SfyScMYcc")!)
+  expectEqual(MainActorFn.self, globalActorMetatypeFn(Float.self))
 }
 
 DemangleToMetadataTests.test("metatype types") {
@@ -489,6 +505,11 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
   }
 }
 
+if #available(SwiftStdlib 5.5, *) {
+  DemangleToMetadataTests.test("Concurrency standard substitutions") {
+    expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
+  }
+}
 
 runAllTests()
 

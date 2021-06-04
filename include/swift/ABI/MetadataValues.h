@@ -834,8 +834,10 @@ class TargetFunctionTypeFlags {
     ParamFlagsMask         = 0x02000000U,
     EscapingMask           = 0x04000000U,
     DifferentiableMask     = 0x08000000U,
+    GlobalActorMask        = 0x10000000U,
     AsyncMask              = 0x20000000U,
     SendableMask           = 0x40000000U,
+    // NOTE: The next bit will need to introduce a separate flags word.
   };
   int_type Data;
   
@@ -891,6 +893,12 @@ public:
         (isSendable ? SendableMask : 0));
   }
 
+  constexpr TargetFunctionTypeFlags<int_type>
+  withGlobalActor(bool globalActor) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~GlobalActorMask) | (globalActor ? GlobalActorMask : 0));
+  }
+
   unsigned getNumParameters() const { return Data & NumParametersMask; }
 
   FunctionMetadataConvention getConvention() const {
@@ -913,6 +921,10 @@ public:
 
   bool isDifferentiable() const {
     return bool (Data & DifferentiableMask);
+  }
+
+  bool hasGlobalActor() const {
+    return bool (Data & GlobalActorMask);
   }
 
   int_type getIntValue() const {

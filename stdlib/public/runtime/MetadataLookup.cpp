@@ -673,6 +673,10 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
   extern "C" const ContextDescriptor DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
 
+// FIXME: When the _Concurrency library gets merged into the Standard Library,
+// we will be able to reference those symbols directly as well.
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
+
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
@@ -703,6 +707,9 @@ _findContextDescriptor(Demangle::NodePointer node,
     if (name.equals(#TYPENAME)) { \
       return &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)); \
     }
+  // FIXME: When the _Concurrency library gets merged into the Standard Library,
+  // we will be able to reference those symbols directly as well.
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
 #endif
@@ -1480,7 +1487,8 @@ public:
   createFunctionType(
       llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
       BuiltType result, FunctionTypeFlags flags,
-      FunctionMetadataDifferentiabilityKind diffKind) const {
+      FunctionMetadataDifferentiabilityKind diffKind,
+      BuiltType globalActorType) const {
     assert(
         (flags.isDifferentiable() && diffKind.isDifferentiable()) ||
         (!flags.isDifferentiable() && !diffKind.isDifferentiable()));
@@ -1497,15 +1505,22 @@ public:
         paramFlags.push_back(param.getFlags().getIntValue());
     }
 
-    return flags.isDifferentiable()
-        ? swift_getFunctionTypeMetadataDifferentiable(
-              flags, diffKind, paramTypes.data(),
-              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-              result)
-        : swift_getFunctionTypeMetadata(
-              flags, paramTypes.data(),
-              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
-              result);
+    if (globalActorType)
+      flags = flags.withGlobalActor(true);
+
+    return flags.hasGlobalActor()
+        ? swift_getFunctionTypeMetadataGlobalActor(flags, diffKind, paramTypes.data(),
+            flags.hasParameterFlags() ? paramFlags.data() : nullptr, result,
+            globalActorType)
+        : flags.isDifferentiable()
+          ? swift_getFunctionTypeMetadataDifferentiable(
+                flags, diffKind, paramTypes.data(),
+                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+                result)
+          : swift_getFunctionTypeMetadata(
+                flags, paramTypes.data(),
+                flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+                result);
   }
 
   TypeLookupErrorOr<BuiltType> createImplFunctionType(

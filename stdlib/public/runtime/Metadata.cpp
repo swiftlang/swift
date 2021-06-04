@@ -1084,6 +1084,7 @@ public:
     const Metadata *const *Parameters;
     const uint32_t *ParameterFlags;
     const Metadata *Result;
+    const Metadata *GlobalActor;
 
     FunctionTypeFlags getFlags() const { return Flags; }
 
@@ -1107,11 +1108,13 @@ public:
       return ParameterFlags::fromIntValue(flags);
     }
 
+    const Metadata *getGlobalActor() const { return GlobalActor; }
+
     friend llvm::hash_code hash_value(const Key &key) {
       auto hash = llvm::hash_combine(
           key.Flags.getIntValue(),
           key.DifferentiabilityKind.getIntValue(),
-          key.Result);
+          key.Result, key.GlobalActor);
       for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
         hash = llvm::hash_combine(hash, key.getParameter(i));
         hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
@@ -1134,6 +1137,8 @@ public:
       return false;
     if (key.getResult() != Data.ResultType)
       return false;
+    if (key.getGlobalActor() != Data.getGlobalActor())
+      return false;
     for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
       if (key.getParameter(i) != Data.getParameter(i))
         return false;
@@ -1147,7 +1152,7 @@ public:
   friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
     Key key = {value.Data.Flags, value.Data.getDifferentiabilityKind(),
                value.Data.getParameters(), value.Data.getParameterFlags(),
-               value.Data.ResultType};
+               value.Data.ResultType, value.Data.getGlobalActor()};
     return hash_value(key);
   }
 
@@ -1167,6 +1172,8 @@ public:
     if (flags.isDifferentiable())
       size = roundUpToAlignment(size, sizeof(void *)) +
           sizeof(FunctionMetadataDifferentiabilityKind);
+    if (flags.hasGlobalActor())
+      size = roundUpToAlignment(size, sizeof(void *)) + sizeof(Metadata *);
     return roundUpToAlignment(size, sizeof(void *));
   }
 };
@@ -1225,9 +1232,12 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
   assert(!flags.isDifferentiable()
          && "Differentiable function type metadata should be obtained using "
             "'swift_getFunctionTypeMetadataDifferentiable'");
+  assert(!flags.hasGlobalActor()
+         && "Global actor function type metadata should be obtained using "
+            "'swift_getFunctionTypeMetadataGlobalActor'");
   FunctionCacheEntry::Key key = {
     flags, FunctionMetadataDifferentiabilityKind::NonDifferentiable, parameters,
-    parameterFlags, result,
+    parameterFlags, result, nullptr
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1237,10 +1247,25 @@ swift::swift_getFunctionTypeMetadataDifferentiable(
     FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
     const Metadata *const *parameters, const uint32_t *parameterFlags,
     const Metadata *result) {
+  assert(!flags.hasGlobalActor()
+         && "Global actor function type metadata should be obtained using "
+            "'swift_getFunctionTypeMetadataGlobalActor'");
   assert(flags.isDifferentiable());
   assert(diffKind.isDifferentiable());
   FunctionCacheEntry::Key key = {
-    flags, diffKind, parameters, parameterFlags, result
+    flags, diffKind, parameters, parameterFlags, result, nullptr
+  };
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadataGlobalActor(
+    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
+    const Metadata *const *parameters, const uint32_t *parameterFlags,
+    const Metadata *result, const Metadata *globalActor) {
+  assert(flags.hasGlobalActor());
+  FunctionCacheEntry::Key key = {
+    flags, diffKind, parameters, parameterFlags, result, globalActor
   };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
@@ -1281,6 +1306,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
   Data.setKind(MetadataKind::Function);
   Data.Flags = flags;
   Data.ResultType = key.getResult();
+  if (flags.hasGlobalActor())
+    *Data.getGlobalActorAddr() = key.getGlobalActor();
   if (flags.isDifferentiable())
     *Data.getDifferentiabilityKindAddress() = key.getDifferentiabilityKind();
 

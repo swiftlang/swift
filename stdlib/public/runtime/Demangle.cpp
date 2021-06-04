@@ -564,6 +564,14 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     result->addChild(resultTy, Dem);
     
     auto funcNode = Dem.createNode(kind);
+    if (func->hasGlobalActor()) {
+      auto globalActorTypeNode =
+          _swift_buildDemanglingForMetadata(func->getGlobalActor(), Dem);
+      NodePointer globalActorNode =
+          Dem.createNode(Node::Kind::GlobalActorFunctionType);
+      globalActorNode->addChild(globalActorTypeNode, Dem);
+      funcNode->addChild(globalActorNode, Dem);
+    }
     switch (func->getDifferentiabilityKind().Value) {
     case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
       break;

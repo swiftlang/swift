@@ -517,6 +517,7 @@ private:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ConcurrentFunctionType:
     case Node::Kind::DifferentiableFunctionType:
+    case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
@@ -810,6 +811,11 @@ private:
     unsigned startIndex = 0;
     bool isSendable = false, isAsync = false, isThrows = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    if (node->getChild(startIndex)->getKind() ==
+          Node::Kind::GlobalActorFunctionType) {
+      print(node->getChild(startIndex));
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() ==
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
@@ -2583,6 +2589,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       assert(false && "Unexpected case NonDifferentiable");
     }
     Printer << ' ';
+    return nullptr;
+  }
+  case Node::Kind::GlobalActorFunctionType: {
+    if (Node->getNumChildren() > 0) {
+      Printer << '@';
+      print(Node->getChild(0));
+      Printer << ' ';
+    }
     return nullptr;
   }
   case Node::Kind::AsyncAnnotation:
