@@ -97,13 +97,13 @@ import _Concurrency
 // CHECK-NEXT: {{^[}]$}}
 
 // CHECK-LABEL: protocol ProtocolWithSwiftAttributes {
-// CHECK-NEXT: @actorIndependent func independentMethod()
+// CHECK-NEXT: nonisolated func independentMethod()
 // CHECK-NEXT: {{^}} @objc @MainActor func mainActorMethod()
 // CHECK-NEXT: {{^}} @objc @MainActor func uiActorMethod()
 // CHECK-NEXT: {{^}} @objc optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
 
-// CHECK: {{^}}@actorIndependent(unsafe) var MAGIC_NUMBER: Int32 { get }
+// CHECK: {{^}}nonisolated var MAGIC_NUMBER: Int32 { get }
 
 // CHECK: func doSomethingConcurrently(_ block: @Sendable () -> Void)
 

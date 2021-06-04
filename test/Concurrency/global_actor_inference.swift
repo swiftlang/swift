@@ -255,20 +255,20 @@ func barSync() {
 @propertyWrapper
 @OtherGlobalActor
 struct WrapperOnActor<Wrapped> {
-  @actorIndependent(unsafe) private var stored: Wrapped
+  private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
     stored = wrappedValue
   }
 
   @MainActor var wrappedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get { }
+    set { }
   }
 
   @SomeGlobalActor var projectedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get {  }
+    set { }
   }
 }
 
@@ -285,20 +285,20 @@ public struct WrapperOnMainActor<Wrapped> {
 
 @propertyWrapper
 actor WrapperActor<Wrapped> {
-  @actorIndependent(unsafe) var storage: Wrapped
+  var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
     storage = wrappedValue
   }
 
   nonisolated var wrappedValue: Wrapped {
-    get { storage }
-    set { storage = newValue }
+    get { }
+    set { }
   }
 
   nonisolated var projectedValue: Wrapped {
-    get { storage }
-    set { storage = newValue }
+    get { }
+    set { }
   }
 }
 
@@ -344,20 +344,20 @@ actor WrapperActorBad1<Wrapped> {
 
 @propertyWrapper
 actor WrapperActorBad2<Wrapped> {
-  @actorIndependent(unsafe) var storage: Wrapped
+  var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
     storage = wrappedValue
   }
 
   nonisolated var wrappedValue: Wrapped {
-    get { storage }
-    set { storage = newValue }
+    get { }
+    set { }
   }
 
   var projectedValue: Wrapped { // expected-error{{'projectedValue' property in property wrapper type 'WrapperActorBad2' cannot be isolated to the actor instance; consider 'nonisolated'}}
-    get { storage }
-    set { storage = newValue }
+    get {  }
+    set {  }
   }
 }
 
@@ -382,7 +382,7 @@ actor ActorWithWrapper {
 
 @propertyWrapper
 struct WrapperOnSomeGlobalActor<Wrapped> {
-  @actorIndependent(unsafe) private var stored: Wrapped
+  private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
     stored = wrappedValue
@@ -450,20 +450,20 @@ class UGASubclass2: UGAClass {
 @propertyWrapper
 @OtherGlobalActor(unsafe)
 struct WrapperOnUnsafeActor<Wrapped> {
-  @actorIndependent(unsafe) private var stored: Wrapped
+  private var stored: Wrapped
 
   init(wrappedValue: Wrapped) {
     stored = wrappedValue
   }
 
   @MainActor(unsafe) var wrappedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get { }
+    set { }
   }
 
   @SomeGlobalActor(unsafe) var projectedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get { }
+    set { }
   }
 }
 
@@ -490,14 +490,13 @@ struct HasWrapperOnUnsafeActor {
 }
 
 // ----------------------------------------------------------------------
-// Actor-independent closures
+// Nonisolated closures
 // ----------------------------------------------------------------------
-@SomeGlobalActor func getGlobal7() -> Int { 7 } // expected-note{{calls to global function 'getGlobal7()' from outside of its actor context are implicitly asynchronous}}
+@SomeGlobalActor func getGlobal7() -> Int { 7 }
 func acceptClosure<T>(_: () -> T) { }
 
 @SomeGlobalActor func someGlobalActorFunc() async {
   acceptClosure { getGlobal7() } // okay
-  acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'getGlobal7()' in a synchronous nonisolated context}}
 }
 
 // ----------------------------------------------------------------------
