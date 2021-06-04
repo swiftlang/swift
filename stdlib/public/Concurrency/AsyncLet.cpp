@@ -44,7 +44,7 @@ private:
   // TODO: more additional flags here, we can use them for future optimizations.
   //       e.g. "was awaited on" or "needs free"
 
-  friend class AsyncTask;
+  friend class ::swift::AsyncTask;
 
 public:
   explicit AsyncLetImpl(AsyncTask* task)
