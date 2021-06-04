@@ -137,6 +137,40 @@ public:
       break;
     }
 
+    switch (F->getDifferentiabilityKind().Value) {
+    case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Forward:
+      printField("differentiable", "forward");
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Reverse:
+      printField("differentiable", "reverse");
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Normal:
+      printField("differentiable", "normal");
+      break;
+
+    case FunctionMetadataDifferentiabilityKind::Linear:
+      printField("differentiable", "linear");
+      break;
+    }
+
+    if (auto globalActor = F->getGlobalActor()) {
+      fprintf(file, "\n");
+      Indent += 2;
+      printHeader("global-actor");
+      {
+        Indent += 2;
+        printRec(globalActor);
+        fprintf(file, ")");
+        Indent -= 2;
+      }
+      Indent += 2;
+    }
+
     fprintf(file, "\n");
     Indent += 2;
     printHeader("parameters");
@@ -670,7 +704,27 @@ public:
       funcNode->addChild(node, Dem);
     }
 
-    // FIXME: Differentiability is missing
+    if (F->getFlags().isDifferentiable()) {
+      MangledDifferentiabilityKind mangledKind;
+      switch (F->getDifferentiabilityKind().Value) {
+#define CASE(X) case FunctionMetadataDifferentiabilityKind::X: \
+        mangledKind = MangledDifferentiabilityKind::X; break;
+
+      CASE(NonDifferentiable)
+      CASE(Forward)
+      CASE(Reverse)
+      CASE(Normal)
+      CASE(Linear)
+#undef CASE
+      }
+
+      funcNode->addChild(
+          Dem.createNode(
+            Node::Kind::DifferentiableFunctionType,
+            (Node::IndexType)mangledKind),
+          Dem);
+    }
+
     if (F->getFlags().isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
     if (F->getFlags().isSendable()) {

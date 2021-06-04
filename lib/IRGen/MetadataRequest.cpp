@@ -1445,15 +1445,20 @@ namespace {
                        .withThrows(type->isThrowing())
                        .withParameterFlags(hasParameterFlags)
                        .withEscaping(isEscaping)
-                       .withDifferentiable(type->isDifferentiable());
+                       .withDifferentiable(type->isDifferentiable())
+                       .withGlobalActor(!type->getGlobalActor().isNull());
 
       auto flagsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                              flags.getIntValue());
       llvm::Value *diffKindVal = nullptr;
       if (type->isDifferentiable()) {
         assert(metadataDifferentiabilityKind.isDifferentiable());
-        diffKindVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                             flags.getIntValue());
+        diffKindVal = llvm::ConstantInt::get(
+            IGF.IGM.SizeTy, metadataDifferentiabilityKind.getIntValue());
+      } else if (type->getGlobalActor()) {
+        diffKindVal = llvm::ConstantInt::get(
+            IGF.IGM.SizeTy,
+            FunctionMetadataDifferentiabilityKind::NonDifferentiable);
       }
 
       auto collectParameters =
@@ -1507,7 +1512,8 @@ namespace {
       case 1:
       case 2:
       case 3: {
-        if (!hasParameterFlags && !type->isDifferentiable()) {
+        if (!hasParameterFlags && !type->isDifferentiable() &&
+            !type->getGlobalActor()) {
           llvm::SmallVector<llvm::Value *, 8> arguments;
           auto *metadataFn = constructSimpleCall(arguments);
           auto *call = IGF.Builder.CreateCall(metadataFn, arguments);
@@ -1515,48 +1521,56 @@ namespace {
           return setLocal(CanType(type), MetadataResponse::forComplete(call));
         }
 
-        // If function type has parameter flags or is differentiable, let's emit
-        // the most general function to retrieve them.
+        // If function type has parameter flags or is differentiable or has a
+        // global actor, emit the most general function to retrieve them.
         LLVM_FALLTHROUGH;
       }
 
       default:
-        assert(!params.empty() || type->isDifferentiable() &&
+        assert((!params.empty() || type->isDifferentiable() ||
+                type->getGlobalActor()) &&
                "0 parameter case should be specialized unless it is a "
-               "differentiable function");
+               "differentiable function or has a global actor");
 
         auto *const Int32Ptr = IGF.IGM.Int32Ty->getPointerTo();
         llvm::SmallVector<llvm::Value *, 8> arguments;
 
         arguments.push_back(flagsVal);
 
-        if (type->isDifferentiable()) {
-          assert(diffKindVal);
+        if (diffKindVal) {
           arguments.push_back(diffKindVal);
         }
 
         ConstantInitBuilder paramFlags(IGF.IGM);
         auto flagsArr = paramFlags.beginArray();
 
-        auto arrayTy =
-            llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy, numParams);
-        Address parameters = IGF.createAlloca(
-            arrayTy, IGF.IGM.getTypeMetadataAlignment(), "function-parameters");
+        Address parameters;
+        if (!params.empty()) {
+          auto arrayTy =
+              llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy, numParams);
+          parameters = IGF.createAlloca(
+              arrayTy, IGF.IGM.getTypeMetadataAlignment(), "function-parameters");
 
-        IGF.Builder.CreateLifetimeStart(parameters,
-                                        IGF.IGM.getPointerSize() * numParams);
+          IGF.Builder.CreateLifetimeStart(parameters,
+                                          IGF.IGM.getPointerSize() * numParams);
 
-        collectParameters([&](unsigned i, llvm::Value *typeRef,
-                              ParameterFlags flags) {
-          auto argPtr = IGF.Builder.CreateStructGEP(parameters, i,
-                                                    IGF.IGM.getPointerSize());
-          IGF.Builder.CreateStore(typeRef, argPtr);
-          if (i == 0)
-            arguments.push_back(argPtr.getAddress());
+          collectParameters([&](unsigned i, llvm::Value *typeRef,
+                                ParameterFlags flags) {
+            auto argPtr = IGF.Builder.CreateStructGEP(parameters, i,
+                                                      IGF.IGM.getPointerSize());
+            IGF.Builder.CreateStore(typeRef, argPtr);
+            if (i == 0)
+              arguments.push_back(argPtr.getAddress());
 
-          if (hasParameterFlags)
-            flagsArr.addInt32(flags.getIntValue());
-        });
+            if (hasParameterFlags)
+              flagsArr.addInt32(flags.getIntValue());
+          });
+        } else {
+          auto parametersPtr =
+              llvm::ConstantPointerNull::get(
+                IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+          arguments.push_back(parametersPtr);
+        }
 
         if (hasParameterFlags) {
           auto *flagsVar = flagsArr.finishAndCreateGlobal(
@@ -1570,9 +1584,16 @@ namespace {
 
         arguments.push_back(result);
 
-        auto *getMetadataFn = type->isDifferentiable()
-            ? IGF.IGM.getGetFunctionMetadataDifferentiableFn()
-            : IGF.IGM.getGetFunctionMetadataFn();
+        if (Type globalActor = type->getGlobalActor()) {
+          arguments.push_back(
+              IGF.emitAbstractTypeMetadataRef(globalActor->getCanonicalType()));
+        }
+
+        auto *getMetadataFn = type->getGlobalActor()
+            ? IGF.IGM.getGetFunctionMetadataGlobalActorFn()
+            : type->isDifferentiable()
+              ? IGF.IGM.getGetFunctionMetadataDifferentiableFn()
+              : IGF.IGM.getGetFunctionMetadataFn();
 
         auto call = IGF.Builder.CreateCall(getMetadataFn, arguments);
         call->setDoesNotThrow();
