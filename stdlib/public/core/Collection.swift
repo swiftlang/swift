@@ -1467,7 +1467,7 @@ extension Collection {
   ///     }
   ///     // Prints "[10, 20, 30, 40]"
   ///
-  /// - Parameter end: The index of the last element to include in the
+  /// - Parameter position: The index of the last element to include in the
   ///   resulting subsequence. `end` must be a valid index of the collection
   ///   that is not equal to the `endIndex` property.
   /// - Returns: A subsequence up to, and including, the `end` position.
