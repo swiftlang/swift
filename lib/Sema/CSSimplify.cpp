@@ -4460,6 +4460,10 @@ bool ConstraintSystem::repairFailures(
     // a conversion to another function type, see `matchFunctionTypes`.
     if (parentLoc->isForContextualType() ||
         parentLoc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      // If either type has a placeholder, consider this fixed.
+      if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+        return true;
+
       // If there is a fix associated with contextual conversion or
       // a function type itself, let's ignore argument failure but
       // increase a score.
