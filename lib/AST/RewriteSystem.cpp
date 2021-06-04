@@ -21,6 +21,107 @@
 using namespace swift;
 using namespace rewriting;
 
+/// Atoms are uniqued and immutable, stored as a single pointer;
+/// the Storage type is the allocated backing storage.
+struct Atom::Storage final
+  : public llvm::FoldingSetNode,
+    public llvm::TrailingObjects<Storage, const ProtocolDecl *, Term> {
+  friend class Atom;
+
+  unsigned Kind : 3;
+  unsigned NumProtocols : 15;
+  unsigned NumSubstitutions : 14;
+
+  union {
+    Identifier Name;
+    CanType ConcreteType;
+    LayoutConstraint Layout;
+    const ProtocolDecl *Proto;
+    GenericTypeParamType *GenericParam;
+  };
+
+  explicit Storage(Identifier name) {
+    Kind = unsigned(Atom::Kind::Name);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Name = name;
+  }
+
+  explicit Storage(LayoutConstraint layout) {
+    Kind = unsigned(Atom::Kind::Layout);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Layout = layout;
+  }
+
+  explicit Storage(const ProtocolDecl *proto) {
+    Kind = unsigned(Atom::Kind::Protocol);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Proto = proto;
+  }
+
+  explicit Storage(GenericTypeParamType *param) {
+    Kind = unsigned(Atom::Kind::GenericParam);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    GenericParam = param;
+  }
+
+  Storage(ArrayRef<const ProtocolDecl *> protos, Identifier name) {
+    assert(!protos.empty());
+
+    Kind = unsigned(Atom::Kind::AssociatedType);
+    NumProtocols = protos.size();
+    assert(NumProtocols == protos.size() && "Overflow");
+    NumSubstitutions = 0;
+    Name = name;
+
+    for (unsigned i : indices(protos))
+      getProtocols()[i] = protos[i];
+  }
+
+  Storage(Atom::Kind kind, CanType type, ArrayRef<Term> substitutions) {
+    assert(kind == Atom::Kind::Superclass ||
+           kind == Atom::Kind::ConcreteType);
+    assert(type->hasTypeParameter() != substitutions.empty());
+
+    Kind = unsigned(kind);
+    NumProtocols = 0;
+    NumSubstitutions = substitutions.size();
+    ConcreteType = type;
+
+    for (unsigned i : indices(substitutions))
+      getSubstitutions()[i] = substitutions[i];
+  }
+
+  size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
+    return NumProtocols;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Term>) const {
+    return NumSubstitutions;
+  }
+
+  MutableArrayRef<const ProtocolDecl *> getProtocols() {
+    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
+  }
+
+  ArrayRef<const ProtocolDecl *> getProtocols() const {
+    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
+  }
+
+  MutableArrayRef<Term> getSubstitutions() {
+    return {getTrailingObjects<Term>(), NumSubstitutions};
+  }
+
+  ArrayRef<Term> getSubstitutions() const {
+    return {getTrailingObjects<Term>(), NumSubstitutions};
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+};
+
 Atom::Kind Atom::getKind() const {
   return Kind(Ptr->Kind);
 }
@@ -59,6 +160,24 @@ LayoutConstraint Atom::getLayoutConstraint() const {
   return Ptr->Layout;
 }
 
+/// Get the superclass type associated with a superclass atom.
+CanType Atom::getSuperclass() const {
+  assert(getKind() == Kind::Superclass);
+  return Ptr->ConcreteType;
+}
+
+/// Get the concrete type associated with a concrete type atom.
+CanType Atom::getConcreteType() const {
+  assert(getKind() == Kind::ConcreteType);
+  return Ptr->ConcreteType;
+}
+
+ArrayRef<Term> Atom::getSubstitutions() const {
+  assert(getKind() == Kind::Superclass ||
+         getKind() == Kind::ConcreteType);
+  return Ptr->getSubstitutions();
+}
+
 /// Creates a new name atom.
 Atom Atom::forName(Identifier name,
                    RewriteContext &ctx) {
@@ -73,6 +192,12 @@ Atom Atom::forName(Identifier name,
   unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *atom = new (mem) Storage(name);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -95,6 +220,12 @@ Atom Atom::forProtocol(const ProtocolDecl *proto,
   unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *atom = new (mem) Storage(proto);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -133,6 +264,12 @@ Atom Atom::forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *atom = new (mem) Storage(protos, name);
 
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
   ctx.Atoms.InsertNode(atom, insertPos);
 
   return atom;
@@ -157,6 +294,12 @@ Atom Atom::forGenericParam(GenericTypeParamType *param,
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *atom = new (mem) Storage(param);
 
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
   ctx.Atoms.InsertNode(atom, insertPos);
 
   return atom;
@@ -176,6 +319,73 @@ Atom Atom::forLayout(LayoutConstraint layout,
   unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
   void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
   auto *atom = new (mem) Storage(layout);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a superclass atom, representing a superclass constraint.
+Atom Atom::forSuperclass(CanType type, ArrayRef<Term> substitutions,
+                         RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Superclass));
+  id.AddPointer(type.getPointer());
+  id.AddInteger(unsigned(substitutions.size()));
+
+  for (auto substitution : substitutions)
+    id.AddPointer(substitution.getOpaquePointer());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
+      0, substitutions.size());
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(Kind::Superclass, type, substitutions);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a concrete type atom, representing a superclass constraint.
+Atom Atom::forConcreteType(CanType type, ArrayRef<Term> substitutions,
+                           RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::ConcreteType));
+  id.AddPointer(type.getPointer());
+  id.AddInteger(unsigned(substitutions.size()));
+  for (auto substitution : substitutions)
+    id.AddPointer(substitution.getOpaquePointer());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
+      0, substitutions.size());
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(Kind::ConcreteType, type, substitutions);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
 
   ctx.Atoms.InsertNode(atom, insertPos);
 
@@ -266,6 +476,12 @@ int Atom::compare(Atom other, const ProtocolGraph &graph) const {
   case Kind::Layout:
     result = getLayoutConstraint().compare(other.getLayoutConstraint());
     break;
+
+  case Kind::Superclass:
+  case Kind::ConcreteType: {
+    assert(false && "Cannot compare concrete types yet");
+    break;
+  }
   }
 
   assert(result != 0 && "Two distinct atoms should not compare equal");
@@ -274,6 +490,24 @@ int Atom::compare(Atom other, const ProtocolGraph &graph) const {
 
 /// Print the atom using our mnemonic representation.
 void Atom::dump(llvm::raw_ostream &out) const {
+  auto dumpSubstitutions = [&]() {
+    if (getSubstitutions().size() > 0) {
+      out << " with <";
+
+      bool first = true;
+      for (auto substitution : getSubstitutions()) {
+        if (first) {
+          first = false;
+        } else {
+          out << ", ";
+        }
+        substitution.dump(out);
+      }
+
+      out << ">";
+    }
+  };
+
   switch (getKind()) {
   case Kind::Name:
     out << getName();
@@ -306,10 +540,95 @@ void Atom::dump(llvm::raw_ostream &out) const {
     out << "[layout: ";
     getLayoutConstraint()->print(out);
     out << "]";
+    return;
+
+  case Kind::Superclass:
+    out << "[superclass: " << getSuperclass();
+    dumpSubstitutions();
+    out << "]";
+    return;
+
+  case Kind::ConcreteType:
+    out << "[concrete: " << getConcreteType();
+    dumpSubstitutions();
+    out << "]";
+    return;
   }
 
   llvm_unreachable("Bad atom kind");
 }
+
+void Atom::Storage::Profile(llvm::FoldingSetNodeID &id) const {
+  id.AddInteger(Kind);
+
+  switch (Atom::Kind(Kind)) {
+  case Atom::Kind::Name:
+    id.AddPointer(Name.get());
+    return;
+
+  case Atom::Kind::Layout:
+    id.AddPointer(Layout.getPointer());
+    return;
+
+  case Atom::Kind::Protocol:
+    id.AddPointer(Proto);
+    return;
+
+  case Atom::Kind::GenericParam:
+    id.AddPointer(GenericParam);
+    return;
+
+  case Atom::Kind::AssociatedType: {
+    auto protos = getProtocols();
+    id.AddInteger(protos.size());
+
+    for (const auto *proto : protos)
+      id.AddPointer(proto);
+
+    id.AddPointer(Name.get());
+    return;
+  }
+
+  case Atom::Kind::Superclass:
+  case Atom::Kind::ConcreteType: {
+    id.AddPointer(ConcreteType.getPointer());
+
+    id.AddInteger(NumSubstitutions);
+    for (auto term : getSubstitutions())
+      id.AddPointer(term.getOpaquePointer());
+
+    return;
+  }
+  }
+
+  llvm_unreachable("Bad atom kind");
+}
+
+/// Terms are uniqued and immutable, stored as a single pointer;
+/// the Storage type is the allocated backing storage.
+struct Term::Storage final
+  : public llvm::FoldingSetNode,
+    public llvm::TrailingObjects<Storage, Atom> {
+  friend class Atom;
+
+  unsigned Size;
+
+  explicit Storage(unsigned size) : Size(size) {}
+
+  size_t numTrailingObjects(OverloadToken<Atom>) const {
+    return Size;
+  }
+
+  MutableArrayRef<Atom> getElements() {
+    return {getTrailingObjects<Atom>(), Size};
+  }
+
+  ArrayRef<Atom> getElements() const {
+    return {getTrailingObjects<Atom>(), Size};
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+};
 
 size_t Term::size() const { return Ptr->Size; }
 
@@ -356,6 +675,13 @@ Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
   ctx.Terms.InsertNode(term, insertPos);
 
   return term;
+}
+
+void Term::Storage::Profile(llvm::FoldingSetNodeID &id) const {
+  id.AddInteger(Size);
+
+  for (auto atom : getElements())
+    id.AddPointer(atom.getOpaquePointer());
 }
 
 /// Linear order on terms.

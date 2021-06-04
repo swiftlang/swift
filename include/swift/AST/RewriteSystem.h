@@ -35,8 +35,9 @@ namespace swift {
 
 namespace rewriting {
 
-class RewriteContext;
 class MutableTerm;
+class RewriteContext;
+class Term;
 
 /// The smallest element in the rewrite system.
 ///
@@ -46,35 +47,68 @@ class MutableTerm;
 ///   case type([Protocol], Identifier)
 ///   case genericParam(index: Int, depth: Int)
 ///   case layout(LayoutConstraint)
+///   case superclass(CanType, substitutions: [Term])
+///   case concrete(CanType, substitutions: [Term])
 /// }
+///
+/// For the concrete type atoms (`superclass` and `concrete`),
+/// the type's structural components must either be concrete, or
+/// generic parameters. All generic parameters must have a depth
+/// of 0; the generic parameter index corresponds to an index in
+/// the `substitutions` array.
+///
+/// For example, the superclass requirement
+/// "T : MyClass<U.X, (Int) -> V.A.B>" is denoted with an atom
+/// structured as follows:
+///
+/// - type: MyClass<τ_0_0, (Int) -> τ_0_1>
+/// - substitutions:
+///   - U.X
+///   - V.A.B
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class Atom final {
 public:
   enum class Kind : uint8_t {
+    //////
+    ////// "Type-like" atom kinds:
+    //////
+
     /// An associated type [P:T] or [P&Q&...:T]. The parent term
     /// must be known to conform to P (or P, Q, ...).
     AssociatedType,
 
     /// A generic parameter, uniquely identified by depth and
     /// index. Can only appear at the beginning of a term, where
-    /// it represents a generic parameter of the top-level generic
+    /// it denotes a generic parameter of the top-level generic
     /// signature.
     GenericParam,
 
     /// An unbound identifier name.
     Name,
 
-    /// When appearing at the start of a term, represents a nested
+    //////
+    ////// "Fact-like" atom kinds:
+    //////
+
+    /// When appearing at the start of a term, denotes a nested
     /// type of a protocol 'Self' type.
     ///
-    /// When appearing at the end of a term, represents that the
-    /// term conforms to the protocol.
+    /// When appearing at the end of a term, denotes that the
+    /// term's type conforms to the protocol.
     Protocol,
 
-    /// When appearring at the end of a term, represents that the
-    /// term conforms to the layout.
-    Layout
+    /// When appearing at the end of a term, denotes that the
+    /// term's type satisfies the layout constraint.
+    Layout,
+
+    /// When appearing at the end of a term, denotes that the term
+    /// is a subclass of the superclass constraint.
+    Superclass,
+
+    /// When appearing at the end of a term, denotes that the term
+    /// is exactly equal to the concrete type.
+    ConcreteType,
   };
 
 private:
@@ -100,6 +134,12 @@ public:
 
   LayoutConstraint getLayoutConstraint() const;
 
+  CanType getSuperclass() const;
+
+  CanType getConcreteType() const;
+
+  ArrayRef<Term> getSubstitutions() const;
+
   /// Returns an opaque pointer that uniquely identifies this atom.
   const void *getOpaquePointer() const {
     return Ptr;
@@ -124,6 +164,14 @@ public:
 
   static Atom forLayout(LayoutConstraint layout,
                         RewriteContext &ctx);
+
+  static Atom forSuperclass(CanType type,
+                            ArrayRef<Term> substitutions,
+                            RewriteContext &ctx);
+
+  static Atom forConcreteType(CanType type,
+                              ArrayRef<Term> substitutions,
+                              RewriteContext &ctx);
 
   int compare(Atom other, const ProtocolGraph &protos) const;
 
@@ -170,151 +218,14 @@ public:
 
   Atom operator[](size_t index) const;
 
+  /// Returns an opaque pointer that uniquely identifies this term.
+  const void *getOpaquePointer() const {
+    return Ptr;
+  }
+
   static Term get(const MutableTerm &term, RewriteContext &ctx);
 
   void dump(llvm::raw_ostream &out) const;
-};
-
-/// Atoms are uniqued and immutable, stored as a single pointer;
-/// the Storage type is the allocated backing storage.
-struct Atom::Storage final
-  : public llvm::FoldingSetNode,
-    public llvm::TrailingObjects<Storage, const ProtocolDecl *, Term> {
-  friend class Atom;
-
-  unsigned Kind : 3;
-  unsigned NumProtocols : 15;
-  unsigned NumSubstitutions : 14;
-
-  union {
-    Identifier Name;
-    LayoutConstraint Layout;
-    const ProtocolDecl *Proto;
-    GenericTypeParamType *GenericParam;
-  };
-
-  explicit Storage(Identifier name) {
-    Kind = unsigned(Atom::Kind::Name);
-    NumProtocols = 0;
-    NumSubstitutions = 0;
-    Name = name;
-  }
-
-  explicit Storage(LayoutConstraint layout) {
-    Kind = unsigned(Atom::Kind::Layout);
-    NumProtocols = 0;
-    NumSubstitutions = 0;
-    Layout = layout;
-  }
-
-  explicit Storage(const ProtocolDecl *proto) {
-    Kind = unsigned(Atom::Kind::Protocol);
-    NumProtocols = 0;
-    NumSubstitutions = 0;
-    Proto = proto;
-  }
-
-  explicit Storage(GenericTypeParamType *param) {
-    Kind = unsigned(Atom::Kind::GenericParam);
-    NumProtocols = 0;
-    NumSubstitutions = 0;
-    GenericParam = param;
-  }
-
-  Storage(ArrayRef<const ProtocolDecl *> protos, Identifier name) {
-    assert(!protos.empty());
-
-    Kind = unsigned(Atom::Kind::AssociatedType);
-    NumProtocols = protos.size();
-    assert(NumProtocols == protos.size() && "Overflow");
-    NumSubstitutions = 0;
-    Name = name;
-
-    for (unsigned i : indices(protos))
-      getProtocols()[i] = protos[i];
-  }
-
-  size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
-    return NumProtocols;
-  }
-
-  size_t numTrailingObjects(OverloadToken<Term>) const {
-    return NumSubstitutions;
-  }
-
-  MutableArrayRef<const ProtocolDecl *> getProtocols() {
-    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
-  }
-
-  ArrayRef<const ProtocolDecl *> getProtocols() const {
-    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
-  }
-
-  void Profile(llvm::FoldingSetNodeID &id) {
-    id.AddInteger(Kind);
-
-    switch (Atom::Kind(Kind)) {
-    case Atom::Kind::Name:
-      id.AddPointer(Name.get());
-      return;
-
-    case Atom::Kind::Layout:
-      id.AddPointer(Layout.getPointer());
-      return;
-
-    case Atom::Kind::Protocol:
-      id.AddPointer(Proto);
-      return;
-
-    case Atom::Kind::GenericParam:
-      id.AddPointer(GenericParam);
-      return;
-
-    case Atom::Kind::AssociatedType: {
-      auto protos = getProtocols();
-      id.AddInteger(protos.size());
-
-      for (const auto *proto : protos)
-        id.AddPointer(proto);
-
-      id.AddPointer(Name.get());
-      return;
-    }
-    }
-
-    llvm_unreachable("Bad atom kind");
-  }
-};
-
-/// Terms are uniqued and immutable, stored as a single pointer;
-/// the Storage type is the allocated backing storage.
-struct Term::Storage final
-  : public llvm::FoldingSetNode,
-    public llvm::TrailingObjects<Storage, Atom> {
-  friend class Atom;
-
-  unsigned Size;
-
-  explicit Storage(unsigned size) : Size(size) {}
-
-  size_t numTrailingObjects(OverloadToken<Atom>) const {
-    return Size;
-  }
-
-  MutableArrayRef<Atom> getElements() {
-    return {getTrailingObjects<Atom>(), Size};
-  }
-
-  ArrayRef<Atom> getElements() const {
-    return {getTrailingObjects<Atom>(), Size};
-  }
-
-  void Profile(llvm::FoldingSetNodeID &id) {
-    id.AddInteger(Size);
-
-    for (auto atom : getElements())
-      id.AddPointer(atom.getOpaquePointer());
-  }
 };
 
 /// A term is a sequence of one or more atoms.
