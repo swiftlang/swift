@@ -164,7 +164,6 @@ sil @trivial_destructor_load : $@convention(thin) () -> () {
 //
 // CHECK-LABEL: sil @trivial_destructor_store_into : $@convention(thin) () -> () {
 // CHECK: bb0
-// CHECK-NEXT: integer_literal
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @trivial_destructor_store_into : $@convention(thin) () -> () {
