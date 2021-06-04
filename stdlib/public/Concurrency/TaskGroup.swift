@@ -16,10 +16,10 @@ import Swift
 // ==== TaskGroup --------------------------------------------------------------
 
 /// Starts a new task group which provides a scope in which a dynamic number of
-/// tasks may be spawned.
+/// tasks may be created.
 ///
 /// When the group returns,
-/// it implicitly waits for all spawned tasks to complete.
+/// it implicitly waits for all child tasks to complete.
 /// The tasks are canceled only if `cancelAll()` was invoked before returning,
 /// if the group's task was canceled.
 ///
@@ -50,14 +50,14 @@ import Swift
 /// Canceling the task in which the group is running
 /// also cancels the group and all of its child tasks.
 ///
-/// If you call `spawn(priority:operation:)` to create a new task in a canceled group,
+/// If you call `async(priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
-/// Alternatively, you can call `spawnUnlessCancelled(priority:operation:)`,
-/// which doesn't spawn the task if the group has already been canceled
+/// Alternatively, you can call `asyncUnlessCancelled(priority:operation:)`,
+/// which doesn't create the task if the group has already been canceled
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation
-/// and others are better not even being spawned
+/// and others are better not even being created
 /// knowing they can't produce useful results.
 ///
 /// Because the tasks you add to a group with this method are nonthrowing,
@@ -91,10 +91,10 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
-/// Starts a new scope in which a dynamic number of throwing tasks can be spawned.
+/// Starts a new scope in which a dynamic number of throwing tasks can be created.
 ///
 /// When the group returns,
-/// it implicitly waits for all spawned tasks to complete.
+/// it implicitly waits for all child tasks to complete.
 /// The tasks are canceled only if `cancelAll()` was invoked before returning,
 /// if the group's task was canceled,
 /// or if the group's body throws an error.
@@ -126,14 +126,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// Canceling the task in which the group is running
 /// also cancels the group and all of its child tasks.
 ///
-/// If you call `spawn(priority:operation:)` to create a new task in a canceled group,
+/// If you call `async(priority:operation:)` to create a new task in a canceled group,
 /// that task is is immediately canceled after being created.
-/// Alternatively, you can call `spawnUnlessCancelled(priority:operation:)`,
-/// which doesn't spawn the task if the group has already been canceled
+/// Alternatively, you can call `asyncUnlessCancelled(priority:operation:)`,
+/// which doesn't create the task if the group has already been canceled
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
 /// some child tasks need to run regardless of cancellation
-/// and others are better not even being spawned
+/// and others are better not even being created
 /// knowing they can't produce useful results.
 ///
 /// Throwing an error in one of the tasks of a task group
@@ -145,14 +145,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 /// nothing is canceled and the group doesn't throw an error:
 ///
 ///     withThrowingTaskGroup { group in
-///         group.spawn { throw SomeError() }
+///         group.async { throw SomeError() }
 ///     }
 ///
 /// In contrast, this example throws `SomeError`
 /// and cancels all of the tasks in the group:
 ///
 ///     withThrowingTaskGroup { group in
-///         group.spawn { throw SomeError() }
+///         group.async { throw SomeError() }
 ///         try group.next()
 ///     }
 ///
@@ -194,7 +194,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
-/// A task group serves as storage for dynamically spawned child tasks.
+/// A task group serves as storage for dynamically created child tasks.
 ///
 /// To create a task group,
 /// call the `withTaskGroup(of:returning:body:)` method.
@@ -315,8 +315,8 @@ public struct TaskGroup<ChildTaskResult> {
   /// not in the order that those tasks were added to the task group.
   /// For example:
   ///
-  ///     group.spawn { 1 }
-  ///     group.spawn { 2 }
+  ///     group.async { 1 }
+  ///     group.async { 2 }
   ///
   ///     print(await group.next())
   ///     // Prints either "2" or "1".
@@ -424,7 +424,7 @@ public struct TaskGroup<ChildTaskResult> {
 // proofing, in case we'd ever have typed errors, however unlikely this may be.
 // Today the throwing task group failure is simply automatically bound to `Error`.
 
-/// A task group serves as storage for dynamically spawned,
+/// A task group serves as storage for dynamically created,
 /// potentially throwing, child tasks.
 ///
 @available(SwiftStdlib 5.5, *)
@@ -454,7 +454,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     }
   }
 
-  /// Spawn, unconditionally, a child task in the group.
+  /// Unconditionally create a child task in the group.
   ///
   /// ### Error handling
   /// Operations are allowed to `throw`, in which case the `try await next()`
@@ -550,8 +550,8 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// not in the order that those tasks were added to the task group.
   /// For example:
   ///
-  ///     group.spawn { 1 }
-  ///     group.spawn { 2 }
+  ///     group.async { 1 }
+  ///     group.async { 2 }
   ///
   ///     await print(group.next())
   ///     // Prints either "2" or "1".
@@ -610,8 +610,8 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// not in the order that those tasks were added to the task group.
   /// For example:
   ///
-  ///     group.spawn { 1 }
-  ///     group.spawn { 2 }
+  ///     group.async { 1 }
+  ///     group.async { 2 }
   ///
   ///     guard let result = await group.nextResult() else {
   ///         return  // No task to wait on, which won't happen in this example.
@@ -710,9 +710,9 @@ extension TaskGroup: AsyncSequence {
   /// which you can use to continue iterating over the group's results.
   /// For example:
   ///
-  ///     group.spawn { 1 }
-  ///     group.spawn { throw SomeError }
-  ///     group.spawn { 2 }
+  ///     group.async { 1 }
+  ///     group.async { throw SomeError }
+  ///     group.async { 2 }
   ///     
   ///     do { 
   ///         // Assuming the child tasks complete in order, this prints "1"
