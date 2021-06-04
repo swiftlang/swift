@@ -1252,6 +1252,11 @@ def skip_inherited_docs : Flag<["-"], "skip-inherited-docs">,
   HelpText<"Skip emitting doc comments for members inherited through classes or "
            "default implementations">;
 
+def include_spi_symbols : Flag<["-"], "include-spi-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Add symbols with SPI information to the symbol graph">;
+
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

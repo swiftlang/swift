@@ -630,7 +630,7 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
 
   // Don't include declarations with the @_spi attribute unless the
   // access control filter is internal or below.
-  if (D->isSPI()) {
+  if (D->isSPI() && !Walker.Options.IncludeSPISymbols) {
     return Walker.Options.MinimumAccessLevel > AccessLevel::Internal;
   }
 

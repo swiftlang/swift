@@ -425,6 +425,9 @@ public:
   /// which are inherited through classes or default implementations.
   bool SkipInheritedDocs = false;
 
+  /// Whether to include symbols with SPI information in the symbol graph.
+  bool IncludeSPISymbolsInSymbolGraph = false;
+
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);

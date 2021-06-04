@@ -168,6 +168,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
   }
   serializationOpts.SkipSymbolGraphInheritedDocs = opts.SkipInheritedDocs;
+  serializationOpts.IncludeSPISymbolsInSymbolGraph = opts.IncludeSPISymbolsInSymbolGraph;
   
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;

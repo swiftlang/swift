@@ -959,6 +959,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
         /*EmitSynthesizedMembers*/ false,
         /*PrintMessages*/ false,
         /*SkipInheritedDocs*/ false,
+        /*IncludeSPISymbols*/ true,
     };
 
     symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
