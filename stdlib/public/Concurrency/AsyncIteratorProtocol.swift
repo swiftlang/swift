@@ -12,7 +12,7 @@
 
 import Swift
 
-/// A type that that asychronously supplies the values of a sequence one at a
+/// A type that asynchronously supplies the values of a sequence one at a
 /// time.
 ///
 /// The `AsyncIteratorProtocol` defines the type returned by the
