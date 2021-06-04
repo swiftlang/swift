@@ -40,6 +40,13 @@ static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
 
 void ASTScopeImpl::checkSourceRangeBeforeAddingChild(ASTScopeImpl *child,
                                                      const ASTContext &ctx) const {
+  // Ignore debugger bindings - they're a special mix of user code and implicit
+  // wrapper code that is too difficult to check for consistency.
+  if (auto d = getDeclIfAny().getPtrOrNull())
+    if (auto *PBD = dyn_cast<PatternBindingDecl>(d))
+      if (PBD->isDebuggerBinding())
+        return;
+  
   auto &sourceMgr = ctx.SourceMgr;
 
   auto range = getCharSourceRangeOfScope(sourceMgr);
