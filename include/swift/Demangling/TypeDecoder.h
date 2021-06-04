@@ -73,6 +73,7 @@ public:
     Flags = Flags.withValueOwnership(ownership);
   }
   void setNoDerivative() { Flags = Flags.withNoDerivative(true); }
+  void setIsolated() { Flags = Flags.withIsolated(true); }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -1411,6 +1412,12 @@ private:
 
         case NodeKind::NoDerivative:
           param.setNoDerivative();
+          node = node->getFirstChild();
+          hasParamFlags = true;
+          break;
+
+        case NodeKind::Isolated:
+          param.setIsolated();
           node = node->getFirstChild();
           hasParamFlags = true;
           break;

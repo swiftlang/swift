@@ -1383,7 +1383,8 @@ namespace {
             .withValueOwnership(flags.getValueOwnership())
             .withVariadic(flags.isVariadic())
             .withAutoClosure(flags.isAutoClosure())
-            .withNoDerivative(flags.isNoDerivative());
+            .withNoDerivative(flags.isNoDerivative())
+            .withIsolated(flags.isIsolated());
       };
 
       bool hasParameterFlags = false;
