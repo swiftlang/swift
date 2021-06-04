@@ -87,23 +87,12 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
 
 bool IsActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  // Protocols are actors if their `Self` type conforms to `Actor`.
+  // Protocols are actors if they inherit from `Actor`.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-    // Simple case: we have the Actor protocol itself.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::Actor))
-      return true;
-
-    auto actorProto = nominal->getASTContext().getProtocol(
-        KnownProtocolKind::Actor);
-    if (!actorProto)
-      return false;
-
-    auto selfType = Type(protocol->getProtocolSelfType());
-    auto genericSig = protocol->getGenericSignature();
-    if (!genericSig)
-      return false;
-
-    return genericSig->requiresProtocol(selfType, actorProto);
+    auto &ctx = protocol->getASTContext();
+    auto *actorProtocol = ctx.getProtocol(KnownProtocolKind::Actor);
+    return (protocol == actorProtocol ||
+            protocol->inheritsFrom(actorProtocol));
   }
 
   // Class declarations are actors if they were declared with "actor".
