@@ -5815,8 +5815,8 @@ private:
 
   /// Prints a tuple of elements, or a lone single element if only one is
   /// present, using the provided printing function.
-  template <typename T, typename PrintFn>
-  void addTupleOf(ArrayRef<T> Elements, llvm::raw_ostream &OS,
+  template <typename Container, typename PrintFn>
+  void addTupleOf(const Container &Elements, llvm::raw_ostream &OS,
                   PrintFn PrintElt) {
     if (Elements.size() == 1) {
       PrintElt(Elements[0]);
@@ -5917,8 +5917,7 @@ private:
       // cont.resume(returning: (res1, res2, ...))
       OS << ContName << tok::period << "resume" << tok::l_paren;
       OS << "returning" << tok::colon << " ";
-      addTupleOf(llvm::makeArrayRef(SuccessParamNames), OS,
-                 [&](auto Ref) { OS << Ref; });
+      addTupleOf(SuccessParamNames, OS, [&](auto Ref) { OS << Ref; });
       OS << tok::r_paren << "\n";
       break;
     }
