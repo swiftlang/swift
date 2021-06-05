@@ -310,7 +310,6 @@ private:
     case Node::Kind::Structure:
     case Node::Kind::OtherNominalType:
     case Node::Kind::TupleElementName:
-    case Node::Kind::Type:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
     case Node::Kind::LabelList:
@@ -320,6 +319,9 @@ private:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
       return true;
+
+    case Node::Kind::Type:
+      return isSimpleType(Node->getChild(0));
 
     case Node::Kind::ProtocolList:
       return Node->getChild(0)->getNumChildren() <= 1;
