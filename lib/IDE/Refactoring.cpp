@@ -6416,9 +6416,10 @@ private:
     }
 
     if (DiagEngine.hadAnyError()) {
-      // Can only fallback when the results are params, in which case only
-      // the names are used (defaulted to the names of the params if none)
-      if (HandlerDesc.Type != HandlerType::PARAMS)
+      // For now, only fallback when the results are params with an error param,
+      // in which case only the names are used (defaulted to the names of the
+      // params if none).
+      if (HandlerDesc.Type != HandlerType::PARAMS || !HandlerDesc.HasError)
         return;
       DiagEngine.resetHadAnyError();
 
@@ -6429,7 +6430,7 @@ private:
       addFallbackVars(CallbackParams, Blocks);
       addDo();
       addAwaitCall(CE, ArgList.ref(), Blocks.SuccessBlock, SuccessParams,
-                   HandlerDesc, /*AddDeclarations=*/!HandlerDesc.HasError);
+                   HandlerDesc, /*AddDeclarations*/ false);
       addFallbackCatch(ErrParam);
       OS << "\n";
       convertNodes(NodesToPrint::inBraceStmt(CallbackBody));
