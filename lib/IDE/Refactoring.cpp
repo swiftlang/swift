@@ -5326,7 +5326,12 @@ private:
       auto CC = classifyCallbackCondition(
           CallbackCondition(ErrParam, &Items[0]), SuccessNodes,
           /*elseStmt*/ nullptr);
-      if (CC && CC->Path == ConditionPath::FAILURE)
+      if (!CC) {
+        DiagEngine.diagnose(CS->getLoc(), diag::unknown_callback_case_item);
+        return;
+      }
+
+      if (CC->Path == ConditionPath::FAILURE)
         std::swap(Block, OtherBlock);
 
       // We'll be dropping the case, but make sure to keep any attached
@@ -5339,8 +5344,7 @@ private:
         Block->addPossibleCommentLoc(SS->getRBraceLoc());
 
       setNodes(Block, OtherBlock, std::move(SuccessNodes));
-      if (CC)
-        Block->addBinding(*CC, DiagEngine);
+      Block->addBinding(*CC, DiagEngine);
       if (DiagEngine.hadAnyError())
         return;
     }
