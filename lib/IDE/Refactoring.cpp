@@ -6140,6 +6140,14 @@ private:
     // TODO: Handle Result.get as well
     if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
       if (auto *D = DRE->getDecl()) {
+        // Look through to the parent var decl if we have one. This ensures we
+        // look at the var in a case stmt's pattern rather than the var that's
+        // implicitly declared in the body.
+        if (auto *VD = dyn_cast<VarDecl>(D)) {
+          if (auto *Parent = VD->getParentVarDecl())
+            D = Parent;
+        }
+
         bool AddPlaceholder = Placeholders.count(D);
         StringRef Name = newNameFor(D, false);
         if (AddPlaceholder || !Name.empty())

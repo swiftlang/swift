@@ -293,7 +293,7 @@ func testPatterns() async throws {
   // MIXED-TUPLE-RESULT-NEXT:   let ((x, y), z) = res
   // MIXED-TUPLE-RESULT-NEXT:   let ((x1, _), z1) = res
   // MIXED-TUPLE-RESULT-NEXT:   print("a", x, y, z)
-  // MIXED-TUPLE-RESULT-NEXT:   print("b", x, z)
+  // MIXED-TUPLE-RESULT-NEXT:   print("b", x1, z1)
   // MIXED-TUPLE-RESULT-NEXT: } catch let err {
   // MIXED-TUPLE-RESULT-NEXT:   print("oh no")
   // MIXED-TUPLE-RESULT-NEXT:   print("oh no again")
