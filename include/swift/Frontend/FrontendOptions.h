@@ -182,12 +182,6 @@ public:
   /// the module.
   bool CheckOnoneSupportCompleteness = false;
 
-  /// If set, dumps wall time taken to check each function body to llvm::errs().
-  bool DebugTimeFunctionBodies = false;
-
-  /// If set, dumps wall time taken to check each expression.
-  bool DebugTimeExpressionTypeChecking = false;
-
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
 
