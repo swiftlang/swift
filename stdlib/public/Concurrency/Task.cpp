@@ -66,7 +66,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
     case Status::Error:
     case Status::Success:
 #if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%p] task %p waiting on task %p, completed immediately\n", pthread_self(), waitingTask, this);
+      fprintf(stderr, "[%lu] task %p waiting on task %p, completed immediately\n",
+              _swift_get_thread_id(), waitingTask, this);
 #endif
       _swift_tsan_acquire(static_cast<Job *>(this));
       // The task is done; we don't need to wait.
@@ -74,7 +75,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
 
     case Status::Executing:
 #if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%p] task %p waiting on task %p, going to sleep\n", pthread_self(), waitingTask, this);
+      fprintf(stderr, "[%lu] task %p waiting on task %p, going to sleep\n",
+              _swift_get_thread_id(), waitingTask, this);
 #endif
       _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is now complete. We'll need to add ourselves to the queue.
@@ -151,7 +153,8 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
 #if SWIFT_TASK_PRINTF_DEBUG
   if (!waitingTask)
-    fprintf(stderr, "[%p] task %p had no waiting tasks\n", pthread_self(), this);
+    fprintf(stderr, "[%lu] task %p had no waiting tasks\n",
+            _swift_get_thread_id(), this);
 #endif
 
   while (waitingTask) {
@@ -160,7 +163,8 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
 #if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] waking task %p from future of task %p\n", pthread_self(), waitingTask, this);
+    fprintf(stderr, "[%lu] waking task %p from future of task %p\n",
+            _swift_get_thread_id(), waitingTask, this);
 #endif
 
     // Fill in the return context.
@@ -210,7 +214,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // here.
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] destroy task %p\n", pthread_self(), task);
+  fprintf(stderr, "[%lu] destroy task %p\n", _swift_get_thread_id(), task);
 #endif
   free(task);
 }
@@ -286,7 +290,7 @@ static void completeTaskImpl(AsyncTask *task,
   task->Private.complete(task);
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] task %p completed\n", pthread_self(), task);
+  fprintf(stderr, "[%lu] task %p completed\n", _swift_get_thread_id(), task);
 #endif
 
   // Complete the future.
@@ -434,7 +438,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     allocation = malloc(amountToAllocate);
   }
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] allocate task %p, parent = %p\n", pthread_self(), allocation, parent);
+  fprintf(stderr, "[%lu] allocate task %p, parent = %p\n",
+          _swift_get_thread_id(), allocation, parent);
 #endif
 
   AsyncContext *initialContext =
@@ -511,7 +516,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   }
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] creating task %p with parent %p\n", pthread_self(), task, parent);
+  fprintf(stderr, "[%lu] creating task %p with parent %p\n",
+          _swift_get_thread_id(), task, parent);
 #endif
 
   // Initialize the task-local allocator.

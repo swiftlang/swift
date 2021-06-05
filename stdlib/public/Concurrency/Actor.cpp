@@ -276,7 +276,8 @@ static ExecutorRef swift_task_getCurrentExecutorImpl() {
   auto result = (currentTracking ? currentTracking->getActiveExecutor()
                                  : ExecutorRef::generic());
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] getting current executor %p\n", pthread_self(), result.getIdentity());
+  fprintf(stderr, "[%lu] getting current executor %p\n",
+          _swift_get_thread_id(), result.getIdentity());
 #endif
   return result;
 }
@@ -1181,7 +1182,8 @@ static Job *preprocessQueue(JobRef first,
 
 void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] giving up thread for actor %p\n", pthread_self(), this);
+  fprintf(stderr, "[%lu] giving up thread for actor %p\n",
+          _swift_get_thread_id(), this);
 #endif
   auto oldState = CurrentState.load(std::memory_order_acquire);
   assert(oldState.Flags.isAnyRunningStatus());
@@ -1245,8 +1247,10 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
     }
     
 #if SWIFT_TASK_PRINTF_DEBUG
-#  define LOG_STATE_TRANSITION fprintf(stderr, "[%p] actor %p transitioned from %zx to %zx (%s)\n", \
-  pthread_self(), this, oldState.Flags.getOpaqueValue(), newState.Flags.getOpaqueValue(), __FUNCTION__)
+#  define LOG_STATE_TRANSITION                                                  \
+    fprintf(stderr, "[%lu] actor %p transitioned from %zx to %zx (%s)\n",       \
+            _swift_get_thread_id(), this, oldState.Flags.getOpaqueValue(),      \
+            newState.Flags.getOpaqueValue(), __FUNCTION__)
 #else
 #  define LOG_STATE_TRANSITION ((void)0)
 #endif
@@ -1503,7 +1507,8 @@ SWIFT_CC(swiftasync)
 static void processDefaultActor(DefaultActorImpl *currentActor,
                                 RunningJobInfo runner) {
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] processDefaultActor %p\n", pthread_self(), currentActor);
+  fprintf(stderr, "[%lu] processDefaultActor %p\n",
+          _swift_get_thread_id(), currentActor);
 #endif
   DefaultActorImpl *actor = currentActor;
 
@@ -1529,7 +1534,8 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
                                                   runner);
 
 #if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] processDefaultActor %p claimed job %p\n", pthread_self(), currentActor, job);
+    fprintf(stderr, "[%lu] processDefaultActor %p claimed job %p\n",
+            _swift_get_thread_id(), currentActor, job);
 #endif
 
     // If we failed to claim a job, we have nothing to do.
@@ -1551,7 +1557,8 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
     auto currentExecutor = trackingInfo.getActiveExecutor();
 
 #if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] processDefaultActor %p current executor now %p\n", pthread_self(), currentActor, currentExecutor.getIdentity());
+    fprintf(stderr, "[%lu] processDefaultActor %p current executor now %p\n",
+            _swift_get_thread_id(), currentActor, currentExecutor.getIdentity());
 #endif
 
     if (!currentExecutor.isDefaultActor()) {
@@ -1872,7 +1879,8 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
   trackingInfo.leave();
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] leaving assumed thread, current executor is %p\n", pthread_self(), executor.getIdentity());
+  fprintf(stderr, "[%lu] leaving assumed thread, current executor is %p\n",
+          _swift_get_thread_id(), executor.getIdentity());
 #endif
 
   if (executor.isDefaultActor())
@@ -1888,7 +1896,9 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
     (trackingInfo ? trackingInfo->getActiveExecutor()
                   : ExecutorRef::generic());
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] trying to switch from executor %p to %p\n", pthread_self(), currentExecutor.getIdentity(), newExecutor.getIdentity());
+  fprintf(stderr, "[%lu] trying to switch from executor %p to %p\n",
+          _swift_get_thread_id(), currentExecutor.getIdentity(),
+          newExecutor.getIdentity());
 #endif
 
   // If the current executor is compatible with running the new executor,
@@ -1916,7 +1926,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
       !shouldYieldThread() &&
       tryAssumeThreadForSwitch(newExecutor, runner)) {
 #if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] switch succeeded, task %p assumed thread for executor %p\n", pthread_self(), task, newExecutor.getIdentity());
+    fprintf(stderr, "[%lu] switch succeeded, task %p assumed thread for executor %p\n",
+            _swift_get_thread_id(), task, newExecutor.getIdentity());
 #endif
     giveUpThreadForSwitch(currentExecutor, runner);
     // 'return' forces tail call
@@ -1926,7 +1937,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   // Otherwise, just asynchronously enqueue the task on the given
   // executor.
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] switch failed, task %p enqueued on executor %p\n", pthread_self(), task, newExecutor.getIdentity());
+  fprintf(stderr, "[%lu] switch failed, task %p enqueued on executor %p\n",
+          _swift_get_thread_id(), task, newExecutor.getIdentity());
 #endif
   swift_task_enqueue(task, newExecutor);
 }
@@ -1946,7 +1958,8 @@ void _swift_task_enqueueOnExecutor(Job *job, HeapObject *executor,
 SWIFT_CC(swift)
 static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] enqueue job %p on executor %p\n", pthread_self(), job, executor.getIdentity());
+  fprintf(stderr, "[%lu] enqueue job %p on executor %p\n",
+          _swift_get_thread_id(), job, executor.getIdentity());
 #endif
 
   assert(job && "no job provided");
