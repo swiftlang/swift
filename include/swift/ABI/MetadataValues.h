@@ -321,19 +321,18 @@ public:
     ReadCoroutine,
   };
 
-private:
   enum : int_type {
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
     IsDynamicMask = 0x20,
-    IsAsyncMask = 0x40,
+    IsAsyncMask = 0x40, // added in Swift 5.5 runtime
+    IsNonoverriddenMask = 0x80, // added in Swift 5.5 runtime
     ExtraDiscriminatorShift = 16,
     ExtraDiscriminatorMask = 0xFFFF0000,
   };
 
   int_type Value;
 
-public:
   MethodDescriptorFlags(Kind kind) : Value(unsigned(kind)) {}
 
   MethodDescriptorFlags withIsInstance(bool isInstance) const {
@@ -364,6 +363,15 @@ public:
     return copy;
   }
 
+  MethodDescriptorFlags withIsNonoverridden(bool isNonoverridden) const {
+    auto copy = *this;
+    if (isNonoverridden)
+      copy.Value |= IsNonoverriddenMask;
+    else
+      copy.Value &= ~IsNonoverriddenMask;
+    return copy;
+  }
+
   MethodDescriptorFlags withExtraDiscriminator(uint16_t value) const {
     auto copy = *this;
     copy.Value = (copy.Value & ~ExtraDiscriminatorMask)
@@ -380,6 +388,12 @@ public:
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+  
+  /// Is the method known to have no overrides?
+  /// This indicates that the implementation reference from this method
+  /// descriptor can be used directly, without looking into the vtable
+  /// of the subclass for a potential override.
+  bool isNonoverridden() const { return Value & IsNonoverriddenMask; }
 
   bool isAsync() const { return Value & IsAsyncMask; }
 

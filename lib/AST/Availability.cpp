@@ -416,7 +416,6 @@ AvailabilityContext ASTContext::getSwift55Availability() {
   return getSwiftFutureAvailability();
 }
 
-
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;
 

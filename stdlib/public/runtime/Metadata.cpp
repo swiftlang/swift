@@ -3300,6 +3300,25 @@ swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
 
   assert(isAncestorOf(metadata, description));
 
+  // If the method descriptor is non-overridden, we can just return the
+  // implementation pointer from the descriptor.
+  if (method->Flags.isNonoverridden()) {
+    auto impl = method->Impl.get();
+#if SWIFT_PTRAUTH
+    if (method->Flags.isAsync()) {
+      return ptrauth_sign_unauthenticated(impl,
+                                          ptrauth_key_process_independent_data,
+                                          method->Flags.getExtraDiscriminator());
+    } else {
+      return ptrauth_sign_unauthenticated(impl,
+                                          ptrauth_key_function_pointer,
+                                          method->Flags.getExtraDiscriminator());
+    }
+#else
+    return impl;
+#endif
+  }
+  
   auto *vtable = description->getVTableDescriptor();
   assert(vtable != nullptr);
 
