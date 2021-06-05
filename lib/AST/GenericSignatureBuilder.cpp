@@ -8738,14 +8738,6 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
     verifyGenericSignature(context, canGenericSig);
   }
 }
-
-bool AbstractGenericSignatureRequest::isCached() const {
-  return true;
-}
-
-bool InferredGenericSignatureRequest::isCached() const {
-  return true;
-}
       
 /// Check whether the inputs to the \c AbstractGenericSignatureRequest are
 /// all canonical.
