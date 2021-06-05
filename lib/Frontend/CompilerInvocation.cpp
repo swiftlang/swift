@@ -686,6 +686,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.TargetVariant = llvm::Triple(A->getValue());
   }
 
+  // Collect -clang-target value if specified in the front-end invocation.
+  // Usually, the driver will pass down a clang target with the
+  // exactly same value as the main target, so we could dignose the usage of
+  // unavailable APIs.
+  // The reason we cannot infer clang target from -target is that not all
+  // front-end invocation will include a -target to start with. For instance,
+  // when compiling a Swift module from a textual interface, -target isn't
+  // necessary because the textual interface hardcoded the proper target triple
+  // to use. Inferring -clang-target there will always give us the default
+  // target triple.
+  if (const Arg *A = Args.getLastArg(OPT_clang_target)) {
+    Opts.ClangTarget = llvm::Triple(A->getValue());
+  }
+
   Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
