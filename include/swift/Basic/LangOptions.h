@@ -90,6 +90,16 @@ namespace swift {
     /// performed.
     llvm::Optional<llvm::Triple> TargetVariant;
 
+    /// The target triple to instantiate the internal clang instance.
+    /// When not specified, the compiler will use the value of -target to
+    /// instantiate the clang instance.
+    /// This is mainly used to avoid lowering the target triple to use for clang when
+    /// importing a .swiftinterface whose -target value may be different from
+    /// the loading module.
+    /// The lowering triple may result in multiple versions of the same Clang
+    /// modules being built.
+    llvm::Optional<llvm::Triple> ClangTarget;
+
     /// The SDK version, if known.
     Optional<llvm::VersionTuple> SDKVersion;
 
