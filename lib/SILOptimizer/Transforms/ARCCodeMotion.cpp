@@ -76,7 +76,6 @@
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
