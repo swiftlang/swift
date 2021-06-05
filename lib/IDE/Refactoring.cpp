@@ -4851,8 +4851,7 @@ public:
     Nodes.addNode(Node);
   }
 
-  void addBinding(const ClassifiedCondition &FromCondition,
-                  DiagnosticEngine &DiagEngine) {
+  void addBinding(const ClassifiedCondition &FromCondition) {
     auto *P = FromCondition.BindPattern;
     if (!P)
       return;
@@ -4866,13 +4865,9 @@ public:
     ParamPatternBindings[FromCondition.Subject].push_back(P);
   }
 
-  void addAllBindings(const ClassifiedCallbackConditions &FromConditions,
-                      DiagnosticEngine &DiagEngine) {
-    for (auto &Entry : FromConditions) {
-      addBinding(Entry.second, DiagEngine);
-      if (DiagEngine.hadAnyError())
-        return;
-    }
+  void addAllBindings(const ClassifiedCallbackConditions &FromConditions) {
+    for (auto &Entry : FromConditions)
+      addBinding(Entry.second);
   }
 };
 
@@ -5309,9 +5304,7 @@ private:
     // comments.
     CurrentBlock->addPossibleCommentLoc(Statement->getStartLoc());
 
-    ThenBlock->addAllBindings(CallbackConditions, DiagEngine);
-    if (DiagEngine.hadAnyError())
-      return;
+    ThenBlock->addAllBindings(CallbackConditions);
 
     // TODO: Handle nested ifs
     setNodes(ThenBlock, ElseBlock, std::move(ThenNodesToPrint));
@@ -5400,9 +5393,7 @@ private:
         Block->addPossibleCommentLoc(SS->getRBraceLoc());
 
       setNodes(Block, OtherBlock, std::move(SuccessNodes));
-      Block->addBinding(*CC, DiagEngine);
-      if (DiagEngine.hadAnyError())
-        return;
+      Block->addBinding(*CC);
     }
     // Mark this switch statement as having been transformed.
     HandledSwitches.insert(SS);
