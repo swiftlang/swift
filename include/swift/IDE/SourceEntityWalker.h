@@ -73,6 +73,9 @@ public:
   /// Walks the provided Expr.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(Expr *E);
+  /// Walks the provided Pattern.
+  /// \returns true if traversal was aborted, false otherwise.
+  bool walk(Pattern *P);
   /// Walks the provided ASTNode.
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTNode N);
@@ -100,6 +103,14 @@ public:
   /// This method is called after visiting the children of an expression. If it
   /// returns false, the remaining traversal is terminated and returns failure.
   virtual bool walkToExprPost(Expr *E) { return true; }
+
+  /// This method is called when first visiting a pattern, before walking
+  /// into its children. If it returns false, the subtree is skipped.
+  virtual bool walkToPatternPre(Pattern *P) { return true; }
+
+  /// This method is called after visiting the children of a pattern. If it
+  /// returns false, the remaining traversal is terminated and returns failure.
+  virtual bool walkToPatternPost(Pattern *P) { return true; }
 
   /// This method is called when a ValueDecl is referenced in source. If it
   /// returns false, the remaining traversal is terminated and returns failure.

@@ -5474,10 +5474,10 @@ private:
     return shouldWalkInto(S->getSourceRange());
   }
 
-  std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) {
+  bool walkToPatternPre(Pattern *P) override {
     if (P == Target.dyn_cast<Pattern *>())
       AfterTarget = true;
-    return { shouldWalkInto(P->getSourceRange()), P };
+    return shouldWalkInto(P->getSourceRange());
   }
 
   bool shouldWalkInto(SourceRange Range) {
