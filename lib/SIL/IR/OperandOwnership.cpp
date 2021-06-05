@@ -431,6 +431,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   case SILArgumentConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for non-address types");
   }
+  llvm_unreachable("covered switch");
 }
 
 OperandOwnership
@@ -511,6 +512,7 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   case OwnershipKind::Owned:
     return OperandOwnership::ForwardingConsume;
   }
+  llvm_unreachable("covered switch");
 }
 
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {

@@ -228,6 +228,7 @@ namespace irgen {
           // future.
           return false;
         }
+        llvm_unreachable("covered switch");
       }
 
       friend bool operator==(Kind lhs, Kind rhs) {

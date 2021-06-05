@@ -2695,6 +2695,7 @@ static AccessKind mapAccessKind(SGFAccessKind accessKind) {
   case SGFAccessKind::ReadWrite:
     return AccessKind::ReadWrite;
   }
+  llvm_unreachable("covered switch");
 }
 
 void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,

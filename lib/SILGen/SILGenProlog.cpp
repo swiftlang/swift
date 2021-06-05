@@ -666,6 +666,7 @@ Optional<SILValue> SILGenFunction::emitExecutor(
   case ActorIsolation::GlobalActorUnsafe:
     return emitLoadGlobalActorExecutor(isolation.getGlobalActor());
   }
+  llvm_unreachable("covered switch");
 }
 
 void SILGenFunction::emitPreconditionCheckExpectedExecutor(

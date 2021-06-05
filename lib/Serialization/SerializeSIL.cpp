@@ -108,6 +108,7 @@ toStableDifferentiabilityKind(swift::DifferentiabilityKind kind) {
   case swift::DifferentiabilityKind::Linear:
     return (unsigned)serialization::DifferentiabilityKind::Linear;
   }
+  llvm_unreachable("covered switch");
 }
 
 namespace {

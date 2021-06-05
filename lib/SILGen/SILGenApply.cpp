@@ -1927,6 +1927,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   case MagicIdentifierLiteralExpr::DSOHandle:
     llvm_unreachable("handled elsewhere");
   }
+  llvm_unreachable("covered switch");
 }
 
 static inline PreparedArguments buildBuiltinLiteralArgs(SILGenFunction &SGF,

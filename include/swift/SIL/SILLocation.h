@@ -207,6 +207,7 @@ private:
     case FilenameAndLocationKind:
       llvm_unreachable("location type has no AST node");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Returns true if the location has a separate AST node for debugging.
@@ -300,6 +301,7 @@ public:
     case FilenameAndLocationKind: return storage.filePositionLoc == nullptr;;
     case SourceLocKind:           return storage.sourceLoc.isInvalid();
     }
+    llvm_unreachable("covered switch");
   }
   explicit operator bool() const { return !isNull(); }
 
@@ -313,6 +315,7 @@ public:
     case FilenameAndLocationKind:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Returns true if this location came from a SIL file.

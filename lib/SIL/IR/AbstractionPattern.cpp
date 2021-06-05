@@ -661,6 +661,7 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
   case Kind::ObjCCompletionHandlerArgumentsType:
     swift_unreachable("not appropriate for this kind");
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractionPattern
