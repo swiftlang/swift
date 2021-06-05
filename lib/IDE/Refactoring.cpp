@@ -5487,18 +5487,20 @@ private:
 };
 
 /// Similar to the \c ReferenceCollector but collects references in all scopes
-/// without any starting point in each scope.
+/// without any starting point in each scope. In addition, it tracks the number
+/// of references to a decl in a given scope.
 class ScopedDeclCollector : private SourceEntityWalker {
 public:
   using DeclsTy = llvm::DenseSet<const Decl *>;
+  using RefDeclsTy = llvm::DenseMap<const Decl *, /*numRefs*/ unsigned>;
 
 private:
-  using ScopedDeclsTy = llvm::DenseMap<const Stmt *, DeclsTy>;
+  using ScopedDeclsTy = llvm::DenseMap<const Stmt *, RefDeclsTy>;
 
   struct Scope {
     DeclsTy DeclaredDecls;
-    DeclsTy *ReferencedDecls;
-    Scope(DeclsTy *ReferencedDecls) : DeclaredDecls(),
+    RefDeclsTy *ReferencedDecls;
+    Scope(RefDeclsTy *ReferencedDecls) : DeclaredDecls(),
         ReferencedDecls(ReferencedDecls) {}
   };
 
@@ -5514,7 +5516,7 @@ public:
     walk(Node);
   }
 
-  DeclsTy *getReferencedDecls(Stmt *Scope) {
+  const RefDeclsTy *getReferencedDecls(Stmt *Scope) const {
     auto Res = ReferencedDecls.find(Scope);
     if (Res == ReferencedDecls.end())
       return nullptr;
@@ -5528,7 +5530,7 @@ private:
 
     ScopeStack.back().DeclaredDecls.insert(D);
     if (isa<DeclContext>(D))
-      ScopeStack.back().ReferencedDecls->insert(D);
+      (*ScopeStack.back().ReferencedDecls)[D] += 1;
     return true;
   }
 
@@ -5539,8 +5541,10 @@ private:
     if (!E->isImplicit()) {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
         if (auto *D = DRE->getDecl()) {
+          // If we have a reference that isn't declared in the same scope,
+          // increment the number of references to that decl.
           if (!D->isImplicit() && !ScopeStack.back().DeclaredDecls.count(D))
-            ScopeStack.back().ReferencedDecls->insert(D);
+            (*ScopeStack.back().ReferencedDecls)[D] += 1;
         }
       }
     }
@@ -5563,9 +5567,10 @@ private:
         // Add any referenced decls to the parent scope that weren't declared
         // there.
         auto &ParentStack = ScopeStack[NumScopes - 2];
-        for (auto *D : *ScopeStack.back().ReferencedDecls) {
+        for (auto DeclAndNumRefs : *ScopeStack.back().ReferencedDecls) {
+          auto *D = DeclAndNumRefs.first;
           if (!ParentStack.DeclaredDecls.count(D))
-            ParentStack.ReferencedDecls->insert(D);
+            (*ParentStack.ReferencedDecls)[D] += DeclAndNumRefs.second;
         }
       }
       ScopeStack.pop_back();
@@ -6119,7 +6124,10 @@ private:
       // The body of those statements will include the decls if they've been
       // referenced, so shadowing is still avoided there.
       if (auto *ReferencedDecls = ScopedDecls.getReferencedDecls(S)) {
-        addNewScope(*ReferencedDecls);
+        llvm::DenseSet<const Decl *> Decls;
+        for (auto DeclAndNumRefs : *ReferencedDecls)
+          Decls.insert(DeclAndNumRefs.first);
+        addNewScope(Decls);
       } else {
         addNewScope({});
       }
@@ -6740,8 +6748,8 @@ private:
 
   void addNewScope(const llvm::DenseSet<const Decl *> &Decls) {
     ScopedNames.push_back({});
-    for (auto *D : Decls) {
-      auto Name = getDeclName(D);
+    for (auto DeclAndNumRefs : Decls) {
+      auto Name = getDeclName(DeclAndNumRefs);
       if (!Name.empty())
         ScopedNames.back().insert(Name);
     }
