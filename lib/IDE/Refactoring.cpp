@@ -4988,6 +4988,11 @@ private:
     if (!Cond.isValid())
       return None;
 
+    // If the condition involves a refutable pattern, we can't currently handle
+    // it.
+    if (Cond.BindPattern && Cond.BindPattern->isRefutablePattern())
+      return None;
+
     // For certain types of condition, they need to appear in certain lists.
     auto CondType = *Cond.Type;
     switch (CondType) {
