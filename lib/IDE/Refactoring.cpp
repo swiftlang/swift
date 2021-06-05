@@ -4534,6 +4534,9 @@ struct CallbackCondition {
   ///   - `case .failure(let bind) = <Subject>`
   ///   - `let bind = try? <Subject>.get()`
   CallbackCondition(const Pattern *P, const Expr *Init) {
+    Init = Init->getSemanticsProvidingExpr();
+    P = P->getSemanticsProvidingPattern();
+
     if (auto *DRE = dyn_cast<DeclRefExpr>(Init)) {
       if (auto *OSP = dyn_cast<OptionalSomePattern>(P)) {
         // `let bind = <Subject>`

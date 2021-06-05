@@ -372,10 +372,14 @@ withError { res, err in
   if let str2 = res {
     print("got result \(str2)")
   }
+  if case (let str3?) = (res) {
+    print("got result \(str3)")
+  }
   print("after")
 }
 // MULTIBIND: let str = try await withError()
 // MULTIBIND-NEXT: print("before")
+// MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("after")
