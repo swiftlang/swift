@@ -217,30 +217,10 @@ macro(swift_common_standalone_build_config_clang product)
 endmacro()
 
 macro(swift_common_standalone_build_config_cmark product)
-  set(${product}_PATH_TO_CMARK_SOURCE "${${product}_PATH_TO_CMARK_SOURCE}"
-    CACHE PATH "Path to CMark source code.")
-  set(${product}_PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-    CACHE PATH "Path to the directory where CMark was built.")
-  set(${product}_CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}" CACHE PATH
-    "Path to the directory where CMark was installed.")
-  get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-    ABSOLUTE)
-  get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
-    ABSOLUTE)
-  get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
-    ABSOLUTE)
-
-  set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
-  set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
-
-  file(TO_CMAKE_PATH "${CMARK_MAIN_INCLUDE_DIR}" CMARK_MAIN_INCLUDE_DIR)
-  file(TO_CMAKE_PATH "${CMARK_BUILD_INCLUDE_DIR}" CMARK_BUILD_INCLUDE_DIR)
-
-  include_directories("${CMARK_MAIN_INCLUDE_DIR}"
-                      "${CMARK_BUILD_INCLUDE_DIR}")
-
-  include(${PATH_TO_CMARK_BUILD}/src/cmarkTargets.cmake)
-  add_definitions(-DCMARK_STATIC_DEFINE)
+  find_package(cmark CONFIG)
+  if(NOT cmark_FOUND)
+    find_package(cmark REQUIRED)
+  endif()
 endmacro()
 
 # Common cmake project config for standalone builds.
@@ -275,29 +255,8 @@ macro(swift_common_unified_build_config product)
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 
-  # If cmark was checked out into tools/cmark, expect to build it as
-  # part of the unified build.
-  if(EXISTS "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
-    set(${product}_PATH_TO_CMARK_SOURCE "${LLVM_EXTERNAL_CMARK_SOURCE_DIR}")
-    set(${product}_PATH_TO_CMARK_BUILD "${CMAKE_BINARY_DIR}/tools/cmark")
-    set(${product}_CMARK_LIBRARY_DIR "${CMAKE_BINARY_DIR}/lib")
-
-    get_filename_component(CMARK_MAIN_SRC_DIR "${${product}_PATH_TO_CMARK_SOURCE}"
-      ABSOLUTE)
-    get_filename_component(PATH_TO_CMARK_BUILD "${${product}_PATH_TO_CMARK_BUILD}"
-      ABSOLUTE)
-    get_filename_component(CMARK_LIBRARY_DIR "${${product}_CMARK_LIBRARY_DIR}"
-      ABSOLUTE)
-
-    set(CMARK_BUILD_INCLUDE_DIR "${PATH_TO_CMARK_BUILD}/src")
-    set(CMARK_MAIN_INCLUDE_DIR "${CMARK_MAIN_SRC_DIR}/src")
-  endif()
-
-  include_directories(
-      "${CLANG_BUILD_INCLUDE_DIR}"
-      "${CLANG_MAIN_INCLUDE_DIR}"
-      "${CMARK_MAIN_INCLUDE_DIR}"
-      "${CMARK_BUILD_INCLUDE_DIR}")
+  include_directories(${CLANG_BUILD_INCLUDE_DIR}
+    ${CLANG_MAIN_INCLUDE_DIR})
 
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
 

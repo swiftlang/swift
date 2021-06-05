@@ -24,6 +24,8 @@ add_sourcekit_library(SourceKitSwiftLang
       objcarcopts
       profiledata
 )
+target_compile_definitions(SourceKitSwiftLang PRIVATE
+  CMARK_STATIC_DEFINE)
 target_link_libraries(SourceKitSwiftLang PRIVATE
   SourceKitCore
   swiftDriver

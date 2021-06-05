@@ -250,8 +250,7 @@ cmake^
     -DCMAKE_MT=mt^
     -DCMAKE_INSTALL_PREFIX:PATH=%install_directory%^
     -DClang_DIR:PATH=%build_root%\llvm\lib\cmake\clang^
-    -DSWIFT_PATH_TO_CMARK_BUILD:PATH=%build_root%\cmark^
-    -DSWIFT_PATH_TO_CMARK_SOURCE:PATH=%source_root%\cmark^
+    -Dcmark_DIR:PATH=%build_root%\cmark\src^
     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH=%source_root%\swift-corelibs-libdispatch^
     -DLLVM_DIR:PATH=%build_root%\llvm\lib\cmake\llvm^
     -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON^

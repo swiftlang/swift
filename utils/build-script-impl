@@ -1971,8 +1971,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
-                    -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
-                    -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
+                    -Dcmark_DIR:PATH=$(build_directory ${host} cmark)/src
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD:PATH="$(build_directory ${host} libdispatch_static)"
