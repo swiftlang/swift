@@ -27,6 +27,16 @@
 
 #include "../runtime/StackAllocator.h"
 
+#if HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRA_LEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 namespace swift {
 
 // Uncomment to enable helpful debug spew to stderr
