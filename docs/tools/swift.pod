@@ -20,7 +20,7 @@ To execute a Swift program:
 
 =over
 
-B<swift> program.swift -- <arguments>
+B<swift> program.swift <arguments>
 
 =back
 
