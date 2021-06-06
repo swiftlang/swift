@@ -156,6 +156,7 @@ StringRef OwnershipKind::asString() const {
   case OwnershipKind::None:
     return "none";
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -389,6 +390,7 @@ StringRef OperandOwnership::asString() const {
   case OperandOwnership::Reborrow:
     return "reborrow";
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,

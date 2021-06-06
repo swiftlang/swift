@@ -2950,6 +2950,7 @@ namespace {
                                  swift::irgen::ConstantReference::Direct);
       }
       }
+      llvm_unreachable("covered switch");
     }
 
     void addValueWitnessTable() {
@@ -3008,6 +3009,7 @@ namespace {
       case ClassMetadataStrategy::Fixed:
         return false;
       }
+      llvm_unreachable("covered switch");
     }
 
     void addSuperclass() {

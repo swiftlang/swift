@@ -391,6 +391,7 @@ llvm::StringRef swift::getFeatureName(Feature feature) {
   case Feature::FeatureName: return #FeatureName;
 #include "swift/Basic/Features.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
@@ -405,4 +406,5 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   case AccessNoteDiagnosticBehavior::ErrorOnFailureRemarkOnSuccess:
     return DiagnosticBehavior::Error;
   }
+  llvm_unreachable("covered switch");
 }

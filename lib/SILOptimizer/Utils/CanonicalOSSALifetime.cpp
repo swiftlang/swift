@@ -666,6 +666,7 @@ endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
     return domInfo->properlyDominates(beginAccess->getParent(),
                                       getCurrentDef()->getParentBlock());
   }
+  llvm_unreachable("covered switch");
 }
 
 // Find all overlapping access scopes and extend pruned liveness to cover them:
@@ -1208,6 +1209,7 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
     consumes.clear();
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//

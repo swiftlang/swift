@@ -616,6 +616,7 @@ SemanticFunctionLevel swift::getSemanticFunctionLevel(SILFunction *function) {
     return SemanticFunctionLevel::Transient;
 
   } // end switch
+  llvm_unreachable("covered switch");
 }
 
 /// Return true if \p apply calls into an optimizable semantic function from
