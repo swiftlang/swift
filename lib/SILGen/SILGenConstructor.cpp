@@ -1036,6 +1036,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
 #include "swift/AST/PatternNodes.def"
     llvm_unreachable("Refutable pattern in stored property pattern binding");
   }
+  llvm_unreachable("covered switch");
 }
 
 static std::pair<AbstractionPattern, CanType>

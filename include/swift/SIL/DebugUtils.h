@@ -290,6 +290,7 @@ struct DebugVarCarryingInst {
     case Kind::AllocBox:
       return cast<AllocBoxInst>(inst)->getDecl();
     }
+    llvm_unreachable("covered switch");
   }
 
   Optional<SILDebugVariable> getVarInfo() const {
@@ -305,6 +306,7 @@ struct DebugVarCarryingInst {
     case Kind::AllocBox:
       return cast<AllocBoxInst>(inst)->getVarInfo();
     }
+    llvm_unreachable("covered switch");
   }
 };
 

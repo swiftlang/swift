@@ -447,6 +447,7 @@ BorrowedValue BorrowingOperand::getBorrowIntroducingUserResult() {
     return BorrowedValue(bi->getDestBB()->getArgument(op->getOperandNumber()));
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 void BorrowingOperand::getImplicitUses(
