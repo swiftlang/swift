@@ -1732,7 +1732,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   }
 
   if (f->getLoweredFunctionType()->isAsync()) {
-    setupAsync(Signature::forAsyncEntry(IGM, f->getLoweredFunctionType())
+    setupAsync(Signature::forAsyncEntry(IGM, f->getLoweredFunctionType(),
+                                        /*useSpecialConvention*/ false)
                    .getAsyncContextIndex());
   }
 }
@@ -1951,10 +1952,11 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
 
   if (funcTy->isAsync()) {
-    emitAsyncFunctionEntry(
-        IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
-        LinkEntity::forSILFunction(IGF.CurSILFn),
-        Signature::forAsyncEntry(IGF.IGM, funcTy).getAsyncContextIndex());
+    emitAsyncFunctionEntry(IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
+                           LinkEntity::forSILFunction(IGF.CurSILFn),
+                           Signature::forAsyncEntry(
+                               IGF.IGM, funcTy, /*useSpecialConvention*/ false)
+                               .getAsyncContextIndex());
     if (IGF.CurSILFn->isDynamicallyReplaceable()) {
       IGF.IGM.createReplaceableProlog(IGF, IGF.CurSILFn);
       // Remap the entry block.
@@ -2503,7 +2505,7 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   setLoweredFunctionPointer(i, FunctionPointer(fnType, diffWitness, signature));
 }
 
-static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
+FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
   using SpecialKind = FunctionPointer::SpecialKind;
 
   // Check for some special cases, which are currently all async:
@@ -2530,9 +2532,9 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
   auto fnType = fn->getLoweredFunctionType();
 
-  auto fpKind = classifyFunctionPointerKind(fn);
+  auto fpKind = irgen::classifyFunctionPointerKind(fn);
 
-  auto sig = IGM.getSignature(fnType, fpKind.suppressGenerics());
+  auto sig = IGM.getSignature(fnType, fpKind.useSpecialConvention());
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
@@ -3072,11 +3074,15 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Pass the generic arguments.
-  if (hasPolymorphicParameters(origCalleeType) &&
-      !emission->getCallee().getFunctionPointer().suppressGenerics()) {
+  auto useSpecialConvention =
+      emission->getCallee().getFunctionPointer().useSpecialConvention();
+  if (hasPolymorphicParameters(origCalleeType) && !useSpecialConvention) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
+  } else if (useSpecialConvention) {
+    llArgs.add(emission->getResumeFunctionPointer());
+    llArgs.add(emission->getAsyncContext());
   }
 
   // Add all those arguments.
