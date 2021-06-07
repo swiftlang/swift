@@ -88,7 +88,6 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
     return true;
   }
   switch (user->getKind()) {
-
   // Known reads...
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::SelectEnumAddrInst:
@@ -100,6 +99,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
+  case SILInstructionKind::ValueMetatypeInst:
     return true;
 
   // Known writes...
