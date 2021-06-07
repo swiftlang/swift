@@ -167,3 +167,25 @@ function(add_overlay_targets_single overlay)
 
   add_dependencies(sdk-overlay ${xcode_overlay_target_name})
 endfunction()
+
+function(add_overlay_dependencies_to target)
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs "OVERLAYS" "TARGET_SDKS")
+
+  cmake_parse_arguments(AODT "${options}" "${oneValueArgs}"
+                                "${multiValueArgs}" ${ARGN} )
+
+  foreach(sdk ${AODT_TARGET_SDKS})
+    set(sdk_name ${SWIFT_SDK_${sdk}_LIB_SUBDIR})
+    foreach(overlay ${AODT_OVERLAYS})
+      # We added this check so not to force the user to explicitly
+      # check if the overlays are built or not 
+      if(TARGET ${overlay}Overlay-${sdk})
+        add_dependencies(${target}-${sdk} ${overlay}Overlay-${sdk})
+      else()
+        message(WARNING "${overlay}Overlay-${sdk} does not exist, assuming that's on purpose and not adding as dependencies for ${target}-${sdk}")
+      endif()
+    endforeach()
+  endforeach()
+endfunction()

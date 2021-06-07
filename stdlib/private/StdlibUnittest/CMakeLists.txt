@@ -59,3 +59,8 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   LINK_LIBRARIES ${swift_stdlib_unittest_link_libraries})
 set_source_files_properties(InspectValue.cpp PROPERTIES COMPILE_FLAGS -std=c++14)
 
+if(SWIFT_FOUNDATION_OVERLAYS_BUILD_FROM_SOURCE)
+    include(OverlayXcodeExternalProject)
+
+    add_overlay_dependencies(swiftStdlibUnittest FoundationOverlay)
+endif()
