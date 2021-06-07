@@ -27,10 +27,34 @@
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
 
+#if HAVE_PTHREAD_H
+#include <pthread.h>
+#endif
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRA_LEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
 namespace swift {
 
 // Uncomment to enable helpful debug spew to stderr
 //#define SWIFT_TASK_PRINTF_DEBUG 1
+
+#if defined(_WIN32)
+using ThreadID = decltype(GetCurrentThreadId());
+#else
+using ThreadID = decltype(pthread_self());
+#endif
+
+inline ThreadID _swift_get_thread_id() {
+#if defined(_WIN32)
+  return GetCurrentThreadId();
+#else
+  return pthread_self();
+#endif
+}
 
 class AsyncTask;
 class TaskGroup;

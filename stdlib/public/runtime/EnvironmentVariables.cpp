@@ -122,8 +122,18 @@ OnceToken_t swift::runtime::environment::initializeToken;
 extern "C" char **environ;
 #define ENVIRON environ
 #elif defined(_WIN32)
+// `_environ` is DLL-imported unless we are linking against the static C runtime
+// (via `/MT` or `/MTd`).
+#if defined(_DLL)
+extern "C" __declspec(dllimport) char **_environ;
+#else
 extern "C" char **_environ;
+#endif
+// `_environ` is unavailable in the Windows Runtime environment.
+// https://docs.microsoft.com/en-us/cpp/c-runtime-library/environ-wenviron?view=msvc-160
+#if !defined(_WINRT_DLL)
 #define ENVIRON _environ
+#endif
 #endif
 
 #ifdef ENVIRON
