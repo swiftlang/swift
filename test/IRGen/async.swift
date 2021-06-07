@@ -13,15 +13,18 @@ public func h(_: @Sendable (Int) -> Int) { }
 
 public class SomeClass {}
 
-@_silgen_name("swift_task_future_wait")
-public func task_future_wait(_ task: __owned SomeClass) async throws -> Int
+//@_silgen_name("swift_task_future_wait")
+//public func task_future_wait(_ task: __owned SomeClass) async throws -> Int
+
+@_silgen_name("swift_task_future_wait_throwing")
+public func _taskFutureGetThrowing<T>(_ task: SomeClass) async throws -> T
 
 // CHECK: define{{.*}} swift{{(tail)?}}cc void @"$s5async8testThisyyAA9SomeClassCnYaF"(%swift.context* swiftasync %0{{.*}}
-// CHECK-64: call swiftcc i8* @swift_task_alloc(i64 48)
-// CHECK: {{(must)?}}tail call swift{{(tail)?}}cc void @swift_task_future_wait(
+// CHECK-NOT: @swift_task_alloc
+// CHECK: {{(must)?}}tail call swift{{(tail)?}}cc void @swift_task_future_wait_throwing(%swift.opaque* {{.*}}, %swift.context* {{.*}}, %T5async9SomeClassC* {{.*}}, i8* {{.*}}, %swift.context* {{.*}})
 public func testThis(_ task: __owned SomeClass) async {
   do {
-    let _ = try await task_future_wait(task)
+    let _ : Int = try await _taskFutureGetThrowing(task)
   } catch _ {
     print("error")
   }

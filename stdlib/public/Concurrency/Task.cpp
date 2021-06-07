@@ -366,7 +366,16 @@ SWIFT_CC(swiftasync)
 static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
-  return context->asyncResumeEntryPoint(_context, context->errorResult);
+  auto resumeWithError =
+      reinterpret_cast<AsyncVoidClosureEntryPoint *>(context->ResumeParent);
+  return resumeWithError(context->Parent, context->errorResult);
+}
+
+SWIFT_CC(swiftasync)
+static void
+task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+
+  return _context->ResumeParent(_context->Parent);
 }
 
 /// All `swift_task_create*` variants funnel into this common implementation.
@@ -667,17 +676,21 @@ swift::swift_task_create_group_future(
 }
 
 SWIFT_CC(swiftasync)
-static void swift_task_future_waitImpl(OpaqueValue *result,
-                                       SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
-                                       AsyncTask *task, Metadata *T) {
+static void swift_task_future_waitImpl(
+  OpaqueValue *result,
+  SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+  AsyncTask *task,
+  TaskContinuationFunction *resumeFn,
+  AsyncContext *callContext) {
   // Suspend the waiting task.
   auto waitingTask = swift_task_getCurrent();
-  waitingTask->ResumeTask = rawContext->ResumeParent;
-  waitingTask->ResumeContext = rawContext;
+  waitingTask->ResumeTask = task_future_wait_resume_adapter;
+  waitingTask->ResumeContext = callContext;
 
   // Stash the result pointer for when we resume later.
-  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
-  context->asyncResumeEntryPoint = nullptr;
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(callContext);
+  context->ResumeParent = resumeFn;
+  context->Parent = callerContext;
   context->successResultPointer = result;
   context->errorResult = nullptr;
 
@@ -702,20 +715,21 @@ static void swift_task_future_waitImpl(OpaqueValue *result,
 
 SWIFT_CC(swiftasync)
 void swift_task_future_wait_throwingImpl(
-    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
-    AsyncTask *task, Metadata *T) {
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    AsyncTask *task,
+    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    AsyncContext *callContext) {
   auto waitingTask = swift_task_getCurrent();
   // Suspend the waiting task.
-  auto originalResumeParent =
-      reinterpret_cast<AsyncVoidClosureResumeEntryPoint *>(
-          rawContext->ResumeParent);
   waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
-  waitingTask->ResumeContext = rawContext;
+  waitingTask->ResumeContext = callContext;
 
   // Stash the result pointer for when we resume later.
-  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(callContext);
+  context->ResumeParent =
+      reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+  context->Parent = callerContext;
   context->successResultPointer = result;
-  context->asyncResumeEntryPoint = originalResumeParent;
   context->errorResult = nullptr;
 
   // Wait on the future.

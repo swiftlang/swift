@@ -75,7 +75,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 ) async -> GroupResult {
   #if compiler(>=5.5) && $BuiltinTaskGroup
 
-  let _group = Builtin.createTaskGroup()
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
   var group = TaskGroup<ChildTaskResult>(group: _group)
 
   // Run the withTaskGroup body.
@@ -169,7 +169,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 ) async rethrows -> GroupResult {
   #if compiler(>=5.5) && $BuiltinTaskGroup
 
-  let _group = Builtin.createTaskGroup()
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
   var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
 
   do {

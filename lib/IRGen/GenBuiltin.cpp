@@ -250,7 +250,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
-    out.add(emitCreateTaskGroup(IGF));
+    // Claim metadata pointer.
+    (void)args.claimAll();
+    out.add(emitCreateTaskGroup(IGF, substitutions));
     return;
   }
 

@@ -1393,7 +1393,7 @@ public:
   void finishEmitAfterTopLevel();
 
   Signature getSignature(CanSILFunctionType fnType,
-                         bool suppressGenerics = false);
+                         bool useSpecialConvention = false);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
