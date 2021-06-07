@@ -197,6 +197,13 @@ void ConstraintGraphNode::notifyReferencingVars() const {
   }
 }
 
+void ConstraintGraphNode::notifyReferencedVars(
+    llvm::function_ref<void(ConstraintGraphNode &)> notification) {
+  for (auto *fixedBinding : getReferencedVars()) {
+    notification(CG[fixedBinding]);
+  }
+}
+
 void ConstraintGraphNode::addToEquivalenceClass(
        ArrayRef<TypeVariableType *> typeVars) {
   assert(forRepresentativeVar() &&
@@ -304,10 +311,10 @@ void ConstraintGraphNode::introduceToInference(Constraint *constraint,
   if (!notifyReferencedVars || !isUsefulForReferencedVars(constraint))
     return;
 
-  for (auto *fixedBinding : getReferencedVars()) {
-    CG[fixedBinding].introduceToInference(constraint,
-                                          /*notifyReferencedVars=*/false);
-  }
+  this->notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+    referencedVar.introduceToInference(constraint,
+                                       /*notifyReferencedVars=*/false);
+  });
 }
 
 void ConstraintGraphNode::retractFromInference(Constraint *constraint,
@@ -325,10 +332,10 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint,
   if (!notifyReferencedVars || !isUsefulForReferencedVars(constraint))
     return;
 
-  for (auto *fixedBinding : getReferencedVars()) {
-    CG[fixedBinding].retractFromInference(constraint,
-                                          /*notifyReferencedVars=*/false);
-  }
+  this->notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
+    referencedVar.retractFromInference(constraint,
+                                       /*notifyReferencedVars=*/false);
+  });
 }
 
 void ConstraintGraphNode::reintroduceToInference(Constraint *constraint,

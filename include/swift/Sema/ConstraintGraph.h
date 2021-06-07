@@ -166,6 +166,10 @@ private:
   /// or equivalence class changes.
   void notifyReferencingVars() const;
 
+  /// Notify all of the type variables referenced by this one about a change.
+  void notifyReferencedVars(
+      llvm::function_ref<void(ConstraintGraphNode &)> notification);
+
   /// }
 
   /// The constraint graph this node belongs to.
