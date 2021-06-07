@@ -3812,6 +3812,12 @@ public:
   /// Whether the class was explicitly declared with the `actor` keyword.
   bool isExplicitActor() const { return Bits.ClassDecl.IsActor; }
 
+  /// Whether the class was explicitly declared with the `distributed actor` keywords.
+  bool isExplicitDistributedActor() const {
+    return isExplicitActor() &&
+           getAttrs().hasAttribute<DistributedActorAttr>();
+  }
+
   /// Get the closest-to-root superclass that's an actor class.
   const ClassDecl *getRootActorClass() const;
 
