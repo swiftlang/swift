@@ -409,8 +409,7 @@ public:
   OptionalStorage(OptionalStorage &&other) = default;
 
   template <class... ArgTypes>
-  explicit OptionalStorage(llvm::optional_detail::in_place_t,
-                           ArgTypes &&...Args)
+  explicit OptionalStorage(llvm::in_place_t, ArgTypes &&...Args)
       : Storage(std::forward<ArgTypes>(Args)...) {}
 
   void reset() { Storage = SyntaxDataRef(AbsoluteRawSyntax(nullptr), nullptr); }
