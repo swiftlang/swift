@@ -1086,6 +1086,10 @@ def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Separately set the target we should use for internal Clang instance">;
 
+def disable_clang_target : Separate<["-"], "disable-clang-target">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Disable a separately specified target triple for Clang instance to use">;
+
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
