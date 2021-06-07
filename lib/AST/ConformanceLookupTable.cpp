@@ -529,6 +529,18 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
                                    ConformanceEntry *lhs,
                                    ConformanceEntry *rhs,
                                    bool &diagnoseSuperseded) {
+  // If only one of the conformances is unconditionally available on the
+  // current deployment target, pick that one.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
+      rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
+    return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
+            ? Ordering::Before
+            : Ordering::After);
+  }
+
   // If one entry is fixed and the other is not, we have our answer.
   if (lhs->isFixed() != rhs->isFixed()) {
     // If the non-fixed conformance is not replaceable, we have a failure to
