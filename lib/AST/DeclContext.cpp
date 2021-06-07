@@ -1305,3 +1305,22 @@ static bool isSpecializeExtensionContext(const DeclContext *dc) {
 bool DeclContext::isInSpecializeExtensionContext() const {
    return isSpecializeExtensionContext(this);
 }
+
+bool DeclContext::isAlwaysAvailableConformanceContext() const {
+  auto *ext = dyn_cast<ExtensionDecl>(this);
+  if (ext == nullptr)
+    return true;
+
+  if (AvailableAttr::isUnavailable(ext))
+    return false;
+
+  auto &ctx = getASTContext();
+
+  AvailabilityContext conformanceAvailability{
+      AvailabilityInference::availableRange(ext, ctx)};
+
+  auto deploymentTarget =
+      AvailabilityContext::forDeploymentTarget(ctx);
+
+  return deploymentTarget.isContainedIn(conformanceAvailability);
+}
