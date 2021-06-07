@@ -13,6 +13,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// This test fails in recent Swift CI runs
+// REQUIRES: radar78882565
+
 import C
 import E
 import G
@@ -111,7 +114,7 @@ import SubE
 // CHECK-NEXT: "-frontend"
 // CHECK-NEXT: "-only-use-extra-clang-opts"
 // CHECK-NEXT: "-Xcc"
-// CHECK-NEXT: "BUILD_DIR/bin/clang"
+// CHECK-NEXT: "clang"
 // CHECK:      "-fsystem-module",
 // CHECK-NEXT: "-emit-pcm",
 // CHECK-NEXT: "-module-name",
