@@ -33,32 +33,20 @@ using namespace swift;
 
 bool IsDistributedActorRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  // Protocols are actors if their `Self` type conforms to `DistributedActor`.
+  // Protocols are actors if they inherit from `DistributedActor`.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
-    // Simple case: we have the `DistributedActor` protocol itself.
-    if (protocol->isSpecificProtocol(KnownProtocolKind::DistributedActor))
-      return true;
-
-    auto actorProto = nominal->getASTContext().getProtocol(
-        KnownProtocolKind::DistributedActor);
-    if (!actorProto)
-      return false;
-
-    auto selfType = Type(protocol->getProtocolSelfType());
-    auto genericSig = protocol->getGenericSignature();
-    if (!genericSig)
-      return false;
-
-    return genericSig->requiresProtocol(selfType, actorProto);
+    auto &ctx = protocol->getASTContext();
+    auto *distributedActorProtocol = ctx.getProtocol(KnownProtocolKind::DistributedActor);
+    return (protocol == distributedActorProtocol ||
+            protocol->inheritsFrom(distributedActorProtocol));
   }
 
   // Class declarations are 'distributed actors' if they are declared with 'distributed actor'
-  if(!dyn_cast<ClassDecl>(nominal))
+  auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if(!classDecl)
     return false;
 
-  auto distributedAttr = nominal->getAttrs()
-      .getAttribute<DistributedActorAttr>();
-  return distributedAttr != nullptr;
+  return classDecl->isExplicitDistributedActor();
 }
 
 bool IsDistributedFuncRequest::evaluate(
