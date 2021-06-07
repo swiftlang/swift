@@ -5,7 +5,6 @@
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t/build
 # RUN: mkdir -p %t/source
-# COM: mkdir -p %t/overlay
 # RUN: split-file %s %t/source
 # RUN: %{cmake-generate}  -S %t/source -B %t/build -DCMAKE_MODULE_PATH=%swift_src_root/stdlib/cmake/modules -DTARGET_SDKS:STRING=OSX 2>&1 | %FileCheck --check-prefix NO-TARGET-CHECK %s
 # RUN: %empty-directory(%t/build)
@@ -13,17 +12,22 @@
 # RUN: %empty-directory(%t/build)
 # RUN: %{cmake-generate}  -S %t/source -B %t/build -DCMAKE_MODULE_PATH=%swift_src_root/stdlib/cmake/modules 2>&1 | %FileCheck --check-prefix NO-TARGET-CHECK %s
 
-# NO-TARGET-CHECK-NOT: CoreFoundationOverlay-OSX
+# NO-TARGET-CHECK-NOT: [CoreFoundationOverlay-OSX]
+# NO-TARGET-CHECK-NOT: [FoundationOverlay-OSX]
 
 # targets are generated if SDKs and source dir are provided
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t/build
 # RUN: mkdir -p %t/source
-# COM: mkdir -p %t/overlay
 # RUN: split-file %s %t/source
 # RUN: %{cmake-generate}  -S %t/source -B %t/build -DCMAKE_MODULE_PATH=%swift_src_root/stdlib/cmake/modules -DTARGET_SDKS:STRING=OSX -DOVERLAY_DIR:STRING=%t/source/overlay -DSWIFTLIB_DIR:STRING=%t/build/lib 2>&1 | %FileCheck %s
 
-# CHECK: CoreFoundationOverlay-OSX
+# CHECK-DAG: [CoreFoundationOverlay-OSX]
+# CHECK-DAG: [FoundationOverlay-OSX]
+# CHECK-LABEL: The final target dependency graph is:
+# CHECK-LABEL: target {{.}} is [FoundationOverlay-OSX]
+# CHECK: depends on target{{.*}}[CoreFoundationOverlay-OSX]
+# CHECK-LABEL: {{target . is|Generating done}}
 
 #--- CMakeLists.txt
 cmake_minimum_required(VERSION 3.12.4)

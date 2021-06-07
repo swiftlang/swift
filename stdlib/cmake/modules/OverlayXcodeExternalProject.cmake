@@ -28,6 +28,12 @@ function(build_corefoundation_and_foundation_overlays)
        BUILD_TARGET CoreFoundation-swiftoverlay
        ADDITIONAL_XCODEBUILD_ARGUMENTS ${BCFFO_ADDITIONAL_XCODEBUILD_ARGS}
        TARGET_SDKS ${BCFFO_TARGET_SDKS})
+    add_overlay_xcode_project(Foundation
+      SOURCE_DIR ${BCFFO_FOUNDATION_OVERLAYS_SOURCE_DIR}
+       BUILD_TARGET Foundation-swiftoverlay
+       ADDITIONAL_XCODEBUILD_ARGUMENTS ${BCFFO_ADDITIONAL_XCODEBUILD_ARGS}
+       TARGET_SDKS ${BCFFO_TARGET_SDKS}
+       DEPENDS CoreFoundationOverlay)
   endif()
 
 endfunction()
