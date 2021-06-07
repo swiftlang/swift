@@ -3,6 +3,13 @@
 
 // RUN: %empty-directory(%t)
 
+// This test somehow depends on the Foundation overlay present in the build
+// directory, even though it uses the mock SDK. Unfortunately we can't
+// continue building overlays in-tree, so this will need further investigation.
+// (The hidden dependency seems like a problem -- the mock SDK ought to use mock
+// overlays, not the real ones.)
+// REQUIRES: rdar78879483
+
 import Foundation
 import ConvertBoolObjC
 

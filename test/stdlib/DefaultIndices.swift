@@ -23,7 +23,7 @@ extension Collection {
 }
 
 suite.test("Bidirectional dispatch") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+  guard #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) else {
     // This used to cause a runtime trap until https://github.com/apple/swift/pull/32019
     return
   }

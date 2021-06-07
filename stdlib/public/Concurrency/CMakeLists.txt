@@ -96,7 +96,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
     -Xfrontend -define-availability
-    -Xfrontend \"SwiftStdlib 5.5:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999\"
+    -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )

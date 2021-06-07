@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// REQUIRES: rdar78576626
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
