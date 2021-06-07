@@ -1066,7 +1066,27 @@ LookupConformanceInModuleRequest::evaluate(
     }
   }
 
-  // FIXME: Ambiguity resolution.
+  assert(!conformances.empty());
+
+  // If we have multiple conformances, first try to filter out any that are
+  // unavailable on the current deployment target.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  if (conformances.size() > 1) {
+    SmallVector<ProtocolConformance *, 2> availableConformances;
+
+    for (auto *conformance : conformances) {
+      if (conformance->getDeclContext()->isAlwaysAvailableConformanceContext())
+        availableConformances.push_back(conformance);
+    }
+
+    // Don't filter anything out if all conformances are unavailable.
+    if (!availableConformances.empty())
+      std::swap(availableConformances, conformances);
+  }
+
+  // If we still have multiple conformances, just pick the first one.
   auto conformance = conformances.front();
 
   // Rebuild inherited conformances based on the root normal conformance.
