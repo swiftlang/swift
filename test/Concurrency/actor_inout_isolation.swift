@@ -186,7 +186,7 @@ actor MyActor {
 
     // expected-error@+1{{cannot pass immutable value of type 'Int' as inout argument}}
     await modifyAsynchronously(&(maybePoint?.z)!)
-    // expected-error@+2{{actor-isolated property 'position' can only be used 'inout' from inside the actor}}
+    // expected-error@+2{{actor-isolated property 'position' can not be used 'inout' on a non-isolated actor instance}}
     // expected-error@+1{{actor-isolated property 'myActor' cannot be passed 'inout' to 'async' function call}}
     await modifyAsynchronously(&myActor.position.x)
   }

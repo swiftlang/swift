@@ -229,9 +229,9 @@ func anotherAsyncFunc() async {
   // expected-note@+1{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   _ = b.balance()
 
-  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can only be referenced from inside the actor}}
+  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can not be partially applied}}
 
-  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can only be mutated from inside the actor}}
+  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a non-isolated context}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = b.owner
   _ = await b.owner == "cat"
@@ -242,9 +242,9 @@ func anotherAsyncFunc() async {
 func regularFunc() {
   let a = BankAccount(initialDeposit: 34)
 
-  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
+  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can not be partially applied}}
 
-  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
+  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can not be referenced from a non-isolated context}}
 }
 
 
