@@ -63,7 +63,7 @@ func testInvalidTopLevelCompletion() {
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureType[#() -> ()#];
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub1[#InvalidClassSub1#];
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
-  // INVALID-TOP-DAG: Decl[Protocol]/OtherModule[errors]: InvalidProtocol[#InvalidProtocol#];
+  // INVALID-TOP-DAG: Decl[Protocol]/OtherModule[errors]/Flair[RareType]: InvalidProtocol[#InvalidProtocol#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncThrows()[' throws'][#<<error type>>#];
   // INVALID-TOP: End completions
 }

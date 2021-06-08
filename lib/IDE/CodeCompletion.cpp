@@ -743,6 +743,8 @@ void CodeCompletionResult::printPrefix(raw_ostream &OS) const {
     PRINT_FLAIR(ArgumentLabels, "ArgLabels");
     PRINT_FLAIR(CommonKeywordAtCurrentPosition, "CommonKeyword")
     PRINT_FLAIR(RareKeywordAtCurrentPosition, "RareKeyword")
+    PRINT_FLAIR(RareTypeAtCurrentPosition, "RareType")
+    PRINT_FLAIR(ExpressionAtNonScriptOrMainFileScope, "ExprAtFileScope")
     Prefix.append("]");
   }
   if (NotRecommended)
@@ -6457,10 +6459,54 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
   }
 }
 
+static void postProcessResults(ArrayRef<CodeCompletionResult *> results,
+                               CompletionKind Kind, DeclContext *DC) {
+  auto isExprKeyword = [](const CodeCompletionResult *result) {
+    if (result->getKind() != CodeCompletionResult::ResultKind::Keyword)
+      return false;
+    switch (result->getKeywordKind()) {
+#define POUND_DIRECTIVE_KEYWORD(kw)
+#define POUND_CONFIG(kw)
+#define POUND_KEYWORD(kw) case CodeCompletionKeywordKind::pound_##kw:
+#include "swift/Syntax/TokenKinds.def"
+      return true;
+    default:
+      return false;
+    }
+  };
+  for (CodeCompletionResult *result : results) {
+    auto flair = result->getFlair();
+
+    // Starting a statement with a protocol name is not common. So protocol
+    // names at non-type name position are "rare".
+    if (result->getKind() == CodeCompletionResult::ResultKind::Declaration &&
+        result->getAssociatedDeclKind() == CodeCompletionDeclKind::Protocol &&
+        Kind != CompletionKind::TypeSimpleBeginning &&
+        Kind != CompletionKind::TypeIdentifierWithoutDot &&
+        Kind != CompletionKind::TypeIdentifierWithDot &&
+        Kind != CompletionKind::TypeDeclResultBeginning &&
+        Kind != CompletionKind::GenericRequirement) {
+      flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
+    }
+
+    // Starting a statement at top-level in non-script files is invalid.
+    if (Kind == CompletionKind::StmtOrExpr &&
+        isCodeCompletionAtTopLevel(DC) &&
+        !DC->getParentSourceFile()->isScriptMode() &&
+        (result->getKind() == CodeCompletionResult::ResultKind::Declaration ||
+         result->getKind() == CodeCompletionResult::ResultKind::Literal ||
+         isExprKeyword(result))) {
+      flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
+    }
+    result->setFlair(flair);
+  }
+}
+
 static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                      CompletionLookup &Lookup,
-                                     SourceFile &SF,
+                                     DeclContext *DC,
                                      CodeCompletionConsumer &Consumer) {
+  auto &SF = *DC->getParentSourceFile();
   llvm::SmallPtrSet<Identifier, 8> seenModuleNames;
   std::vector<RequestedCachedModule> RequestedModules;
 
@@ -6571,12 +6617,10 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   Lookup.RequestedCachedResults.clear();
   CompletionContext.typeContextKind = Lookup.typeContextKind();
 
-  // Use the current SourceFile as the DeclContext so that we can use it to
-  // perform qualified lookup, and to get the correct visibility for
-  // @testable imports.
-  DeclContext *DCForModules = &SF;
-  Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
-                                   DCForModules);
+  postProcessResults(CompletionContext.getResultSink().Results,
+                     CompletionContext.CodeCompletionKind, DC);
+
+  Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
 
 void deliverUnresolvedMemberResults(
@@ -6614,8 +6658,8 @@ void deliverUnresolvedMemberResults(
     }
     Lookup.getUnresolvedMemberCompletions(Result.ExpectedTy);
   }
-  SourceFile *SF = DC->getParentSourceFile();
-  deliverCompletionResults(CompletionCtx, Lookup, *SF, Consumer);
+
+  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
 }
 
 void deliverDotExprResults(
@@ -6655,8 +6699,7 @@ void deliverDotExprResults(
     Lookup.getValueExprCompletions(Result.BaseTy, Result.BaseDecl);
   }
 
-  SourceFile *SF = DC->getParentSourceFile();
-  deliverCompletionResults(CompletionCtx, Lookup, *SF, Consumer);
+  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
 }
 
 bool CodeCompletionCallbacksImpl::trySolverCompletion(bool MaybeFuncBody) {
@@ -7284,7 +7327,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  deliverCompletionResults(CompletionContext, Lookup, P.SF, Consumer);
+  deliverCompletionResults(CompletionContext, Lookup, CurDeclContext, Consumer);
 }
 
 void PrintingCodeCompletionConsumer::handleResults(
@@ -7360,16 +7403,17 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
   CompletionLookup Lookup(targetSink, module->getASTContext(), SF);
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
-
-void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
-                                           CodeCompletionResultSink &sourceSink,
-                                           bool onlyTypes,
-                                           bool onlyPrecedenceGroups) {
+ArrayRef<CodeCompletionResult *>
+swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                                      CodeCompletionResultSink &sourceSink,
+                                      bool onlyTypes,
+                                      bool onlyPrecedenceGroups) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
   // results alive.
   targetSink.ForeignAllocators.push_back(sourceSink.Allocator);
+  auto startSize = targetSink.Results.size();
 
   if (onlyTypes) {
     std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
@@ -7419,12 +7463,21 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                               sourceSink.Results.begin(),
                               sourceSink.Results.end());
   }
+
+  return llvm::makeArrayRef(targetSink.Results.data() + startSize,
+                            targetSink.Results.size() - startSize);
 }
 
 void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
     CodeCompletionContext &context,
     ArrayRef<RequestedCachedModule> requestedModules,
-    DeclContext *DCForModules) {
+    DeclContext *DC) {
+
+  // Use the current SourceFile as the DeclContext so that we can use it to
+  // perform qualified lookup, and to get the correct visibility for
+  // @testable imports.
+  DeclContext *DCForModules = DC->getParentSourceFile();
+
   for (auto &R : requestedModules) {
     // FIXME(thread-safety): lock the whole AST context.  We might load a
     // module.
@@ -7440,8 +7493,9 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    copyCodeCompletionResults(context.getResultSink(), (*V)->Sink,
-                              R.OnlyTypes, R.OnlyPrecedenceGroups);
+    auto newItems = copyCodeCompletionResults(context.getResultSink(), (*V)->Sink,
+                                              R.OnlyTypes, R.OnlyPrecedenceGroups);
+    postProcessResults(newItems, context.CodeCompletionKind, DC);
   }
 
   handleResults(context.takeResults());
