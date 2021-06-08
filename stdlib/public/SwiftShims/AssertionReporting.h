@@ -68,21 +68,6 @@ void _swift_stdlib_reportUnimplementedInitializer(
     const unsigned char *initName, int initNameLength,
     __swift_uint32_t flags);
 
-/// Report a call to a _remote function on a distributed (remote) actor,
-/// that was not dynamically replaced by some specific ActorTransport library.
-///
-///     <file>: <line>: <column>: Fatal error: remote function 'greet(name:)'
-///     invoked on remote distributed actor reference of type 'Greeter'.
-///     Configure an appropriate 'ActorTransport' for this actor to resolve
-///     this error (e.g. by depending on some specific ActorTransport library)
-SWIFT_RUNTIME_STDLIB_API
-void _swift_stdlib_reportMissingDistributedActorTransport(
-    const unsigned char *className, int classNameLength,
-    const unsigned char *funcName, int funcNameLength,
-    const unsigned char *file, int fileLength,
-    __swift_uint32_t line, __swift_uint32_t column,
-    __swift_uint32_t flags);
-
 #ifdef __cplusplus
 } // extern "C"
 #endif

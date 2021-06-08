@@ -561,9 +561,11 @@ static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
 ///
 /// Create a stub body that emits a fatal error message.
 static std::pair<BraceStmt *, bool>
-synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *) {
+synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
+  auto distributedFunc = static_cast<AbstractFunctionDecl *>(context);
   auto classDecl = func->getDeclContext()->getSelfClassDecl();
   auto &ctx = func->getASTContext();
+  auto &SM = ctx.SourceMgr;
 
   auto *staticStringDecl = ctx.getStaticStringDecl();
   auto staticStringType = staticStringDecl->getDeclaredInterfaceType();
@@ -574,8 +576,9 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *) {
   auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
 
   auto missingTransportDecl = ctx.getMissingDistributedActorTransport();
+  assert(missingTransportDecl);
 
-  // Create a call to Swift._missingDistributedActorTransport // TODO: move to `Distributed` module
+  // Create a call to _Distributed._missingDistributedActorTransport
   auto loc = func->getLoc();
   Expr *ref = new (ctx) DeclRefExpr(missingTransportDecl,
                                     DeclNameLoc(loc), /*Implicit=*/true);
@@ -594,23 +597,34 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *) {
   assert(isa<ConstructorDecl>(className->getBuiltinInitializer().getDecl()));
   className->setType(staticStringType);
 
-  auto *funcName = new (ctx) MagicIdentifierLiteralExpr(
-      MagicIdentifierLiteralExpr::Function, loc, /*Implicit=*/true);
+  auto *funcName = new (ctx) StringLiteralExpr(
+      ctx.AllocateCopy(func->getName().getBaseName().getIdentifier().str()), loc,
+      /*Implicit=*/true);
   funcName->setType(staticStringType);
   funcName->setBuiltinInitializer(staticStringInit);
 
-  auto *file = new (ctx) MagicIdentifierLiteralExpr(
-      MagicIdentifierLiteralExpr::FileID, loc, /*Implicit=*/true);
+  // Note: Sadly we cannot just rely on #function, #file, #line for the location
+  // (MagicIdentifierLiteralExpr), of the call because the call is made from a thunk.
+  // That thunk does not carry those info today although it could.
+  //
+  // Instead, we offer the location where the distributed func was declared.
+  auto fileString = SM.getDisplayNameForLoc(distributedFunc->getStartLoc());
+  auto *file = new (ctx) StringLiteralExpr(fileString, loc, /*Implicit=*/true);
   file->setType(staticStringType);
   file->setBuiltinInitializer(staticStringInit);
 
-  auto *line = new (ctx) MagicIdentifierLiteralExpr(
-      MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
+  auto startLineAndCol = SM.getPresumedLineAndColumnForLoc(distributedFunc->getStartLoc());
+//  auto *line = new (ctx) MagicIdentifierLiteralExpr(
+//      MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
+//  auto *line = new (ctx) IntegerLiteralExpr(startLineAndCol.first, loc,
+//                                            /*implicit*/ true);
+  auto *line = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.first);
   line->setType(uintType);
   line->setBuiltinInitializer(uintInit);
 
-  auto *column = new (ctx) MagicIdentifierLiteralExpr(
-      MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
+//  auto *column = new (ctx) MagicIdentifierLiteralExpr(
+//      MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
+  auto *column = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.second);
   column->setType(uintType);
   column->setBuiltinInitializer(uintInit);
 
@@ -624,9 +638,6 @@ synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *) {
   // stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr)); // FIXME: this causes 'different types for return type: String vs. ()'
   auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit=*/true);
-
-
-
   return { body, /*isTypeChecked=*/true };
 }
 
@@ -680,7 +691,7 @@ static void addImplicitRemoteActorFunction(ClassDecl *decl, FuncDecl *func) {
   remoteFuncDecl->setUserAccessible(false);
   remoteFuncDecl->setSynthesized();
 
-  remoteFuncDecl->setBodySynthesizer(&synthesizeRemoteFuncStubBody);
+  remoteFuncDecl->setBodySynthesizer(&synthesizeRemoteFuncStubBody, func);
 
   // same access control as the original function is fine
   remoteFuncDecl->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);

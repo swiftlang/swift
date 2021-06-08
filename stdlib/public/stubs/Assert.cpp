@@ -117,25 +117,3 @@ void _swift_stdlib_reportUnimplementedInitializer(
   free(log);
 }
 
-void _swift_stdlib_reportMissingDistributedActorTransport(
-    const unsigned char *className, int classNameLength,
-    const unsigned char *funcName, int funcNameLength,
-    const unsigned char *file, int fileLength,
-    uint32_t line, uint32_t column,
-    uint32_t flags
-) {
-  char *log;
-  swift_asprintf(
-      &log,
-      "%.*s:%" PRIu32 ": Fatal error: remote function '%.*s' invoked on remote "
-                      "distributed actor reference of type '%.*s'. Configure an appropriate "
-                      "'ActorTransport' for this actor to resolve this error (e.g. by depending "
-                      "on some specific ActorTransport library)\n",
-      fileLength, file,
-      line,
-      funcNameLength, funcName,
-      classNameLength, className);
-
-  swift_reportError(flags, log);
-  free(log);
-}

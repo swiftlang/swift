@@ -14,6 +14,7 @@ set(swift_distributed_link_libraries
   swiftCore)
 
 add_swift_target_library(swift_Distributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  AssertDistributed.swift
   DistributedActor.swift
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
