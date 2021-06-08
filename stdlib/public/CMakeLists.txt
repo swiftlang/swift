@@ -118,8 +118,8 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   if(SWIFT_FOUNDATION_OVERLAYS_BUILD_FROM_SOURCE)
     include(OverlayXcodeExternalProject)
    
-    # TODO: validation tests missing, build-script flags missing
     list_intersect("${SWIFT_SDKS}" "${SWIFT_FOUNDATION_OVERLAYS_SUPPORTED_SDKS}" SDKS_TO_BUILD_FOR)
+    message(STATUS "Building CoreFoundation and Foundation SDKs for SDKs: " ${SDKS_TO_BUILD_FOR})
     build_corefoundation_and_foundation_overlays(
       TARGET_SDKS ${SDKS_TO_BUILD_FOR}
       FOUNDATION_OVERLAYS_SOURCE_DIR ${SWIFT_FOUNDATION_OVERLAYS_SOURCE_REPO}

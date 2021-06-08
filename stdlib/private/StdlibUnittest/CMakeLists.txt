@@ -62,5 +62,7 @@ set_source_files_properties(InspectValue.cpp PROPERTIES COMPILE_FLAGS -std=c++14
 if(SWIFT_FOUNDATION_OVERLAYS_BUILD_FROM_SOURCE)
     include(OverlayXcodeExternalProject)
 
-    add_overlay_dependencies(swiftStdlibUnittest FoundationOverlay)
+    add_overlay_dependencies_to(swiftStdlibUnittest
+      OVERLAYS Foundation
+      TARGET_SDKS ${SWIFT_SDKS})
 endif()

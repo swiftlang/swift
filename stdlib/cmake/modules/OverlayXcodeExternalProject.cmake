@@ -76,8 +76,9 @@ function(add_overlay_xcode_project_single overlay)
 
   set(dependencies swiftCore ${AOXP_DEPENDS})
   list(TRANSFORM dependencies APPEND "-${sdk_name}")
+  set(xcode_overlay_target_name ${overlay}Overlay-${sdk_name})
 
-  ExternalProject_Add(${overlay}Overlay-${sdk_name}
+  ExternalProject_Add(${xcode_overlay_target_name}
     SOURCE_DIR ${AOXP_SOURCE_DIR}
     INSTALL_DIR  ${SWIFTLIB_DIR}/${sdk_name}
     CONFIGURE_COMMAND ""
@@ -105,6 +106,12 @@ function(add_overlay_xcode_project_single overlay)
     <INSTALL_DIR>/libswift${overlay}.dylib
     EXCLUDE_FROM_ALL TRUE
     DEPENDS ${dependencies})
+
+  add_dependencies(sdk-overlay ${xcode_overlay_target_name})
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    set(variant_suffix "${sdk_name}-${arch}")
+    add_dependencies(swift-stdlib-${variant_suffix} ${xcode_overlay_target_name})
+  endforeach()
 endfunction()
 
 function(add_overlay_dependencies_to target)
@@ -120,10 +127,10 @@ function(add_overlay_dependencies_to target)
     foreach(overlay ${AODT_OVERLAYS})
       # We added this check so not to force the user to explicitly
       # check if the overlays are built or not 
-      if(TARGET ${overlay}Overlay-${sdk})
-        add_dependencies(${target}-${sdk} ${overlay}Overlay-${sdk})
+      if(TARGET ${overlay}Overlay-${sdk_name})
+        add_dependencies(${target}-${sdk_name} ${overlay}Overlay-${sdk_name})
       else()
-        message(WARNING "${overlay}Overlay-${sdk} does not exist, assuming that's on purpose and not adding as dependencies for ${target}-${sdk}")
+        message(WARNING "${overlay}Overlay-${sdk_name} does not exist, assuming that's on purpose and not adding as dependencies for ${target}-${sdk_name}")
       endif()
     endforeach()
   endforeach()
