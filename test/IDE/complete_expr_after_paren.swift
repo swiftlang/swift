@@ -40,20 +40,20 @@ class MyClass: Base, MyProtocol {
 func testConstructer() {
   MyClass(#^INITIALIZER^#)
 // INITIALIZER: Begin completions, 4 items
-// INITIALIZER-DAG: Decl[Constructor]/CurrNominal:      ['(']{#init1: Int#}[')'][#MyClass#];
-// INITIALIZER-DAG: Decl[Constructor]/CurrNominal:      ['(']{#init2: Int#}[')'][#MyClass#];
-// INITIALIZER-DAG: Decl[Constructor]/CurrNominal:      ['(']{#init3: Int#}[')'][#MyClass#];
-// INITIALIZER-DAG: Decl[Constructor]/CurrNominal:      ['(']{#init4: Int#}[')'][#MyClass#];
+// INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init1: Int#}[')'][#MyClass#];
+// INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init2: Int#}[')'][#MyClass#];
+// INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init3: Int#}[')'][#MyClass#];
+// INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#init4: Int#}[')'][#MyClass#];
 // INITIALIZER: End completions
 }
 
 func testMethod(obj: MyClass) {
   obj.method(#^METHOD^#)
 // METHOD: Begin completions, 4 items
-// METHOD-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#method1: Int#}[')'][#Void#];
-// METHOD-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#method2: Int#}[')'][#Void#];
-// METHOD-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#method3: Int#}[')'][#Void#];
-// METHOD-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#method4: Int#}[')'][#Void#];
+// METHOD-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method1: Int#}[')'][#Void#];
+// METHOD-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method2: Int#}[')'][#Void#];
+// METHOD-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method3: Int#}[')'][#Void#];
+// METHOD-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method4: Int#}[')'][#Void#];
 // METHOD: End completions
 }
 
@@ -73,8 +73,8 @@ struct MyStruct: HasUnavailable {
 func testUnavailable(val: MyStruct) {
   val.method(#^AVAILABILITY^#)
 // AVAILABILITY: Begin completions, 2 items
-// AVAILABILITY-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#method2: Int#}[')'][#Void#];
-// AVAILABILITY-DAG: Decl[InstanceMethod]/Super:         ['(']{#method1: Int#}[')'][#Void#];
+// AVAILABILITY-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#method2: Int#}[')'][#Void#];
+// AVAILABILITY-DAG: Decl[InstanceMethod]/Super/Flair[ArgLabels]:         ['(']{#method1: Int#}[')'][#Void#];
 // AVAILABILITY: End completions
 }
 
@@ -85,7 +85,7 @@ struct TestStatic {
 func testStaticFunc() {
   TestStatic.method(#^STATIC^#)
 // STATIC: Begin completions
-// STATIC-DAG: Decl[StaticMethod]/CurrNominal:     ['(']{#(self): TestStatic#}[')'][#() -> Void#];
-// STATIC-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(self): TestStatic#}[')'][#() -> Void#];
+// STATIC-DAG: Decl[StaticMethod]/CurrNominal/Flair[ArgLabels]:     ['(']{#(self): TestStatic#}[')'][#() -> Void#];
+// STATIC-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]:   ['(']{#(self): TestStatic#}[')'][#() -> Void#];
 // STATIC: End completions
 }

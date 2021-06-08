@@ -228,7 +228,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     CodeCompletionResult *result = nullptr;
     if (kind == CodeCompletionResult::Declaration) {
       result = new (*V.Sink.Allocator) CodeCompletionResult(
-          context, /*IsArgumentLabels=*/false, numBytesToErase, string,
+          context, CodeCompletionFlair(), numBytesToErase, string,
           declKind, isSystem, moduleName, notRecommended, briefDocComment,
           copyArray(*V.Sink.Allocator, ArrayRef<StringRef>(assocUSRs)),
           copyArray(*V.Sink.Allocator,
@@ -236,7 +236,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
           CodeCompletionResult::Unknown, opKind);
     } else {
       result = new (*V.Sink.Allocator)
-          CodeCompletionResult(kind, context, /*IsArgumentLabels=*/false,
+          CodeCompletionResult(kind, context,  CodeCompletionFlair(),
                                numBytesToErase, string,
                                CodeCompletionResult::NotApplicable, opKind);
     }
@@ -341,7 +341,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
   {
     endian::Writer LE(results, little);
     for (CodeCompletionResult *R : V.Sink.Results) {
-      assert(!R->isArgumentLabels() && "Argument labels should not be cached");
+      assert(!R->getFlair().toRaw() && "Any flairs should not be cached");
       assert(R->getNotRecommendedReason() !=
              CodeCompletionResult::NotRecommendedReason::InvalidAsyncContext &&
              "InvalidAsyncContext is decl context specific, cannot be cached");

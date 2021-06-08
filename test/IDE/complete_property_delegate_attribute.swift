@@ -21,8 +21,8 @@ struct TestStruct {
   @MyStruct(#^AFTER_PAREN^#
   var test1
 // AFTER_PAREN: Begin completions, 2 items
-// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal:      ['(']{#wrappedValue: MyEnum#}[')'][#MyStruct#]; name=wrappedValue: MyEnum
-// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal:      ['(']{#arg1: MyEnum#}, {#arg2: Int#}[')'][#MyStruct#]; name=arg1: MyEnum, arg2: Int
+// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#wrappedValue: MyEnum#}[')'][#MyStruct#]; name=wrappedValue: MyEnum
+// AFTER_PAREN-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#arg1: MyEnum#}, {#arg2: Int#}[')'][#MyStruct#]; name=arg1: MyEnum, arg2: Int
 // AFTER_PAREN: End completions
 
   @MyStruct(arg1: #^ARG_MyEnum_NODOT^#
@@ -35,8 +35,8 @@ struct TestStruct {
   @MyStruct(arg1: .#^ARG_MyEnum_DOT^#
   var test3
 // ARG_MyEnum_DOT: Begin completions, 3 items
-// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     east[#MyEnum#]; name=east
-// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     west[#MyEnum#]; name=west
+// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     east[#MyEnum#]; name=east
+// ARG_MyEnum_DOT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     west[#MyEnum#]; name=west
 // ARG_MyEnum_DOT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // ARG_MyEnum_DOT: End completions
 

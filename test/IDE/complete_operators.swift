@@ -192,7 +192,7 @@ func testInfix11() {
 }
 
 // INFIX_11: Begin completions, 3 items
-// INFIX_11-DAG: Decl[Constructor]/CurrNominal:      ()[#S2#]; name=()
+// INFIX_11-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ()[#S2#]; name=()
 // INFIX_11-DAG: Keyword[self]/CurrNominal:          .self[#S2.Type#]; name=self
 // INFIX_11-DAG: Keyword/CurrNominal:                .Type[#S2.Type#]; name=Type
 // INFIX_11: End completions
@@ -230,7 +230,7 @@ func testInfix16<T: P where T.T == S2>() {
 }
 
 // INFIX_16: Begin completions, 2 items
-// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(self): P#})[#() -> S2#]; name=(self: P)
+// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ({#(self): P#})[#() -> S2#]; name=(self: P)
 // INFIX_16-NEXT: Keyword[self]/CurrNominal:        .self[#(T) -> () -> S2#]; name=self
 // INFIX_16: End completions
 
@@ -274,7 +274,7 @@ func testInfix22() {
   E.B#^INFIX_22^#
 }
 // INFIX_22: Begin completions, 2 items
-// INFIX_22-NEXT: Pattern/CurrModule:               ({#S2#})[#E#]; name=(S2)
+// INFIX_22-NEXT: Pattern/CurrModule/Flair[ArgLabels]:               ({#S2#})[#E#]; name=(S2)
 // INFIX_22: End completions
 
 func testSpace(x: S2) {

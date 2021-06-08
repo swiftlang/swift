@@ -165,7 +165,7 @@ func rdar22834017() {
   Foo(#^RDAR_22834017^#)
 }
 // RDAR_22834017: Begin completions, 1 items
-// RDAR_22834017: Decl[Constructor]/CurrNominal:      ['(']{#a: <<error type>>#}, {#b: <<error type>>#}, {#c: <<error type>>#}[')'][#Foo#];
+// RDAR_22834017: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#a: <<error type>>#}, {#b: <<error type>>#}, {#c: <<error type>>#}[')'][#Foo#];
 // RDAR_22834017: End completions
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692
@@ -300,7 +300,7 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
   x({_ in }#^RDAR_28188259^#)
 }
 // RDAR_28188259: Begin completions
-// RDAR_28188259-DAG: Pattern/CurrModule:                 ({#Int#})[#Void#]; name=(Int)
+// RDAR_28188259-DAG: Pattern/CurrModule/Flair[ArgLabels]: ({#Int#})[#Void#]; name=(Int)
 // RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(Int) -> ()#]; name=self
 // RDAR_28188259: End completions
 

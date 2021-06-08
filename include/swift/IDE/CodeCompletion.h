@@ -16,6 +16,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -375,33 +376,6 @@ enum class SemanticContextKind {
   /// Used in cases when the concept of semantic context is not applicable.
   None,
 
-  /// This is a highly-likely expression-context-specific completion
-  /// result.  This description is intentionally vague: this is a catch-all
-  /// category for all heuristics for highly-likely results.
-  ///
-  /// For example, the name of an overridden superclass member inside a nominal
-  /// member function has ExpressionSpecific context:
-  /// \code
-  ///   class Base {
-  ///     init() {}
-  ///     init(a: Int) {}
-  ///     func foo() {}
-  ///     func bar() {}
-  ///   }
-  ///   class Derived {
-  ///     init() {
-  ///       super. // init() -- ExpressionSpecific
-  ///              // init(a: Int) -- Super
-  ///     }
-  ///
-  ///     func foo() {
-  ///       super. // foo() -- ExpressionSpecific
-  ///              // bar() -- Super
-  ///     }
-  ///   }
-  /// \endcode
-  ExpressionSpecific,
-
   /// A declaration from the same function.
   Local,
 
@@ -433,6 +407,26 @@ enum class SemanticContextKind {
   /// A declaration imported from other module.
   OtherModule,
 };
+
+enum class CodeCompletionFlairBit: uint8_t {
+  /// **Deprecated**. Old style catch-all prioritization.
+  ExpressionSpecific = 1 << 0,
+
+  /// E.g. override func foo() { super.foo() ...
+  SuperChain = 1 << 1,
+
+  /// Argument label and type. i.e. 'label: <#Ty#>'.
+  ArgumentLabels = 1 << 2,
+
+  /// E.g. decl introducer or modifiers ('enum', 'protocol', 'public', etc.) at
+  /// top-level.
+  CommonKeywordAtCurrentPosition = 1 << 3,
+
+  /// E.g. type decl introducer ('enum', 'class', etc.) in a function body.
+  RareKeywordAtCurrentPosition = 1 << 4,
+};
+
+using CodeCompletionFlair = OptionSet<CodeCompletionFlairBit>;
 
 /// The declaration kind of a code completion result, if it is a declaration.
 enum class CodeCompletionDeclKind {
@@ -615,7 +609,7 @@ private:
   unsigned AssociatedKind : 8;
   unsigned KnownOperatorKind : 6;
   unsigned SemanticContext : 3;
-  unsigned IsArgumentLabels : 1;
+  unsigned Flair: 8;
   unsigned NotRecommended : 4;
   unsigned IsSystem : 1;
 
@@ -640,15 +634,14 @@ public:
   ///
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
   CodeCompletionResult(ResultKind Kind, SemanticContextKind SemanticContext,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        CodeCompletionOperatorKind KnownOperatorKind =
                            CodeCompletionOperatorKind::None,
                        StringRef BriefDocComment = StringRef())
       : Kind(Kind), KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
+        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
@@ -668,13 +661,13 @@ public:
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
   CodeCompletionResult(CodeCompletionKeywordKind Kind,
                        SemanticContextKind SemanticContext,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair,
+                       unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance,
                        StringRef BriefDocComment = StringRef())
       : Kind(Keyword), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
+        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         BriefDocComment(BriefDocComment), TypeDistance(TypeDistance) {
@@ -688,12 +681,11 @@ public:
   /// \note The caller must ensure \c CodeCompletionString outlives this result.
   CodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
                        SemanticContextKind SemanticContext,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        ExpectedTypeRelation TypeDistance)
       : Kind(Literal), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
+        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecommendedReason::None)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         TypeDistance(TypeDistance) {
@@ -708,7 +700,7 @@ public:
   /// arguments outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   CodeCompletionResult(SemanticContextKind SemanticContext,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl, StringRef ModuleName,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
@@ -717,8 +709,7 @@ public:
                        ArrayRef<std::pair<StringRef, StringRef>> DocWords,
                        enum ExpectedTypeRelation TypeDistance)
       : Kind(ResultKind::Declaration), KnownOperatorKind(0),
-        SemanticContext(unsigned(SemanticContext)),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
+        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecReason)),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
@@ -737,7 +728,7 @@ public:
 
   // Used by deserialization.
   CodeCompletionResult(SemanticContextKind SemanticContext,
-                       bool IsArgumentLabels, unsigned NumBytesToErase,
+                       CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
                        StringRef ModuleName,
@@ -749,8 +740,7 @@ public:
                        CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)),
-        IsArgumentLabels(unsigned(IsArgumentLabels)),
+        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
         NotRecommended(unsigned(NotRecReason)), IsSystem(IsSystem),
         NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
         ModuleName(ModuleName), BriefDocComment(BriefDocComment),
@@ -813,8 +803,8 @@ public:
     return static_cast<SemanticContextKind>(SemanticContext);
   }
 
-  bool isArgumentLabels() const {
-    return static_cast<bool>(IsArgumentLabels);
+  CodeCompletionFlair getFlair() const {
+    return static_cast<CodeCompletionFlair>(Flair);
   }
 
   bool isNotRecommended() const {
