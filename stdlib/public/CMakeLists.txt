@@ -119,11 +119,14 @@ if(SWIFT_BUILD_SDK_OVERLAY)
     include(OverlayXcodeExternalProject)
    
     list_intersect("${SWIFT_SDKS}" "${SWIFT_FOUNDATION_OVERLAYS_SUPPORTED_SDKS}" SDKS_TO_BUILD_FOR)
-    message(STATUS "Building CoreFoundation and Foundation SDKs for SDKs: " ${SDKS_TO_BUILD_FOR})
+    message(STATUS "Building CoreFoundation and Foundation overlays for SDKs: " ${SDKS_TO_BUILD_FOR})
     build_corefoundation_and_foundation_overlays(
       TARGET_SDKS ${SDKS_TO_BUILD_FOR}
       FOUNDATION_OVERLAYS_SOURCE_DIR ${SWIFT_FOUNDATION_OVERLAYS_SOURCE_REPO}
       ADDITIONAL_XCODEBUILD_ARGUMENTS ${SWIFT_FOUNDATION_OVERLAYS_ADDITIONAL_XCODEBUILD_ARGS})
+    add_stdlib_dependencies_to(
+      OVERLAYS CoreFoundation
+      TARGET_SDKS ${SDKS_TO_BUILD_FOR})
   endif()
 
   if(WINDOWS IN_LIST SWIFT_SDKS)
