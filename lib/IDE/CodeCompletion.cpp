@@ -7418,10 +7418,9 @@ swift::ide::makeCodeCompletionCallbacksFactory(
 void swift::ide::lookupCodeCompletionResultsFromModule(
     CodeCompletionResultSink &targetSink, const ModuleDecl *module,
     ArrayRef<std::string> accessPath, bool needLeadingDot,
-    const DeclContext *currDeclContext) {
-  // Consisitently use the SourceFile as the decl context, to avoid decl
-  // context specific behaviors.
-  auto *SF = currDeclContext->getParentSourceFile();
+    const SourceFile *SF) {
+  // Use the SourceFile as the decl context, to avoid decl context specific
+  // behaviors.
   CompletionLookup Lookup(targetSink, module->getASTContext(), SF);
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
@@ -7497,8 +7496,9 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
 
   // Use the current SourceFile as the DeclContext so that we can use it to
   // perform qualified lookup, and to get the correct visibility for
-  // @testable imports.
-  DeclContext *DCForModules = DC->getParentSourceFile();
+  // @testable imports. Also it cannot use 'DC' since it would apply decl
+  // context changes to cached results.
+  const SourceFile *SF = DC->getParentSourceFile();
 
   for (auto &R : requestedModules) {
     // FIXME(thread-safety): lock the whole AST context.  We might load a
@@ -7511,7 +7511,7 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       (*V)->Sink.annotateResult = context.getAnnotateResult();
       lookupCodeCompletionResultsFromModule(
           (*V)->Sink, R.TheModule, R.Key.AccessPath,
-          R.Key.ResultsHaveLeadingDot, DCForModules);
+          R.Key.ResultsHaveLeadingDot, SF);
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
