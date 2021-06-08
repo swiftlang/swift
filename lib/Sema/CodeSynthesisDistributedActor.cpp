@@ -51,9 +51,9 @@ using namespace swift;
 /// \param param The parameter to the call.
 static CallExpr *
 createCall_DistributedActor_transport_assignAddress(ASTContext &C,
-                                 DeclContext *DC,
-                                 Expr *base, Type returnType,
-                                 Type param) {
+                                                    DeclContext *DC,
+                                                    Expr *base, Type returnType,
+                                                    Type param) {
   // (_ actorType:)
   auto *paramDecl = new (C) ParamDecl(SourceLoc(),
                                       SourceLoc(), Identifier(),
@@ -154,9 +154,9 @@ createBody_DistributedActor_init_transport(AbstractFunctionDecl *initDecl, void 
     // Bound transport.assignAddress(Self.self) call
     auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
     auto *callExpr = createCall_DistributedActor_transport_assignAddress(C, funcDC,
-        /*base=*/transportExpr,
-        /*returnType=*/addressType,
-        /*param=*/selfType);
+                                                                         /*base=*/transportExpr,
+                                                                         /*returnType=*/addressType,
+                                                                         /*param=*/selfType);
     auto *assignAddressExpr = new (C) AssignExpr(
         varAddressExpr, SourceLoc(), callExpr, /*Implicit=*/true);
     statements.push_back(assignAddressExpr);
@@ -168,14 +168,14 @@ createBody_DistributedActor_init_transport(AbstractFunctionDecl *initDecl, void 
     // Bound transport.actorReady(self) call
     auto selfType = funcDC->getInnermostTypeContext()->getSelfTypeInContext();
     auto *callExpr = createCall_DistributedActor_transport_actorReady(C, funcDC,
-        /*base=*/transportExpr,
-        /*actorType=*/selfType,
-        /*param=*/selfRef);
+                                                                      /*base=*/transportExpr,
+                                                                      /*actorType=*/selfType,
+                                                                      /*param=*/selfRef);
     statements.push_back(callExpr);
   }
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
-      /*implicit=*/true);
+                                 /*implicit=*/true);
   return { body, /*isTypeChecked=*/false };
 }
 
@@ -191,7 +191,7 @@ createDistributedActor_init_local(ClassDecl *classDecl,
                                   ASTContext &ctx) {
   auto &C = ctx;
 
-//  auto conformanceDC = derived.getConformanceContext();
+  //  auto conformanceDC = derived.getConformanceContext();
   auto conformanceDC = classDecl;
 
   // Expected type: (Self) -> (ActorTransport) -> (Self)
@@ -212,11 +212,11 @@ createDistributedActor_init_local(ClassDecl *classDecl,
 
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
-          /*Failable=*/false, SourceLoc(),
-          /*Async=*/false, SourceLoc(),
-          /*Throws=*/false, SourceLoc(),
-          paramList,
-          /*GenericParams=*/nullptr, conformanceDC);
+                              /*Failable=*/false, SourceLoc(),
+                              /*Async=*/false, SourceLoc(),
+                              /*Throws=*/false, SourceLoc(),
+                              paramList,
+                              /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&createBody_DistributedActor_init_transport);
@@ -288,7 +288,7 @@ createDistributedActor_init_resolve_body(AbstractFunctionDecl *initDecl, void *)
   // end-of-FIXME: this must be checking with the transport instead
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
-      /*implicit=*/true);
+                                 /*implicit=*/true);
 
   return { body, /*isTypeChecked=*/false };
 }
@@ -302,7 +302,7 @@ createDistributedActor_init_resolve_body(AbstractFunctionDecl *initDecl, void *)
 /// resolve initializer.
 static ConstructorDecl *
 createDistributedActor_init_resolve(ClassDecl *classDecl,
-                                  ASTContext &ctx) {
+                                    ASTContext &ctx) {
   auto &C = ctx;
 
   auto conformanceDC = classDecl;
@@ -332,18 +332,18 @@ createDistributedActor_init_resolve(ClassDecl *classDecl,
       /*LParenLoc=*/SourceLoc(),
       /*params=*/{addressParamDecl, transportParamDecl},
       /*RParenLoc=*/SourceLoc()
-  );
+      );
 
   // Func name: init(resolve:using:)
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
-          /*Failable=*/false, SourceLoc(),
-          /*Async=*/false, SourceLoc(),
-          /*Throws=*/true, SourceLoc(),
-          paramList,
-          /*GenericParams=*/nullptr, conformanceDC);
+                              /*Failable=*/false, SourceLoc(),
+                              /*Async=*/false, SourceLoc(),
+                              /*Throws=*/true, SourceLoc(),
+                              paramList,
+                              /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&createDistributedActor_init_resolve_body);
@@ -396,16 +396,16 @@ static void collectNonOveriddenDistributedActorInits(
   assert(actorDecl->isDistributedActor());
   auto protoDecl = Context.getProtocol(KnownProtocolKind::DistributedActor);
 
-//  // Record all of the initializers the actorDecl has implemented.
-//  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
-//  for (auto member : actorDecl->getMembers())
-//    if (auto ctor = dyn_cast<ConstructorDecl>(member))
-//      if (!ctor->hasStubImplementation())
-//         // if (auto overridden = ctor->getOverriddenDecl())
-//          overriddenInits.insert(ctor);
-//
-//  actorDecl->synthesizeSemanticMembersIfNeeded(
-//    DeclBaseName::createConstructor());
+  //  // Record all of the initializers the actorDecl has implemented.
+  //  llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
+  //  for (auto member : actorDecl->getMembers())
+  //    if (auto ctor = dyn_cast<ConstructorDecl>(member))
+  //      if (!ctor->hasStubImplementation())
+  //         // if (auto overridden = ctor->getOverriddenDecl())
+  //          overriddenInits.insert(ctor);
+  //
+  //  actorDecl->synthesizeSemanticMembersIfNeeded(
+  //    DeclBaseName::createConstructor());
 
   NLOptions subOptions = (NL_QualifiedDefault | NL_IgnoreAccessControl);
   SmallVector<ValueDecl *, 4> lookupResults;
@@ -417,8 +417,8 @@ static void collectNonOveriddenDistributedActorInits(
     // Distributed Actor Constructor
     auto daCtor = cast<ConstructorDecl>(decl);
 
-// TODO: Don't require it if overriden
-//    if (!overriddenInits.count(daCtor))
+    // TODO: Don't require it if overriden
+    //    if (!overriddenInits.count(daCtor))
     results.push_back(daCtor);
   }
 }
@@ -444,14 +444,14 @@ static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
   // Check whether the user has defined a designated initializer for this class,
   // and whether all of its stored properties have initial values.
   auto &ctx = decl->getASTContext();
-//  bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
-//  bool defaultInitable =
-//      areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
-//
-//  // We can't define these overrides if we have any uninitialized
-//  // stored properties.
-//  if (!defaultInitable && !foundDesignatedInit)
-//    return;
+  //  bool foundDesignatedInit = hasUserDefinedDesignatedInit(ctx.evaluator, decl);
+  //  bool defaultInitable =
+  //      areAllStoredPropertiesDefaultInitializable(ctx.evaluator, decl);
+  //
+  //  // We can't define these overrides if we have any uninitialized
+  //  // stored properties.
+  //  if (!defaultInitable && !foundDesignatedInit)
+  //    return;
 
   SmallVector<ConstructorDecl *, 4> nonOverridenCtors;
   collectNonOveriddenDistributedActorInits(
@@ -554,6 +554,164 @@ static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
 }
 
 /******************************************************************************/
+/*************************** _REMOTE_ FUNCTIONS *******************************/
+/******************************************************************************/
+
+/// Synthesizes the for `_remote_xxx` functions.
+///
+/// Create a stub body that emits a fatal error message.
+static std::pair<BraceStmt *, bool>
+synthesizeRemoteFuncStubBody(AbstractFunctionDecl *func, void *context) {
+  auto distributedFunc = static_cast<AbstractFunctionDecl *>(context);
+  auto classDecl = func->getDeclContext()->getSelfClassDecl();
+  auto &ctx = func->getASTContext();
+  auto &SM = ctx.SourceMgr;
+
+  auto *staticStringDecl = ctx.getStaticStringDecl();
+  auto staticStringType = staticStringDecl->getDeclaredInterfaceType();
+  auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
+
+  auto *uintDecl = ctx.getUIntDecl();
+  auto uintType = uintDecl->getDeclaredInterfaceType();
+  auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
+
+  auto missingTransportDecl = ctx.getMissingDistributedActorTransport();
+  assert(missingTransportDecl);
+
+  // Create a call to _Distributed._missingDistributedActorTransport
+  auto loc = func->getLoc();
+  Expr *ref = new (ctx) DeclRefExpr(missingTransportDecl,
+                                    DeclNameLoc(loc), /*Implicit=*/true);
+  ref->setType(missingTransportDecl->getInterfaceType()
+  ->removeArgumentLabels(1));
+
+  llvm::SmallString<64> buffer;
+  StringRef fullClassName = ctx.AllocateCopy(
+      (classDecl->getModuleContext()->getName().str() +
+      "." +
+      classDecl->getName().str()).toStringRef(buffer));
+
+  auto *className = new (ctx) StringLiteralExpr(fullClassName, loc,
+                                                /*Implicit=*/true);
+  className->setBuiltinInitializer(staticStringInit);
+  assert(isa<ConstructorDecl>(className->getBuiltinInitializer().getDecl()));
+  className->setType(staticStringType);
+
+  auto *funcName = new (ctx) StringLiteralExpr(
+      ctx.AllocateCopy(func->getName().getBaseName().getIdentifier().str()), loc,
+      /*Implicit=*/true);
+  funcName->setType(staticStringType);
+  funcName->setBuiltinInitializer(staticStringInit);
+
+  // Note: Sadly we cannot just rely on #function, #file, #line for the location
+  // (MagicIdentifierLiteralExpr), of the call because the call is made from a thunk.
+  // That thunk does not carry those info today although it could.
+  //
+  // Instead, we offer the location where the distributed func was declared.
+  auto fileString = SM.getDisplayNameForLoc(distributedFunc->getStartLoc());
+  auto *file = new (ctx) StringLiteralExpr(fileString, loc, /*Implicit=*/true);
+  file->setType(staticStringType);
+  file->setBuiltinInitializer(staticStringInit);
+
+  auto startLineAndCol = SM.getPresumedLineAndColumnForLoc(distributedFunc->getStartLoc());
+//  auto *line = new (ctx) MagicIdentifierLiteralExpr(
+//      MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
+//  auto *line = new (ctx) IntegerLiteralExpr(startLineAndCol.first, loc,
+//                                            /*implicit*/ true);
+  auto *line = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.first);
+  line->setType(uintType);
+  line->setBuiltinInitializer(uintInit);
+
+//  auto *column = new (ctx) MagicIdentifierLiteralExpr(
+//      MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
+  auto *column = IntegerLiteralExpr::createFromUnsigned(ctx, startLineAndCol.second);
+  column->setType(uintType);
+  column->setBuiltinInitializer(uintInit);
+
+  auto *call = CallExpr::createImplicit(
+      ctx, ref, { className, funcName, file, line, column }, {});
+  call->setType(ctx.getNeverType());
+  call->setThrows(false);
+
+  SmallVector<ASTNode, 2> stmts;
+  stmts.push_back(call); // something() -> Never
+  // stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr)); // FIXME: this causes 'different types for return type: String vs. ()'
+  auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
+                                /*implicit=*/true);
+  return { body, /*isTypeChecked=*/true };
+}
+
+static Identifier makeRemoteFuncIdentifier(FuncDecl* func) {
+  auto &C = func->getASTContext();
+  auto localFuncName = func->getBaseIdentifier().str().str();
+  auto remoteFuncIdent = C.getIdentifier("_remote_" + localFuncName);
+  return remoteFuncIdent;
+}
+
+/// Create a remote stub for the passed in \c func.
+/// The remote stub function is not user accessible and mirrors the API of
+/// the local function. It is always throwing, async, and user-inaccessible.
+///
+/// ```
+/// // func greet(name: String) { ... }
+/// dynamic <access> func _remote_greet(name: String) async throws {
+///     fatalError(...)
+/// }
+/// ```
+///
+/// and is intended to be replaced by a transport library by providing an
+/// appropriate @_dynamicReplacement function.
+static void addImplicitRemoteActorFunction(ClassDecl *decl, FuncDecl *func) {
+  auto &C = decl->getASTContext();
+  auto parentDC = decl;
+
+  auto remoteFuncIdent = makeRemoteFuncIdentifier(func);
+
+  auto params = ParameterList::clone(C, func->getParameters());
+  auto genericParams = func->getGenericParams(); // TODO: also clone those
+  Type resultTy = func->getResultInterfaceType();
+
+  DeclName name(C, remoteFuncIdent, params);
+  auto *const remoteFuncDecl = FuncDecl::createImplicit(
+      C, StaticSpellingKind::None, name, /*NameLoc=*/SourceLoc(),
+      /*Async=*/true, /*Throws=*/true,
+      /*GenericParams=*/genericParams, params,
+      resultTy, parentDC);
+
+  // *dynamic* because we'll be replacing it with specific transports
+  remoteFuncDecl->getAttrs().add(
+      new (C) DynamicAttr(/*implicit=*/true));
+
+  // @_distributedActorIndependent
+  remoteFuncDecl->getAttrs().add(
+      new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
+
+  // users should never have to access this function directly;
+  // it is only invoked from our distributed function thunk if the actor is remote.
+  remoteFuncDecl->setUserAccessible(false);
+  remoteFuncDecl->setSynthesized();
+
+  remoteFuncDecl->setBodySynthesizer(&synthesizeRemoteFuncStubBody, func);
+
+  // same access control as the original function is fine
+  remoteFuncDecl->copyFormalAccessFrom(func, /*sourceIsParentContext=*/false);
+
+  decl->addMember(remoteFuncDecl);
+}
+
+/// Synthesize dynamic _remote stub functions for each encountered distributed function.
+static void addImplicitRemoteActorFunctions(ClassDecl *decl) {
+  assert(decl->isDistributedActor());
+
+  for (auto member : decl->getMembers()) {
+    auto func = dyn_cast<FuncDecl>(member);
+    if (func && func->isDistributed()) {
+      addImplicitRemoteActorFunction(decl, func);
+    }
+  }
+}
+
+/******************************************************************************/
 /************************ SYNTHESIS ENTRY POINT *******************************/
 /******************************************************************************/
 
@@ -573,4 +731,5 @@ static void addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
 
   addImplicitDistributedActorConstructors(decl);
   addImplicitDistributedActorStoredProperties(decl);
+  addImplicitRemoteActorFunctions(decl);
 }

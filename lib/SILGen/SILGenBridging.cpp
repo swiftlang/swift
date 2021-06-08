@@ -1960,7 +1960,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   //
   // func X_distributedThunk(...) async throws -> T {
   //   if __isRemoteActor(self) {
-  //     return try await Self.__remote_X(...)
+  //     return try await self._remote_X(...)
   //   } else {
   //     return try await self.X(...)
   //   }
@@ -2011,19 +2011,9 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   //   ...
   // }
   {
-    auto desc = UnqualifiedLookupDescriptor(
-        DeclNameRef(ctx.Id___isRemoteActor),
-        fd->getDeclContext(), fd->getLoc(), UnqualifiedLookupOptions());
-    auto lookup =
-        evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
-    FuncDecl *isRemoteFn = nullptr;
-    for (const auto &result : lookup) {
-      // FIXME: Validate this further, because we're assuming the exact type.
-      if (auto func = dyn_cast<FuncDecl>(result.getValueDecl())) {
-        isRemoteFn = func;
-        break;
-      }
-    }
+    FuncDecl* isRemoteFn = ctx.getIsRemoteDistributedActor();
+    assert(isRemoteFn &&
+           "Could not find 'is remote' function, is the '_Distributed' module available?");
 
     ManagedValue selfAnyObject = B.createInitExistentialRef(loc, getLoweredType(ctx.getAnyObjectType()),
                                                         CanType(selfType),
@@ -2037,19 +2027,17 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     B.createCondBranch(loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
   }
 
-
   // if __isRemoteActor(self) {
-  //   return try await Self._remote_X(...)
+  //   return try await self._remote_X(...)
   // }
   {
     B.emitBlock(isRemoteBB);
 
     auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
-    // FIXME: should this be an llvm_unreachable instead?
     assert(selfTyDecl && "distributed function declared outside of actor");
 
-    auto selfMetatype = getLoweredType(selfTyDecl->getInterfaceType());
-    SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
+//    auto selfMetatype = getLoweredType(selfTyDecl->getInterfaceType());
+//    SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
 
     auto remoteFnDecl = selfTyDecl->lookupDirectRemoteFunc(fd);
     assert(remoteFnDecl && "Could not find _remote_<dist_func_name> function");
@@ -2057,19 +2045,19 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
     SILGenFunctionBuilder builder(SGM);
     auto remoteFnSIL = builder.getOrCreateFunction(loc, remoteFnRef, ForDefinition);
-
     SILValue remoteFn = B.createFunctionRefFor(loc, remoteFnSIL);
 
     auto subs = F.getForwardingSubstitutionMap();
 
     SmallVector<SILValue, 8> remoteParams(params);
-    remoteParams.emplace_back(metatypeValue);
+//     remoteParams.emplace_back(metatypeValue);
 
+    // B.createTryApply(loc, remoteFn, subs, params, remoteReturnBB, remoteErrorBB);
     B.createTryApply(loc, remoteFn, subs, remoteParams, remoteReturnBB, remoteErrorBB);
   }
 
   // else {
-  //   return try await self.X(...)
+  //   return (try)? (await)? self.X(...)
   // }
   {
     B.emitBlock(isLocalBB);

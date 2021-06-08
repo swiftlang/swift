@@ -1,17 +1,13 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-fail-simple-swift(-Xfrontend -enable-experimental-distributed -parse-as-library %import-libdispatch) 2>&1 | %FileCheck %s
+//
+// // TODO: could not figure out how to use 'not --crash' it never is used with target-run-simple-swift
+// This test is intended to *crash*, so we're using target-fail-simple-swift
+// which expects the exit code of the program to be non-zero;
+// We then check stderr for the expected error message using filecheck as usual.
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: distributed
-
-// rdar://76038845
-// UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: back_deployment_runtime
-
-// rdar://77798215
-// UNSUPPORTED: OS=windows-msvc
-
-// REQUIRES: radar78290608
 
 import _Distributed
 
@@ -19,15 +15,6 @@ import _Distributed
 distributed actor SomeSpecificDistributedActor {
   distributed func hello() async throws -> String {
     "local impl"
-  }
-}
-
-@available(SwiftStdlib 5.5, *)
-extension SomeSpecificDistributedActor {
-
-  @_dynamicReplacement(for: hello())
-  nonisolated func _remote_hello() async throws -> String {
-    return "remote impl (address: \(actor.actorAddress))"
   }
 }
 
@@ -57,31 +44,14 @@ struct FakeTransport: ActorTransport {
 
 // ==== Execute ----------------------------------------------------------------
 
-@_silgen_name("swift_distributed_actor_is_remote")
-func __isRemoteActor(_ actor: AnyObject) -> Bool
-
-func __isLocalActor(_ actor: AnyObject) -> Bool {
-  return !__isRemoteActor(actor)
-}
-
-// ==== Execute ----------------------------------------------------------------
-
 @available(SwiftStdlib 5.5, *)
 func test_remote() async {
   let address = ActorAddress(parse: "")
   let transport = FakeTransport()
 
-  let local = SomeSpecificDistributedActor(transport: transport)
-  _ = local.actorAddress
-  assert(__isLocalActor(local) == true, "should be local")
-  assert(__isRemoteActor(local) == false, "should be local")
-
-  // assume it always makes a remote one
   let remote = try! SomeSpecificDistributedActor(resolve: address, using: transport)
-  assert(__isLocalActor(remote) == false, "should be remote")
-  assert(__isRemoteActor(remote) == true, "should be remote")
-
-  print("done") // CHECK: done
+  _ = try! await remote.hello() // let it crash!
+  // CHECK: SOURCE_DIR/test/Distributed/Runtime/distributed_no_transport_boom.swift:16: Fatal error: Invoked remote placeholder function '_remote_hello' on remote distributed actor of type 'main.SomeSpecificDistributedActor'. Configure an appropriate 'ActorTransport' for this actor to resolve this error (e.g. by depending on some specific transport library).
 }
 
 @available(SwiftStdlib 5.5, *)

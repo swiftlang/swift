@@ -35,7 +35,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "CodeSynthesisDistributedActor.cpp"
+#include "CodeSynthesisDistributedActor.cpp" // FIXME: remove this!!!
 using namespace swift;
 
 const bool IsImplicit = true;

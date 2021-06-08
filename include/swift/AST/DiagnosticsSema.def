@@ -4436,11 +4436,9 @@ ERROR(distributed_actor_func_param_not_codable,none,
 ERROR(distributed_actor_func_result_not_codable,none,
       "distributed function result type %0 does not conform to 'Codable'",
       (Type))
-ERROR(distributed_actor_func_missing_remote_func,none,
-      "distributed function is missing its remote static func implementation (%0). "
-      "You may want to use a distributed actor SwiftPM plugin to generate those, "
-      "or implement it manually.",
-      (Identifier))
+ERROR(distributed_actor_remote_func_implemented_manually,none,
+      "Distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
+      (Identifier, Identifier))
 ERROR(distributed_actor_remote_func_is_not_static,none,
       "remote function %0 must be static.",
       (DeclName))
