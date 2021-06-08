@@ -624,8 +624,7 @@ function(add_swift_host_tool executable)
   _add_host_variant_c_compile_flags(${executable})
   _add_host_variant_link_flags(${executable})
   _add_host_variant_c_compile_link_flags(${executable})
-  target_link_directories(${executable} PRIVATE
-    ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+
   # Force executables linker language to be CXX so that we do not link using the
   # host toolchain swiftc.
   set_target_properties(${executable} PROPERTIES LINKER_LANGUAGE CXX)
