@@ -11,9 +11,11 @@ import sys
 
 utils = os.path.dirname(os.path.realpath(__file__))
 
+
 def main(arguments):
     parser = argparse.ArgumentParser(
-        description='Postprocess binaries to prepare for their execution on Darwin platforms')
+        description='Postprocess binaries to prepare for \
+                     their execution on Darwin platforms')
     parser.add_argument('bins', nargs='+', help='one or more binary files')
 
     args = parser.parse_args(arguments)
@@ -21,6 +23,7 @@ def main(arguments):
     for bin in args.bins:
         unrpathize(bin)
         codesign(bin)
+
 
 # This function rewrites binaries that use these `@rpath`-based load
 # commands to use direct /usr/lib/swift paths instead, to work around
@@ -76,9 +79,11 @@ def unrpathize(filename):
 
     subprocess.check_call(command)
 
+
 def codesign(filename):
     # "-" is the signing identity for ad-hoc signing.
     command = ["/usr/bin/codesign", "--force", "--sign", "-", filename]
     subprocess.check_call(command)
+
 
 sys.exit(main(sys.argv[1:]))
