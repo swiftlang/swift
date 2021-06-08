@@ -7,6 +7,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// REQUIRES: radar78290608
+
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
