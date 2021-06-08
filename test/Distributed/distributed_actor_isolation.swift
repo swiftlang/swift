@@ -56,6 +56,7 @@ distributed actor DistributedActor_1 {
 
   distributed func distInt() async throws -> Int { 42 } // ok
   distributed func distInt(int: Int) async throws -> Int { int } // ok
+  distributed func distIntString(int: Int, two: String) async throws -> (String) { "\(int) + \(two)" } // ok
 
   distributed func dist(notCodable: NotCodableValue) async throws {
     // expected-error@-1 {{distributed function parameter 'notCodable' of type 'NotCodableValue' does not conform to 'Codable'}}
@@ -65,10 +66,10 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
 
-  distributed func distReturnGeneric<T: Codable>(int: Int) async throws -> T { // ok
-    fatalError()
+  distributed func distReturnGeneric<T: Codable>(item: T) async throws -> T { // ok
+    item
   }
-  distributed func distReturnGenericWhere<T>(int: Int) async throws -> T where T: Codable { // ok
+  distributed func distReturnGenericWhere<T>(item: Int) async throws -> T where T: Codable { // ok
     fatalError()
   }
   distributed func distBadReturnGeneric<T>(int: Int) async throws -> T {
@@ -80,7 +81,7 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
   distributed func distGenericParamWhere<T>(value: T) async throws -> T where T: Codable { // ok
-    fatalError()
+    value
   }
   distributed func distBadGenericParam<T>(int: T) async throws {
     // expected-error@-1 {{distributed function parameter 'int' of type 'T' does not conform to 'Codable'}}
@@ -102,31 +103,6 @@ distributed actor DistributedActor_1 {
     await self.distHelloAsync()
     try self.distHelloThrows()
     try await self.distHelloAsyncThrows()
-  }
-}
-
-@available(SwiftStdlib 5.5, *)
-extension DistributedActor_1 {
-  static func _remote_distHello(actor: DistributedActor_1) async throws { }
-  static func _remote_distHelloAsync(actor: DistributedActor_1) async throws  { }
-  static func _remote_distHelloThrows(actor: DistributedActor_1) async throws { }
-  static func _remote_distHelloAsyncThrows(actor: DistributedActor_1) async throws { }
-
-  static func _remote_distInt(actor: DistributedActor_1) async throws -> Int { 42 }
-  static func _remote_distInt(int: Int, actor: DistributedActor_1) async throws -> Int { int }
-
-  static func _remote_distReturnGeneric<T: Codable>(int: Int, actor: DistributedActor_1) async throws -> T {
-    fatalError()
-  }
-  static func _remote_distReturnGenericWhere<T>(int: Int, actor: DistributedActor_1) async throws -> T where T: Codable {
-    fatalError()
-  }
-
-  static func _remote_distGenericParam<T: Codable>(value: T, actor: DistributedActor_1) async throws {
-    fatalError()
-  }
-  static func _remote_distGenericParamWhere<T>(value: T, actor: DistributedActor_1) async throws -> T where T: Codable {
-    fatalError()
   }
 }
 
@@ -153,17 +129,6 @@ func test_outside(
   _ = await distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
-}
-
-@available(SwiftStdlib 5.5, *)
-distributed actor DistributedActor_2 {
-  // TODO: should report the error on the remote function instead?
-  distributed func okey() {} // expected-error{{remote function '_remote_okey()' must be static.}}
-}
-
-@available(SwiftStdlib 5.5, *)
-extension DistributedActor_2 {
-  func _remote_okey() {}
 }
 
 // ==== Codable parameters and return types ------------------------------------

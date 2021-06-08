@@ -50,36 +50,6 @@ distributed actor SomeSpecificDistributedActor {
 
 }
 
-@available(SwiftStdlib 5.5, *)
-extension SomeSpecificDistributedActor {
-
-  static func _remote_helloAsyncThrows(actor: SomeSpecificDistributedActor) async throws -> String {
-    return "remote(\(#function)) (address: \(actor.actorAddress))"
-  }
-
-  static func _remote_helloAsync(actor: SomeSpecificDistributedActor) async throws -> String {
-    return "remote(\(#function)) (address: \(actor.actorAddress))"
-  }
-
-  static func _remote_helloThrows(actor: SomeSpecificDistributedActor) async throws -> String {
-    return "remote(\(#function)) (address: \(actor.actorAddress))"
-  }
-
-  static func _remote_hello(actor: SomeSpecificDistributedActor) async throws -> String {
-    return "remote(\(#function)) (address: \(actor.actorAddress))"
-  }
-
-  // === errors
-
-  static func _remote_helloThrowsImplBoom(actor: SomeSpecificDistributedActor) async throws -> String {
-    throw Boom()
-  }
-
-  static func _remote_helloThrowsTransportBoom(actor: SomeSpecificDistributedActor) async throws -> String {
-    throw Boom()
-  }
-}
-
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")

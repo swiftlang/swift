@@ -6324,6 +6324,12 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
+  auto *Clone = ParamDecl::cloneWithoutType(Ctx, PD);
+  Clone->setInterfaceType(PD->getInterfaceType());
+  return Clone;
+}
+
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());

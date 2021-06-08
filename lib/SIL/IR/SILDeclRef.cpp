@@ -121,8 +121,8 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
   return false;
 }
 
-SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
-                       bool isDistributed,
+SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
+                       bool isForeign, bool isDistributed,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
     : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
       defaultArgIndex(0), pointer(derivativeId) {}
@@ -171,7 +171,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistribut
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                        GenericSignature prespecializedSig)
-    : SILDeclRef(baseLoc, false) {
+    : SILDeclRef(baseLoc, false, false) {
   pointer = prespecializedSig.getPointer();
 }
 

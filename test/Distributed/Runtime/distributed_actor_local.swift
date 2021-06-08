@@ -20,13 +20,6 @@ distributed actor SomeSpecificDistributedActor {
   }
 }
 
-@available(SwiftStdlib 5.5, *)
-extension SomeSpecificDistributedActor {
-  static func _remote_hello(actor: SomeSpecificDistributedActor) async throws {
-    print("Remote invocation")
-  }
-}
-
 // ==== Execute ----------------------------------------------------------------
 
 @_silgen_name("swift_distributed_actor_is_remote")
@@ -35,7 +28,6 @@ func __isRemoteActor(_ actor: AnyObject) -> Bool
 func __isLocalActor(_ actor: AnyObject) -> Bool {
   return !__isRemoteActor(actor)
 }
-
 
 // ==== Fake Transport ---------------------------------------------------------
 
@@ -89,8 +81,17 @@ func test_run(transport: FakeTransport) async {
 }
 
 @available(SwiftStdlib 5.5, *)
+func test_echo(transport: FakeTransport) async {
+  let actor = SomeSpecificDistributedActor(transport: transport)
+
+  let echo = try! await actor.echo(int: 42)
+  print("echo: \(echo)") // CHECK: echo: 42
+}
+
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_run(transport: FakeTransport())
+    await test_echo(transport: FakeTransport())
   }
 }

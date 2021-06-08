@@ -67,6 +67,14 @@ public:
     return create(decl->getASTContext(), decl);
   }
 
+  static ParameterList *clone(const ASTContext &Ctx, ParameterList *PL) {
+    SmallVector<ParamDecl*, 4> params;
+    params.reserve(PL->size());
+    for (auto p : *PL)
+      params.push_back(ParamDecl::clone(Ctx, p));
+    return ParameterList::create(Ctx, params);
+  }
+
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
   
