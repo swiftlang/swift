@@ -4788,7 +4788,11 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
   friend class NamingPatternRequest;
+  friend class GetFieldIndexRequest;
+  friend class ComputeFieldIndicesRequest;
   NamedPattern *NamingPattern = nullptr;
+
+  int fieldIndex = -1;
 
 public:
   enum class Introducer : uint8_t {
@@ -4820,6 +4824,8 @@ public:
   StringRef getNameStr() const {
     return hasName() ? getBaseIdentifier().str() : "_";
   }
+
+  int getFieldIndex() const;
 
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
