@@ -122,7 +122,7 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   }
 
   @MainActor func mainActorMethod() {
-    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from synchronous context of global actor 'MainActor'}}
+    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from the main actor}}
   }
 
   @MainActor func uiActorMethod() { }

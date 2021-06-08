@@ -181,8 +181,8 @@ actor GenericSub<T> : GenericSuper<[T]> { // expected-error{{actor types do not 
   nonisolated override func method3() { } // expected-error{{nonisolated instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
   @OtherGlobalActor func testMethod() {
-    method() // expected-error{{actor-isolated instance method 'method()' can not be referenced from synchronous context of global actor 'OtherGlobalActor'}}
-    _ = method // expected-error{{actor-isolated instance method 'method()' can not be referenced from context of global actor 'OtherGlobalActor'}}
+    method() // expected-error{{actor-isolated instance method 'method()' can not be referenced from global actor 'OtherGlobalActor'}}
+    _ = method // expected-error{{actor-isolated instance method 'method()' can not be partially applied}}
   }
 }
 
