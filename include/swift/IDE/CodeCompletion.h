@@ -33,6 +33,7 @@ class Decl;
 class DeclContext;
 class FrontendOptions;
 class ModuleDecl;
+class SourceFile;
 
 namespace ide {
 
@@ -1025,7 +1026,7 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
                                            const ModuleDecl *module,
                                            ArrayRef<std::string> accessPath,
                                            bool needLeadingDot,
-                                           const DeclContext *currDeclContext);
+                                           const SourceFile *SF);
 
 /// Copy code completion results from \p sourceSink to \p targetSink, possibly
 /// restricting by \p onlyTypes. Returns copied results in \p targetSink.
