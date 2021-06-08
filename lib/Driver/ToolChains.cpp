@@ -175,6 +175,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-aarch64-use-tbi");
   }
 
+  if (output.getPrimaryOutputType() == file_types::TY_SwiftModuleFile) {
+    arguments.push_back("-warn-on-potentially-unavailable-enum-case");
+  }
+
   // Enable or disable ObjC interop appropriately for the platform
   if (Triple.isOSDarwin()) {
     arguments.push_back("-enable-objc-interop");
