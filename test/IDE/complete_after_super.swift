@@ -123,7 +123,7 @@ class SuperDerivedA : SuperBaseA {
   init() {
     super#^CONSTRUCTOR_SUPER_NO_DOT_1?check=COMMON_BASE_A_NO_DOT;check=CONSTRUCTOR_SUPER_NO_DOT_1^#
 // CONSTRUCTOR_SUPER_NO_DOT_1: Begin completions, 8 items
-// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Constructor]/ExprSpecific: .init()[#SuperBaseA#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_NO_DOT_1-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: .init()[#SuperBaseA#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_NO_DOT_1: End completions
   }
 
@@ -145,13 +145,13 @@ class SuperDerivedA : SuperBaseA {
   init (a: Float) {
     super.init#^CONSTRUCTOR_SUPER_INIT_1^#
 // CONSTRUCTOR_SUPER_INIT_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal: ()[#SuperBaseA#]; name=()
+// CONSTRUCTOR_SUPER_INIT_1-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ()[#SuperBaseA#]; name=()
 // CONSTRUCTOR_SUPER_INIT_1: End completions
   }
   init (b: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions, 1 items
-// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal: ['('][')'][#SuperBaseA#]; name=
+// CONSTRUCTOR_SUPER_INIT_PAREN_1: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#SuperBaseA#]; name=
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 
@@ -291,7 +291,7 @@ class SuperDerivedB : SuperBaseB {
   init() {
     super#^CONSTRUCTOR_SUPER_NO_DOT_2?check=COMMON_BASE_B_NO_DOT;check=CONSTRUCTOR_SUPER_NO_DOT_2^#
 // CONSTRUCTOR_SUPER_NO_DOT_2: Begin completions, 10 items
-// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/ExprSpecific: .init()[#SuperBaseB#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: .init()[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#a: Double#})[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_NO_DOT_2-DAG: Decl[Constructor]/CurrNominal: .init({#int: Int#})[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_NO_DOT_2: End completions
@@ -302,7 +302,7 @@ class SuperDerivedB : SuperBaseB {
 // CONSTRUCTOR_SUPER_DOT_2: Begin completions, 9 items
 // CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init({#a: Double#})[#SuperBaseB#]{{; name=.+$}}
-// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/ExprSpecific: init({#int: Int#})[#SuperBaseB#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: init({#int: Int#})[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_2: End completions
   }
 
@@ -365,7 +365,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2?check=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2;check=NO_SUPER_DECLS^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[Constructor]/CurrNominal:    init()[#SemanticContextBase1#]{{; name=.+$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[Constructor]/ExprSpecific:    init({#a: Int#})[#SemanticContextBase1#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[Constructor]/CurrNominal/Flair[SuperChain]:    init({#a: Int#})[#SemanticContextBase1#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: End completions
@@ -379,7 +379,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4?check=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4;check=NO_SUPER_DECLS;check=NO_CONSTRUCTORS^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4: Begin completions
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/ExprSpecific: instanceFunc1()[#Void#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[SuperChain]: instanceFunc1()[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
@@ -387,7 +387,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5?check=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5;check=NO_SUPER_DECLS;check=NO_CONSTRUCTORS^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}
-// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/ExprSpecific: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal/Flair[SuperChain]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: End completions
   }
 }
@@ -417,6 +417,37 @@ class Closures : SuperBaseA {
   }
 }
 
+class SuperBaseC {
+  init(x: Int) {}
+  func foo() {}
+  func bar() {}
+}
+class SuperDerivedC1: SuperBaseC {}
+class SuperDerivedC2: SuperDerivedC1 {
+  init(x: Int) {
+    super.#^OVERRIDE_2HOP_INIT1^#
+// OVERRIDE_2HOP_INIT1: Begin completions, 3 items
+// OVERRIDE_2HOP_INIT1-DAG: Decl[Constructor]/CurrNominal/Flair[SuperChain]: init({#x: Int#})[#SuperDerivedC1#];
+// OVERRIDE_2HOP_INIT1-DAG: Decl[InstanceMethod]/Super:         foo()[#Void#];
+// OVERRIDE_2HOP_INIT1-DAG: Decl[InstanceMethod]/Super:         bar()[#Void#];
+// OVERRIDE_2HOP_INIT1: End completions
+  }
+  init(y: Int) {
+    super.#^OVERRIDE_2HOP_INIT2^#
+// OVERRIDE_2HOP_INIT2: Begin completions, 3 items
+// OVERRIDE_2HOP_INIT2-DAG: Decl[Constructor]/CurrNominal:      init({#x: Int#})[#SuperDerivedC1#];
+// OVERRIDE_2HOP_INIT2-DAG: Decl[InstanceMethod]/Super:         foo()[#Void#];
+// OVERRIDE_2HOP_INIT2-DAG: Decl[InstanceMethod]/Super:         bar()[#Void#];
+// OVERRIDE_2HOP_INIT2: End completions
+  }
+  override func foo() {
+    super.#^OVERRIDE_2HOP_METHOD^#
+// OVERRIDE_2HOP_METHOD: Begin completions, 2 items
+// OVERRIDE_2HOP_METHOD-DAG: Decl[InstanceMethod]/Super/Flair[SuperChain]: foo()[#Void#];
+// OVERRIDE_2HOP_METHOD-DAG: Decl[InstanceMethod]/Super:         bar()[#Void#];
+// OVERRIDE_2HOP_METHOD: End completions
+  }
+}
 
 //===--- Code completion for 'super' keyword itself.
 

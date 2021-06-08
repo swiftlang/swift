@@ -31,8 +31,8 @@ func testGlobal() {
 }
 // GLOBAL_EXPR: Begin completions
 // GLOBAL_EXPR-DAG: Decl[Struct]/CurrModule:            <name>MyStruct</name>; typename=<typeid.user>MyStruct</typeid.user>;
-// GLOBAL_EXPR-DAG: Keyword[class]/None:                <keyword>class</keyword>; typename=;
-// GLOBAL_EXPR-DAG: Keyword[enum]/None:                 <keyword>enum</keyword>; typename=;
+// GLOBAL_EXPR-DAG: Keyword[class]/None/Flair[RareKeyword]: <keyword>class</keyword>; typename=;
+// GLOBAL_EXPR-DAG: Keyword[enum]/None/Flair[RareKeyword]: <keyword>enum</keyword>; typename=;
 // GLOBAL_EXPR-DAG: Keyword[if]/None:                   <keyword>if</keyword>; typename=;
 // GLOBAL_EXPR-DAG: Keyword[guard]/None:                <keyword>guard</keyword>; typename=;
 // GLOBAL_EXPR-DAG: Keyword[try]/None:                  <keyword>try</keyword>; typename=;
@@ -99,12 +99,12 @@ func testImplicitMember() -> MyStruct {
 }
 // EXPR_IMPLICITMEMBER: Begin completions, 7 items
 // EXPR_IMPLICITMEMBER-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: <name>init</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: <name>instance</name>; typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: <name>instance</name>; typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelNameParamName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) <keyword>throws</keyword> -&gt; <typeid.user>MyStruct</typeid.user>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>labelName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: (<attribute>@autoclosure</attribute> () -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>sameName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(label: <keyword>inout</keyword> <typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
 // EXPR_IMPLICITMEMBER-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: <name>paramName</name>(<callarg><callarg.label>_</callarg.label> <callarg.param>self</callarg.param>: <callarg.type><typeid.user>MyStruct</typeid.user></callarg.type></callarg>); typename=(<typeid.sys>Int</typeid.sys>) -&gt; <typeid.sys>Void</typeid.sys>;
-// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
+// EXPR_IMPLICITMEMBER-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: <name>create</name>(<callarg><callarg.label>x</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>); typename=<typeid.user>MyStruct</typeid.user>;
 // EXPR_IMPLICITMEMBER: End completions
 
 func testArgument() -> MyStruct {
@@ -112,7 +112,7 @@ func testArgument() -> MyStruct {
   foo(x: 1, #^CALLARG^#
 }
 // CALLARG: Begin completions, 1 items
-// CALLARG-DAG: Pattern/ExprSpecific:               <callarg><callarg.label>y</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>; typename=<typeid.sys>Int</typeid.sys>
+// CALLARG-DAG: Pattern/Local/Flair[ArgLabels]:               <callarg><callarg.label>y</callarg.label>: <callarg.type><typeid.sys>Int</typeid.sys></callarg.type></callarg>; typename=<typeid.sys>Int</typeid.sys>
 // CALLARG: End completions
 
 struct TestArchetypeAnnotations<T> {

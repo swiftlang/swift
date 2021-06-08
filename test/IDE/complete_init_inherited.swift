@@ -15,9 +15,9 @@ class A {
 }
 
 // TEST_A: Begin completions
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#A#]{{; name=.+$}}
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#A#]{{; name=.+$}}
-// TEST_A-NEXT: Decl[Constructor]/CurrNominal:      ({#float: Float#})[#A#]{{; name=.+$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#A#]{{; name=.+$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#double: Double#})[#A#]{{; name=.+$}}
+// TEST_A-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_A-NEXT: Keyword[self]/CurrNominal:          .self[#A.Type#]; name=self
 // TEST_A-NEXT: Keyword/CurrNominal:                .Type[#A.Type#]; name=Type
 // TEST_A-NEXT: End completions
@@ -29,9 +29,9 @@ class B : A {
 }
 
 // TEST_B: Begin completions
-// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#B#]{{; name=.+$}}
-// TEST_B-NEXT: Decl[Constructor]/CurrNominal:      ({#double: Double#})[#B#]{{; name=.+$}}
-// TEST_B-NEXT: Decl[Constructor]/Super:            ({#float: Float#})[#A#]{{; name=.+$}}
+// TEST_B-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#B#]{{; name=.+$}}
+// TEST_B-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#double: Double#})[#B#]{{; name=.+$}}
+// TEST_B-NEXT: Decl[Constructor]/Super/Flair[ArgLabels]:            ({#float: Float#})[#A#]{{; name=.+$}}
 // TEST_B-NEXT: Keyword[self]/CurrNominal:          .self[#B.Type#]; name=self
 // TEST_B-NEXT: Keyword/CurrNominal: .Type[#B.Type#]; name=Type
 // TEST_B-NEXT: End completions
@@ -47,8 +47,8 @@ class C : B {
 }
 
 // TEST_C: Begin completions
-// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#C#]{{; name=.+$}}
-// TEST_C-NEXT: Decl[Constructor]/CurrNominal:      ({#c: C#})[#C#]{{; name=.+$}}
+// TEST_C-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#C#]{{; name=.+$}}
+// TEST_C-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_C-NEXT: Keyword[self]/CurrNominal:          .self[#C.Type#]; name=self
 // TEST_C-NEXT: Keyword/CurrNominal:                .Type[#C.Type#]; name=Type
 // TEST_C-NEXT: End completions
@@ -65,9 +65,9 @@ class D : C {
 }
 
 // TEST_D: Begin completions
-// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#d: D#})[#D#]{{; name=.+$}}
-// TEST_D-NEXT: Decl[Constructor]/CurrNominal:      ({#int: Int#})[#D#]{{; name=.+$}}
-// TEST_D-NEXT: Decl[Constructor]/Super:            ({#c: C#})[#C#]{{; name=.+$}}
+// TEST_D-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#d: D#})[#D#]{{; name=.+$}}
+// TEST_D-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ({#int: Int#})[#D#]{{; name=.+$}}
+// TEST_D-NEXT: Decl[Constructor]/Super/Flair[ArgLabels]:            ({#c: C#})[#C#]{{; name=.+$}}
 // TEST_D-NEXT: Keyword[self]/CurrNominal:          .self[#D.Type#]; name=self
 // TEST_D-NEXT: Keyword/CurrNominal:                .Type[#D.Type#]; name=Type
 // TEST_D-NEXT: End completions
@@ -76,9 +76,9 @@ class D : C {
 // TEST_D_DOT-NEXT: Decl[Constructor]/CurrNominal:  init({#int: Int#})[#D#]; name=init(int: Int)
 // TEST_D_DOT-NEXT: Decl[Constructor]/Super:        init({#c: C#})[#C#]; name=init(c: C)
 
-// TEST_D_PAREN: Decl[Constructor]/CurrNominal:       ['(']{#d: D#}[')'][#D#]; name=d: D
-// TEST_D_PAREN-NEXT: Decl[Constructor]/CurrNominal:  ['(']{#int: Int#}[')'][#D#]; name=int: Int
-// TEST_D_PAREN-NEXT: Decl[Constructor]/Super:  ['(']{#c: C#}[')'][#C#]; name=c: C
+// TEST_D_PAREN: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:       ['(']{#d: D#}[')'][#D#]; name=d: D
+// TEST_D_PAREN-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:  ['(']{#int: Int#}[')'][#D#]; name=int: Int
+// TEST_D_PAREN-NEXT: Decl[Constructor]/Super/Flair[ArgLabels]:  ['(']{#c: C#}[')'][#C#]; name=c: C
 
 func testA() {
   A#^TEST_A^#
@@ -108,8 +108,8 @@ class R74233797Derived : R74233797Base {
 func testR74233797() {
     R74233797Derived(#^METATYPE_CONVERSION^#)
 // METATYPE_CONVERSION: Begin completions
-// METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal: ['(']{#sub: Bool#}[')'][#R74233797Derived#];
-// METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal: ['('][')'][#R74233797Derived#];
-// METATYPE_CONVERSION-DAG: Decl[Constructor]/Super: ['(']{#(test): Bool#}[')'][#R74233797Base#];
+// METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#sub: Bool#}[')'][#R74233797Derived#];
+// METATYPE_CONVERSION-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['('][')'][#R74233797Derived#];
+// METATYPE_CONVERSION-DAG: Decl[Constructor]/Super/Flair[ArgLabels]: ['(']{#(test): Bool#}[')'][#R74233797Base#];
 // METATYPE_CONVERSION: End completions
 }

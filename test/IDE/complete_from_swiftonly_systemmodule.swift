@@ -73,6 +73,6 @@ func test(value: SomeValue) {
 
   let _ = SomeValue(#^INITIALIZER^#
 // INITIALIZER: Begin completions, 1 items
-// INITIALIZER-DAG: Decl[Constructor]/CurrNominal/IsSystem: ['(']{#public: Int#}[')'][#SomeValue#];
+// INITIALIZER-DAG: Decl[Constructor]/CurrNominal/Flair[ArgLabels]/IsSystem: ['(']{#public: Int#}[')'][#SomeValue#];
 // INITIALIZER: End completions
 }

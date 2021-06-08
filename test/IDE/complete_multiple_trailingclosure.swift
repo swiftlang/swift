@@ -26,11 +26,11 @@ func testGlobalFunc() {
     { 1 } #^GLOBALFUNC_SAMELINE^#
     #^GLOBALFUNC_NEWLINE^#
 // GLOBALFUNC_SAMELINE: Begin completions, 1 items
-// GLOBALFUNC_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
+// GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: () -> String {|}#}[#() -> String#];
 // GLOBALFUNC_SAMELINE: End completions
 
 // GLOBALFUNC_NEWLINE: Begin completions
-// FIXME-GLOBALFUNC_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
+// FIXME-GLOBALFUNC_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: () -> String {|}#}[#() -> String#];
 // GLOBALFUNC_NEWLINE: End completions
 
   globalFunc1()
@@ -55,15 +55,15 @@ func testMethod(value: MyStruct) {
   } #^METHOD_SAMELINE^#
   #^METHOD_NEWLINE^#
 // METHOD_SAMELINE: Begin completions, 4 items
-// METHOD_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {|}#}[#(() -> String)?#];
+// METHOD_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: (() -> String)? {|}#}[#(() -> String)?#];
 // METHOD_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#];
 // METHOD_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#];
 // METHOD_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#];
 // METHOD_SAMELINE: End completions
 
 // METHOD_NEWLINE: Begin completions
-// FIXME-METHOD_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {|}#}[#(() -> String)?#];
-// METHOD_NEWLINE-DAG: Keyword[class]/None:                class;
+// FIXME-METHOD_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: (() -> String)? {|}#}[#(() -> String)?#];
+// METHOD_NEWLINE-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // METHOD_NEWLINE-DAG: Keyword[if]/None:                   if;
 // METHOD_NEWLINE-DAG: Keyword[try]/None:                  try;
 // METHOD_NEWLINE-DAG: Decl[LocalVar]/Local:               value[#MyStruct#]; name=value
@@ -86,16 +86,16 @@ func testOverloadedInit() {
   #^INIT_OVERLOADED_NEWLINE^#
 
 // INIT_OVERLOADED_SAMELINE: Begin completions, 4 items
-// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
-// INIT_OVERLOADED_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {|}#}[#() -> String#];
+// INIT_OVERLOADED_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: () -> String {|}#}[#() -> String#];
+// INIT_OVERLOADED_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn3: () -> String {|}#}[#() -> String#];
 // INIT_OVERLOADED_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INIT_OVERLOADED_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct#];
 // INIT_OVERLOADED_SAMELINE: End completions
 
 // INIT_OVERLOADED_NEWLINE: Begin completions
-// FIXME-INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
-// FIXME-INIT_OVERLOADED_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {|}#}[#() -> String#];
-// INIT_OVERLOADED_NEWLINE-DAG: Keyword[class]/None:                class;
+// FIXME-INIT_OVERLOADED_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: () -> String {|}#}[#() -> String#];
+// FIXME-INIT_OVERLOADED_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn3: () -> String {|}#}[#() -> String#];
+// INIT_OVERLOADED_NEWLINE-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // INIT_OVERLOADED_NEWLINE-DAG: Keyword[if]/None:                   if;
 // INIT_OVERLOADED_NEWLINE-DAG: Keyword[try]/None:                  try;
 // INIT_OVERLOADED_NEWLINE-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -113,16 +113,16 @@ func testOptionalInit() {
   #^INIT_OPTIONAL_NEWLINE^#
 
 // INIT_OPTIONAL_SAMELINE: Begin completions, 4 items
-// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
-// INIT_OPTIONAL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {|}#}[#() -> String#];
+// INIT_OPTIONAL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: () -> String {|}#}[#() -> String#];
+// INIT_OPTIONAL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn3: () -> String {|}#}[#() -> String#];
 // INIT_OPTIONAL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INIT_OPTIONAL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct2#];
 // INIT_OPTIONAL_SAMELINE: End completions
 
 // INIT_OPTIONAL_NEWLINE: Begin completions
-// FIXME-INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
-// FIXME-INIT_OPTIONAL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {|}#}[#() -> String#];
-// INIT_OPTIONAL_NEWLINE-DAG: Keyword[class]/None:                class;
+// FIXME-INIT_OPTIONAL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: () -> String {|}#}[#() -> String#];
+// FIXME-INIT_OPTIONAL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn3: () -> String {|}#}[#() -> String#];
+// INIT_OPTIONAL_NEWLINE-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // INIT_OPTIONAL_NEWLINE-DAG: Keyword[if]/None:                   if;
 // INIT_OPTIONAL_NEWLINE-DAG: Keyword[try]/None:                  try;
 // INIT_OPTIONAL_NEWLINE-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -141,11 +141,11 @@ func testOptionalInit() {
   #^INIT_REQUIRED_NEWLINE_1^#
 
 // INIT_REQUIRED_SAMELINE_1: Begin completions, 1 items
-// INIT_REQUIRED_SAMELINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_1-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn2: () -> String {|}#}[#() -> String#];
 // INIT_REQUIRED_SAMELINE_1: End completions
 
 // INIT_REQUIRED_NEWLINE_1: Begin completions
-// FIXME-INIT_REQUIRED_NEWLINE_1-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
+// FIXME-INIT_REQUIRED_NEWLINE_1-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn2: () -> String {|}#}[#() -> String#];
 // INIT_REQUIRED_NEWLINE_1: End completions
 
   // missing 'fn3'.
@@ -157,11 +157,11 @@ func testOptionalInit() {
   #^INIT_REQUIRED_NEWLINE_2^#
 
 // INIT_REQUIRED_SAMELINE_2: Begin completions, 1 items
-// INIT_REQUIRED_SAMELINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {|}#}[#() -> String#];
+// INIT_REQUIRED_SAMELINE_2-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn3: () -> String {|}#}[#() -> String#];
 // INIT_REQUIRED_SAMELINE_2: End completions
 
 // INIT_REQUIRED_NEWLINE_2: Begin completions
-// FIXME-INIT_REQUIRED_NEWLINE_2-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {|}#}[#() -> String#];
+// FIXME-INIT_REQUIRED_NEWLINE_2-DAG: Pattern/Local/Flair[ArgLabels]:               {#fn3: () -> String {|}#}[#() -> String#];
 // INIT_REQUIRED_NEWLINE_2: End completions
 
   // Call is completed.
@@ -182,7 +182,7 @@ func testOptionalInit() {
 // INIT_REQUIRED_NEWLINE_3: Begin completions
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn2
 // INIT_REQUIRED_NEWLINE_3-NOT: name=fn3
-// INIT_REQUIRED_NEWLINE_3-DAG: Keyword[class]/None:                class;
+// INIT_REQUIRED_NEWLINE_3-DAG: Keyword[class]/None/Flair[RareKeyword]: class;
 // INIT_REQUIRED_NEWLINE_3-DAG: Keyword[if]/None:                   if;
 // INIT_REQUIRED_NEWLINE_3-DAG: Keyword[try]/None:                  try;
 // INIT_REQUIRED_NEWLINE_3-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -207,7 +207,7 @@ func testFallbackPostfix() {
 // the stage at which we complete argument labels, so we can't rule it out for
 // now (SR-14450).
 // INIT_FALLBACK_1: Begin completions, 3 items
-// INIT_FALLBACK_1-DAG: Pattern/ExprSpecific:               {#arg3: () -> _ {|}#}[#() -> _#]
+// INIT_FALLBACK_1-DAG: Pattern/Local/Flair[ArgLabels]:     {#arg3: () -> _ {|}#}[#() -> _#]
 // INIT_FALLBACK_1-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INIT_FALLBACK_1-DAG: Keyword[self]/CurrNominal:          .self[#MyStruct4<Int>#];
 // INIT_FALLBACK_1: End completions
@@ -230,14 +230,14 @@ struct TestNominalMember: P {
   #^MEMBERDECL_NEWLINE^#
 
 // MEMBERDECL_SAMELINE: Begin completions, 4 items
-// MEMBERDECL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
+// MEMBERDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
 // MEMBERDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .enumFunc()[#Void#]; name=enumFunc()
 // MEMBERDECL_SAMELINE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: [' ']+ {#SimpleEnum#}[#SimpleEnum#]; name=+ SimpleEnum
 // MEMBERDECL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#SimpleEnum#]; name=self
 // MEMBERDECL_SAMELINE: End completions
 
 // MEMBERDECL_NEWLINE: Begin completions
-// FIXME-MEMBERDECL_NEWLINE-DAG: Pattern/ExprSpecific:               {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
+// FIXME-MEMBERDECL_NEWLINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2: (() -> String)? {|}#}[#(() -> String)?#]; name=fn2: (() -> String)?
 // MEMBERDECL_NEWLINE-DAG: Keyword[enum]/None:                 enum; name=enum
 // MEMBERDECL_NEWLINE-DAG: Keyword[func]/None:                 func; name=func
 // MEMBERDECL_NEWLINE-DAG: Keyword[private]/None:              private; name=private
@@ -254,8 +254,8 @@ func testInitializedVarDecl() {
     #^INITIALIZED_VARDECL_NEWLINE^#
 // INITIALIZED_VARDECL_SAMELINE: Begin completions, 4 items
 // INITIALIZED_VARDECL_SAMELINE-NOT: localVal
-// INITIALIZED_VARDECL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn2: () -> String {|}#}[#() -> String#];
-// INITIALIZED_VARDECL_SAMELINE-DAG: Pattern/ExprSpecific:               {#fn3: () -> String {|}#}[#() -> String#];
+// INITIALIZED_VARDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn2: () -> String {|}#}[#() -> String#];
+// INITIALIZED_VARDECL_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]:     {#fn3: () -> String {|}#}[#() -> String#];
 // INITIALIZED_VARDECL_SAMELINE-DAG: Decl[InstanceMethod]/CurrNominal:   .testStructMethod()[#Void#];
 // INITIALIZED_VARDECL_SAMELINE-DAG: Keyword[self]/CurrNominal:          .self[#TestStruct#];
 // INITIALIZED_VARDECL_SAMELINE-NOT: localVal

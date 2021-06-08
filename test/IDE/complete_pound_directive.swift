@@ -47,20 +47,20 @@ class C {
 
 // CONDITION: Begin completions
 // CONDITION-NOT: globalVar
-// CONDITION-DAG: Pattern/ExprSpecific:               os({#(name)#}); name=os(name)
-// CONDITION-DAG: Pattern/ExprSpecific:               arch({#(name)#}); name=arch(name)
-// CONDITION-DAG: Pattern/ExprSpecific:               canImport({#(module)#}); name=canImport(module)
-// CONDITION-DAG: Pattern/ExprSpecific:               targetEnvironment(simulator); name=targetEnvironment(simulator)
-// CONDITION-DAG: Pattern/ExprSpecific:               swift(>={#(version)#}); name=swift(>=version)
-// CONDITION-DAG: Pattern/ExprSpecific:               swift(<{#(version)#}); name=swift(<version)
-// CONDITION-DAG: Pattern/ExprSpecific:               compiler(>={#(version)#}); name=compiler(>=version)
-// CONDITION-DAG: Pattern/ExprSpecific:               compiler(<{#(version)#}); name=compiler(<version)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               os({#(name)#}); name=os(name)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               arch({#(name)#}); name=arch(name)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               canImport({#(module)#}); name=canImport(module)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               targetEnvironment(simulator); name=targetEnvironment(simulator)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(>={#(version)#}); name=swift(>=version)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               swift(<{#(version)#}); name=swift(<version)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(>={#(version)#}); name=compiler(>=version)
+// CONDITION-DAG: Pattern/CurrModule/Flair[ExprSpecific]:               compiler(<{#(version)#}); name=compiler(<version)
 // CONDITION-DAG: Keyword[true]/None:                 true[#Bool#]; name=true
 // CONDITION-DAG: Keyword[false]/None:                false[#Bool#]; name=false
 // CONDITION-NOT: globalVar
 
-// WITHFLAG: Keyword/ExprSpecific:               FOO; name=FOO
-// WITHFLAG: Keyword/ExprSpecific:               BAR; name=BAR
+// WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               FOO; name=FOO
+// WITHFLAG: Keyword/CurrModule/Flair[ExprSpecific]:               BAR; name=BAR
 
 // NOFLAG-NOT: FOO 
 // NOFLAG-NOT: BAR
