@@ -668,23 +668,6 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
 
     pushStructureNode(SN, Closure);
 
-  } else if (auto *CLE = dyn_cast<CaptureListExpr>(E)) {
-    // The ASTWalker visits captured variables twice, from a `CaptureListEntry` they are visited
-    // from the `VarDecl` and the `PatternBindingDecl` entries.
-    // We take over visitation here to avoid walking the `PatternBindingDecl` ones.
-    for (auto c : CLE->getCaptureList()) {
-      if (auto *VD = c.Var) {
-        // We're skipping over the PatternBindingDecl so we need to handle the
-        // the VarDecl's attributes that we'd normally process visiting the PBD.
-        if (!handleAttrs(VD->getAttrs()))
-          return { false, nullptr };
-        VD->walk(*this);
-      }
-    }
-    if (auto *CE = CLE->getClosureBody())
-      CE->walk(*this);
-    return { false, walkToExprPost(E) };
-
   } else if (auto SE = dyn_cast<SequenceExpr>(E)) {
     // In SequenceExpr, explicit cast expressions (e.g. 'as', 'is') appear
     // twice. Skip pointers we've already seen.

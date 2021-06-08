@@ -2492,26 +2492,16 @@ public:
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D)) {
       if (shouldTrackVarDecl(vd)) {
-        // Inline constructor.
-        auto defaultFlags = [&]() -> unsigned {
-          // If this VarDecl is nested inside of a CaptureListExpr, remember
-          // that fact for better diagnostics.
-          auto parentAsExpr = Parent.getAsExpr();
-          if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
-            return RK_CaptureList | RK_Defined;
-          // Otherwise, return none.
-          return RK_Defined;
-        }();
+        unsigned flags = RK_Defined;
+        if (vd->isCaptureList())
+          flags |= RK_CaptureList;
 
-        if (!vd->isImplicit()) {
-          if (auto *childVd =
-                  vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
-            // Child vars are never in capture lists.
-            assert(defaultFlags == RK_Defined);
-            VarDecls[childVd] |= RK_Defined;
-          }
+        if (auto childVd = vd->getCorrespondingCaseBodyVariable()) {
+          // Child vars are never in capture lists.
+          assert(flags == RK_Defined);
+          addMark(childVd.get(), flags);
         }
-        VarDecls[vd] |= defaultFlags;
+        addMark(vd, flags);
       }
     }
 

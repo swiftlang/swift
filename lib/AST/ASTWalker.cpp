@@ -802,8 +802,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
           else
             return nullptr;
         }
-      } else if (doIt(c.Var) || doIt(c.Init)) {
-        return nullptr;
+      } else {
+        // Note we do not walk c.Var here, as it'll be visited as a part of the
+        // PatternBindingDecl.
+        if (doIt(c.Init))
+          return nullptr;
       }
     }
 
