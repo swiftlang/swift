@@ -14,7 +14,7 @@
 //
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestNSNumberBridging
-// 
+// RUN: %target-codesign %t/TestNSNumberBridging
 // RUN: %target-run %t/TestNSNumberBridging
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

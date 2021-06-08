@@ -386,7 +386,7 @@ struct ConformanceState {
         runtime::bincompat::workaroundProtocolConformanceReverseIteration();
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
-    if (__builtin_available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)) {
+    if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
       if (runtime::environment::SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES()) {
         if (&_dyld_swift_optimizations_version) {
           if (_dyld_swift_optimizations_version() ==
