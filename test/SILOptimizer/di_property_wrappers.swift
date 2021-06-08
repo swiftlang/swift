@@ -92,6 +92,11 @@ final class IntClass {
      }
      wrapped = 27
   }
+
+  convenience init(withConvenienceInit x: Int) {
+    self.init()
+    self.wrapped = x
+  }
 }
 
 struct RefStruct {
@@ -210,6 +215,13 @@ func testIntClass() {
   let t5 = IntClass(dynamic: true)
   // CHECK-NEXT: 27
   print(t5.wrapped)
+
+  // CHECK-NEXT:   .. init 42
+  // CHECK-NEXT:   .. set 27
+  // CHECK-NEXT:   .. set 123
+  let t6 = IntClass(withConvenienceInit: 123)
+  // CHECK-NEXT: 123
+  print(t6.wrapped)
 }
 
 func testRefStruct() {
