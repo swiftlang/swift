@@ -92,7 +92,7 @@ static Class _swift_getObjCClassOfAllocated(const void *object) {
 /// Fetch the ObjC class object associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced
-/// by KVO. See [NOTE: Dynamic-subclass-KVO]
+/// by KVO.
 ///
 /// The object pointer may be a tagged pointer, but cannot be null.
 const ClassMetadata *swift::swift_getObjCClassFromObject(HeapObject *object) {
@@ -122,7 +122,7 @@ const ClassMetadata *swift::swift_getObjCClassFromObject(HeapObject *object) {
 /// Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced
-/// by KVO. See [NOTE: Dynamic-subclass-KVO]
+/// by KVO.
 ///
 /// The object pointer may be a tagged pointer, but cannot be null.
 const Metadata *swift::swift_getObjectType(HeapObject *object) {
