@@ -255,8 +255,11 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_Object);
     addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_TBD);
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                            file_types::TY_LLVM_BC);
     addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+    addInputsOfType(Arguments, context.InputActions, file_types::TY_TBD);
     addInputsOfType(Arguments, context.InputActions, file_types::TY_LLVM_BC);
   }
 
