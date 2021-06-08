@@ -1848,14 +1848,14 @@ static bool canDeclContextHandleAsync(const DeclContext *DC) {
 ///         #false#
 ///       }
 ///     }
-static bool isCodeCompletionAtTopLevel(DeclContext *DC) {
+static bool isCodeCompletionAtTopLevel(const DeclContext *DC) {
   if (DC->isModuleScopeContext())
     return true;
 
   // CC token at top-level is parsed as an expression. If the only element
   // body of the TopLevelCodeDecl is a CodeCompletionExpr without a base
   // expression, the user might be writing a top-level declaration.
-  if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
+  if (const TopLevelCodeDecl *TLCD = dyn_cast<const TopLevelCodeDecl>(DC)) {
     auto body = TLCD->getBody();
     if (!body || body->empty())
       return true;
@@ -1895,6 +1895,13 @@ static bool isCompletionDeclContextLocalContext(DeclContext *DC) {
   if (isCodeCompletionAtTopLevel(DC))
     return false;
   return true;
+}
+
+/// Return \c true if the completion happens at top-level of a library file.
+static bool isCodeCompletionAtTopLevelOfLibraryFile(const DeclContext *DC) {
+  if (DC->getParentSourceFile()->isScriptMode())
+    return false;
+  return isCodeCompletionAtTopLevel(DC);
 }
 
 /// Build completions by doing visible decl lookup from a context.
@@ -3611,11 +3618,13 @@ public:
 
   void addKeyword(StringRef Name, StringRef TypeAnnotation,
                   CodeCompletionKeywordKind KeyKind
-                    = CodeCompletionKeywordKind::None) {
+                    = CodeCompletionKeywordKind::None,
+                  CodeCompletionFlair flair = {}) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, expectedTypeContext);
+    Builder.addFlair(flair);
     addLeadingDot(Builder);
     Builder.addKeyword(Name);
     Builder.setKeywordKind(KeyKind);
@@ -4365,6 +4374,10 @@ public:
 
   /// Add '#file', '#line', et at.
   void addPoundLiteralCompletions(bool needPound) {
+    CodeCompletionFlair flair;
+    if (isCodeCompletionAtTopLevelOfLibraryFile(CurrDeclContext))
+      flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
+
     auto addFromProto = [&](MagicIdentifierLiteralExpr::Kind magicKind,
                             Optional<CodeCompletionLiteralKind> literalKind) {
       CodeCompletionKeywordKind kwKind;
@@ -4389,13 +4402,14 @@ public:
 
       if (!literalKind) {
         // Pointer type
-        addKeyword(name, "UnsafeRawPointer", kwKind);
+        addKeyword(name, "UnsafeRawPointer", kwKind, flair);
         return;
       }
 
       CodeCompletionResultBuilder builder(
           Sink, CodeCompletionResult::ResultKind::Keyword,
           SemanticContextKind::None, {});
+      builder.addFlair(flair);
       builder.setLiteralKind(literalKind.getValue());
       builder.setKeywordKind(kwKind);
       builder.addBaseName(name);
@@ -4417,6 +4431,10 @@ public:
   void addValueLiteralCompletions() {
     auto &context = CurrDeclContext->getASTContext();
 
+    CodeCompletionFlair flair;
+    if (isCodeCompletionAtTopLevelOfLibraryFile(CurrDeclContext))
+      flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
+
     auto addFromProto = [&](
         CodeCompletionLiteralKind kind,
         llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
@@ -4425,6 +4443,7 @@ public:
       CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
                                           SemanticContextKind::None, {});
       builder.setLiteralKind(kind);
+      builder.addFlair(flair);
 
       consumer(builder);
       addTypeRelationFromProtocol(builder, kind);
@@ -4497,6 +4516,7 @@ public:
       CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
                                           SemanticContextKind::None, {});
       builder.setLiteralKind(LK::Tuple);
+      builder.addFlair(flair);
 
       builder.addLeftParen();
       builder.addSimpleNamedParameter("values");
@@ -6051,8 +6071,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
 
   auto getFlair = [&](CodeCompletionKeywordKind Kind,
                       Optional<DeclAttrKind> DAK) -> CodeCompletionFlair {
-    if (isCodeCompletionAtTopLevel(DC) &&
-        !DC->getParentSourceFile()->isScriptMode()) {
+    if (isCodeCompletionAtTopLevelOfLibraryFile(DC)) {
       // Type decls are common in library file top-level.
       if (isTypeDeclIntroducer(Kind, DAK))
         return CodeCompletionFlairBit::CommonKeywordAtCurrentPosition;
@@ -6165,11 +6184,20 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
 #undef CONTEXTUAL_CASE
 }
 
-static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) {
+static void addStmtKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
+                            bool MaybeFuncBody) {
+  CodeCompletionFlair flair;
+  // Starting a statement at top-level in non-script files is invalid.
+  if (isCodeCompletionAtTopLevelOfLibraryFile(DC)) {
+    flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
+  }
+
   auto AddStmtKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
     if (!MaybeFuncBody && Kind == CodeCompletionKeywordKind::kw_return)
       return;
-    addKeyword(Sink, Name, Kind);
+    addKeyword(Sink, Name, Kind, "",
+               CodeCompletionResult::ExpectedTypeRelation::NotApplicable,
+               flair);
   };
 #define STMT_KEYWORD(kw) AddStmtKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
 #include "swift/Syntax/TokenKinds.def"
@@ -6195,12 +6223,22 @@ static void addObserverKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "didSet", CodeCompletionKeywordKind::None);
 }
 
-static void addExprKeywords(CodeCompletionResultSink &Sink) {
+static void addExprKeywords(CodeCompletionResultSink &Sink, DeclContext *DC) {
+  // Expression is invalid at top-level of non-script files.
+  CodeCompletionFlair flair;
+  if (isCodeCompletionAtTopLevelOfLibraryFile(DC)) {
+    flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
+  }
+
   // Expr keywords.
-  addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try);
-  addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try);
-  addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try);
-  addKeyword(Sink, "await", CodeCompletionKeywordKind::None);
+  addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try, "",
+             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
+  addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try, "",
+             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
+  addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try, "",
+             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
+  addKeyword(Sink, "await", CodeCompletionKeywordKind::None, "",
+             CodeCompletionResult::ExpectedTypeRelation::NotApplicable, flair);
 }
 
 static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
@@ -6269,7 +6307,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addDeclKeywords(Sink, CurDeclContext,
                     Context.LangOpts.EnableExperimentalConcurrency,
                     Context.LangOpts.EnableExperimentalDistributed);
-    addStmtKeywords(Sink, MaybeFuncBody);
+    addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
     LLVM_FALLTHROUGH;
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::YieldStmtExpr:
@@ -6277,7 +6315,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::ForEachSequence:
     addSuperKeyword(Sink);
     addLetVarKeywords(Sink);
-    addExprKeywords(Sink);
+    addExprKeywords(Sink, CurDeclContext);
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
 
@@ -6481,19 +6519,6 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
 
 static void postProcessResults(ArrayRef<CodeCompletionResult *> results,
                                CompletionKind Kind, DeclContext *DC) {
-  auto isExprKeyword = [](const CodeCompletionResult *result) {
-    if (result->getKind() != CodeCompletionResult::ResultKind::Keyword)
-      return false;
-    switch (result->getKeywordKind()) {
-#define POUND_DIRECTIVE_KEYWORD(kw)
-#define POUND_CONFIG(kw)
-#define POUND_KEYWORD(kw) case CodeCompletionKeywordKind::pound_##kw:
-#include "swift/Syntax/TokenKinds.def"
-      return true;
-    default:
-      return false;
-    }
-  };
   for (CodeCompletionResult *result : results) {
     auto flair = result->getFlair();
 
@@ -6511,11 +6536,8 @@ static void postProcessResults(ArrayRef<CodeCompletionResult *> results,
 
     // Starting a statement at top-level in non-script files is invalid.
     if (Kind == CompletionKind::StmtOrExpr &&
-        isCodeCompletionAtTopLevel(DC) &&
-        !DC->getParentSourceFile()->isScriptMode() &&
-        (result->getKind() == CodeCompletionResult::ResultKind::Declaration ||
-         result->getKind() == CodeCompletionResult::ResultKind::Literal ||
-         isExprKeyword(result))) {
+        result->getKind() == CodeCompletionResult::ResultKind::Declaration &&
+        isCodeCompletionAtTopLevelOfLibraryFile(DC)) {
       flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
     }
     result->setFlair(flair);
@@ -7006,7 +7028,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       // Add any keywords that can be used in an argument expr position.
       addSuperKeyword(CompletionContext.getResultSink());
-      addExprKeywords(CompletionContext.getResultSink());
+      addExprKeywords(CompletionContext.getResultSink(), CurDeclContext);
 
       DoPostfixExprBeginning();
     }
@@ -7152,7 +7174,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       // Add any keywords that can be used in an argument expr position.
       addSuperKeyword(CompletionContext.getResultSink());
-      addExprKeywords(CompletionContext.getResultSink());
+      addExprKeywords(CompletionContext.getResultSink(), CurDeclContext);
 
       DoPostfixExprBeginning();
     }
@@ -7208,10 +7230,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           addDeclKeywords(Sink, CurDeclContext,
                           Context.LangOpts.EnableExperimentalConcurrency,
                           Context.LangOpts.EnableExperimentalDistributed);
-          addStmtKeywords(Sink, MaybeFuncBody);
+          addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
           addSuperKeyword(Sink);
           addLetVarKeywords(Sink);
-          addExprKeywords(Sink);
+          addExprKeywords(Sink, CurDeclContext);
           addAnyTypeKeyword(Sink, Context.TheAnyType);
           DoPostfixExprBeginning();
         }
