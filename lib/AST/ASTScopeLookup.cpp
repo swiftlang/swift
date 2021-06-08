@@ -408,7 +408,7 @@ bool PatternEntryInitializerScope::lookupLocalsOrMembers(
 
 bool CaptureListScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
   for (auto &e : expr->getCaptureList()) {
-    if (consumer.consume({e.Var}))
+    if (consumer.consume({e.getVar()}))
       return true;
   }
   return false;

@@ -1243,8 +1243,8 @@ namespace {
       if (auto CLE = dyn_cast<CaptureListExpr>(E)) {
         // Make sure to recontextualize any decls in the capture list as well.
         for (auto &CLE : CLE->getCaptureList()) {
-          CLE.Var->setDeclContext(NewDC);
-          CLE.Init->setDeclContext(NewDC);
+          CLE.getVar()->setDeclContext(NewDC);
+          CLE.PBD->setDeclContext(NewDC);
         }
       }
       

@@ -3469,7 +3469,7 @@ namespace {
 
         auto &CS = CG.getConstraintSystem();
         for (const auto &capture : captureList->getCaptureList()) {
-          SolutionApplicationTarget target(capture.Init);
+          SolutionApplicationTarget target(capture.PBD);
           if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
             return {false, nullptr};
         }

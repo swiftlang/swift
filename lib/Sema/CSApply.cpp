@@ -8108,7 +8108,7 @@ namespace {
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         // Rewrite captures.
         for (const auto &capture : captureList->getCaptureList()) {
-          (void)rewriteTarget(SolutionApplicationTarget(capture.Init));
+          (void)rewriteTarget(SolutionApplicationTarget(capture.PBD));
         }
       }
 
