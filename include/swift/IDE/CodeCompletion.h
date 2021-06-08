@@ -424,6 +424,13 @@ enum class CodeCompletionFlairBit: uint8_t {
 
   /// E.g. type decl introducer ('enum', 'class', etc.) in a function body.
   RareKeywordAtCurrentPosition = 1 << 4,
+
+  /// E.g. protocol names at an expression position.
+  RareTypeAtCurrentPosition = 1 << 5,
+
+  /// E.g. referencing a type, function, etc… at top level position in a non
+  /// script/main.swift file
+  ExpressionAtNonScriptOrMainFileScope = 1 << 6,
 };
 
 using CodeCompletionFlair = OptionSet<CodeCompletionFlairBit>;
@@ -807,6 +814,10 @@ public:
     return static_cast<CodeCompletionFlair>(Flair);
   }
 
+  void setFlair(CodeCompletionFlair flair) {
+    Flair = unsigned(flair.toRaw());
+  }
+
   bool isNotRecommended() const {
     return getNotRecommendedReason() != NotRecommendedReason::None;
   }
@@ -961,7 +972,7 @@ public:
   virtual void
   handleResultsAndModules(CodeCompletionContext &context,
                           ArrayRef<RequestedCachedModule> requestedModules,
-                          DeclContext *DCForModules) = 0;
+                          DeclContext *DC) = 0;
 };
 
 /// A simplified code completion consumer interface that clients can use to get
@@ -1017,11 +1028,12 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
                                            const DeclContext *currDeclContext);
 
 /// Copy code completion results from \p sourceSink to \p targetSink, possibly
-/// restricting by \p onlyTypes.
-void copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
-                               CodeCompletionResultSink &sourceSink,
-                               bool onlyTypes,
-                               bool onlyPrecedenceGroups);
+/// restricting by \p onlyTypes. Returns copied results in \p targetSink.
+ArrayRef<CodeCompletionResult *>
+copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                          CodeCompletionResultSink &sourceSink,
+                          bool onlyTypes,
+                          bool onlyPrecedenceGroups);
 
 } // end namespace ide
 } // end namespace swift
