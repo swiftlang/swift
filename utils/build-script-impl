@@ -64,7 +64,7 @@ KNOWN_SETTINGS=(
     build-runtime-with-host-compiler              ""                "use the host c++ compiler to build everything"
     build-stdlib-deployment-targets               "all"             "space-separated list that filters which of the configured targets to build the Swift standard library for, or 'all'"
     build-toolchain-only                          ""                "If set, only build the necessary tools to build an external toolchain"
-    libswift                                      ""                "Build the compiler with libswift"
+    libswift                                      "1"               "Build the compiler with libswift"
     cmake-generator                               "Unix Makefiles"  "kind of build system to generate; see output of 'cmake --help' for choices"
     llvm-num-parallel-lto-link-jobs               ""                "The number of parallel link jobs to use when compiling llvm"
     reconfigure                                   ""                "force a CMake configuration run even if CMakeCache.txt already exists"
