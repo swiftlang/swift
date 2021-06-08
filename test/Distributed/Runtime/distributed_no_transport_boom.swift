@@ -9,6 +9,8 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
+// REQUIRES: radar78290608
+
 import _Distributed
 
 @available(SwiftStdlib 5.5, *)
