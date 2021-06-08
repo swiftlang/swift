@@ -247,6 +247,19 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t *OutInstanceTypeRef,
                                         swift_addr_t *OutStartOfInstanceData);
 
+/// Like swift_reflection_projectExistential, with 2 differences:
+///
+/// - When dealing with an error existential, this version will dereference 
+///   the ExistentialAddress before proceeding.
+/// - After setting OutInstanceTypeRef and OutStartOfInstanceData this version
+///   may derefence and set OutStartOfInstanceData if OutInstanceTypeRef is a 
+///   class TypeRef.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_projectExistentialAndUnwrapClass(
+    SwiftReflectionContextRef ContextRef, swift_addr_t ExistentialAddress,
+    swift_typeref_t ExistentialTypeRef, swift_typeref_t *OutInstanceTypeRef,
+    swift_addr_t *OutStartOfInstanceData);
+
 /// Projects the value of an enum.
 ///
 /// Takes the address and typeref for an enum and determines the
