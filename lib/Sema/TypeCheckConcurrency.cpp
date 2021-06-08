@@ -2338,8 +2338,15 @@ namespace {
         // FIXME: We can collapse a much of this with the ActorSelf case.
         bool continueToCheckingLocalIsolation = false;
         // Must reference distributed actor-isolated state on 'self'.
+        //
+        // FIXME: For now, be loose about access to "self" in actor
+        // initializers/deinitializers. We'll want to tighten this up once
+        // we decide exactly how the model should go.
         auto isolatedActor = getIsolatedActor(base);
-        if (!isolatedActor) {
+        if (!isolatedActor &&
+            !(isolatedActor.isActorSelf() &&
+              member->isInstanceMember() &&
+              isActorInitOrDeInitContext(getDeclContext()))) {
           // invocation on not-'self', is only okey if this is a distributed func
 
           if (auto func = dyn_cast<FuncDecl>(member)) {
