@@ -66,6 +66,8 @@ PATTERN_NODES = [
     # wildcard-pattern -> '_' type-annotation?
     Node('WildcardPattern', kind='Pattern',
          children=[
+             Child('Unknown', kind='Attribute',
+                   is_optional=True),
              Child('Wildcard', kind='WildcardToken'),
              Child('TypeAnnotation', kind='TypeAnnotation',
                    is_optional=True),

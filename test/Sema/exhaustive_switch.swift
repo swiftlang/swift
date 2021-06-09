@@ -1450,3 +1450,65 @@ func sr12412() {
       case (e: .y, b: true)?: break
   }
 }
+
+func nestedUnknown(_ e: NonFrozenEnum) {
+  switch (e, e) { // expected-warning{{switch must be exhaustive}}
+  // expected-note@-1{{add missing case: '(.a, .a)'}}
+  // expected-note@-2{{add missing case: '(.b, .a)'}}
+  // expected-note@-3{{add missing case: '(.c, .a)'}}
+  case (@unknown _, .a): ()
+  default: ()
+  }
+  switch (e, e) { // expected-warning{{switch must be exhaustive}}
+  // expected-note@-1{{add missing case: '(.c, _)'}}
+  // expected-note@-2{{add missing case: '(.b, _)'}}
+  // expected-note@-3{{add missing case: '(.a, _)'}}
+  case (@unknown _, _): ()
+  }
+  switch (e, e) { // expected-warning{{switch must be exhaustive}}
+  // expected-note@-1{{add missing case: '(.a, .a)'}}
+  // expected-note@-2{{add missing case: '(.b, .a)'}}
+  // expected-note@-3{{add missing case: '(.c, .a)'}}
+  // expected-note@-4{{add missing case: '(.a, .b)'}}
+  // expected-note@-5{{add missing case: '(.b, .b)'}}
+  // expected-note@-6{{add missing case: '(.c, .b)'}}
+  // expected-note@-7{{add missing case: '(.a, .c)'}}
+  // expected-note@-8{{add missing case: '(.b, .c)'}}
+  // expected-note@-9{{add missing case: '(.c, .c)'}}
+  case (@unknown _, @unknown _): ()
+  }
+  switch (e, e) { // expected-warning{{switch must be exhaustive}}
+  // expected-note@-1{{add missing case: '(.b, .a)'}}
+  // expected-note@-2{{add missing case: '(.c, .a)'}}
+  case (.a, _): ()
+  case (@unknown _, .a): ()
+  default: ()
+  }
+  switch (e, e) { // expected-warning{{switch must be exhaustive}}
+  // expected-note@-1{{add missing case: '(.b, .a)'}}
+  // expected-note@-2{{add missing case: '(.c, .a)'}}
+  case (.a, _), (@unknown _, .a): ()
+  default: ()
+  }
+  switch Optional.some(e) { // expected-warning{{switch must be exhaustive}}
+  // expected-note@-1{{add missing case: '.some(.a)'}}
+  // expected-note@-2{{add missing case: '.some(.b)'}}
+  // expected-note@-3{{add missing case: '.some(.c)'}}
+  case .some(@unknown _): ()
+  case .none: ()
+  }
+}
+
+// Check that statements are ill-formed
+
+let (@unknown _) = NonFrozenEnum.a
+// expected-error@-1{{expected pattern}}
+// expected-error@-2{{cannot convert value}}
+let @unknown _ = NonFrozenEnum.a
+// expected-error@-1{{expected pattern}}
+for @unknown _ in [NonFrozenEnum.a] {}
+// expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
+// expected-error@-2{{expected pattern}}
+// expected-error@-3{{expected '{' to start the body of for-each loop}}
+if let @unknown _ = .some(NonFrozenEnum.a) {}
+// FIXME: [Varun] Not sure where to issue error in Parse/Sema for above code

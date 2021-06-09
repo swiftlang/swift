@@ -1011,7 +1011,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     
     if (result.isNull()) {
       // Recover by creating AnyPattern.
-      auto *AP = new (Context) AnyPattern(colonLoc);
+      auto *AP = new (Context) AnyPattern(/*@unknown*/ SourceLoc(), colonLoc);
       if (colonLoc.isInvalid())
         AP->setImplicit();
       result = makeParserErrorResult(AP);
@@ -1098,8 +1098,9 @@ ParserResult<Pattern> Parser::parsePattern() {
       return makeParserResult(NamedPattern::createImplicit(Context, VD));
     }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
-    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
-    
+    return makeParserResult(new (Context) AnyPattern(/*@unknown*/ SourceLoc(),
+                                                     consumeToken(tok::kw__)));
+
   case tok::identifier: {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
@@ -1156,7 +1157,8 @@ ParserResult<Pattern> Parser::parsePattern() {
         .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
       SourceLoc Loc = Tok.getLoc();
       consumeToken();
-      return makeParserErrorResult(new (Context) AnyPattern(Loc));
+      return makeParserErrorResult(
+          new (Context) AnyPattern(/*@unknown*/ SourceLoc(), Loc));
     }
     diagnose(Tok, diag::expected_pattern);
     return nullptr;

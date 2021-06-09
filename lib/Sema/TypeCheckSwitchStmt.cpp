@@ -137,7 +137,7 @@ namespace {
           cache.insert(getType().getPointer());
 
           SmallVector<Space, 4> spaces;
-          decompose(DC, getType(), spaces);
+          decompose(DC, getType(), /*makeUnknownSpace*/ true, spaces);
           size_t acc = 0;
           for (auto &sp : spaces) {
             // Decomposed pattern spaces grow with the sum of the subspaces.
@@ -778,8 +778,42 @@ namespace {
         }
       };
 
+      /// Decompose '@unknown _' patterns in arbitrary nested positions.
+      ///
+      /// For example, if you have a non-frozen enum E { case a; case b },
+      /// and you're matching on a pair of type (E, E):
+      /// \code
+      ///                 (@unknown _, @unknown _)
+      ///   [decompose]-> ((.a | .b), (.a | .b))
+      ///     [flatten]-> (.a, .a) | (.b, .a) | (.a, .b) | (.b, .b)
+      /// \endcode
+      static void decomposeUnknowns(const DeclContext *DC,
+                                    const Pattern *pattern,
+                                    SmallVectorImpl<Space> &outSpaces) {
+        auto projectAnyPattern = [DC](const AnyPattern *anyPattern) -> Space {
+          auto type = anyPattern->getType();
+          if (anyPattern->isUnknown()) {
+            if (Space::canDecompose(type)) {
+              SmallVector<Space, 4> spaces;
+              Space::decompose(DC, type, /*makeUnknownSpace*/ false, spaces);
+              return Space::forDisjunct(spaces);
+            }
+            auto &diag = DC->getASTContext().Diags;
+            auto unknownLoc = anyPattern->getUnknownLoc();
+            diag.diagnose(unknownLoc, diag::unknown_pattern_for_non_enum, type);
+            diag.diagnose(unknownLoc, diag::non_enum_drop_unknown)
+                .fixItRemove(
+                    SourceRange(unknownLoc, unknownLoc.getAdvancedLoc(8)));
+          }
+          return Space::forType(anyPattern->getType(), Identifier());
+        };
+        auto decomposed = projectPattern(pattern, projectAnyPattern);
+        flatten(decomposed, outSpaces);
+      }
+
       // Decompose a type into its component spaces.
       static void decompose(const DeclContext *DC, Type tp,
+                            bool makeUnknownSpace,
                             SmallVectorImpl<Space> &arr) {
         assert(canDecompose(tp) && "Non-decomposable type?");
 
@@ -816,10 +850,12 @@ namespace {
                                              constElemSpaces);
               });
 
-          if (!E->isFormallyExhaustive(DC)) {
-            arr.push_back(Space::forUnknown(/*allowedButNotRequired*/false));
-          } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
-            arr.push_back(Space::forUnknown(/*allowedButNotRequired*/true));
+          if (makeUnknownSpace) {
+            if (!E->isFormallyExhaustive(DC)) {
+              arr.push_back(Space::forUnknown(/*allowedButNotRequired*/ false));
+            } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
+              arr.push_back(Space::forUnknown(/*allowedButNotRequired*/ true));
+            }
           }
 
         } else if (auto *TTy = tp->castTo<TupleType>()) {
@@ -840,7 +876,7 @@ namespace {
 
       static Space decompose(const DeclContext *DC, Type type) {
         SmallVector<Space, 4> spaces;
-        decompose(DC, type, spaces);
+        decompose(DC, type, /*makeUnknownSpace*/ true, spaces);
         return Space::forDisjunct(spaces);
       }
 
@@ -955,6 +991,33 @@ namespace {
       const CaseStmt *unknownCase = nullptr;
       SmallVector<Space, 4> spaces;
       auto &DE = Context.Diags;
+
+      auto handleUnknownAnyPattern =
+          [this](const CaseStmt *caseBlock,
+                 const SmallVectorImpl<Space> &spacesSoFar,
+                 const Pattern *pattern, const Space &projection) {
+            if (!pattern->hasUnknownAnyPattern())
+              return;
+            Space coveredSoFar = Space::forDisjunct(spacesSoFar);
+            Space partialUncovered =
+                projection.minus(coveredSoFar, DC, /*minusCount*/ nullptr)
+                    .getValue();
+            if (!partialUncovered.isEmpty()) {
+              // TODO: Maybe we should prefer inserting alternatives in-between
+              // if the @unknown _ is not in the first condition clause?
+              //   case .a, (@unknown _) [fix]-> case .a, .b, (@unknown _)
+              SmallVector<Space, 4> scratchSpaces;
+              Space::decomposeUnknowns(DC, pattern, scratchSpaces);
+              Space projectionDecomposed = Space::forDisjunct(scratchSpaces);
+              partialUncovered =
+                  projectionDecomposed
+                      .minus(coveredSoFar, DC, /*minusCount*/ nullptr)
+                      .getValue();
+              diagnoseMissingCases(RequiresDefault::No, partialUncovered,
+                                   caseBlock);
+            }
+          };
+
       for (auto *caseBlock : Switch->getCases()) {
         if (caseBlock->hasUnknownAttr()) {
           assert(unknownCase == nullptr && "multiple unknown cases");
@@ -972,7 +1035,9 @@ namespace {
           if (caseItem.isDefault())
             return;
 
-          Space projection = projectPattern(caseItem.getPattern());
+          auto casePattern = caseItem.getPattern();
+          Space projection =
+              projectPattern(casePattern, /*projectAnyPattern*/ nullptr);
           bool isRedundant = !projection.isEmpty() &&
                              llvm::any_of(spaces, [&](const Space &handled) {
             return projection.isSubspace(handled, DC);
@@ -996,8 +1061,10 @@ namespace {
             continue;
           }
 
-          if (!projection.isEmpty())
+          if (!projection.isEmpty()) {
+            handleUnknownAnyPattern(caseBlock, spaces, casePattern, projection);
             spaces.push_back(projection);
+          }
         }
       }
 
@@ -1034,7 +1101,8 @@ namespace {
       if (uncovered.getKind() == SpaceKind::Type) {
         if (Space::canDecompose(uncovered.getType())) {
           SmallVector<Space, 4> spaces;
-          Space::decompose(DC, uncovered.getType(), spaces);
+          Space::decompose(DC, uncovered.getType(), /*makeUnknownCases*/ true,
+                           spaces);
           diagnoseMissingCases(RequiresDefault::No, Space::forDisjunct(spaces),
                                unknownCase);
         } else {
@@ -1379,9 +1447,14 @@ namespace {
     }
 
     /// Recursively project a pattern into a Space.
-    static Space projectPattern(const Pattern *item) {
+    static Space projectPattern(
+        const Pattern *item,
+        llvm::function_ref<Space(const AnyPattern *)> projectAnyPattern) {
       switch (item->getKind()) {
       case PatternKind::Any:
+        if (projectAnyPattern) {
+          return projectAnyPattern(cast<AnyPattern>(item));
+        }
         return Space::forType(item->getType(), Identifier());
       case PatternKind::Named:
         return Space::forType(item->getType(),
@@ -1395,7 +1468,7 @@ namespace {
         case CheckedCastKind::BridgingCoercion: {
           if (auto *subPattern = IP->getSubPattern()) {
             // Project the cast target's subpattern.
-            Space castSubSpace = projectPattern(subPattern);
+            Space castSubSpace = projectPattern(subPattern, projectAnyPattern);
             // If we recieved a type space from a named pattern or a wildcard
             // we have to re-project with the cast's target type to maintain
             // consistency with the scrutinee's type.
@@ -1426,18 +1499,18 @@ namespace {
         return Space();
       case PatternKind::Binding: {
         auto *VP = cast<BindingPattern>(item);
-        return projectPattern(VP->getSubPattern());
+        return projectPattern(VP->getSubPattern(), projectAnyPattern);
       }
       case PatternKind::Paren: {
         auto *PP = cast<ParenPattern>(item);
-        return projectPattern(PP->getSubPattern());
+        return projectPattern(PP->getSubPattern(), projectAnyPattern);
       }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
         auto &Ctx = OSP->getElementDecl()->getASTContext();
         const Identifier name = Ctx.getOptionalSomeDecl()->getBaseIdentifier();
 
-        auto subSpace = projectPattern(OSP->getSubPattern());
+        auto subSpace = projectPattern(OSP->getSubPattern(), projectAnyPattern);
         // To match patterns like (_, _, ...)?, we must rewrite the underlying
         // tuple pattern to .some(_, _, ...) first.
         if (subSpace.getKind() == SpaceKind::Constructor &&
@@ -1464,7 +1537,8 @@ namespace {
           auto *TP = dyn_cast<TuplePattern>(SP);
           llvm::transform(TP->getElements(), std::back_inserter(conArgSpace),
                           [&](TuplePatternElt pate) {
-                            return projectPattern(pate.getPattern());
+                            return projectPattern(pate.getPattern(),
+                                                  projectAnyPattern);
                           });
           // FIXME: Compound names.
           return Space::forConstructor(item->getType(),
@@ -1488,9 +1562,9 @@ namespace {
             if (auto *TTy = outerType->getAs<TupleType>())
               Space::getTupleTypeSpaces(outerType, TTy, conArgSpace);
             else
-              conArgSpace.push_back(projectPattern(SP));
+              conArgSpace.push_back(projectPattern(SP, projectAnyPattern));
           } else if (SP->getKind() == PatternKind::Tuple) {
-            Space argTupleSpace = projectPattern(SP);
+            Space argTupleSpace = projectPattern(SP, projectAnyPattern);
             // Tuples are modeled as if they are enums with a single, nameless
             // case, which means argTupleSpace will either be a Constructor or
             // Empty space. If it's empty (i.e. it contributes nothing to the
@@ -1500,7 +1574,7 @@ namespace {
             assert(argTupleSpace.getKind() == SpaceKind::Constructor);
             conArgSpace.push_back(argTupleSpace);
           } else {
-            conArgSpace.push_back(projectPattern(SP));
+            conArgSpace.push_back(projectPattern(SP, projectAnyPattern));
           }
           // FIXME: Compound names.
           return Space::forConstructor(item->getType(),
@@ -1508,7 +1582,7 @@ namespace {
                                        conArgSpace);
         }
         default:
-          return projectPattern(SP);
+          return projectPattern(SP, projectAnyPattern);
         }
       }
       case PatternKind::Tuple: {
@@ -1516,7 +1590,8 @@ namespace {
         SmallVector<Space, 4> conArgSpace;
         llvm::transform(TP->getElements(), std::back_inserter(conArgSpace),
                         [&](TuplePatternElt pate) {
-                          return projectPattern(pate.getPattern());
+                          return projectPattern(pate.getPattern(),
+                                                projectAnyPattern);
                         });
         return Space::forConstructor(item->getType(), Identifier(),
                                      conArgSpace);

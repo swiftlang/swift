@@ -1100,7 +1100,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // If that didn't work, use a bogus pattern so that we can fill out
   // the AST.
   if (patternResult.isNull()) {
-    auto *AP = new (P.Context) AnyPattern(P.PreviousLoc);
+    auto *AP =
+        new (P.Context) AnyPattern(/*@unknown*/ SourceLoc(), P.PreviousLoc);
     if (P.PreviousLoc.isInvalid())
       AP->setImplicit();
     patternResult = makeParserErrorResult(AP);
@@ -1551,7 +1552,7 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
     
   if (ThePattern.isNull()) {
     // Recover by creating AnyPattern.
-    auto *AP = new (Context) AnyPattern(PreviousLoc);
+    auto *AP = new (Context) AnyPattern(/*@unknown*/ SourceLoc(), PreviousLoc);
     if (PreviousLoc.isInvalid())
       AP->setImplicit();
     ThePattern = makeParserResult(AP);
@@ -2427,7 +2428,7 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
 static ParserStatus
 parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
                      SmallVectorImpl<CaseLabelItem> &LabelItems,
-                     SourceLoc &ColonLoc) {
+                     SourceLoc UnknownLoc, SourceLoc &ColonLoc) {
   SyntaxParsingContext CaseContext(P.SyntaxContext,
                                    SyntaxKind::SwitchDefaultLabel);
   ParserStatus Status;
@@ -2453,7 +2454,7 @@ parseStmtCaseDefault(Parser &P, SourceLoc &CaseLoc,
     P.consumeToken(tok::colon);
 
   // Create an implicit AnyPattern to represent the default match.
-  auto Any = new (P.Context) AnyPattern(CaseLoc);
+  auto Any = new (P.Context) AnyPattern(UnknownLoc, CaseLoc);
   if (CaseLoc.isInvalid())
     Any->setImplicit();
   LabelItems.push_back(
@@ -2545,7 +2546,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
     Status |= ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls,
                               ColonLoc, CaseBodyDecls);
   } else if (Tok.is(tok::kw_default)) {
-    Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems, ColonLoc);
+    Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems,
+                                   UnknownAttrLoc, ColonLoc);
   } else {
     llvm_unreachable("isAtStartOfSwitchCase() lied.");
   }

@@ -1513,7 +1513,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 ///     '.' identifier
 ///
 ///   expr-discard:
-///     '_'
+///     @unknown? '_' (@unknown can only appear in patterns)
 ///
 ///   expr-primary:
 ///     expr-literal
@@ -1548,6 +1548,16 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // Objective-C programmers habitually type @"foo", so recover gracefully
     // with a fixit.  If this isn't @"foo", just handle it like an unknown
     // input.
+    if (peekToken().isContextualKeyword("unknown")) {
+      auto UnknownLoc = consumeToken();
+      consumeToken();
+      if (!Tok.is(tok::kw__))
+        goto UnknownCharacter;
+      // Similar to the tok::kw__ case.
+      ExprContext.setCreateSyntax(SyntaxKind::DiscardAssignmentExpr);
+      return makeParserResult(new (Context) DiscardAssignmentExpr(
+          UnknownLoc, consumeToken(), /*Implicit=*/false));
+    }
     if (peekToken().isNot(tok::string_literal))
       goto UnknownCharacter;
     
@@ -1650,8 +1660,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
   case tok::kw__: // _
     ExprContext.setCreateSyntax(SyntaxKind::DiscardAssignmentExpr);
-    return makeParserResult(
-      new (Context) DiscardAssignmentExpr(consumeToken(), /*Implicit=*/false));
+    return makeParserResult(new (Context) DiscardAssignmentExpr(
+        /*@unknown*/ SourceLoc(), consumeToken(), /*Implicit=*/false));
 
   case tok::pound_selector: // expr-selector
     return parseExprSelector();
