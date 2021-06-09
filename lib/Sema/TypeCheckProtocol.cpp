@@ -4642,10 +4642,12 @@ void ConformanceChecker::resolveValueWitnesses() {
         return;
 
       // Ensure that Actor.unownedExecutor is implemented within the
-      // actor class itself.
+      // actor class itself.  But if this somehow resolves to the
+      // requirement, ignore it.
       if (requirement->getName().isSimpleName(C.Id_unownedExecutor) &&
           Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
           DC != witness->getDeclContext() &&
+          !isa<ProtocolDecl>(witness->getDeclContext()) &&
           Adoptee->getClassOrBoundGenericClass() &&
           Adoptee->getClassOrBoundGenericClass()->isActor()) {
         witness->diagnose(diag::unowned_executor_outside_actor);
