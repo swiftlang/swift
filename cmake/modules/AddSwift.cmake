@@ -477,7 +477,17 @@ function(add_swift_host_library name)
   endif()
 
   add_library(${name} ${libkind} ${ASHL_SOURCES})
-  add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
+
+  # Respect LLVM_COMMON_DEPENDS if it is set.
+  #
+  # LLVM_COMMON_DEPENDS if a global variable set in ./lib that provides targets
+  # such as swift-syntax or tblgen that all LLVM/Swift based tools depend on. If
+  # we don't have it defined, then do not add the dependency since some parts of
+  # swift host tools do not interact with LLVM/Swift tools and do not define
+  # LLVM_COMMON_DEPENDS.
+  if (LLVM_COMMON_DEPENDS)
+    add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
+  endif()
   if (NOT ASHL_PURE_SWIFT)
     llvm_update_compile_flags(${name})
   endif()
@@ -624,12 +634,21 @@ function(add_swift_host_tool executable)
   _add_host_variant_c_compile_flags(${executable})
   _add_host_variant_link_flags(${executable})
   _add_host_variant_c_compile_link_flags(${executable})
-  target_link_directories(${executable} PRIVATE
-    ${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR})
+
   # Force executables linker language to be CXX so that we do not link using the
   # host toolchain swiftc.
   set_target_properties(${executable} PROPERTIES LINKER_LANGUAGE CXX)
-  add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})
+
+  # Respect LLVM_COMMON_DEPENDS if it is set.
+  #
+  # LLVM_COMMON_DEPENDS if a global variable set in ./lib that provides targets
+  # such as swift-syntax or tblgen that all LLVM/Swift based tools depend on. If
+  # we don't have it defined, then do not add the dependency since some parts of
+  # swift host tools do not interact with LLVM/Swift tools and do not define
+  # LLVM_COMMON_DEPENDS.
+  if (LLVM_COMMON_DEPENDS)
+    add_dependencies(${executable} ${LLVM_COMMON_DEPENDS})
+  endif()
 
   set_target_properties(${executable} PROPERTIES
     FOLDER "Swift executables")
