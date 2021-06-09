@@ -31,5 +31,5 @@ bool DerivedConformance::canDeriveDistributedActor(
 // ==== ------------------------------------------------------------------------
 
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
- return nullptr;
+  return nullptr;
 }
