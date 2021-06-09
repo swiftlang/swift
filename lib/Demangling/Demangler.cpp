@@ -739,6 +739,9 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'c':
     return createWithChild(
         Node::Kind::GlobalActorFunctionType, popTypeAndGetChild());
+  case 'i':
+    return createType(
+        createWithChild(Node::Kind::Isolated, popTypeAndGetChild()));
   case 'j':
     return demangleDifferentiableFunctionType();
   case 'k':

@@ -199,6 +199,9 @@ public:
         break;
       }
 
+      if (flags.isIsolated())
+        printHeader("isolated");
+
       if (flags.isVariadic())
         printHeader("variadic");
 
@@ -632,6 +635,9 @@ public:
       case ValueOwnership::Owned:
         wrapInput(Node::Kind::Owned);
         break;
+      }
+      if (flags.isIsolated()) {
+        wrapInput(Node::Kind::Isolated);
       }
 
       inputs.push_back({input, flags.isVariadic()});

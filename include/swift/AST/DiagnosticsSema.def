@@ -4349,9 +4349,13 @@ ERROR(override_implicit_unowned_executor,none,
       "explicitly defined", ())
 
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
-        "%select{from inside the actor|on 'self'}2",
-        (DescriptiveDeclKind, DeclName, bool, unsigned))
+        "actor-isolated %0 %1 can not be "
+        "%select{referenced|mutated|used 'inout'}2 "
+        "%select{on a non-isolated actor instance|"
+        "from a Sendable function|from a Sendable closure|"
+        "from an 'async let' initializer|from global actor %4|"
+        "from the main actor|from a non-isolated context}3",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %0 %1 can only be referenced "
       "inside the distributed actor",
@@ -4359,10 +4363,6 @@ ERROR(distributed_actor_isolated_non_self_reference,none,
 ERROR(distributed_actor_needs_explicit_distributed_import,none,
       "'_Distributed' module not imported, required for 'distributed actor'",
       ())
-ERROR(actor_isolated_self_independent_context,none,
-        "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from a "
-        "non-isolated context",
-        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
       "%select{| implicitly}2 'async' function call",
@@ -4370,10 +4370,6 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
-ERROR(actor_isolated_global_actor_context,none,
-      "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}3 "
-      "from%select{| synchronous}4 context of global actor %2",
-      (DescriptiveDeclKind, DeclName, Type, unsigned, bool))
 ERROR(global_actor_from_instance_actor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from actor %3 %select{|in a synchronous context}5",
@@ -4398,15 +4394,6 @@ ERROR(actor_isolated_partial_apply,none,
 ERROR(concurrent_access_local,none,
         "use of local %0 %1 in concurrently-executing code",
         (DescriptiveDeclKind, DeclName))
-ERROR(actor_isolated_from_concurrent_closure,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent closure",
-        (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_concurrent_function,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent function",
-        (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_async_let,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
-        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to%select{| distributed}0 actor-isolated %1 %2",
       (bool, DescriptiveDeclKind, DeclName))
@@ -4475,6 +4462,9 @@ ERROR(actor_cannot_conform_to_global_actor_protocol,none,
 NOTE(protocol_isolated_to_global_actor_here,none,
      "%0 is isolated to global actor %1 here", (Type, Type))
 
+ERROR(isolated_parameter_not_actor,none,
+      "'isolated' parameter has non-actor type %0", (Type))
+      
 WARNING(non_concurrent_param_type,none,
         "cannot pass argument of non-sendable type %0 across actors",
         (Type))

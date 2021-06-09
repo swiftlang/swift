@@ -70,7 +70,7 @@ actor MyActor: MySuperActor { // expected-error{{actor types do not support inhe
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 5{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 9{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String {
     super.superState += 4
     return synchronous()
@@ -88,19 +88,19 @@ actor Camera {
 func checkAsyncPropertyAccess() async {
   let act = MyActor()
   let _ : Int = await act.mutable + act.mutable
-  act.mutable += 1  // expected-error {{actor-isolated property 'mutable' can only be mutated from inside the actor}}
+  act.mutable += 1  // expected-error {{actor-isolated property 'mutable' can not be mutated from a non-isolated context}}
 
-  act.superState += 1 // expected-error {{actor-isolated property 'superState' can only be mutated from inside the actor}}
+  act.superState += 1 // expected-error {{actor-isolated property 'superState' can not be mutated from a non-isolated context}}
 
-  act.text[0].append("hello") // expected-error{{actor-isolated property 'text' can only be mutated from inside the actor}}
+  act.text[0].append("hello") // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
 
   // this is not the same as the above, because Array is a value type
   var arr = await act.text
   arr[0].append("hello")
 
-  act.text.append("no") // expected-error{{actor-isolated property 'text' can only be mutated from inside the actor}}
+  act.text.append("no") // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
 
-  act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can only be mutated from inside the actor}}
+  act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can not be mutated from a non-isolated context}}
 
   _ = act.point  // expected-warning{{cannot use property 'point' with a non-sendable type 'Point' across actors}}
 }
@@ -144,14 +144,14 @@ extension MyActor {
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
 
     // Partial application
-    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
+    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
     _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from a non-isolated context}}
     acceptClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
     acceptClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
-    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
-    acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}}}
-    acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated}}
-    acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
+    acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
+    acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
+    acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
 
     return 5
   }
@@ -188,9 +188,9 @@ extension MyActor {
     _ = otherActor.mutable  // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
     // expected-note@-1{{property access is 'async'}}
     _ = await otherActor.mutable
-    otherActor.mutable = 0  // expected-error{{actor-isolated property 'mutable' can only be mutated on 'self'}}
-    acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can only be used 'inout' on 'self'}}
-    // expected-error@+2{{actor-isolated property 'mutable' can only be mutated on 'self'}}
+    otherActor.mutable = 0  // expected-error{{actor-isolated property 'mutable' can not be mutated on a non-isolated actor instance}}
+    acceptInout(&otherActor.mutable)  // expected-error{{actor-isolated property 'mutable' can not be used 'inout' on a non-isolated actor instance}}
+    // expected-error@+2{{actor-isolated property 'mutable' can not be mutated on a non-isolated actor instance}}
     // expected-warning@+1{{no 'async' operations occur within 'await' expression}}
     await otherActor.mutable = 0
 
@@ -239,12 +239,12 @@ extension MyActor {
         _ = otherLocalVar
       }
 
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent closure}}
-      _ = self.mutable // expected-error{{actor-isolated property 'mutable' cannot be referenced from a concurrent closure}}
-      self.mutable = 0 // expected-error{{actor-isolated property 'mutable' cannot be mutated from a concurrent closure}}
-      acceptInout(&self.mutable) // expected-error{{actor-isolated property 'mutable' cannot be used 'inout' from a concurrent closure}}
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a Sendable closure}}
+      _ = self.mutable // expected-error{{actor-isolated property 'mutable' can not be referenced from a Sendable closure}}
+      self.mutable = 0 // expected-error{{actor-isolated property 'mutable' can not be mutated from a Sendable closure}}
+      acceptInout(&self.mutable) // expected-error{{actor-isolated property 'mutable' can not be used 'inout' from a Sendable closure}}
       _ = self.immutable
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a Sendable closure}}
       _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
       localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
@@ -275,8 +275,8 @@ extension MyActor {
 
     // Local functions might run concurrently.
     @Sendable func localFn1() {
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a Sendable function}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a Sendable function}}
       _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
       localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
@@ -284,8 +284,8 @@ extension MyActor {
 
     @Sendable func localFn2() {
       acceptClosure {
-        _ = text[0]  // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
-        _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
+        _ = text[0]  // expected-error{{actor-isolated property 'text' can not be referenced from a non-isolated context}}
+        _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
         _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
         localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
         _ = localConstant
@@ -300,14 +300,14 @@ extension MyActor {
     localVar = 0
 
     // Partial application
-    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
+    _ = synchronous
     _ = super.superMethod
     acceptClosure(synchronous)
     acceptClosure(self.synchronous)
-    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
-    acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+    acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced on a non-isolated actor instance}}
+    acceptEscapingClosure(synchronous)
+    acceptEscapingClosure(self.synchronous)
+    acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
 
     acceptAsyncClosure(self.asynchronous)
     acceptEscapingAsyncClosure(self.asynchronous)
@@ -458,7 +458,7 @@ extension MyActor {
     _ = otherActor.immutable // okay
     _ = otherActor.synchronous() // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
     // expected-note@-1{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
-    _ = otherActor.synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
+    _ = otherActor.synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
     _ = await otherActor.asynchronous()
     _ = otherActor.text[0] // expected-error{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
     // expected-note@-1{{property access is 'async'}}
@@ -513,7 +513,7 @@ func testGlobalRestrictions(actor: MyActor) async {
   let _ = MyActor()
 
   // references to sync methods must be fully applied.
-  _ = actor.synchronous // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced from inside the actor}}
+  _ = actor.synchronous // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
   _ = actor.asynchronous
 
   // any kind of method can be called from outside the actor, so long as it's marked with 'await'
@@ -829,7 +829,7 @@ func test_invalid_reference_to_actor_member_without_a_call_note() {
   actor Test {
     func returnPartial(other: A) async -> () async -> () {
       let a = other.partial
-      // expected-error@-1 {{actor-isolated instance method 'partial()' can only be referenced from inside the actor}}
+      // expected-error@-1 {{actor-isolated instance method 'partial()' can not be partially applied}}
       return a
     }
   }

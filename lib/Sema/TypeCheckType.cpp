@@ -1849,6 +1849,8 @@ namespace {
                                         TypeResolutionOptions options);
     NeverNullType resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
                                            TypeResolutionOptions options);
+    NeverNullType resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
+                                          TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -1963,6 +1965,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Shared:
   case TypeReprKind::Owned:
     return resolveSpecifierTypeRepr(cast<SpecifierTypeRepr>(repr), options);
+
+  case TypeReprKind::Isolated:
+    return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
 
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -2669,23 +2674,31 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       nestedRepr = tupleRepr->getElementType(0);
     }
 
-    if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
-      switch (specifierRepr->getKind()) {
-      case TypeReprKind::Shared:
-        ownership = ValueOwnership::Shared;
-        nestedRepr = specifierRepr->getBase();
-        break;
-      case TypeReprKind::InOut:
-        ownership = ValueOwnership::InOut;
-        nestedRepr = specifierRepr->getBase();
-        break;
-      case TypeReprKind::Owned:
-        ownership = ValueOwnership::Owned;
-        nestedRepr = specifierRepr->getBase();
-        break;
-      default:
-        break;
+    bool isolated = false;
+    while (true) {
+      if (auto *specifierRepr = dyn_cast<SpecifierTypeRepr>(nestedRepr)) {
+        switch (specifierRepr->getKind()) {
+        case TypeReprKind::Shared:
+          ownership = ValueOwnership::Shared;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::InOut:
+          ownership = ValueOwnership::InOut;
+          nestedRepr = specifierRepr->getBase();
+            continue;
+        case TypeReprKind::Owned:
+          ownership = ValueOwnership::Owned;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        case TypeReprKind::Isolated:
+          isolated = true;
+          nestedRepr = specifierRepr->getBase();
+          continue;
+        default:
+          break;
+        }
       }
+      break;
     }
 
     bool noDerivative = false;
@@ -2705,7 +2718,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        noDerivative);
+        isolated, noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags,
                           inputRepr->getElementName(i));
   }
@@ -3497,6 +3510,30 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
   }
 
   return resolveType(repr->getBase(), options);
+}
+
+NeverNullType
+TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
+                                      TypeResolutionOptions options) {
+  // isolated is only value for non-EnumCaseDecl parameters.
+  if (!options.is(TypeResolverContext::FunctionInput) ||
+      options.hasBase(TypeResolverContext::EnumElementDecl)) {
+    diagnoseInvalid(
+        repr, repr->getSpecifierLoc(), diag::attr_only_on_parameters,
+        "isolated");
+    return ErrorType::get(getASTContext());
+  }
+
+  Type type = resolveType(repr->getBase(), options);
+
+  // isolated parameters must be of actor type
+  if (!type->hasTypeParameter() && !type->isActorType() && !type->hasError()) {
+    diagnoseInvalid(
+        repr, repr->getSpecifierLoc(), diag::isolated_parameter_not_actor, type);
+    return ErrorType::get(type);
+  }
+
+  return type;
 }
 
 NeverNullType TypeResolver::resolveArrayType(ArrayTypeRepr *repr,

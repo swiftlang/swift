@@ -23,3 +23,9 @@
 // CHECK: (function
 // CHECK:   (global-actor
 // CHECK:     (class Swift.MainActor))
+
+// CHECK: actorIsolatedFunction: (isolated TypesToReflect.SomeActor) -> ()
+// CHECK: (function
+// CHECK:   (parameters
+// CHECK:     isolated
+// CHECK:     (class TypesToReflect.SomeActor))

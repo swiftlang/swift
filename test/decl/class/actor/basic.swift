@@ -12,9 +12,10 @@ actor MyActorSubclass2: MyActor { } // expected-error{{actor types do not suppor
 // expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
 actor class MyActorClass { }
 
-class NonActor { }
+class NonActor { } // expected-note{{overridden declaration is here}}
 
 actor NonActorSubclass : NonActor { } // expected-error{{actor types do not support inheritance}}
+// expected-error@-1{{actor-isolated initializer 'init()' has different actor isolation from nonisolated overridden declaration}}
 
 // expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
 public actor class BobHope {}

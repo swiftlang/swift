@@ -114,6 +114,9 @@ SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
               ActorIsolationState(ValueDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, HasIsolatedSelfRequest,
+              bool(ValueDecl *),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest, OperatorDecl *(FuncDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
