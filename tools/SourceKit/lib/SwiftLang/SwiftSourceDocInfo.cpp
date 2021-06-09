@@ -2368,3 +2368,62 @@ void SwiftLangSupport::collectExpressionTypes(StringRef FileName,
                                    &OncePerASTToken,
                                    llvm::vfs::getRealFileSystem());
 }
+
+void SwiftLangSupport::collectVariableTypes(
+    StringRef FileName, ArrayRef<const char *> Args, Optional<unsigned> Offset,
+    Optional<unsigned> Length,
+    std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok = ASTMgr->getInvocation(Args, FileName, Error);
+  if (!Invok) {
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver(RequestResult<VariableTypesInFile>::fromError(Error));
+    return;
+  }
+  assert(Invok);
+
+  class VariableTypeCollectorASTConsumer : public SwiftASTConsumer {
+  private:
+    std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver;
+    Optional<unsigned> Offset;
+    Optional<unsigned> Length;
+
+  public:
+    VariableTypeCollectorASTConsumer(
+        std::function<void(const RequestResult<VariableTypesInFile> &)>
+            Receiver,
+        Optional<unsigned> Offset, Optional<unsigned> Length)
+        : Receiver(std::move(Receiver)), Offset(Offset), Length(Length) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
+      std::vector<VariableTypeInfo> Infos;
+      std::string TypeBuffer;
+      llvm::raw_string_ostream OS(TypeBuffer);
+      VariableTypesInFile Result;
+      collectVariableType(*SF, Offset, Length, Infos, OS);
+      for (auto Info : Infos) {
+        Result.Results.push_back({Info.Offset, Info.Length, Info.TypeOffset, Info.HasExplicitType});
+      }
+      Result.TypeBuffer = OS.str();
+      Receiver(RequestResult<VariableTypesInFile>::fromResult(Result));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<VariableTypesInFile>::cancelled());
+    }
+
+    void failed(StringRef Error) override {
+      Receiver(RequestResult<VariableTypesInFile>::fromError(Error));
+    }
+  };
+
+  auto Collector = std::make_shared<VariableTypeCollectorASTConsumer>(
+      Receiver, Offset, Length);
+  /// FIXME: When request cancellation is implemented and Xcode adopts it,
+  /// don't use 'OncePerASTToken'.
+  static const char OncePerASTToken = 0;
+  getASTManager()->processASTAsync(Invok, std::move(Collector),
+                                   &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
+}

@@ -731,6 +731,95 @@ swift::collectExpressionType(SourceFile &SF,
   return Scratch;
 }
 
+/// This walker will traverse the AST and report types for every variable
+/// declaration.
+class VariableTypeCollector : public SourceEntityWalker {
+private:
+  SourceManager &SM;
+  unsigned int BufferId;
+
+  /// The start offset of the range in which variable types are to be collected.
+  Optional<unsigned> TotalOffset;
+
+  /// The length of the range in which variable types are to be collected.
+  Optional<unsigned> TotalLength;
+
+  /// The output vector for VariableTypeInfos emitted during traversal.
+  std::vector<VariableTypeInfo> &Results;
+
+  /// We print all types into a single output stream (e.g. into a string buffer)
+  /// and provide offsets into this string buffer to describe individual types,
+  /// i.e. `OS` builds a string that contains all null-terminated printed type
+  /// strings. When referring to one of these types, we can use the offsets at
+  /// which it starts in the `OS`.
+  llvm::raw_ostream &OS;
+
+  /// Map from a printed type to the offset in OS where the type starts.
+  llvm::StringMap<uint32_t> TypeOffsets;
+
+  /// Returns the start and end offset of this string in `OS`. If `PrintedType`
+  /// hasn't been printed to `OS` yet, this function will do so.
+  std::pair<uint32_t, uint32_t> getTypeOffsets(StringRef PrintedType) {
+    auto It = TypeOffsets.find(PrintedType);
+    if (It == TypeOffsets.end()) {
+      TypeOffsets[PrintedType] = OS.tell();
+      OS << PrintedType << '\0';
+    }
+    return {TypeOffsets[PrintedType], PrintedType.size()};
+  }
+
+public:
+  VariableTypeCollector(SourceFile &SF, Optional<unsigned> Offset,
+                        Optional<unsigned> Length,
+                        std::vector<VariableTypeInfo> &Results,
+                        llvm::raw_ostream &OS)
+      : SM(SF.getASTContext().SourceMgr), BufferId(*SF.getBufferID()),
+        TotalOffset(Offset), TotalLength(Length), Results(Results), OS(OS) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    if (Range.isInvalid()) {
+      return false;
+    }
+    unsigned Offset = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
+    unsigned Length = Range.getByteLength();
+    // Skip this declaration and its subtree if outside the range
+    if (TotalOffset.hasValue() && TotalLength.hasValue() &&
+        (Offset < *TotalOffset || Offset >= (*TotalOffset + *TotalLength))) {
+      return false;
+    }
+    if (auto VD = dyn_cast<VarDecl>(D)) {
+      // Print the type to a temporary buffer
+      SmallString<64> Buffer;
+      {
+        llvm::raw_svector_ostream OS(Buffer);
+        PrintOptions Options;
+        Options.SynthesizeSugarOnTypes = true;
+        VD->getType()->print(OS, Options);
+      }
+      // Transfer the type to `OS` if needed and get the offsets of this string
+      // in `OS`.
+      auto Ty = getTypeOffsets(Buffer.str());
+      bool HasExplicitType =
+          VD->getTypeReprOrParentPatternTypeRepr() != nullptr;
+      // Add the type information to the result list.
+      Results.emplace_back(Offset, Length, HasExplicitType, Ty.first);
+    }
+    return true;
+  }
+};
+
+VariableTypeInfo::VariableTypeInfo(uint32_t Offset, uint32_t Length,
+                                   bool HasExplicitType, uint32_t TypeOffset)
+    : Offset(Offset), Length(Length), HasExplicitType(HasExplicitType),
+      TypeOffset(TypeOffset) {}
+
+void swift::collectVariableType(
+    SourceFile &SF, Optional<unsigned> Offset, Optional<unsigned> Length,
+    std::vector<VariableTypeInfo> &Scratch, llvm::raw_ostream &OS) {
+  VariableTypeCollector Walker(SF, Offset, Length, Scratch, OS);
+  Walker.walk(SF);
+}
+
 ArrayRef<ValueDecl*> swift::
 canDeclProvideDefaultImplementationFor(ValueDecl* VD) {
   return evaluateOrDefault(VD->getASTContext().evaluator,

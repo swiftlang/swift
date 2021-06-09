@@ -147,6 +147,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("stats", SourceKitRequest::Statistics)
         .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
         .Case("collect-type", SourceKitRequest::CollectExpresstionType)
+        .Case("collect-var-type", SourceKitRequest::CollectVariableType)
         .Case("global-config", SourceKitRequest::GlobalConfiguration)
         .Case("dependency-updated", SourceKitRequest::DependencyUpdated)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
