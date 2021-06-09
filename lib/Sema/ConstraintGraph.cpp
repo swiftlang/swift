@@ -321,15 +321,6 @@ void ConstraintGraphNode::introduceToInference(Constraint *constraint) {
         getTypeVariable()->getImpl().getRepresentative(/*record=*/nullptr);
     CG[repr].introduceToInference(constraint);
   }
-
-  /*
-  if (!notifyReferencedVars || !isUsefulForReferencedVars(constraint))
-    return;
-
-  this->notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-    referencedVar.introduceToInference(constraint);
-  });
-*/
 }
 
 void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
@@ -342,15 +333,6 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint) {
         getTypeVariable()->getImpl().getRepresentative(/*record=*/nullptr);
     CG[repr].retractFromInference(constraint);
   }
-
-  /*
-  if (!notifyReferencedVars || !isUsefulForReferencedVars(constraint))
-    return;
-
-  this->notifyReferencedVars([&](ConstraintGraphNode &referencedVar) {
-                               referencedVar.retractFromInference(constraint);
-  });
-  */
 }
 
 void ConstraintGraphNode::reintroduceToInference(Constraint *constraint) {
