@@ -29,7 +29,7 @@ from swift_build_support.toolchain import host_toolchain
 from swift_build_support.workspace import Workspace
 
 
-class CMarkTestCase(unittest.TestCase):
+class EarlySwiftDriverTestCase(unittest.TestCase):
 
     def setUp(self):
         # Setup workspace
