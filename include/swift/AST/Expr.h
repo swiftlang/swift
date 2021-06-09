@@ -4180,13 +4180,11 @@ public:
 /// Instances of this structure represent elements of the capture list that can
 /// optionally occur in a capture expression.
 struct CaptureListEntry {
-  VarDecl *Var;
-  PatternBindingDecl *Init;
+  PatternBindingDecl *PBD;
 
-  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
-  : Var(Var), Init(Init) {
-  }
+  explicit CaptureListEntry(PatternBindingDecl *PBD);
 
+  VarDecl *getVar() const;
   bool isSimpleSelfCapture() const;
 };
 

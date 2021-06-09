@@ -796,14 +796,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitCaptureListExpr(CaptureListExpr *expr) {
     for (auto c : expr->getCaptureList()) {
       if (Walker.shouldWalkCaptureInitializerExpressions()) {
-        for (auto entryIdx : range(c.Init->getNumPatternEntries())) {
-          if (auto newInit = doIt(c.Init->getInit(entryIdx)))
-            c.Init->setInit(entryIdx, newInit);
+        for (auto entryIdx : range(c.PBD->getNumPatternEntries())) {
+          if (auto newInit = doIt(c.PBD->getInit(entryIdx)))
+            c.PBD->setInit(entryIdx, newInit);
           else
             return nullptr;
         }
-      } else if (doIt(c.Var) || doIt(c.Init)) {
-        return nullptr;
+      } else {
+        if (doIt(c.PBD))
+          return nullptr;
       }
     }
 

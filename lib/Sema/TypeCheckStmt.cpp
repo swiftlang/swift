@@ -101,8 +101,8 @@ namespace {
       if (auto CapE = dyn_cast<CaptureListExpr>(E)) {
         if (isa<AutoClosureExpr>(ParentDC)) {
           for (auto &Cap : CapE->getCaptureList()) {
-            Cap.Init->setDeclContext(ParentDC);
-            Cap.Var->setDeclContext(ParentDC);
+            Cap.PBD->setDeclContext(ParentDC);
+            Cap.getVar()->setDeclContext(ParentDC);
           }
         }
       }

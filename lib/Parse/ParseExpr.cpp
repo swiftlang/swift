@@ -2651,7 +2651,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
           /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
           CurDeclContext);
 
-      auto CLE = CaptureListEntry(VD, PBD);
+      auto CLE = CaptureListEntry(PBD);
       if (CLE.isSimpleSelfCapture())
         VD->setIsSelfParamCapture();
 

@@ -2496,8 +2496,7 @@ public:
     for (auto capture : E->getCaptureList()) {
       OS << '\n';
       Indent += 2;
-      printRec(capture.Var);
-      printRec(capture.Init);
+      printRec(capture.PBD);
       Indent -= 2;
     }
     printRec(E->getClosureBody());
