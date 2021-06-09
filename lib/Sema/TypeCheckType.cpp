@@ -1630,29 +1630,27 @@ static Type
 resolveIdentTypeComponent(TypeResolution resolution,
                           GenericParamList *silParams,
                           ArrayRef<ComponentIdentTypeRepr *> components) {
-  auto comp = components.back();
-
   // The first component uses unqualified lookup.
-  const auto parentComps = components.drop_back();
-  if (parentComps.empty()) {
-    return resolveTopLevelIdentTypeComponent(resolution, silParams,
-                                             comp);
+  auto topLevelComp = components.front();
+  auto result = resolveTopLevelIdentTypeComponent(resolution, silParams,
+                                                  topLevelComp);
+  if (result->hasError())
+    return ErrorType::get(result->getASTContext());
+
+  // Remaining components are resolved via iterated qualified lookups.
+  SourceRange parentRange(topLevelComp->getStartLoc(),
+                          topLevelComp->getEndLoc());
+  for (auto nestedComp : components.drop_front()) {
+    result = resolveNestedIdentTypeComponent(resolution, silParams,
+                                             result, parentRange,
+                                             nestedComp);
+    if (result->hasError())
+      return ErrorType::get(result->getASTContext());
+
+    parentRange.End = nestedComp->getEndLoc();
   }
 
-  // All remaining components use qualified lookup.
-
-  // Resolve the parent type.
-  Type parentTy = resolveIdentTypeComponent(resolution, silParams,
-                                            parentComps);
-  if (!parentTy || parentTy->hasError()) return parentTy;
-  
-  SourceRange parentRange(parentComps.front()->getStartLoc(),
-                          parentComps.back()->getEndLoc());
-
-  // Resolve the nested type.
-  return resolveNestedIdentTypeComponent(resolution, silParams,
-                                         parentTy, parentRange,
-                                         comp);
+  return result;
 }
 
 // Hack to apply context-specific @escaping to an AST function type.
