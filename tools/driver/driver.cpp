@@ -221,7 +221,7 @@ static int run_driver(StringRef ExecName,
     SmallString<256> NewDriverPath(llvm::sys::path::parent_path(Path));
     if (appendSwiftDriverName(NewDriverPath) &&
         llvm::sys::fs::exists(NewDriverPath)) {
-      SmallVector<const char *, 256> subCommandArgs;
+      std::vector<const char *> subCommandArgs;
       // Rewrite the program argument.
       subCommandArgs.push_back(NewDriverPath.c_str());
       if (ExecName == "swiftc") {
