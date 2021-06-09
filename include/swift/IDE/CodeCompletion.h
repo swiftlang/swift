@@ -40,6 +40,7 @@ namespace ide {
 class CodeCompletionCache;
 class CodeCompletionContext;
 class CodeCompletionResultBuilder;
+struct CodeCompletionResultSink;
 struct RequestedCachedModule;
 
 /// A routine to remove code completion tokens from code completion
@@ -760,6 +761,12 @@ public:
            getOperatorKind() != CodeCompletionOperatorKind::None);
   }
 
+  /// Copy this result to \p Sink with \p newFlair . Note that this does NOT
+  /// copy the value of \c CompletionString , \c AssociatedUSRs etc. it only
+  /// copies the pointers to them.
+  CodeCompletionResult *withFlair(CodeCompletionFlair newFlair,
+                                  CodeCompletionResultSink &Sink);
+
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
@@ -815,6 +822,7 @@ public:
     return static_cast<CodeCompletionFlair>(Flair);
   }
 
+  /// Modify "flair" of this result *in place*.
   void setFlair(CodeCompletionFlair flair) {
     Flair = unsigned(flair.toRaw());
   }
@@ -1030,7 +1038,7 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
 
 /// Copy code completion results from \p sourceSink to \p targetSink, possibly
 /// restricting by \p onlyTypes. Returns copied results in \p targetSink.
-ArrayRef<CodeCompletionResult *>
+MutableArrayRef<CodeCompletionResult *>
 copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                           CodeCompletionResultSink &sourceSink,
                           bool onlyTypes,
