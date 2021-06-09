@@ -24,7 +24,7 @@ except ImportError:
 
 # from swift_build_support import cmake
 from swift_build_support import shell
-# from swift_build_support.products import CMark
+from swift_build_support.products import CMark
 from swift_build_support.targets import StdlibDeploymentTarget
 from swift_build_support.toolchain import host_toolchain
 from swift_build_support.workspace import Workspace
@@ -113,3 +113,31 @@ class CMarkTestCase(unittest.TestCase):
 #            cmake=self.toolchain.cmake,
 #            cmake_args=' '.join(_cmake.common_options()),
 #            build_variant=self.args.cmark_build_variant))
+
+    def test_should_test(self):
+        cmark = CMark(
+            args=argparse.Namespace(test_cmark=True, cross_compile_hosts=[]),
+            toolchain=self.toolchain,
+            source_dir=self.workspace.source_root,
+            build_dir=self.workspace.build_root)
+
+        self.assertTrue(cmark.should_test(self.host.name))
+
+    def test_should_skip_test(self):
+        cmark = CMark(
+            args=argparse.Namespace(test_cmark=False, cross_compile_hosts=[]),
+            toolchain=self.toolchain,
+            source_dir=self.workspace.source_root,
+            build_dir=self.workspace.build_root)
+
+        self.assertFalse(cmark.should_test(self.host.name))
+
+    def test_should_skip_test_cross_compile(self):
+        cmark = CMark(
+            args=argparse.Namespace(test_cmark=True,
+                                    cross_compile_hosts=[self.host.name]),
+            toolchain=self.toolchain,
+            source_dir=self.workspace.source_root,
+            build_dir=self.workspace.build_root)
+
+        self.assertFalse(cmark.should_test(self.host.name))
