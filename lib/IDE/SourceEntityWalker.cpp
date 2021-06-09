@@ -66,6 +66,7 @@ private:
   Stmt *walkToStmtPost(Stmt *S) override;
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
+  Pattern *walkToPatternPost(Pattern *P) override;
 
   bool handleImports(ImportDecl *Import);
   bool handleCustomAttributes(Decl *D);
@@ -587,6 +588,9 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
     return { false, nullptr };
   }
 
+  if (!SEWalker.walkToPatternPre(P))
+    return { false, P };
+
   if (P->isImplicit())
     return { true, P };
 
@@ -607,6 +611,16 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
   // subpattern.  The type will be walked as a part of another TypedPattern.
   TP->getSubPattern()->walk(*this);
   return { false, P };
+}
+
+Pattern *SemaAnnotator::walkToPatternPost(Pattern *P) {
+  if (isDone())
+     return nullptr;
+
+  bool Continue = SEWalker.walkToPatternPost(P);
+  if (!Continue)
+    Cancelled = true;
+  return Continue ? P : nullptr;
 }
 
 bool SemaAnnotator::handleCustomAttributes(Decl *D) {
@@ -822,6 +836,11 @@ bool SourceEntityWalker::walk(Stmt *S) {
 bool SourceEntityWalker::walk(Expr *E) {
   SemaAnnotator Annotator(*this);
   return performWalk(Annotator, [&]() { return E->walk(Annotator); });
+}
+
+bool SourceEntityWalker::walk(Pattern *P) {
+  SemaAnnotator Annotator(*this);
+  return performWalk(Annotator, [&]() { return P->walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(Decl *D) {

@@ -70,5 +70,7 @@ ERROR(callback_multiple_case_items, none, "cannot refactor switch using a case w
 
 ERROR(callback_where_case_item, none, "cannot refactor switch using a case with where clause", ())
 
+ERROR(unknown_callback_case_item, none, "cannot refactor complex case conditions", ())
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
