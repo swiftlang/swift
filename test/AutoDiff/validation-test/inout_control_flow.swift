@@ -11,13 +11,14 @@ struct Model: Differentiable {
   var first: Float = 3
   var second: Float = 1
 
-  mutating func outer(){
+  mutating func outer() {
     inner()
   }
 
   mutating func inner() {
     self.second = self.first
 
+    // Dummy no-op if block, required to introduce control flow.
     let x = 5
     if x < 50 {}
   }
@@ -53,6 +54,7 @@ struct Model2<T: NumericDifferentiable>: Differentiable {
 func adjust<T: NumericDifferentiable>(model: inout Model2<T>, multiplier: T) {
   model.first = model.second * multiplier
 
+  // Dummy no-op if block, required to introduce control flow.
   let x = 5
   if x < 50 {}
 }
@@ -75,6 +77,7 @@ InoutControlFlowTests.test("InoutParameterWithControlFlow") {
 func adjust2<T: NumericDifferentiable>(multiplier: T, model: inout Model2<T>) {
   model.first = model.second * multiplier
 
+  // Dummy no-op if block, required to introduce control flow.
   let x = 5
   if x < 50 {}
 }

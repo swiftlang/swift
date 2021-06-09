@@ -2093,25 +2093,27 @@ bool PullbackCloner::Implementation::run() {
     }
   }
 
-  // Do a second pass for all inout values.
+  // Do a second pass for all inout parameters.
   for (auto i : getConfig().parameterIndices->getIndices()) {
-    // Skip `inout` parameters for functions with single basic blocks:
-    // additional adjoint accumulation is not necessary.
+    // Skip non-inout parameters.
+    auto isParameterInout = conv.getParameters()[i].isIndirectMutating();
+    if (!isParameterInout)
+      continue;
+
+    // Skip `inout` parameters for functions with a single basic block:
+    // adjoint accumulation for those parameters is already done by
+    // per-instruction visitors.
+    if (getOriginal().size() == 1)
+      continue;
 
     // For functions with multiple basic blocks, accumulation is needed
     // for `inout` parameters because pullback basic blocks have different
     // adjoint buffers.
-    auto isOriginalFunctionSingleBasicBlock = getOriginal().size() == 1;
-    auto isParameterInout = conv.getParameters()[i].isIndirectMutating();
-    if (isParameterInout) {
-      if (isOriginalFunctionSingleBasicBlock) {
-        continue;
-      } else {
-        pullbackIndirectResults.push_back(
-          getPullback().getArgumentsWithoutIndirectResults()[pullbackInoutArgumentIndex++]);
-      }
-      addRetElt(i);
-    }
+    auto pullbackInoutArgument =
+        getPullback()
+            .getArgumentsWithoutIndirectResults()[pullbackInoutArgumentIndex++];
+    pullbackIndirectResults.push_back(pullbackInoutArgument);
+    addRetElt(i);
   }
 
   // Copy them to adjoint indirect results.
@@ -2126,9 +2128,9 @@ bool PullbackCloner::Implementation::run() {
     } else {
       builder.createCopyAddr(pbLoc, source, dest, IsTake, IsNotInitialization);
     }
+    currentIndex++;
     // Prevent source buffer from being deallocated, since the underlying
     // value is moved.
-    currentIndex++;
     destroyedLocalAllocations.insert(source);
   }
 
