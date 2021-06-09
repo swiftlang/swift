@@ -1057,7 +1057,7 @@ public:
   void emitDebugVariableDeclaration(StorageType Storage, DebugTypeInfo Ty,
                                     SILType SILTy, const SILDebugScope *DS,
                                     VarDecl *VarDecl, SILDebugVariable VarInfo,
-                                    IndirectionKind Indirection = DirectValue) {
+                                    IndirectionKind Indirection) {
     // TODO: fix demangling for C++ types (SR-13223).
     if (swift::TypeBase *ty = SILTy.getASTType().getPointer()) {
       if (MetatypeType *metaTy = dyn_cast<MetatypeType>(ty))
@@ -4695,6 +4695,14 @@ void IRGenSILFunction::emitPoisonDebugValueInst(DebugValueInst *i) {
   Builder.CreateStore(newShadowVal, shadowAddress, ptrAlign);
 }
 
+/// Determine whether the debug-info-carrying instruction \c i belongs to an
+/// async function and thus may get allocated in the coroutine context. These
+/// variables need to be marked with the Coro flag, so LLVM's CoroSplit pass can
+/// recognize them.
+static bool InCoroContext(SILFunction &f, SILInstruction &i) {
+  return f.isAsync() && !i.getDebugScope()->InlinedCallSite;
+}
+
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (i->poisonRefs()) {
     emitPoisonDebugValueInst(i);
@@ -4739,11 +4747,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (!IGM.DebugInfo)
     return;
 
-  IndirectionKind Indirection = DirectValue;
-  if (CurSILFn->isAsync() && !i->getDebugScope()->InlinedCallSite &&
-      (Copy.empty() || !isa<llvm::Constant>(Copy[0]))) {
-    Indirection = CoroDirectValue;
-  }
+  IndirectionKind Indirection =
+    InCoroContext(*CurSILFn, *i) ? CoroDirectValue : DirectValue;
 
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
                                i->getDecl(), *VarInfo, Indirection);
@@ -5103,7 +5108,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
          isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr));
 
-  auto Indirection = DirectValue;
+  auto Indirection =
+      InCoroContext(*CurSILFn, *i) ? CoroDirectValue : DirectValue;
   if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&
       !IGM.IRGen.Opts.shouldOptimize())
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))
@@ -5111,7 +5117,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
         // Store the address of the dynamic alloca on the stack.
         addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
                               /*init*/ true);
-        Indirection = IndirectValue;
+        Indirection =
+            InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue;
       }
 
   if (!Decl)
@@ -5352,9 +5359,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   if (!IGM.DebugInfo)
     return;
 
-  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
-                                         i->getDebugScope(), Decl, *VarInfo,
-                                         IndirectValue);
+  IGM.DebugInfo->emitVariableDeclaration(
+      Builder, Storage, DbgTy, i->getDebugScope(), Decl, *VarInfo,
+      InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue);
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
