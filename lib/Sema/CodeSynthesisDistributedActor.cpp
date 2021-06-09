@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeCheckDistributed.h"
+
 #include "CodeSynthesis.h"
 
 #include "TypeChecker.h"
@@ -426,7 +428,6 @@ static void collectNonOveriddenDistributedActorInits(
 
 /// For a distributed actor, automatically define initializers
 /// that match the DistributedActor requirements.
-// TODO: inheritance is tricky here?
 static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
   // Bail out if not a distributed actor definition.
   if (!decl->isDistributedActor())
@@ -716,7 +717,7 @@ static void addImplicitRemoteActorFunctions(ClassDecl *decl) {
 /******************************************************************************/
 
 /// Entry point for adding all computed members to a distributed actor decl.
-static void addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
+void swift::addImplicitDistributedActorMembersToClass(ClassDecl *decl) {
   // Bail out if not a distributed actor definition.
   if (!decl->isDistributedActor())
     return;
