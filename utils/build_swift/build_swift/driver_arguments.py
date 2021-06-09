@@ -1071,7 +1071,7 @@ def create_argument_parser():
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
            help='skip cleaning up Swift driver')
     option('--skip-test-cmark', toggle_false('test_cmark'),
-           help='skip testing swiftpm')
+           help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
