@@ -1260,8 +1260,9 @@ namespace {
 
       // Track the capture contexts for variables.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        auto *closure = captureList->getClosureBody();
         for (const auto &entry : captureList->getCaptureList()) {
-          captureContexts[entry.Var].push_back(captureList->getClosureBody());
+          captureContexts[entry.getVar()].push_back(closure);
         }
       }
 
@@ -1290,11 +1291,11 @@ namespace {
       // Remove the tracked capture contexts.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         for (const auto &entry : captureList->getCaptureList()) {
-          auto &contexts = captureContexts[entry.Var];
+          auto &contexts = captureContexts[entry.getVar()];
           assert(contexts.back() == captureList->getClosureBody());
           contexts.pop_back();
           if (contexts.empty())
-            captureContexts.erase(entry.Var);
+            captureContexts.erase(entry.getVar());
         }
       }
 

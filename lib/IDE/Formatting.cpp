@@ -2586,18 +2586,17 @@ private:
 
         ListAligner Aligner(SM, TargetLocation, ContextLoc, L, R);
         for (auto &Entry: ParentCapture->getCaptureList()) {
-          if (auto *PBD = Entry.Init) {
-            NodesToSkip.insert(PBD);
-            SourceRange Range = PBD->getSourceRangeIncludingAttrs();
-            Aligner.updateAlignment(Range, PBD);
+          auto *PBD = Entry.PBD;
+          NodesToSkip.insert(PBD);
+          SourceRange Range = PBD->getSourceRangeIncludingAttrs();
+          Aligner.updateAlignment(Range, PBD);
 
-            if (isTargetContext(Range)) {
-              Aligner.setAlignmentIfNeeded(CtxOverride);
-              return IndentContext {
-                Range.Start,
-                !OutdentChecker::hasOutdent(SM, Range, PBD)
-              };
-            }
+          if (isTargetContext(Range)) {
+            Aligner.setAlignmentIfNeeded(CtxOverride);
+            return IndentContext {
+              Range.Start,
+              !OutdentChecker::hasOutdent(SM, Range, PBD)
+            };
           }
         }
         return Aligner.getContextAndSetAlignment(CtxOverride);

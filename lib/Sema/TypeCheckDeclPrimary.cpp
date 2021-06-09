@@ -1440,7 +1440,7 @@ void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
 void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
   SmallVector<VarDecl *, 2> captureListVars;
   for (auto &capture : expr->getCaptureList())
-    captureListVars.push_back(capture.Var);
+    captureListVars.push_back(capture.getVar());
 
   diagnoseDuplicateDecls(captureListVars);
 }
