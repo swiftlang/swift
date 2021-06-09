@@ -385,6 +385,7 @@ static GenericMetadataCache &getCache(
 }
 
 #if SWIFT_PTRAUTH && SWIFT_OBJC_INTEROP
+// See [NOTE: Dynamic-subclass-KVO]
 static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   auto oldClassMetadata = reinterpret_cast<const ClassMetadata *>(oldClass);
 

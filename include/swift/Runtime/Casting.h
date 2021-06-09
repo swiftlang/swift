@@ -224,7 +224,7 @@ swift_getDynamicType(OpaqueValue *value, const Metadata *self,
 /// Fetch the type metadata associated with the formal dynamic
 /// type of the given (possibly Objective-C) object.  The formal
 /// dynamic type ignores dynamic subclasses such as those introduced
-/// by KVO.
+/// by KVO. See [NOTE: Dynamic-subclass-KVO]
 ///
 /// The object pointer may be a tagged pointer, but cannot be null.
 SWIFT_RUNTIME_EXPORT
