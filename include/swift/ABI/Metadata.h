@@ -1168,8 +1168,25 @@ public:
     Description = description;
   }
 
+  // [NOTE: Dynamic-subclass-KVO]
+  //
+  // Using Objective-C runtime, KVO can modify object behavior without needing
+  // to modify the object's code. This is done by dynamically creating an
+  // artificial subclass of the the object's type.
+  //
+  // The isa pointer of the observed object is swapped out to point to
+  // the artificial subclass, which has the following properties:
+  // - Setters for observed keys are overridden to additionally post
+  // notifications.
+  // - The `-class` method is overridden to return the original class type
+  // instead of the artificial subclass type.
+  //
+  // For more details, see:
+  // https://www.mikeash.com/pyblog/friday-qa-2009-01-23.html
+
   /// Is this class an artificial subclass, such as one dynamically
   /// created for various dynamic purposes like KVO?
+  /// See [NOTE: Dynamic-subclass-KVO]
   bool isArtificialSubclass() const {
     assert(isTypeMetadata());
     return Description == nullptr;
