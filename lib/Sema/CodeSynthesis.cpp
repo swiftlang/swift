@@ -20,6 +20,7 @@
 #include "TypeCheckDecl.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
+#include "TypeCheckDistributed.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
@@ -35,7 +36,6 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "CodeSynthesisDistributedActor.cpp" // FIXME: remove this!!!
 using namespace swift;
 
 const bool IsImplicit = true;
