@@ -1670,6 +1670,11 @@ void Remangler::mangleInOut(Node *node) {
   Buffer << 'z';
 }
 
+void Remangler::mangleIsolated(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Yi";
+}
+
 void Remangler::mangleShared(Node *node) {
   mangleSingleChildNode(node);
   Buffer << 'h';

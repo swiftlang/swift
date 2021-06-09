@@ -117,15 +117,15 @@ func globalAsync() async { }
 actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
-  func independentMethod() {
+  nonisolated func independentMethod() {
     syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from a non-isolated context}}
   }
 
-  func mainActorMethod() {
-    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from synchronous context of global actor 'MainActor'}}
+  @MainActor func mainActorMethod() {
+    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from the main actor}}
   }
 
-  func uiActorMethod() { }
+  @MainActor func uiActorMethod() { }
 }
 
 // Sendable conformance inference for imported types.

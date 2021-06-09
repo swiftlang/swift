@@ -499,6 +499,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
         wrapInput(Node::Kind::Owned);
         break;
       }
+      if (flags.isIsolated()) {
+        wrapInput(Node::Kind::Isolated);
+      }
 
       inputs.push_back({input, flags.isVariadic()});
     }

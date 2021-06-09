@@ -165,7 +165,7 @@ class C6: P2, P3 {
 // Global actor checking for overrides
 // ----------------------------------------------------------------------
 actor GenericSuper<T> {
-  @GenericGlobalActor<T> func method() { }
+  @GenericGlobalActor<T> func method() { } // expected-note {{overridden declaration is here}}
 
   @GenericGlobalActor<T> func method2() { } // expected-note {{overridden declaration is here}}
   @GenericGlobalActor<T> func method3() { } // expected-note {{overridden declaration is here}}
@@ -175,13 +175,14 @@ actor GenericSuper<T> {
 
 actor GenericSub<T> : GenericSuper<[T]> { // expected-error{{actor types do not support inheritance}}
   override func method() { }  // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@-1{{actor-isolated instance method 'method()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
   nonisolated override func method3() { } // expected-error{{nonisolated instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
   @OtherGlobalActor func testMethod() {
-    method() // expected-error{{call to global actor 'GenericGlobalActor<[T]>'-isolated instance method 'method()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
-    _ = method
+    method() // expected-error{{actor-isolated instance method 'method()' can not be referenced from global actor 'OtherGlobalActor'}}
+    _ = method // expected-error{{actor-isolated instance method 'method()' can not be partially applied}}
   }
 }
 
