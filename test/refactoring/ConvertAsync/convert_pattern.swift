@@ -121,9 +121,7 @@ func testPatterns() async throws {
   // FALLBACK-NEXT: guard let (str1, str2) = strs, str1 == "hi" else { fatalError() }
   // FALLBACK-NEXT: print(str1, str2, err)
 
-  // FIXME: Arguably we should be able to classify everything after the guard as
-  // a success path and avoid the fallback in this case.
-  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=FALLBACK2 %s
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=GUARD-AND-UNHANDLED %s
   stringTupleParam { strs, err in
     guard let (str1, str2) = strs else { fatalError() }
     print(str1, str2)
@@ -134,22 +132,17 @@ func testPatterns() async throws {
     }
   }
 
-  // FALLBACK2:      var strs: (String, String)? = nil
-  // FALLBACK2-NEXT: var err: Error? = nil
-  // FALLBACK2-NEXT: do {
-  // FALLBACK2-NEXT:   strs = try await stringTupleParam()
-  // FALLBACK2-NEXT: } catch {
-  // FALLBACK2-NEXT:   err = error
-  // FALLBACK2-NEXT: }
-  // FALLBACK2-EMPTY:
-  // FALLBACK2-NEXT: guard let (str1, str2) = strs else { fatalError() }
-  // FALLBACK2-NEXT: print(str1, str2)
-  // FALLBACK2-NEXT: if .random(), err == nil {
-  // FALLBACK2-NEXT:   print("yay")
-  // FALLBACK2-NEXT: } else {
-  // FALLBACK2-NEXT:   print("nay")
-  // FALLBACK2-NEXT: }
-
+  // GUARD-AND-UNHANDLED:      do {
+  // GUARD-AND-UNHANDLED-NEXT:   let (str1, str2) = try await stringTupleParam()
+  // GUARD-AND-UNHANDLED-NEXT:   print(str1, str2)
+  // GUARD-AND-UNHANDLED-NEXT:   if .random(), <#err#> == nil {
+  // GUARD-AND-UNHANDLED-NEXT:     print("yay")
+  // GUARD-AND-UNHANDLED-NEXT:   } else {
+  // GUARD-AND-UNHANDLED-NEXT:     print("nay")
+  // GUARD-AND-UNHANDLED-NEXT:   }
+  // GUARD-AND-UNHANDLED-NEXT: } catch let err {
+  // GUARD-AND-UNHANDLED-NEXT:   fatalError()
+  // GUARD-AND-UNHANDLED-NEXT: }
 
   // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MIXED-BINDINGS %s
   stringTupleParam { strs, err in
