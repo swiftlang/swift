@@ -801,6 +801,24 @@ void CodeCompletionResult::dump() const {
   llvm::errs() << "\n";
 }
 
+CodeCompletionResult *
+CodeCompletionResult::withFlair(CodeCompletionFlair newFlair,
+                                CodeCompletionResultSink &Sink) {
+  if (Kind == ResultKind::Declaration) {
+    return new (*Sink.Allocator) CodeCompletionResult(
+        getSemanticContext(), newFlair, getNumBytesToErase(),
+        getCompletionString(), getAssociatedDeclKind(), isSystem(),
+        getModuleName(), getNotRecommendedReason(), getBriefDocComment(),
+        getAssociatedUSRs(), getDeclKeywords(), getExpectedTypeRelation(),
+        isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
+  } else {
+    return new (*Sink.Allocator) CodeCompletionResult(
+        getKind(), getSemanticContext(), newFlair, getNumBytesToErase(),
+        getCompletionString(), getExpectedTypeRelation(),
+        isOperator() ? getOperatorKind() : CodeCompletionOperatorKind::None);
+  }
+}
+
 void CodeCompletionResultBuilder::withNestedGroup(
     CodeCompletionString::Chunk::ChunkKind Kind,
     llvm::function_ref<void()> body) {
@@ -6517,9 +6535,16 @@ static void addConditionalCompilationFlags(ASTContext &Ctx,
   }
 }
 
-static void postProcessResults(ArrayRef<CodeCompletionResult *> results,
-                               CompletionKind Kind, DeclContext *DC) {
-  for (CodeCompletionResult *result : results) {
+/// Add flairs to the each item in \p results .
+///
+/// If \p Sink is passed, the pointer of the each result may be replaced with a
+/// pointer to the new item allocated in \p Sink.
+/// If \p Sink is nullptr, the pointee of each result may be modified in place.
+static void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
+                               CompletionKind Kind, DeclContext *DC,
+                               CodeCompletionResultSink *Sink) {
+  for (CodeCompletionResult *&result : results) {
+    bool modified = false;
     auto flair = result->getFlair();
 
     // Starting a statement with a protocol name is not common. So protocol
@@ -6532,6 +6557,7 @@ static void postProcessResults(ArrayRef<CodeCompletionResult *> results,
         Kind != CompletionKind::TypeDeclResultBeginning &&
         Kind != CompletionKind::GenericRequirement) {
       flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
+      modified = true;
     }
 
     // Starting a statement at top-level in non-script files is invalid.
@@ -6539,8 +6565,19 @@ static void postProcessResults(ArrayRef<CodeCompletionResult *> results,
         result->getKind() == CodeCompletionResult::ResultKind::Declaration &&
         isCodeCompletionAtTopLevelOfLibraryFile(DC)) {
       flair |= CodeCompletionFlairBit::ExpressionAtNonScriptOrMainFileScope;
+      modified = true;
     }
-    result->setFlair(flair);
+
+    if (!modified)
+      continue;
+
+    if (Sink) {
+      // Replace the result with a new result with the flair.
+      result = result->withFlair(flair, *Sink);
+    } else {
+      // 'Sink' == nullptr means the result is modifiable in place.
+      result->setFlair(flair);
+    }
   }
 }
 
@@ -6660,7 +6697,8 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   CompletionContext.typeContextKind = Lookup.typeContextKind();
 
   postProcessResults(CompletionContext.getResultSink().Results,
-                     CompletionContext.CodeCompletionKind, DC);
+                     CompletionContext.CodeCompletionKind, DC,
+                     /*Sink=*/nullptr);
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
@@ -7446,7 +7484,8 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
   CompletionLookup Lookup(targetSink, module->getASTContext(), SF);
   Lookup.lookupExternalModuleDecls(module, accessPath, needLeadingDot);
 }
-ArrayRef<CodeCompletionResult *>
+
+MutableArrayRef<CodeCompletionResult *>
 swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                                       CodeCompletionResultSink &sourceSink,
                                       bool onlyTypes,
@@ -7507,8 +7546,8 @@ swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                               sourceSink.Results.end());
   }
 
-  return llvm::makeArrayRef(targetSink.Results.data() + startSize,
-                            targetSink.Results.size() - startSize);
+  return llvm::makeMutableArrayRef(targetSink.Results.data() + startSize,
+                                   targetSink.Results.size() - startSize);
 }
 
 void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
@@ -7537,9 +7576,11 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    auto newItems = copyCodeCompletionResults(context.getResultSink(), (*V)->Sink,
-                                              R.OnlyTypes, R.OnlyPrecedenceGroups);
-    postProcessResults(newItems, context.CodeCompletionKind, DC);
+    auto newItems =
+        copyCodeCompletionResults(context.getResultSink(), (*V)->Sink,
+                                  R.OnlyTypes, R.OnlyPrecedenceGroups);
+    postProcessResults(newItems, context.CodeCompletionKind, DC,
+                       &context.getResultSink());
   }
 
   handleResults(context.takeResults());
