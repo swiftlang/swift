@@ -5718,6 +5718,10 @@ class AsyncConverter : private SourceEntityWalker {
   /// Whether a pattern is currently being converted.
   bool ConvertingPattern = false;
 
+  /// release/5.5 only: Tracks the VarDecls visited to avoid a double walk. On
+  /// main, this is fixed in the ASTWalker.
+  llvm::DenseSet<VarDecl *> VisitedVars;
+
   /// A mapping of inline patterns to print for closure parameters.
   using InlinePatternsToPrint = llvm::DenseMap<const Decl *, const Pattern *>;
 
@@ -6110,16 +6114,20 @@ private:
 
     // Functions and types already have their names in \c ScopedNames, only
     // variables should need to be renamed.
-    if (isa<VarDecl>(D)) {
-      // If we don't already have a name for the var, assign it one. Note that
-      // vars in binding patterns may already have assigned names here.
-      if (Names.find(D) == Names.end()) {
-        auto Ident = assignUniqueName(D, StringRef());
-        ScopedNames.back().insert(Ident);
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      // release/5.5 only: check to see if we've already visited this var to
+      // avoid a double walk. On main, this is fixed in the ASTWalker.
+      if (VisitedVars.insert(VD).second) {
+        // If we don't already have a name for the var, assign it one. Note that
+        // vars in binding patterns may already have assigned names here.
+        if (Names.find(D) == Names.end()) {
+          auto Ident = assignUniqueName(D, StringRef());
+          ScopedNames.back().insert(Ident);
+        }
+        addCustom(D->getSourceRange(), [&]() {
+          OS << newNameFor(D);
+        });
       }
-      addCustom(D->getSourceRange(), [&]() {
-        OS << newNameFor(D);
-      });
     }
 
     // Note we don't walk into any nested local function decls. If we start
