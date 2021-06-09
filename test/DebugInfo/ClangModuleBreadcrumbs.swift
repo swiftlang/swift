@@ -7,6 +7,8 @@
 import ClangModule.SubModule
 import OtherClangModule.SubModule
 
+let _ = someFunc(0)
+
 // Check for Clang module breadcrumbs.
 // CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}Swift
 // CHECK-SAME:           ClangModule
@@ -14,6 +16,10 @@ import OtherClangModule.SubModule
 
 // CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99}}, {{.*}} producer: "{{.*}}Swift
 // CHECK-SAME:           OtherClangModule
+// CHECK-SAME:           dwoId:
+
+// CHECK: !DICompileUnit(language: DW_LANG_{{ObjC|C99}},{{.*}} producer: "{{.*}}clang
+// CHECK-SAME:           ClangModule
 // CHECK-SAME:           dwoId:
 
 // NONE: DICompileUnit({{.*}}

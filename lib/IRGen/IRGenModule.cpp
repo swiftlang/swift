@@ -113,7 +113,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
     break;
   case IRGenDebugInfoLevel::ASTTypes:
   case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.DebugTypeExtRefs = true;
+    CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
