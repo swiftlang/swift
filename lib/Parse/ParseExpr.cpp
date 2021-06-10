@@ -2460,7 +2460,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
   // speculative parse to validate it and look for 'in'.
   if (Tok.isAny(
           tok::at_sign, tok::l_paren, tok::l_square, tok::identifier,
-          tok::kw__)) {
+          tok::kw__, tok::code_complete)) {
     BacktrackingScope backtrack(*this);
 
     // Consume attributes.
@@ -2496,11 +2496,11 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       }
 
       // Okay, we have a closure signature.
-    } else if (Tok.isIdentifierOrUnderscore()) {
+    } else if (Tok.isIdentifierOrUnderscore() || Tok.is(tok::code_complete)) {
       // Parse identifier (',' identifier)*
       consumeToken();
       while (consumeIf(tok::comma)) {
-        if (Tok.isIdentifierOrUnderscore()) {
+        if (Tok.isIdentifierOrUnderscore() || Tok.is(tok::code_complete)) {
           consumeToken();
           continue;
         }
@@ -2687,7 +2687,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       bool HasNext;
       do {
         SyntaxParsingContext ClParamCtx(SyntaxContext, SyntaxKind::ClosureParam);
-        if (Tok.isNot(tok::identifier, tok::kw__)) {
+        if (Tok.isNot(tok::identifier, tok::kw__, tok::code_complete)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           status.setIsParseError();
           break;
@@ -2698,7 +2698,10 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         if (Tok.is(tok::identifier)) {
           nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
         } else {
-          nameLoc = consumeToken(tok::kw__);
+          assert(Tok.isAny(tok::kw__ , tok::code_complete));
+          // Consume and ignore code_completion token so that completion don't
+          // suggest anything for the parameter name declaration.
+          nameLoc = consumeToken();
         }
         auto var = new (Context)
             ParamDecl(SourceLoc(), SourceLoc(),
