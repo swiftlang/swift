@@ -198,7 +198,7 @@ public:
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        const SILDebugScope *DS, bool InCoroContext = false);
+                        const SILDebugScope *DS, bool InCoroContext);
 
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
@@ -2419,21 +2419,9 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   // Emit locationless intrinsic for variables that were optimized away.
   if (Storage.empty())
     emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
-                     DBuilder.createExpression(), Line, Loc.column, Scope, DS);
-}
-
-static bool pointsIntoAlloca(llvm::Value *Storage) {
-  while (Storage) {
-    if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
-      Storage = LdInst->getOperand(0);
-    else if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Storage))
-      Storage = GEPInst->getOperand(0);
-    else if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Storage))
-      Storage = BCInst->getOperand(0);
-    else
-      return isa<llvm::AllocaInst>(Storage);
-  }
-  return false;
+                     DBuilder.createExpression(), Line, Loc.column, Scope, DS,
+                     Indirection == CoroDirectValue ||
+                         Indirection == CoroIndirectValue);
 }
 
 void IRGenDebugInfoImpl::emitDbgIntrinsic(
@@ -2477,11 +2465,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     else
       DBuilder.insertDeclare(Storage, Var, Expr, DL, &EntryBlock);
   } else {
-    if (pointsIntoAlloca(Storage))
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-    else
-      // Insert a dbg.value at the current insertion point.
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
+    // Insert a dbg.value at the current insertion point.
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
   }
 }
 
