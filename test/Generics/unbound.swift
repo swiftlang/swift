@@ -91,3 +91,16 @@ func makeInner() -> Outer<String, String>.Middle.Inner {
 var innerProperty: Outer.Middle.Inner = makeInner()
 // expected-error@-1 {{reference to generic type 'Outer' requires arguments in <...>}}
 
+// Some nested generic cases
+struct OuterStruct<T> { // expected-note 2{{generic type 'OuterStruct' declared here}}
+  struct InnerStruct<U> {} // expected-note {{generic type 'InnerStruct' declared here}}
+}
+
+func nested(_: OuterStruct.InnerStruct) {}
+// expected-error@-1 {{reference to generic type 'OuterStruct' requires arguments in <...>}}
+
+func nested(_: OuterStruct.InnerStruct<Int>) {}
+// expected-error@-1 {{reference to generic type 'OuterStruct' requires arguments in <...>}}
+
+func nested(_: OuterStruct<Int>.InnerStruct) {}
+// expected-error@-1 {{reference to generic type 'OuterStruct<Int>.InnerStruct' requires arguments in <...>}}
