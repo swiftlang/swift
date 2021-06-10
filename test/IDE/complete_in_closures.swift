@@ -385,4 +385,14 @@ func testSignature() {
 
     accept { (arg1: #^PARAMTYPE_1?check=WITH_GLOBAL_DECLS^#) in }
     accept { (arg1: Int, arg2: #^PARAMTYPE_2?check=WITH_GLOBAL_DECLS^#) in }
+
+    accept { [#^CAPTURE_1?check=WITH_GLOBAL_DECLS^#] in }
+    accept { [weak #^CAPTURE_2?check=WITH_GLOBAL_DECLS^#] in }
+    accept { [#^CAPTURE_3?check=EMPTY^# = capture] in }
+    accept { [weak #^CAPTURE_4?check=EMPTY^# = capture] in }
+
+    accept { () -> #^RESULTTYPE_1?check=WITH_GLOBAL_DECLS^# in }
+    accept { arg1, arg2 -> #^RESULTTYPE_2?check=WITH_GLOBAL_DECLS^# in }
+
+    // NOTE: For effects specifiers completion (e.g. '() <HERE> -> Void') see test/IDE/complete_concurrency_specifier.swift
 }
