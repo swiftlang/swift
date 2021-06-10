@@ -728,8 +728,8 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
 
-  // Only has an effect if opt-remark is enabled.
-  P.addOptRemarkGenerator();
+  // Emits remarks on all functions with @_assemblyVision attribute.
+  P.addAssemblyVisionRemarkGenerator();
 
   // FIXME: rdar://72935649 (Miscompile on combining PruneVTables with WMO)
   // P.addPruneVTables();
