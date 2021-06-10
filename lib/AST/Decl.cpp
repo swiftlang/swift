@@ -636,9 +636,18 @@ const ExternalSourceLocs *Decl::getSerializedLocs() const {
     return &NullLocs;
   }
 
+  CharSourceRange BufferRange = SM.getRangeForBuffer(BufferID);
   auto ResolveLoc = [&](const ExternalSourceLocs::RawLoc &Raw) -> SourceLoc {
+    // If the underlying source has been updated and the swiftsourceinfo hasn't,
+    // make sure we don't produce invalid source locations. Ideally would check
+    // the file hasn't been modified.
+    if (Raw.Offset > BufferRange.getByteLength())
+      return SourceLoc();
+
     // If the decl had a presumed loc, create its virtual file so that
-    // getPresumedLineAndColForLoc works from serialized locations as well.
+    // getPresumedLineAndColForLoc works from serialized locations as well. No
+    // need to check the buffer range, the directive must be before the location
+    // itself.
     if (Raw.Directive.isValid()) {
       auto &LD = Raw.Directive;
       SourceLoc Loc = SM.getLocForOffset(BufferID, LD.Offset);
