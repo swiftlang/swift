@@ -300,7 +300,7 @@ public func _forEachField(
 ///     and the `_MetadataKind` of the field's type.
 /// - Returns: `true` if every invocation of `body` returns `true`; otherwise,
 ///   `false`.
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *)
 @discardableResult
 @_spi(Reflection)
 public func _forEachFieldWithKeyPath<Root>(

@@ -6,7 +6,7 @@ import _Differentiation
 
 var FunctionTypeMetadataTests = TestSuite("FunctionTypeMetadata")
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
   FunctionTypeMetadataTests.test("Reflect differentiable function type") {
     expectEqual(
       "@differentiable(reverse) (Swift.Float) -> Swift.Float",

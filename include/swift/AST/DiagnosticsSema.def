@@ -4341,7 +4341,10 @@ ERROR(async_objc_dynamic_self,none,
 ERROR(actor_inheritance,none,
       "actor types do not support inheritance", ())
 
-ERROR(unowned_executor_outside_actor,none,
+// FIXME: This diagnostic was temporarily downgraded from an error because
+// it spuriously triggers when building the Foundation module from its textual
+// swiftinterface. (rdar://78932296)
+WARNING(unowned_executor_outside_actor,none,
       "'unownedExecutor' can only be implemented within the main "
       "definition of an actor", ())
 ERROR(override_implicit_unowned_executor,none,
@@ -5343,6 +5346,10 @@ ERROR(availability_stored_property_no_potential,
 ERROR(availability_enum_element_no_potential,
       none, "enum cases with associated values cannot be marked potentially unavailable with "
       "'@available'", ())
+
+WARNING(availability_enum_element_no_potential_warn,
+        none, "enum cases with associated values cannot be marked potentially unavailable with "
+        "'@available'", ())
 
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",

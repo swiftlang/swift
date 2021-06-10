@@ -615,7 +615,7 @@ func rdar50679161() {
 
 
 func rdar_50467583_and_50909555() {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
     // rdar://problem/50467583
     let _: Set = [Int][] // expected-error {{no 'subscript' candidates produce the expected contextual result type 'Set'}}
     // expected-error@-1 {{no exact matches in call to subscript}}

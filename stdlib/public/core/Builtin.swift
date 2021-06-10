@@ -346,12 +346,12 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 }
 
 #if INTERNAL_CHECKS_ENABLED
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 @usableFromInline
 @_silgen_name("_swift_isImmutableCOWBuffer")
 internal func _swift_isImmutableCOWBuffer(_ object: AnyObject) -> Bool
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 @usableFromInline
 @_silgen_name("_swift_setImmutableCOWBuffer")
 internal func _swift_setImmutableCOWBuffer(_ object: AnyObject, _ immutable: Bool) -> Bool
