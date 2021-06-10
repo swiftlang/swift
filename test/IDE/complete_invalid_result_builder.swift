@@ -55,6 +55,6 @@ test {
 }
 
 // MYENUM_MEMBERS: Begin completions
-// MYENUM_MEMBERS-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: a[#MyEnum#]; name=a
-// MYENUM_MEMBERS-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: b[#MyEnum#]; name=b
+// MYENUM_MEMBERS-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a[#MyEnum#]; name=a
+// MYENUM_MEMBERS-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: b[#MyEnum#]; name=b
 // MYENUM_MEMBERS: End completions 

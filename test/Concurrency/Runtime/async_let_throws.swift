@@ -14,7 +14,7 @@ func boom() throws -> Int {
   throw Boom()
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test() async {
   async let result = boom()
 
@@ -25,7 +25,7 @@ func test() async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test()

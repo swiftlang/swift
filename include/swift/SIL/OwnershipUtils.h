@@ -752,6 +752,7 @@ struct InteriorPointerOperand {
       return InteriorPointerOperand(op, kind);
     }
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the end scope of all borrow introducers of the parent value of this
@@ -1035,6 +1036,7 @@ struct OwnedValueIntroducer {
     case OwnedValueIntroducerKind::AllocRefInit:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   bool operator==(const OwnedValueIntroducer &other) const {
@@ -1076,10 +1078,10 @@ void findTransitiveReborrowBaseValuePairs(
     BorrowingOperand initialScopeOperand, SILValue origBaseValue,
     function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair);
 
-/// Given a begin_borrow visit all end_borrow users of the borrow or its
-/// reborrows.
+/// Given a begin of a borrow scope, visit all end_borrow users of the borrow or
+/// its reborrows.
 void visitTransitiveEndBorrows(
-    BeginBorrowInst *borrowInst,
+    BorrowedValue beginBorrow,
     function_ref<void(EndBorrowInst *)> visitEndBorrow);
 
 } // namespace swift

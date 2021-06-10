@@ -67,6 +67,14 @@ public:
     return create(decl->getASTContext(), decl);
   }
 
+  static ParameterList *clone(const ASTContext &Ctx, ParameterList *PL) {
+    SmallVector<ParamDecl*, 4> params;
+    params.reserve(PL->size());
+    for (auto p : *PL)
+      params.push_back(ParamDecl::clone(Ctx, p));
+    return ParameterList::create(Ctx, params);
+  }
+
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
   
@@ -76,7 +84,10 @@ public:
   iterator end() { return getArray().end(); }
   const_iterator begin() const { return getArray().begin(); }
   const_iterator end() const { return getArray().end(); }
-  
+
+  ParamDecl *front() const { return getArray().front(); }
+  ParamDecl *back() const { return getArray().back(); }
+
   MutableArrayRef<ParamDecl*> getArray() {
     return {getTrailingObjects<ParamDecl*>(), numParameters};
   }

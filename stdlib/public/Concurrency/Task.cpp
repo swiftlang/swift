@@ -25,6 +25,7 @@
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
 #include "Debug.h"
+#include "Error.h"
 
 #include <dispatch/dispatch.h>
 
@@ -65,7 +66,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
     case Status::Error:
     case Status::Success:
 #if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%p] task %p waiting on task %p, completed immediately\n", pthread_self(), waitingTask, this);
+      fprintf(stderr, "[%lu] task %p waiting on task %p, completed immediately\n",
+              _swift_get_thread_id(), waitingTask, this);
 #endif
       _swift_tsan_acquire(static_cast<Job *>(this));
       // The task is done; we don't need to wait.
@@ -73,7 +75,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
 
     case Status::Executing:
 #if SWIFT_TASK_PRINTF_DEBUG
-      fprintf(stderr, "[%p] task %p waiting on task %p, going to sleep\n", pthread_self(), waitingTask, this);
+      fprintf(stderr, "[%lu] task %p waiting on task %p, going to sleep\n",
+              _swift_get_thread_id(), waitingTask, this);
 #endif
       _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is now complete. We'll need to add ourselves to the queue.
@@ -93,6 +96,20 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
       return FutureFragment::Status::Executing;
     }
   }
+}
+
+void NullaryContinuationJob::process(Job *_job) {
+  auto *job = cast<NullaryContinuationJob>(_job);
+
+  auto *task = job->Task;
+  auto *continuation = job->Continuation;
+
+  _swift_task_dealloc_specific(task, job);
+
+  auto *context = cast<ContinuationAsyncContext>(continuation->ResumeContext);
+
+  context->setErrorResult(nullptr);
+  swift_continuation_resume(continuation);
 }
 
 void AsyncTask::completeFuture(AsyncContext *context) {
@@ -136,7 +153,8 @@ void AsyncTask::completeFuture(AsyncContext *context) {
 
 #if SWIFT_TASK_PRINTF_DEBUG
   if (!waitingTask)
-    fprintf(stderr, "[%p] task %p had no waiting tasks\n", pthread_self(), this);
+    fprintf(stderr, "[%lu] task %p had no waiting tasks\n",
+            _swift_get_thread_id(), this);
 #endif
 
   while (waitingTask) {
@@ -145,7 +163,8 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
 #if SWIFT_TASK_PRINTF_DEBUG
-    fprintf(stderr, "[%p] waking task %p from future of task %p\n", pthread_self(), waitingTask, this);
+    fprintf(stderr, "[%lu] waking task %p from future of task %p\n",
+            _swift_get_thread_id(), waitingTask, this);
 #endif
 
     // Fill in the return context.
@@ -179,8 +198,7 @@ AsyncTask::~AsyncTask() {
     futureFragment()->destroy();
   }
 
-  // Release any objects potentially held as task local values.
-  Local.destroy(this);
+  Private.destroy();
 }
 
 SWIFT_CC(swift)
@@ -196,7 +214,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // here.
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] destroy task %p\n", pthread_self(), task);
+  fprintf(stderr, "[%lu] destroy task %p\n", _swift_get_thread_id(), task);
 #endif
   free(task);
 }
@@ -254,6 +272,8 @@ static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   }
 };
 
+const void *const swift::_swift_concurrency_debug_jobMetadata =
+    static_cast<Metadata *>(&jobHeapMetadata);
 const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
 
@@ -267,16 +287,10 @@ static void completeTaskImpl(AsyncTask *task,
       reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
   asyncContextPrefix->errorResult = error;
 
-  // Destroy and deallocate any remaining task local items.
-  // We need to do this before we destroy the task local deallocator.
-  task->Local.destroy(task);
-
-  // Tear down the task-local allocator immediately;
-  // there's no need to wait for the object to be destroyed.
-  _swift_task_alloc_destroy(task);
+  task->Private.complete(task);
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] task %p completed\n", pthread_self(), task);
+  fprintf(stderr, "[%lu] task %p completed\n", _swift_get_thread_id(), task);
 #endif
 
   // Complete the future.
@@ -362,16 +376,17 @@ static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *
 
 /// All `swift_task_create*` variants funnel into this common implementation.
 ///
-/// If \p isSpawnLetTask is true, the \p closureContext is not heap allocated,
+/// If \p isAsyncLetTask is true, the \p closureContext is not heap allocated,
 /// but stack-allocated (and must not be ref-counted).
 /// Also, async-let tasks are not heap allcoated, but allcoated with the parent
 /// task's stack allocator.
 static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
-    JobFlags flags, TaskGroup *group,
+    size_t rawFlags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
-    void *closureContext, bool isSpawnLetTask,
+    void *closureContext, bool isAsyncLetTask,
     size_t initialContextSize) {
+  JobFlags flags(rawFlags);
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
@@ -415,7 +430,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   constexpr unsigned initialSlabSize = 512;
 
   void *allocation = nullptr;
-  if (isSpawnLetTask) {
+  if (isAsyncLetTask) {
     assert(parent);
     allocation = _swift_task_alloc_specific(parent,
                                         amountToAllocate + initialSlabSize);
@@ -423,7 +438,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     allocation = malloc(amountToAllocate);
   }
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] allocate task %p, parent = %p\n", pthread_self(), allocation, parent);
+  fprintf(stderr, "[%lu] allocate task %p, parent = %p\n",
+          _swift_get_thread_id(), allocation, parent);
 #endif
 
   AsyncContext *initialContext =
@@ -461,7 +477,7 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task = nullptr;
-  if (isSpawnLetTask) {
+  if (isAsyncLetTask) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
     task = new(allocation) AsyncTask(&taskHeapMetadata,
@@ -492,7 +508,6 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 
     // Set up the context for the future so there is no error, and a successful
     // result will be written into the future fragment's storage.
-    auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
     auto futureAsyncContextPrefix =
         reinterpret_cast<FutureAsyncContextPrefix *>(
             reinterpret_cast<char *>(allocation) + headerSize -
@@ -501,8 +516,22 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   }
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] creating task %p with parent %p\n", pthread_self(), task, parent);
+  fprintf(stderr, "[%lu] creating task %p with parent %p\n",
+          _swift_get_thread_id(), task, parent);
 #endif
+
+  // Initialize the task-local allocator.
+  if (isAsyncLetTask) {
+    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+                                                   &completeTask);
+    assert(parent);
+    void *initialSlab = (char*)allocation + amountToAllocate;
+    task->Private.initializeWithSlab(task, initialSlab, initialSlabSize);
+  } else {
+    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+        closureContext ? &completeTaskWithClosure : &completeTaskAndRelease);
+    task->Private.initialize(task);
+  }
 
   // Perform additional linking between parent and child task.
   if (parent) {
@@ -513,6 +542,9 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     // so they may have been spawned in any case still.
     if (swift_task_isCancelled(parent))
       swift_task_cancel(task);
+
+    // Initialize task locals with a link to the parent task.
+    task->_private().Local.initializeLinkParent(task, parent);
   }
 
   // Configure the initial context.
@@ -525,37 +557,17 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
-  // Initialize the task-local allocator.
-  if (isSpawnLetTask) {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-                                                   &completeTask);
-    assert(parent);
-    void *initialSlab = (char*)allocation + amountToAllocate;
-    _swift_task_alloc_initialize_with_slab(task, initialSlab, initialSlabSize);
-  } else {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-        closureContext ? &completeTaskWithClosure : &completeTaskAndRelease);
-    _swift_task_alloc_initialize(task);
-  }
-
-  // TODO: if the allocator would be prepared earlier we could do this in some
-  //       other existing if-parent if rather than adding another one here.
-  if (parent) {
-    // Initialize task locals with a link to the parent task.
-    task->Local.initializeLinkParent(task, parent);
-  }
-
   return {task, initialContext};
 }
 
 static AsyncTaskAndContext swift_task_create_group_future_common(
-    JobFlags flags, TaskGroup *group, const Metadata *futureResultType,
+    size_t flags, TaskGroup *group, const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
-    void *closureContext, bool isSpawnLetTask,
+    void *closureContext, bool isAsyncLetTask,
     size_t initialContextSize);
 
 AsyncTaskAndContext
-swift::swift_task_create_f(JobFlags flags,
+swift::swift_task_create_f(size_t flags,
                 ThinNullaryAsyncSignature::FunctionType *function,
                            size_t initialContextSize) {
   return swift_task_create_future_f(
@@ -563,10 +575,10 @@ swift::swift_task_create_f(JobFlags flags,
 }
 
 AsyncTaskAndContext swift::swift_task_create_future_f(
-    JobFlags flags,
+    size_t flags,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
-  assert(!flags.task_isGroupChildTask() &&
+  assert(!JobFlags(flags).task_isGroupChildTask() &&
   "use swift_task_create_group_future_f to initialize task group child tasks");
   return swift_task_create_group_future_f(
       flags, /*group=*/nullptr, futureResultType,
@@ -574,14 +586,14 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
 }
 
 AsyncTaskAndContext swift::swift_task_create_group_future_f(
-    JobFlags flags, TaskGroup *group,
+    size_t flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize) {
   return swift_task_create_group_future_common(flags, group,
                                                futureResultType,
                                                function, nullptr,
-                                               /*isSpawnLetTask*/ false,
+                                               /*isAsyncLetTask*/ false,
                                                initialContextSize);
 }
 
@@ -602,7 +614,7 @@ getAsyncClosureEntryPointAndContextSize(void *function,
           fnPtr->ExpectedContextSize};
 }
 
-AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
+AsyncTaskAndContext swift::swift_task_create_future(size_t flags,
                      const Metadata *futureResultType,
                      void *closureEntry,
                      HeapObject * /* +1 */ closureContext) {
@@ -617,11 +629,11 @@ AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
   return swift_task_create_group_future_common(
       flags, nullptr, futureResultType,
       taskEntry, closureContext,
-      /*isSpawnLetTask*/ false,
+      /*isAsyncLetTask*/ false,
       initialContextSize);
 }
 
-AsyncTaskAndContext swift::swift_task_create_async_let_future(JobFlags flags,
+AsyncTaskAndContext swift::swift_task_create_async_let_future(size_t flags,
                      const Metadata *futureResultType,
                      void *closureEntry,
                      void *closureContext) {
@@ -636,13 +648,13 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(JobFlags flags,
   return swift_task_create_group_future_common(
       flags, nullptr, futureResultType,
       taskEntry, closureContext,
-      /*isSpawnLetTask*/ true,
+      /*isAsyncLetTask*/ true,
       initialContextSize);
 }
 
 AsyncTaskAndContext
 swift::swift_task_create_group_future(
-                        JobFlags flags, TaskGroup *group,
+                        size_t flags, TaskGroup *group,
                         const Metadata *futureResultType,
                         void *closureEntry,
                         HeapObject * /*+1*/closureContext) {
@@ -656,7 +668,7 @@ swift::swift_task_create_group_future(
   return swift_task_create_group_future_common(
       flags, group, futureResultType,
       taskEntry, closureContext,
-      /*isSpawnLetTask*/ false,
+      /*isAsyncLetTask*/ false,
       initialContextSize);
 }
 
@@ -690,7 +702,7 @@ static void swift_task_future_waitImpl(OpaqueValue *result,
     return waitingTask->runInFullyEstablishedContext();
 
   case FutureFragment::Status::Error:
-    fatalError(0, "future reported an error, but wait cannot throw");
+    swift_Concurrency_fatalError(0, "future reported an error, but wait cannot throw");
   }
 }
 
@@ -834,7 +846,7 @@ void swift::swift_task_runAndBlockThread(const void *function,
   // Set up a task that runs the runAndBlock async function above.
   auto flags = JobFlags(JobKind::Task, JobPriority::Default);
   auto pair = swift_task_create_f(
-      flags,
+      flags.getOpaqueValue(),
       reinterpret_cast<ThinNullaryAsyncSignature::FunctionType *>(
           &runAndBlock_start),
       sizeof(RunAndBlockContext));
@@ -959,6 +971,21 @@ static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
   swift_task_removeStatusRecord(record);
   swift_task_dealloc(record);
+}
+
+SWIFT_CC(swift)
+static NullaryContinuationJob*
+swift_task_createNullaryContinuationJobImpl(
+    size_t priority,
+    AsyncTask *continuation) {
+  void *allocation =
+      swift_task_alloc(sizeof(NullaryContinuationJob));
+  auto *job =
+      new (allocation) NullaryContinuationJob(
+        swift_task_getCurrent(), static_cast<JobPriority>(priority),
+        continuation);
+
+  return job;
 }
 
 SWIFT_CC(swift)

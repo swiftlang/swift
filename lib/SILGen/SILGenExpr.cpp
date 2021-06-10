@@ -1568,10 +1568,8 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
     // Ensure that weak captures are in a separate scope.
     DebugScope scope(SGF, CleanupLocation(captureList));
     // CaptureListExprs evaluate their bound variables.
-    for (auto capture : captureList->getCaptureList()) {
-      SGF.visit(capture.Var);
-      SGF.visit(capture.Init);
-    }
+    for (auto capture : captureList->getCaptureList())
+      SGF.visit(capture.PBD);
 
     // Emit the closure body.
     auto *closure = captureList->getClosureBody();
@@ -2205,6 +2203,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
+  assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
   return SGF.emitDynamicMemberRefExpr(E, C);
 }
 
@@ -2227,6 +2226,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 RValue RValueEmitter::visitDynamicSubscriptExpr(
                                       DynamicSubscriptExpr *E, SGFContext C) {
   assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
+  assert(!E->isImplicitlyThrows() && "an distributed-actor-isolated @objc member?");
   return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
@@ -2416,10 +2416,8 @@ RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   // Ensure that weak captures are in a separate scope.
   DebugScope scope(SGF, CleanupLocation(E));
   // CaptureListExprs evaluate their bound variables.
-  for (auto capture : E->getCaptureList()) {
-    SGF.visit(capture.Var);
-    SGF.visit(capture.Init);
-  }
+  for (auto capture : E->getCaptureList())
+    SGF.visit(capture.PBD);
 
   // Then they evaluate to their body.
   return visit(E->getClosureBody(), C);
@@ -5253,7 +5251,7 @@ RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
 RValue RValueEmitter::visitAppliedPropertyWrapperExpr(
     AppliedPropertyWrapperExpr *E, SGFContext C) {
   auto *param = const_cast<ParamDecl *>(E->getParamDecl());
-  auto argument = visit(E->getValue(), C);
+  auto argument = visit(E->getValue());
   SILDeclRef::Kind initKind;
   switch (E->getValueKind()) {
   case swift::AppliedPropertyWrapperExpr::ValueKind::WrappedValue:

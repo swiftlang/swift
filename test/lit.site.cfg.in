@@ -34,6 +34,7 @@ config.swift_test_results_dir = \
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
 config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
+config.libdispatch_static_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@"
 config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 
@@ -127,6 +128,8 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
     config.available_features.add('differentiable_programming')
 if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
+if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
+    config.available_features.add('distributed')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

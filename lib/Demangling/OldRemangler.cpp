@@ -653,7 +653,12 @@ void Remangler::mangleThrowsAnnotation(Node *node) {
 }
 
 void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  Buffer << "D" << (char)node->getIndex(); // differentiability kind
+  Buffer << "D";
+  mangleChildNodes(node);
+}
+
+void Remangler::mangleGlobalActorFunctionType(Node *node) {
+  Buffer << "Y" << (char)node->getIndex(); // differentiability kind
 }
 
 void Remangler::mangleFieldOffset(Node *node) {
@@ -753,6 +758,10 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
 
 void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
+}
+
+void Remangler::mangleReabstractionThunkHelperWithGlobalActor(Node *node) {
+  Buffer << "<reabstraction-thunk-helper-with-global-actor>";
 }
 
 void Remangler::mangleAutoDiffFunction(Node *node, EntityContext &ctx) {
@@ -1482,6 +1491,11 @@ void Remangler::mangleOwned(Node *node) {
 
 void Remangler::mangleInOut(Node *node) {
   Buffer << 'R';
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleIsolated(Node *node) {
+  Buffer << "Yi";
   mangleSingleChildNode(node); // type
 }
 

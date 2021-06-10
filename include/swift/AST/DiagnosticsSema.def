@@ -279,6 +279,9 @@ FIXIT(insert_closure_return_type_placeholder,
       "%select{| () }0-> <#Result#> %select{|in }0",
       (bool))
 
+NOTE(use_of_anon_closure_param,none,
+     "anonymous closure parameter %0 is used here", (Identifier))
+
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
@@ -358,8 +361,8 @@ ERROR(cannot_convert_argument_value,none,
       (Type,Type))
 
 NOTE(candidate_has_invalid_argument_at_position,none,
-     "candidate expects %select{|in-out }2value of type %0 for parameter #%1",
-     (Type, unsigned, bool))
+     "candidate expects %select{|in-out }2value of type %0 for parameter #%1 (got %3)",
+     (Type, unsigned, bool, Type))
 
 ERROR(cannot_convert_array_to_variadic,none,
       "cannot pass array of type %0 as variadic arguments of type %1",
@@ -425,6 +428,9 @@ ERROR(cannot_convert_argument_value_anyobject,none,
       (Type, Type))
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+NOTE(note_incompatible_argument_value_nil_at_pos,none,
+     "'nil' is not compatible with expected argument type %0 at position #%1",
+     (Type, unsigned))
 
 ERROR(cannot_convert_condition_value,none,
       "cannot convert value of type %0 to expected condition type %1",
@@ -559,15 +565,22 @@ ERROR(async_functiontype_mismatch,none,
       "invalid conversion from 'async' function of type %0 to "
       "synchronous function type %1", (Type, Type))
 
+ERROR(cannot_pass_async_func_to_sync_parameter,none,
+      "cannot pass function of type %0 "
+      "to parameter expecting synchronous function type", (Type))
+
+NOTE(async_inferred_from_operation,none,
+     "'async' inferred from asynchronous operation used here", ())
+
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
       "'#keyPath' can only be used with the Objective-C runtime", ())
-ERROR(expression_unused_keypath_result,none,
+ERROR(expression_unused_keypath_result,NoUsage,
       "result of key path is unused", ())
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (Identifier))
-WARNING(expr_keypath_swift3_objc_inference,none,
+WARNING(expr_keypath_swift3_objc_inference,Deprecation,
         "argument of '#keyPath' refers to property %0 in %1 that depends on "
         "'@objc' inference deprecated in Swift 4",
         (Identifier, Identifier))
@@ -627,7 +640,7 @@ ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
-WARNING(expr_deprecated_writable_keypath,none,
+WARNING(expr_deprecated_writable_keypath,Deprecation,
         "forming a writable keypath to property %0 that is read-only in this context "
         "is deprecated and will be removed in a future release",(DeclName))
 
@@ -670,7 +683,7 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
-WARNING(expr_selector_swift3_objc_inference,none,
+WARNING(expr_selector_swift3_objc_inference,Deprecation,
         "argument of '#selector' refers to %0 %1 in %2 that depends on "
         "'@objc' inference deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Identifier))
@@ -680,10 +693,10 @@ WARNING(selector_literal_invalid,none,
         "string literal is not a valid Objective-C selector", ())
 WARNING(selector_literal_undeclared,none,
         "no method declared with Objective-C selector %0", (ObjCSelector))
-WARNING(selector_literal_deprecated,none,
+WARNING(selector_literal_deprecated,Deprecation,
         "use of string literal for Objective-C selectors is deprecated; "
         "use '#selector' or explicitly construct a 'Selector'", ())
-WARNING(selector_literal_deprecated_suggest,none,
+WARNING(selector_literal_deprecated_suggest,Deprecation,
         "use of string literal for Objective-C selectors is deprecated; "
         "use '#selector' instead", ())
 WARNING(selector_construction_suggest,none,
@@ -779,13 +792,6 @@ ERROR(serialization_fatal,Fatal,
       "fatal error encountered while reading from module '%0'; "
       SWIFT_BUG_REPORT_MESSAGE,
       (StringRef))
-NOTE(serialization_misc_version,none,
-     "module '%0' full misc version is '%1'",
-     (StringRef, StringRef))
-NOTE(serialization_compatibility_version_mismatch,none,
-     "compiling as Swift %0, with '%1' built as Swift %2 "
-     "(this is supported but may expose additional compiler issues)",
-     (StringRef, StringRef, StringRef))
 
 ERROR(serialization_invalid_decl,Fatal,
       "deserialized invalid declaration %0 (%1) in module '%2'",
@@ -818,7 +824,7 @@ ERROR(invalid_redecl_implicit,none,
       "invalid redeclaration of synthesized "
       "%select{%0|implementation for protocol requirement}1 %2",
       (DescriptiveDeclKind, bool, DeclName))
-WARNING(invalid_redecl_swift5_warning,none,
+WARNING(invalid_redecl_swift5_warning,Deprecation,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
 
@@ -1261,7 +1267,7 @@ ERROR(extra_trailing_closure_in_call,none,
 ERROR(trailing_closure_bad_param,none,
       "trailing closure passed to parameter of type %0 that does not "
       "accept a closure", (Type))
-WARNING(unlabeled_trailing_closure_deprecated,none,
+WARNING(unlabeled_trailing_closure_deprecated,Deprecation,
         "backward matching of the unlabeled trailing closure is deprecated; label the argument with %0 to suppress this warning",
         (Identifier))
 NOTE(decl_multiple_defaulted_closure_parameters,none,
@@ -1541,7 +1547,7 @@ ERROR(missing_unimplemented_init_runtime,none,
 ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
 
-WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
+WARNING(expr_dynamic_lookup_swift3_objc_inference,Deprecation,
         "reference to %0 %1 of %2 depends on '@objc' inference "
         "deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Identifier))
@@ -2411,8 +2417,9 @@ NOTE(redundant_conformance_here,none,
      "conformance constraint %0 : %1 implied here",
      (Type, ProtocolDecl *))
 
-ERROR(unsupported_recursive_requirements, none,
-      "requirement involves recursion that is not currently supported", ())
+WARNING(missing_protocol_refinement, none,
+        "protocol %0 should be declared to refine %1 due to a same-type constraint on 'Self'",
+        (ProtocolDecl *, ProtocolDecl *))
 
 ERROR(same_type_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be equal to both "
@@ -2666,7 +2673,7 @@ WARNING(implicitly_final_cannot_be_open_swift4,none,
         "static declarations}0 are implicitly 'final'; use 'public' instead of "
         "'open'", (unsigned))
 
-WARNING(override_swift3_objc_inference,none,
+WARNING(override_swift3_objc_inference,Deprecation,
         "override of %0 %1 from extension of %2 depends on deprecated "
         "inference of '@objc'",
         (DescriptiveDeclKind, DeclName, Identifier))
@@ -2682,7 +2689,7 @@ WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
 ERROR(inheritance_from_protocol_with_superclass,none,
   "inheritance from class-constrained protocol composition type %0", (Type))
-WARNING(anyobject_class_inheritance_deprecated,none,
+WARNING(anyobject_class_inheritance_deprecated,Deprecation,
   "using 'class' keyword to define a class-constrained protocol is deprecated; "
   "use 'AnyObject' instead", ())
 ERROR(multiple_inheritance,none,
@@ -2962,7 +2969,8 @@ NOTE(codable_enum_duplicate_case_name_here,none,
 NOTE(codable_enum_duplicate_parameter_name_here,none,
      "cannot automatically synthesize %0 for %1 because "
      "user defined parameter name %2 in %3 conflicts with "
-     "automatically generated parameter name", (Type, Type, Identifier, Identifier))
+     "automatically generated parameter name",
+     (Type, Type, Identifier, Identifier))
 
 WARNING(decodable_property_will_not_be_decoded, none,
         "immutable property will not be decoded because it is declared with "
@@ -3470,7 +3478,7 @@ ERROR(cfclass_designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0",
       (DeclName))
 ERROR(enumstruct_convenience_init,none,
-      "delegating initializers in %0 are not marked with 'convenience'",
+      "initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
@@ -3746,7 +3754,7 @@ NOTE(fix_unqualified_access_top_level_multi,none,
      "use '%0' to reference the %1 in module %2",
      (StringRef, DescriptiveDeclKind, Identifier))
 
-WARNING(warn_deprecated_conditional_conformance_outer_access,none,
+WARNING(warn_deprecated_conditional_conformance_outer_access,Deprecation,
         "use of %0 as reference to %1 in %2 %3 will change in future versions of Swift to reference %4 in %5 %6 "
         "which comes via a conditional conformance",
         (DeclNameRef, DescriptiveDeclKind, DescriptiveDeclKind, DeclName,
@@ -3922,32 +3930,32 @@ WARNING(guard_always_succeeds,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
-ERROR(expression_unused_closure,none,
+ERROR(expression_unused_closure,NoUsage,
       "closure expression is unused", ())
-ERROR(expression_unused_function,none,
+ERROR(expression_unused_function,NoUsage,
       "function is unused", ())
-WARNING(expression_unused_lvalue,none,
+WARNING(expression_unused_lvalue,NoUsage,
       "%select{"
         "variable|"
         "property is accessed but result|"
         "subscript is accessed but result"
       "}0 is unused",
       (unsigned))
-WARNING(expression_unused_result_call,none,
+WARNING(expression_unused_result_call,NoUsage,
         "result of call to %0 is unused", (DeclName))
-WARNING(expression_unused_result_operator,none,
+WARNING(expression_unused_result_operator,NoUsage,
         "result of operator %0 is unused", (DeclName))
-WARNING(expression_unused_result_unknown, none,
+WARNING(expression_unused_result_unknown, NoUsage,
         "result of call to %select{function|closure}0 returning %1 is unused", (bool, Type))
-WARNING(expression_unused_result, none,
+WARNING(expression_unused_result, NoUsage,
         "expression of type %0 is unused", (Type))
-WARNING(expression_unused_init_result,none,
+WARNING(expression_unused_init_result,NoUsage,
         "result of %0 initializer is unused", (Type))
-WARNING(expression_unused_optional_try,none,
+WARNING(expression_unused_optional_try,NoUsage,
         "result of 'try?' is unused", ())
-WARNING(expression_unused_selector_result, none,
+WARNING(expression_unused_selector_result, NoUsage,
         "result of '#selector' is unused", ())
-WARNING(expression_unused_literal,none,
+WARNING(expression_unused_literal,NoUsage,
         "%0 literal is unused", (StringRef))
 
 ERROR(assignment_lhs_not_lvalue,none,
@@ -4091,7 +4099,7 @@ ERROR(pattern_type_mismatch_context,none,
 
 ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
-WARNING(found_one_pattern_for_several_associated_values,none,
+WARNING(found_one_pattern_for_several_associated_values,Deprecation,
         "enum case '%0' has %1 associated values; matching them as a tuple "
         "is deprecated", (StringRef, unsigned))
 WARNING(converting_tuple_into_several_associated_values,none,
@@ -4236,8 +4244,8 @@ ERROR(throwing_interpolation_without_try,none,
       "interpolation can throw but is not marked with 'try'", ())
 ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
-ERROR(throwing_spawn_let_without_try,none,
-      "reading 'spawn let' can throw but is not marked with 'try'", ())
+ERROR(throwing_async_let_without_try,none,
+      "reading 'async let' can throw but is not marked with 'try'", ())
 ERROR(throwing_prop_access_without_try,none,
       "property access can throw but is not marked with 'try'", ())
 ERROR(throwing_subscript_access_without_try,none,
@@ -4266,8 +4274,8 @@ NOTE(async_access_without_await,none,
 
 NOTE(async_call_without_await_in_autoclosure,none,
       "call is 'async' in an autoclosure argument", ())
-NOTE(async_call_without_await_in_spawn_let,none,
-      "call is 'async' in an 'spawn let' initializer", ())
+NOTE(async_call_without_await_in_async_let,none,
+      "call is 'async' in an 'async let' initializer", ())
 
 WARNING(no_async_in_await,none,
         "no 'async' operations occur within 'await' expression", ())
@@ -4280,13 +4288,11 @@ ERROR(await_in_illegal_context,none,
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(async_in_nonasync_function,none,
-      "%select{'async'|'async' call|'await'|'spawn let'|'async' property access|'async' subscript access}0 in "
+      "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
       "%select{a function|an autoclosure}1 that does not support concurrency",
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
-NOTE(note_add_asynchandler_to_function,none,
-     "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
 NOTE(note_add_nonisolated_to_decl,none,
      "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
@@ -4307,47 +4313,20 @@ NOTE(protocol_witness_async_conflict,none,
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
-WARNING(async_let_is_spawn_let,none,
-      "'async let' is now 'spawn let'", ())
-
-ERROR(spawn_not_let,none,
-      "'spawn' can only be used with 'let' declarations", ())
-ERROR(spawn_let_not_local,none,
-      "'spawn let' can only be used on local declarations", ())
-ERROR(spawn_let_not_initialized,none,
-      "'spawn let' binding requires an initializer expression", ())
-ERROR(spawn_let_no_variables,none,
-      "'spawn let' requires at least one named variable", ())
-NOTE(spawn_let_without_await,none,
-      "reference to spawn let %0 is 'async'", (DeclName))
-ERROR(spawn_let_in_illegal_context,none,
-      "spawn let %0 cannot be referenced in "
+ERROR(async_not_let,none,
+      "'async' can only be used with 'let' declarations", ())
+ERROR(async_let_not_local,none,
+      "'async let' can only be used on local declarations", ())
+ERROR(async_let_not_initialized,none,
+      "'async let' binding requires an initializer expression", ())
+ERROR(async_let_no_variables,none,
+      "'async let' requires at least one named variable", ())
+NOTE(async_let_without_await,none,
+      "reference to async let %0 is 'async'", (DeclName))
+ERROR(async_let_in_illegal_context,none,
+      "async let %0 cannot be referenced in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
       (DeclName, unsigned))
-
-ERROR(asynchandler_non_func,none,
-      "'@asyncHandler' can only be applied to functions",
-      ())
-ERROR(asynchandler_returns_value,none,
-      "'@asyncHandler' function can only return 'Void'",
-      ())
-ERROR(asynchandler_throws,none,
-      "'@asyncHandler' function cannot throw",
-      ())
-ERROR(asynchandler_async,none,
-      "'@asyncHandler' function cannot be 'async' itself",
-      ())
-ERROR(asynchandler_inout_parameter,none,
-      "'inout' parameter is not allowed in '@asyncHandler' function",
-      ())
-ERROR(asynchandler_noescape_closure_parameter,none,
-      "non-escaping closure parameter is not allowed in '@asyncHandler' function",
-      ())
-ERROR(asynchandler_mutating,none,
-      "'@asyncHandler' function cannot be 'mutating'",
-      ())
-ERROR(asynchandler_removed,none,
-      "'@asyncHandler' has been removed from the language", ())
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "
@@ -4362,7 +4341,10 @@ ERROR(async_objc_dynamic_self,none,
 ERROR(actor_inheritance,none,
       "actor types do not support inheritance", ())
 
-ERROR(unowned_executor_outside_actor,none,
+// FIXME: This diagnostic was temporarily downgraded from an error because
+// it spuriously triggers when building the Foundation module from its textual
+// swiftinterface. (rdar://78932296)
+WARNING(unowned_executor_outside_actor,none,
       "'unownedExecutor' can only be implemented within the main "
       "definition of an actor", ())
 ERROR(override_implicit_unowned_executor,none,
@@ -4370,13 +4352,20 @@ ERROR(override_implicit_unowned_executor,none,
       "explicitly defined", ())
 
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
-        "%select{from inside the actor|on 'self'}2",
-        (DescriptiveDeclKind, DeclName, bool, unsigned))
-ERROR(actor_isolated_self_independent_context,none,
-        "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from a "
-        "non-isolated context",
-        (DescriptiveDeclKind, DeclName, unsigned))
+        "actor-isolated %0 %1 can not be "
+        "%select{referenced|mutated|used 'inout'}2 "
+        "%select{on a non-isolated actor instance|"
+        "from a Sendable function|from a Sendable closure|"
+        "from an 'async let' initializer|from global actor %4|"
+        "from the main actor|from a non-isolated context}3",
+        (DescriptiveDeclKind, DeclName, unsigned, unsigned, Type))
+ERROR(distributed_actor_isolated_non_self_reference,none,
+      "distributed actor-isolated %0 %1 can only be referenced "
+      "inside the distributed actor",
+      (DescriptiveDeclKind, DeclName))
+ERROR(distributed_actor_needs_explicit_distributed_import,none,
+      "'_Distributed' module not imported, required for 'distributed actor'",
+      ())
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
       "%select{| implicitly}2 'async' function call",
@@ -4384,10 +4373,6 @@ ERROR(actor_isolated_inout_state,none,
 ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
-ERROR(actor_isolated_global_actor_context,none,
-      "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}3 "
-      "from%select{| synchronous}4 context of global actor %2",
-      (DescriptiveDeclKind, DeclName, Type, unsigned, bool))
 ERROR(global_actor_from_instance_actor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
       " from actor %3 %select{|in a synchronous context}5",
@@ -4412,18 +4397,9 @@ ERROR(actor_isolated_partial_apply,none,
 ERROR(concurrent_access_local,none,
         "use of local %0 %1 in concurrently-executing code",
         (DescriptiveDeclKind, DeclName))
-ERROR(actor_isolated_from_concurrent_closure,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent closure",
-        (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_concurrent_function,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent function",
-        (DescriptiveDeclKind, DeclName, unsigned))
-ERROR(actor_isolated_from_spawn_let,none,
-        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'spawn let' initializer",
-        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
-      "cannot form key path to actor-isolated %0 %1",
-      (DescriptiveDeclKind, DeclName))
+      "cannot form key path to%select{| distributed}0 actor-isolated %1 %2",
+      (bool, DescriptiveDeclKind, DeclName))
 ERROR(effectful_keypath_component,none,
       "cannot form key path to %0 with 'throws' or 'async'",
       (DescriptiveDeclKind))
@@ -4438,12 +4414,33 @@ NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
+NOTE(distributed_actor_isolated_method_note,none,
+      "only 'distributed' functions can be called from outside the distributed actor",
+      ())
+ERROR(distributed_actor_isolated_method,none,
+      "only 'distributed' functions can be called from outside the distributed actor", // TODO: more like 'non-distributed' ... defined here
+      ())
+ERROR(distributed_actor_func_param_not_codable,none,
+      "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
+      (StringRef, Type))
+ERROR(distributed_actor_func_result_not_codable,none,
+      "distributed function result type %0 does not conform to 'Codable'",
+      (Type))
+ERROR(distributed_actor_remote_func_implemented_manually,none,
+      "Distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
+      (Identifier, Identifier))
+ERROR(distributed_actor_remote_func_is_not_static,none,
+      "remote function %0 must be static.",
+      (DeclName))
+ERROR(distributed_actor_remote_func_is_not_async_throws,none,
+      "remote function %0 must be 'async throws'.",
+      (DeclName))
+ERROR(distributed_actor_remote_func_must_not_be_distributed,none,
+      "remote function %0 must be 'async throws'.",
+      (DeclName))
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
-NOTE(actor_isolated_let,none,
-     "use `nonisolated` to allow synchronous access to 'let' from outside "
-     "the actor", ())
 WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
@@ -4462,7 +4459,15 @@ ERROR(global_actor_isolated_requirement_witness_conflict,none,
       "%0 %1 isolated to global actor %2 can not satisfy corresponding "
       "requirement from protocol %3 isolated to global actor %4",
       (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
+ERROR(actor_cannot_conform_to_global_actor_protocol,none,
+      "actor %0 cannot conform to global actor isolated protocol %1",
+      (Type, Type))
+NOTE(protocol_isolated_to_global_actor_here,none,
+     "%0 is isolated to global actor %1 here", (Type, Type))
 
+ERROR(isolated_parameter_not_actor,none,
+      "'isolated' parameter has non-actor type %0", (Type))
+      
 WARNING(non_concurrent_param_type,none,
         "cannot pass argument of non-sendable type %0 across actors",
         (Type))
@@ -4476,12 +4481,13 @@ WARNING(non_concurrent_property_type,none,
 WARNING(non_concurrent_keypath_capture,none,
         "cannot form key path that captures non-sendable type %0",
         (Type))
+WARNING(non_concurrent_keypath_access,none,
+        "cannot form key path that accesses non-sendable type %0",
+        (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
       "'Sendable'-conforming %2 %3 has non-sendable type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
-ERROR(non_sendable_nonisolated_let,none,
-      "non-isolated let property %0 has non-Sendable type %1", (DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
@@ -4497,15 +4503,12 @@ ERROR(concurrent_value_inherit,none,
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
 
-ERROR(actorindependent_mutable_storage,none,
-      "'@actorIndependent' can not be applied to stored properties",
+ERROR(nonisolated_let,none,
+      "'nonisolated' is meaningless on 'let' declarations because "
+      "they are immutable",
       ())
-ERROR(actorindependent_local_var,none,
-      "'@actorIndependent' can not be applied to local variables",
-      ())
-
 ERROR(nonisolated_mutable_storage,none,
-      "nonisolated' can not be applied to stored properties",
+      "'nonisolated' can not be applied to stored properties",
       ())
 ERROR(nonisolated_local_var,none,
       "'nonisolated' can not be applied to local variables",
@@ -4515,6 +4518,60 @@ ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
       "the actor instance; consider 'nonisolated'",
       (Identifier, Identifier))
+
+ERROR(distributed_actor_func_defined_outside_of_distributed_actor,none,
+      "distributed function %0 is declared outside of an distributed actor",
+      (DeclName))
+ERROR(distributed_actor_local_init_explicitly_defined,none,
+      "'distributed actor' local-initializer 'init(transport:)' "
+      "cannot be implemented explicitly.",
+      ())
+ERROR(distributed_actor_init_resolve_must_not_be_user_defined,none,
+      "'distributed actor' resolve-initializer 'init(resolve:using:)' "
+      "cannot be implemented explicitly.",
+      ())
+ERROR(distributed_actor_init_user_defined_must_be_convenience,none,
+      "'distributed actor' initializer %0 must be 'convenience' initializer. "
+      "Distributed actors have an implicitly synthesized designated "
+      "'init(transport:)' local-initializer, which other initializers must delegate to",
+      (DeclName))
+ERROR(distributed_actor_init_must_delegate_to_local_init,none,
+      "'distributed actor' initializer %0 must (directly or indirectly) delegate "
+      "to 'init(transport:)'",
+      (DeclName))
+ERROR(distributed_actor_init_must_not_delegate_to_resolve_init,none,
+      "'distributed actor' initializer %0 cannot delegate to resolve-initializer "
+      "'init(resolve:using:)', as it may result resolving a storageless proxy instance",
+      (DeclName))
+ERROR(distributed_actor_local_var,none,
+      "'distributed' can not be applied to local variables",
+      ())
+ERROR(distributed_actor_property,none,
+      "'distributed' can not be applied to local properties",
+      ())
+ERROR(distributed_actor_storage,none,
+      "'distributed' can not be applied to actor properties; "
+      "Only functions can be 'distributed'",
+      ())
+ERROR(distributed_actor_not_actor,none,
+      "'distributed' can only be applied to 'actor' definitions, "
+      "and distributed actor-isolated async functions",
+      ())
+ERROR(distributed_actor_not_actor_func,none,
+      "'distributed' can only be applied to distributed actor async functions",
+      ())
+ERROR(distributed_actor_func_static,none,
+      "'distributed' functions cannot be 'static'",
+      ())
+ERROR(distributed_actor_func_not_in_distributed_actor,none,
+      "'distributed' function can only be declared within 'distributed actor'",
+      ())
+ERROR(distributed_actor_independent_property_must_be_let,none,
+      "_distributedActorIndependent can be applied to properties, however they must be 'let'",
+      ())
+NOTE(distributed_actor_isolated_property,none,
+      "distributed actor state is only available within the actor instance",
+      ())
 
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
@@ -4633,7 +4690,7 @@ ERROR(enum_element_ellipsis,none,
 WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
         "using '!' is not allowed here; treating this as '?' instead", ())
 
-WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,none,
+WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,Deprecation,
         "using '!' here is deprecated and will be removed in a future release", ())
 
 ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
@@ -4697,7 +4754,7 @@ ERROR(attribute_requires_function_type,none,
       "@%0 attribute only applies to function types", (StringRef))
 ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
-ERROR(unreferenced_generic_parameter,none,
+ERROR(unreferenced_generic_parameter,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(unexpected_ctype_for_non_c_convention,none,
       "convention '%0' does not support the 'cType' argument label, did you "
@@ -4812,9 +4869,9 @@ ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
       "@objc protocols must not have operator requirements", ())
-WARNING(objc_inference_swift3_dynamic,none,
+WARNING(objc_inference_swift3_dynamic,Deprecation,
         "inference of '@objc' for 'dynamic' members is deprecated", ())
-WARNING(objc_inference_swift3_objc_derived,none,
+WARNING(objc_inference_swift3_objc_derived,Deprecation,
         "inference of '@objc' for members of Objective-C-derived classes is "
         "deprecated", ())
 
@@ -4839,7 +4896,7 @@ ERROR(objc_setter_for_nonobjc_property,none,
       "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
-WARNING(accessor_swift3_objc_inference,none,
+WARNING(accessor_swift3_objc_inference,Deprecation,
         "%select{%0 %1|%1}2 with '@objc' %select{getter|setter}3 depends on "
         "deprecated inference of '@objc'",
         (DescriptiveDeclKind, DeclName, bool, bool))
@@ -4934,7 +4991,7 @@ NOTE(objc_overriding_objc_decl,none,
 NOTE(objc_witness_objc_requirement,none,
      "satisfying requirement for %0 %1 in protocol %2",
      (DescriptiveDeclKind, DeclName, Identifier))
-WARNING(witness_swift3_objc_inference,none,
+WARNING(witness_swift3_objc_inference,Deprecation,
         "use of %0 %1 to satisfy a requirement of protocol %2 depends on "
         "'@objc' inference deprecated in Swift 4",
         (DescriptiveDeclKind, DeclName, Type))
@@ -5029,10 +5086,11 @@ NOTE(objc_declared_here,none,
      OBJC_DIAG_SELECT " declared here",
      (unsigned, DeclName))
 
+// %2 and %3 are unused to make signature match with diag::objc_redecl.
 ERROR(objc_redecl_same,none,
-      OBJC_DIAG_SELECT " with Objective-C selector %2 conflicts with "
+      OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
       "previous declaration with the same Objective-C selector",
-      (unsigned, DeclName, ObjCSelector))
+      (unsigned, DeclName, unsigned, DeclName, ObjCSelector))
 
 ERROR(objc_override_other,none,
       OBJC_DIAG_SELECT " with Objective-C selector %4 conflicts with "
@@ -5216,13 +5274,13 @@ NOTE(availability_obsoleted, none,
      "%select{getter for |setter for |}0%1 was obsoleted in %2 %3",
      (unsigned, DeclName, StringRef, llvm::VersionTuple))
 
-WARNING(availability_deprecated, none,
+WARNING(availability_deprecated, Deprecation,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
-WARNING(availability_deprecated_rename, none,
+WARNING(availability_deprecated_rename, Deprecation,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| in %3%select{| %5}4}2: "
         "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
@@ -5289,6 +5347,10 @@ ERROR(availability_enum_element_no_potential,
       none, "enum cases with associated values cannot be marked potentially unavailable with "
       "'@available'", ())
 
+WARNING(availability_enum_element_no_potential_warn,
+        none, "enum cases with associated values cannot be marked potentially unavailable with "
+        "'@available'", ())
+
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (Identifier, DeclName, StringRef, llvm::VersionTuple))
@@ -5334,7 +5396,7 @@ NOTE(conformance_availability_obsoleted, none,
      "conformance of %0 to %1 was obsoleted in %2 %3",
      (Type, Type, StringRef, llvm::VersionTuple))
 
-WARNING(conformance_availability_deprecated, none,
+WARNING(conformance_availability_deprecated, Deprecation,
         "conformance of %0 to %1 %select{is|%select{is|was}4}2 "
         "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
         (Type, Type, bool, StringRef, bool, llvm::VersionTuple,
@@ -5480,31 +5542,31 @@ NOTE(specialize_found_function_of_type, none,
 // MARK: Variable usage diagnostics
 //------------------------------------------------------------------------------
 
-WARNING(pbd_never_used_stmtcond, none,
+WARNING(pbd_never_used_stmtcond, NoUsage,
         "value %0 was defined but never used; consider replacing "
         "with boolean test",
         (Identifier))
-WARNING(unused_setter_parameter, none,
+WARNING(unused_setter_parameter, NoUsage,
         "setter argument %0 was never used, but the property was accessed",
         (Identifier))
 NOTE(fixit_for_unused_setter_parameter, none,
      "did you mean to use %0 instead of accessing the property's current value?", (Identifier))
 
-WARNING(pbd_never_used, none,
+WARNING(pbd_never_used, NoUsage,
         "initialization of %select{variable|immutable value}1 %0 was never used"
         "; consider replacing with assignment to '_' or removing it",
         (Identifier, unsigned))
 
 
-WARNING(capture_never_used, none,
+WARNING(capture_never_used, NoUsage,
         "capture %0 was never used",
         (Identifier))
 
-WARNING(variable_never_used, none,
+WARNING(variable_never_used, NoUsage,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
-WARNING(immutable_value_never_used_but_assigned, none,
+WARNING(immutable_value_never_used_but_assigned, NoUsage,
         "immutable value %0 was never used; consider removing it",
         (Identifier))
 WARNING(variable_never_mutated, none,
@@ -5589,7 +5651,7 @@ ERROR(override_nsobject_hash_error,none,
       "'NSObject.hash(into:)' is not overridable; "
       "did you mean to override 'NSObject.hash'?", ())
 
-WARNING(hashvalue_implementation,none,
+WARNING(hashvalue_implementation,Deprecation,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
@@ -5709,10 +5771,10 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
-WARNING(property_wrapper_wrapperValue,none,
+WARNING(property_wrapper_wrapperValue,Deprecation,
         "property wrapper's 'wrapperValue' property should be renamed to "
         "'projectedValue'; use of 'wrapperValue' is deprecated", ())
-WARNING(property_wrapper_init_initialValue,none,
+WARNING(property_wrapper_init_initialValue,Deprecation,
         "property wrapper's 'init(initialValue:)' should be renamed "
         "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
         ())
@@ -5809,7 +5871,7 @@ NOTE(result_builder_missing_build_limited_availability, none,
 // MARK: Tuple Shuffle Diagnostics
 //------------------------------------------------------------------------------
 
- WARNING(warn_reordering_tuple_shuffle_deprecated,none,
+ WARNING(warn_reordering_tuple_shuffle_deprecated,Deprecation,
         "expression shuffles the elements of this tuple; "
         "this behavior is deprecated", ())
 
@@ -5863,31 +5925,43 @@ ERROR(atomics_ordering_must_be_constant, none,
 // MARK: access notes
 //------------------------------------------------------------------------------
 
+#define WHICH_ACCESS_NOTE(reason) "specified by access note for %" #reason
+
 REMARK(attr_added_by_access_note, none,
-       "access note for %0 adds %select{attribute|modifier}1 '%2' to this %3",
-       (StringRef, bool, StringRef, DescriptiveDeclKind))
+       "implicitly added '%1' to this %2, as " WHICH_ACCESS_NOTE(0),
+       (StringRef, StringRef, DescriptiveDeclKind))
 NOTE(fixit_attr_added_by_access_note, none,
-     "add %select{attribute|modifier}0 explicitly to silence this warning",
-     (bool))
+     "add '%0' explicitly to silence this warning",
+     (StringRef))
 
 REMARK(attr_removed_by_access_note, none,
-       "access note for %0 removes %select{attribute|modifier}1 '%2' from "
-       "this %3",
-       (StringRef, bool, StringRef, DescriptiveDeclKind))
+       "implicitly removed '%1' from this %3, as " WHICH_ACCESS_NOTE(0),
+       (StringRef, StringRef, DescriptiveDeclKind))
 NOTE(fixit_attr_removed_by_access_note, none,
-     "remove %select{attribute|modifier}0 explicitly to silence this warning",
-     (bool))
+     "remove '%0' explicitly to silence this warning",
+     (StringRef))
 
 REMARK(attr_objc_name_changed_by_access_note, none,
-        "access note for %0 changes the '@objc' name of this %1 to %2",
-        (StringRef, DescriptiveDeclKind, ObjCSelector))
+       "implicitly changed Objective-C name of this %1 to %2, as "
+       WHICH_ACCESS_NOTE(0),
+       (StringRef, DescriptiveDeclKind, ObjCSelector))
 NOTE(fixit_attr_objc_name_changed_by_access_note, none,
-     "change '@objc' name in source code explicitly to silence this warning",
+     "change Objective-C name explicitly to silence this warning",
      ())
-REMARK(attr_objc_name_conflicts_with_access_note, none,
-       "access note for %0 changes the '@objc' name of this %1 to %2, but "
-       "source code specifies %3; the access note will be ignored",
-       (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
+
+// Bad access note diagnostics. These are usually emitted as remarks, but
+// '-Raccess-note=all-validate' emits them as errors.
+
+ERROR(attr_objc_name_conflicts_with_access_note, none,
+      "ignored access note: did not change Objective-C name of this %1 from %2 "
+      "to %3, even though it was " WHICH_ACCESS_NOTE(0),
+      (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
+ERROR(wrap_invalid_attr_added_by_access_note, none,
+      "ignored access note: %0; did not implicitly add '%2' to this %3, even "
+      "though it was " WHICH_ACCESS_NOTE(1),
+      (DiagnosticInfo *, StringRef, StringRef, DescriptiveDeclKind))
+
+#undef WHICH_ACCESS_NOTE
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -19,6 +19,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMatcher.h"
@@ -206,20 +207,15 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (extendedNominal == nullptr)
       return true;
 
-    // FIXME: The extension may not have a generic signature set up yet as
-    // resolving signatures may trigger associated type inference.  This cycle
-    // is now detectable and we should look into untangling it
-    // - see rdar://55263708
-    if (!extension->hasComputedGenericSignature())
-      return true;
-
-    // Retrieve the generic signature of the extension.
-    const auto extensionSig = extension->getGenericSignature();
+    auto *proto = dyn_cast<ProtocolDecl>(extendedNominal);
 
     // If the extension is bound to the nominal the conformance is
     // declared on, it is viable for inference when its conditional
     // requirements are satisfied by those of the conformance context.
-    if (!isa<ProtocolDecl>(extendedNominal)) {
+    if (!proto) {
+      // Retrieve the generic signature of the extension.
+      const auto extensionSig = extension->getGenericSignature();
+
       // Extensions of non-generic nominals are always viable for inference.
       if (!extensionSig)
         return true;
@@ -235,29 +231,28 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // in the first place. Only check conformances on the `Self` type,
     // because those have to be explicitly declared on the type somewhere
     // so won't be affected by whatever answer inference comes up with.
-    auto selfTy = extension->getSelfInterfaceType();
-    for (const Requirement &reqt : extensionSig->getRequirements()) {
-      switch (reqt.getKind()) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
-        // FIXME: This is the wrong check
-        if (selfTy->isEqual(reqt.getFirstType()) &&
-            !TypeChecker::isSubtypeOf(conformance->getType(),
-                                      reqt.getSecondType(), dc))
-          return false;
-        break;
+    auto *module = dc->getParentModule();
+    auto checkConformance = [&](ProtocolDecl *proto) {
+      auto otherConf = module->lookupConformance(conformance->getType(),
+                                                 proto);
+      return (otherConf && otherConf.getConditionalRequirements().empty());
+    };
 
-      case RequirementKind::Layout:
-      case RequirementKind::SameType:
-        break;
+    // First check the extended protocol itself.
+    if (!checkConformance(proto))
+      return false;
+
+    // Now check any additional bounds on 'Self' from the where clause.
+    auto bounds = getSelfBoundsFromWhereClause(extension);
+    for (auto *decl : bounds.decls) {
+      if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+        if (!checkConformance(proto))
+          return false;
       }
     }
 
     return true;
   };
-
-  auto typeInContext =
-    conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
 
   for (auto witness :
        checker.lookupValueWitnesses(req, /*ignoringNames=*/nullptr)) {
@@ -314,6 +309,10 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
           if (!associatedTypesAreSameEquivalenceClass(dmt->getAssocType(),
                                                       result.first))
             return false;
+
+          auto typeInContext =
+            conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
+
           if (!dmt->getBase()->isEqual(typeInContext))
             return false;
 

@@ -1204,67 +1204,55 @@ public:
     }
   }
 
-  void checkInstructionsSILLocation(SILInstruction *I) {
-    // Check the debug scope.
-    auto *DS = I->getDebugScope();
-    if (DS && !maybeScopeless(*I))
-      require(DS, "instruction has a location, but no scope");
+  void checkInstructionsSILLocation(SILInstruction *inst) {
+    // First verify structural debug info information.
+    inst->verifyDebugInfo();
 
-    require(!DS || DS->getParentFunction() == I->getFunction(),
+    // Check the debug scope.
+    auto *debugScope = inst->getDebugScope();
+    if (debugScope && !maybeScopeless(*inst))
+      require(debugScope, "instruction has a location, but no scope");
+    require(!debugScope ||
+                debugScope->getParentFunction() == inst->getFunction(),
             "debug scope of instruction belongs to a different function");
 
-    // Check the location kind.
-    SILLocation L = I->getLoc();
-    SILLocation::LocationKind LocKind = L.getKind();
-    SILInstructionKind InstKind = I->getKind();
-
-    // Check that there is at most one debug variable defined
-    // for each argument slot. This catches SIL transformations
-    // that accidentally remove inline information (stored in the SILDebugScope)
-    // from debug-variable-carrying instructions.
-    if (!DS->InlinedCallSite) {
-      Optional<SILDebugVariable> VarInfo;
-      if (auto *DI = dyn_cast<AllocStackInst>(I))
-        VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<AllocBoxInst>(I))
-        VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<DebugValueInst>(I))
-        VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<DebugValueAddrInst>(I))
-        VarInfo = DI->getVarInfo();
-
-      if (VarInfo)
-        if (unsigned ArgNo = VarInfo->ArgNo) {
-          // It is a function argument.
-          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty() && !VarInfo->Name.empty()) {
-            require(
-                DebugVars[ArgNo] == VarInfo->Name,
-                "Scope contains conflicting debug variables for one function "
-                "argument");
-          } else {
-            // Reserve enough space.
-            while (DebugVars.size() <= ArgNo) {
-              DebugVars.push_back(StringRef());
-            }
-          }
-          DebugVars[ArgNo] = VarInfo->Name;
-      }
-    }
-
-    // Regular locations are allowed on all instructions.
-    if (LocKind == SILLocation::RegularKind)
+    // Check that there is at most one debug variable defined for each argument
+    // slot if our debug scope is not an inlined call site.
+    //
+    // This catches SIL transformations that accidentally remove inline
+    // information (stored in the SILDebugScope) from debug-variable-carrying
+    // instructions.
+    if (debugScope->InlinedCallSite)
       return;
 
-    if (LocKind == SILLocation::ReturnKind ||
-        LocKind == SILLocation::ImplicitReturnKind)
-      require(InstKind == SILInstructionKind::BranchInst ||
-              InstKind == SILInstructionKind::ReturnInst ||
-              InstKind == SILInstructionKind::UnreachableInst,
-        "return locations are only allowed on branch and return instructions");
+    Optional<SILDebugVariable> varInfo;
+    if (auto *di = dyn_cast<AllocStackInst>(inst))
+      varInfo = di->getVarInfo();
+    else if (auto *di = dyn_cast<AllocBoxInst>(inst))
+      varInfo = di->getVarInfo();
+    else if (auto *di = dyn_cast<DebugValueInst>(inst))
+      varInfo = di->getVarInfo();
+    else if (auto *di = dyn_cast<DebugValueAddrInst>(inst))
+      varInfo = di->getVarInfo();
 
-    if (LocKind == SILLocation::ArtificialUnreachableKind)
-      require(InstKind == SILInstructionKind::UnreachableInst,
-        "artificial locations are only allowed on Unreachable instructions");
+    if (!varInfo)
+      return;
+
+    if (unsigned argNum = varInfo->ArgNo) {
+      // It is a function argument.
+      if (argNum < DebugVars.size() && !DebugVars[argNum].empty() &&
+          !varInfo->Name.empty()) {
+        require(DebugVars[argNum] == varInfo->Name,
+                "Scope contains conflicting debug variables for one function "
+                "argument");
+      } else {
+        // Reserve enough space.
+        while (DebugVars.size() <= argNum) {
+          DebugVars.push_back(StringRef());
+        }
+      }
+      DebugVars[argNum] = varInfo->Name;
+    }
   }
 
   /// Check that the types of this value producer are all legal in the function

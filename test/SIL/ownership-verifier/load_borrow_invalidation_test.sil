@@ -410,3 +410,21 @@ bb0(%0 : $*Builtin.NativeObject):
   return %2 : $Bool
 }
  
+sil [ossa] @test_valuemetatype : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  %3a = value_metatype $@thick Builtin.NativeObject.Type, %1 : $*Builtin.NativeObject
+  %2 = load_borrow %1 : $*Builtin.NativeObject
+  %gUser = function_ref @guaranteedUser : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %gUser(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $Builtin.NativeObject
+  %3 = address_to_pointer %1 : $*Builtin.NativeObject to $Builtin.RawPointer
+  %4 = mark_dependence %3 : $Builtin.RawPointer on %1 : $*Builtin.NativeObject
+  %rawPointerUser = function_ref @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  apply %rawPointerUser(%4) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

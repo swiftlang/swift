@@ -464,7 +464,7 @@ class SDKNodeTypeNominal : public SDKNodeType {
   StringRef USR;
 public:
   SDKNodeTypeNominal(SDKNodeInitInfo Info);
-  // Get the usr of the correspoding nominal type decl.
+  // Get the usr of the corresponding nominal type decl.
   StringRef getUsr() const { return USR; }
   static bool classof(const SDKNode *N);
   void jsonize(json::Output &Out) override;

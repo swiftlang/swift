@@ -2712,7 +2712,7 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                       signature);
   }
   }
-  
+  llvm_unreachable("covered switch");
 }
 
 FunctionPointer

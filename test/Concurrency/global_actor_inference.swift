@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -165,7 +165,7 @@ class C6: P2, P3 {
 // Global actor checking for overrides
 // ----------------------------------------------------------------------
 actor GenericSuper<T> {
-  @GenericGlobalActor<T> func method() { }
+  @GenericGlobalActor<T> func method() { } // expected-note {{overridden declaration is here}}
 
   @GenericGlobalActor<T> func method2() { } // expected-note {{overridden declaration is here}}
   @GenericGlobalActor<T> func method3() { } // expected-note {{overridden declaration is here}}
@@ -175,13 +175,14 @@ actor GenericSuper<T> {
 
 actor GenericSub<T> : GenericSuper<[T]> { // expected-error{{actor types do not support inheritance}}
   override func method() { }  // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  // expected-error@-1{{actor-isolated instance method 'method()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
   nonisolated override func method3() { } // expected-error{{nonisolated instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
   @OtherGlobalActor func testMethod() {
-    method() // expected-error{{call to global actor 'GenericGlobalActor<[T]>'-isolated instance method 'method()' in a synchronous global actor 'OtherGlobalActor'-isolated context}}
-    _ = method
+    method() // expected-error{{actor-isolated instance method 'method()' can not be referenced from global actor 'OtherGlobalActor'}}
+    _ = method // expected-error{{actor-isolated instance method 'method()' can not be partially applied}}
   }
 }
 
@@ -227,19 +228,6 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
 
   func onGenericGlobalActorString() { }
   @GenericGlobalActor<Int> func onGenericGlobalActorInt() { }
-
-  @asyncHandler @GenericGlobalActor<String>
-  override func i() { // okay to differ from superclass because it's an asyncHandler.
-    onGenericGlobalActorString()
-  }
-
-  @asyncHandler
-  override func j() { // okay, isolated to GenericGlobalActor<String>
-    onGenericGlobalActorString() // okay
-
-    // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{5-5=await }}
-    onGenericGlobalActorInt() // expected-note{{call is 'async'}}
-  }
 }
 
 // ----------------------------------------------------------------------
@@ -253,7 +241,7 @@ class SubclassWithGlobalActors : SuperclassWithGlobalActors {
 
 func bar() async {
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{3-3=await }}
-  foo() // expected-note{{call is 'async'}}
+  foo() // expected-note{{calls to global function 'foo()' from outside of its actor context are implicitly asynchronous}}
 }
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
@@ -268,20 +256,20 @@ func barSync() {
 @propertyWrapper
 @OtherGlobalActor
 struct WrapperOnActor<Wrapped> {
-  @actorIndependent(unsafe) private var stored: Wrapped
+  private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
     stored = wrappedValue
   }
 
   @MainActor var wrappedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get { }
+    set { }
   }
 
   @SomeGlobalActor var projectedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get {  }
+    set { }
   }
 }
 
@@ -298,20 +286,20 @@ public struct WrapperOnMainActor<Wrapped> {
 
 @propertyWrapper
 actor WrapperActor<Wrapped> {
-  @actorIndependent(unsafe) var storage: Wrapped
+  var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
     storage = wrappedValue
   }
 
   nonisolated var wrappedValue: Wrapped {
-    get { storage }
-    set { storage = newValue }
+    get { }
+    set { }
   }
 
   nonisolated var projectedValue: Wrapped {
-    get { storage }
-    set { storage = newValue }
+    get { }
+    set { }
   }
 }
 
@@ -357,21 +345,28 @@ actor WrapperActorBad1<Wrapped> {
 
 @propertyWrapper
 actor WrapperActorBad2<Wrapped> {
-  @actorIndependent(unsafe) var storage: Wrapped
+  var storage: Wrapped
 
   init(wrappedValue: Wrapped) {
     storage = wrappedValue
   }
 
   nonisolated var wrappedValue: Wrapped {
-    get { storage }
-    set { storage = newValue }
+    get { }
+    set { }
   }
 
   var projectedValue: Wrapped { // expected-error{{'projectedValue' property in property wrapper type 'WrapperActorBad2' cannot be isolated to the actor instance; consider 'nonisolated'}}
-    get { storage }
-    set { storage = newValue }
+    get {  }
+    set {  }
   }
+}
+
+@propertyWrapper
+struct WrapperWithMainActorDefaultInit {
+  var wrappedValue: Int { fatalError() }
+
+  @MainActor init() {} // expected-note {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
 }
 
 actor ActorWithWrapper {
@@ -381,12 +376,14 @@ actor ActorWithWrapper {
     _ = synced // expected-error{{'synced' isolated to global actor}}
     _ = $synced // expected-error{{'$synced' isolated to global actor}}
     _ = _synced // expected-error{{'_synced' isolated to global actor}}
+
+    @WrapperWithMainActorDefaultInit var value: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
   }
 }
 
 @propertyWrapper
 struct WrapperOnSomeGlobalActor<Wrapped> {
-  @actorIndependent(unsafe) private var stored: Wrapped
+  private var stored: Wrapped
 
   nonisolated init(wrappedValue: Wrapped) {
     stored = wrappedValue
@@ -454,20 +451,20 @@ class UGASubclass2: UGAClass {
 @propertyWrapper
 @OtherGlobalActor(unsafe)
 struct WrapperOnUnsafeActor<Wrapped> {
-  @actorIndependent(unsafe) private var stored: Wrapped
+  private var stored: Wrapped
 
   init(wrappedValue: Wrapped) {
     stored = wrappedValue
   }
 
   @MainActor(unsafe) var wrappedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get { }
+    set { }
   }
 
   @SomeGlobalActor(unsafe) var projectedValue: Wrapped {
-    get { stored }
-    set { stored = newValue }
+    get { }
+    set { }
   }
 }
 
@@ -494,14 +491,13 @@ struct HasWrapperOnUnsafeActor {
 }
 
 // ----------------------------------------------------------------------
-// Actor-independent closures
+// Nonisolated closures
 // ----------------------------------------------------------------------
-@SomeGlobalActor func getGlobal7() -> Int { 7 } // expected-note{{calls to global function 'getGlobal7()' from outside of its actor context are implicitly asynchronous}}
+@SomeGlobalActor func getGlobal7() -> Int { 7 }
 func acceptClosure<T>(_: () -> T) { }
 
 @SomeGlobalActor func someGlobalActorFunc() async {
   acceptClosure { getGlobal7() } // okay
-  acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'getGlobal7()' in a synchronous nonisolated context}}
 }
 
 // ----------------------------------------------------------------------
@@ -509,7 +505,7 @@ func acceptClosure<T>(_: () -> T) { }
 // ----------------------------------------------------------------------
 func takesUnsafeMainActor(@_unsafeMainActor fn: () -> Void) { }
 
-@MainActor func onlyOnMainActor() { } // expected-note{{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
+@MainActor func onlyOnMainActor() { }
 
 func useUnsafeMainActor() {
   takesUnsafeMainActor {
@@ -525,7 +521,8 @@ func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable 
 
 @MainActor func testCallFromMainActor() {
   acceptAsyncSendableClosure {
-    onlyOnMainActor() // expected-error{{call to main actor-isolated global function 'onlyOnMainActor()' in a synchronous nonisolated context}}
+    onlyOnMainActor() // expected-error{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@-1 {{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
   }
 
   acceptAsyncSendableClosure {

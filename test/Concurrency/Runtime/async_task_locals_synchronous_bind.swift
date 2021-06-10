@@ -8,13 +8,13 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 enum TL {
   @TaskLocal
   static var number: Int = 0
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @discardableResult
 func printTaskLocal<V>(
     _ key: TaskLocal<V>,
@@ -32,35 +32,27 @@ func printTaskLocal<V>(
 
 // ==== ------------------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-func synchronous_bind() async {
+@available(SwiftStdlib 5.5, *)
+func synchronous_bind() {
 
   func synchronous() {
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
 
-    withUnsafeCurrentTask { task in
-      guard let task = task else {
-        fatalError()
-      }
-
-      task.withTaskLocal(TL.$number, boundTo: 2222) {
-        printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
-      }
-
-      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
+    TL.$number.withValue(2222) {
+      printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
     }
 
     printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (1111)
   }
 
-  await TL.$number.withValue(1111) {
+  TL.$number.withValue(1111) {
     synchronous()
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
-  static func main() async {
-    await synchronous_bind()
+  static func main() {
+    synchronous_bind()
   }
 }

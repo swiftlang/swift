@@ -158,6 +158,7 @@ static SourceLoc getLocForPresentation(SILLocation loc,
   case SourceLocPresentationKind::EndRange:
     return loc.getEndSourceLoc();
   }
+  llvm_unreachable("covered switch");
 }
 
 /// The user has passed us an instruction that for some reason has a source loc

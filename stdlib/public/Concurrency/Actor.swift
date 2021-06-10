@@ -15,9 +15,9 @@ import Swift
 
 /// Common protocol to which all actors conform.
 ///
-/// The \c Actor protocol generalizes over all actor types. Actor types
+/// The `Actor` protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol Actor: AnyObject, Sendable {
 
   /// Retrieve the executor for this actor as an optimized, unowned
@@ -37,24 +37,24 @@ public protocol Actor: AnyObject, Sendable {
 
 /// Called to initialize the default actor instance in an actor.
 /// The implementation will call this within the actor's initializer.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_defaultActor_initialize")
 public func _defaultActorInitialize(_ actor: AnyObject)
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_defaultActor_destroy")
 public func _defaultActorDestroy(_ actor: AnyObject)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_enqueueMainExecutor")
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)
 
-/// A singleton actor whose executor is equivalent to 
-/// \c DispatchQueue.main, which is the main dispatch queue.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+/// A singleton actor whose executor is equivalent to the main
+/// dispatch queue.
+@available(SwiftStdlib 5.5, *)
 @globalActor public final actor MainActor: SerialExecutor {
   public static let shared = MainActor()
 
@@ -75,7 +75,7 @@ internal func _enqueueOnMain(_ job: UnownedJob)
 }
 
 // Used by the concurrency runtime
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension SerialExecutor {
   @_silgen_name("_swift_task_getMainExecutor")
   internal func _getMainExecutor() -> UnownedSerialExecutor {
@@ -83,7 +83,7 @@ extension SerialExecutor {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 extension MainActor {
   /// Execute the given body closure on the main actor.
   public static func run<T>(

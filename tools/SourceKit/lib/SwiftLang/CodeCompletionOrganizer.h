@@ -43,6 +43,7 @@ struct Options {
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
   bool annotatedDescription = false;
+  bool includeObjectLiterals = true;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 
@@ -65,8 +66,7 @@ extendCompletions(ArrayRef<SwiftResult *> swiftResults, CompletionSink &sink,
                   SwiftCompletionInfo &info,
                   const NameToPopularityMap *nameToPopularity,
                   const Options &options, Completion *prefix = nullptr,
-                  Optional<SemanticContextKind> overrideContext = None,
-                  Optional<SemanticContextKind> overrideOperatorContext = None);
+                  bool clearFlair = false);
 
 bool addCustomCompletions(CompletionSink &sink,
                           std::vector<Completion *> &completions,

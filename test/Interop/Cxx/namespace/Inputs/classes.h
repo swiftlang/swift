@@ -40,4 +40,35 @@ struct BasicStruct {
 };
 } // namespace ClassesNS3
 
+namespace GlobalAliasToNS1 = ClassesNS1;
+
+namespace ClassesNS4 {
+namespace AliasToGlobalNS1 = ::ClassesNS1;
+namespace AliasToGlobalNS2 = ::ClassesNS1::ClassesNS2;
+
+namespace ClassesNS5 {
+struct BasicStruct {};
+} // namespace ClassesNS5
+
+namespace AliasToInnerNS5 = ClassesNS5;
+namespace AliasToNS2 = ClassesNS1::ClassesNS2;
+
+namespace AliasChainToNS1 = GlobalAliasToNS1;
+namespace AliasChainToNS2 = AliasChainToNS1::ClassesNS2;
+} // namespace ClassesNS4
+
+namespace ClassesNS5 {
+struct BasicStruct {};
+namespace AliasToAnotherNS5 = ClassesNS4::ClassesNS5;
+
+namespace ClassesNS5 {
+struct BasicStruct {};
+namespace AliasToNS5NS5 = ClassesNS5;
+} // namespace ClassesNS5
+
+namespace AliasToGlobalNS5 = ::ClassesNS5;
+namespace AliasToLocalNS5 = ClassesNS5;
+namespace AliasToNS5 = ::ClassesNS5::ClassesNS5;
+} // namespace ClassesNS5
+
 #endif // TEST_INTEROP_CXX_NAMESPACE_INPUTS_CLASSES_H

@@ -55,7 +55,7 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
     return DiagnosticBehavior::Ignore;
 
   case ObjCReason::ExplicitlyObjCByAccessNote:
-    return DiagnosticBehavior::Remark;
+    return ctx.LangOpts.getAccessNoteFailureLimit();
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
@@ -97,31 +97,57 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   llvm_unreachable("unhandled reason");
 }
 
-/// Emit an additional diagnostic describing why we are applying @objc to the
-/// decl, if this is not obvious from the decl itself.
-static void describeObjCReason(const ValueDecl *VD, ObjCReason Reason) {
-  if (Reason == ObjCReason::MemberOfObjCProtocol) {
-    VD->diagnose(diag::objc_inferring_on_objc_protocol_member);
-  } else if (Reason == ObjCReason::OverridesObjC) {
-    unsigned kind = isa<VarDecl>(VD) ? 0
-                  : isa<SubscriptDecl>(VD) ? 1
-                  : isa<ConstructorDecl>(VD) ? 2
+void ObjCReason::describe(const Decl *D) const {
+  switch (kind) {
+  case ObjCReason::MemberOfObjCProtocol:
+    D->diagnose(diag::objc_inferring_on_objc_protocol_member);
+    break;
+
+  case ObjCReason::OverridesObjC: {
+    unsigned kind = isa<VarDecl>(D) ? 0
+                  : isa<SubscriptDecl>(D) ? 1
+                  : isa<ConstructorDecl>(D) ? 2
                   : 3;
 
-    auto overridden = VD->getOverriddenDecl();
+    auto overridden = cast<ValueDecl>(D)->getOverriddenDecl();
     overridden->diagnose(diag::objc_overriding_objc_decl,
-                         kind, VD->getOverriddenDecl()->getName());
-  } else if (Reason == ObjCReason::WitnessToObjC) {
-    auto requirement = Reason.getObjCRequirement();
+                         kind, overridden->getName());
+    break;
+  }
+
+  case ObjCReason::WitnessToObjC: {
+    auto requirement = getObjCRequirement();
     requirement->diagnose(diag::objc_witness_objc_requirement,
-                VD->getDescriptiveKind(), requirement->getName(),
+                D->getDescriptiveKind(), requirement->getName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())
                   ->getName());
+    break;
   }
-  else if (Reason == ObjCReason::ExplicitlyObjCByAccessNote) {
-    // FIXME: Look up the Reason string in the access note and emit a note that
-    // includes it
+
+  case ObjCReason::ExplicitlyObjCByAccessNote:
+  case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyDynamic:
+  case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyIBOutlet:
+  case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyIBSegueAction:
+  case ObjCReason::ExplicitlyNSManaged:
+  case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
+  case ObjCReason::MemberOfObjCExtension:
+  case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::ElementOfObjCEnum:
+  case ObjCReason::Accessor:
+    // No additional note required.
+    break;
   }
+}
+
+void ObjCReason::setAttrInvalid() const {
+  if (requiresAttr(kind))
+    getAttr()->setInvalid();
 }
 
 static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
@@ -253,19 +279,21 @@ static void diagnoseFunctionParamNotRepresentable(
   auto behavior = behaviorLimitForObjCReason(Reason, AFD->getASTContext());
 
   if (NumParams == 1) {
-    AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
-                  getObjCDiagnosticAttrKind(Reason))
-        .limitBehavior(behavior);
+    softenIfAccessNote(AFD, Reason.getAttr(),
+      AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
+                    getObjCDiagnosticAttrKind(Reason))
+          .limitBehavior(behavior));
   } else {
-    AFD->diagnose(diag::objc_invalid_on_func_param_type,
-                  ParamIndex + 1, getObjCDiagnosticAttrKind(Reason))
-        .limitBehavior(behavior);
+    softenIfAccessNote(AFD, Reason.getAttr(),
+      AFD->diagnose(diag::objc_invalid_on_func_param_type,
+                    ParamIndex + 1, getObjCDiagnosticAttrKind(Reason))
+          .limitBehavior(behavior));
   }
   SourceRange SR;
   if (auto typeRepr = P->getTypeRepr())
     SR = typeRepr->getSourceRange();
   diagnoseTypeNotRepresentableInObjC(AFD, P->getType(), SR, behavior);
-  describeObjCReason(AFD, Reason);
+  Reason.describe(AFD);
 }
 
 static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
@@ -282,22 +310,24 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
 
     // Swift Varargs are not representable in Objective-C.
     if (param->isVariadic()) {
-      diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
-                     getObjCDiagnosticAttrKind(Reason))
-        .highlight(param->getSourceRange())
-        .limitBehavior(behavior);
-      describeObjCReason(AFD, Reason);
+      softenIfAccessNote(AFD, Reason.getAttr(),
+        diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
+                       getObjCDiagnosticAttrKind(Reason))
+          .highlight(param->getSourceRange())
+          .limitBehavior(behavior));
+      Reason.describe(AFD);
 
       return false;
     }
 
     // Swift inout parameters are not representable in Objective-C.
     if (param->isInOut()) {
-      diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
-                     getObjCDiagnosticAttrKind(Reason))
-        .highlight(param->getSourceRange())
-        .limitBehavior(behavior);
-      describeObjCReason(AFD, Reason);
+      softenIfAccessNote(AFD, Reason.getAttr(),
+        diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
+                       getObjCDiagnosticAttrKind(Reason))
+          .highlight(param->getSourceRange())
+          .limitBehavior(behavior));
+      Reason.describe(AFD);
 
       return false;
     }
@@ -339,19 +369,21 @@ static bool checkObjCWithGenericParams(const ValueDecl *VD, ObjCReason Reason) {
   auto *GC = VD->getAsGenericContext();
   assert(GC);
   if (GC->getGenericParams()) {
-    VD->diagnose(diag::objc_invalid_with_generic_params,
-                 VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
-        .limitBehavior(behavior);
-    describeObjCReason(VD, Reason);
+    softenIfAccessNote(VD, Reason.getAttr(),
+      VD->diagnose(diag::objc_invalid_with_generic_params,
+                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
+          .limitBehavior(behavior));
+    Reason.describe(VD);
 
     return true;
   }
 
   if (GC->getTrailingWhereClause()) {
-    VD->diagnose(diag::objc_invalid_with_generic_requirements,
-                 VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
-        .limitBehavior(behavior);
-    describeObjCReason(VD, Reason);
+    softenIfAccessNote(VD, Reason.getAttr(),
+      VD->diagnose(diag::objc_invalid_with_generic_requirements,
+                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason))
+          .limitBehavior(behavior));
+    Reason.describe(VD);
 
     return true;
   }
@@ -381,7 +413,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
     VD->diagnose(diag::objc_invalid_on_foreign_class,
                  getObjCDiagnosticAttrKind(Reason))
         .limitBehavior(behavior);
-    describeObjCReason(VD, Reason);
+    Reason.describe(VD);
     break;
 
   case ClassDecl::ForeignKind::RuntimeOnly:
@@ -389,7 +421,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
                  VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
                  clas->getName())
         .limitBehavior(behavior);
-    describeObjCReason(VD, Reason);
+    Reason.describe(VD);
     break;
   }
 
@@ -407,15 +439,15 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   case ActorIsolationRestriction::CrossActorSelf:
     // FIXME: Substitution map?
     diagnoseNonConcurrentTypesInReference(
-        const_cast<ValueDecl *>(VD), VD->getDeclContext(), VD->getLoc(),
-        ConcurrentReferenceKind::CrossActor, behavior);
+        const_cast<ValueDecl *>(VD), VD->getDeclContext()->getParentModule(),
+        VD->getLoc(), ConcurrentReferenceKind::CrossActor, behavior);
     return false;
   case ActorIsolationRestriction::ActorSelf:
     // Actor-isolated functions cannot be @objc.
     VD->diagnose(diag::actor_isolated_objc, VD->getDescriptiveKind(),
                  VD->getName())
         .limitBehavior(behavior);
-    describeObjCReason(VD, Reason);
+    Reason.describe(VD);
     if (auto FD = dyn_cast<FuncDecl>(VD)) {
       addAsyncNotes(const_cast<FuncDecl *>(FD));
     }
@@ -425,6 +457,9 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   case ActorIsolationRestriction::GlobalActor:
     // FIXME: Consider whether to limit @objc on global-actor-qualified
     // declarations.
+  case ActorIsolationRestriction::DistributedActorSelf:
+    // we do not allow distributed + objc actors.
+    return false;
   case ActorIsolationRestriction::Unrestricted:
   case ActorIsolationRestriction::Unsafe:
     return false;
@@ -470,13 +505,16 @@ static const ClassDecl *getResilientAncestor(ModuleDecl *mod,
 /// extension of an Objective-C runtime visible class, and
 /// therefore is not representable in Objective-C.
 static bool checkObjCInExtensionContext(const ValueDecl *value,
-                                        DiagnosticBehavior behavior) {
+                                        ObjCReason reason) {
+  auto behavior = behaviorLimitForObjCReason(reason, value->getASTContext());
   auto DC = value->getDeclContext();
 
   if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
     if (ED->getTrailingWhereClause()) {
-      value->diagnose(diag::objc_in_extension_context)
-          .limitBehavior(behavior);
+      softenIfAccessNote(value, reason.getAttr(),
+        value->diagnose(diag::objc_in_extension_context)
+            .limitBehavior(behavior));
+      reason.describe(value);
       return true;
     }
 
@@ -493,12 +531,14 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
           auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
           auto range = getMinOSVersionForClassStubs(target);
           auto *ancestor = getResilientAncestor(mod, classDecl);
-          value->diagnose(diag::objc_in_resilient_extension,
-                          value->getDescriptiveKind(),
-                          ancestor->getName(),
-                          platform,
-                          range.getLowerEndpoint())
-              .limitBehavior(behavior);
+          softenIfAccessNote(value, reason.getAttr(),
+            value->diagnose(diag::objc_in_resilient_extension,
+                            value->getDescriptiveKind(),
+                            ancestor->getName(),
+                            platform,
+                            range.getLowerEndpoint())
+                .limitBehavior(behavior));
+          reason.describe(value);
           return true;
         }
       }
@@ -513,9 +553,11 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
                 ->isImplicitDynamicEnabled())
           return false;
         if (!classDecl->usesObjCGenericsModel()) {
-          value->diagnose(diag::objc_in_generic_extension,
-                          classDecl->isGeneric())
-              .limitBehavior(behavior);
+          softenIfAccessNote(value, reason.getAttr(),
+            value->diagnose(diag::objc_in_generic_extension,
+                            classDecl->isGeneric())
+                .limitBehavior(behavior));
+          reason.describe(value);
           return true;
         }
       }
@@ -565,17 +607,17 @@ bool swift::isRepresentableInObjC(
   ASTContext &ctx = AFD->getASTContext();
   DiagnosticStateRAII diagState(ctx.Diags);
 
-  auto behavior = behaviorLimitForObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(AFD, Reason))
     return false;
   if (checkObjCWithGenericParams(AFD, Reason))
     return false;
-  if (checkObjCInExtensionContext(AFD, behavior))
+  if (checkObjCInExtensionContext(AFD, Reason))
     return false;
   if (checkObjCActorIsolation(AFD, Reason))
     return false;
 
+  auto behavior = behaviorLimitForObjCReason(Reason, ctx);
   if (AFD->isOperator()) {
     AFD->diagnose((isa<ProtocolDecl>(AFD->getDeclContext())
                     ? diag::objc_operator_proto
@@ -588,50 +630,62 @@ bool swift::isRepresentableInObjC(
     // Accessors can only be @objc if the storage declaration is.
     // Global computed properties may however @_cdecl their accessors.
     auto storage = accessor->getStorage();
-    if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
-        Reason != ObjCReason::WitnessToObjC &&
-        Reason != ObjCReason::MemberOfObjCProtocol) {
-      if (accessor->isGetter()) {
+    bool storageIsObjC = storage->isObjC()
+        || Reason == ObjCReason::ExplicitlyCDecl
+        || Reason == ObjCReason::WitnessToObjC
+        || Reason == ObjCReason::MemberOfObjCProtocol;
+
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet: {
+      // willSet/didSet implementations are never exposed to objc, they are
+      // always directly dispatched from the synthesized setter.
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_observing_accessor)
+          .limitBehavior(behavior);
+      Reason.describe(accessor);
+      return false;
+    }
+
+    case AccessorKind::Get:
+      if (!storageIsObjC) {
         auto error = isa<VarDecl>(storage)
                        ? diag::objc_getter_for_nonobjc_property
                        : diag::objc_getter_for_nonobjc_subscript;
 
-        accessor->diagnose(error).limitBehavior(behavior);
-        describeObjCReason(accessor, Reason);
-      } else if (accessor->isSetter()) {
+        diagnoseAndRemoveAttr(accessor, Reason.getAttr(), error)
+            .limitBehavior(behavior);
+        Reason.describe(accessor);
+        return false;
+      }
+      return true;
+
+    case AccessorKind::Set:
+      if (!storageIsObjC) {
         auto error = isa<VarDecl>(storage)
                        ? diag::objc_setter_for_nonobjc_property
                        : diag::objc_setter_for_nonobjc_subscript;
 
-        accessor->diagnose(error).limitBehavior(behavior);
-        describeObjCReason(accessor, Reason);
+        diagnoseAndRemoveAttr(accessor, Reason.getAttr(), error)
+            .limitBehavior(behavior);
+        Reason.describe(accessor);
+        return false;
       }
-      return false;
-    }
-
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::DidSet:
-    case AccessorKind::WillSet:
-      // willSet/didSet implementations are never exposed to objc, they are
-      // always directly dispatched from the synthesized setter.
-      accessor->diagnose(diag::objc_observing_accessor).limitBehavior(behavior);
-      describeObjCReason(accessor, Reason);
-      return false;
-
-    case AccessorKind::Get:
-    case AccessorKind::Set:
       return true;
 
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
-      accessor->diagnose(diag::objc_addressor).limitBehavior(behavior);
-      describeObjCReason(accessor, Reason);
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(), diag::objc_addressor)
+          .limitBehavior(behavior);
+      Reason.describe(accessor);
       return false;
 
     case AccessorKind::Read:
     case AccessorKind::Modify:
-      accessor->diagnose(diag::objc_coroutine_accessor).limitBehavior(behavior);
-      describeObjCReason(accessor, Reason);
+      diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
+                            diag::objc_coroutine_accessor)
+          .limitBehavior(behavior);
+      Reason.describe(accessor);
       return false;
     }
     llvm_unreachable("bad kind");
@@ -666,13 +720,14 @@ bool swift::isRepresentableInObjC(
         !ResultType->isUninhabited() &&
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                        const_cast<FuncDecl *>(FD))) {
-      AFD->diagnose(diag::objc_invalid_on_func_result_type,
-                    getObjCDiagnosticAttrKind(Reason))
-          .limitBehavior(behavior);
+      softenIfAccessNote(AFD, Reason.getAttr(),
+       AFD->diagnose(diag::objc_invalid_on_func_result_type,
+                      getObjCDiagnosticAttrKind(Reason))
+            .limitBehavior(behavior));
       diagnoseTypeNotRepresentableInObjC(FD, ResultType,
                                          FD->getResultTypeSourceRange(),
                                          behavior);
-      describeObjCReason(FD, Reason);
+      Reason.describe(FD);
       return false;
     }
   }
@@ -682,10 +737,11 @@ bool swift::isRepresentableInObjC(
     // information into a completion handler.
     auto FD = dyn_cast<FuncDecl>(AFD);
     if (!FD) {
-      AFD->diagnose(diag::not_objc_function_async, AFD->getDescriptiveKind())
-        .highlight(AFD->getAsyncLoc())
-        .limitBehavior(behavior);
-      describeObjCReason(AFD, Reason);
+      softenIfAccessNote(AFD, Reason.getAttr(),
+        AFD->diagnose(diag::not_objc_function_async, AFD->getDescriptiveKind())
+          .highlight(AFD->getAsyncLoc())
+          .limitBehavior(behavior));
+      Reason.describe(AFD);
 
       return false;
     }
@@ -696,7 +752,7 @@ bool swift::isRepresentableInObjC(
       AFD->diagnose(diag::async_objc_dynamic_self)
           .highlight(AFD->getAsyncLoc())
           .limitBehavior(behavior);
-      describeObjCReason(AFD, Reason);
+      Reason.describe(AFD);
 
       return false;
     }
@@ -721,13 +777,14 @@ bool swift::isRepresentableInObjC(
       // Make sure that the paraneter type is representable in Objective-C.
       if (!type->isRepresentableIn(
               ForeignLanguage::ObjectiveC, const_cast<FuncDecl *>(FD))) {
-        AFD->diagnose(diag::objc_invalid_on_func_result_type,
-                      getObjCDiagnosticAttrKind(Reason))
-            .limitBehavior(behavior);
+        softenIfAccessNote(AFD, Reason.getAttr(),
+          AFD->diagnose(diag::objc_invalid_on_func_result_type,
+                        getObjCDiagnosticAttrKind(Reason))
+              .limitBehavior(behavior));
         diagnoseTypeNotRepresentableInObjC(FD, type,
                                            FD->getResultTypeSourceRange(),
                                            behavior);
-        describeObjCReason(FD, Reason);
+        Reason.describe(FD);
 
         return true;
       }
@@ -789,11 +846,12 @@ bool swift::isRepresentableInObjC(
 
       // Only non-failing initializers can throw.
       if (ctor->isFailable()) {
-        AFD->diagnose(diag::objc_invalid_on_failing_init,
-                      getObjCDiagnosticAttrKind(Reason))
-          .highlight(throwsLoc)
-          .limitBehavior(behavior);
-        describeObjCReason(AFD, Reason);
+        softenIfAccessNote(AFD, Reason.getAttr(),
+          AFD->diagnose(diag::objc_invalid_on_failing_init,
+                        getObjCDiagnosticAttrKind(Reason))
+            .highlight(throwsLoc)
+            .limitBehavior(behavior));
+        Reason.describe(AFD);
 
         return false;
       }
@@ -823,20 +881,22 @@ bool swift::isRepresentableInObjC(
                isValidObjectiveCErrorResultType(dc, optOptionalType)) {
       // Cannot return an optional bridged type, because 'nil' is reserved
       // to indicate failure. Call this out in a separate diagnostic.
-      AFD->diagnose(diag::objc_invalid_on_throwing_optional_result,
-                    getObjCDiagnosticAttrKind(Reason),
-                    resultType)
-        .highlight(throwsLoc)
-        .limitBehavior(behavior);
-      describeObjCReason(AFD, Reason);
+      softenIfAccessNote(AFD, Reason.getAttr(),
+        AFD->diagnose(diag::objc_invalid_on_throwing_optional_result,
+                      getObjCDiagnosticAttrKind(Reason),
+                      resultType)
+          .highlight(throwsLoc)
+          .limitBehavior(behavior));
+      Reason.describe(AFD);
       return false;
     } else {
       // Other result types are not permitted.
-      AFD->diagnose(diag::objc_invalid_on_throwing_result,
-                    getObjCDiagnosticAttrKind(Reason), resultType)
-        .highlight(throwsLoc)
-        .limitBehavior(behavior);
-      describeObjCReason(AFD, Reason);
+      softenIfAccessNote(AFD, Reason.getAttr(),
+        AFD->diagnose(diag::objc_invalid_on_throwing_result,
+                      getObjCDiagnosticAttrKind(Reason), resultType)
+          .highlight(throwsLoc)
+          .limitBehavior(behavior));
+      Reason.describe(AFD);
       return false;
     }
 
@@ -987,9 +1047,8 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
   bool Result = T->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                      VD->getDeclContext());
-  auto behavior = behaviorLimitForObjCReason(Reason, ctx);
 
-  if (Result && checkObjCInExtensionContext(VD, behavior))
+  if (Result && checkObjCInExtensionContext(VD, Reason))
     return false;
 
   if (checkObjCInForeignClassContext(VD, Reason))
@@ -997,11 +1056,16 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (checkObjCActorIsolation(VD, Reason))
     return false;
 
+  auto behavior = behaviorLimitForObjCReason(Reason, ctx);
+
   // effectful computed properties cannot be represented, and its an error
   // to mark them as @objc
   if (VD->getEffectfulGetAccessor()) {
-    VD->diagnose(diag::effectful_not_representable_objc,
-                 VD->getDescriptiveKind());
+    softenIfAccessNote(VD, Reason.getAttr(),
+      VD->diagnose(diag::effectful_not_representable_objc,
+                   VD->getDescriptiveKind())
+          .limitBehavior(behavior));
+    Reason.describe(VD);
     return false;
   }
 
@@ -1011,13 +1075,14 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     if (TypeRange.isInvalid())
       TypeRange = VD->getNameLoc();
 
-    VD->diagnose(diag::objc_invalid_on_var, getObjCDiagnosticAttrKind(Reason))
-        .highlight(TypeRange)
-        .limitBehavior(behavior);
+    softenIfAccessNote(VD, Reason.getAttr(),
+      VD->diagnose(diag::objc_invalid_on_var, getObjCDiagnosticAttrKind(Reason))
+          .highlight(TypeRange)
+          .limitBehavior(behavior));
     diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(),
                                        VD->getInterfaceType(),
                                        TypeRange, behavior);
-    describeObjCReason(VD, Reason);
+    Reason.describe(VD);
   }
 
   return Result;
@@ -1039,17 +1104,22 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // effectful subscripts cannot be represented, and its an error
   // to mark them as @objc
   if (SD->getEffectfulGetAccessor()) {
-    SD->diagnose(diag::effectful_not_representable_objc,
-                 SD->getDescriptiveKind());
+    softenIfAccessNote(SD, Reason.getAttr(),
+      SD->diagnose(diag::effectful_not_representable_objc,
+                   SD->getDescriptiveKind())
+          .limitBehavior(behavior));
+    Reason.describe(SD);
     return false;
   }
 
   // ObjC doesn't support class subscripts.
   if (!SD->isInstanceMember()) {
-    SD->diagnose(diag::objc_invalid_on_static_subscript,
-                 SD->getDescriptiveKind(), Reason)
-        .limitBehavior(behavior);
-    describeObjCReason(SD, Reason);
+    softenIfAccessNote(SD, Reason.getAttr(),
+      SD->diagnose(diag::objc_invalid_on_static_subscript,
+                   SD->getDescriptiveKind(), Reason)
+          .limitBehavior(behavior));
+    Reason.describe(SD);
+    Reason.setAttrInvalid();
     return true;
   }
 
@@ -1078,7 +1148,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
         ForeignLanguage::ObjectiveC, SD->getDeclContext());
   bool Result = IndexResult && ElementResult;
 
-  if (Result && checkObjCInExtensionContext(SD, behavior))
+  if (Result && checkObjCInExtensionContext(SD, Reason))
     return false;
 
   if (!Result) {
@@ -1087,16 +1157,17 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
       TypeRange = SD->getIndices()->getSourceRange();
     else
       TypeRange = SD->getElementTypeSourceRange();
-    SD->diagnose(diag::objc_invalid_on_subscript,
-                 getObjCDiagnosticAttrKind(Reason))
-      .highlight(TypeRange)
-      .limitBehavior(behavior);
+    softenIfAccessNote(SD, Reason.getAttr(),
+      SD->diagnose(diag::objc_invalid_on_subscript,
+                   getObjCDiagnosticAttrKind(Reason))
+        .highlight(TypeRange)
+        .limitBehavior(behavior));
 
     diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
                                        !IndexResult ? IndexType
                                                     : ElementType,
                                        TypeRange, behavior);
-    describeObjCReason(SD, Reason);
+    Reason.describe(SD);
   }
 
   return Result;
@@ -1145,9 +1216,9 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
 
 ObjCReason swift::objCReasonForObjCAttr(const ObjCAttr *attr) {
   if (attr->getAddedByAccessNote())
-    return ObjCReason::ExplicitlyObjCByAccessNote;
+    return ObjCReason(ObjCReason::ExplicitlyObjCByAccessNote, attr);
 
-  return ObjCReason::ExplicitlyObjC;
+  return ObjCReason(ObjCReason::ExplicitlyObjC, attr);
 }
 
 // A class is @objc if it does not have generic ancestry, and it either has
@@ -1160,10 +1231,6 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     auto reason = objCReasonForObjCAttr(attr);
     auto behavior = behaviorLimitForObjCReason(reason, ctx);
 
-    SourceLoc attrLoc = attr->getLocation();
-    if (attrLoc.isInvalid())
-      attrLoc = CD->getLoc();
-
     if (ancestry.contains(AncestryFlags::Generic)) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
@@ -1173,9 +1240,9 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         return None;
       }
 
-      ctx.Diags.diagnose(attrLoc, diag::objc_for_generic_class)
-        .fixItRemove(attr->getRangeWithAt())
+      swift::diagnoseAndRemoveAttr(CD, attr, diag::objc_for_generic_class)
         .limitBehavior(behavior);
+      reason.describe(CD);
     }
 
     // If the class has resilient ancestry, @objc just controls the runtime
@@ -1194,13 +1261,13 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
       auto range = getMinOSVersionForClassStubs(target);
       auto *ancestor = getResilientAncestor(CD->getParentModule(), CD);
-      ctx.Diags.diagnose(attrLoc,
-                         diag::objc_for_resilient_class,
-                         ancestor->getName(),
-                         platform,
-                         range.getLowerEndpoint())
-        .fixItRemove(attr->getRangeWithAt())
+      swift::diagnoseAndRemoveAttr(CD, attr,
+                                   diag::objc_for_resilient_class,
+                                   ancestor->getName(),
+                                   platform,
+                                   range.getLowerEndpoint())
         .limitBehavior(behavior);
+      reason.describe(CD);
     }
 
     // Only allow ObjC-rooted classes to be @objc.
@@ -1208,10 +1275,10 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     if (ancestry.contains(AncestryFlags::ObjC) &&
         !ancestry.contains(AncestryFlags::ClangImported)) {
       if (ctx.LangOpts.EnableObjCAttrRequiresFoundation) {
-        ctx.Diags.diagnose(attrLoc,
-                           diag::invalid_objc_swift_rooted_class)
-          .fixItRemove(attr->getRangeWithAt())
+        swift::diagnoseAndRemoveAttr(CD, attr,
+                                     diag::invalid_objc_swift_rooted_class)
           .limitBehavior(behavior);
+        reason.describe(CD);
         // If the user has not spelled out a superclass, offer to insert
         // 'NSObject'. We could also offer to replace the existing superclass,
         // but that's a touch aggressive.
@@ -1229,9 +1296,9 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       }
 
       if (!ctx.LangOpts.EnableObjCInterop) {
-        ctx.Diags.diagnose(attrLoc, diag::objc_interop_disabled)
-          .fixItRemove(attr->getRangeWithAt())
+        swift::diagnoseAndRemoveAttr(CD, attr, diag::objc_interop_disabled)
           .limitBehavior(behavior);
+        reason.describe(CD);
       }
     }
 
@@ -1333,18 +1400,22 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   //
   // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
   // (where they warn on failure) and loudly in Swift 4 (error on failure).
-  if (VD->getAttrs().hasAttribute<IBOutletAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBOutlet);
-  if (VD->getAttrs().hasAttribute<IBActionAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBAction);
-  if (VD->getAttrs().hasAttribute<IBSegueActionAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBSegueAction);
-  if (VD->getAttrs().hasAttribute<IBInspectableAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyIBInspectable);
-  if (VD->getAttrs().hasAttribute<GKInspectableAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyGKInspectable);
-  if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyNSManaged);
+  if (auto attr = VD->getAttrs().getAttribute<IBOutletAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBOutlet, attr);
+  if (auto attr = VD->getAttrs().getAttribute<IBActionAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBAction, attr);
+  if (auto attr = VD->getAttrs().getAttribute<IBSegueActionAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBSegueAction, attr);
+  if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBInspectable, attr);
+  if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyGKInspectable, attr);
+  if (auto attr = VD->getAttrs().getAttribute<NSManagedAttr>()) {
+    // Make sure the implicit DynamicAttr gets added before we potentially
+    // disable this attribute.
+    (void) VD->isDynamic();
+    return ObjCReason(ObjCReason::ExplicitlyNSManaged, attr);
+  }
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol) {
     if (!VD->isProtocolRequirement())
@@ -1397,7 +1468,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
                       "@objc ");
       }
 
-      return ObjCReason(ObjCReason::ExplicitlyDynamic);
+      return ObjCReason(ObjCReason::ExplicitlyDynamic, attr);
     }
   }
 
@@ -1520,8 +1591,10 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
-  else if (isa<ClassDecl>(VD)) {
+  else if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
     // Classes can be @objc.
+
+
 
     // Protocols and enums can also be @objc, but this is covered by the
     // isObjC() check at the beginning.
@@ -1592,17 +1665,23 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   Optional<ForeignAsyncConvention> asyncConvention;
   Optional<ForeignErrorConvention> errorConvention;
   if (auto var = dyn_cast<VarDecl>(VD)) {
-    if (!isRepresentableInObjC(var, *isObjC))
+    if (!isRepresentableInObjC(var, *isObjC)) {
+      isObjC->setAttrInvalid();
       return false;
+    }
   } else if (auto subscript = dyn_cast<SubscriptDecl>(VD)) {
-    if (!isRepresentableInObjC(subscript, *isObjC))
+    if (!isRepresentableInObjC(subscript, *isObjC)) {
+      isObjC->setAttrInvalid();
       return false;
+    }
   } else if (isa<DestructorDecl>(VD)) {
     // Destructors need no additional checking.
   } else if (auto func = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (!isRepresentableInObjC(
-            func, *isObjC, asyncConvention, errorConvention))
+            func, *isObjC, asyncConvention, errorConvention)) {
+      isObjC->setAttrInvalid();
       return false;
+    }
   }
 
   // Note that this declaration is exposed to Objective-C.
@@ -1622,13 +1701,14 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
   /// Set the @objc name.
   auto setObjCName = [&](ObjCSelector selector) {
-    // If there already is an @objc attribute, update its name.
+    // If there already is an @objc attribute, invalidate and remove it. (This
+    // helps with access notes.)
     if (attr) {
-      const_cast<ObjCAttr *>(attr)->setName(selector, /*implicit=*/true);
-      return;
+      attr->setInvalid();
+      decl->getAttrs().removeAttribute(attr);
     }
 
-    // Otherwise, create an @objc attribute with the implicit name.
+    // Create an @objc attribute with the implicit name.
     attr = ObjCAttr::create(ctx, selector, /*implicitName=*/true);
     decl->getAttrs().add(attr);
   };
@@ -1693,14 +1773,15 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
               diagLoc = decl->getLoc();
             if (!attr->getNameLocs().empty())
               firstNameLoc = attr->getNameLocs().front();
-            ctx.Diags.diagnose(diagLoc,
-                        diag::objc_override_property_name_mismatch,
-                        attr->getName()->getSelectorPieces()[0],
-                        overriddenName)
-              .fixItReplaceChars(firstNameLoc,
-                                 attr->getRParenLoc(),
-                                 overriddenName.str())
-              .limitBehavior(behavior);
+            softenIfAccessNote(decl, attr,
+              ctx.Diags.diagnose(diagLoc,
+                          diag::objc_override_property_name_mismatch,
+                          attr->getName()->getSelectorPieces()[0],
+                          overriddenName)
+                .fixItReplaceChars(firstNameLoc,
+                                   attr->getRParenLoc(),
+                                   overriddenName.str())
+                .limitBehavior(behavior));
             overridden->diagnose(diag::overridden_here);
           }
 
@@ -2103,7 +2184,7 @@ bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *de
   // about implicit ones because they don't have useful source location
   // information.
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
-  if (attr && attr->isImplicit())
+  if (attr && (attr->isImplicit() || attr->getLocation().isInvalid()))
     attr = nullptr;
 
   // If there is an @objc attribute with an explicit, incorrect witness
@@ -2335,6 +2416,17 @@ getObjCMethodConflictDecls(const SourceFile::ObjCMethodConflict &conflict) {
   return classDecl->lookupDirect(selector, isInstanceMethod);
 }
 
+static ObjCAttr *getObjCAttrIfFromAccessNote(ValueDecl *VD) {
+  if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>())
+    if (objc->getAddedByAccessNote())
+      return objc;
+
+  if (auto accessor = dyn_cast<AccessorDecl>(VD))
+    return getObjCAttrIfFromAccessNote(accessor->getStorage());
+
+  return nullptr;
+}
+
 bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   // If there were no conflicts, we're done.
   if (sf.ObjCMethodConflicts.empty())
@@ -2385,22 +2477,41 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
     // Diagnose the conflict.
     anyConflicts = true;
 
-    // If the first method is in an extension and the second is not, swap them
-    // so the primary diagnostic is on the extension method.
+    /// If true, \p a has a "weaker" claim on the selector than \p b, and the
+    /// conflict diagnostic should appear on \p a instead of \p b.
+    auto areBackwards =
+        [&](AbstractFunctionDecl *a, AbstractFunctionDecl *b) -> bool {
+      #define RULE(aCriterion, bCriterion) do { \
+        bool _aCriterion = (aCriterion), _bCriterion = (bCriterion); \
+        if (!_aCriterion && _bCriterion) \
+          return true; \
+        if (_aCriterion && !_bCriterion) \
+          return false; \
+      } while (0)
+
+      // Is one of these from an access note?
+      RULE(getObjCAttrIfFromAccessNote(a),
+           getObjCAttrIfFromAccessNote(b));
+
+      // Is one of these from the main declaration?
+      RULE(!isa<ExtensionDecl>(a->getDeclContext()),
+           !isa<ExtensionDecl>(b->getDeclContext()));
+
+      // Are these from different source files? If so, fall back to the order in
+      // which the declarations were type checked.
+      // FIXME: This is gross and nondeterministic.
+      if (a->getParentSourceFile() != b->getParentSourceFile())
+        return false;
+
+      // Handle them in source order.
+      return !ordering(a, b);
+
+      #undef RULE
+    };
+
     MutableArrayRef<AbstractFunctionDecl *> methodsRef(methods);
-    if (isa<ExtensionDecl>(methods[0]->getDeclContext()) &&
-        !isa<ExtensionDecl>(methods[1]->getDeclContext())) {
+    if (areBackwards(methods[0], methods[1]))
       std::swap(methodsRef[0], methodsRef[1]);
-
-    // Within a source file, use our canonical ordering.
-    } else if (methods[0]->getParentSourceFile() ==
-               methods[1]->getParentSourceFile() &&
-              !ordering(methods[0], methods[1])) {
-      std::swap(methodsRef[0], methodsRef[1]);
-    }
-
-    // Otherwise, fall back to the order in which the declarations were type
-    // checked.
 
     auto originalMethod = methods.front();
     auto conflictingMethods = methodsRef.slice(1);
@@ -2414,18 +2525,25 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
         if (auto accessor = dyn_cast<AccessorDecl>(originalMethod))
           originalDecl = accessor->getStorage();
 
-      if (diagInfo == origDiagInfo) {
-        Ctx.Diags.diagnose(conflictingDecl, diag::objc_redecl_same,
-                           diagInfo.first, diagInfo.second, selector);
+      bool redeclSame = (diagInfo == origDiagInfo);
+      auto diag = Ctx.Diags.diagnose(conflictingDecl,
+                                     redeclSame ? diag::objc_redecl_same
+                                                : diag::objc_redecl,
+                                     diagInfo.first, diagInfo.second,
+                                     origDiagInfo.first, origDiagInfo.second,
+                                     selector);
+
+      auto objcAttr = getObjCAttrIfFromAccessNote(conflictingDecl);
+      swift::softenIfAccessNote(conflictingDecl, objcAttr, diag);
+      if (objcAttr)
+        objcAttr->setInvalid();
+
+      if (redeclSame)
         Ctx.Diags.diagnose(originalDecl, diag::invalid_redecl_prev,
                            originalDecl->getBaseName());
-      } else {
-        Ctx.Diags.diagnose(conflictingDecl, diag::objc_redecl, diagInfo.first,
-                           diagInfo.second, origDiagInfo.first,
-                           origDiagInfo.second, selector);
+      else
         Ctx.Diags.diagnose(originalDecl, diag::objc_declared_here,
                            origDiagInfo.first, origDiagInfo.second);
-      }
     }
   }
 

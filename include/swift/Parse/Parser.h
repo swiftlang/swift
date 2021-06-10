@@ -745,6 +745,14 @@ public:
       Context.LangOpts.ParseForSyntaxTreeOnly;
   }
 
+  /// Returns true to indicate that experimental 'distributed actor' syntax
+  /// should be parsed if the parser is only a syntax tree or if the user has
+  /// passed the `-enable-experimental-distributed' flag to the frontend.
+  bool shouldParseExperimentalDistributed() const {
+    return Context.LangOpts.EnableExperimentalDistributed ||
+      Context.LangOpts.ParseForSyntaxTreeOnly;
+  }
+
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
@@ -1090,28 +1098,32 @@ public:
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
-  bool parseTypeAttributeList(ParamDecl::Specifier &Specifier,
-                              SourceLoc &SpecifierLoc,
-                              TypeAttributes &Attributes) {
+  ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
+                                      SourceLoc &SpecifierLoc,
+                                      SourceLoc &IsolatedLoc,
+                                      TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (Tok.is(tok::identifier) &&
          (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned"))))
-      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
-    return false;
+          Tok.getRawText().equals("__owned") ||
+          Tok.isContextualKeyword("isolated"))))
+      return parseTypeAttributeListPresent(
+          Specifier, SpecifierLoc, IsolatedLoc, Attributes);
+    return makeParserSuccess();
   }
-  bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                     SourceLoc &SpecifierLoc,
-                                     TypeAttributes &Attributes);
+
+  ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
+                                             SourceLoc &SpecifierLoc,
+                                             SourceLoc &IsolatedLoc,
+                                             TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
                                         TypeAttributes::Convention &convention);
 
-  bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
-                          PatternBindingInitializer *&initContext,
-                          bool justChecking = false);
-  
-  
+  ParserStatus parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                                  PatternBindingInitializer *&initContext,
+                                  bool justChecking = false);
+
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
@@ -1261,7 +1273,8 @@ public:
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
                                  ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc);
+                                 SourceLoc SpecifierLoc,
+                                 SourceLoc IsolatedLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1320,6 +1333,9 @@ public:
     /// The second name, the presence of which is indicated by \c SecondNameLoc.
     Identifier SecondName;
 
+    /// The location of the 'isolated' keyword, if present.
+    SourceLoc IsolatedLoc;
+
     /// The type following the ':'.
     TypeRepr *Type = nullptr;
 
@@ -1353,6 +1369,9 @@ public:
     /// An enum element.
     EnumElement,
   };
+
+  /// Whether we are at the start of a parameter name when parsing a parameter.
+  bool startsParameterName(bool isClosure);
 
   /// Parse a parameter-clause.
   ///

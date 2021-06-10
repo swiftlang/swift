@@ -1438,7 +1438,6 @@ namespace  {
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
-    UNINTERESTING_ATTR(AsyncHandler)
     UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
@@ -1534,7 +1533,8 @@ namespace  {
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
-    UNINTERESTING_ATTR(ActorIndependent)
+    UNINTERESTING_ATTR(DistributedActor)
+    UNINTERESTING_ATTR(DistributedActorIndependent)
     UNINTERESTING_ATTR(GlobalActor)
     UNINTERESTING_ATTR(Async)
     UNINTERESTING_ATTR(Spawn)
@@ -1549,6 +1549,7 @@ namespace  {
     UNINTERESTING_ATTR(UnsafeMainActor)
     UNINTERESTING_ATTR(ImplicitSelfCapture)
     UNINTERESTING_ATTR(InheritActorContext)
+    UNINTERESTING_ATTR(Isolated)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

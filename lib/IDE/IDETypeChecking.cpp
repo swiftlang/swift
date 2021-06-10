@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -169,13 +170,13 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
-    void addRequirement(GenericSignature GenericSig,
-                        Type First, Type Second, RequirementKind Kind) {
-      CanType CanFirst = GenericSig->getCanonicalTypeInContext(First);
-      CanType CanSecond;
-      if (Second) CanSecond = GenericSig->getCanonicalTypeInContext(Second);
+    void addRequirement(GenericSignature GenericSig, swift::Requirement Req) {
+      auto First = Req.getFirstType();
+      auto CanFirst = GenericSig->getCanonicalTypeInContext(First);
+      auto Second = Req.getSecondType();
+      auto CanSecond = GenericSig->getCanonicalTypeInContext(Second);
 
-      Requirements.insert({First, Second, Kind, CanFirst, CanSecond});
+      Requirements.insert({First, Second, Req.getKind(), CanFirst, CanSecond});
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
       // Trivially unmergeable.
@@ -289,65 +290,53 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
         ->getSelfProtocolDecl();
       for (auto Req : Reqs) {
-        auto Kind = Req.getKind();
-
-        // FIXME: Could do something here
-        if (Kind == RequirementKind::Layout)
+        // FIXME: Don't skip layout requirements.
+        if (Req.getKind() == RequirementKind::Layout)
           continue;
-
-        Type First = Req.getFirstType();
-        Type Second = Req.getSecondType();
 
         // Skip protocol's Self : <Protocol> requirement.
         if (BaseProto &&
             Req.getKind() == RequirementKind::Conformance &&
-            First->isEqual(BaseProto->getSelfInterfaceType()) &&
-            Second->getAnyNominal() == BaseProto)
+            Req.getFirstType()->isEqual(BaseProto->getSelfInterfaceType()) &&
+            Req.getProtocolDecl() == BaseProto)
           continue;
 
         if (!BaseType->isExistentialType()) {
-          First = First.subst(subMap);
-          Second = Second.subst(subMap);
-
-          if (First->hasError() || Second->hasError()) {
+          // Apply any substitutions we need to map the requirements from a
+          // a protocol extension to an extension on the conforming type.
+          auto SubstReq = Req.subst(subMap);
+          if (!SubstReq) {
             // Substitution with interface type bases can only fail
             // if a concrete type fails to conform to a protocol.
             // In this case, just give up on the extension altogether.
             return true;
           }
+
+          Req = *SubstReq;
         }
 
-        switch (Kind) {
-        case RequirementKind::Conformance: {
-          auto *M = DC->getParentModule();
-          auto *Proto = Second->castTo<ProtocolType>()->getDecl();
-          if (!First->isTypeParameter() && !First->is<ArchetypeType>() &&
-              M->conformsToProtocol(First, Proto).isInvalid())
-            return true;
-          if (M->conformsToProtocol(First, Proto).isInvalid())
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-          break;
-        }
+        assert(!Req.getFirstType()->hasArchetype());
+        assert(!Req.getSecondType()->hasArchetype());
 
-        case RequirementKind::Superclass:
-          if (!Second->isBindableToSuperclassOf(First)) {
-            return true;
-          } else if (!Second->isExactSuperclassOf(Second)) {
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-          }
-          break;
+        auto *M = DC->getParentModule();
+        auto SubstReq = Req.subst(
+          [&](Type type) -> Type {
+            if (type->isTypeParameter())
+              return Target->mapTypeIntoContext(type);
 
-        case RequirementKind::SameType:
-          if (!First->isBindableTo(Second) &&
-              !Second->isBindableTo(First)) {
-            return true;
-          } else if (!First->isEqual(Second)) {
-            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
-          }
-          break;
+            return type;
+          },
+          LookUpConformanceInModule(M));
+        if (!SubstReq)
+          return true;
 
-        case RequirementKind::Layout:
-          llvm_unreachable("Handled above");
+        // FIXME: Need to handle conditional requirements here!
+        ArrayRef<Requirement> conditionalRequirements;
+        if (!SubstReq->isSatisfied(conditionalRequirements)) {
+          if (!SubstReq->canBeSatisfied())
+            return true;
+
+          MergeInfo.addRequirement(GenericSig, Req);
         }
       }
       return false;

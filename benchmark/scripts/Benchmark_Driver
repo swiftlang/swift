@@ -31,6 +31,7 @@ import glob
 import logging
 import math
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -54,6 +55,16 @@ class BenchmarkDriver(object):
         Optional parameters are for injecting dependencies -- used for testing.
         """
         self.args = args
+        self.run_env = os.environ.copy()
+        if hasattr(args, 'libdir') and args.libdir:
+            # The benchmark binaries should pick up the built swift libraries
+            # automatically, because their RPATH should point to ../lib/swift
+            # But it does not harm to additionally set the dynamic library path,
+            # e.g. as a workaround to rdar://78584073
+            if platform.system() == "Darwin":
+                self.run_env["DYLD_LIBRARY_PATH"] = args.libdir
+            elif platform.system() == "Linux":
+                self.run_env["LD_LIBRARY_PATH"] = args.libdir
         self._subprocess = _subprocess or subprocess
         self.all_tests = []
         self.test_number = {}
@@ -66,7 +77,8 @@ class BenchmarkDriver(object):
 
     def _invoke(self, cmd):
         return self._subprocess.check_output(
-            cmd, stderr=self._subprocess.STDOUT, universal_newlines=True
+            cmd, stderr=self._subprocess.STDOUT, universal_newlines=True,
+            env=self.run_env
         )
 
     @property

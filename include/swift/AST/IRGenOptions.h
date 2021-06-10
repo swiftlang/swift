@@ -250,9 +250,6 @@ public:
   /// Whether we should run swift specific LLVM optimizations after IRGen.
   unsigned DisableSwiftSpecificLLVMOptzns : 1;
 
-  /// Whether we should run LLVM SLP vectorizer.
-  unsigned DisableLLVMSLPVectorizer : 1;
-
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
 
@@ -323,9 +320,6 @@ public:
   /// measurements on a non-clean build directory.
   unsigned UseIncrementalLLVMCodeGen : 1;
 
-  /// Enable use of the swiftcall calling convention.
-  unsigned UseSwiftCall : 1;
-
   /// Enable the use of type layouts for value witness functions and use
   /// vw functions instead of outlined copy/destroy functions.
   unsigned UseTypeLayoutValueHandling : 1;
@@ -387,7 +381,7 @@ public:
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
-        DisableLLVMSLPVectorizer(false), Playground(false),
+        Playground(false),
         EmitStackPromotionChecks(false), FunctionSections(false),
         PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         LLVMLTOKind(IRGenLLVMLTOKind::None), HasValueNamesSetting(false),
@@ -396,7 +390,7 @@ public:
         ForcePublicLinkage(false), LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
         PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), UseTypeLayoutValueHandling(true),
+        UseTypeLayoutValueHandling(true),
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         DisableConcreteTypeMetadataMangledNameAccessors(false), CmdArgs(),

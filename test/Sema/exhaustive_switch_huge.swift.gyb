@@ -1,0 +1,19 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/exhaustive_switch_huge.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/exhaustive_switch_huge.swift
+
+% case_limit = 10000
+
+// Make sure the exhaustiveness checker can check an unreasonable amount of
+// enum cases in a reasonable amount of time.
+enum E {
+% for i in range(case_limit):
+  case x${i}
+% end
+}
+
+switch E.x1 {
+% for i in range(case_limit):
+  case .x${i}  : break
+% end
+}

@@ -1324,9 +1324,12 @@ namespace {
         if (!initInfo.hasInitFromWrappedValue())
           return false;
 
+        auto *fnDecl = SGF.FunctionDC->getAsDecl();
         bool isAssignmentToSelfParamInInit =
-            IsOnSelfParameter &&
-            isa<ConstructorDecl>(SGF.FunctionDC->getAsDecl());
+            IsOnSelfParameter && isa<ConstructorDecl>(fnDecl) &&
+            // Convenience initializers only contain assignments and not
+            // initializations.
+            !(cast<ConstructorDecl>(fnDecl)->isConvenienceInit());
 
         // Assignment to a wrapped property can only be re-written to initialization for
         // members of `self` in an initializer, and for local variables.
@@ -2695,6 +2698,7 @@ static AccessKind mapAccessKind(SGFAccessKind accessKind) {
   case SGFAccessKind::ReadWrite:
     return AccessKind::ReadWrite;
   }
+  llvm_unreachable("covered switch");
 }
 
 void LValue::addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
@@ -2816,7 +2820,7 @@ SILGenFunction::maybeEmitValueOfLocalVarDecl(
   if (It != VarLocs.end()) {
     // If the variable is part of an async let, ensure that the child task
     // has completed first.
-    if (var->isSpawnLet() && accessKind != AccessKind::Write) {
+    if (var->isAsyncLet() && accessKind != AccessKind::Write) {
       auto patternBinding = var->getParentPatternBinding();
       unsigned index = patternBinding->getPatternEntryIndexForVarDecl(var);
       completeAsyncLetChildTask(patternBinding, index);

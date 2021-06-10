@@ -167,16 +167,55 @@ static void validateProfilingArgs(DiagnosticEngine &diags,
 
 static void validateDependencyScanningArgs(DiagnosticEngine &diags,
                                            const ArgList &args) {
-  const Arg *ExternalDependencyMap = args.getLastArg(options::OPT_placeholder_dependency_module_map);
+  const Arg *ExternalDependencyMap =
+      args.getLastArg(options::OPT_placeholder_dependency_module_map);
   const Arg *ScanDependencies = args.getLastArg(options::OPT_scan_dependencies);
   const Arg *Prescan = args.getLastArg(options::OPT_import_prescan);
+
+  const Arg *SerializeCache =
+      args.getLastArg(options::OPT_serialize_dependency_scan_cache);
+  const Arg *ReuseCache =
+      args.getLastArg(options::OPT_reuse_dependency_scan_cache);
+  const Arg *CacheSerializationPath =
+      args.getLastArg(options::OPT_dependency_scan_cache_path);
+  const Arg *TestSerialization = args.getLastArg(
+      options::OPT_debug_test_dependency_scan_cache_serialization);
+
   if (ExternalDependencyMap && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
-                   "-placeholder-dependency-module-map-file", "-scan-dependencies");
+                   "-placeholder-dependency-module-map-file",
+                   "-scan-dependencies");
   }
   if (Prescan && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-import-prescan", "-scan-dependencies");
+  }
+  if (Prescan && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-import-prescan", "-scan-dependencies");
+  }
+  if (SerializeCache && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-serialize-dependency-scan-cache", "-scan-dependencies");
+  }
+  if (ReuseCache && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-load-dependency-scan-cache", "-scan-dependencies");
+  }
+  if (TestSerialization && !ScanDependencies) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-test-dependency-scan-cache-serialization",
+                   "-scan-dependencies");
+  }
+  if (SerializeCache && !CacheSerializationPath) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-serialize-dependency-scan-cache",
+                   "-dependency-scan-cache-path");
+  }
+  if (ReuseCache && !CacheSerializationPath) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-serialize-dependency-scan-cache",
+                   "-dependency-scan-cache-path");
   }
 }
 
@@ -251,27 +290,6 @@ static void validateSearchPathArgs(DiagnosticEngine &diags,
   }
 }
 
-static void validateAutolinkingArgs(DiagnosticEngine &diags,
-                                    const ArgList &args,
-                                    const llvm::Triple &T) {
-  auto *forceLoadArg = args.getLastArg(options::OPT_autolink_force_load);
-  if (!forceLoadArg)
-    return;
-  auto *incrementalArg = args.getLastArg(options::OPT_incremental);
-  if (!incrementalArg)
-    return;
-
-  if (T.supportsCOMDAT())
-    return;
-
-  // Note: -incremental can itself be overridden by other arguments later
-  // on, but since -autolink-force-load is a rare and not-really-recommended
-  // option it's not worth modeling that complexity here (or moving the
-  // check somewhere else).
-  diags.diagnose(SourceLoc(), diag::error_option_not_supported,
-                 forceLoadArg->getSpelling(), incrementalArg->getSpelling());
-}
-
 /// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
                          const llvm::Triple &T) {
@@ -282,7 +300,6 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
-  validateAutolinkingArgs(diags, args, T);
   validateVerifyIncrementalDependencyArgs(diags, args);
 }
 
@@ -860,7 +877,8 @@ getDriverBatchSizeLimit(llvm::opt::InputArgList &ArgList,
 
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
-                         std::unique_ptr<llvm::opt::InputArgList> ArgList) {
+                         std::unique_ptr<llvm::opt::InputArgList> ArgList,
+                         bool AllowErrors) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
@@ -880,7 +898,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // Perform toolchain specific args validation.
   TC.validateArguments(Diags, *TranslatedArgList, DefaultTargetTriple);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (!handleImmediateArgs(*TranslatedArgList, TC)) {
@@ -891,7 +909,7 @@ Driver::buildCompilation(const ToolChain &TC,
   InputFileList Inputs;
   buildInputs(TC, *TranslatedArgList, Inputs);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   // Determine the OutputInfo for the driver.
@@ -900,14 +918,14 @@ Driver::buildCompilation(const ToolChain &TC,
   OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   assert(OI.CompilerOutputType != file_types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
 
   TC.validateOutputInfo(Diags, OI);
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   validateEmbedBitcode(*TranslatedArgList, OI, Diags);
@@ -919,7 +937,7 @@ Driver::buildCompilation(const ToolChain &TC,
   Optional<OutputFileMap> OFM = buildOutputFileMap(
       *TranslatedArgList, workingDirectory);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (ArgList->hasArg(options::OPT_driver_print_output_file_map)) {
@@ -927,7 +945,9 @@ Driver::buildCompilation(const ToolChain &TC,
       OFM->dump(llvm::errs(), true);
     else
       Diags.diagnose(SourceLoc(), diag::error_no_output_file_map_specified);
-    return nullptr;
+    if (!AllowErrors) {
+      return nullptr;
+    }
   }
 
   const bool ShowIncrementalBuildDecisions =
@@ -1044,7 +1064,7 @@ Driver::buildCompilation(const ToolChain &TC,
   buildActions(TopLevelActions, TC, OI,
                whyIgnoreIncrementallity.empty() ? &outOfDateMap : nullptr, *C);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (DriverPrintActions) {
@@ -1076,7 +1096,7 @@ Driver::buildCompilation(const ToolChain &TC,
   if (!whyIgnoreIncrementallity.empty())
     C->disableIncrementalBuild(whyIgnoreIncrementallity);
 
-  if (Diags.hadAnyError())
+  if (Diags.hadAnyError() && !AllowErrors)
     return nullptr;
 
   if (DriverPrintBindings)
@@ -2222,13 +2242,25 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     }
     TopLevelActions.push_back(LinkAction);
 
-    if (TC.getTriple().isOSDarwin() &&
-        OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
-      auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
-      TopLevelActions.push_back(dSYMAction);
-      if (Args.hasArg(options::OPT_verify_debug_info)) {
-        TopLevelActions.push_back(
-            C.createAction<VerifyDebugInfoJobAction>(dSYMAction));
+    if (TC.getTriple().isOSDarwin()) {
+      switch (OI.LinkAction) {
+      case LinkKind::Executable:
+      case LinkKind::DynamicLibrary:
+        if (OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
+          auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
+          TopLevelActions.push_back(dSYMAction);
+          if (Args.hasArg(options::OPT_verify_debug_info)) {
+            TopLevelActions.push_back(
+                C.createAction<VerifyDebugInfoJobAction>(dSYMAction));
+          }
+        }
+        break;
+
+      case LinkKind::None:
+        LLVM_FALLTHROUGH;
+      case LinkKind::StaticLibrary:
+        // Cannot build the DSYM bundle for non-image targets.
+        break;
       }
     }
   } else {

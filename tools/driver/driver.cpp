@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeLibSwift.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
@@ -134,19 +135,28 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   return true;
 }
 
-static bool shouldDisallowNewDriver(StringRef ExecName,
+static bool shouldDisallowNewDriver(DiagnosticEngine &diags,
+                                    StringRef ExecName,
                                     const ArrayRef<const char *> argv) {
   // We are not invoking the driver, so don't forward.
   if (ExecName != "swift" && ExecName != "swiftc") {
     return true;
   }
+  StringRef disableArg = "-disallow-use-new-driver";
+  StringRef disableEnv = "SWIFT_USE_OLD_DRIVER";
+  auto shouldWarn = !llvm::sys::Process::
+    GetEnv("SWIFT_AVOID_WARNING_USING_OLD_DRIVER").hasValue();
   // If user specified using the old driver, don't forward.
-  if (llvm::find_if(argv, [](const char* arg) {
-    return StringRef(arg) == "-disallow-use-new-driver";
+  if (llvm::find_if(argv, [&](const char* arg) {
+    return StringRef(arg) == disableArg;
   }) != argv.end()) {
+    if (shouldWarn)
+      diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableArg);
     return true;
   }
-  if (llvm::sys::Process::GetEnv("SWIFT_USE_OLD_DRIVER").hasValue()) {
+  if (llvm::sys::Process::GetEnv(disableEnv).hasValue()) {
+    if (shouldWarn)
+      diags.diagnose(SourceLoc(), diag::old_driver_deprecated, disableEnv);
     return true;
   }
   return false;
@@ -158,22 +168,26 @@ static bool appendSwiftDriverName(SmallString<256> &buffer) {
     llvm::sys::path::append(buffer, *driverNameOp);
     return true;
   }
-#ifdef __APPLE__
-  // FIXME: use swift-driver as the default driver for all platforms.
+
   llvm::sys::path::append(buffer, "swift-driver");
   if (llvm::sys::fs::exists(buffer)) {
     return true;
   }
   llvm::sys::path::remove_filename(buffer);
   llvm::sys::path::append(buffer, "swift-driver-new");
-  return true;
-#else
+  if (llvm::sys::fs::exists(buffer)) {
+    return true;
+  }
+
   return false;
-#endif
 }
 
 static int run_driver(StringRef ExecName,
                        const ArrayRef<const char *> argv) {
+  // This is done here and not done in FrontendTool.cpp, because
+  // FrontendTool.cpp is linked to tools, which don't use libswift.
+  initializeLibSwift();
+
   // Handle integrated tools.
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
@@ -208,11 +222,11 @@ static int run_driver(StringRef ExecName,
 
   // Forwarding calls to the swift driver if the C++ driver is invoked as `swift`
   // or `swiftc`, and an environment variable SWIFT_USE_NEW_DRIVER is defined.
-  if (!shouldDisallowNewDriver(ExecName, argv)) {
+  if (!shouldDisallowNewDriver(Diags, ExecName, argv)) {
     SmallString<256> NewDriverPath(llvm::sys::path::parent_path(Path));
     if (appendSwiftDriverName(NewDriverPath) &&
         llvm::sys::fs::exists(NewDriverPath)) {
-      SmallVector<const char *, 256> subCommandArgs;
+      std::vector<const char *> subCommandArgs;
       // Rewrite the program argument.
       subCommandArgs.push_back(NewDriverPath.c_str());
       if (ExecName == "swiftc") {
@@ -275,6 +289,13 @@ static int run_driver(StringRef ExecName,
   std::unique_ptr<ToolChain> TC = TheDriver.buildToolChain(*ArgList);
   if (Diags.hadAnyError())
     return 1;
+
+  for (auto arg: ArgList->getArgs()) {
+    if (arg->getOption().hasFlag(options::NewDriverOnlyOption)) {
+      Diags.diagnose(SourceLoc(), diag::warning_unsupported_driver_option,
+                     arg->getSpelling());
+    }
+  }
 
   std::unique_ptr<Compilation> C =
       TheDriver.buildCompilation(*TC, std::move(ArgList));

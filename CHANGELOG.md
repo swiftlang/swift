@@ -6,6 +6,52 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.5
 ---------
 
+* [SE-0313][]:
+
+  Declarations inside an actor that would normally by actor-isolated can
+  explicitly become non-isolated using the `nonisolated` keyword. Non-isolated
+  declarations can be used to conform to synchronous protocol requirements:
+
+  ```swift
+  actor Account: Hashable {
+    let idNumber: Int
+    var balance: Double
+
+    nonisolated func hash(into hasher: inout Hasher) { // okay, non-isolated satisfies synchronous requirement
+      hasher.combine(idNumber) // okay, can reference idNumber from outside the let
+      hasher.combine(balance) // error: cannot synchronously access actor-isolated property
+    }
+  }
+  ```
+
+* [SE-0300][]:
+
+  Async functions can now be suspended using the `withUnsafeContinuation`
+  and `withUnsafeThrowingContinuation` functions. These both take a closure,
+  and then suspend the current async task, executing that closure with a
+  continuation value for the current task. The program must use that
+  continuation at some point in the future to resume the task, passing in
+  a value or error, which then becomes the result of the `withUnsafeContinuation`
+  call in the resumed task.
+
+* Type names are no longer allowed as an argument to a subscript parameter that expects a metatype type
+
+  ```swift
+  struct MyValue {
+  }
+
+  struct MyStruct {
+    subscript(a: MyValue.Type) -> Int { get { ... } }
+  }
+
+  func test(obj: MyStruct) {
+    let _ = obj[MyValue]
+  }
+  ```
+
+  Accepting subscripts with `MyValue` as an argument was an oversight because `MyValue` requires explicit `.self`
+  to reference its metatype, so correct syntax would be to use `obj[MyValue.self]`.
+
 * [SE-0310][]:
   
   Read-only computed properties and subscripts can now define their `get` accessor to be `async` and/or `throws`, by writing one or both of those keywords between the `get` and `{`.  Thus, these members can now make asynchronous calls or throw errors in the process of producing a value:
@@ -48,7 +94,6 @@ Swift 5.5
     //            ^~~~~~~~~ this access is async
   }
   ```
-
 
 * [SE-0306][]:
 
@@ -8476,8 +8521,10 @@ Swift 1.0
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 [SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
+[SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
+[SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

@@ -492,3 +492,30 @@ func test_arg_conformance_with_conditional_reqs(i: Int) {
   let _: Int?? = simple(overloaded_result())
   let _: Int?? = overloaded(overloaded_result())
 }
+
+// rdar://77570994 - regression in type unification for literal collections
+
+protocol Elt {
+}
+
+extension Int : Elt {}
+extension Int64 : Elt {}
+extension Dictionary : Elt where Key == String, Value: Elt {}
+
+struct Object {}
+
+extension Object : ExpressibleByDictionaryLiteral {
+  init(dictionaryLiteral elements: (String, Elt)...) {
+  }
+}
+
+enum E {
+case test(cond: Bool, v: Int64)
+
+  var test_prop: Object {
+    switch self {
+    case let .test(cond, v):
+      return ["obj": ["a": v, "b": cond ? 0 : 42]] // Ok
+    }
+  }
+}

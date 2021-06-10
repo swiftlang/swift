@@ -916,6 +916,10 @@ namespace {
         if (!entry.isValid() || entry.getKind() != SILWitnessTable::Method ||
             entry.getMethodWitness().Requirement != func)
           continue;
+        auto silFunc = entry.getMethodWitness().Witness;
+        if (silFunc->isAsync()) {
+          return IGM.getAddrOfAsyncFunctionPointer(silFunc);
+        }
         return IGM.getAddrOfSILFunction(entry.getMethodWitness().Witness,
                                         NotForDefinition);
       }
@@ -2946,6 +2950,7 @@ namespace {
                                  swift::irgen::ConstantReference::Direct);
       }
       }
+      llvm_unreachable("covered switch");
     }
 
     void addValueWitnessTable() {
@@ -3004,6 +3009,7 @@ namespace {
       case ClassMetadataStrategy::Fixed:
         return false;
       }
+      llvm_unreachable("covered switch");
     }
 
     void addSuperclass() {
@@ -5159,6 +5165,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
+  case KnownProtocolKind::DistributedActor:
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:

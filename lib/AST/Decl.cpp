@@ -1341,6 +1341,17 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
   return Result;
 }
 
+PatternBindingDecl *PatternBindingDecl::createForDebugger(
+    ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
+    DeclContext *Parent) {
+  auto *Result = createImplicit(Ctx, StaticSpelling, Pat, E, Parent);
+  Result->Bits.PatternBindingDecl.IsDebugger = true;
+  for (auto &entry : Result->getMutablePatternList()) {
+    entry.setFromDebugger();
+  }
+  return Result;
+}
+
 PatternBindingDecl *
 PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
@@ -1409,6 +1420,15 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() const {
       LazySelfParam->setImplicit();
       LazySelfParam->setSpecifier(specifier);
       LazySelfParam->setInterfaceType(DC->getSelfInterfaceType());
+
+      // Lazy members of actors have an isolated 'self', assuming there is
+      // no "nonisolated" attribute.
+      if (auto nominal = DC->getSelfNominalTypeDecl()) {
+        if (nominal->isActor() &&
+            !singleVar->getAttrs().hasAttribute<NonisolatedAttr>())
+          LazySelfParam->setIsolated();
+      }
+
       mutableThis->SelfParam = LazySelfParam;
     }
   }
@@ -1581,9 +1601,9 @@ StaticSpellingKind PatternBindingDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-bool PatternBindingDecl::isSpawnLet() const {
+bool PatternBindingDecl::isAsyncLet() const {
   if (auto var = getAnchoringVarDecl(0))
-    return var->isSpawnLet();
+    return var->isAsyncLet();
 
   return false;
 }
@@ -2842,6 +2862,10 @@ bool ValueDecl::isDynamic() const {
     getAttrs().hasAttribute<DynamicAttr>());
 }
 
+bool ValueDecl::isDistributedActorIndependent() const {
+  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
+}
+
 bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!isObjCDynamic())
     return false;
@@ -3823,6 +3847,12 @@ bool NominalTypeDecl::isActor() const {
                            false);
 }
 
+bool NominalTypeDecl::isDistributedActor() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsDistributedActorRequest{mutableThis},
+                           false);
+}
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
@@ -4129,6 +4159,13 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
                            SynthesizeDefaultInitRequest{mutableThis}, nullptr);
 }
 
+bool NominalTypeDecl::hasDistributedActorLocalInitializer() const {
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, HasDistributedActorLocalInitRequest{mutableThis},
+                           false);
+}
+
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
@@ -4151,15 +4188,24 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     }
   } else {
     auto argumentNames = member.getArgumentNames();
-    if (!member.isCompoundName() || argumentNames.size() == 1) {
-      if (baseName == DeclBaseName::createConstructor() &&
-          (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
-        action.emplace(ImplicitMemberAction::ResolveDecodable);
+    if (member.isSimpleName() || argumentNames.size() == 1) {
+      if (baseName == DeclBaseName::createConstructor()) {
+        if ((member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
+          action.emplace(ImplicitMemberAction::ResolveDecodable);
+        } else if (argumentNames.front() == Context.Id_transport) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+        }
       } else if (!baseName.isSpecial() &&
-                 baseName.getIdentifier() == Context.Id_encode &&
-                 (member.isSimpleName() ||
-                  argumentNames.front() == Context.Id_to)) {
+           baseName.getIdentifier() == Context.Id_encode &&
+           (member.isSimpleName() || argumentNames.front() == Context.Id_to)) {
         action.emplace(ImplicitMemberAction::ResolveEncodable);
+      }
+    } else if (member.isSimpleName() || argumentNames.size() == 2) {
+      if (baseName == DeclBaseName::createConstructor()) {
+        if (argumentNames[0] == Context.Id_resolve &&
+            argumentNames[1] == Context.Id_using) {
+          action.emplace(ImplicitMemberAction::ResolveDistributedActor);
+        }
       }
     }
   }
@@ -4703,6 +4749,11 @@ bool ProtocolDecl::isMarkerProtocol() const {
   return getAttrs().hasAttribute<MarkerAttr>();
 }
 
+bool ProtocolDecl::inheritsFromDistributedActor() const {
+  auto &C = getASTContext();
+  return inheritsFrom(C.getDistributedActorDecl());
+}
+
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
@@ -5155,6 +5206,8 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::Differentiable;
   case KnownProtocolKind::Actor:
     return KnownDerivableProtocolKind::Actor;
+  case KnownProtocolKind::DistributedActor:
+    return KnownDerivableProtocolKind::DistributedActor;
   default: return None;
   }
 }
@@ -5195,6 +5248,10 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
       return true;
   }
   return false;
+}
+
+bool AbstractStorageDecl::isDistributedActorIndependent() const {
+  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
@@ -5877,7 +5934,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   return true;
 }
 
-bool VarDecl::isSpawnLet() const {
+bool VarDecl::isAsyncLet() const {
   return getAttrs().hasAttribute<AsyncAttr>() || getAttrs().hasAttribute<SpawnAttr>();
 }
 
@@ -5936,17 +5993,33 @@ llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
 
 /// Whether this property has any attached property wrappers.
 bool VarDecl::hasAttachedPropertyWrapper() const {
-  return !getAttachedPropertyWrappers().empty() || hasImplicitPropertyWrapper();
+  if (getAttrs().hasAttribute<CustomAttr>()) {
+    if (!getAttachedPropertyWrappers().empty())
+      return true;
+  }
+
+  if (hasImplicitPropertyWrapper())
+    return true;
+
+  return false;
 }
 
 bool VarDecl::hasImplicitPropertyWrapper() const {
-  if (!getAttachedPropertyWrappers().empty())
+  if (getAttrs().hasAttribute<CustomAttr>()) {
+    if (!getAttachedPropertyWrappers().empty())
+      return false;
+  }
+
+  if (isImplicit())
     return false;
 
-  auto *dc = getDeclContext();
-  bool isClosureParam = isa<ParamDecl>(this) &&
-      dc->getContextKind() == DeclContextKind::AbstractClosureExpr;
-  return !isImplicit() && getName().hasDollarPrefix() && isClosureParam;
+  if (!isa<ParamDecl>(this))
+    return false;
+
+  if (!isa<AbstractClosureExpr>(getDeclContext()))
+    return false;
+
+  return getName().hasDollarPrefix();
 }
 
 bool VarDecl::hasExternalPropertyWrapper() const {
@@ -6260,6 +6333,12 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
+  auto *Clone = ParamDecl::cloneWithoutType(Ctx, PD);
+  Clone->setInterfaceType(PD->getInterfaceType());
+  return Clone;
+}
+
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
@@ -6386,8 +6465,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   auto internalLabel = getParameterName();
   auto flags = ParameterTypeFlags::fromParameterType(
       type, isVariadic(), isAutoClosure(), isNonEphemeral(),
-      getValueOwnership(),
-      /*isNoDerivative*/ false);
+      getValueOwnership(), isIsolated(), /*isNoDerivative*/ false);
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
@@ -6941,25 +7019,14 @@ bool AbstractFunctionDecl::isSendable() const {
   return getAttrs().hasAttribute<SendableAttr>();
 }
 
-bool AbstractFunctionDecl::isAsyncHandler() const {
+bool AbstractFunctionDecl::isDistributed() const {
   auto func = dyn_cast<FuncDecl>(this);
   if (!func)
     return false;
 
   auto mutableFunc = const_cast<FuncDecl *>(func);
   return evaluateOrDefault(getASTContext().evaluator,
-                           IsAsyncHandlerRequest{mutableFunc},
-                           false);
-}
-
-bool AbstractFunctionDecl::canBeAsyncHandler() const {
-  auto func = dyn_cast<FuncDecl>(this);
-  if (!func)
-    return false;
-
-  auto mutableFunc = const_cast<FuncDecl *>(func);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           CanBeAsyncHandlerRequest{mutableFunc},
+                           IsDistributedFuncRequest{mutableFunc},
                            false);
 }
 
@@ -7687,6 +7754,17 @@ bool FuncDecl::isMainTypeMainMethod() const {
          getParameters()->size() == 0;
 }
 
+bool VarDecl::isDistributedActorAddressName(ASTContext &ctx, DeclName name) {
+  assert(name.getArgumentNames().size() == 0);
+  return name.getBaseName() == ctx.Id_actorAddress;
+}
+
+bool VarDecl::isDistributedActorTransportName(ASTContext &ctx, DeclName name) {
+  assert(name.getArgumentNames().size() == 0);
+  return name.getBaseName() == ctx.Id_transport ||
+    name.getBaseName() == ctx.Id_actorTransport;
+}
+
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
                                  bool Async, SourceLoc AsyncLoc,
@@ -7740,6 +7818,47 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
 
   return params->get(0)->getInterfaceType()->isVoid();
 }
+
+bool ConstructorDecl::isDistributedActorLocalInit() const {
+  auto name = getName();
+  auto argumentNames = name.getArgumentNames();
+
+  if (argumentNames.size() != 1)
+    return false;
+
+  auto &C = getASTContext();
+  if (argumentNames[0] != C.Id_transport)
+    return false;
+
+  auto *params = getParameters();
+  assert(params->size() == 1);
+
+  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+  return params->get(0)->getInterfaceType()->isEqual(transportType);
+}
+
+bool ConstructorDecl::isDistributedActorResolveInit() const {
+  auto name = getName();
+  auto argumentNames = name.getArgumentNames();
+
+  if (argumentNames.size() != 2)
+    return false;
+
+  auto &C = getASTContext();
+  if (argumentNames[0] != C.Id_resolve ||
+      argumentNames[1] != C.Id_using)
+    return false;
+
+  auto *params = getParameters();
+  assert(params->size() == 2);
+
+  auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
+  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+
+  return params->get(0)->getInterfaceType()->isEqual(addressType) &&
+         params->get(1)->getInterfaceType()->isEqual(transportType);
+}
+
 
 DestructorDecl::DestructorDecl(SourceLoc DestructorLoc, DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Destructor, Parent,
@@ -8208,6 +8327,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       auto selfDecl = isolation.getActorInstance();
       auto actorClass = selfDecl->getType()->getRValueType()
           ->getClassOrBoundGenericClass();
+      // FIXME: Doesn't work properly with generics
       assert(actorClass && "Bad closure actor isolation?");
       return ActorIsolation::forActorInstance(actorClass);
     }

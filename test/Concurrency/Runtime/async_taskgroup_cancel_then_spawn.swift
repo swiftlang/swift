@@ -10,12 +10,12 @@
 
 import Dispatch
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_taskGroup_cancel_then_add() async {
   // CHECK: test_taskGroup_cancel_then_add
   print("\(#function)")
@@ -52,7 +52,7 @@ func test_taskGroup_cancel_then_add() async {
 
 
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_then_add()

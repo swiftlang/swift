@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library -sanitize=thread)
 
+// Segfaulted in CI on TSan bot. rdar://78264164
+// REQUIRES: rdar78264164
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
@@ -8,7 +11,7 @@
 
 var scratchBuffer: UnsafeMutableBufferPointer<Int> = .allocate(capacity: 1000)
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func completeFastOrSlow(n: Int) async -> Int {
   if n % 2 == 0 {
     await Task.sleep(2_000_000_000)
@@ -18,7 +21,7 @@ func completeFastOrSlow(n: Int) async -> Int {
   return n
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func test_sum_nextOnCompletedOrPending() async {
   scratchBuffer.initialize(repeating: 0)
 
@@ -54,7 +57,7 @@ func test_sum_nextOnCompletedOrPending() async {
   assert(sum == expected, "Expected: \(expected), got: \(sum)")
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await test_sum_nextOnCompletedOrPending()

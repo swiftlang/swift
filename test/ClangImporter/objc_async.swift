@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency -enable-experimental-async-handler %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -117,19 +117,15 @@ func globalAsync() async { }
 actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
-  func independentMethod() {
+  nonisolated func independentMethod() {
     syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from a non-isolated context}}
   }
 
-  func asyncHandlerMethod() {
-    await globalAsync() // okay because we infer @asyncHandler from the protocol
+  @MainActor func mainActorMethod() {
+    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from the main actor}}
   }
 
-  func mainActorMethod() {
-    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from synchronous context of global actor 'MainActor'}}
-  }
-
-  func uiActorMethod() { }
+  @MainActor func uiActorMethod() { }
 }
 
 // Sendable conformance inference for imported types.

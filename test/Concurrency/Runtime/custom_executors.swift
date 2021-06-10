@@ -5,6 +5,7 @@
 
 // UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
+// UNSUPPORTED: use_os_stdlib
 
 actor Simple {
   var count = 0
@@ -16,9 +17,9 @@ actor Simple {
 
 actor Custom {
   var count = 0
-  nonisolated let simple = Simple()
+  let simple = Simple()
 
-  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+  @available(SwiftStdlib 5.5, *)
   nonisolated var unownedExecutor: UnownedSerialExecutor {
     print("custom unownedExecutor")
     return simple.unownedExecutor
@@ -32,7 +33,7 @@ actor Custom {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     print("begin")

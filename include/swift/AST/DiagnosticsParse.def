@@ -1428,6 +1428,8 @@ ERROR(attr_renamed, none,
       "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
 WARNING(attr_renamed_warning, none,
         "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+WARNING(attr_renamed_to_modifier_warning, none,
+        "'@%0' has been renamed to '%1'", (StringRef, StringRef))
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
@@ -1753,7 +1755,7 @@ ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
 ERROR(compiler_version_too_many_components,none,
       "compiler version must not have more than five components", ())
-WARNING(unused_compiler_version_component,none,
+WARNING(unused_compiler_version_component,NoUsage,
       "the second version component is not used for comparison", ())
 ERROR(empty_version_component,none,
       "found empty version component", ())
@@ -1774,7 +1776,7 @@ WARNING(likely_simulator_platform_condition,none,
 
 ERROR(canimport_two_parameters, none, "canImport can take only two parameters", ())
 
-ERROR(canimport_label, none, "2nd parameter of canImport should be labeled as version or underlyingVersion", ())
+ERROR(canimport_label, none, "2nd parameter of canImport should be labeled as _version or _underlyingVersion", ())
 
 ERROR(canimport_version, none, "cannot parse module version: %0", (StringRef))
 
@@ -1822,7 +1824,7 @@ ERROR(pound_available_package_description_not_allowed, none,
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
-ERROR(attr_requires_concurrency,none,
+ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
       (StringRef, bool))

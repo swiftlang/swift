@@ -105,11 +105,10 @@ public:
   void removeCachedAST();
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
-  std::pair<unsigned, unsigned> getLineAndColumnInBuffer(unsigned Offset);
 
-  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
-             bool BuildSyntaxTree,
-             swift::SyntaxParsingCache *SyntaxCache = nullptr);
+  void resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
+                       SwiftLangSupport &Lang, bool BuildSyntaxTree,
+                       swift::SyntaxParsingCache *SyntaxCache = nullptr);
   void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
@@ -129,7 +128,7 @@ public:
 
   /// Whether or not the AST stored for this document is up-to-date or just an
   /// artifact of incremental syntax parsing
-  bool hasUpToDateAST() const;
+  bool isIncrementalParsingEnabled() const;
 
   /// Returns the virtual filesystem associated with this document.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const;

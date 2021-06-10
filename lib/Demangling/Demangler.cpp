@@ -736,6 +736,12 @@ NodePointer Demangler::demangleTypeAnnotation() {
     return createNode(Node::Kind::AsyncAnnotation);
   case 'b':
     return createNode(Node::Kind::ConcurrentFunctionType);
+  case 'c':
+    return createWithChild(
+        Node::Kind::GlobalActorFunctionType, popTypeAndGetChild());
+  case 'i':
+    return createType(
+        createWithChild(Node::Kind::Isolated, popTypeAndGetChild()));
   case 'j':
     return demangleDifferentiableFunctionType();
   case 'k':
@@ -949,7 +955,9 @@ NodePointer Demangler::demangleStandardSubstitution() {
       int RepeatCount = demangleNatural();
       if (RepeatCount > SubstitutionMerging::MaxRepeatCount)
         return nullptr;
-      if (NodePointer Nd = createStandardSubstitution(nextChar())) {
+      bool secondLevelSubstitution = nextIf('c');
+      if (NodePointer Nd = createStandardSubstitution(
+              nextChar(), secondLevelSubstitution)) {
         while (RepeatCount-- > 1) {
           pushNode(Nd);
         }
@@ -960,10 +968,16 @@ NodePointer Demangler::demangleStandardSubstitution() {
   }
 }
 
-NodePointer Demangler::createStandardSubstitution(char Subst) {
+NodePointer Demangler::createStandardSubstitution(
+    char Subst, bool SecondLevel) {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)                   \
-  if (Subst == #MANGLING[0]) {                                    \
-    return createSwiftType(Node::Kind::KIND, #TYPENAME);      \
+  if (!SecondLevel && Subst == #MANGLING[0]) {                    \
+    return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
+  }
+
+#define STANDARD_TYPE_2(KIND, MANGLING, TYPENAME)                   \
+  if (SecondLevel && Subst == #MANGLING[0]) {                    \
+    return createSwiftType(Node::Kind::KIND, #TYPENAME);          \
   }
 
 #include "swift/Demangling/StandardTypesMangling.def"
@@ -1272,6 +1286,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
+  addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
   addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
@@ -1308,6 +1323,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     return nullptr;
 
   unsigned FirstChildIdx = 0;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::GlobalActorFunctionType)
+    ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::DifferentiableFunctionType)
     ++FirstChildIdx;
@@ -2537,6 +2555,20 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       return createNode(Node::Kind::OutlinedBridgedMethod, Params);
     }
     case 'u': return createNode(Node::Kind::AsyncFunctionPointer);
+    case 'U': {
+      auto globalActor = popNode(Node::Kind::Type);
+      if (!globalActor)
+        return nullptr;
+      
+      auto reabstraction = popNode();
+      if (!reabstraction)
+        return nullptr;
+      
+      auto node = createNode(Node::Kind::ReabstractionThunkHelperWithGlobalActor);
+      node->addChild(reabstraction, *this);
+      node->addChild(globalActor, *this);
+      return node;
+    }
     case 'J':
       switch (peekChar()) {
       case 'S':

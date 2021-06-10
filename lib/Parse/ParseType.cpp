@@ -36,7 +36,8 @@ using namespace swift::syntax;
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        const TypeAttributes &attrs,
                                        ParamDecl::Specifier specifier,
-                                       SourceLoc specifierLoc) {
+                                       SourceLoc specifierLoc,
+                                       SourceLoc isolatedLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty()) {
     ty = new (Context) AttributedTypeRepr(attrs, ty);
@@ -57,6 +58,11 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     case ParamDecl::Specifier::Default:
       break;
     }
+  }
+
+  // Apply 'isolated'.
+  if (isolatedLoc.isValid()) {
+    ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
   }
 
   return ty;
@@ -311,7 +317,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                      LAngleLoc, Args, RAngleLoc);
   return makeParserResult(applyAttributeToType(repr, attrs,
                                                ParamDecl::Specifier::Owned,
-                                               SourceLoc()));
+                                               SourceLoc(), SourceLoc()));
 }
 
 
@@ -328,11 +334,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // Start a context for creating type syntax.
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
                                           SyntaxContextKind::Type);
+
+  ParserStatus status;
+
   // Parse attributes.
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
+  SourceLoc isolatedLoc;
   TypeAttributes attrs;
-  parseTypeAttributeList(specifier, specifierLoc, attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -360,10 +370,10 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   }
 
   ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
+  status |= ParserStatus(ty);
   if (ty.isNull())
-    return ty;
+    return status;
   auto tyR = ty.get();
-  auto status = ParserStatus(ty);
 
   // Parse effects specifiers.
   // Don't consume them, if there's no following '->', so we can emit a more
@@ -387,11 +397,11 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
+    status |= SecondHalf;
     if (SecondHalf.isNull()) {
       status.setIsParseError();
       return status;
     }
-    status |= SecondHalf;
 
     if (SyntaxContext->isEnabled()) {
       ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
@@ -529,11 +539,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     if (tyR)
       tyR->walk(walker);
   }
-  if (specifierLoc.isValid() || !attrs.empty())
+  if (specifierLoc.isValid() || isolatedLoc.isValid() || !attrs.empty())
     SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
-  return makeParserResult(status, applyAttributeToType(tyR, attrs, specifier,
-                                                       specifierLoc));
+  return makeParserResult(
+      status,
+      applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc));
 }
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
@@ -1016,9 +1027,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // If the tuple element starts with a potential argument label followed by a
     // ':' or another potential argument label, then the identifier is an
     // element tag, and it is followed by a type annotation.
-    if (Tok.canBeArgumentLabel()
-        && (peekToken().is(tok::colon)
-            || peekToken().canBeArgumentLabel())) {
+    if (startsParameterName(false)) {
       // Consume a name.
       element.NameLoc = consumeArgumentLabel(element.Name,
                                              /*diagnoseDollarPrefix=*/true);

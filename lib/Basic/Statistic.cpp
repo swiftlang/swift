@@ -10,19 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/Decl.h"
+#include "swift/Basic/Statistic.h"
+#include "swift/Config.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
-#include "swift/Basic/Statistic.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <chrono>
 #include <limits>
 
@@ -57,6 +55,16 @@ bool environmentVariableRequestedMaximumDeterminism() {
   if (const char *S = ::getenv("SWIFTC_MAXIMUM_DETERMINISM"))
     return (S[0] != '\0');
   return false;
+}
+
+uint64_t getInstructionsExecuted() {
+#if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
+  struct rusage_info_v4 ru;
+  if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru) == 0) {
+    return ru.ri_instructions;
+  }
+#endif
+  return 0;
 }
 
 static std::string
@@ -510,12 +518,9 @@ FrontendStatsTracer::~FrontendStatsTracer()
 // associated fields in the provided AlwaysOnFrontendCounters.
 void updateProcessWideFrontendCounters(
     UnifiedStatsReporter::AlwaysOnFrontendCounters &C) {
-#if defined(HAVE_PROC_PID_RUSAGE) && defined(RUSAGE_INFO_V4)
-  struct rusage_info_v4 ru;
-  if (0 == proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ru)) {
-    C.NumInstructionsExecuted = ru.ri_instructions;
+  if (auto instrExecuted = getInstructionsExecuted()) {
+    C.NumInstructionsExecuted = instrExecuted;
   }
-#endif
 
 #if defined(HAVE_MALLOC_ZONE_STATISTICS) && defined(HAVE_MALLOC_MALLOC_H)
   // On Darwin we have a lifetime max that's maintained by malloc we can

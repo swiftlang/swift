@@ -350,7 +350,8 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
     mangleIndex(Idx - 26);
     return true;
   }
-  char Subst = Idx + 'A';
+  char SubstChar = Idx + 'A';
+  StringRef Subst(&SubstChar, 1);
   if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ false)) {
     Buffer << 'A' << Subst;
   }
@@ -371,6 +372,7 @@ void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
 
 bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getKind() != Node::Kind::Structure
+      && node->getKind() != Node::Kind::Class
       && node->getKind() != Node::Kind::Enum
       && node->getKind() != Node::Kind::Protocol)
     return false;
@@ -384,9 +386,9 @@ bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getChild(1)->getKind() != Node::Kind::Identifier)
     return false;
 
-  if (char Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
-    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
-      Buffer << 'S' << Subst;
+  if (auto Subst = getStandardTypeSubst(node->getChild(1)->getText())) {
+    if (!SubstMerging.tryMergeSubst(*this, *Subst, /*isStandardSubst*/ true)) {
+      Buffer << 'S' << *Subst;
     }
     return true;
   }
@@ -1668,6 +1670,11 @@ void Remangler::mangleInOut(Node *node) {
   Buffer << 'z';
 }
 
+void Remangler::mangleIsolated(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Yi";
+}
+
 void Remangler::mangleShared(Node *node) {
   mangleSingleChildNode(node);
   Buffer << 'h';
@@ -2125,6 +2132,11 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   Buffer << "Ty";
 }
 
+void Remangler::mangleReabstractionThunkHelperWithGlobalActor(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "TU";
+}
+
 void Remangler::mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op) {
   auto childIt = node->begin();
   while (childIt != node->end() &&
@@ -2476,6 +2488,11 @@ void Remangler::mangleAsyncAnnotation(Node *node) {
 
 void Remangler::mangleDifferentiableFunctionType(Node *node) {
   Buffer << "Yj" << (char)node->getIndex(); // differentiability kind
+}
+
+void Remangler::mangleGlobalActorFunctionType(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "Yc";
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {

@@ -92,7 +92,7 @@ func test002() {
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
 // THROW1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
-// THROW1-DAG:  Decl[Protocol]/CurrModule:          ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
+// THROW1-DAG:  Decl[Protocol]/CurrModule/Flair[RareType]: ErrorPro1[#ErrorPro1#]; name=ErrorPro1{{$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getError1()[#Error1#]{{; name=.+$}}
 // THROW1-DAG:  Decl[FreeFunction]/CurrModule:      getNSError()[#NSError#]{{; name=.+$}}
 
@@ -124,7 +124,7 @@ func test004() {
 func test005() {
   do {} catch Error4.E2#^CATCH3^#
 // CATCH3: Begin completions
-// CATCH3: Pattern/CurrModule:               ({#Int32#})[#Error4#]{{; name=.+$}}
+// CATCH3: Pattern/CurrModule/Flair[ArgLabels]:               ({#Int32#})[#Error4#]{{; name=.+$}}
 // CATCH3: End completions
 }
 

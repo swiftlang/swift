@@ -64,13 +64,13 @@ suite.test("NSKeyedUnarchiver") {
 }
 
 // Disable negative tests on older OSes because of rdar://problem/50504765
-if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
+if #available(macOS 12, iOS 15, watchOS 8, tvOS 15, *) {
   suite.test("PrivateClass") {
     expectNotEqual(0, NSKeyedUnarchiver._swift_checkClassAndWarnForKeyedArchiving(PrivateClass.self, operation: op))
   }
 }
 
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
   // Generic classes and nested classes were considered to have unstable names
   // in earlier releases.
   suite.test("GenericClass") {

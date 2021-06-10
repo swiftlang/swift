@@ -260,7 +260,7 @@ class ARCSequenceOpts : public SILFunctionTransform {
       return;
 
     if (!EnableLoopARC) {
-      auto *AA = getAnalysis<AliasAnalysis>();
+      auto *AA = getAnalysis<AliasAnalysis>(F);
       auto *POTA = getAnalysis<PostOrderAnalysis>();
       auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
       auto *EAFI = getAnalysis<EpilogueARCAnalysis>()->get(F);
@@ -288,7 +288,7 @@ class ARCSequenceOpts : public SILFunctionTransform {
       LA->unlockInvalidation();
     }
 
-    auto *AA = getAnalysis<AliasAnalysis>();
+    auto *AA = getAnalysis<AliasAnalysis>(F);
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *EAFI = getAnalysis<EpilogueARCAnalysis>()->get(F);

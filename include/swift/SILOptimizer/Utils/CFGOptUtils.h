@@ -36,7 +36,7 @@ namespace swift {
 class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
-class InstModCallbacks;
+struct InstModCallbacks;
 
 /// Adds a new argument to an edge between a branch and a destination
 /// block. Allows for user injected callbacks via \p callbacks.

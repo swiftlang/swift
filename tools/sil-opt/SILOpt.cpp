@@ -20,6 +20,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeLibSwift.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -102,6 +103,10 @@ DisableObjCInterop("disable-objc-interop",
 static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
+
+static llvm::cl::opt<bool>
+EnableExperimentalDistributed("enable-experimental-distributed",
+                   llvm::cl::desc("Enable experimental distributed actors."));
 
 static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
@@ -352,6 +357,8 @@ int main(int argc, char **argv) {
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
+
+  initializeLibSwift();
 
   if (PrintStats)
     llvm::EnableStatistics();

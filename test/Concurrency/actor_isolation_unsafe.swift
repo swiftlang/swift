@@ -26,7 +26,7 @@ struct S2_P1: P1 {
 }
 
 struct S3_P1: P1 {
-  @actorIndependent func onMainActor() { }
+  nonisolated func onMainActor() { }
 }
 
 struct S4_P1: P1 {
@@ -36,7 +36,7 @@ struct S4_P1: P1 {
 @MainActor(unsafe)
 protocol P2 {
   func f() // expected-note{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
-  @actorIndependent func g()
+  nonisolated func g()
 }
 
 struct S5_P2: P2 {
@@ -44,7 +44,7 @@ struct S5_P2: P2 {
   func g() { }
 }
 
-@actorIndependent func testP2(x: S5_P2, p2: P2) {
+nonisolated func testP2(x: S5_P2, p2: P2) {
   p2.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
   p2.g() // OKAY
   x.f() // expected-error{{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
@@ -72,7 +72,7 @@ class C2: C1 {
 }
 
 class C3: C1 {
-  @actorIndependent override func method() {
+  nonisolated override func method() {
     globalSome() // expected-error{{call to global actor 'SomeGlobalActor'-isolated global function 'globalSome()' in a synchronous nonisolated context}}
   }
 }
@@ -99,4 +99,14 @@ class C7: C2 {
     globalMain() // expected-error{{call to main actor-isolated global function 'globalMain()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
     globalSome() // okay
   }
+}
+
+@MainActor(unsafe) // expected-note {{'GloballyIsolatedProto' is isolated to global actor 'MainActor' here}}
+protocol GloballyIsolatedProto {
+}
+
+// rdar://75849035 - trying to conform an actor to a global-actor isolated protocol should result in an error
+func test_conforming_actor_to_global_actor_protocol() {
+  actor MyValue : GloballyIsolatedProto {}
+  // expected-error@-1 {{actor 'MyValue' cannot conform to global actor isolated protocol 'GloballyIsolatedProto'}}
 }

@@ -117,6 +117,10 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Identifiers, core->Identifiers);
 }
 
+bool ModuleFile::allowCompilerErrors() const {
+  return getContext().LangOpts.AllowModuleWithCompilerErrors;
+}
+
 Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                             bool recoverFromIncompatibility) {
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -1245,9 +1249,9 @@ bool SerializedASTFile::getAllGenericSignatures(
   return true;
 }
 
-Decl *SerializedASTFile::getMainDecl() const {
+ValueDecl *SerializedASTFile::getMainDecl() const {
   assert(hasEntryPoint());
-  return File.getDecl(File.getEntryPointDeclID());
+  return cast_or_null<ValueDecl>(File.getDecl(File.getEntryPointDeclID()));
 }
 
 const version::Version &SerializedASTFile::getLanguageVersionBuiltWith() const {

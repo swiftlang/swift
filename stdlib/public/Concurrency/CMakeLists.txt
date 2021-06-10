@@ -42,6 +42,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   CheckedContinuation.swift
   GlobalExecutor.cpp
   Errors.swift
+  Error.cpp
   Executor.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
@@ -60,6 +61,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncThrowingMapSequence.swift
   AsyncThrowingPrefixWhileSequence.swift
   PartialAsyncTask.swift
+  SourceCompatibilityShims.swift
   Task.cpp
   Task.swift
   TaskCancellation.swift
@@ -71,7 +73,11 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.swift
   ThreadSanitizer.cpp
   Mutex.cpp
-  YieldingContinuation.swift
+  AsyncStreamBuffer.swift
+  AsyncStream.swift
+  AsyncThrowingStream.swift
+  AsyncStream.cpp
+  Deque.swift
   ${swift_concurrency_objc_sources}
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
@@ -89,6 +95,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
+    -Xfrontend -define-availability
+    -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )

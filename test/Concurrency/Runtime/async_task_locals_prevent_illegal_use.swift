@@ -8,8 +8,10 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 enum TL {
   @TaskLocal
   static var number: Int = 2
@@ -17,13 +19,12 @@ enum TL {
 
 // ==== ------------------------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 func bindAroundGroupSpawn() async {
   await TL.$number.withValue(1111) { // ok
     await withTaskGroup(of: Int.self) { group in
-
       // CHECK: error: task-local: detected illegal task-local value binding at {{.*}}illegal_use.swift:[[# @LINE + 1]]
-      await TL.$number.withValue(2222) { // bad!
+      TL.$number.withValue(2222) { // bad!
         print("Survived, inside withValue!") // CHECK-NOT: Survived, inside withValue!
         group.spawn {
           0 // don't actually perform the read, it would be unsafe.
@@ -35,7 +36,7 @@ func bindAroundGroupSpawn() async {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await bindAroundGroupSpawn()

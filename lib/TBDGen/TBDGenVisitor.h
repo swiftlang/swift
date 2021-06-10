@@ -58,7 +58,6 @@ struct InstallNameStore {
   // the default install name.
   std::map<uint8_t, std::string> PlatformInstallName;
   StringRef getInstallName(LinkerPlatformId Id) const;
-  void remark(ASTContext &Ctx, StringRef ModuleName) const;
 };
 
 /// A set of callbacks for recording APIs.
@@ -181,18 +180,9 @@ public:
   TBDGenVisitor(const TBDGenDescriptor &desc, APIRecorder &recorder);
 
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
-  void addMainIfNecessary(FileUnit *file) {
-    // HACK: 'main' is a special symbol that's always emitted in SILGen if
-    //       the file has an entry point. Since it doesn't show up in the
-    //       module until SILGen, we need to explicitly add it here.
-    //
-    // Make sure to only add the main symbol for the module that we're emitting
-    // TBD for, and not for any statically linked libraries.
-    // FIXME: We should have a SymbolSource for main.
-    if (file->hasEntryPoint() && file->getParentModule() == SwiftModule)
-      addSymbol(SwiftModule->getASTContext().getEntryPointFunctionName(),
-                SymbolSource::forUnknown());
-  }
+
+  /// Add the main symbol.
+  void addMainIfNecessary(FileUnit *file);
 
   /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();

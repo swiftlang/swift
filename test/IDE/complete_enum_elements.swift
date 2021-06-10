@@ -14,9 +14,9 @@ enum FooEnum: CaseIterable {
 }
 
 // FOO_ENUM_TYPE_CONTEXT: Begin completions
-// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Foo1[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: .alias1[#FooEnum#]; name=alias1
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_TYPE_CONTEXT-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .alias1[#FooEnum#]; name=alias1
 // FOO_ENUM_TYPE_CONTEXT: End completions
 
 // FOO_ENUM_NO_DOT: Begin completions
@@ -53,9 +53,9 @@ enum FooEnum: CaseIterable {
 // FOO_ENUM_DOT_CONTEXT-NEXT: End completions
 
 // FOO_ENUM_DOT_ELEMENTS: Begin completions, 6 items
-// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo1[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: Foo2[#FooEnum#]{{; name=.+$}}
-// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: alias1[#FooEnum#]; name=alias1
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Foo1[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Foo2[#FooEnum#]{{; name=.+$}}
+// FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: alias1[#FooEnum#]; name=alias1
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): FooEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: FooEnum)
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[TypeAlias]/CurrNominal: AllCases[#[FooEnum]#]; name=AllCases
 // FOO_ENUM_DOT_ELEMENTS-NEXT: Decl[StaticVar]/CurrNominal:        allCases[#[FooEnum]#]; name=allCases
@@ -202,15 +202,15 @@ enum QuxEnum : Int {
 }
 
 // QUX_ENUM_TYPE_CONTEXT: Begin completions
-// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Qux1[#QuxEnum#]{{; name=.+$}}
-// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: .Qux2[#QuxEnum#]{{; name=.+$}}
+// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Qux1[#QuxEnum#]{{; name=.+$}}
+// QUX_ENUM_TYPE_CONTEXT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_TYPE_CONTEXT: End completions
 
 // QUX_ENUM_NO_DOT: Begin completions, 7 items
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux1[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Qux2[#QuxEnum#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[TypeAlias]/CurrNominal:      .RawValue[#Int#]{{; name=.+$}}
-// QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal:    ({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
+// QUX_ENUM_NO_DOT-NEXT: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:    ({#rawValue: Int#})[#QuxEnum?#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/Super/IsSystem: .hash({#(self): QuxEnum#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
 // QUX_ENUM_NO_DOT-NEXT: Keyword[self]/CurrNominal:        .self[#QuxEnum.Type#]; name=self
 // QUX_ENUM_NO_DOT-NEXT: Keyword/CurrNominal:              .Type[#QuxEnum.Type#]; name=Type
@@ -364,16 +364,16 @@ func testWithInvalid1() {
 // UNRESOLVED_1:  Begin completions
 // UNRESOLVED_1-NOT:  Baz
 // UNRESOLVED_1-NOT:  Bar
-// UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux1[#QuxEnum#]; name=Qux1
-// UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux2[#QuxEnum#]; name=Qux2
+// UNRESOLVED_1-DAG:  Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     Qux1[#QuxEnum#]; name=Qux1
+// UNRESOLVED_1-DAG:  Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     Qux2[#QuxEnum#]; name=Qux2
 // UNRESOLVED_1-NOT:  Okay
 }
 
 func testUnqualified1(x: QuxEnum) {
   _ = x == .Qux1 || x == .#^UNRESOLVED_2^#Qux2
   // UNRESOLVED_2: Begin completions
-  // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux1[#QuxEnum#]; name=Qux1
-  // UNRESOLVED_2-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]:     Qux2[#QuxEnum#]; name=Qux2
+  // UNRESOLVED_2-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     Qux1[#QuxEnum#]; name=Qux1
+  // UNRESOLVED_2-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:     Qux2[#QuxEnum#]; name=Qux2
   // UNRESOLVED_2-DAG: Decl[TypeAlias]/CurrNominal:                                RawValue[#Int#]; name=RawValue
   // UNRESOLVED_2-DAG: Decl[Constructor]/CurrNominal:                              init({#rawValue: Int#})[#QuxEnum?#]; name=init(rawValue: Int)
   // UNRESOLVED_2-DAG: Decl[InstanceMethod]/Super/IsSystem/TypeRelation[Invalid]:  hash({#(self): QuxEnum#})[#(into: inout Hasher) -> Void#]; name=hash(self: QuxEnum)

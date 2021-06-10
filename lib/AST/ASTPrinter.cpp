@@ -2601,6 +2601,10 @@ static bool usesFeatureConcurrentFunctions(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureActors2(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureSendable(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     if (func->isSendable())
@@ -2769,6 +2773,17 @@ static bool usesFeatureInheritActorContext(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     for (auto param : *func->getParameters()) {
       if (param->getAttrs().hasAttribute<InheritActorContextAttr>())
+        return true;
+    }
+  }
+
+  return false;
+}
+
+static bool usesFeatureImplicitSelfCapture(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    for (auto param : *func->getParameters()) {
+      if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>())
         return true;
     }
   }
@@ -3219,6 +3234,9 @@ static void printParameterFlags(ASTPrinter &printer,
     break;
   }
 
+  if (flags.isIsolated())
+    printer.printKeyword("isolated", options, " ");
+
   if (!options.excludeAttrKind(TAK_escaping) && escaping)
     printer.printKeyword("@escaping", options, " ");
 }
@@ -3330,6 +3348,10 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   };
 
   printAttributes(param);
+
+  if (param->isIsolated())
+    Printer << "isolated ";
+
   printArgName();
 
   TypeLoc TheTypeLoc;

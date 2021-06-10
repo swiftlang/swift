@@ -32,13 +32,6 @@ public actor MyActor {
     }
   }
 
-  // CHECK-RAW: sil private [ossa] @$s4test7MyActorCfdSiycfU_
-  // CHECK-RAW-NOT: extract_executor
-  // CHECK-RAW: return [[VALUE:%.*]] : $Int
-  deinit {
-    takeClosure { self.counter }
-  }
-
   // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiycfU_
   // CHECK-RAW-NOT: _checkExpectedExecutor
   // CHECK-RAW: onMainActor

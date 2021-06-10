@@ -1247,8 +1247,9 @@ bool SILParser::parseSILType(SILType &Result,
   // Parse attributes.
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
+  SourceLoc isolatedLoc;
   TypeAttributes attrs;
-  P.parseTypeAttributeList(specifier, specifierLoc, attrs);
+  P.parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, attrs);
 
   // Global functions are implicitly @convention(thin) if not specified otherwise.
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
@@ -1268,7 +1269,8 @@ bool SILParser::parseSILType(SILType &Result,
   
   // Apply attributes to the type.
   auto *attrRepr =
-      P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
+      P.applyAttributeToType(
+        TyR.get(), attrs, specifier, specifierLoc, isolatedLoc);
   const auto Ty =
       performTypeResolution(attrRepr, /*IsSILType=*/true,
                             OuterGenericEnv, OuterGenericParams);
@@ -1397,7 +1399,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
+    Result = SILDeclRef(VD, Kind, IsObjC, /*distributed=*/false, DerivativeId);
     return false;
   }
 
@@ -1517,7 +1519,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, IsObjC, DerivativeId);
+  Result = SILDeclRef(VD, Kind, IsObjC, /*distributed=*/false, DerivativeId);
   return false;
 }
 

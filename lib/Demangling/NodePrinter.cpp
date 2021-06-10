@@ -310,7 +310,6 @@ private:
     case Node::Kind::Structure:
     case Node::Kind::OtherNominalType:
     case Node::Kind::TupleElementName:
-    case Node::Kind::Type:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
     case Node::Kind::LabelList:
@@ -320,6 +319,9 @@ private:
     case Node::Kind::SugaredDictionary:
     case Node::Kind::SugaredParen:
       return true;
+
+    case Node::Kind::Type:
+      return isSimpleType(Node->getChild(0));
 
     case Node::Kind::ProtocolList:
       return Node->getChild(0)->getNumChildren() <= 1;
@@ -414,6 +416,7 @@ private:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
+    case Node::Kind::Isolated:
     case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::KeyPathGetterThunkHelper:
@@ -471,6 +474,7 @@ private:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::ReabstractionThunkHelperWithSelf:
+    case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
     case Node::Kind::ReadAccessor:
     case Node::Kind::RelatedEntityDeclName:
     case Node::Kind::RetroactiveConformance:
@@ -516,6 +520,7 @@ private:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ConcurrentFunctionType:
     case Node::Kind::DifferentiableFunctionType:
+    case Node::Kind::GlobalActorFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
@@ -809,6 +814,11 @@ private:
     unsigned startIndex = 0;
     bool isSendable = false, isAsync = false, isThrows = false;
     auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+    if (node->getChild(startIndex)->getKind() ==
+          Node::Kind::GlobalActorFunctionType) {
+      print(node->getChild(startIndex));
+      ++startIndex;
+    }
     if (node->getChild(startIndex)->getKind() ==
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
@@ -1414,6 +1424,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "inout ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::Isolated:
+    Printer << "isolated ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::Shared:
     Printer << "__shared ";
     print(Node->getChild(0));
@@ -1743,6 +1757,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(idx + 1));
     Printer << " to ";
     print(Node->getChild(idx));
+    return nullptr;
+  }
+  case Node::Kind::ReabstractionThunkHelperWithGlobalActor: {
+    print(Node->getChild(0));
+    Printer << " with global actor constraint ";
+    print(Node->getChild(1));
     return nullptr;
   }
   case Node::Kind::ReabstractionThunkHelperWithSelf: {
@@ -2576,6 +2596,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       assert(false && "Unexpected case NonDifferentiable");
     }
     Printer << ' ';
+    return nullptr;
+  }
+  case Node::Kind::GlobalActorFunctionType: {
+    if (Node->getNumChildren() > 0) {
+      Printer << '@';
+      print(Node->getChild(0));
+      Printer << ' ';
+    }
     return nullptr;
   }
   case Node::Kind::AsyncAnnotation:

@@ -13,46 +13,64 @@
 import Foo
 import Bar
 
-#if canImport(Bar, version: 113.331) // expected-warning {{cannot find user version number for Swift module 'Bar'; version number ignored}}
+#if canImport(Bar, _version: 113.331) // expected-warning {{cannot find user version number for Swift module 'Bar'; version number ignored}}
 #endif
 
-#if canImport(Bar, version: 2) // expected-warning {{cannot find user version number for Swift module 'Bar'; version number ignored}}
+#if canImport(Bar, _version: 2) // expected-warning {{cannot find user version number for Swift module 'Bar'; version number ignored}}
 #endif
 
 func canImportVersioned() {
-#if canImport(Foo, version: 113.331)
+#if canImport(Foo, _version: 113.331)
   let a = 1
 #endif
 
-#if canImport(Foo, version: 113.3000)
+#if canImport(Foo, _version: 113.3000)
   let b = 1
 #endif
 
-#if canImport(Foo, version: 114)
+#if canImport(Foo, _version: 114)
   let c = 1
 #endif
 
-#if canImport(Foo, version: 4)
+#if canImport(Foo, _version: 4)
   let d = 1 // expected-warning {{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, version: 113.33)
+#if canImport(Foo, _version: 113.33)
   let e = 1 // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, underlyingVersion: 113.33)
+#if canImport(Foo, _underlyingVersion: 113.33)
   let ee = 1
 #endif
 
-#if canImport(Foo, version: 113.329)
+#if canImport(Foo, _version: 113.329)
   let f = 1 // expected-warning {{initialization of immutable value 'f' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
-#if canImport(Foo, version: 113.330)
+#if canImport(Foo, _version: 113.330)
   let g = 1 // expected-warning {{initialization of immutable value 'g' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Foo)
   let h = 1 // expected-warning {{initialization of immutable value 'h' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+}
+
+func canImportVersionedString() {
+#if canImport(Foo, _version: "113.331")
+  let a = 1
+#endif
+
+#if canImport(Foo, _version: "113.3000")
+  let b = 1
+#endif
+
+#if canImport(Foo, _version: "4")
+  let d = 1 // expected-warning {{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "113.33")
+  let e = 1 // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 }

@@ -1,0 +1,7 @@
+# RUN: %empty-directory(%t)
+# RUN: mkdir -p %t
+# RUN: SKIP_XCODE_VERSION_CHECK=1 SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --reconfigure --verbose 2>&1| %FileCheck %s
+
+# REQUIRES: standalone_build
+
+# CHECK: build-script-impl{{.*}} --reconfigure

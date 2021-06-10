@@ -475,6 +475,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
 
   setAccess(AccessLevel::Public);
 
+  Bits.ModuleDecl.StaticLibrary = 0;
   Bits.ModuleDecl.TestingEnabled = 0;
   Bits.ModuleDecl.FailedToLoad = 0;
   Bits.ModuleDecl.RawResilienceStrategy = 0;
@@ -1065,7 +1066,27 @@ LookupConformanceInModuleRequest::evaluate(
     }
   }
 
-  // FIXME: Ambiguity resolution.
+  assert(!conformances.empty());
+
+  // If we have multiple conformances, first try to filter out any that are
+  // unavailable on the current deployment target.
+  //
+  // FIXME: Conformance lookup should really depend on source location for
+  // this to be 100% correct.
+  if (conformances.size() > 1) {
+    SmallVector<ProtocolConformance *, 2> availableConformances;
+
+    for (auto *conformance : conformances) {
+      if (conformance->getDeclContext()->isAlwaysAvailableConformanceContext())
+        availableConformances.push_back(conformance);
+    }
+
+    // Don't filter anything out if all conformances are unavailable.
+    if (!availableConformances.empty())
+      std::swap(availableConformances, conformances);
+  }
+
+  // If we still have multiple conformances, just pick the first one.
   auto conformance = conformances.front();
 
   // Rebuild inherited conformances based on the root normal conformance.
@@ -1406,6 +1427,12 @@ bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool ModuleDecl::hasStandardSubstitutions() const {
+  return !getParent() &&
+      (getName() == getASTContext().StdlibModuleName ||
+       getName() == getASTContext().Id_Concurrency);
+}
+
 bool ModuleDecl::isSwiftShimsModule() const {
   return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
 }
@@ -1422,7 +1449,7 @@ bool ModuleDecl::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }
 
-bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+bool SourceFile::registerMainDecl(ValueDecl *mainDecl, SourceLoc diagLoc) {
   assert(mainDecl);
   if (mainDecl == MainDecl)
     return false;

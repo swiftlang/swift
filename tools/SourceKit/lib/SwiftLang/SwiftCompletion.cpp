@@ -121,7 +121,7 @@ static bool swiftCodeCompleteImpl(
     unsigned Offset, SwiftCodeCompletionConsumer &SwiftConsumer,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    bool annotateDescription, std::string &Error) {
+    const CodeCompletion::Options &opts, std::string &Error) {
   return Lang.performCompletionLikeOperation(
       UnresolvedInputFile, Offset, Args, FileSystem, Error,
       [&](CompilerInstance &CI, bool reusingASTContext) {
@@ -130,7 +130,8 @@ static bool swiftCodeCompleteImpl(
         auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
         ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
         CompletionContext.ReusingASTContext = reusingASTContext;
-        CompletionContext.setAnnotateResult(annotateDescription);
+        CompletionContext.setAnnotateResult(opts.annotatedDescription);
+        CompletionContext.setIncludeObjectLiterals(opts.includeObjectLiterals);
         std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
             ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                                     SwiftConsumer));
@@ -214,8 +215,7 @@ void SwiftLangSupport::codeComplete(
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, fileSystem,
-                             CCOpts.annotatedDescription, Error)) {
+                             Args, fileSystem, CCOpts, Error)) {
     SKConsumer.failed(Error);
   }
 }
@@ -492,23 +492,28 @@ bool SwiftToSourceKitCompletionAdapter::handleResult(
   static UIdent CCCtxCurrentModule("source.codecompletion.context.thismodule");
   static UIdent CCCtxOtherModule("source.codecompletion.context.othermodule");
 
-  switch (Result->getSemanticContext()) {
-  case SemanticContextKind::None:
-    Info.SemanticContext = CCCtxNone; break;
-  case SemanticContextKind::ExpressionSpecific:
-    Info.SemanticContext = CCCtxExpressionSpecific; break;
-  case SemanticContextKind::Local:
-    Info.SemanticContext = CCCtxLocal; break;
-  case SemanticContextKind::CurrentNominal:
-    Info.SemanticContext = CCCtxCurrentNominal; break;
-  case SemanticContextKind::Super:
-    Info.SemanticContext = CCCtxSuper; break;
-  case SemanticContextKind::OutsideNominal:
-    Info.SemanticContext = CCCtxOutsideNominal; break;
-  case SemanticContextKind::CurrentModule:
-    Info.SemanticContext = CCCtxCurrentModule; break;
-  case SemanticContextKind::OtherModule:
-    Info.SemanticContext = CCCtxOtherModule; break;
+
+  if (Result->getFlair().contains(CodeCompletionFlairBit::ExpressionSpecific) ||
+      Result->getFlair().contains(CodeCompletionFlairBit::SuperChain)) {
+    // NOTE: `CCCtxExpressionSpecific` is to maintain compatibility.
+    Info.SemanticContext = CCCtxExpressionSpecific;
+  } else {
+    switch (Result->getSemanticContext()) {
+    case SemanticContextKind::None:
+      Info.SemanticContext = CCCtxNone; break;
+    case SemanticContextKind::Local:
+      Info.SemanticContext = CCCtxLocal; break;
+    case SemanticContextKind::CurrentNominal:
+      Info.SemanticContext = CCCtxCurrentNominal; break;
+    case SemanticContextKind::Super:
+      Info.SemanticContext = CCCtxSuper; break;
+    case SemanticContextKind::OutsideNominal:
+      Info.SemanticContext = CCCtxOutsideNominal; break;
+    case SemanticContextKind::CurrentModule:
+      Info.SemanticContext = CCCtxCurrentModule; break;
+    case SemanticContextKind::OtherModule:
+      Info.SemanticContext = CCCtxOtherModule; break;
+    }
   }
 
   static UIdent CCTypeRelNotApplicable("source.codecompletion.typerelation.notapplicable");
@@ -728,6 +733,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyFuzzyWeight("key.codecomplete.sort.fuzzyweight");
   static UIdent KeyPopularityBonus("key.codecomplete.sort.popularitybonus");
   static UIdent KeyAnnotatedDescription("key.codecomplete.annotateddescription");
+  static UIdent KeyIncludeObjectLiterals("key.codecomplete.includeobjectliterals");
 
   from.valueForOption(KeySortByName, to.sortByName);
   from.valueForOption(KeyUseImportDepth, to.useImportDepth);
@@ -753,6 +759,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyHideByName, to.hideByNameStyle);
   from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
   from.valueForOption(KeyAnnotatedDescription, to.annotatedDescription);
+  from.valueForOption(KeyIncludeObjectLiterals, to.includeObjectLiterals);
 }
 
 /// Canonicalize a name that is in the format of a reference to a function into
@@ -912,14 +919,15 @@ static void transformAndForwardResults(
         CodeCompletionString::create(innerSink.allocator, chunks);
     CodeCompletion::SwiftResult paren(
         CodeCompletion::SwiftResult::ResultKind::BuiltinOperator,
-        SemanticContextKind::ExpressionSpecific, /*IsArgumentLabels=*/false,
+        SemanticContextKind::CurrentNominal,
+        CodeCompletionFlairBit::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0, completionString,
         CodeCompletionResult::ExpectedTypeRelation::NotApplicable);
 
     SwiftCompletionInfo info;
     std::vector<Completion *> extended =
         extendCompletions(&paren, innerSink, info, nameToPopularity, options,
-                          exactMatch, SemanticContextKind::ExpressionSpecific);
+                          exactMatch);
     assert(extended.size() == 1);
     return extended.front();
   };
@@ -1000,11 +1008,11 @@ static void transformAndForwardResults(
       auto topResults = filterInnerResults(results, options.addInnerResults,
                                            options.addInnerOperators, hasDot,
                                            hasQDot, hasInit, rules);
-      // FIXME: Overriding the default to context "None" is a hack so that they
-      // won't overwhelm other results that also match the filter text.
+      // FIXME: Clearing the flair (and semantic context) is a hack so that
+      // they won't overwhelm other results that also match the filter text.
       innerResults = extendCompletions(
           topResults, innerSink, info, nameToPopularity, options, exactMatch,
-          SemanticContextKind::None, SemanticContextKind::None);
+          /*clearFlair=*/true);
     });
 
     auto *inputBuf = session->getBuffer();
@@ -1023,7 +1031,7 @@ static void transformAndForwardResults(
     std::string error;
     if (!swiftCodeCompleteImpl(lang, buffer.get(), str.size(), swiftConsumer,
                                cargs, session->getFileSystem(),
-                               options.annotatedDescription, error)) {
+                               options, error)) {
       consumer.failed(error);
       return;
     }
@@ -1123,8 +1131,7 @@ void SwiftLangSupport::codeCompleteOpen(
 
   // Invoke completion.
   if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
-                             extendedArgs, fileSystem,
-                             CCOpts.annotatedDescription, error)) {
+                             extendedArgs, fileSystem, CCOpts, error)) {
     consumer.failed(error);
     return;
   }

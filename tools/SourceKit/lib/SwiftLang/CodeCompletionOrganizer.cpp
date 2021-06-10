@@ -72,9 +72,7 @@ struct CodeCompletion::Group : public Item {
 std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
     ArrayRef<SwiftResult *> swiftResults, CompletionSink &sink,
     SwiftCompletionInfo &info, const NameToPopularityMap *nameToPopularity,
-    const Options &options, Completion *prefix,
-    Optional<SemanticContextKind> overrideContext,
-    Optional<SemanticContextKind> overrideOperatorContext) {
+    const Options &options, Completion *prefix, bool clearFlair) {
 
   ImportDepth depth;
   if (info.swiftASTContext) {
@@ -125,10 +123,9 @@ std::vector<Completion *> SourceKit::CodeCompletion::extendCompletions(
       builder.setSemanticContext(prefix->getSemanticContext());
     }
 
-    if (overrideOperatorContext && result->isOperator()) {
-      builder.setSemanticContext(*overrideOperatorContext);
-    } else if (overrideContext) {
-      builder.setSemanticContext(*overrideContext);
+    if (clearFlair) {
+      builder.setFlair(CodeCompletionFlair());
+      builder.setSemanticContext(SemanticContextKind::None);
     }
 
     // If this result is not from the current module, try to get a popularity
@@ -157,8 +154,8 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         CodeCompletionString::create(sink.allocator, chunk);
     CodeCompletion::SwiftResult swiftResult(
         CodeCompletion::SwiftResult::ResultKind::Pattern,
-        SemanticContextKind::ExpressionSpecific,
-        /*IsArgumentLabels=*/false, /*NumBytesToErase=*/0, completionString,
+        SemanticContextKind::Local, CodeCompletionFlairBit::ExpressionSpecific,
+        /*NumBytesToErase=*/0, completionString,
         CodeCompletionResult::ExpectedTypeRelation::Unknown);
 
     CompletionBuilder builder(sink, swiftResult);
@@ -583,7 +580,6 @@ static double getSemanticContextScore(bool useImportDepth,
                                       Completion *completion) {
   double order = -1.0;
   switch (completion->getSemanticContext()) {
-  case SemanticContextKind::ExpressionSpecific: order = 0; break;
   case SemanticContextKind::Local: order = 1; break;
   case SemanticContextKind::CurrentNominal: order = 2; break;
   case SemanticContextKind::Super: order = 3; break;
@@ -661,13 +657,13 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
   if (completion->isNotRecommended() && !skipMetaGroups)
     return ResultBucket::NotRecommended;
 
-  if (completion->getSemanticContext() ==
-          SemanticContextKind::ExpressionSpecific &&
-      !skipMetaGroups)
-    return ResultBucket::ExpressionSpecific;
-
-  if (completion->isArgumentLabels() && !skipMetaGroups)
-    return ResultBucket::ExpressionSpecific;
+  if (!skipMetaGroups) {
+    auto flair = completion->getFlair();
+    if (flair.contains(CodeCompletionFlairBit::ExpressionSpecific) ||
+        flair.contains(CodeCompletionFlairBit::SuperChain) ||
+        flair.contains(CodeCompletionFlairBit::ArgumentLabels))
+      return ResultBucket::ExpressionSpecific;
+  }
 
   if (completion->isOperator())
     return ResultBucket::Operator;
@@ -1126,6 +1122,7 @@ CompletionBuilder::CompletionBuilder(CompletionSink &sink, SwiftResult &base)
     : sink(sink), current(base) {
   typeRelation = current.getExpectedTypeRelation();
   semanticContext = current.getSemanticContext();
+  flair = current.getFlair();
   completionString =
       const_cast<CodeCompletionString *>(current.getCompletionString());
 
@@ -1170,15 +1167,13 @@ Completion *CompletionBuilder::finish() {
 
     if (current.getKind() == SwiftResult::Declaration) {
       base = SwiftResult(
-          semanticContext, current.isArgumentLabels(),
-          current.getNumBytesToErase(), completionString,
+          semanticContext, flair, current.getNumBytesToErase(), completionString,
           current.getAssociatedDeclKind(), current.isSystem(),
           current.getModuleName(), current.getNotRecommendedReason(),
           current.getBriefDocComment(), current.getAssociatedUSRs(),
           current.getDeclKeywords(), typeRelation, opKind);
     } else {
-      base = SwiftResult(current.getKind(), semanticContext,
-                         current.isArgumentLabels(),
+      base = SwiftResult(current.getKind(), semanticContext, flair,
                          current.getNumBytesToErase(), completionString,
                          typeRelation, opKind);
     }

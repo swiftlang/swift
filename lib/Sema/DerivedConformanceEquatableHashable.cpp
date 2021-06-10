@@ -134,16 +134,9 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                       fnType);
   }
 
-  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
-  TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
-                                         { }, { }, SourceLoc(),
-                                         /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true,
-                                         TupleType::get(abTupleElts, C));
-
-  auto *cmpExpr = new (C) BinaryExpr(
-      cmpFuncExpr, abTuple, /*implicit*/ true,
-      fnType->castTo<FunctionType>()->getResult());
+  auto *cmpExpr =
+      BinaryExpr::create(C, aIndex, cmpFuncExpr, bIndex, /*implicit*/ true,
+                         fnType->castTo<FunctionType>()->getResult());
   cmpExpr->setThrows(false);
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
@@ -864,17 +857,16 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (TypeChecker::conformsToProtocol(
-          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::Hashable,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
-  ProtocolDecl *intLiteralProto =
-      C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC)
-          .isInvalid()) {
+  if (!TypeChecker::conformsToKnownProtocol(
+          intType, KnownProtocolKind::ExpressibleByIntegerLiteral,
+          derived.getParentModule())) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;

@@ -13,6 +13,8 @@
 #ifndef SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 #define SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 
+#include "ModuleFile.h"
+#include "ModuleFileSharedCore.h"
 #include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
@@ -20,12 +22,6 @@
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
-class ModuleFile;
-class ModuleFileSharedCore;
-
-StringRef getNameOfModule(const ModuleFile *);
-StringRef getNameOfModule(const ModuleFileSharedCore *);
-
 namespace serialization {
 
 class XRefTracePath {
@@ -470,7 +466,9 @@ public:
       : PrettyStackTraceModuleFile("While reading from", module) {}
 
   void print(raw_ostream &os) const override {
-    os << Action << " \'" << getNameOfModule(&MF) << "'\n";
+    os << Action << " ";
+    MF.outputDiagnosticInfo(os);
+    os << "\n";
   }
 };
 
@@ -481,7 +479,9 @@ public:
       : MF(module) {}
 
   void print(raw_ostream &os) const override {
-    os << "While reading from \'" << getNameOfModule(&MF) << "'\n";
+    os << "While reading from ";
+    MF.outputDiagnosticInfo(os);
+    os << "\n";
   }
 };
 

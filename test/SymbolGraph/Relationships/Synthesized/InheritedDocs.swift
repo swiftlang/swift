@@ -6,12 +6,14 @@
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes IMPL
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS-DOCS
+// RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes EXTRA
 
 // RUN: %target-swift-symbolgraph-extract -module-name InheritedDocs -I %t -pretty-print -output-dir %t -skip-inherited-docs
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes CHECK,SKIP
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes IMPL
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS
 // RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes BONUS-SKIP
+// RUN: %FileCheck %s --input-file %t/InheritedDocs.symbols.json --check-prefixes EXTRA
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name InheritedDocs -emit-module -emit-module-path %t/InheritedDocs.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/ -skip-inherited-docs
@@ -46,6 +48,14 @@
 // BONUS-NEXT:         "identifier": "s:13InheritedDocs1PPAAE9bonusFuncyyF"
 // BONUS-NEXT:         "displayName": "P.bonusFunc()"
 
+// synthesized symbols that don't have docs to inherit still need to have the sourceOrigin field
+
+// EXTRA:         "source": "s:13InheritedDocs1PPAAE9extraFuncyyF::SYNTHESIZED::s:13InheritedDocs1SV"
+// EXTRA-NEXT:    "target": "s:13InheritedDocs1SV"
+// EXTRA-NEXT:    "sourceOrigin"
+// EXTRA-NEXT:        "identifier": "s:13InheritedDocs1PPAAE9extraFuncyyF"
+// EXTRA-NEXT:        "displayName": "P.extraFunc()"
+
 /// Protocol P
 public protocol P {
     /// Some Function
@@ -57,6 +67,8 @@ public extension P {
 
     /// Bonus docs!
     func bonusFunc() {}
+
+    func extraFunc() {} // no docs, but still needs sourceOrigin
 }
 
 public struct S: P {

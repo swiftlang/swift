@@ -859,7 +859,8 @@ bool LiteralRequirement::isCoveredBy(Type type, DeclContext *useDC) const {
   if (hasDefaultType() && coversDefaultType(type, getDefaultType()))
     return true;
 
-  return bool(TypeChecker::conformsToProtocol(type, getProtocol(), useDC));
+  return (bool)TypeChecker::conformsToProtocol(type, getProtocol(),
+                                               useDC->getParentModule());
 }
 
 std::pair<bool, Type>
@@ -1110,14 +1111,35 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   if (type->hasError())
     return None;
 
-  if (auto *locator = TypeVar->getImpl().getLocator()) {
-    if (locator->isKeyPathType()) {
-      auto *BGT =
-          type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
-      if (!BGT || !isKnownKeyPathType(BGT))
-        return None;
-    }
+  if (TypeVar->getImpl().isKeyPathType()) {
+    auto *BGT = type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
+    if (!BGT || !isKnownKeyPathType(BGT))
+      return None;
 
+    // `PartialKeyPath<T>` represents a type-erased version of `KeyPath<T, V>`.
+    //
+    // In situations where partial key path cannot be used directly i.e.
+    // passing an argument to a parameter represented by a partial key path,
+    // let's attempt a `KeyPath` binding which would then be converted to a
+    // partial key path since there is a subtype relationship between them.
+    if (BGT->isPartialKeyPath() && kind == AllowedBindingKind::Subtypes) {
+      auto &ctx = CS.getASTContext();
+      auto *keyPathLoc = TypeVar->getImpl().getLocator();
+
+      auto rootTy = BGT->getGenericArgs()[0];
+      // Since partial key path is an erased version of `KeyPath`, the value
+      // type would never be used, which means that binding can use
+      // type variable generated for a result of key path expression.
+      auto valueTy =
+          keyPathLoc->castLastElementTo<LocatorPathElt::KeyPathType>()
+              .getValueType();
+
+      type = BoundGenericType::get(ctx.getKeyPathDecl(), Type(),
+                                   {rootTy, valueTy});
+    }
+  }
+
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
     // Don't allow a protocol type to get propagated from the base to the result
     // type of a chain, Result should always be a concrete type which conforms
     // to the protocol inferred for the base.
@@ -1192,8 +1214,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     if (!bindingTypeVar)
       return None;
 
-    AdjacentVars.insert({bindingTypeVar, constraint});
-
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information
     // to be resolved to anything, so let's note that fact in the potential
@@ -1215,14 +1235,24 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
         assert(kind == AllowedBindingKind::Supertypes);
         SupertypeOf.insert({bindingTypeVar, constraint});
       }
+
+      AdjacentVars.insert({bindingTypeVar, constraint});
       break;
     }
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
-    case ConstraintKind::Equal:
+    case ConstraintKind::Equal: {
+      EquivalentTo.insert({bindingTypeVar, constraint});
+      AdjacentVars.insert({bindingTypeVar, constraint});
+      break;
+    }
+
     case ConstraintKind::UnresolvedMemberChainBase: {
       EquivalentTo.insert({bindingTypeVar, constraint});
+
+      // Don't record adjacency between base and result types,
+      // this is just an auxiliary contraint to enforce ordering.
       break;
     }
 
@@ -1527,6 +1557,9 @@ void BindingSet::dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
 }
 
 void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+
   out.indent(indent);
   if (isDirectHole())
     out << "hole ";
@@ -1539,15 +1572,17 @@ void BindingSet::dump(llvm::raw_ostream &out, unsigned indent) const {
   auto literalKind = getLiteralKind();
   if (literalKind != LiteralBindingKind::None)
     out << "literal=" << static_cast<int>(literalKind) << " ";
-  if (involvesTypeVariables())
-    out << "involves_type_vars ";
+  if (involvesTypeVariables()) {
+    out << "involves_type_vars=[";
+    interleave(AdjacentVars,
+               [&](const auto *typeVar) { out << typeVar->getString(PO); },
+               [&out]() { out << " "; });
+    out << "] ";
+  }
 
   auto numDefaultable = getNumViableDefaultableBindings();
   if (numDefaultable > 0)
     out << "#defaultable_bindings=" << numDefaultable << " ";
-
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
 
   auto printBinding = [&](const PotentialBinding &binding) {
     auto type = binding.BindingType;
@@ -1645,6 +1680,15 @@ bool TypeVarBindingProducer::computeNext() {
 
     newBindings.push_back(std::move(binding));
   };
+
+  // Let's attempt only directly inferrable bindings for
+  // a type variable representing a closure type because
+  // such type variables are handled specially and only
+  // bound to a type inferred from their expression, having
+  // contextual bindings is just a trigger for that to
+  // happen.
+  if (TypeVar->getImpl().isClosureType())
+    return false;
 
   for (auto &binding : Bindings) {
     const auto type = binding.BindingType;
@@ -1839,6 +1883,15 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
     // type fix because it wouldn't produce a useful diagnostic.
     auto *kpLocator = cs.getConstraintLocator(srcLocator->getAnchor());
     if (cs.hasFixFor(kpLocator, FixKind::AllowKeyPathWithoutComponents))
+      return None;
+
+    // If key path has any invalid component, let's just skip fix because the
+    // invalid component would be already diagnosed.
+    auto keyPath = castToExpr<KeyPathExpr>(srcLocator->getAnchor());
+    if (llvm::any_of(keyPath->getComponents(),
+                     [](KeyPathExpr::Component component) {
+                       return !component.isValid();
+                     }))
       return None;
 
     ConstraintFix *fix = SpecifyKeyPathRootType::create(cs, dstLocator);

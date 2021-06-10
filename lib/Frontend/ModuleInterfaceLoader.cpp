@@ -287,44 +287,45 @@ struct ModuleRebuildInfo {
 
   /// Emits a diagnostic for all out-of-date compiled or forwarding modules
   /// encountered while trying to load a module.
-  void diagnose(ASTContext &ctx, SourceLoc loc, StringRef moduleName,
-                 StringRef interfacePath, StringRef prebuiltCacheDir) {
-    ctx.Diags.diagnose(loc, diag::rebuilding_module_from_interface,
-                       moduleName, interfacePath);
+  template<typename... DiagArgs>
+  void diagnose(ASTContext &ctx, DiagnosticEngine &diags,
+                StringRef prebuiltCacheDir, SourceLoc loc,
+                DiagArgs &&...diagArgs) {
+    diags.diagnose(loc, std::forward<DiagArgs>(diagArgs)...);
     auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.SDKPath);
     llvm::SmallString<64> buffer = prebuiltCacheDir;
     llvm::sys::path::append(buffer, "SystemVersion.plist");
     auto PBMVer = getSDKBuildVersionFromPlist(buffer.str());
     if (!SDKVer.empty() && !PBMVer.empty()) {
       // Remark the potential version difference.
-      ctx.Diags.diagnose(loc, diag::sdk_version_pbm_version, SDKVer,
+      diags.diagnose(loc, diag::sdk_version_pbm_version, SDKVer,
                          PBMVer);
     }
     // We may have found multiple failing modules, that failed for different
     // reasons. Emit a note for each of them.
     for (auto &mod : outOfDateModules) {
-      ctx.Diags.diagnose(loc, diag::out_of_date_module_here,
+      diags.diagnose(loc, diag::out_of_date_module_here,
                          (unsigned)mod.kind, mod.path);
 
       // Diagnose any out-of-date dependencies in this module.
       for (auto &dep : mod.outOfDateDependencies) {
-        ctx.Diags.diagnose(loc, diag::module_interface_dependency_out_of_date,
+        diags.diagnose(loc, diag::module_interface_dependency_out_of_date,
                            dep);
       }
 
       // Diagnose any missing dependencies in this module.
       for (auto &dep : mod.missingDependencies) {
-        ctx.Diags.diagnose(loc, diag::module_interface_dependency_missing, dep);
+        diags.diagnose(loc, diag::module_interface_dependency_missing, dep);
       }
 
       // If there was a compiled module that wasn't able to be read, diagnose
       // the reason we couldn't read it.
       if (auto status = mod.serializationStatus) {
         if (auto reason = invalidModuleReason(*status)) {
-          ctx.Diags.diagnose(loc, diag::compiled_module_invalid_reason,
+          diags.diagnose(loc, diag::compiled_module_invalid_reason,
               mod.path, reason);
         } else {
-          ctx.Diags.diagnose(loc, diag::compiled_module_invalid, mod.path);
+          diags.diagnose(loc, diag::compiled_module_invalid, mod.path);
         }
       }
     }
@@ -346,6 +347,7 @@ class ModuleInterfaceLoaderImpl {
   const std::string interfacePath;
   const StringRef moduleName;
   const StringRef prebuiltCacheDir;
+  const StringRef backupInterfaceDir;
   const StringRef cacheDir;
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
@@ -356,13 +358,16 @@ class ModuleInterfaceLoaderImpl {
   ModuleInterfaceLoaderImpl(
       ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
       StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
+      StringRef backupInterfaceDir,
       SourceLoc diagLoc, ModuleInterfaceLoaderOptions Opts,
       RequireOSSAModules_t requiresOSSAModules,
       DependencyTracker *dependencyTracker = nullptr,
       ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized)
       : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
         modulePath(modulePath), interfacePath(interfacePath),
-        moduleName(moduleName), prebuiltCacheDir(prebuiltCacheDir),
+        moduleName(moduleName),
+        prebuiltCacheDir(prebuiltCacheDir),
+        backupInterfaceDir(backupInterfaceDir),
         cacheDir(cacheDir), diagnosticLoc(diagLoc),
         dependencyTracker(dependencyTracker), loadMode(loadMode), Opts(Opts),
         requiresOSSAModules(requiresOSSAModules) {}
@@ -418,6 +423,37 @@ class ModuleInterfaceLoaderImpl {
     return xxHash64(buf.get()->getBuffer()) == dep.getContentHash() ?
         DependencyStatus::UpToDate :
         DependencyStatus::OutOfDate;
+  }
+
+  std::string getBackupPublicModuleInterfacePath() {
+    return getBackupPublicModuleInterfacePath(ctx.SourceMgr, backupInterfaceDir,
+                                              moduleName, interfacePath);
+  }
+
+  static std::string getBackupPublicModuleInterfacePath(SourceManager &SM,
+                                                        StringRef backupInterfaceDir,
+                                                        StringRef moduleName,
+                                                        StringRef interfacePath) {
+    if (backupInterfaceDir.empty())
+      return std::string();
+    auto &fs = *SM.getFileSystem();
+    auto fileName = llvm::sys::path::filename(interfacePath);
+    {
+      llvm::SmallString<256> path(backupInterfaceDir);
+      llvm::sys::path::append(path, llvm::Twine(moduleName) + ".swiftmodule");
+      llvm::sys::path::append(path, fileName);
+      if (fs.exists(path.str())) {
+        return path.str().str();
+      }
+    }
+    {
+      llvm::SmallString<256> path(backupInterfaceDir);
+      llvm::sys::path::append(path, fileName);
+      if (fs.exists(path.str())) {
+        return path.str().str();
+      }
+    }
+    return std::string();
   }
 
   // Check if all the provided file dependencies are up-to-date compared to
@@ -521,16 +557,22 @@ class ModuleInterfaceLoaderImpl {
     return true;
   }
 
+  bool canInterfaceHavePrebuiltModule() {
+    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
+    if (!sdkPath.empty() &&
+        hasPrefix(path::begin(interfacePath), path::end(interfacePath),
+                  path::begin(sdkPath), path::end(sdkPath))) {
+      return !StringRef(interfacePath).endswith(".private.swiftinterface");
+    }
+    return false;
+  }
+
   Optional<StringRef>
   computePrebuiltModulePath(llvm::SmallString<256> &scratch) {
     namespace path = llvm::sys::path;
-    StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
 
     // Check if this is a public interface file from the SDK.
-    if (sdkPath.empty() ||
-        !hasPrefix(path::begin(interfacePath), path::end(interfacePath),
-                   path::begin(sdkPath), path::end(sdkPath)) ||
-        StringRef(interfacePath).endswith(".private.swiftinterface"))
+    if (!canInterfaceHavePrebuiltModule())
       return None;
 
     // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
@@ -862,9 +904,10 @@ class ModuleInterfaceLoaderImpl {
       trackSystemDependencies = ClangDependencyTracker->needSystemDependencies();
     }
     InterfaceSubContextDelegateImpl astDelegate(
-        ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+        ctx.SourceMgr, &ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
         ctx.ClangImporterOpts, Opts,
         /*buildModuleCacheDirIfAbsent*/ true, cacheDir, prebuiltCacheDir,
+        backupInterfaceDir,
         /*serializeDependencyHashes*/ false, trackSystemDependencies,
         requiresOSSAModules);
 
@@ -914,39 +957,107 @@ class ModuleInterfaceLoaderImpl {
       return std::make_error_code(std::errc::not_supported);
     }
 
-    // Set up a builder if we need to build the module. It'll also set up
-    // the genericSubInvocation we'll need to use to compute the cache paths.
-    ModuleInterfaceBuilder builder(
-      ctx.SourceMgr, ctx.Diags, astDelegate, interfacePath, moduleName, cacheDir,
-      prebuiltCacheDir,
-      Opts.disableInterfaceLock, diagnosticLoc,
-      dependencyTracker);
-
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 
     // We didn't discover a module corresponding to this interface.
     // Diagnose that we didn't find a loadable module, if we were asked to.
-    auto remarkRebuild = [&]() {
-      rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
-                           interfacePath, prebuiltCacheDir);
+    //
+    // Note that we use `diags` so that we emit this remark even when we're
+    // emitting other messages to `emptyDiags` (see below); these act as status
+    // messages to explain what's taking so long.
+    auto remarkRebuildAll = [&]() {
+      rebuildInfo.diagnose(ctx, diags, prebuiltCacheDir, diagnosticLoc,
+                           diag::rebuilding_module_from_interface, moduleName,
+                           interfacePath);
     };
-    // If we found an out-of-date .swiftmodule, we still want to add it as
-    // a dependency of the .swiftinterface. That way if it's updated, but
-    // the .swiftinterface remains the same, we invalidate the cache and
-    // check the new .swiftmodule, because it likely has more information
-    // about the state of the world.
-    if (rebuildInfo.sawOutOfDateModule(modulePath))
-      builder.addExtraDependency(modulePath);
+    // Diagnose only for the standard library; it should be prebuilt in typical
+    // workflows, but if it isn't, building it may take several minutes and a
+    // lot of memory, so users may think the compiler is busy-hung.
+    auto remarkRebuildStdlib = [&]() {
+      if (moduleName != "Swift")
+        return;
+      
+      auto moduleTriple = getTargetSpecificModuleTriple(ctx.LangOpts.Target);
+      rebuildInfo.diagnose(ctx, diags, prebuiltCacheDir, SourceLoc(),
+                           diag::rebuilding_stdlib_from_interface,
+                           moduleTriple.str());
+    };
+    auto remarkRebuild = Opts.remarkOnRebuildFromInterface
+                       ? llvm::function_ref<void()>(remarkRebuildAll)
+                       : remarkRebuildStdlib;
 
-    if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
-                                 &moduleBuffer,
-                                 Opts.remarkOnRebuildFromInterface ? remarkRebuild:
-                                   llvm::function_ref<void()>()))
+    bool failed = false;
+    std::string backupPath = getBackupPublicModuleInterfacePath();
+    {
+      DiagnosticEngine emptyDiags(ctx.SourceMgr);
+      std::unique_ptr<llvm::SaveAndRestore<DiagnosticEngine*>> saver;
+      DiagnosticEngine *diagsToUse = &ctx.Diags;
+      // Avoid emitting diagnostics if we have a backup interface to use.
+      // If we succeed in building this canonical interface, it's not interesting
+      // to see those diagnostics.
+      // If we failed in build, we will use the back up interface and it's interesting
+      // to see diagnostics there.
+      if (!backupPath.empty()) {
+        diagsToUse = &emptyDiags;
+        saver = std::make_unique<llvm::SaveAndRestore<DiagnosticEngine*>>(
+          astDelegate.Diags, diagsToUse);
+      }
+      // Set up a builder if we need to build the module. It'll also set up
+      // the genericSubInvocation we'll need to use to compute the cache paths.
+      ModuleInterfaceBuilder builder(
+        ctx.SourceMgr, diagsToUse,
+        astDelegate, interfacePath, moduleName, cacheDir,
+        prebuiltCacheDir, backupInterfaceDir,
+        Opts.disableInterfaceLock, diagnosticLoc,
+        dependencyTracker);
+      // If we found an out-of-date .swiftmodule, we still want to add it as
+      // a dependency of the .swiftinterface. That way if it's updated, but
+      // the .swiftinterface remains the same, we invalidate the cache and
+      // check the new .swiftmodule, because it likely has more information
+      // about the state of the world.
+      if (rebuildInfo.sawOutOfDateModule(modulePath))
+        builder.addExtraDependency(modulePath);
+      failed = builder.buildSwiftModule(cachedOutputPath,
+                                        /*shouldSerializeDeps*/true,
+                                        &moduleBuffer, remarkRebuild);
+    }
+    if (!failed) {
+      // If succeeded, we are done.
+      assert(moduleBuffer &&
+             "failed to write module buffer but returned success?");
+      return std::move(moduleBuffer);
+    } else if (backupPath.empty()) {
+      // If failed and we don't have a backup interface file, return error code.
       return std::make_error_code(std::errc::invalid_argument);
-
-    assert(moduleBuffer &&
-           "failed to write module buffer but returned success?");
-    return std::move(moduleBuffer);
+    }
+    assert(failed);
+    assert(!backupPath.empty());
+    while (1) {
+      diags.diagnose(diagnosticLoc, diag::interface_file_backup_used,
+                     interfacePath, backupPath);
+      // Set up a builder if we need to build the module. It'll also set up
+      // the genericSubInvocation we'll need to use to compute the cache paths.
+      ModuleInterfaceBuilder fallbackBuilder(
+        ctx.SourceMgr, &ctx.Diags, astDelegate, backupPath, moduleName, cacheDir,
+        prebuiltCacheDir, backupInterfaceDir,
+        Opts.disableInterfaceLock, diagnosticLoc,
+        dependencyTracker);
+      if (rebuildInfo.sawOutOfDateModule(modulePath))
+        fallbackBuilder.addExtraDependency(modulePath);
+      // Add the canonical interface path as a dependency of this module.
+      // This ensures that after the user manually fixed the canonical interface
+      // file and removed the fallback interface file, we can rebuild the cache.
+      fallbackBuilder.addExtraDependency(interfacePath);
+      // Use cachedOutputPath as the output file path. This output path was
+      // calcualted using the canonical interface file path to make sure we
+      // can find it from the canonical interface file.
+      auto failedAgain = fallbackBuilder.buildSwiftModule(cachedOutputPath,
+          /*shouldSerializeDeps*/true, &moduleBuffer, remarkRebuild);
+      if (failedAgain)
+        return std::make_error_code(std::errc::invalid_argument);
+      assert(moduleBuffer);
+      return std::move(moduleBuffer);
+    }
   }
 };
 
@@ -1004,7 +1115,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   auto ModuleName = ModuleID.Item.str();
   ModuleInterfaceLoaderImpl Impl(
       Ctx, ModPath, InPath, ModuleName, InterfaceChecker.CacheDir,
-      InterfaceChecker.PrebuiltCacheDir, ModuleID.Loc, InterfaceChecker.Opts,
+      InterfaceChecker.PrebuiltCacheDir, InterfaceChecker.BackupInterfaceDir,
+      ModuleID.Loc, InterfaceChecker.Opts,
       InterfaceChecker.RequiresOSSAModules, dependencyTracker,
       llvm::is_contained(PreferInterfaceForModules, ModuleName)
           ? ModuleLoadingMode::PreferInterface
@@ -1044,7 +1156,8 @@ ModuleInterfaceCheckerImpl::getCompiledModuleCandidatesForInterface(
   llvm::SmallString<32> modulePath = interfacePath;
   llvm::sys::path::replace_extension(modulePath, newExt);
   ModuleInterfaceLoaderImpl Impl(Ctx, modulePath, interfacePath, moduleName,
-                                 CacheDir, PrebuiltCacheDir, SourceLoc(), Opts,
+                                 CacheDir, PrebuiltCacheDir, BackupInterfaceDir,
+                                 SourceLoc(), Opts,
                                  RequiresOSSAModules, nullptr,
                                  ModuleLoadingMode::PreferSerialized);
   std::vector<std::string> results;
@@ -1065,7 +1178,8 @@ bool ModuleInterfaceCheckerImpl::tryEmitForwardingModule(
   llvm::SmallString<32> modulePath = interfacePath;
   llvm::sys::path::replace_extension(modulePath, newExt);
   ModuleInterfaceLoaderImpl Impl(Ctx, modulePath, interfacePath, moduleName,
-                                 CacheDir, PrebuiltCacheDir, SourceLoc(), Opts,
+                                 CacheDir, PrebuiltCacheDir,
+                                 BackupInterfaceDir, SourceLoc(), Opts,
                                  RequiresOSSAModules, nullptr,
                                  ModuleLoadingMode::PreferSerialized);
   SmallVector<FileDependency, 16> deps;
@@ -1092,22 +1206,45 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     const ClangImporterOptions &ClangOpts, StringRef CacheDir,
-    StringRef PrebuiltCacheDir, StringRef ModuleName, StringRef InPath,
+    StringRef PrebuiltCacheDir, StringRef BackupInterfaceDir,
+    StringRef ModuleName, StringRef InPath,
     StringRef OutPath, bool SerializeDependencyHashes,
     bool TrackSystemDependencies, ModuleInterfaceLoaderOptions LoaderOpts,
     RequireOSSAModules_t RequireOSSAModules) {
   InterfaceSubContextDelegateImpl astDelegate(
-      SourceMgr, Diags, SearchPathOpts, LangOpts, ClangOpts, LoaderOpts,
+      SourceMgr, &Diags, SearchPathOpts, LangOpts, ClangOpts, LoaderOpts,
       /*CreateCacheDirIfAbsent*/ true, CacheDir, PrebuiltCacheDir,
+      BackupInterfaceDir,
       SerializeDependencyHashes, TrackSystemDependencies, RequireOSSAModules);
-  ModuleInterfaceBuilder builder(SourceMgr, Diags, astDelegate, InPath,
+  ModuleInterfaceBuilder builder(SourceMgr, &Diags, astDelegate, InPath,
                                  ModuleName, CacheDir, PrebuiltCacheDir,
+                                 BackupInterfaceDir,
                                  LoaderOpts.disableInterfaceLock);
   // FIXME: We really only want to serialize 'important' dependencies here, if
   //        we want to ship the built swiftmodules to another machine.
-  return builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
-                                  /*ModuleBuffer*/nullptr, nullptr,
-                                  SearchPathOpts.CandidateCompiledModules);
+  auto failed = builder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                         /*ModuleBuffer*/nullptr, nullptr,
+                                         SearchPathOpts.CandidateCompiledModules);
+  if (!failed)
+    return false;
+  auto backInPath =
+    ModuleInterfaceLoaderImpl::getBackupPublicModuleInterfacePath(SourceMgr,
+      BackupInterfaceDir, ModuleName, InPath);
+  if (backInPath.empty())
+    return true;
+  assert(failed);
+  assert(!backInPath.empty());
+  ModuleInterfaceBuilder backupBuilder(SourceMgr, &Diags, astDelegate, backInPath,
+                                       ModuleName, CacheDir, PrebuiltCacheDir,
+                                       BackupInterfaceDir,
+                                       LoaderOpts.disableInterfaceLock);
+  // Ensure we can rebuild module after user changed the original interface file.
+  backupBuilder.addExtraDependency(InPath);
+  // FIXME: We really only want to serialize 'important' dependencies here, if
+  //        we want to ship the built swiftmodules to another machine.
+  return backupBuilder.buildSwiftModule(OutPath, /*shouldSerializeDeps*/true,
+                                        /*ModuleBuffer*/nullptr, nullptr,
+                                        SearchPathOpts.CandidateCompiledModules);
 }
 
 void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
@@ -1129,6 +1266,17 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   auto triple = ArgSaver.save(genericSubInvocation.getTargetTriple());
   if (!triple.empty()) {
     GenericArgs.push_back("-target");
+    GenericArgs.push_back(triple);
+  }
+
+  if (LangOpts.ClangTarget.hasValue()) {
+    genericSubInvocation.getLangOptions().ClangTarget = LangOpts.ClangTarget;
+    auto triple = ArgSaver.save(genericSubInvocation.getLangOptions()
+      .ClangTarget->getTriple());
+    assert(!triple.empty());
+    // In explicit module build, all PCMs will be built using the given clang target.
+    // So the Swift interface should know that as well to load these PCMs properly.
+    GenericArgs.push_back("-clang-target");
     GenericArgs.push_back(triple);
   }
 
@@ -1184,8 +1332,8 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   if (!FileOrError) {
     // Don't use this->diagnose() because it'll just try to re-open
     // interfacePath.
-    Diags.diagnose(diagnosticLoc, diag::error_open_input_file,
-                   interfacePath, FileOrError.getError().message());
+    Diags->diagnose(diagnosticLoc, diag::error_open_input_file,
+                    interfacePath, FileOrError.getError().message());
     return true;
   }
   auto SB = FileOrError.get()->getBuffer();
@@ -1205,7 +1353,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   }
   assert(VersMatches.size() == 2);
   // FIXME We should diagnose this at a location that makes sense:
-  auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), &Diags);
+  auto Vers = swift::version::Version(VersMatches[1], SourceLoc(), Diags);
 
   if (CompRe.match(SB, &CompMatches)) {
     assert(CompMatches.size() == 2);
@@ -1226,7 +1374,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   }
 
   SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
-  if (subInvocation.parseArgs(SubArgs, Diags)) {
+  if (subInvocation.parseArgs(SubArgs, *Diags)) {
     return true;
   }
 
@@ -1243,11 +1391,12 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
 }
 
 InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
-    SourceManager &SM, DiagnosticEngine &Diags,
+    SourceManager &SM, DiagnosticEngine *Diags,
     const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
     const ClangImporterOptions &clangImporterOpts,
     ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
     StringRef moduleCachePath, StringRef prebuiltCachePath,
+    StringRef backupModuleInterfaceDir,
     bool serializeDependencyHashes, bool trackSystemDependencies,
     RequireOSSAModules_t requireOSSAModules)
     : SM(SM), Diags(Diags), ArgSaver(Allocator) {
@@ -1263,6 +1412,10 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   if (!prebuiltCachePath.empty()) {
     genericSubInvocation.getFrontendOptions().PrebuiltModuleCachePath =
       prebuiltCachePath.str();
+  }
+  if (!backupModuleInterfaceDir.empty()) {
+    genericSubInvocation.getFrontendOptions().BackupModuleInterfaceDir =
+      backupModuleInterfaceDir.str();
   }
   if (trackSystemDependencies) {
     genericSubInvocation.getFrontendOptions().IntermoduleDependencyTracking =
@@ -1477,7 +1630,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   }
   // Insert arguments collected from the interface file.
   BuildArgs.insert(BuildArgs.end(), SubArgs.begin(), SubArgs.end());
-  if (subInvocation.parseArgs(SubArgs, Diags)) {
+  if (subInvocation.parseArgs(SubArgs, *Diags)) {
     return std::make_error_code(std::errc::not_supported);
   }
   CompilerInstance subInstance;
@@ -1487,7 +1640,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 
-  ForwardingDiagnosticConsumer FDC(Diags);
+  ForwardingDiagnosticConsumer FDC(*Diags);
   subInstance.addDiagnosticConsumer(&FDC);
   if (subInstance.setup(subInvocation)) {
     return std::make_error_code(std::errc::not_supported);

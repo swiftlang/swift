@@ -320,6 +320,7 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   friend llvm::ilist_traits<SILInstruction>;
   friend llvm::ilist_traits<SILBasicBlock>;
   friend SILBasicBlock;
+  friend SILModule;
 
   /// A backreference to the containing basic block.  This is maintained by
   /// ilist_traits<SILInstruction>.
@@ -364,9 +365,14 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   SILInstructionResultArray getResultsImpl() const;
 
 protected:
+  friend class LibswiftPassInvocation;
+
   SILInstruction() {
     NumCreatedInstructions++;
   }
+
+  /// This method unlinks 'self' from the containing basic block.
+  void removeFromParent();
 
   ~SILInstruction() {
     NumDeletedInstructions++;
@@ -380,6 +386,10 @@ public:
                      size_t Alignment = alignof(ValueBase)) {
     return C.allocateInst(Bytes, Alignment);
   }
+
+  /// Returns true if this instruction is removed from its function and
+  /// scheduled to be deleted.
+  bool isDeleted() const { return !ParentBB; }
 
   enum class MemoryBehavior {
     None,
@@ -463,6 +473,9 @@ public:
 
   /// Drops all uses that belong to this instruction.
   void dropAllReferences();
+
+  /// Drops all references that aren't represented by operands.
+  void dropNonOperandReferences();
 
   /// Replace all uses of all results of this instruction with undef.
   void replaceAllUsesOfAllResultsWithUndef();
@@ -732,6 +745,10 @@ public:
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
   void verifyOperandOwnership() const;
+
+  /// Verify that this instruction and its associated debug information follow
+  /// all SIL debug info invariants.
+  void verifyDebugInfo() const;
 
   /// Get the number of created SILInstructions.
   static int getNumCreatedInstructions() {

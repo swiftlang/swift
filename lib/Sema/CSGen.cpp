@@ -411,7 +411,7 @@ namespace {
       if (otherArgTy && otherArgTy->getAnyNominal()) {
         if (otherArgTy->isEqual(paramTy) &&
             TypeChecker::conformsToProtocol(
-                otherArgTy, literalProto, CS.DC)) {
+                otherArgTy, literalProto, CS.DC->getParentModule())) {
           return true;
         }
       } else if (Type defaultType =
@@ -1737,13 +1737,15 @@ namespace {
         if (!contextualType)
           return false;
 
+        auto *M = CS.DC->getParentModule();
+
         auto type = contextualType->lookThroughAllOptionalTypes();
-        if (conformsToKnownProtocol(
-                CS.DC, type, KnownProtocolKind::ExpressibleByArrayLiteral))
+        if (TypeChecker::conformsToKnownProtocol(
+                type, KnownProtocolKind::ExpressibleByArrayLiteral, M))
           return false;
 
-        return conformsToKnownProtocol(
-            CS.DC, type, KnownProtocolKind::ExpressibleByDictionaryLiteral);
+        return TypeChecker::conformsToKnownProtocol(
+            type, KnownProtocolKind::ExpressibleByDictionaryLiteral, M);
       };
 
       if (isDictionaryContextualType(contextualType)) {
@@ -3256,10 +3258,11 @@ namespace {
       // The result is a KeyPath from the root to the end component.
       // The type of key path depends on the overloads chosen for the key
       // path components.
-      auto typeLoc =
-          CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+      auto typeLoc = CS.getConstraintLocator(
+          locator, LocatorPathElt::KeyPathType(rvalueBase));
+
       Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape |
-                                        TVO_CanBindToHole);
+                                                     TVO_CanBindToHole);
       CS.addKeyPathConstraint(kpTy, root, rvalueBase, componentTypeVars,
                               locator);
       return kpTy;
@@ -3466,7 +3469,7 @@ namespace {
 
         auto &CS = CG.getConstraintSystem();
         for (const auto &capture : captureList->getCaptureList()) {
-          SolutionApplicationTarget target(capture.Init);
+          SolutionApplicationTarget target(capture.PBD);
           if (CS.generateConstraints(target, FreeTypeVariableBinding::Disallow))
             return {false, nullptr};
         }
@@ -4133,31 +4136,6 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   // Optimize the constraints.
   ConstraintOptimizer optimizer(*this);
   e->walk(optimizer);
-}
-
-bool swift::areGenericRequirementsSatisfied(
-    const DeclContext *DC, GenericSignature sig,
-    SubstitutionMap Substitutions, bool isExtension) {
-
-  ConstraintSystemOptions Options;
-  ConstraintSystem CS(const_cast<DeclContext *>(DC), Options);
-  auto Loc = CS.getConstraintLocator({});
-
-  // For every requirement, add a constraint.
-  for (auto Req : sig->getRequirements()) {
-    if (auto resolved = Req.subst(
-          QuerySubstitutionMap{Substitutions},
-          LookUpConformanceInModule(DC->getParentModule()))) {
-      CS.addConstraint(*resolved, Loc);
-    } else if (isExtension) {
-      return false;
-    }
-    // Unresolved requirements are requirements of the function itself. This
-    // does not prevent it from being applied. E.g. func foo<T: Sequence>(x: T).
-  }
-
-  // Having a solution implies the requirements have been fulfilled.
-  return CS.solveSingle().hasValue();
 }
 
 struct ResolvedMemberResult::Implementation {

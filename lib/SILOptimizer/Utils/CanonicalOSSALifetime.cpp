@@ -666,6 +666,7 @@ endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
     return domInfo->properlyDominates(beginAccess->getParent(),
                                       getCurrentDef()->getParentBlock());
   }
+  llvm_unreachable("covered switch");
 }
 
 // Find all overlapping access scopes and extend pruned liveness to cover them:
@@ -1208,6 +1209,7 @@ bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
     consumes.clear();
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1277,8 +1279,7 @@ swift::canonicalizeOSSALifetimes(CanonicalizeOSSALifetime &canonicalizer,
   // We use our canonicalizers inst mod callbacks.
   InstructionDeleter deleter(canonicalizer.getInstModCallbacks());
   for (auto *copy : deadCopies) {
-    deleter.recursivelyDeleteUsersIfDead(copy);
+    deleter.deleteIfDead(copy);
   }
-
   return SILAnalysis::InvalidationKind::Instructions;
 }

@@ -129,6 +129,13 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
 
   FrontendOpts.PrebuiltModuleCachePath = computePrebuiltCachePath(
       SearchPathOpts.RuntimeResourcePath, LangOpts.Target, LangOpts.SDKVersion);
+  if (!FrontendOpts.PrebuiltModuleCachePath.empty())
+    return;
+  StringRef anchor = "prebuilt-modules";
+  assert(((StringRef)FrontendOpts.PrebuiltModuleCachePath).contains(anchor));
+  auto pair = ((StringRef)FrontendOpts.PrebuiltModuleCachePath).split(anchor);
+  FrontendOpts.BackupModuleInterfaceDir =
+    (llvm::Twine(pair.first) + "preferred-interfaces" + pair.second).str();
 }
 
 static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
@@ -348,14 +355,26 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
   if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
   ArgStringList RenderedArgs;
+  ArgStringList RenderedArgsIgnorable;
   for (auto A : Args) {
-    if (A->getOption().hasFlag(options::ModuleInterfaceOption))
+    if (A->getOption().hasFlag(options::ModuleInterfaceOptionIgnorable)) {
+      A->render(Args, RenderedArgsIgnorable);
+    } else if (A->getOption().hasFlag(options::ModuleInterfaceOption)) {
       A->render(Args, RenderedArgs);
+    }
   }
-  llvm::raw_string_ostream OS(Opts.Flags);
-  interleave(RenderedArgs,
-             [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
-             [&] { OS << " "; });
+  {
+    llvm::raw_string_ostream OS(Opts.Flags);
+    interleave(RenderedArgs,
+               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+               [&] { OS << " "; });
+  }
+  {
+    llvm::raw_string_ostream OS(Opts.IgnorableFlags);
+    interleave(RenderedArgsIgnorable,
+               [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+               [&] { OS << " "; });
+  }
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
@@ -400,17 +419,25 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
+
+  Opts.EnableExperimentalDistributed |=
+    Args.hasArg(OPT_enable_experimental_distributed);
+
   Opts.EnableInferPublicSendable |=
     Args.hasFlag(OPT_enable_infer_public_concurrent_value,
                  OPT_disable_infer_public_concurrent_value,
                  false);
-  Opts.EnableExperimentalAsyncHandler |=
-    Args.hasArg(OPT_enable_experimental_async_handler);
   Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
     Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
+
+  /// experimental distributed also implicitly enables experimental concurrency
+  Opts.EnableExperimentalDistributed |=
+    Args.hasArg(OPT_enable_experimental_distributed);
+  Opts.EnableExperimentalConcurrency |=
+    Args.hasArg(OPT_enable_experimental_distributed);
 
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
@@ -430,6 +457,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_conformance_availability_errors);
   }
 
+  Opts.WarnOnPotentiallyUnavailableEnumCase |=
+      Args.hasArg(OPT_warn_on_potentially_unavailable_enum_case);
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl
@@ -604,6 +633,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
 
+  if (Arg *A = Args.getLastArg(OPT_Raccess_note)) {
+    auto value = llvm::StringSwitch<Optional<AccessNoteDiagnosticBehavior>>(A->getValue())
+      .Case("none", AccessNoteDiagnosticBehavior::Ignore)
+      .Case("failures", AccessNoteDiagnosticBehavior::RemarkOnFailure)
+      .Case("all", AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess)
+      .Case("all-validate", AccessNoteDiagnosticBehavior::ErrorOnFailureRemarkOnSuccess)
+      .Default(None);
+
+    if (value)
+      Opts.AccessNoteBehavior = *value;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  }
+
   Opts.EnableConcisePoundFile =
       Args.hasArg(OPT_enable_experimental_concise_pound_file);
   Opts.EnableFuzzyForwardScanTrailingClosureMatching =
@@ -642,6 +686,20 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
     Opts.TargetVariant = llvm::Triple(A->getValue());
+  }
+
+  // Collect -clang-target value if specified in the front-end invocation.
+  // Usually, the driver will pass down a clang target with the
+  // exactly same value as the main target, so we could dignose the usage of
+  // unavailable APIs.
+  // The reason we cannot infer clang target from -target is that not all
+  // front-end invocation will include a -target to start with. For instance,
+  // when compiling a Swift module from a textual interface, -target isn't
+  // necessary because the textual interface hardcoded the proper target triple
+  // to use. Inferring -clang-target there will always give us the default
+  // target triple.
+  if (const Arg *A = Args.getLastArg(OPT_clang_target)) {
+    Opts.ClangTarget = llvm::Triple(A->getValue());
   }
 
   Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
@@ -749,6 +807,35 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.EnableRequirementMachine = Args.hasFlag(
+      OPT_enable_requirement_machine,
+      OPT_disable_requirement_machine, /*default=*/false);
+
+  Opts.DebugRequirementMachine = Args.hasArg(
+      OPT_debug_requirement_machine);
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_step_limit)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineStepLimit = limit;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_depth_limit)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineDepthLimit = limit;
+    }
+  }
+
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
@@ -834,7 +921,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_experimental_print_full_convention);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
     unsigned line;
@@ -854,6 +940,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
+
+  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   return HadError;
 }
@@ -1494,7 +1582,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
   Opts.DisableSwiftSpecificLLVMOptzns |=
       Args.hasArg(OPT_disable_swift_specific_llvm_optzns);
-  Opts.DisableLLVMSLPVectorizer |= Args.hasArg(OPT_disable_llvm_slp_vectorizer);
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
 
@@ -1567,8 +1654,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     // Disable type layouts at Onone except if explictly requested.
     Opts.UseTypeLayoutValueHandling = false;
   }
-
-  Opts.UseSwiftCall = Args.hasArg(OPT_enable_swiftcall);
 
   // This is set to true by default.
   Opts.UseIncrementalLLVMCodeGen &=

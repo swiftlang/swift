@@ -10,8 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILValue.h"
+
 namespace swift {
+
+class SILLocation;
+
 namespace Lowering {
+
+class SILGenFunction;
 
 /// Represents the information necessary to return to a caller's own
 /// active executor after making a hop to an actor for actor-isolated calls.

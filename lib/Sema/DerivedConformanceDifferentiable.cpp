@@ -84,7 +84,7 @@ getStoredPropertiesForDifferentiation(
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     auto conformance = TypeChecker::conformsToProtocol(
-        varType, diffableProto, nominal);
+        varType, diffableProto, DC->getParentModule());
     if (!conformance)
       continue;
     // Skip `let` stored properties with a mutating `move(by:)` if requested.
@@ -113,11 +113,12 @@ static StructDecl *convertToStructDecl(ValueDecl *v) {
 /// for the given interface type and declaration context.
 static Type getTangentVectorInterfaceType(Type contextualType,
                                           DeclContext *DC) {
-  auto &C = contextualType->getASTContext();
+  auto &C = DC->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   assert(diffableProto && "`Differentiable` protocol not found");
   auto conf =
-      TypeChecker::conformsToProtocol(contextualType, diffableProto, DC);
+      TypeChecker::conformsToProtocol(contextualType, diffableProto,
+                                      DC->getParentModule());
   assert(conf && "Contextual type must conform to `Differentiable`");
   if (!conf)
     return nullptr;
@@ -139,7 +140,8 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   // `Self` must conform to `AdditiveArithmetic`.
-  if (!TypeChecker::conformsToProtocol(nominalTypeInContext, addArithProto, DC))
+  if (!TypeChecker::conformsToProtocol(nominalTypeInContext, addArithProto,
+                                       DC->getParentModule()))
     return false;
   for (auto *field : nominal->getStoredProperties()) {
     // `Self` must not have any `@noDerivative` stored properties.
@@ -147,7 +149,8 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
       return false;
     // `Self` must have all stored properties satisfy `Self == TangentVector`.
     auto fieldType = DC->mapTypeIntoContext(field->getValueInterfaceType());
-    auto conf = TypeChecker::conformsToProtocol(fieldType, diffableProto, DC);
+    auto conf = TypeChecker::conformsToProtocol(fieldType, diffableProto,
+                                                DC->getParentModule());
     if (!conf)
       return false;
     auto tangentType = conf.getTypeWitnessByName(fieldType, C.Id_TangentVector);
@@ -210,7 +213,8 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC);
+    return (bool)TypeChecker::conformsToProtocol(varType, diffableProto,
+                                                 DC->getParentModule());
   });
 }
 
@@ -551,7 +555,8 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     // Check whether to diagnose stored property.
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     auto diffableConformance =
-        TypeChecker::conformsToProtocol(varType, diffableProto, nominal);
+        TypeChecker::conformsToProtocol(varType, diffableProto,
+                                        DC->getParentModule());
     // If stored property should not be diagnosed, continue.
     if (diffableConformance && 
         canInvokeMoveByOnProperty(vd, diffableConformance))

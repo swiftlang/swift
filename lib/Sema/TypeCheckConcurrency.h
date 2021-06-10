@@ -25,6 +25,7 @@
 namespace swift {
 
 class AbstractFunctionDecl;
+class ConstructorDecl;
 class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
@@ -38,20 +39,21 @@ class EnumElementDecl;
 class Expr;
 class FuncDecl;
 class Initializer;
-class LangOptions;
 class PatternBindingDecl;
 class ProtocolConformance;
 class TopLevelCodeDecl;
 class TypeBase;
 class ValueDecl;
 
-/// Add notes suggesting the addition of 'async' or '@asyncHandler', as
-/// appropriate, to a diagnostic for a function that isn't an async context.
+/// Add notes suggesting the addition of 'async', as appropriate,
+/// to a diagnostic for a function that isn't an async context.
 void addAsyncNotes(AbstractFunctionDecl const* func);
 
 /// Check actor isolation rules.
 void checkTopLevelActorIsolation(TopLevelCodeDecl *decl);
 void checkFunctionActorIsolation(AbstractFunctionDecl *decl);
+void checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor);
+void checkActorConstructorBody(ClassDecl *decl, ConstructorDecl *ctor, BraceStmt *body);
 void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
 void checkPropertyWrapperActorIsolation(
@@ -100,6 +102,10 @@ public:
     /// are permitted from elsewhere as a cross-actor reference, but
     /// contexts with unspecified isolation won't diagnose anything.
     GlobalActorUnsafe,
+
+    /// References to declarations that are part of a distributed actor are
+    /// only permitted if they are async.
+    DistributedActorSelf,
   };
 
 private:
@@ -129,7 +135,9 @@ public:
 
   /// Retrieve the actor type that the declaration is within.
   NominalTypeDecl *getActorType() const {
-    assert(kind == ActorSelf || kind == CrossActorSelf);
+    assert(kind == ActorSelf || 
+           kind == CrossActorSelf || 
+           kind == DistributedActorSelf);
     return data.actorType;
   }
 
@@ -155,6 +163,15 @@ public:
       NominalTypeDecl *actor, bool isCrossActor) {
     ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
                                      isCrossActor);
+    result.data.actorType = actor;
+    return result;
+  }
+
+  /// Accesses to the given declaration can only be made via the 'self' of
+  /// the current actor.
+  static ActorIsolationRestriction forDistributedActorSelf(
+      NominalTypeDecl *actor, bool isCrossActor) {
+    ActorIsolationRestriction result(DistributedActorSelf, isCrossActor);
     result.data.actorType = actor;
     return result;
   }
@@ -199,7 +216,7 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 /// domain, including the substitutions so that (e.g.) we can consider the
 /// specific types at the use site.
 ///
-/// \param dc The declaration context from which the reference occurs. This is
+/// \param module The module from which the reference occurs. This is
 /// used to perform lookup of conformances to the \c Sendable protocol.
 ///
 /// \param loc The location at which the reference occurs, which will be
@@ -210,13 +227,9 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 ///
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonConcurrentTypesInReference(
-    ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
+    ConcreteDeclRef declRef, ModuleDecl *module, SourceLoc loc,
     ConcurrentReferenceKind refKind,
     DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
-
-/// Whether we should diagnose cases where Sendable conformances are
-/// missing.
-bool shouldDiagnoseNonSendableViolations(const LangOptions &langOpts);
 
 /// How the concurrent value check should be performed.
 enum class SendableCheck {
@@ -238,8 +251,8 @@ enum class SendableCheck {
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(
     SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
-
 /// Get the explicit global actor specified for a closure.
+
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
 /// Check the correctness of the given Sendable conformance.

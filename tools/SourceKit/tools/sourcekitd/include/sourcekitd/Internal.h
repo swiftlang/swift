@@ -83,6 +83,7 @@ public:
     void set(SourceKit::UIdent Key, int64_t val);
     void set(SourceKit::UIdent Key, llvm::ArrayRef<llvm::StringRef> Strs);
     void set(SourceKit::UIdent Key, llvm::ArrayRef<std::string> Strs);
+    void set(SourceKit::UIdent Key, llvm::ArrayRef<SourceKit::UIdent> UIDs);
     void setBool(SourceKit::UIdent Key, bool val);
     Array setArray(SourceKit::UIdent Key);
     Dictionary setDictionary(SourceKit::UIdent Key);

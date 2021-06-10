@@ -66,6 +66,7 @@ private:
   Stmt *walkToStmtPost(Stmt *S) override;
 
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
+  Pattern *walkToPatternPost(Pattern *P) override;
 
   bool handleImports(ImportDecl *Import);
   bool handleCustomAttributes(Decl *D);
@@ -439,11 +440,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     }
   } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
-    if (!BinE->getArg()->getElement(0)->walk(*this))
+    if (!BinE->getLHS()->walk(*this))
       return doStopTraversal();
     if (!BinE->getFn()->walk(*this))
       return doStopTraversal();
-    if (!BinE->getArg()->getElement(1)->walk(*this))
+    if (!BinE->getRHS()->walk(*this))
       return doStopTraversal();
 
     // We already visited the children.
@@ -587,6 +588,9 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
     return { false, nullptr };
   }
 
+  if (!SEWalker.walkToPatternPre(P))
+    return { false, P };
+
   if (P->isImplicit())
     return { true, P };
 
@@ -607,6 +611,16 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
   // subpattern.  The type will be walked as a part of another TypedPattern.
   TP->getSubPattern()->walk(*this);
   return { false, P };
+}
+
+Pattern *SemaAnnotator::walkToPatternPost(Pattern *P) {
+  if (isDone())
+     return nullptr;
+
+  bool Continue = SEWalker.walkToPatternPost(P);
+  if (!Continue)
+    Cancelled = true;
+  return Continue ? P : nullptr;
 }
 
 bool SemaAnnotator::handleCustomAttributes(Decl *D) {
@@ -806,32 +820,37 @@ bool SemaAnnotator::shouldIgnore(Decl *D) {
 
 bool SourceEntityWalker::walk(SourceFile &SrcFile) {
   SemaAnnotator Annotator(*this);
-  return SrcFile.walk(Annotator);
+  return performWalk(Annotator, [&]() { return SrcFile.walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(ModuleDecl &Mod) {
   SemaAnnotator Annotator(*this);
-  return Mod.walk(Annotator);
+  return performWalk(Annotator, [&]() { return Mod.walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(Stmt *S) {
   SemaAnnotator Annotator(*this);
-  return S->walk(Annotator);
+  return performWalk(Annotator, [&]() { return S->walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(Expr *E) {
   SemaAnnotator Annotator(*this);
-  return E->walk(Annotator);
+  return performWalk(Annotator, [&]() { return E->walk(Annotator); });
+}
+
+bool SourceEntityWalker::walk(Pattern *P) {
+  SemaAnnotator Annotator(*this);
+  return performWalk(Annotator, [&]() { return P->walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(Decl *D) {
   SemaAnnotator Annotator(*this);
-  return D->walk(Annotator);
+  return performWalk(Annotator, [&]() { return D->walk(Annotator); });
 }
 
 bool SourceEntityWalker::walk(DeclContext *DC) {
   SemaAnnotator Annotator(*this);
-  return DC->walkContext(Annotator);
+  return performWalk(Annotator, [&]() { return DC->walkContext(Annotator); });
 }
 
 bool SourceEntityWalker::walk(ASTNode N) {

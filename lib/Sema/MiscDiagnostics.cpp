@@ -1840,13 +1840,9 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     genericParamText << contextTy;
   };
 
-  // FIXME: We can potentially be in the middle of creating a generic signature
-  // if we get here.  Break this cycle.
-  if (typeDecl->hasComputedGenericSignature()) {
-    llvm::interleave(typeDecl->getInnermostGenericParamTypes(),
-                     printGenericParamSummary,
-                     [&] { genericParamText << ", "; });
-  }
+  llvm::interleave(typeDecl->getInnermostGenericParamTypes(),
+                   printGenericParamSummary,
+                   [&] { genericParamText << ", "; });
   
   genericParamText << ">";
   return true;
@@ -2496,26 +2492,16 @@ public:
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D)) {
       if (shouldTrackVarDecl(vd)) {
-        // Inline constructor.
-        auto defaultFlags = [&]() -> unsigned {
-          // If this VarDecl is nested inside of a CaptureListExpr, remember
-          // that fact for better diagnostics.
-          auto parentAsExpr = Parent.getAsExpr();
-          if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
-            return RK_CaptureList | RK_Defined;
-          // Otherwise, return none.
-          return RK_Defined;
-        }();
+        unsigned flags = RK_Defined;
+        if (vd->isCaptureList())
+          flags |= RK_CaptureList;
 
-        if (!vd->isImplicit()) {
-          if (auto *childVd =
-                  vd->getCorrespondingCaseBodyVariable().getPtrOrNull()) {
-            // Child vars are never in capture lists.
-            assert(defaultFlags == RK_Defined);
-            VarDecls[childVd] |= RK_Defined;
-          }
+        if (auto childVd = vd->getCorrespondingCaseBodyVariable()) {
+          // Child vars are never in capture lists.
+          assert(flags == RK_Defined);
+          addMark(childVd.get(), flags);
         }
-        VarDecls[vd] |= defaultFlags;
+        addMark(vd, flags);
       }
     }
 
@@ -4532,11 +4518,6 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
     void tryDiagnoseComparisonWithNaN(BinaryExpr *BE) {
       ValueDecl *comparisonDecl = nullptr;
 
-      // Comparison functions like == or <= take two arguments.
-      if (BE->getArg()->getNumElements() != 2) {
-        return;
-      }
-
       // Dig out the function declaration.
       if (auto Fn = BE->getFn()) {
         if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(Fn)) {
@@ -4557,16 +4538,16 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
         return;
       }
 
-      auto firstArg = BE->getArg()->getElement(0);
-      auto secondArg = BE->getArg()->getElement(1);
+      auto *firstArg = BE->getLHS();
+      auto *secondArg = BE->getRHS();
 
       // Both arguments must conform to FloatingPoint protocol.
-      if (!conformsToKnownProtocol(const_cast<DeclContext *>(DC),
-                                   firstArg->getType(),
-                                   KnownProtocolKind::FloatingPoint) ||
-          !conformsToKnownProtocol(const_cast<DeclContext *>(DC),
-                                   secondArg->getType(),
-                                   KnownProtocolKind::FloatingPoint)) {
+      if (!TypeChecker::conformsToKnownProtocol(firstArg->getType(),
+                                                KnownProtocolKind::FloatingPoint,
+                                                DC->getParentModule()) ||
+          !TypeChecker::conformsToKnownProtocol(secondArg->getType(),
+                                                KnownProtocolKind::FloatingPoint,
+                                                DC->getParentModule())) {
         return;
       }
 

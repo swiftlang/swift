@@ -126,9 +126,6 @@ def diagnostic_documentation_path
   : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
   HelpText<"Path to diagnostic documentation resources">;
 
-def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
-  HelpText<"Enable the use of LLVM swiftcall support">;
-
 def enable_testable_attr_requires_testable_module :
   Flag<["-"], "enable-testable-attr-requires-testable-module">,
   HelpText<"Enable checking of @testable">;
@@ -188,6 +185,18 @@ def batch_scan_input_file
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
 
+def serialize_dependency_scan_cache : Flag<["-"], "serialize-dependency-scan-cache">,
+   HelpText<"After performing a dependency scan, serialize the scanner's internal state.">;
+
+def reuse_dependency_scan_cache : Flag<["-"], "load-dependency-scan-cache">,
+   HelpText<"After performing a dependency scan, serialize the scanner's internal state.">;
+
+def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
+  HelpText<"The path to output the dependency scanner's internal state.">;
+
+def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
+  HelpText<"Emit remarks indicating use of the serialized module dependency scanning cache.">;
+
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Run SIL copy propagation to shorten object lifetime.">;
 def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
@@ -198,6 +207,12 @@ def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-send
 
 def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
     HelpText<"Disable inference of Sendable conformances for public structs and enums">;
+
+def Raccess_note : Separate<["-"], "Raccess-note">,
+    MetaVarName<"none|failures|all|all-validate">,
+    HelpText<"Control access note remarks (default: all)">;
+def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
+    Alias<Raccess_note>;
 
 } // end let Flags = [FrontendOption, NoDriverOption]
 
@@ -229,9 +244,9 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_async_handler :
-  Flag<["-"], "enable-experimental-async-handler">,
-  HelpText<"Enable experimental @asyncHandler feature">;
+def enable_experimental_distributed :
+  Flag<["-"], "enable-experimental-distributed">,
+  HelpText<"Enable experimental 'distributed' actors and functions">;
 
 def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
@@ -258,6 +273,23 @@ def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
+
+def enable_requirement_machine : Flag<["-"], "enable-requirement-machine">,
+  HelpText<"Enable experimental generics implementation">;
+
+def disable_requirement_machine : Flag<["-"], "disable-requirement-machine">,
+  HelpText<"Disable experimental generics implementation">;
+
+def debug_requirement_machine : Flag<["-"], "debug-requirement-machine">,
+  HelpText<"Enables debugging output from the generics implementation">;
+
+def requirement_machine_step_limit : Separate<["-"], "requirement-machine-step-limit">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum steps before we give up on confluent completion">;
+
+def requirement_machine_depth_limit : Separate<["-"], "requirement-machine-depth-limit">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum depth before we give up on confluent completion">;
 
 def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
   HelpText<"Debug generic signatures">;
@@ -286,6 +318,9 @@ def debug_crash_immediately : Flag<["-"], "debug-crash-immediately">,
 def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
   DebugCrashOpt, HelpText<"Force a crash after parsing">;
 
+def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
+   HelpText<"After performing a dependency scan, serialize and then deserialize the scanner's internal state.">;
+
 def debugger_support : Flag<["-"], "debugger-support">,
   HelpText<"Process swift code as if running in the debugger">;
 
@@ -296,6 +331,10 @@ def disable_clangimporter_source_import : Flag<["-"],
 def disable_implicit_concurrency_module_import : Flag<["-"],
   "disable-implicit-concurrency-module-import">,
   HelpText<"Disable the implicit import of the _Concurrency module.">;
+
+def disable_implicit_distributed_module_import : Flag<["-"],
+  "disable-implicit-distributed-module-import">,
+  HelpText<"Disable the implicit import of the _Distributed module.">;
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
@@ -332,9 +371,6 @@ def disable_sil_perf_optzns : Flag<["-"], "disable-sil-perf-optzns">,
 
 def disable_swift_specific_llvm_optzns : Flag<["-"], "disable-swift-specific-llvm-optzns">,
   HelpText<"Don't run Swift specific LLVM optimization passes.">;
-
-def disable_llvm_slp_vectorizer : Flag<["-"], "disable-llvm-slp-vectorizer">,
-  HelpText<"Don't run LLVM SLP vectorizer">;
 
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
@@ -416,6 +452,10 @@ def enable_conformance_availability_errors : Flag<["-"],
 def disable_conformance_availability_errors : Flag<["-"],
   "disable-conformance-availability-errors">,
   HelpText<"Diagnose conformance availability violations as warnings">;
+
+def warn_on_potentially_unavailable_enum_case : Flag<["-"],
+  "warn-on-potentially-unavailable-enum-case">,
+  HelpText<"Downgrade potential unavailability of enum case to a warning">;
 
 def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
   HelpText<"Deprecated, will be removed in future versions.">;
@@ -694,6 +734,13 @@ def prebuilt_module_cache_path :
 def prebuilt_module_cache_path_EQ :
   Joined<["-"], "prebuilt-module-cache-path=">,
   Alias<prebuilt_module_cache_path>;
+
+def backup_module_interface_path :
+  Separate<["-"], "backup-module-interface-path">,
+  HelpText<"Directory of module interfaces as backups to those from SDKs">;
+def backup_module_interface_path_EQ :
+  Joined<["-"], "backup-module-interface-path=">,
+  Alias<backup_module_interface_path>;
 
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
    HelpText<"Force public linkage for private symbols. Used by LLDB.">;

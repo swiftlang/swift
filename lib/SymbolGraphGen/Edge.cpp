@@ -15,8 +15,28 @@
 #include "Symbol.h"
 #include "SymbolGraphASTWalker.h"
 
+#include <queue>
+
 using namespace swift;
 using namespace symbolgraphgen;
+
+namespace {
+const ValueDecl *getForeignProtocolRequirement(const ValueDecl *VD, const ModuleDecl *M) {
+  std::queue<const ValueDecl *> requirements;
+  while (true) {
+    for (auto *req : VD->getSatisfiedProtocolRequirements()) {
+      if (req->getModuleContext()->getNameStr() != M->getNameStr())
+        return req;
+      else
+        requirements.push(req);
+    }
+    if (requirements.empty())
+      return nullptr;
+    VD = requirements.front();
+    requirements.pop();
+  }
+}
+} // end anonymous namespace
 
 void Edge::serialize(llvm::json::OStream &OS) const {
   OS.object([&](){
@@ -61,6 +81,14 @@ void Edge::serialize(llvm::json::OStream &OS) const {
     const ValueDecl *InheritingDecl = nullptr;
     if (const auto *ID = Source.getDeclInheritingDocs()) {
       if (Target.getSymbolDecl() == ID || Source.getSynthesizedBaseTypeDecl())
+        InheritingDecl = ID;
+    }
+
+    if (!InheritingDecl && Source.getSynthesizedBaseTypeDecl())
+      InheritingDecl = Source.getSymbolDecl();
+
+    if (!InheritingDecl) {
+      if (const auto *ID = getForeignProtocolRequirement(Source.getSymbolDecl(), &Graph->M))
         InheritingDecl = ID;
     }
     

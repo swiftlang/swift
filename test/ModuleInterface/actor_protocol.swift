@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -enable-experimental-async-handler -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
+// RUN: %target-swift-frontend -typecheck -enable-library-evolution -enable-experimental-concurrency -emit-module-interface-path %t/Library.swiftinterface -module-name Library %s
 // RUN: %FileCheck --check-prefix CHECK-EXTENSION %s <%t/Library.swiftinterface
 // RUN: %FileCheck --check-prefix CHECK %s <%t/Library.swiftinterface
 // REQUIRES: concurrency
@@ -12,47 +12,47 @@
 // CHECK-EXTENSION-NOT: extension {{.+}} : _Concurrency.Actor
 
 // CHECK: public actor PlainActorClass {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public actor PlainActorClass {
-  @actorIndependent public func enqueue(_ job: UnownedJob) { }
+  nonisolated public func enqueue(_ job: UnownedJob) { }
 }
 
 // CHECK: public actor ExplicitActorClass : _Concurrency.Actor {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public actor ExplicitActorClass : Actor {
-  @actorIndependent public func enqueue(_ job: UnownedJob) { }
+  nonisolated public func enqueue(_ job: UnownedJob) { }
 }
 
 // CHECK: public actor EmptyActor {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public actor EmptyActor {}
 
-// CHECK: actor public class EmptyActorClass {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public actor class EmptyActorClass {}
+// CHECK: public actor EmptyActorClass {
+@available(SwiftStdlib 5.5, *)
+public actor EmptyActorClass {}
 
 // CHECK: public protocol Cat : _Concurrency.Actor {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol Cat : Actor {
   func mew()
 }
 
 // CHECK: public actor HouseCat : Library.Cat {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public actor HouseCat : Cat {
-  @asyncHandler public func mew() {}
-  @actorIndependent public func enqueue(_ job: UnownedJob) { }
+  nonisolated public func mew() {}
+  nonisolated public func enqueue(_ job: UnownedJob) { }
 }
 
 // CHECK: public protocol ToothyMouth {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public protocol ToothyMouth {
   func chew()
 }
 
 // CHECK: public actor Lion : Library.ToothyMouth, _Concurrency.Actor {
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 public actor Lion : ToothyMouth, Actor {
-  @asyncHandler public func chew() {}
-  @actorIndependent public func enqueue(_ job: UnownedJob) { }
+  nonisolated public func chew() {}
+  nonisolated public func enqueue(_ job: UnownedJob) { }
 }

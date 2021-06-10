@@ -22,7 +22,10 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
+#include "swift/Option/Options.h"
 
+#include "llvm/Option/OptTable.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
@@ -722,6 +725,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
 
     // We've loaded the file. Now try to bring it into the AST.
     fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
+    M.setStaticLibrary(loadedModuleFile->isStaticLibrary());
     if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
     if (loadedModuleFile->arePrivateImportsEnabled())
@@ -969,7 +973,55 @@ bool swift::extractCompilerFlagsFromInterface(StringRef buffer,
     return true;
   assert(FlagMatches.size() == 2);
   llvm::cl::TokenizeGNUCommandLine(FlagMatches[1], ArgSaver, SubArgs);
+  SmallVector<StringRef, 1> IgnFlagMatches;
+  // Cherry-pick supported options from the ignorable list.
+  auto IgnFlagRe = llvm::Regex("^// swift-module-flags-ignorable:(.*)$",
+                               llvm::Regex::Newline);
+  // It's OK the interface doesn't have the ignorable list, we just ignore them
+  // all.
+  if (!IgnFlagRe.match(buffer, &IgnFlagMatches))
+    return false;
+  SmallVector<const char *, 8> IgnSubArgs;
+  llvm::cl::TokenizeGNUCommandLine(IgnFlagMatches[1], ArgSaver, IgnSubArgs);
+  std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
+  unsigned missingArgIdx = 0;
+  unsigned missingArgCount = 0;
+  auto parsedIgns = table->ParseArgs(IgnSubArgs, missingArgIdx, missingArgCount);
+  for (auto parse: parsedIgns) {
+    // Check if the option is a frontend option. This will filter out unknown
+    // options and input-like options.
+    if (!parse->getOption().hasFlag(options::FrontendOption))
+      continue;
+    // Push the supported option and its value to the list.
+    // We shouldn't need to worry about cases like -tbd-install_name=Foo because
+    // the parsing function should have droped alias options already.
+    SubArgs.push_back(ArgSaver.save(parse->getSpelling()).data());
+    for (auto value: parse->getValues())
+      SubArgs.push_back(value);
+  }
+
   return false;
+}
+
+llvm::VersionTuple
+swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
+  llvm::VersionTuple result;
+  // Read the inteface file and extract its compiler arguments line
+  if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
+    llvm::BumpPtrAllocator alloc;
+    llvm::StringSaver argSaver(alloc);
+    SmallVector<const char*, 8> args;
+    (void)extractCompilerFlagsFromInterface((*file)->getBuffer(), argSaver, args);
+    for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
+      // Check the version number specified via -user-module-version.
+      StringRef current(args[I]), next(args[I + 1]);
+      if (current == "-user-module-version") {
+        result.tryParse(next);
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 bool SerializedModuleLoaderBase::canImportModule(
@@ -1008,21 +1060,7 @@ bool SerializedModuleLoaderBase::canImportModule(
   assert(!underlyingVersion);
   llvm::VersionTuple currentVersion;
   if (!moduleInterfacePath.empty()) {
-    // Read the inteface file and extract its compiler arguments line
-    if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
-      llvm::BumpPtrAllocator alloc;
-      llvm::StringSaver argSaver(alloc);
-      SmallVector<const char*, 8> args;
-      (void)extractCompilerFlagsFromInterface((*file)->getBuffer(), argSaver, args);
-      for (unsigned I = 0, N = args.size(); I + 1 < N; I++) {
-        // Check the version number specified via -user-module-version.
-        StringRef current(args[I]), next(args[I + 1]);
-        if (current == "-user-module-version") {
-          currentVersion.tryParse(next);
-          break;
-        }
-      }
-    }
+    currentVersion = extractUserModuleVersionFromInterface(moduleInterfacePath);
   }
   // If failing to extract the user version from the interface file, try the binary
   // format, if present.

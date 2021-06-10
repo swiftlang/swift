@@ -1,4 +1,6 @@
 func withError(_ completion: (String?, Error?) -> Void) { }
+func notOptional(_ completion: (String, Error?) -> Void) { }
+func errorOnly(_ completion: (Error?) -> Void) { }
 func test(_ str: String) -> Bool { return false }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNRELATED %s
@@ -37,6 +39,53 @@ withError { res, err in
 // BOUND-NEXT: } catch let bad {
 // BOUND-NEXT: print("got error \(bad)")
 // BOUND-NEXT: }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=BOUND-COMMENT %s
+withError { res, err in // a
+  // b
+  print("before")
+  // c
+  if let bad = err { // d
+    // e
+    print("got error \(bad)")
+    // f
+    return
+    // g
+  }
+  // h
+  if let str = res { // i
+    // j
+    print("got result \(str)")
+    // k
+  }
+  // l
+  print("after")
+  // m
+}
+// BOUND-COMMENT: do {
+// BOUND-COMMENT-NEXT: let str = try await withError()
+// BOUND-COMMENT-NEXT: // a
+// BOUND-COMMENT-NEXT: // b
+// BOUND-COMMENT-NEXT: print("before")
+// BOUND-COMMENT-NEXT: // c
+// BOUND-COMMENT-NEXT: // h
+// BOUND-COMMENT-NEXT: // i
+// BOUND-COMMENT-NEXT: // j
+// BOUND-COMMENT-NEXT: print("got result \(str)")
+// BOUND-COMMENT-NEXT: // k
+// BOUND-COMMENT-NEXT: // l
+// BOUND-COMMENT-NEXT: print("after")
+// BOUND-COMMENT-NEXT: // m
+// BOUND-COMMENT-EMPTY:
+// BOUND-COMMENT-NEXT: } catch let bad {
+// BOUND-COMMENT-NEXT: // d
+// BOUND-COMMENT-NEXT: // e
+// BOUND-COMMENT-NEXT: print("got error \(bad)")
+// BOUND-COMMENT-NEXT: // f
+// BOUND-COMMENT-NEXT: // g
+// BOUND-COMMENT-NEXT: {{ }}
+// BOUND-COMMENT-NEXT: }
+
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNBOUND-ERR %s
 withError { res, err in
@@ -264,7 +313,7 @@ withError { res, err in
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=UNBOUND %s
 withError { res, err in
   print("before")
-  if res != nil && err == nil {
+  if ((res != (nil)) && err == nil) {
     print("got result \(res!)")
   } else {
     print("got error \(err!)")
@@ -323,23 +372,16 @@ withError { res, err in
   if let str2 = res {
     print("got result \(str2)")
   }
+  if case (let str3?) = (res) {
+    print("got result \(str3)")
+  }
   print("after")
 }
-// MULTIBIND: var res: String? = nil
-// MULTIBIND-NEXT: var err: Error? = nil
-// MULTIBIND-NEXT: do {
-// MULTIBIND-NEXT: res = try await withError()
-// MULTIBIND-NEXT: } catch {
-// MULTIBIND-NEXT: err = error
-// MULTIBIND-NEXT: }
-// MULTIBIND-EMPTY:
+// MULTIBIND: let str = try await withError()
 // MULTIBIND-NEXT: print("before")
-// MULTIBIND-NEXT: if let str = res {
 // MULTIBIND-NEXT: print("got result \(str)")
-// MULTIBIND-NEXT: }
-// MULTIBIND-NEXT: if let str2 = res {
-// MULTIBIND-NEXT: print("got result \(str2)")
-// MULTIBIND-NEXT: }
+// MULTIBIND-NEXT: print("got result \(str)")
+// MULTIBIND-NEXT: print("got result \(str)")
 // MULTIBIND-NEXT: print("after")
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=NESTEDRET %s
@@ -357,7 +399,7 @@ withError { res, err in
 // NESTEDRET-NEXT: let str = try await withError()
 // NESTEDRET-NEXT: print("before")
 // NESTEDRET-NEXT: if test(str) {
-// NESTEDRET-NEXT: return
+// NESTEDRET-NEXT:   <#return#>
 // NESTEDRET-NEXT: }
 // NESTEDRET-NEXT: print("got result \(str)")
 // NESTEDRET-NEXT: print("after")
@@ -412,6 +454,7 @@ withError { str, err in
   print("before")
   guard err == nil else { return }
   _ = str!.count
+  _ = /*before*/str!/*after*/.count
   _ = str?.count
   _ = str!.count.bitWidth
   _ = str?.count.bitWidth
@@ -424,6 +467,7 @@ withError { str, err in
 // UNWRAPPING:      let str = try await withError()
 // UNWRAPPING-NEXT: print("before")
 // UNWRAPPING-NEXT: _ = str.count
+// UNWRAPPING-NEXT: _ = /*before*/str/*after*/.count
 // UNWRAPPING-NEXT: _ = str.count
 // UNWRAPPING-NEXT: _ = str.count.bitWidth
 // UNWRAPPING-NEXT: _ = str.count.bitWidth
@@ -438,3 +482,41 @@ withError { str, err in
 // UNWRAPPING-NEXT: _ = str.first?.isWhitespace
 // UNWRAPPING-NEXT: _ = (str.first?.isWhitespace)!
 // UNWRAPPING-NEXT: print("after")
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NOT-OPTIONAL %s
+notOptional { str, err in
+  print("before")
+  if let err2 = err {
+    print("got error \(err2)")
+    return
+  }
+  print("got result \(str)")
+  print("after")
+}
+// NOT-OPTIONAL: do {
+// NOT-OPTIONAL-NEXT: let str = try await notOptional()
+// NOT-OPTIONAL-NEXT: print("before")
+// NOT-OPTIONAL-NEXT: print("got result \(str)")
+// NOT-OPTIONAL-NEXT: print("after")
+// NOT-OPTIONAL-NEXT: } catch let err2 {
+// NOT-OPTIONAL-NEXT: print("got error \(err2)")
+// NOT-OPTIONAL-NEXT: }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ERROR-ONLY %s
+errorOnly { err in
+  print("before")
+  if let err2 = err {
+    print("got error \(err2)")
+    return
+  }
+  print("after")
+}
+// ERROR-ONLY: convert_params_single.swift
+// ERROR-ONLY-NEXT: do {
+// ERROR-ONLY-NEXT: try await errorOnly()
+// ERROR-ONLY-NEXT: print("before")
+// ERROR-ONLY-NEXT: print("after")
+// ERROR-ONLY-NEXT: } catch let err2 {
+// ERROR-ONLY-NEXT: print("got error \(err2)")
+// ERROR-ONLY-NEXT: }
+// ERROR-ONLY-NOT: }

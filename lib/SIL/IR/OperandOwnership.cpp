@@ -431,6 +431,7 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   case SILArgumentConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for non-address types");
   }
+  llvm_unreachable("covered switch");
 }
 
 OperandOwnership
@@ -511,6 +512,7 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   case OwnershipKind::Owned:
     return OperandOwnership::ForwardingConsume;
   }
+  llvm_unreachable("covered switch");
 }
 
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {
@@ -811,6 +813,9 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
+
+BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDistributedRemoteActor)
+BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDistributedActor)
 
 // FIXME: Why do these reqiuire a borrowed value at all?
 BUILTIN_OPERAND_OWNERSHIP(ForwardingBorrow, AutoDiffAllocateSubcontext)

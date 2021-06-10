@@ -1488,6 +1488,31 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         }
       }
 
+      // Detect that there is sync -> async mismatch early on for
+      // closure argument to avoid re-checking calls if there was
+      // an overload choice with synchronous parameter of the same
+      // shape e.g.
+      //
+      // func test(_: () -> Void) -> MyStruct {}
+      // func test(_: () async -> Void) -> MyStruct {}
+      //
+      // test({ ... }).<member>...
+      //
+      // Synchronous overload is always better in this case so there
+      // is no need to re-check follow-up `<member>`s and better
+      // to short-circuit this path early.
+      if (auto *fnType = paramTy->getAs<FunctionType>()) {
+        if (fnType->isAsync()) {
+          auto *typeVar = argTy->getAs<TypeVariableType>();
+          if (typeVar && typeVar->getImpl().isClosureType()) {
+            auto *locator = typeVar->getImpl().getLocator();
+            auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
+            if (!cs.getClosureType(closure)->isAsync())
+              cs.increaseScore(SK_SyncInAsync);
+          }
+        }
+      }
+
       cs.addConstraint(
           subKind, argTy, paramTy,
           matchingAutoClosureResult
@@ -2037,7 +2062,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
     }
 
-    increaseScore(SK_SyncInAsync);
+    bool forClosureInArgumentPosition = false;
+    if (auto last = locator.last()) {
+      forClosureInArgumentPosition =
+          last->is<LocatorPathElt::ApplyArgToParam>() &&
+          isa<ClosureExpr>(locator.trySimplifyToExpr());
+    }
+
+    // Since it's possible to infer `async` from the body of a
+    // closure, score for sync -> async mismatch is increased
+    // while solver is matching arguments to parameters to
+    // indicate than solution with such a mismatch is always
+    // worse than one with synchronous functions on both sides.
+    if (!forClosureInArgumentPosition)
+      increaseScore(SK_SyncInAsync);
   }
 
   // A @Sendable function can be a subtype of a non-@Sendable function.
@@ -2076,8 +2114,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(), ConstraintKind::Equal, subflags, locator);
       if (result == SolutionKind::Error)
         return getTypeMatchFailure(locator);
-    } else if (func1->getGlobalActor()) {
-      // Cannot remove a global actor.
+    } else if (func1->getGlobalActor() && !func2->isAsync()) {
+      // Cannot remove a global actor from a synchronous function.
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
@@ -2421,6 +2459,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // failures, and create a fix to re-label arguments if types
       // line up correctly.
       hasLabelingFailures = true;
+    }
+
+    // "isolated" can be added as a subtype relation, but otherwise must match.
+    if (func1Param.isIsolated() != func2Param.isIsolated() &&
+        !(func2Param.isIsolated() && subKind >= ConstraintKind::Subtype)) {
+      return getTypeMatchFailure(argumentLocator);
     }
 
     // FIXME: We should check value ownership too, but it's not completely
@@ -3469,9 +3513,10 @@ static bool repairArrayLiteralUsedAsDictionary(
   if (unwrappedDict->isTypeVariableOrMember())
     return false;
 
-  if (!conformsToKnownProtocol(
-          cs.DC, unwrappedDict,
-          KnownProtocolKind::ExpressibleByDictionaryLiteral))
+  if (!TypeChecker::conformsToKnownProtocol(
+          unwrappedDict,
+          KnownProtocolKind::ExpressibleByDictionaryLiteral,
+          cs.DC->getParentModule()))
     return false;
 
   // Ignore any attempts at promoting the value to an optional as even after
@@ -4421,6 +4466,10 @@ bool ConstraintSystem::repairFailures(
     // a conversion to another function type, see `matchFunctionTypes`.
     if (parentLoc->isForContextualType() ||
         parentLoc->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
+      // If either type has a placeholder, consider this fixed.
+      if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
+        return true;
+
       // If there is a fix associated with contextual conversion or
       // a function type itself, let's ignore argument failure but
       // increase a score.
@@ -5143,6 +5192,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("type variables should have already been handled by now");
 
     case TypeKind::DependentMember: {
+      // If types are identical, let's consider this constraint solved
+      // even though they are dependent members, they would be resolved
+      // to the same concrete type.
+      if (desugar1->isEqual(desugar2))
+        return getTypeMatchSuccess();
+
       // If one of the dependent member types has no type variables,
       // this comparison is effectively illformed, because dependent
       // member couldn't be simplified down to the actual type, and
@@ -6108,7 +6163,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   switch (kind) {
   case ConstraintKind::SelfObjectOfProtocol: {
     auto conformance = TypeChecker::containsProtocol(
-        type, protocol, DC, /*skipConditionalRequirements=*/true);
+        type, protocol, DC->getParentModule(),
+        /*skipConditionalRequirements=*/true);
     if (conformance) {
       return recordConformance(conformance);
     }
@@ -6150,6 +6206,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
               ? locator.withPathElement(LocatorPathElt::ContextualType(
                     getContextualTypePurpose(Nil)))
               : locator);
+
+      // Only requirement placed directly on `nil` literal is
+      // `ExpressibleByNilLiteral`, so if `nil` is an argument
+      // to an application, let's update locator accordingly to
+      // diagnose possible ambiguities with multiple mismatched
+      // overload choices.
+      if (fixLocator->directlyAt<NilLiteralExpr>()) {
+        if (auto argInfo =
+                isArgumentExpr(castToExpr(fixLocator->getAnchor()))) {
+          Expr *application;
+          unsigned argIdx;
+
+          std::tie(application, argIdx) = *argInfo;
+
+          fixLocator = getConstraintLocator(
+              application,
+              {LocatorPathElt::ApplyArgument(),
+               LocatorPathElt::ApplyArgToParam(argIdx, argIdx, /*flags=*/{})});
+        }
+      }
 
       // Here the roles are reversed - `nil` is something we are trying to
       // convert to `type` by making sure that it conforms to a specific
@@ -6217,7 +6293,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       if (auto rawValue = isRawRepresentable(*this, type)) {
         if (!rawValue->isTypeVariableOrMember() &&
-            TypeChecker::conformsToProtocol(rawValue, protocol, DC)) {
+            TypeChecker::conformsToProtocol(rawValue, protocol,
+                                            DC->getParentModule())) {
           auto *fix = UseRawValue::create(*this, type, protocolTy, loc);
           return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
         }
@@ -7555,7 +7632,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         auto *SD = cast<SubscriptDecl>(candidate.getDecl());
         bool isKeyPathBased = isValidKeyPathDynamicMemberLookup(SD);
 
-        if (isValidStringDynamicMemberLookup(SD, DC) || isKeyPathBased)
+        if (isValidStringDynamicMemberLookup(SD, DC->getParentModule()) ||
+            isKeyPathBased)
           result.addViable(OverloadChoice::getDynamicMemberLookup(
               baseTy, SD, name, isKeyPathBased));
       }
@@ -8662,8 +8740,18 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       Type wrappedValueType;
 
       if (paramDecl->hasImplicitPropertyWrapper()) {
-        backingType = getContextualParamAt(i)->getPlainType();
-        wrappedValueType = createTypeVariable(getConstraintLocator(locator),
+        if (auto contextualType = getContextualParamAt(i)) {
+          backingType = contextualType->getPlainType();
+        } else {
+          // There may not be a contextual parameter type if the contextual
+          // type is not a function type or if closure body declares too many
+          // parameters.
+          auto *paramLoc =
+              getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+          backingType = createTypeVariable(paramLoc, TVO_CanBindToHole);
+        }
+
+        wrappedValueType = createTypeVariable(getConstraintLocator(paramDecl),
                                               TVO_CanBindToHole | TVO_CanBindToLValue);
       } else {
         auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
@@ -10182,7 +10270,6 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
-  auto decl = type->getAnyNominal();
   DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
   auto matches = CS.performMemberLookup(
       ConstraintKind::ValueMember, methodName, type,
@@ -10192,7 +10279,8 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
   auto candidates = matches.ViableCandidates;
   auto filter = [&](OverloadChoice choice) {
     auto cand = cast<FuncDecl>(choice.getDecl());
-    return !isValidDynamicCallableMethod(cand, decl, hasKeywordArgs);
+    return !isValidDynamicCallableMethod(cand, CS.DC->getParentModule(),
+                                         hasKeywordArgs);
   };
   candidates.erase(
       std::remove_if(candidates.begin(), candidates.end(), filter),
@@ -11372,6 +11460,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
                      : false;
         }))
       impact += 3;
+
+    // Passing a closure to a parameter that doesn't expect one should
+    // be scored lower because there might be an overload that expects
+    // a closure but has other issues e.g. wrong number of parameters.
+    if (!type2->lookThroughAllOptionalTypes()->is<FunctionType>()) {
+      auto argument = simplifyLocatorToAnchor(fix->getLocator());
+      if (isExpr<ClosureExpr>(argument)) {
+        impact += 2;
+      }
+    }
 
     return recordFix(fix, impact) ? SolutionKind::Error : SolutionKind::Solved;
   }

@@ -41,6 +41,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
@@ -245,6 +246,10 @@ struct ASTContext::Implementation {
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
+
+  // Declare cached declarations for each of the known declarations.
+#define KNOWN_SDK_FUNC_DECL(Module, Name, Id) FuncDecl *Get##Name = nullptr;
+#include "swift/AST/KnownSDKDecls.def"
   
   /// func <Int, Int) -> Bool
   FuncDecl *LessThanIntDecl = nullptr;
@@ -410,6 +415,10 @@ struct ASTContext::Implementation {
     /// Stored generic signature builders for canonical generic signatures.
     llvm::DenseMap<GenericSignature, std::unique_ptr<GenericSignatureBuilder>>
       GenericSignatureBuilders;
+
+    /// Stored requirement machines for canonical generic signatures.
+    llvm::DenseMap<GenericSignature, std::unique_ptr<RequirementMachine>>
+      RequirementMachines;
 
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
@@ -694,16 +703,22 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   return Identifier(I->getKeyData());
 }
 
-void ASTContext::lookupInSwiftModule(
-                   StringRef name,
-                   SmallVectorImpl<ValueDecl *> &results) const {
-  ModuleDecl *M = getStdlibModule();
+void ASTContext::lookupInModule(
+    ModuleDecl *M,
+    StringRef name,
+    SmallVectorImpl<ValueDecl *> &results) const {
   if (!M)
     return;
 
   // Find all of the declarations with this name in the Swift module.
   auto identifier = getIdentifier(name);
   M->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
+}
+
+void ASTContext::lookupInSwiftModule(
+                   StringRef name,
+                   SmallVectorImpl<ValueDecl *> &results) const {
+  lookupInModule(getStdlibModule(), name, results);
 }
 
 FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
@@ -1005,6 +1020,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::SerialExecutor:
     M = getLoadedModule(Id_Concurrency);
     break;
+  case KnownProtocolKind::DistributedActor:
+    M = getLoadedModule(Id_Distributed);
+    break;
   default:
     M = getStdlibModule();
     break;
@@ -1025,14 +1043,22 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   return nullptr;
 }
 
-/// Find the implementation for the given "intrinsic" library function.
+/// Find the implementation for the given "intrinsic" library function,
+/// in the passed in module.
 static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
+                                      ModuleDecl *M,
                                       StringRef name) {
   SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInSwiftModule(name, results);
+  ctx.lookupInModule(M, name, results);
   if (results.size() == 1)
     return dyn_cast_or_null<FuncDecl>(results.front());
   return nullptr;
+}
+
+/// Find the implementation for the given "intrinsic" library function.
+static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
+                                      StringRef name) {
+  return findLibraryIntrinsic(ctx, ctx.getStdlibModule(), name);
 }
 
 /// Returns the type of an intrinsic function if it is not generic, otherwise
@@ -1484,7 +1510,7 @@ ASTContext::associateInfixOperators(PrecedenceGroupDecl *left,
 }
 
 // Find library intrinsic function.
-static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache, 
+static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache,
                                      StringRef name) {
   if (cache) return cache;
 
@@ -1493,11 +1519,32 @@ static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache,
   return cache;
 }
 
-#define FUNC_DECL(Name, Id)                                         \
-FuncDecl *ASTContext::get##Name() const {     \
+// Find library intrinsic function in passed in module
+static FuncDecl *findLibraryFunction(const ASTContext &ctx,
+                                     ModuleDecl *M, FuncDecl *&cache,
+                                     StringRef name) {
+  if (cache) return cache;
+
+  // Look for a generic function.
+  cache = findLibraryIntrinsic(ctx, M, name);
+  return cache;
+}
+
+#define FUNC_DECL(Name, Id)                                    \
+FuncDecl *ASTContext::get##Name() const {                      \
   return findLibraryFunction(*this, getImpl().Get##Name, Id);  \
 }
 #include "swift/AST/KnownDecls.def"
+
+#define KNOWN_SDK_FUNC_DECL(Module, Name, Id)                                \
+FuncDecl *ASTContext::get##Name() const {                                    \
+  if (ModuleDecl *M = getLoadedModule(Id_##Module)) {                        \
+    return findLibraryFunction(*this, M, getImpl().Get##Name, Id);           \
+  } else {                                                                   \
+    return findLibraryFunction(*this, getImpl().Get##Name, Id);              \
+  }                                                                          \
+}
+#include "swift/AST/KnownSDKDecls.def"
 
 bool ASTContext::hasOptionalIntrinsics() const {
   return getOptionalDecl() &&
@@ -1745,6 +1792,10 @@ void ASTContext::registerGenericSignatureBuilder(
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
                                                       CanGenericSignature sig) {
+  if (LangOpts.EnableRequirementMachine) {
+    (void) getOrCreateRequirementMachine(sig);
+  }
+
   // Check whether we already have a generic signature builder for this
   // signature and module.
   auto arena = getArena(sig);
@@ -1823,6 +1874,37 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 #endif
 
   return builder;
+}
+
+RequirementMachine *ASTContext::getOrCreateRequirementMachine(
+    CanGenericSignature sig) {
+  // Check whether we already have a requirement machine for this
+  // signature.
+  auto arena = getArena(sig);
+  auto &machines = getImpl().getArena(arena).RequirementMachines;
+
+  auto &machinePtr = machines[sig];
+  if (machinePtr) {
+    auto *machine = machinePtr.get();
+    if (!machine->isComplete()) {
+      llvm::errs() << "Re-entrant construction of requirement "
+                   << "machine for " << sig << "\n";
+      abort();
+    }
+
+    return machine;
+  }
+
+  auto *machine = new RequirementMachine(*this);
+
+  // Store this requirement machine before adding the signature,
+  // to catch re-entrant construction via addGenericSignature()
+  // below.
+  machinePtr = std::unique_ptr<RequirementMachine>(machine);
+
+  machine->addGenericSignature(sig);
+
+  return machine;
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>
@@ -2708,6 +2790,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   bool isStatic = false;
   SelfAccessKind selfAccess = SelfAccessKind::NonMutating;
   bool isDynamicSelf = false;
+  bool isIsolated = false;
 
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     isStatic = FD->isStatic();
@@ -2724,6 +2807,11 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // FIXME: All methods of non-final classes should have this.
     else if (wantDynamicSelf && FD->hasDynamicSelfResult())
       isDynamicSelf = true;
+
+    // If this is a non-static method within an actor, the 'self' parameter
+    // is isolated if this declaration is isolated.
+    isIsolated = evaluateOrDefault(
+        Ctx.evaluator, HasIsolatedSelfRequest{AFD}, false);
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
@@ -2757,7 +2845,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   if (isStatic)
     return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx));
 
-  auto flags = ParameterTypeFlags();
+  auto flags = ParameterTypeFlags().withIsolated(isIsolated);
   switch (selfAccess) {
   case SelfAccessKind::Consuming:
     flags = flags.withOwned(true);
@@ -3231,7 +3319,8 @@ void AnyFunctionType::decomposeInput(
     result.emplace_back(
         type->getInOutObjectType(), Identifier(),
         ParameterTypeFlags::fromParameterType(type, false, false, false,
-                                              ValueOwnership::Default, false));
+                                              ValueOwnership::Default, false,
+                                              false));
     return;
   }
 }

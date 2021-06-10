@@ -3,8 +3,6 @@
 // RUN:    | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 
-// UNSUPPORTED: CPU=arm64e
-
 // Test that lifetime extension preserves a dbg.declare for "n" in the resume
 // funclet.
 

@@ -193,6 +193,12 @@ def _apply_default_arguments(args):
         args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
 
+    # --test implies --test-early-swift-driver
+    # (unless explicitly skipped with `--skip-test-early-swift-driver`)
+    if args.test and (args.build_early_swift_driver and
+                      args.test_early_swift_driver is None):
+        args.test_early_swift_driver = True
+
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
         args.test_ios_host = False
@@ -281,6 +287,9 @@ def create_argument_parser():
     option('--dump-config', toggle_true,
            help='instead of building, write JSON to stdout containing '
                 'various values used to build in this configuration')
+
+    option(['--reconfigure'], store_true,
+           help="Reconfigure all projects as we build")
 
     option('--legacy-impl', store_true('legacy_impl'),
            help='use legacy implementation')
@@ -610,6 +619,9 @@ def create_argument_parser():
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
 
+    option(['--skip-early-swift-driver'], toggle_false('build_early_swift_driver'),
+           help='skip building the early swift-driver')
+
     option(['--indexstore-db'], toggle_true('build_indexstoredb'),
            help='build IndexStoreDB')
     option('--test-indexstore-db-sanitize-all',
@@ -684,6 +696,12 @@ def create_argument_parser():
     option('--symbols-package', store_path,
            help='if provided, an archive of the symbols directory will be '
                 'generated at this path')
+    option('--darwin-symroot-path-filters', append,
+           type=argparse.ShellSplitType(),
+           help='Space separated list of patterns used to match '
+                'a subset of files to generate symbols for. '
+                'Only supported on Darwin. Can be called multiple times '
+                'to add multiple such options.')
 
     # -------------------------------------------------------------------------
     in_group('Build variant')
@@ -1040,9 +1058,13 @@ def create_argument_parser():
            toggle_false('test_android_host'),
            help='skip testing Android device targets on the host machine (the '
                 'phone itself)')
-
     option('--skip-clean-llbuild', toggle_false('clean_llbuild'),
            help='skip cleaning up llbuild')
+    option('--clean-early-swift-driver', toggle_true('clean_early_swift_driver'),
+           help='Clean up the early SwiftDriver')
+    option('--skip-test-early-swift-driver',
+           store('test_early_swift_driver', const=False),
+           help='Test the early SwiftDriver against the host toolchain')
     option('--skip-clean-swiftpm', toggle_false('clean_swiftpm'),
            help='skip cleaning up swiftpm')
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
@@ -1151,6 +1173,10 @@ def create_argument_parser():
     option('--enable-experimental-concurrency', toggle_true,
            default=True,
            help='Enable experimental Swift concurrency model.')
+
+    option('--enable-experimental-distributed', toggle_true,
+           default=True,
+           help='Enable experimental Swift distributed actors.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')

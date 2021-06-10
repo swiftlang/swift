@@ -1,4 +1,6 @@
 func manyWithError(_ completion: (String?, Int?, Error?) -> Void) { }
+func mixed(_ completion: (String?, Int) -> Void) { }
+func mixedError(_ completion: (String?, Int, Error?) -> Void) { }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MANYBOUND %s
 manyWithError { res1, res2, err in
@@ -23,6 +25,13 @@ manyWithError { res1, res2, err in
 // MANYBOUND-NEXT: print("got error \(bad)")
 // MANYBOUND-NEXT: }
 
+// FIXME: This case is a little tricky: Being in the else block of 'if let str = res1'
+// should allow us to place 'if let i = res2' in the failure block. However, this
+// is a success condition, so we still place it in the success block. Really what
+// we need to do here is check to see if manyWithError has an existing async
+// alternative that still returns optional success values, and allow success
+// classification in that case. Otherwise, we'd probably be better off leaving
+// the condition unhandled, as it's not clear what the user is doing.
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MANYUNBOUND-ERR %s
 manyWithError { res1, res2, err in
   print("before")
@@ -160,3 +169,45 @@ manyWithError { res1, res2, err in
   print("got result \(res2!)")
   print("after")
 }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED %s
+mixed { str, num in
+  print("before")
+  if let res = str {
+    print("got result \(res)")
+  }
+  print("\(num)")
+  print("after")
+}
+// MIXED: convert_params_multi.swift
+// MIXED-NEXT: let (str, num) = await mixed()
+// MIXED-NEXT: print("before")
+// MIXED-NEXT: if let res = str {
+// MIXED-NEXT: print("got result \(res)")
+// MIXED-NEXT: }
+// MIXED-NEXT: print("\(num)")
+// MIXED-NEXT: print("after")
+// MIXED-NOT: }
+
+// RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-ERROR %s
+mixedError { str, num, err in
+  print("before")
+  if let res = str {
+    print("got result \(res)")
+  } else {
+    print("got \(err!)")
+  }
+  print("\(num)")
+  print("after")
+}
+// MIXED-ERROR: convert_params_multi.swift
+// MIXED-ERROR-NEXT: do {
+// MIXED-ERROR-NEXT: let (res, num) = try await mixedError()
+// MIXED-ERROR-NEXT: print("before")
+// MIXED-ERROR-NEXT: print("got result \(res)")
+// MIXED-ERROR-NEXT: print("\(num)")
+// MIXED-ERROR-NEXT: print("after")
+// MIXED-ERROR-NEXT: } catch let err {
+// MIXED-ERROR-NEXT: print("got \(err)")
+// MIXED-ERROR-NEXT: }
+// MIXED-ERROR-NOT: }

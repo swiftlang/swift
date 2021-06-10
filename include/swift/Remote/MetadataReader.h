@@ -811,6 +811,13 @@ public:
                        .withEscaping(Function->isEscaping())
                        .withDifferentiable(Function->isDifferentiable());
 
+      BuiltType globalActor = BuiltType();
+      if (Function->hasGlobalActor()) {
+        globalActor = readTypeFromMetadata(Function->getGlobalActor());
+        if (globalActor)
+          flags = flags.withGlobalActor(true);
+      }
+
       FunctionMetadataDifferentiabilityKind diffKind;
       switch (Function->getDifferentiabilityKind().Value) {
       #define CASE(X) \
@@ -827,7 +834,7 @@ public:
       }
 
       auto BuiltFunction = Builder.createFunctionType(
-          Parameters, Result, flags, diffKind);
+          Parameters, Result, flags, diffKind, globalActor);
       TypeCache[MetadataAddress] = BuiltFunction;
       return BuiltFunction;
     }
@@ -1802,6 +1809,9 @@ private:
   MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
     auto size = sizeAfter;
     uint8_t *buffer = (uint8_t *) malloc(size);
+    if (!buffer)
+      return nullptr;
+
     if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
       free(buffer);
       return nullptr;
@@ -2477,6 +2487,9 @@ private:
     // Use private declaration names for anonymous context references.
     if (parentDemangling->getKind() == Node::Kind::AnonymousContext
         && nameNode->getKind() == Node::Kind::Identifier) {
+      if (parentDemangling->getNumChildren() < 2)
+        return nullptr;
+
       auto privateDeclName =
         dem.createNode(Node::Kind::PrivateDeclName);
       privateDeclName->addChild(parentDemangling->getChild(0), dem);
@@ -2519,6 +2532,8 @@ private:
   std::string readObjCProtocolName(StoredPointer Address) {
     auto Size = sizeof(TargetObjCProtocolPrefix<Runtime>);
     auto Buffer = (uint8_t *)malloc(Size);
+    if (!Buffer)
+      return std::string();
     SWIFT_DEFER {
       free(Buffer);
     };

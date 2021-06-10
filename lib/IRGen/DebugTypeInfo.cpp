@@ -24,9 +24,9 @@
 using namespace swift;
 using namespace irgen;
 
-DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy, Size size,
-                             Alignment align, bool HasDefaultAlignment,
-                             bool IsMetadata)
+DebugTypeInfo::DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy,
+                             Optional<Size> size, Alignment align,
+                             bool HasDefaultAlignment, bool IsMetadata)
     : Type(Ty.getPointer()), StorageType(StorageTy), size(size), align(align),
       DefaultAlignment(HasDefaultAlignment), IsMetadataType(IsMetadata) {
   assert(align.getValue() != 0);
@@ -43,14 +43,10 @@ static bool hasDefaultAlignment(swift::Type Ty) {
 
 DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty,
                                              const TypeInfo &Info) {
-  Size size;
+  Optional<Size> size;
   if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);
     size = FixTy.getFixedSize();
-  } else {
-    // FIXME: Handle NonFixedTypeInfo here or assert that we won't
-    // encounter one.
-    size = Size(0);
   }
   assert(Info.getStorageType() && "StorageType is a nullptr");
   return DebugTypeInfo(Ty.getPointer(), Info.getStorageType(), size,
@@ -160,10 +156,12 @@ TypeDecl *DebugTypeInfo::getDecl() const {
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
-  llvm::errs() << "[Size " << size.getValue() << " Alignment "
-               << align.getValue() << "] ";
-
+  llvm::errs() << "[";
+  if (size)
+    llvm::errs() << "Size " << size->getValue() << " ";
+  llvm::errs() << "Alignment " << align.getValue() << "] ";
   getType()->dump(llvm::errs());
+
   if (StorageType) {
     llvm::errs() << "StorageType=";
     StorageType->dump();

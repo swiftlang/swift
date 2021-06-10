@@ -48,13 +48,14 @@ VERBOSE = False
 class DriverArgs(object):
     """Arguments for BenchmarkDriver."""
 
-    def __init__(self, tests, optimization="O", architecture=None):
+    def __init__(self, benchmark_dir, architecture, platform, optimization="O"):
         """Initialize with path to the build-dir and optimization level."""
         self.benchmarks = None
         self.filters = None
-        self.tests = os.path.join(tests, "bin")
+        self.tests = os.path.join(benchmark_dir, "bin")
         self.optimization = optimization
         self.architecture = architecture
+        self.libdir = os.path.join(benchmark_dir, "lib", "swift", platform)
 
 
 def log(msg):
@@ -165,7 +166,8 @@ def test_opt_levels(args):
                 args.num_samples,
                 args.num_reruns,
                 output_file,
-                args.arch
+                args.arch,
+                args.platform
             ):
                 changes = True
 
@@ -232,7 +234,7 @@ def merge(results, other_results):
 
 def test_performance(
     opt_level, old_dir, new_dir, threshold, num_samples, num_reruns,
-    output_file, arch
+    output_file, arch, platform
 ):
     """Detect performance changes in benchmarks.
 
@@ -242,7 +244,8 @@ def test_performance(
 
     i, unchanged_length_count = 0, 0
     old, new = [
-        BenchmarkDriver(DriverArgs(dir, optimization=opt_level, architecture=arch))
+        BenchmarkDriver(DriverArgs(dir, architecture=arch, platform=platform,
+                                   optimization=opt_level))
         for dir in [old_dir, new_dir]
     ]
     results = [measure(driver, driver.tests, i) for driver in [old, new]]
@@ -266,8 +269,9 @@ def test_performance(
             unchanged_length_count = 0
 
     log("")
+    report_title = "Performance ({}): -{}".format(arch, opt_level)
     return report_results(
-        "Performance: -" + opt_level, None, None, threshold * 1.4, output_file, *results
+        report_title, None, None, threshold * 1.4, output_file, *results
     )
 
 
@@ -382,8 +386,10 @@ performance team (@eeckstein).
 
 
 def check_added(args, output_file=None):
-    old = BenchmarkDriver(DriverArgs(args.oldbuilddir[0], architecture=args.arch))
-    new = BenchmarkDriver(DriverArgs(args.newbuilddir[0], architecture=args.arch))
+    old = BenchmarkDriver(DriverArgs(args.oldbuilddir[0], architecture=args.arch,
+                                     platform=args.platform))
+    new = BenchmarkDriver(DriverArgs(args.newbuilddir[0], architecture=args.arch,
+                                     platform=args.platform))
     added = set(new.tests).difference(set(old.tests))
     new.tests = list(added)
     doctor = BenchmarkDoctor(args, driver=new)

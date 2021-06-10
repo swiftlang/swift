@@ -180,14 +180,10 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   var m = [\A.property, \A.[sub], \A.optProperty!]
   expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`
-  // expected-error@+2 {{key path value type 'Prop?' cannot be converted to contextual type 'Prop'}}
-  // expected-error@+1 {{key path value type 'A' cannot be converted to contextual type 'Prop'}}
+  // \.optProperty returns an optional of Prop and `\.[sub]` returns `A`, all this unifies into `[PartialKeyPath<A>]`
   var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
   expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
   let _: [PartialKeyPath<A>] = [\.property, \.optProperty, \.[sub], \.optProperty!]
 
   var o = [\A.property, \C<A>.value]
@@ -1054,6 +1050,16 @@ func testSyntaxErrors() {
   _ = \A.a!;
 }
 
+// SR-14644
+func sr14644() {
+  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
+  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
+  _ = \Int // expected-error {{key path must have at least one component}}
+  _ = \Int? // expected-error {{key path must have at least one component}}
+  _ = \Int. // expected-error {{invalid component of Swift key path}}
+  // expected-error@-1 {{expected member name following '.'}}
+}
+
 // SR-13364 - keypath missing optional crashes compiler: "Inactive constraints left over?"
 func sr13364() {
   let _: KeyPath<String?, Int?> = \.utf8.count // expected-error {{no exact matches in reference to property 'count'}}
@@ -1110,4 +1116,66 @@ func test_kp_as_function_mismatch() {
   let _ : (String) ->  Bool = \String.filterOut // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
   _ = a.filter(\String.filterOut) // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
 
+}
+
+func test_partial_keypath_inference() {
+  // rdar://problem/34144827
+
+  struct S { var i: Int = 0 }
+  enum E { case A(pkp: PartialKeyPath<S>) }
+
+  _ = E.A(pkp: \.i) // Ok
+
+  // rdar://problem/36472188
+
+  class ThePath {
+    var isWinding:Bool?
+  }
+
+  func walk<T>(aPath: T, forKey: PartialKeyPath<T>) {}
+  func walkThePath(aPath: ThePath, forKey: PartialKeyPath<ThePath>) {}
+
+  func test(path: ThePath) {
+    walkThePath(aPath: path, forKey: \.isWinding) // Ok
+    walk(aPath: path, forKey: \.isWinding) // Ok
+  }
+}
+
+// SR-14499
+struct SR14499_A { }
+struct SR14499_B { }
+
+func sr14499() {
+  func reproduceA() -> [(SR14499_A, SR14499_B)] {
+    [
+      (true, .init(), SR14499_B.init()) // expected-error {{cannot infer contextual base in reference to member 'init'}}
+    ]
+    .filter(\.0) // expected-error {{value of type 'Any' has no member '0'}}
+    // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+    .prefix(3)
+    .map { ($0.1, $0.2) } // expected-error {{value of type 'Any' has no member '1'}} expected-error{{value of type 'Any' has no member '2'}}
+    // expected-note@-1 2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+  }
+
+  func reproduceB() -> [(SR14499_A, SR14499_B)] {
+    [
+      (true, SR14499_A.init(), .init()) // expected-error {{cannot infer contextual base in reference to member 'init'}}
+    ]
+    .filter(\.0) // expected-error {{value of type 'Any' has no member '0'}}
+    // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+    .prefix(3)
+    .map { ($0.1, $0.2) } // expected-error {{value of type 'Any' has no member '1'}} expected-error{{value of type 'Any' has no member '2'}}
+    // expected-note@-1 2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+  }
+
+  func reproduceC() -> [(SR14499_A, SR14499_B)] {
+    [
+      (true, .init(), .init()) // expected-error 2 {{cannot infer contextual base in reference to member 'init'}}
+    ]
+    .filter(\.0) // expected-error {{value of type 'Any' has no member '0'}}
+    // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+    .prefix(3)
+    .map { ($0.1, $0.2) } // expected-error {{value of type 'Any' has no member '1'}} expected-error{{value of type 'Any' has no member '2'}}
+    // expected-note@-1 2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+  }
 }

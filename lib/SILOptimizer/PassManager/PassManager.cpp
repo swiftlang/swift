@@ -16,10 +16,12 @@
 #include "swift/AST/SILOptimizerRequests.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/OptimizerStatsUtils.h"
@@ -318,15 +320,15 @@ void swift::executePassPipelinePlan(SILModule *SM,
 
 SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
                                irgen::IRGenModule *IRMod)
-    : Mod(M), IRMod(IRMod), isMandatory(isMandatory),
-      deserializationNotificationHandler(nullptr) {
+    : Mod(M), IRMod(IRMod),
+      libswiftPassInvocation(this, /*SILCombiner*/ nullptr),
+      isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define ANALYSIS(NAME) \
   Analyses.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
   for (SILAnalysis *A : Analyses) {
     A->initialize(this);
-    M->registerDeleteNotificationHandler(A);
   }
 
   std::unique_ptr<DeserializationNotificationHandler> handler(
@@ -455,7 +457,6 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   }
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
-  Mod->registerDeleteNotificationHandler(SFT);
   if (breakBeforeRunning(F->getName(), SFT))
     LLVM_BUILTIN_DEBUGTRAP;
   if (SILForceVerifyAll ||
@@ -464,7 +465,19 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                        SILForceVerifyAroundPass.end(), MatchFun)) {
     forcePrecomputeAnalyses(F);
   }
+  
+  assert(changeNotifications == SILAnalysis::InvalidationKind::Nothing
+         && "change notifications not cleared");
+  
+  // Run it!
   SFT->run();
+
+  if (changeNotifications != SILAnalysis::InvalidationKind::Nothing) {
+    invalidateAnalysis(F, changeNotifications);
+    changeNotifications = SILAnalysis::InvalidationKind::Nothing;
+  }
+  libswiftPassInvocation.finishedPassRun();
+
   if (SILForceVerifyAll ||
       SILForceVerifyAroundPass.end() !=
           std::find_if(SILForceVerifyAroundPass.begin(),
@@ -472,7 +485,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     verifyAnalyses(F);
   }
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  Mod->removeDeleteNotificationHandler(SFT);
+  Mod->flushDeletedInsts();
 
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
@@ -615,10 +628,9 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  Mod->registerDeleteNotificationHandler(SMT);
   SMT->run();
-  Mod->removeDeleteNotificationHandler(SMT);
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
+  Mod->flushDeletedInsts();
 
   auto Delta = (std::chrono::system_clock::now() - StartTime).count();
   if (SILPrintPassTime) {
@@ -731,7 +743,6 @@ SILPassManager::~SILPassManager() {
 
   // delete the analysis.
   for (auto *A : Analyses) {
-    Mod->removeDeleteNotificationHandler(A);
     assert(!A->isLocked() &&
            "Deleting a locked analysis. Did we forget to unlock ?");
     delete A;
@@ -1063,3 +1074,94 @@ void SILPassManager::viewCallGraph() {
   llvm::ViewGraph(&OCG, "callgraph");
 #endif
 }
+
+//===----------------------------------------------------------------------===//
+//                           LibswiftPassInvocation
+//===----------------------------------------------------------------------===//
+
+static_assert(BridgedSlabCapacity == FixedSizeSlab::capacity,
+              "wrong bridged slab capacity");
+
+FixedSizeSlab *LibswiftPassInvocation::allocSlab(FixedSizeSlab *afterSlab) {
+  FixedSizeSlab *slab = passManager->getModule()->allocSlab();
+  if (afterSlab) {
+    allocatedSlabs.insert(std::next(afterSlab->getIterator()), *slab);
+  } else {
+    allocatedSlabs.push_back(*slab);
+  }
+  return slab;
+}
+
+FixedSizeSlab *LibswiftPassInvocation::freeSlab(FixedSizeSlab *slab) {
+  FixedSizeSlab *prev = std::prev(&*slab->getIterator());
+  allocatedSlabs.remove(*slab);
+  passManager->getModule()->freeSlab(slab);
+  return prev;
+}
+
+void LibswiftPassInvocation::finishedPassRun() {
+  assert(allocatedSlabs.empty() && "StackList is leaking slabs");
+}
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+inline LibswiftPassInvocation *castToPassInvocation(BridgedPassContext ctxt) {
+  return const_cast<LibswiftPassInvocation *>(
+    static_cast<const LibswiftPassInvocation *>(ctxt.opaqueCtxt));
+}
+
+inline FixedSizeSlab *castToSlab(BridgedSlab slab) {
+  if (slab.data)
+    return static_cast<FixedSizeSlab *>((FixedSizeSlabPayload *)slab.data);
+  return nullptr;
+}
+
+inline BridgedSlab toBridgedSlab(FixedSizeSlab *slab) {
+  if (slab) {
+    FixedSizeSlabPayload *payload = slab;
+    assert((void *)payload == slab->dataFor<void>());
+    return {payload};
+  }
+  return {nullptr};
+}
+
+
+BridgedSlab PassContext_getNextSlab(BridgedSlab slab) {
+  return toBridgedSlab(&*std::next(castToSlab(slab)->getIterator()));
+}
+
+BridgedSlab PassContext_allocSlab(BridgedPassContext passContext,
+                                  BridgedSlab afterSlab) {
+  auto *inv = castToPassInvocation(passContext);
+  return toBridgedSlab(inv->allocSlab(castToSlab(afterSlab)));
+}
+
+BridgedSlab PassContext_freeSlab(BridgedPassContext passContext,
+                                 BridgedSlab slab) {
+  auto *inv = castToPassInvocation(passContext);
+  return toBridgedSlab(inv->freeSlab(castToSlab(slab)));
+}
+
+void PassContext_notifyChanges(BridgedPassContext passContext,
+                               enum ChangeNotificationKind changeKind) {
+  LibswiftPassInvocation *inv = castToPassInvocation(passContext);
+  switch (changeKind) {
+  case instructionsChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::Instructions);
+    break;
+  case callsChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::CallsAndInstructions);
+    break;
+  case branchesChanged:
+    inv->notifyChanges(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+    break;
+  }
+}
+
+void PassContext_eraseInstruction(BridgedPassContext passContext,
+                                   BridgedInstruction inst) {
+  castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
+}
+

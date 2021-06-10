@@ -457,8 +457,9 @@ bool SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
 
   // Remove "once" call from the addressor.
   removeToken(CallToOnce->getOperand(0));
-  eraseUsesOfInstruction(CallToOnce);
-  recursivelyDeleteTriviallyDeadInstructions(CallToOnce, true);
+  InstructionDeleter deleter;
+  deleter.forceDeleteWithUsers(CallToOnce);
+  deleter.cleanupDeadInstructions();
 
   // Create the constant initializer of the global variable.
   StaticInitCloner::appendToInitializer(SILG, InitVal);
@@ -818,11 +819,15 @@ bool SILGlobalOpt::run() {
   for (auto &allocPair : globalAllocPairs) {
     HasChanged |= tryRemoveGlobalAlloc(allocPair.first, allocPair.second);
   }
-
-  // Erase the instructions that we have marked for deletion.
-  for (auto *inst : InstToRemove) {
-    eraseUsesOfInstruction(inst);
-    inst->eraseFromParent();
+  if (HasChanged) {
+    // Erase the instructions that we have marked for deletion.
+    InstructionDeleter deleter;
+    for (auto *inst : InstToRemove) {
+      deleter.forceDeleteWithUsers(inst);
+    }
+    deleter.cleanupDeadInstructions();
+  } else {
+    assert(InstToRemove.empty());
   }
 
   for (auto &global : Module->getSILGlobals()) {

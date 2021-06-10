@@ -6,10 +6,10 @@ class Box {
 }
 
 actor Door {
-    nonisolated let immutable : Int = 0
+    let immutable : Int = 0
     let letBox : Box? = nil
     let letDict : [Int : Box] = [:]
-    nonisolated let immutableNeighbor : Door? = nil
+    let immutableNeighbor : Door? = nil
 
 
     var mutableNeighbor : Door? = nil
@@ -19,8 +19,6 @@ actor Door {
     var getOnlyInt : Int {
         get { 0 }
     }
-
-    @actorIndependent(unsafe) var unsafeIndependent : Int = 0
 
     @MainActor var globActor_mutable : Int = 0
     @MainActor let globActor_immutable : Int = 0
@@ -32,7 +30,7 @@ actor Door {
 
     @MainActor subscript(byName: String) -> Int { 0 }
 
-    @actorIndependent subscript(byIEEE754: Double) -> Int { 0 }
+    nonisolated subscript(byIEEE754: Double) -> Int { 0 }
 }
 
 func attemptAccess<T, V>(_ t : T, _ f : (T) -> V) -> V {
@@ -47,7 +45,7 @@ func tryKeyPathsMisc(d : Door) {
 
     // in combination with other key paths
 
-    _ = (\Door.letBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'letBox'}}
+    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
                                        \Box?.?.size)
 
     _ = (\Door.varBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'varBox'}}
@@ -61,9 +59,9 @@ func tryKeyPathsFromAsync() async {
 }
 
 func tryNonSendable() {
-    _ = \Door.letDict[0] // expected-error {{cannot form key path to actor-isolated property 'letDict'}}
+    _ = \Door.letDict[0] // expected-warning {{cannot form key path that accesses non-sendable type '[Int : Box]'}}
     _ = \Door.varDict[0] // expected-error {{cannot form key path to actor-isolated property 'varDict'}}
-    _ = \Door.letBox!.size // expected-error {{cannot form key path to actor-isolated property 'letBox'}}
+    _ = \Door.letBox!.size // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
 }
 
 func tryKeypaths() {
@@ -71,7 +69,6 @@ func tryKeypaths() {
     _ = \Door.unsafeGlobActor_mutable // okay for now
 
     _ = \Door.immutable
-    _ = \Door.unsafeIndependent
     _ = \Door.globActor_immutable
     _ = \Door.[4.2]
     _ = \Door.immutableNeighbor?.immutableNeighbor?.immutableNeighbor

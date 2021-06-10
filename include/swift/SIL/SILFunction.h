@@ -21,6 +21,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/SwiftObjectHeader.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -129,7 +130,11 @@ private:
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
 class SILFunction
-  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction> {
+  : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction>,
+    public SwiftObjectHeader {
+    
+  static SwiftMetatype registeredMetatype;
+    
 public:
   using BlockListType = llvm::iplist<SILBasicBlock>;
 
@@ -385,6 +390,10 @@ private:
   void setHasOwnership(bool newValue) { HasOwnership = newValue; }
 
 public:
+  static void registerBridgedMetatype(SwiftMetatype metatype) {
+    registeredMetatype = metatype;
+  }
+
   ~SILFunction();
 
   SILModule &getModule() const { return Module; }
@@ -980,6 +989,10 @@ public:
   }
 
   void clear();
+
+  /// Like `clear`, but does not call `dropAllReferences`, which is the
+  /// responsibility of the caller.
+  void eraseAllBlocks();
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.

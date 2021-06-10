@@ -59,6 +59,7 @@
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(Actor)
+PROTOCOL(DistributedActor)
 PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
 PROTOCOL(RawRepresentable)

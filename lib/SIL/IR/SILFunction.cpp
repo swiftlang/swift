@@ -14,6 +14,7 @@
 
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -124,6 +125,8 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   return fn;
 }
 
+SwiftMetatype SILFunction::registeredMetatype;
+
 SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          CanSILFunctionType LoweredType,
                          GenericEnvironment *genericEnv,
@@ -135,7 +138,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          const SILDebugScope *DebugScope,
                          IsDynamicallyReplaceable_t isDynamic,
                          IsExactSelfClass_t isExactSelfClass)
-    : Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
+    : SwiftObjectHeader(registeredMetatype),
+      Module(Module), Availability(AvailabilityContext::alwaysAvailable())  {
   init(Linkage, Name, LoweredType, genericEnv, Loc, isBareSILFunction, isTrans,
        isSerialized, entryCount, isThunk, classSubclassScope, inlineStrategy,
        E, DebugScope, isDynamic, isExactSelfClass);
@@ -201,16 +205,7 @@ SILFunction::~SILFunction() {
 
   auto &M = getModule();
   for (auto &BB : *this) {
-    for (auto I = BB.begin(), E = BB.end(); I != E;) {
-      auto Inst = &*I;
-      ++I;
-      SILInstruction::destroy(Inst);
-      // TODO: It is only safe to directly deallocate an
-      // instruction if this BB is being removed in scope
-      // of destructing a SILFunction.
-      M.deallocateInst(Inst);
-    }
-    BB.InstList.clearAndLeakNodesUnsafely();
+    BB.eraseAllInstructions(M);
   }
 
   assert(RefCount == 0 &&
@@ -689,6 +684,10 @@ bool SILFunction::isExternallyUsedSymbol() const {
 
 void SILFunction::clear() {
   dropAllReferences();
+  eraseAllBlocks();
+}
+
+void SILFunction::eraseAllBlocks() {
   BlockList.clear();
 }
 

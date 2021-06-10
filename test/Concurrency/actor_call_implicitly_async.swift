@@ -33,11 +33,9 @@ actor BankAccount {
     curBalance = initialDeposit
   }
 
-  // NOTE: this func is accessed through both async and sync calls.
-  // expected-note@+1 {{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   func balance() -> Int { return curBalance }
 
-  // expected-note@+1 2{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 {{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
   func deposit(_ amount : Int) -> Int {
     guard amount >= 0 else { return 0 }
 
@@ -207,16 +205,16 @@ extension BankAccount {
   func totalBalance(including other: BankAccount) async -> Int {
     //expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{12-12=await }}
     return balance()
-          + other.balance()  // expected-note{{call is 'async'}}
+          + other.balance()  // expected-note{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   }
 
   func breakAccounts(other: BankAccount) async {
     // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{9-9=await }}
-    _ = other.deposit( // expected-note{{call is 'async'}}
-          other.withdraw( // expected-note{{call is 'async'}}
+    _ = other.deposit( // expected-note{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
+          other.withdraw( // expected-note{{calls to instance method 'withdraw' from outside of its actor context are implicitly asynchronous}}
             self.deposit(
-              other.withdraw( // expected-note{{call is 'async'}}
-                other.balance())))) // expected-note{{call is 'async'}}
+              other.withdraw( // expected-note{{calls to instance method 'withdraw' from outside of its actor context are implicitly asynchronous}}
+                other.balance())))) // expected-note{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   }
 }
 
@@ -224,14 +222,16 @@ func anotherAsyncFunc() async {
   let a = BankAccount(initialDeposit: 34)
   let b = BankAccount(initialDeposit: 35)
 
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{call is 'async'}}
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-note@+1{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
   _ = a.deposit(1)
-  // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{call is 'async'}}
+  // expected-error@+2{{expression is 'async' but is not marked with 'await'}} {{7-7=await }}
+  // expected-note@+1{{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   _ = b.balance()
 
-  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can only be referenced from inside the actor}}
+  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can not be partially applied}}
 
-  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can only be mutated from inside the actor}}
+  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a non-isolated context}}
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = b.owner
   _ = await b.owner == "cat"
@@ -242,9 +242,9 @@ func anotherAsyncFunc() async {
 func regularFunc() {
   let a = BankAccount(initialDeposit: 34)
 
-  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
+  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can not be partially applied}}
 
-  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
+  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can not be referenced from a non-isolated context}}
 }
 
 

@@ -44,7 +44,7 @@ private:
   // TODO: more additional flags here, we can use them for future optimizations.
   //       e.g. "was awaited on" or "needs free"
 
-  friend class AsyncTask;
+  friend class ::swift::AsyncTask;
 
 public:
   explicit AsyncLetImpl(AsyncTask* task)
@@ -86,10 +86,6 @@ static AsyncLetImpl *asImpl(const AsyncLet *alet) {
       const_cast<AsyncLet*>(alet));
 }
 
-static AsyncLet *asAbstract(AsyncLetImpl *alet) {
-  return reinterpret_cast<AsyncLet*>(alet);
-}
-
 // =============================================================================
 // ==== start ------------------------------------------------------------------
 
@@ -106,7 +102,7 @@ static void swift_asyncLet_startImpl(AsyncLet *alet,
   flags.task_setIsChildTask(true);
 
   auto childTaskAndContext = swift_task_create_async_let_future(
-      flags,
+      flags.getOpaqueValue(),
       futureResultType,
       closureEntryPoint,
       closureContext);
@@ -134,7 +130,6 @@ SWIFT_CC(swiftasync)
 static void swift_asyncLet_waitImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
     AsyncLet *alet, Metadata *T) {
-  auto waitingTask = swift_task_getCurrent();
   auto task = alet->getTask();
   swift_task_future_wait(result, rawContext, task, T);
 }
@@ -168,7 +163,8 @@ static void swift_asyncLet_endImpl(AsyncLet *alet) {
   assert(parent && "async-let must have a parent task");
 
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%p] async let end of task %p, parent: %p\n", pthread_self(), task, parent);
+  fprintf(stderr, "[%lu] async let end of task %p, parent: %p\n",
+          _swift_get_thread_id(), task, parent);
 #endif
   _swift_task_dealloc_specific(parent, task);
 }

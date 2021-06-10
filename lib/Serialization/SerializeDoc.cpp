@@ -493,7 +493,10 @@ void DocSerializer::writeDocHeader() {
     Metadata.emit(ScratchRecord, SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR,
                   /*short version string length*/0, /*compatibility length*/0,
                   /*user module version major*/0,
-                  /*user module version minor*/0, verText);
+                  /*user module version minor*/0,
+                  /*user module version subminor*/0,
+                  /*user module version build*/0,
+                  verText);
 
     ModuleName.emit(ScratchRecord, M->getName().str());
     Target.emit(ScratchRecord, LangOpts.Target.str());
@@ -878,7 +881,10 @@ public:
                     SWIFTSOURCEINFO_VERSION_MINOR,
                     /*short version string length*/0, /*compatibility length*/0,
                     /*user module version major*/0,
-                    /*user module version minor*/0, verText);
+                    /*user module version minor*/0,
+                    /*user module version sub-minor*/0,
+                    /*user module version build*/0,
+                    verText);
 
       ModuleName.emit(ScratchRecord, M->getName().str());
       Target.emit(ScratchRecord, LangOpts.Target.str());

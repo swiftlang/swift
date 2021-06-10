@@ -428,62 +428,28 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
 
 bool GenericSignatureImpl::isRequirementSatisfied(
     Requirement requirement) const {
-  auto GSB = getGenericSignatureBuilder();
+  if (requirement.getFirstType()->hasTypeParameter()) {
+    auto *genericEnv = getGenericEnvironment();
 
-  auto firstType = requirement.getFirstType();
-  auto canFirstType = getCanonicalTypeInContext(firstType);
+    auto substituted = requirement.subst(
+        [&](SubstitutableType *type) -> Type {
+          if (auto *paramType = type->getAs<GenericTypeParamType>())
+            return genericEnv->mapTypeIntoContext(paramType);
 
-  switch (requirement.getKind()) {
-  case RequirementKind::Conformance: {
-    auto *protocol = requirement.getProtocolDecl();
+          return type;
+        },
+        LookUpConformanceInSignature(this));
 
-    if (canFirstType->isTypeParameter())
-      return requiresProtocol(canFirstType, protocol);
-    else
-      return (bool)GSB->lookupConformance(canFirstType, protocol);
-  }
-
-  case RequirementKind::SameType: {
-    auto canSecondType = getCanonicalTypeInContext(requirement.getSecondType());
-    return canFirstType->isEqual(canSecondType);
-  }
-
-  case RequirementKind::Superclass: {
-    auto requiredSuperclass =
-        getCanonicalTypeInContext(requirement.getSecondType());
-
-    // The requirement could be in terms of type parameters like a user-written
-    // requirement, but it could also be in terms of concrete types if it has
-    // been substituted/otherwise 'resolved', so we need to handle both.
-    auto baseType = canFirstType;
-    if (baseType->isTypeParameter()) {
-      auto directSuperclass = getSuperclassBound(baseType);
-      if (!directSuperclass)
-        return false;
-
-      baseType = getCanonicalTypeInContext(directSuperclass);
-    }
-
-    return requiredSuperclass->isExactSuperclassOf(baseType);
-  }
-
-  case RequirementKind::Layout: {
-    auto requiredLayout = requirement.getLayoutConstraint();
-
-    if (canFirstType->isTypeParameter()) {
-      if (auto layout = getLayoutConstraint(canFirstType))
-        return static_cast<bool>(layout.merge(requiredLayout));
-
+    if (!substituted)
       return false;
-    }
 
-    // The requirement is on a concrete type, so it's either globally correct
-    // or globally incorrect, independent of this generic context. The latter
-    // case should be diagnosed elsewhere, so let's assume it's correct.
-    return true;
+    requirement = *substituted;
   }
-  }
-  llvm_unreachable("unhandled kind");
+
+  // FIXME: Need to check conditional requirements here.
+  ArrayRef<Requirement> conditionalRequirements;
+
+  return requirement.isSatisfied(conditionalRequirements);
 }
 
 SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
@@ -494,7 +460,7 @@ SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
   if (otherSig.getPointer() == this) return result;
 
   // If there is no other signature, no requirements are satisfied.
-  if (!otherSig){
+  if (!otherSig) {
     const auto reqs = getRequirements();
     result.append(reqs.begin(), reqs.end());
     return result;
@@ -576,154 +542,11 @@ CanGenericSignature::getGenericParams() const{
   return {base, params.size()};
 }
 
-namespace {
-  typedef GenericSignatureBuilder::RequirementSource RequirementSource;
-
-  template<typename T>
-  using GSBConstraint = GenericSignatureBuilder::Constraint<T>;
-} // end anonymous namespace
-
-/// Determine whether there is a conformance of the given
-/// subject type to the given protocol within the given set of explicit
-/// requirements.
-static bool hasConformanceInSignature(ArrayRef<Requirement> requirements,
-                                      Type subjectType,
-                                      ProtocolDecl *proto) {
-  // Make sure this requirement exists in the requirement signature.
-  for (const auto &req: requirements) {
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->isEqual(subjectType) &&
-        req.getProtocolDecl() == proto) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 ConformanceAccessPath
 GenericSignatureImpl::getConformanceAccessPath(Type type,
                                                ProtocolDecl *protocol) const {
-  assert(type->isTypeParameter() && "not a type parameter");
-
-  // Look up the equivalence class for this type.
-  auto &builder = *getGenericSignatureBuilder();
-  auto equivClass =
-    builder.resolveEquivalenceClass(
-                                  type,
-                                  ArchetypeResolutionKind::CompleteWellFormed);
-
-  assert(!equivClass->concreteType &&
-         "Concrete types don't have conformance access paths");
-
-  auto cached = equivClass->conformanceAccessPathCache.find(protocol);
-  if (cached != equivClass->conformanceAccessPathCache.end())
-    return cached->second;
-
-  // Dig out the conformance of this type to the given protocol, because we
-  // want its requirement source.
-  auto conforms = equivClass->conformsTo.find(protocol);
-  assert(conforms != equivClass->conformsTo.end());
-
-  auto rootType = equivClass->getAnchor(builder, { });
-  if (hasConformanceInSignature(getRequirements(), rootType, protocol)) {
-    ConformanceAccessPath::Entry root(rootType, protocol);
-    ArrayRef<ConformanceAccessPath::Entry> path(root);
-
-    ConformanceAccessPath result(builder.getASTContext().AllocateCopy(path));
-    equivClass->conformanceAccessPathCache.insert({protocol, result});
-
-    return result;
-  }
-
-  // This conformance comes from a derived source.
-  //
-  // To recover this the conformance, we recursively recover the conformance
-  // of the shortest parent type to the parent protocol first.
-  Type shortestParentType;
-  Type shortestSubjectType;
-  ProtocolDecl *shortestParentProto = nullptr;
-
-  auto isShortestPath = [&](Type parentType,
-                            Type subjectType,
-                            ProtocolDecl *parentProto) -> bool {
-    if (!shortestParentType)
-      return true;
-
-    int cmpParentTypes = compareDependentTypes(parentType, shortestParentType);
-    if (cmpParentTypes != 0)
-      return cmpParentTypes < 0;
-
-    int cmpSubjectTypes = compareDependentTypes(subjectType, shortestSubjectType);
-    if (cmpSubjectTypes != 0)
-      return cmpSubjectTypes < 0;
-
-    int cmpParentProtos = TypeDecl::compare(parentProto, shortestParentProto);
-    return cmpParentProtos < 0;
-  };
-
-  auto recordShortestParentType = [&](Type parentType,
-                                      Type subjectType,
-                                      ProtocolDecl *parentProto) {
-    if (isShortestPath(parentType, subjectType, parentProto)) {
-      shortestParentType = parentType;
-      shortestSubjectType = subjectType;
-      shortestParentProto = parentProto;
-    }
-  };
-
-  for (auto constraint : conforms->second) {
-    auto *source = constraint.source;
-
-    switch (source->kind) {
-    case RequirementSource::Explicit:
-    case RequirementSource::Inferred:
-      // This is not a derived source, so it contributes nothing to the
-      // "shortest parent type" computation.
-      break;
-
-    case RequirementSource::ProtocolRequirement:
-    case RequirementSource::InferredProtocolRequirement: {
-      assert(source->parent->kind != RequirementSource::RequirementSignatureSelf);
-
-      // If we have a derived conformance requirement like T[.P].X : Q, we can
-      // recursively compute the conformance access path for T : P, and append
-      // the path element (Self.X : Q).
-      auto parentType = source->parent->getAffectedType()->getCanonicalType();
-      auto subjectType = source->getStoredType()->getCanonicalType();
-      auto *parentProto = source->getProtocolDecl();
-
-      // We might have multiple candidate parent types and protocols for the
-      // recursive step, so pick the shortest one.
-      recordShortestParentType(parentType, subjectType, parentProto);
-
-      break;
-    }
-
-    default:
-      // There should be no other way of testifying to a conformance on a
-      // dependent type.
-      llvm_unreachable("Bad requirement source for conformance on dependent type");
-    }
-  }
-
-  assert(shortestParentType);
-
-  SmallVector<ConformanceAccessPath::Entry, 2> path;
-
-  auto parentPath = getConformanceAccessPath(
-      shortestParentType, shortestParentProto);
-  for (auto entry : parentPath)
-    path.push_back(entry);
-
-  // Then, we add the subject type from the parent protocol's requirement
-  // signature.
-  path.emplace_back(shortestSubjectType, protocol);
-
-  ConformanceAccessPath result(builder.getASTContext().AllocateCopy(path));
-  equivClass->conformanceAccessPathCache.insert({protocol, result});
-
-  return result;
+  return getGenericSignatureBuilder()->getConformanceAccessPath(
+      type, protocol, this);
 }
 
 unsigned GenericParamKey::findIndexIn(
@@ -864,4 +687,68 @@ Requirement Requirement::getCanonical() const {
 ProtocolDecl *Requirement::getProtocolDecl() const {
   assert(getKind() == RequirementKind::Conformance);
   return getSecondType()->castTo<ProtocolType>()->getDecl();
+}
+
+bool
+Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements) const {
+  switch (getKind()) {
+  case RequirementKind::Conformance: {
+    auto *proto = getProtocolDecl();
+    auto *module = proto->getParentModule();
+    auto conformance = module->lookupConformance(getFirstType(), proto);
+    if (!conformance)
+      return false;
+
+    conditionalRequirements = conformance.getConditionalRequirements();
+    return true;
+  }
+
+  case RequirementKind::Layout: {
+    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      return (layout && layout.merge(getLayoutConstraint()));
+    }
+
+    if (getLayoutConstraint()->isClass())
+      return getFirstType()->satisfiesClassConstraint();
+
+    // TODO: Statically check other layout constraints, once they can
+    // be spelled in Swift.
+    return true;
+  }
+
+  case RequirementKind::Superclass:
+    return getSecondType()->isExactSuperclassOf(getFirstType());
+
+  case RequirementKind::SameType:
+    return getFirstType()->isEqual(getSecondType());
+  }
+
+  llvm_unreachable("Bad requirement kind");
+}
+
+bool Requirement::canBeSatisfied() const {
+  switch (getKind()) {
+  case RequirementKind::Conformance:
+    return getFirstType()->is<ArchetypeType>();
+
+  case RequirementKind::Layout: {
+    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
+      auto layout = archetypeType->getLayoutConstraint();
+      return (!layout || layout.merge(getLayoutConstraint()));
+    }
+
+    return false;
+  }
+
+  case RequirementKind::Superclass:
+    return (getFirstType()->isBindableTo(getSecondType()) ||
+            getSecondType()->isBindableTo(getFirstType()));
+
+  case RequirementKind::SameType:
+    return (getFirstType()->isBindableTo(getSecondType()) ||
+            getSecondType()->isBindableTo(getFirstType()));
+  }
+
+  llvm_unreachable("Bad requirement kind");
 }

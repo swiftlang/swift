@@ -33,6 +33,7 @@ namespace swift {
     const char *SourceInfoOutputPath = nullptr;
     std::string SymbolGraphOutputDir;
     bool SkipSymbolGraphInheritedDocs = true;
+    bool IncludeSPISymbolsInSymbolGraph = false;
     llvm::VersionTuple UserModuleVersion;
 
     StringRef GroupInfoPath;
@@ -136,6 +137,7 @@ namespace swift {
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;
     bool DisableCrossModuleIncrementalInfo = false;
+    bool StaticLibrary = false;
   };
 
 } // end namespace swift

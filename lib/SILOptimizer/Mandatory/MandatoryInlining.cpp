@@ -264,8 +264,16 @@ static  bool fixupReferenceCounts(
   return invalidatedStackNesting;
 }
 
-static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
-  auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
+// Handle the case where the callee of the apply is either a load or a
+// project_box that was used by a deleted load. If we fail to optimize,
+// return an invalid SILValue.
+static SILValue cleanupLoadedCalleeValue(SILValue calleeValue) {
+  auto calleeSource = calleeValue;
+  auto *li = dyn_cast<LoadInst>(calleeValue);
+  if (li) {
+    calleeSource = li->getOperand();
+  }
+  auto *pbi = dyn_cast<ProjectBoxInst>(calleeSource);
   if (!pbi)
     return SILValue();
   auto *abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
@@ -274,17 +282,18 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
 
   // The load instruction must have no more uses or a single destroy left to
   // erase it.
-  if (li->getFunction()->hasOwnership()) {
-    // TODO: What if we have multiple destroy_value? That should be ok as well.
-    auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
-    if (!dvi)
+  if (li) {
+    if (li->getFunction()->hasOwnership()) {
+      // TODO: What if we have multiple destroy_value? That should be ok.
+      auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
+      if (!dvi)
+        return SILValue();
+      dvi->eraseFromParent();
+    } else if (!li->use_empty()) {
       return SILValue();
-    dvi->eraseFromParent();
-  } else if (!li->use_empty()) {
-    return SILValue();
+    }
+    li->eraseFromParent();
   }
-  li->eraseFromParent();
-
   // Look through uses of the alloc box the load is loading from to find up to
   // one store and up to one strong release.
   PointerUnion<StrongReleaseInst *, DestroyValueInst *> destroy;
@@ -356,15 +365,8 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
 /// longer necessary after inlining.
 static void cleanupCalleeValue(SILValue calleeValue,
                                bool &invalidatedStackNesting) {
-  // Handle the case where the callee of the apply is a load instruction. If we
-  // fail to optimize, return. Otherwise, see if we can look through other
-  // abstractions on our callee.
-  if (auto *li = dyn_cast<LoadInst>(calleeValue)) {
-    calleeValue = cleanupLoadedCalleeValue(calleeValue, li);
-    if (!calleeValue) {
-      return;
-    }
-  }
+  if (auto loadedValue = cleanupLoadedCalleeValue(calleeValue))
+    calleeValue = loadedValue;
 
   calleeValue = stripCopiesAndBorrows(calleeValue);
 
@@ -417,46 +419,6 @@ static void cleanupCalleeValue(SILValue calleeValue,
 namespace {
 /// Cleanup dead closures after inlining.
 class ClosureCleanup {
-  using DeadInstSet = SmallBlotSetVector<SILInstruction *, 4>;
-
-  /// A helper class to update the set of dead instructions.
-  ///
-  /// Since this is called by the SILModule callback, the instruction may longer
-  /// be well-formed. Do not visit its operands. However, it's position in the
-  /// basic block is still valid.
-  ///
-  /// FIXME: Using the Module's callback mechanism for this is terrible.
-  /// Instead, cleanupCalleeValue could be easily rewritten to use its own
-  /// instruction deletion helper and pass a callback to tryDeleteDeadClosure
-  /// and recursivelyDeleteTriviallyDeadInstructions.
-  class DeleteUpdateHandler : public DeleteNotificationHandler {
-    SILModule &Module;
-    DeadInstSet &DeadInsts;
-
-  public:
-    DeleteUpdateHandler(SILModule &M, DeadInstSet &DeadInsts)
-        : Module(M), DeadInsts(DeadInsts) {
-      Module.registerDeleteNotificationHandler(this);
-    }
-
-    ~DeleteUpdateHandler() override {
-      // Unregister the handler.
-      Module.removeDeleteNotificationHandler(this);
-    }
-
-    // Handling of instruction removal notifications.
-    bool needsNotifications() override { return true; }
-
-    // Handle notifications about removals of instructions.
-    void handleDeleteNotification(SILNode *node) override {
-      auto deletedI = dyn_cast<SILInstruction>(node);
-      if (!deletedI)
-        return;
-
-      DeadInsts.erase(deletedI);
-    }
-  };
-
   SmallBlotSetVector<SILInstruction *, 4> deadFunctionVals;
 
 public:
@@ -500,9 +462,8 @@ public:
   // set needs to continue to be updated (by this handler) when deleting
   // instructions. This assumes that DeadFunctionValSet::erase() is stable.
   void cleanupDeadClosures(SILFunction *F) {
-    DeleteUpdateHandler deleteUpdate(F->getModule(), deadFunctionVals);
     for (Optional<SILInstruction *> I : deadFunctionVals) {
-      if (!I.hasValue())
+      if (!I.hasValue() || I.getValue()->isDeleted())
         continue;
 
       if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))

@@ -29,6 +29,7 @@
 
 #include "swift/Basic/ExponentialGrowthAppendingBinaryByteStream.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -918,6 +919,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
         dict.set(KeyValue, stat->value);
       };
 
+      Statistic instructionCount(
+          UIdentFromSKDUID(KindStatInstructionCount),
+          "# of instructions executed since the SourceKit process was started");
+      instructionCount.value.store(swift::getInstructionsExecuted());
+      addStat(&instructionCount);
       addStat(&numRequests);
       addStat(&numSemaRequests);
       std::for_each(stats.begin(), stats.end(), addStat);
@@ -2823,6 +2829,28 @@ static void fillDictionaryForDiagnosticInfo(
 
 static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
+
+  if (!Info.ID.empty())
+    Elem.set(KeyID, Info.ID);
+
+  if (!Info.Categories.empty()) {
+    SmallVector<SourceKit::UIdent, 1> CategoryUIDs;
+
+    static UIdent UIDKindDiagDeprecation(KindDiagDeprecation.str());
+    static UIdent UIDKindDiagNoUsage(KindDiagNoUsage.str());
+
+    for (auto C : Info.Categories) {
+      switch (C) {
+      case DiagnosticCategory::Deprecation:
+        CategoryUIDs.push_back(UIDKindDiagDeprecation);
+        break;
+      case DiagnosticCategory::NoUsage:
+        CategoryUIDs.push_back(UIDKindDiagNoUsage);
+        break;
+      }
+    }
+    Elem.set(KeyCategories, CategoryUIDs);
+  }
 
   Elem.set(KeyDescription, Info.Description);
   if (Info.Line != 0) {

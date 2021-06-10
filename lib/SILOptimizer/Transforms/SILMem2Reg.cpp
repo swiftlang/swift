@@ -63,7 +63,8 @@ using DomTreeLevelMap = llvm::DenseMap<DomTreeNode *, unsigned>;
 //===----------------------------------------------------------------------===//
 
 static void replaceDestroy(DestroyAddrInst *dai, SILValue newValue,
-                           SILBuilderContext &ctx) {
+                           SILBuilderContext &ctx,
+                           InstructionDeleter &deleter) {
   SILFunction *f = dai->getFunction();
   auto ty = dai->getOperand()->getType();
 
@@ -83,12 +84,13 @@ static void replaceDestroy(DestroyAddrInst *dai, SILValue newValue,
                               : TypeExpansionKind::None;
   typeLowering.emitLoweredDestroyValue(builder, dai->getLoc(), newValue,
                                        expansionKind);
-  dai->eraseFromParent();
+  deleter.forceDelete(dai);
 }
 
 /// Promote a DebugValueAddr to a DebugValue of the given value.
 static void promoteDebugValueAddr(DebugValueAddrInst *dvai, SILValue value,
-                                  SILBuilderContext &ctx) {
+                                  SILBuilderContext &ctx,
+                                  InstructionDeleter &deleter) {
   assert(dvai->getOperand()->getType().isLoadable(*dvai->getFunction()) &&
          "Unexpected promotion of address-only type!");
   assert(value && "Expected valid value");
@@ -96,7 +98,7 @@ static void promoteDebugValueAddr(DebugValueAddrInst *dvai, SILValue value,
   for (auto *use : value->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser())) {
       if (*dvi->getVarInfo() == *dvai->getVarInfo()) {
-        dvai->eraseFromParent();
+        deleter.forceDelete(dvai);
         return;
       }
     }
@@ -104,7 +106,7 @@ static void promoteDebugValueAddr(DebugValueAddrInst *dvai, SILValue value,
 
   SILBuilderWithScope b(dvai, ctx);
   b.createDebugValue(dvai->getLoc(), value, *dvai->getVarInfo());
-  dvai->eraseFromParent();
+  deleter.forceDelete(dvai);
 }
 
 /// Returns true if \p I is a load which loads from \p ASI.
@@ -141,7 +143,7 @@ static void collectLoads(SILInstruction *i,
 }
 
 static void replaceLoad(LoadInst *li, SILValue newValue, AllocStackInst *asi,
-                        SILBuilderContext &ctx) {
+                        SILBuilderContext &ctx, InstructionDeleter &deleter) {
   ProjectionPath projections(newValue->getType());
   SILValue op = li->getOperand();
   SILBuilderWithScope builder(li, ctx);
@@ -191,14 +193,14 @@ static void replaceLoad(LoadInst *li, SILValue newValue, AllocStackInst *asi,
   std::move(scope).popAtEndOfScope(&*builder.getInsertionPoint());
 
   // Delete the load
-  li->eraseFromParent();
+  deleter.forceDelete(li);
 
   while (op != asi && op->use_empty()) {
     assert(isa<UncheckedAddrCastInst>(op) || isa<StructElementAddrInst>(op) ||
            isa<TupleElementAddrInst>(op));
     auto *inst = cast<SingleValueInstruction>(op);
     SILValue next = inst->getOperand(0);
-    inst->eraseFromParent();
+    deleter.forceDelete(inst);
     op = next;
   }
 }
@@ -253,6 +255,8 @@ class StackAllocationPromoter {
   /// promotion.
   SILBuilderContext &ctx;
 
+  InstructionDeleter &deleter;
+
   /// Records the last store instruction in each block for a specific
   /// AllocStackInst.
   BlockToInstMap lastStoreInBlock;
@@ -261,9 +265,10 @@ public:
   /// C'tor.
   StackAllocationPromoter(AllocStackInst *inputASI, DominanceInfo *inputDomInfo,
                           DomTreeLevelMap &inputDomTreeLevels,
-                          SILBuilderContext &inputCtx)
+                          SILBuilderContext &inputCtx,
+                          InstructionDeleter &deleter)
       : asi(inputASI), dsi(nullptr), domInfo(inputDomInfo),
-        domTreeLevels(inputDomTreeLevels), ctx(inputCtx) {
+        domTreeLevels(inputDomTreeLevels), ctx(inputCtx), deleter(deleter) {
     // Scan the users in search of a deallocation instruction.
     for (auto *use : asi->getUses()) {
       if (auto *foundDealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
@@ -344,7 +349,7 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
         // If we are loading from the AllocStackInst and we already know the
         // content of the Alloca then use it.
         LLVM_DEBUG(llvm::dbgs() << "*** Promoting load: " << *li);
-        replaceLoad(li, runningVal, asi, ctx);
+        replaceLoad(li, runningVal, asi, ctx, deleter);
         ++NumInstRemoved;
       } else if (li->getOperand() == asi &&
                  li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy) {
@@ -389,7 +394,7 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
         LLVM_DEBUG(llvm::dbgs()
                    << "*** Removing redundant store: " << *lastStore);
         ++NumInstRemoved;
-        lastStore->eraseFromParent();
+        deleter.forceDelete(lastStore);
       }
 
       // The stored value is the new running value.
@@ -404,14 +409,14 @@ StoreInst *StackAllocationPromoter::promoteAllocationInBlock(
     // promote this when we deal with hooking up phis.
     if (auto *dvai = dyn_cast<DebugValueAddrInst>(inst)) {
       if (dvai->getOperand() == asi && runningVal)
-        promoteDebugValueAddr(dvai, runningVal, ctx);
+        promoteDebugValueAddr(dvai, runningVal, ctx, deleter);
       continue;
     }
 
     // Replace destroys with a release of the value.
     if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
       if (dai->getOperand() == asi && runningVal) {
-        replaceDestroy(dai, runningVal, ctx);
+        replaceDestroy(dai, runningVal, ctx, deleter);
       }
       continue;
     }
@@ -518,7 +523,7 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &phiBlocks,
   LLVM_DEBUG(llvm::dbgs() << "*** Found the definition: " << *def);
 
   addArgumentToBranch(def, destBlock, ti);
-  ti->eraseFromParent();
+  deleter.forceDelete(ti);
 }
 
 void StackAllocationPromoter::fixBranchesAndUses(BlockSet &phiBlocks) {
@@ -545,7 +550,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &phiBlocks) {
                  << "*** Replacing " << *li << " with Def " << *def);
 
       // Replace the load with the definition that we found.
-      replaceLoad(li, def, asi, ctx);
+      replaceLoad(li, def, asi, ctx, deleter);
       removedUser = true;
       ++NumInstRemoved;
     }
@@ -561,7 +566,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &phiBlocks) {
     if (auto *dvai = dyn_cast<DebugValueAddrInst>(user)) {
       // Replace DebugValueAddr with DebugValue.
       SILValue def = getLiveInValue(phiBlocks, userBlock);
-      promoteDebugValueAddr(dvai, def, ctx);
+      promoteDebugValueAddr(dvai, def, ctx, deleter);
       ++NumInstRemoved;
       continue;
     }
@@ -569,7 +574,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &phiBlocks) {
     // Replace destroys with a release of the value.
     if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
       SILValue def = getLiveInValue(phiBlocks, userBlock);
-      replaceDestroy(dai, def, ctx);
+      replaceDestroy(dai, def, ctx, deleter);
       continue;
     }
   }
@@ -757,6 +762,8 @@ class MemoryToRegisters {
   /// The builder context used when creating new instructions during register
   /// promotion.
   SILBuilderContext ctx;
+
+  InstructionDeleter deleter;
 
   /// Returns the dom tree levels for the current function. Computes these
   /// lazily.
@@ -965,7 +972,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
         // Void (= empty tuple) or a tuple of Voids.
         runningVal = createValueForEmptyTuple(asi->getElementType(), inst, ctx);
       }
-      replaceLoad(cast<LoadInst>(inst), runningVal, asi, ctx);
+      replaceLoad(cast<LoadInst>(inst), runningVal, asi, ctx, deleter);
       ++NumInstRemoved;
       continue;
     }
@@ -980,7 +987,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
                                                           runningVal);
         }
         runningVal = si->getSrc();
-        inst->eraseFromParent();
+        deleter.forceDelete(inst);
         ++NumInstRemoved;
         continue;
       }
@@ -990,12 +997,12 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     if (auto *dvai = dyn_cast<DebugValueAddrInst>(inst)) {
       if (dvai->getOperand() == asi) {
         if (runningVal) {
-          promoteDebugValueAddr(dvai, runningVal, ctx);
+          promoteDebugValueAddr(dvai, runningVal, ctx, deleter);
         } else {
           // Drop debug_value_addr of uninitialized void values.
           assert(asi->getElementType().isVoid() &&
                  "Expected initialization of non-void type!");
-          dvai->eraseFromParent();
+          deleter.forceDelete(dvai);
         }
       }
       continue;
@@ -1004,7 +1011,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // Replace destroys with a release of the value.
     if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
       if (dai->getOperand() == asi) {
-        replaceDestroy(dai, runningVal, ctx);
+        replaceDestroy(dai, runningVal, ctx, deleter);
       }
       continue;
     }
@@ -1012,7 +1019,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     // Remove deallocation.
     if (auto *dsi = dyn_cast<DeallocStackInst>(inst)) {
       if (dsi->getOperand() == asi) {
-        inst->eraseFromParent();
+        deleter.forceDelete(inst);
         NumInstRemoved++;
         // No need to continue scanning after deallocation.
         break;
@@ -1026,7 +1033,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
             isa<TupleElementAddrInst>(addrInst) ||
             isa<UncheckedAddrCastInst>(addrInst))) {
       SILValue op = addrInst->getOperand(0);
-      addrInst->eraseFromParent();
+      deleter.forceDelete(addrInst);
       ++NumInstRemoved;
       addrInst = dyn_cast<SingleValueInstruction>(op);
     }
@@ -1050,7 +1057,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
 
   // Remove write-only AllocStacks.
   if (isWriteOnlyAllocation(alloc)) {
-    eraseUsesOfInstruction(alloc);
+    deleter.forceDeleteWithUsers(alloc);
 
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: "<< *alloc);
     return true;
@@ -1063,7 +1070,9 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
 
     LLVM_DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "
                             << *alloc);
-    if (!alloc->use_empty()) {
+    if (alloc->use_empty()) {
+      deleter.forceDelete(alloc);
+    } else {
       // Handle a corner case where the ASI still has uses:
       // This can come up if the source contains a withUnsafePointer where
       // the pointer escapes. It's illegal code but we should not crash.
@@ -1080,12 +1089,12 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc) {
   // Promote this allocation, lazily computing dom tree levels for this function
   // if we have not done so yet.
   auto &domTreeLevels = getDomTreeLevels();
-  StackAllocationPromoter(alloc, domInfo, domTreeLevels, ctx).run();
+  StackAllocationPromoter(alloc, domInfo, domTreeLevels, ctx, deleter).run();
 
   // Make sure that all of the allocations were promoted into registers.
   assert(isWriteOnlyAllocation(alloc) && "Non-write uses left behind");
   // ... and erase the allocation.
-  eraseUsesOfInstruction(alloc);
+  deleter.forceDeleteWithUsers(alloc);
   return true;
 }
 
@@ -1096,20 +1105,12 @@ bool MemoryToRegisters::run() {
     f.verifyCriticalEdges();
 
   for (auto &block : f) {
-    auto ii = block.begin(), ie = block.end();
-    while (ii != ie) {
-      SILInstruction *inst = &*ii;
+    for (SILInstruction *inst : deleter.updatingReverseRange(&block)) {
       auto *asi = dyn_cast<AllocStackInst>(inst);
-      if (!asi) {
-        ++ii;
+      if (!asi)
         continue;
-      }
 
-      bool promoted = promoteSingleAllocation(asi);
-      ++ii;
-      if (promoted) {
-        if (asi->use_empty())
-          asi->eraseFromParent();
+      if (promoteSingleAllocation(asi)) {
         ++NumInstRemoved;
         madeChange = true;
       }

@@ -7,19 +7,30 @@
 // UNSUPPORTED: back_deployment_runtime
 
 actor Page {
-    nonisolated let initialNumWords : Int
+    let initialNumWords : Int
 
-    @actorIndependent(unsafe)
-    var numWords : Int
+    private let numWordsMem: UnsafeMutablePointer<Int>
+
+    nonisolated
+    var numWords : Int {
+      get { numWordsMem.pointee }
+      set { numWordsMem.pointee = newValue }
+    }
 
     init(_ words : Int) {
-        numWords = words
         initialNumWords = words
+        numWordsMem = .allocate(capacity: 1)
+        numWordsMem.initialize(to: words)
+        numWords = words
+    }
+
+    deinit {
+      numWordsMem.deallocate()
     }
 }
 
 actor Book {
-    nonisolated let pages : [Page]
+    let pages : [Page]
 
     init(_ numPages : Int) {
         var stack : [Page] = []
@@ -29,7 +40,7 @@ actor Book {
         pages = stack
     }
 
-    @actorIndependent
+    nonisolated
     subscript(_ page : Int) -> Page {
         return pages[page]
     }

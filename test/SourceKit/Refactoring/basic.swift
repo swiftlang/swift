@@ -244,16 +244,20 @@ func hasCallToAsyncAlternative() {
 // CHECK-ASYNC-NEXT: Convert Function to Async
 // CHECK-ASYNC-NEXT: source.refactoring.kind.add.async-alternative
 // CHECK-ASYNC-NEXT: Add Async Alternative
+// CHECK-ASYNC-NEXT: source.refactoring.kind.add.async-wrapper
+// CHECK-ASYNC-NEXT: Add Async Wrapper
 // CHECK-ASYNC-NOT: source.refactoring.kind.convert.call-to-async
 // CHECK-ASYNC: ACTIONS END
 
 // CHECK-CALLASYNC: ACTIONS BEGIN
-// CHECK-ASYNC-NOT: source.refactoring.kind.add.async-alternative
-// CHECK-ASYNC-NOT: source.refactoring.kind.convert.func-to-async
+// CHECK-CALLASYNC-NOT: source.refactoring.kind.add.async-alternative
+// CHECK-CALLASYNC-NOT: source.refactoring.kind.convert.func-to-async
+// CHECK-CALLASYNC-NOT: source.refactoring.kind.add.async-wrapper
 // CHECK-CALLASYNC: source.refactoring.kind.convert.call-to-async
 // CHECK-CALLASYNC-NEXT: Convert Call to Async Alternative
-// CHECK-ASYNC-NOT: source.refactoring.kind.add.async-alternative
-// CHECK-ASYNC-NOT: source.refactoring.kind.convert.func-to-async
+// CHECK-CALLASYNC-NOT: source.refactoring.kind.add.async-alternative
+// CHECK-CALLASYNC-NOT: source.refactoring.kind.convert.func-to-async
+// CHECK-CALLASYNC-NOT: source.refactoring.kind.add.async-wrapper
 // CHECK-CALLASYNC: ACTIONS END
 
 // REQUIRES: OS=macosx || OS=linux-gnu

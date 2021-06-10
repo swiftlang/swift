@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Error.h"
+
+#define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
+
 // Include the runtime's mutex support code.
 // FIXME: figure out some reasonable way to share this stuff
 
 #include "../runtime/MutexPThread.cpp"
 #include "../runtime/MutexWin32.cpp"
-
-SWIFT_NORETURN void swift::fatalError(uint32_t flags, const char *format, ...) {
-  abort();
-}

@@ -565,10 +565,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   100)
 
-SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
-  OnFunc | ConcurrencyOnly |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  101)
+// 101 was @asyncHandler and is now unused
 
 // TODO: Remove this once we don't need to support 'actor' as a modifier
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
@@ -577,9 +574,8 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   APIBreakingToAdd | APIBreakingToRemove,
   102)
 
-DECL_ATTR(actorIndependent, ActorIndependent,
-  OnClass | OnStruct | OnEnum | OnExtension | OnFunc | OnConstructor |
-  OnVar | OnSubscript | ConcurrencyOnly |
+CONTEXTUAL_SIMPLE_DECL_ATTR(isolated, Isolated,
+  DeclModifier | OnParam |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   103)
@@ -632,7 +628,6 @@ DECL_ATTR(completionHandlerAsync, CompletionHandlerAsync,
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript |
-  ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,
   112)
@@ -662,6 +657,20 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(spawn, Spawn,
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   117)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
+  DeclModifier | OnClass | OnFunc |
+  DistributedOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  118)
+
+SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
+  OnFunc | OnVar |
+  DistributedOnly | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  119)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

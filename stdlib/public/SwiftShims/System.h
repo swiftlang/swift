@@ -76,8 +76,8 @@
 // This is not ABI per-se but does stay in-sync with LLDB. If it becomes
 // out-of-sync, then users won't see a friendly diagnostic when inspecting
 // references past their lifetime.
-#define SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_32 0x00000880U
-#define SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_64 0x0000000000000880ULL
+#define SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_32 0x00000440U
+#define SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_64 0x0000000000000440ULL
 
 /*********************************** i386 *************************************/
 

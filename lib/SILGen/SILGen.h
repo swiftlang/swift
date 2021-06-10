@@ -86,8 +86,6 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
-  SILFunction *emitTopLevelFunction(SILLocation Loc);
-
   size_t anonymousSymbolCounter = 0;
 
   Optional<SILDeclRef> StringToNSStringFn;
@@ -131,7 +129,6 @@ public:
   Optional<FuncDecl*> ResumeUnsafeContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuation;
   Optional<FuncDecl*> ResumeUnsafeThrowingContinuationWithError;
-  Optional<FuncDecl*> RunAsyncHandler;
   Optional<FuncDecl*> CheckExpectedExecutor;
 
 public:
@@ -178,7 +175,8 @@ public:
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
-                                           CanType dynamicSelfType);
+                                           CanType dynamicSelfType,
+                                           CanType fromGlobalActor);
   
   /// Get or create the declaration of a completion handler block
   /// implementation function for an ObjC API that was imported
@@ -329,6 +327,9 @@ public:
 
   /// Emits a thunk from a Swift function to the native Swift convention.
   void emitNativeToForeignThunk(SILDeclRef thunk);
+
+  /// Emits a thunk from an actor function to a potentially distributed call.
+  void emitDistributedThunk(SILDeclRef thunk);
   
   void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
@@ -452,6 +453,10 @@ public:
 #define FUNC_DECL(NAME, ID) \
   FuncDecl *get##NAME(SILLocation loc);
 #include "swift/AST/KnownDecls.def"
+
+#define KNOWN_SDK_FUNC_DECL(MODULE, NAME, ID) \
+  FuncDecl *get##NAME(SILLocation loc);
+#include "swift/AST/KnownSDKDecls.def"
   
   /// Retrieve the _ObjectiveCBridgeable protocol definition.
   ProtocolDecl *getObjectiveCBridgeable(SILLocation loc);
@@ -507,8 +512,6 @@ public:
   FuncDecl *getResumeUnsafeThrowingContinuation();
   /// Retrieve the _Concurrency._resumeUnsafeThrowingContinuationWithError intrinsic.
   FuncDecl *getResumeUnsafeThrowingContinuationWithError();
-  /// Retrieve the _Concurrency._runAsyncHandler intrinsic.
-  FuncDecl *getRunAsyncHandler();
   /// Retrieve the _Concurrency._runTaskForBridgedAsyncMethod intrinsic.
   FuncDecl *getRunTaskForBridgedAsyncMethod();
   /// Retrieve the _Concurrency._checkExpectedExecutor intrinsic.

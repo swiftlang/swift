@@ -484,3 +484,18 @@ func rdar75146811() {
   // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
   test_named(x: &(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
 }
+
+// rdar://75514153 - Unable to produce a diagnostic for ambiguities related to use of `nil`
+func rdar75514153() {
+  func test_no_label(_: Int) {}    // expected-note 2 {{'nil' is not compatible with expected argument type 'Int' at position #1}}
+  func test_no_label(_: String) {} // expected-note 2 {{'nil' is not compatible with expected argument type 'String' at position #1}}
+
+  test_no_label(nil)   // expected-error {{no exact matches in call to local function 'test_no_label'}}
+  test_no_label((nil)) // expected-error {{no exact matches in call to local function 'test_no_label'}}
+
+  func test_labeled(_: Int, x: Int) {}    // expected-note 2 {{'nil' is not compatible with expected argument type 'Int' at position #2}}
+  func test_labeled(_: Int, x: String) {} // expected-note 2 {{'nil' is not compatible with expected argument type 'String' at position #2}}
+
+  test_labeled(42, x: nil)   // expected-error {{no exact matches in call to local function 'test_labeled'}}
+  test_labeled(42, x: (nil)) // expected-error {{no exact matches in call to local function 'test_labeled'}}
+}

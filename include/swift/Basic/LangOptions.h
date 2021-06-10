@@ -36,6 +36,8 @@
 
 namespace swift {
 
+  enum class DiagnosticBehavior : uint8_t;
+
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
@@ -69,6 +71,13 @@ namespace swift {
     Other
   };
 
+  enum class AccessNoteDiagnosticBehavior : uint8_t {
+    Ignore,
+    RemarkOnFailure,
+    RemarkOnFailureOrSuccess,
+    ErrorOnFailureRemarkOnSuccess
+  };
+
   /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions final {
@@ -89,6 +98,16 @@ namespace swift {
     /// macOS processes. A value of 'None' means no zippering will be
     /// performed.
     llvm::Optional<llvm::Triple> TargetVariant;
+
+    /// The target triple to instantiate the internal clang instance.
+    /// When not specified, the compiler will use the value of -target to
+    /// instantiate the clang instance.
+    /// This is mainly used to avoid lowering the target triple to use for clang when
+    /// importing a .swiftinterface whose -target value may be different from
+    /// the loading module.
+    /// The lowering triple may result in multiple versions of the same Clang
+    /// modules being built.
+    llvm::Optional<llvm::Triple> ClangTarget;
 
     /// The SDK version, if known.
     Optional<llvm::VersionTuple> SDKVersion;
@@ -114,6 +133,9 @@ namespace swift {
 
     /// Should conformance availability violations be diagnosed as errors?
     bool EnableConformanceAvailabilityErrors = false;
+
+    /// Should potential unavailability on enum cases be downgraded to a warning?
+    bool WarnOnPotentiallyUnavailableEnumCase = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
@@ -264,18 +286,18 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental asyncHandler support.
-    bool EnableExperimentalAsyncHandler = false;
-
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
+    /// Enable experimental 'distributed' actors and functions.
+    bool EnableExperimentalDistributed = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
-        !SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY;
+        !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -342,6 +364,17 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
+    /// How should we emit diagnostics about access notes?
+    AccessNoteDiagnosticBehavior AccessNoteBehavior =
+        AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;
+
+    DiagnosticBehavior getAccessNoteFailureLimit() const;
+
+    bool shouldRemarkOnAccessNoteSuccess() const {
+      return AccessNoteBehavior >=
+          AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;
+    }
+
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
@@ -406,6 +439,20 @@ namespace swift {
     };
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
+
+    /// Whether the new experimental generics implementation is enabled.
+    bool EnableRequirementMachine = false;
+
+    /// Enables debugging output from the requirement machine.
+    bool DebugRequirementMachine = false;
+
+    /// Maximum iteration count for requirement machine confluent completion
+    /// algorithm.
+    unsigned RequirementMachineStepLimit = 1000;
+
+    /// Maximum term length for requirement machine confluent completion
+    /// algorithm.
+    unsigned RequirementMachineDepthLimit = 10;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -543,6 +590,9 @@ namespace swift {
     /// Flags for developers
     ///
 
+    /// Debug the generic signatures computed by the generic signature builder.
+    bool DebugGenericSignatures = false;
+
     /// Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
@@ -556,9 +606,6 @@ namespace swift {
     /// Line numbers to activate the constraint solver debugger.
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
-
-    /// Debug the generic signatures computed by the generic signature builder.
-    bool DebugGenericSignatures = false;
 
     /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
     /// identifier reference with the provided prefix name.

@@ -418,7 +418,7 @@ public:
     if (auto ic = dyn_cast<IfConfigDecl>(D)) {
       recurse = asImpl().checkIfConfig(ic);
     } else if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
-      if (patternBinding->isSpawnLet())
+      if (patternBinding->isAsyncLet())
         recurse = asImpl().checkAsyncLet(patternBinding);
     } else {
       recurse = ShouldNotRecurse;
@@ -648,8 +648,8 @@ public:
                                   ConditionalEffectKind conditionalKind,
                                   PotentialEffectReason reason) {
     Classification result;
-
     for (auto k : kinds)
+
       result.merge(forEffect(k, conditionalKind, reason));
 
     return result;
@@ -774,6 +774,7 @@ public:
 
     // If the function doesn't have any effects, we're done here.
     if (!fnType->isThrowing() &&
+        !E->implicitlyThrows() &&
         !fnType->isAsync() &&
         !E->implicitlyAsync()) {
       return Classification();
@@ -793,8 +794,8 @@ public:
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
-          !(kind == EffectKind::Async &&
-            E->implicitlyAsync())) {
+          !(kind == EffectKind::Async && E->implicitlyAsync()) &&
+          !(kind == EffectKind::Throws && E->implicitlyThrows())) {
         return;
       }
 
@@ -1689,7 +1690,7 @@ public:
     bool suggestTryFixIt = reasonKind == PotentialEffectReason::Kind::Apply;
 
     if (reasonKind == PotentialEffectReason::Kind::AsyncLet) {
-      message = diag::throwing_spawn_let_without_try;
+      message = diag::throwing_async_let_without_try;
 
     } else if (reasonKind == PotentialEffectReason::Kind::PropertyAccess) {
       message = diag::throwing_prop_access_without_try;
@@ -1922,9 +1923,9 @@ public:
 
       if (auto declRef = dyn_cast<DeclRefExpr>(e)) {
         if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-          if (var->isSpawnLet()) {
+          if (var->isAsyncLet()) {
             Diags.diagnose(
-                e->getLoc(), diag::spawn_let_in_illegal_context,
+                e->getLoc(), diag::async_let_in_illegal_context,
                 var->getName(), static_cast<unsigned>(getKind()));
             return;
           }
@@ -1932,10 +1933,10 @@ public:
       }
     } else if (auto patternBinding = dyn_cast_or_null<PatternBindingDecl>(
                    node.dyn_cast<Decl *>())) {
-      if (patternBinding->isSpawnLet()) {
+      if (patternBinding->isAsyncLet()) {
         auto var = patternBinding->getAnchoringVarDecl(0);
         Diags.diagnose(
-            e->getLoc(), diag::spawn_let_in_illegal_context,
+            e->getLoc(), diag::async_let_in_illegal_context,
             var->getName(), static_cast<unsigned>(getKind()));
         return;
       }
@@ -2520,7 +2521,7 @@ private:
                                   PotentialEffectReason::forPropertyAccess()));
 
     } else if (E->isImplicitlyAsync()) {
-      checkThrowAsyncSite(E, /*requiresTry=*/false,
+      checkThrowAsyncSite(E, /*requiresTry=*/E->isImplicitlyThrows(),
             Classification::forUnconditional(EffectKind::Async,
                                    PotentialEffectReason::forPropertyAccess()));
 
@@ -2529,7 +2530,7 @@ private:
         // "Async let" declarations are treated as an asynchronous call
         // (to the underlying task's "get"). If the initializer was throwing,
         // then the access is also treated as throwing.
-        if (var->isSpawnLet()) {
+        if (var->isAsyncLet()) {
           // If the initializer could throw, we will have a 'try' in the
           // application of its autoclosure.
           bool throws = false;
@@ -2620,9 +2621,10 @@ private:
 
   void checkThrowAsyncSite(ASTNode E, bool requiresTry,
                            const Classification &classification) {
-    // Suppress all diagnostics when there's an un-analyzable throw site.
+    // Suppress all diagnostics when there's an un-analyzable throw/async site.
     if (classification.isInvalid()) {
       Flags.set(ContextFlags::HasAnyThrowSite);
+      Flags.set(ContextFlags::HasAnyAsyncSite);
       if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
       return;
     }
@@ -2650,15 +2652,10 @@ private:
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
                                     CurContext.isWithinInterpolatedString());
-
-        auto key = uncoveredAsync.find(anchor);
-        if (key == uncoveredAsync.end()) {
-          uncoveredAsync.insert({anchor, {}});
+        if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
           errorOrder.push_back(anchor);
-        }
-        uncoveredAsync[anchor].emplace_back(
-            *expr,
-            classification.getAsyncReason());
+        uncoveredAsync[anchor].emplace_back(*expr,
+                                            classification.getAsyncReason());
       }
     }
 
@@ -2691,7 +2688,7 @@ private:
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowReason());
       } else if (!isTryCovered) {
-        CurContext.diagnoseUncoveredThrowSite(Ctx, E,
+        CurContext.diagnoseUncoveredThrowSite(Ctx, E, // we want this one to trigger
                                               classification.getThrowReason());
       }
       break;
@@ -2830,9 +2827,9 @@ private:
         case PotentialEffectReason::Kind::AsyncLet:
           if (auto declR = dyn_cast<DeclRefExpr>(&diag.expr)) {
             if (auto var = dyn_cast<VarDecl>(declR->getDecl())) {
-              if (var->isSpawnLet()) {
+              if (var->isAsyncLet()) {
                 Ctx.Diags.diagnose(declR->getLoc(),
-                                   diag::spawn_let_without_await,
+                                   diag::async_let_without_await,
                                    var->getName());
                 continue;
               }
@@ -2861,7 +2858,7 @@ private:
                break;
              case AutoClosureExpr::Kind::AsyncLet:
                Ctx.Diags.diagnose(diag.expr.getStartLoc(),
-                                  diag::async_call_without_await_in_spawn_let);
+                                  diag::async_call_without_await_in_async_let);
                break;
              case AutoClosureExpr::Kind::SingleCurryThunk:
              case AutoClosureExpr::Kind::DoubleCurryThunk:
@@ -2871,8 +2868,18 @@ private:
            }
           continue;
          }
-         Ctx.Diags.diagnose(diag.expr.getStartLoc(),
-                            diag::async_access_without_await, 0);
+
+         auto *call = dyn_cast<ApplyExpr>(&diag.expr);
+         if (call && call->implicitlyAsync()) {
+           // Emit a tailored note if the call is implicitly async, meaning the
+           // callee is isolated to an actor.
+           auto callee = call->getCalledValue();
+           Ctx.Diags.diagnose(diag.expr.getStartLoc(), diag::actor_isolated_sync_func,
+                              callee->getDescriptiveKind(), callee->getName());
+         } else {
+           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
+                              diag::async_access_without_await, 0);
+         }
 
          continue;
         }

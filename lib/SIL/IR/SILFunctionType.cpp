@@ -1988,6 +1988,7 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
                                           Optional<SILDeclRef> origConstant,
                                           Optional<SILDeclRef> constant,
                                           Optional<SubstitutionMap> reqtSubs,
+                                          Optional<GenericSignature> genericSig,
                                           SmallVectorImpl<SILYieldInfo> &yields,
                                           SILCoroutineKind &coroutineKind,
                                           SubstFunctionTypeCollector &subst) {
@@ -2012,12 +2013,14 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
 
   auto storage = accessor->getStorage();
   auto valueType = storage->getValueInterfaceType();
+
   if (reqtSubs) {
     valueType = valueType.subst(*reqtSubs);
   }
 
-  auto canValueType = valueType->getCanonicalType(
-    accessor->getGenericSignature());
+  auto canValueType = (genericSig
+                       ? valueType->getCanonicalType(*genericSig)
+                       : valueType->getCanonicalType());
 
   // 'modify' yields an inout of the target type.
   if (accessor->getAccessorKind() == AccessorKind::Modify) {
@@ -2178,7 +2181,8 @@ static CanSILFunctionType getSILFunctionType(
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   SmallVector<SILYieldInfo, 8> yields;
   destructureYieldsForCoroutine(TC, expansionContext, origConstant, constant,
-                                reqtSubs, yields, coroutineKind, subst);
+                                reqtSubs, genericSig, yields, coroutineKind,
+                                subst);
   
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
@@ -2512,6 +2516,9 @@ static CanSILFunctionType getNativeSILFunctionType(
           DefaultConventions(NormalParameterConvention::Guaranteed));
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionTypeForConventions(DeallocatorConventions());
+
+    case SILDeclRef::Kind::EntryPoint:
+      llvm_unreachable("Handled by getSILFunctionTypeForAbstractCFunction");
     }
   }
   }
@@ -3038,6 +3045,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+  case SILDeclRef::Kind::EntryPoint:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -3262,19 +3270,21 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   }
 
   // Anonymous functions currently always have Freestanding CC.
-  if (!c.hasDecl())
+  if (c.getAbstractClosureExpr())
     return SILFunctionTypeRepresentation::Thin;
 
   // FIXME: Assert that there is a native entry point
   // available. There's no great way to do this.
 
   // Protocol witnesses are called using the witness calling convention.
-  if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
-    // Use the regular method convention for foreign-to-native thunks.
-    if (c.isForeignToNativeThunk())
-      return SILFunctionTypeRepresentation::Method;
-    assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
-    return getProtocolWitnessRepresentation(proto);
+  if (c.hasDecl()) {
+    if (auto proto = dyn_cast<ProtocolDecl>(c.getDecl()->getDeclContext())) {
+      // Use the regular method convention for foreign-to-native thunks.
+      if (c.isForeignToNativeThunk())
+        return SILFunctionTypeRepresentation::Method;
+      assert(!c.isNativeToForeignThunk() && "shouldn't be possible");
+      return getProtocolWitnessRepresentation(proto);
+    }
   }
 
   switch (c.kind) {
@@ -3298,6 +3308,9 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
       return SILFunctionTypeRepresentation::Method;
+
+    case SILDeclRef::Kind::EntryPoint:
+      return SILFunctionTypeRepresentation::CFunctionPointer;
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -4125,6 +4138,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
+  case SILDeclRef::Kind::EntryPoint:
     return nullptr;
   }
   llvm_unreachable("bad SILDeclRef kind");
@@ -4294,6 +4308,11 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
     extInfo = extInfo.withThrows(true);
   if (innerExtInfo.isAsync())
     extInfo = extInfo.withAsync(true);
+
+  // Distributed thunks are always `async throws`
+  if (constant.isDistributedThunk()) {
+    extInfo = extInfo.withAsync(true).withThrows(true);
+  }
 
   // If this is a C++ constructor, don't add the metatype "self" parameter
   // because we'll never use it and it will cause problems in IRGen.

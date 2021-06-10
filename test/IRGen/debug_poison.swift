@@ -37,7 +37,7 @@ private func useOptionalK(_: K?) -> Int {
 // CHECK: store %T12debug_poison1KC* [[REF]], %T12debug_poison1KC** %b.debug
 // CHECK: [[Y:%.*]] = call {{.*}} [[INT]] @"$s12debug_poison4use{{.*}}"(%T12debug_poison1KC* [[REF]])
 // CHECK: call void {{.*}} @swift_release {{.*}} [[REF]]
-// CHECK: store %T12debug_poison1KC* inttoptr ([[INT]] 2176 to %T12debug_poison1KC*), %T12debug_poison1KC** %b.debug
+// CHECK: store %T12debug_poison1KC* inttoptr ([[INT]] 1088 to %T12debug_poison1KC*), %T12debug_poison1KC** %b.debug
 // CHECK: store [[INT]] [[Y]], [[INT]]* %y.debug
 // CHECK: call {{.*}} void @"$s12debug_poison6useIntyySiF"([[INT]] [[Y]])
 public func testPoisonRef() {
@@ -56,7 +56,7 @@ public func testPoisonRef() {
 // CHECK: [[Y:%.*]] = call {{.*}} [[INT]] @"$s12debug_poison12useOptionalK{{.*}}"([[INT]] [[REF]])
 // CHECK: call void @swift_release
 // CHECK: [[NIL:%.*]] = icmp eq [[INT]] [[REF]], 0
-// CHECK: [[POISON:%.*]] = select i1 [[NIL]], [[INT]] [[REF]], [[INT]] 2176
+// CHECK: [[POISON:%.*]] = select i1 [[NIL]], [[INT]] [[REF]], [[INT]] 1088
 // CHECK: store [[INT]] [[POISON]], [[INT]]* %b.debug
 // CHECK: store [[INT]] [[Y]], [[INT]]* %y.debug
 // CHECK: call {{.*}} void @"$s12debug_poison6useIntyySiF"([[INT]] [[Y]])
@@ -80,7 +80,7 @@ public func testPoisonOptionalRef() {
 // CHECK: call {{.*}} void @"$s12debug_poison6useAnyyyypF"(
 // CHECK: call void @swift_{{unknownObjectRelease|release}}(%[[REFTY]]* [[REF]]) #1
 // CHECK: [[GEP1:%.*]] = getelementptr inbounds %T12debug_poison1PP, %T12debug_poison1PP* %b.debug, i32 0, i32 0
-// CHECK: store %[[REFTY]]* inttoptr ([[INT]] 2176 to %[[REFTY]]*), %[[REFTY]]** [[GEP1]]
+// CHECK: store %[[REFTY]]* inttoptr ([[INT]] 1088 to %[[REFTY]]*), %[[REFTY]]** [[GEP1]]
 // CHECK: call {{.*}} void @"$s12debug_poison7useNoneyyF"()
 public func testPoisonExistential() {
   let b: P = D()
@@ -102,7 +102,7 @@ public func testPoisonExistential() {
 // CHECK: call {{.*}} void @"$s12debug_poison6useAnyyyypF"(
 // CHECK: call void @swift_{{unknownObjectRelease|release}}(%[[REFTY]]* [[REF]]) #1
 // CHECK: [[GEP1:%.*]] = getelementptr inbounds %T12debug_poison1Q_Xl, %T12debug_poison1Q_Xl* %b.debug, i32 0, i32 0
-// CHECK: store %[[REFTY]]* inttoptr ([[INT]] 2176 to %[[REFTY]]*), %[[REFTY]]** [[GEP1]]
+// CHECK: store %[[REFTY]]* inttoptr ([[INT]] 1088 to %[[REFTY]]*), %[[REFTY]]** [[GEP1]]
 // CHECK: call {{.*}} void @"$s12debug_poison7useNoneyyF"()
 public func testPoisonComposite() {
   let b: Q & AnyObject = E()

@@ -87,7 +87,7 @@ func asyncParams(arg: String, _ completion: (String?, Error?) -> Void) {
 // ASYNC-SIMPLE: func {{[a-zA-Z_]+}}(arg: String) async throws -> String {
 // ASYNC-SIMPLE-NEXT: let str = try await simpleErr(arg: arg)
 // ASYNC-SIMPLE-NEXT: print("simpleErr")
-// ASYNC-SIMPLE-NEXT: return str
+// ASYNC-SIMPLE-NEXT: {{^}}return str{{$}}
 // ASYNC-SIMPLE-NEXT: print("after")
 // ASYNC-SIMPLE-NEXT: }
 
@@ -120,7 +120,7 @@ func asyncResNewErr(arg: String, _ completion: (Result<String, Error>) -> Void) 
 // ASYNC-ERR-NEXT: do {
 // ASYNC-ERR-NEXT: let str = try await simpleErr(arg: arg)
 // ASYNC-ERR-NEXT: print("simpleErr")
-// ASYNC-ERR-NEXT: return str
+// ASYNC-ERR-NEXT: {{^}}return str{{$}}
 // ASYNC-ERR-NEXT: print("after")
 // ASYNC-ERR-NEXT: } catch let err {
 // ASYNC-ERR-NEXT: throw CustomError.Bad
@@ -142,13 +142,58 @@ func asyncUnhandledCompletion(_ completion: (String) -> Void) {
 // ASYNC-UNHANDLED: func asyncUnhandledCompletion() async -> String {
 // ASYNC-UNHANDLED-NEXT: let str = await simple()
 // ASYNC-UNHANDLED-NEXT: let success = run {
-// ASYNC-UNHANDLED-NEXT: <#completion#>(str)
-// ASYNC-UNHANDLED-NEXT: return true
+// ASYNC-UNHANDLED-NEXT:   <#completion#>(str)
+// ASYNC-UNHANDLED-NEXT:   {{^}} return true{{$}}
 // ASYNC-UNHANDLED-NEXT: }
 // ASYNC-UNHANDLED-NEXT: if !success {
-// ASYNC-UNHANDLED-NEXT: return "bad"
+// ASYNC-UNHANDLED-NEXT: {{^}} return "bad"{{$}}
 // ASYNC-UNHANDLED-NEXT: }
 // ASYNC-UNHANDLED-NEXT: }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-UNHANDLED-COMMENT %s
+func asyncUnhandledCommentedCompletion(_ completion: (String) -> Void) {
+  // a
+  simple { str in // b
+    // c
+    let success = run {
+      // d
+      completion(str)
+      // e
+      return true
+      // f
+    }
+    // g
+    if !success {
+      // h
+      completion("bad")
+      // i
+    }
+    // j
+  }
+  // k
+}
+// ASYNC-UNHANDLED-COMMENT:      func asyncUnhandledCommentedCompletion() async -> String {
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // a
+// ASYNC-UNHANDLED-COMMENT-NEXT:   let str = await simple()
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // b
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // c
+// ASYNC-UNHANDLED-COMMENT-NEXT:   let success = run {
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // d
+// ASYNC-UNHANDLED-COMMENT-NEXT:     <#completion#>(str)
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // e
+// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return true{{$}}
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // f
+// ASYNC-UNHANDLED-COMMENT-NEXT:   }
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // g
+// ASYNC-UNHANDLED-COMMENT-NEXT:   if !success {
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // h
+// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return "bad"{{$}}
+// ASYNC-UNHANDLED-COMMENT-NEXT:     // i
+// ASYNC-UNHANDLED-COMMENT-NEXT:   }
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // j
+// ASYNC-UNHANDLED-COMMENT-NEXT:   {{ }}
+// ASYNC-UNHANDLED-COMMENT-NEXT:   // k
+// ASYNC-UNHANDLED-COMMENT-NEXT: }
 
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
 func voidAndErrorCompletion(completion: (Void?, Error?) -> Void) {
@@ -202,3 +247,65 @@ func voidResultCompletion(completion: (Result<Void, Error>) -> Void) {
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=NON-COMPLETION-HANDLER %s
 func functionWithSomeHandler(handler: (String) -> Void) {}
 // NON-COMPLETION-HANDLER: func functionWithSomeHandler() async -> String {}
+
+// rdar://77789360 Make sure we don't print a double return statement.
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING %s
+func testReturnHandling(_ completion: (String?, Error?) -> Void) {
+  return completion("", nil)
+}
+// RETURN-HANDLING:      func testReturnHandling() async throws -> String {
+// RETURN-HANDLING-NEXT:   {{^}} return ""{{$}}
+// RETURN-HANDLING-NEXT: }
+
+// rdar://77789360 Make sure we don't print a double return statement and don't
+// completely drop completion(a).
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING2 %s
+func testReturnHandling2(completion: @escaping (String) -> ()) {
+  testReturnHandling { x, err in
+    guard let x = x else {
+      let a = ""
+      return completion(a)
+    }
+    let b = ""
+    return completion(b)
+  }
+}
+// RETURN-HANDLING2:      func testReturnHandling2() async -> String {
+// RETURN-HANDLING2-NEXT:   do {
+// RETURN-HANDLING2-NEXT:     let x = try await testReturnHandling()
+// RETURN-HANDLING2-NEXT:     let b = ""
+// RETURN-HANDLING2-NEXT:     {{^}}<#return#> b{{$}}
+// RETURN-HANDLING2-NEXT:   } catch let err {
+// RETURN-HANDLING2-NEXT:     let a = ""
+// RETURN-HANDLING2-NEXT:     {{^}}<#return#> a{{$}}
+// RETURN-HANDLING2-NEXT:   }
+// RETURN-HANDLING2-NEXT: }
+
+// FIXME: We should arguably be able to handle transforming this completion handler call (rdar://78011350).
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RETURN-HANDLING3 %s
+func testReturnHandling3(_ completion: (String?, Error?) -> Void) {
+  return (completion("", nil))
+}
+// RETURN-HANDLING3:      func testReturnHandling3() async throws -> String {
+// RETURN-HANDLING3-NEXT:   {{^}} return (<#completion#>("", nil)){{$}}
+// RETURN-HANDLING3-NEXT: }
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RDAR78693050 %s
+func rdar78693050(_ completion: () -> Void) {
+  simple { str in
+    print(str)
+  }
+  if .random() {
+    return completion()
+  }
+  completion()
+}
+
+// RDAR78693050:      func rdar78693050() async {
+// RDAR78693050-NEXT:   let str = await simple()
+// RDAR78693050-NEXT:   print(str)
+// RDAR78693050-NEXT:   if .random() {
+// RDAR78693050-NEXT:     return
+// RDAR78693050-NEXT:   }
+// RDAR78693050-NEXT:   return
+// RDAR78693050-NEXT: }

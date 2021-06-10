@@ -445,6 +445,14 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       }
     }
 
+    // the init(transport:) initializer of a distributed actor is special, as
+    // it ties the actors lifecycle with the transport. As such, it must always
+    // be invoked by any other initializer, just like a designated initializer.
+    if (auto clazz = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+      if (clazz->isDistributedActor() && decl->isDistributedActorLocalInit())
+        return CtorInitializerKind::Designated;
+    }
+
     if (decl->getDeclContext()->getExtendedProtocolDecl()) {
       return CtorInitializerKind::Convenience;
     }
@@ -1102,13 +1110,13 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
-  
+
+  auto *module = ED->getParentModule();
+
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
-    ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return proto &&
-        TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext());
+    return TypeChecker::conformsToKnownProtocol(rawTy, protoKind, module);
   };
 
   static auto otherLiteralProtocolKinds = {
@@ -2149,6 +2157,9 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     nestedRepr = tupleRepr->getElementType(0);
   }
 
+  if (auto isolated = dyn_cast<IsolatedTypeRepr>(nestedRepr))
+    nestedRepr = isolated->getBase();
+  
   if (isa<InOutTypeRepr>(nestedRepr) &&
       param->isDefaultArgument()) {
     auto &ctx = param->getASTContext();
@@ -2299,6 +2310,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       auto selfParam = computeSelfParam(AFD,
                                         /*isInitializingCtor*/true,
                                         /*wantDynamicSelf*/true);
+      PD->setIsolated(selfParam.isIsolated());
       return selfParam.getPlainType();
     }
 

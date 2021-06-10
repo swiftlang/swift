@@ -310,15 +310,19 @@ entity ::=
 ```
 diagnostic ::=
 {
-    <key.line>:        (int64)  // The line upon which the diagnostic was emitted.
-    <key.column>:      (int64)  // The column upon which the diagnostic was emitted.
-    <key.filepath>:    (string) // The absolute path to the file that was being parsed
-                                // when the diagnostic was emitted.
-    <key.severity>:    (UID)    // The severity of the diagnostic. Can be one of:
-                                //   - source.diagnostic.severity.note
-                                //   - source.diagnostic.severity.warning
-                                //   - source.diagnostic.severity.error
-    <key.description>: (string) // A description of the diagnostic.
+    <key.id>:               (string)       // The internal ID of the diagnostic.
+    <key.line>:             (int64)        // The line upon which the diagnostic was emitted.
+    <key.column>:           (int64)        // The column upon which the diagnostic was emitted.
+    <key.filepath>:         (string)       // The absolute path to the file that was being parsed
+                                           // when the diagnostic was emitted.
+    <key.severity>:         (UID)          // The severity of the diagnostic. Can be one of:
+                                           //   - source.diagnostic.severity.note
+                                           //   - source.diagnostic.severity.warning
+                                           //   - source.diagnostic.severity.error
+    <key.description>:      (string)       // A description of the diagnostic.
+    [opt] <key.categories>: (array) [UID*] // The categories of the diagnostic. Can be:
+                                           //   - source.diagnostic.category.deprecation
+                                           //   - source.diagnostic.category.no_usage
 }
 ```
 

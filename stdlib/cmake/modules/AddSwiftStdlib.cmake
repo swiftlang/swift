@@ -965,11 +965,6 @@ function(_add_swift_target_library_single target name)
       endif()
     endif()
 
-    # Always use @rpath for XCTest
-    if(module_name STREQUAL "XCTest")
-      set(install_name_dir "@rpath")
-    endif()
-
     if(SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR)
       set(install_name_dir "${SWIFTLIB_SINGLE_DARWIN_INSTALL_NAME_DIR}")
     endif()
@@ -1348,6 +1343,16 @@ function(_add_swift_target_library_single target name)
       ${library_search_directories})
     target_link_libraries("${target_static}" PRIVATE
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
+
+    # Force executables linker language to be CXX so that we do not link using the
+    # host toolchain swiftc.
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "C")
+    else()
+      set_property(TARGET "${target_static}" PROPERTY
+        LINKER_LANGUAGE "CXX")
+    endif()
   endif()
 
   # Do not add code here.
@@ -1650,6 +1655,12 @@ function(add_swift_target_library name)
                       "-Xfrontend;-disable-implicit-concurrency-module-import")
   endif()
 
+  # Turn off implicit import of _Distributed when building libraries
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS
+                      "-Xfrontend;-disable-implicit-distributed-module-import")
+  endif()
+
   # If we are building this library for targets, loop through the various
   # SDKs building the variants of this library.
   list_intersect(
@@ -1914,9 +1925,7 @@ function(add_swift_target_library name)
       # These paths must come before their normal counterparts so that when compiling
       # macCatalyst-only or unzippered-twin overlays the macCatalyst version
       # of a framework is found and not the Mac version.
-      if(maccatalyst_build_flavor STREQUAL "ios-like"
-          OR (name STREQUAL "swiftXCTest"
-            AND maccatalyst_build_flavor STREQUAL "zippered"))
+      if(maccatalyst_build_flavor STREQUAL "ios-like")
 
         # The path to find iOS-only frameworks (such as UIKit) under macCatalyst.
         set(ios_support_frameworks_path "${SWIFT_SDK_${sdk}_PATH}/System/iOSSupport/System/Library/Frameworks/")

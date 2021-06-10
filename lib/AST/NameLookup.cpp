@@ -1401,6 +1401,30 @@ NominalTypeDecl::lookupDirect(DeclName name,
                            DirectLookupRequest({this, name, flags}), {});
 }
 
+AbstractFunctionDecl*
+NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
+  auto &C = func->getASTContext();
+  auto *selfTyDecl = func->getParent()->getSelfNominalTypeDecl();
+
+  // _remote functions only exist as counterparts to a distributed function.
+  if (!func->isDistributed())
+    return nullptr;
+
+  auto localFuncName = func->getBaseIdentifier().str().str();
+  auto remoteFuncId = C.getIdentifier("_remote_" + localFuncName);
+
+  auto remoteFuncDecls = selfTyDecl->lookupDirect(DeclName(remoteFuncId));
+  if (remoteFuncDecls.empty())
+    return nullptr;
+
+  if (auto remoteDecl = dyn_cast<AbstractFunctionDecl>(remoteFuncDecls.front())) {
+    // TODO: implement more checks here, it has to be the exact right signature.
+    return remoteDecl;
+  }
+
+  return nullptr;
+}
+
 TinyPtrVector<ValueDecl *>
 DirectLookupRequest::evaluate(Evaluator &evaluator,
                               DirectLookupDescriptor desc) const {
@@ -2229,6 +2253,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
+  case TypeReprKind::Isolated:
   case TypeReprKind::Metatype:
   case TypeReprKind::Owned:
   case TypeReprKind::Protocol:
@@ -2755,7 +2780,35 @@ void FindLocalVal::checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     return;
   }
 }
-  
+void FindLocalVal::checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
+  if (!D)
+    return;
+  if (auto var = dyn_cast<VarDecl>(D)) {
+    auto dc = var->getDeclContext();
+    if ((isa<AbstractFunctionDecl>(dc) || isa<ClosureExpr>(dc)) &&
+        var->hasAttachedPropertyWrapper()) {
+      // FIXME: This is currently required to set the interface type of the
+      // auxiliary variables (unless 'var' is a closure param).
+      (void)var->getPropertyWrapperBackingPropertyType();
+
+      auto vars = var->getPropertyWrapperAuxiliaryVariables();
+      if (vars.backingVar) {
+        Consumer.foundDecl(vars.backingVar, Reason);
+      }
+      if (vars.projectionVar) {
+        Consumer.foundDecl(vars.projectionVar, Reason);
+      }
+      if (vars.localWrappedValueVar) {
+        Consumer.foundDecl(vars.localWrappedValueVar, Reason);
+
+        // If 'localWrappedValueVar' exists, the original var is shadowed.
+        return;
+      }
+    }
+  }
+  Consumer.foundDecl(D, Reason);
+}
+
 void FindLocalVal::checkParameterList(const ParameterList *params) {
   for (auto param : *params) {
     checkValueDecl(param, DeclVisibilityKind::FunctionParameter);

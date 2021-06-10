@@ -1,9 +1,9 @@
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(SwiftStdlib 5.5, *)
 @globalActor public final class MeowActor {
   public static let shared = _Impl()
   
   public actor _Impl {
-    @actorIndependent
+    nonisolated
     public func enqueue(_ job: UnownedJob) {
       // DOES NOTHING! :)
     }

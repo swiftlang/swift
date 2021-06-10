@@ -31,12 +31,6 @@
 using namespace swift;
 
 
-// The AliasAnalysis Cache must not grow beyond this size.
-// We limit the size of the AA cache to 2**14 because we want to limit the
-// memory usage of this cache.
-static const int AliasAnalysisMaxCacheSize = 16384;
-
-
 //===----------------------------------------------------------------------===//
 //                                AA Debugging
 //===----------------------------------------------------------------------===//
@@ -538,27 +532,6 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2,
   return MA;
 }
 
-void AliasAnalysis::handleDeleteNotification(SILNode *node) {
-  // The pointer 'node' is going away.  We can't scan the whole cache
-  // and remove all of the occurrences of the pointer. Instead we remove
-  // the pointer from the index caches.
-
-  if (auto *value = dyn_cast<ValueBase>(node))
-    ValueToIndex.invalidateValue(value);
-
-  if (auto *inst = dyn_cast<SILInstruction>(node)) {
-    InstructionToIndex.invalidateValue(inst);
-    
-    // When a MultipleValueInstruction is deleted, we have to invalidate all
-    // the instruction results.
-    if (auto *mvi = dyn_cast<MultipleValueInstruction>(inst)) {
-      for (unsigned idx = 0, end = mvi->getNumResults(); idx < end; ++idx) {
-        ValueToIndex.invalidateValue(mvi->getResult(idx));
-      }
-    }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                                Entry Points
 //===----------------------------------------------------------------------===//
@@ -567,17 +540,13 @@ void AliasAnalysis::handleDeleteNotification(SILNode *node) {
 /// to disambiguate the two values.
 AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
                                  SILType TBAAType1, SILType TBAAType2) {
-  AliasKeyTy Key = toAliasKey(V1, V2, TBAAType1, TBAAType2);
+  AliasCacheKey Key = {V1, V2, TBAAType1.getOpaqueValue(),
+                       TBAAType2.getOpaqueValue()};
 
   // Check if we've already computed this result.
   auto It = AliasCache.find(Key);
   if (It != AliasCache.end()) {
     return It->second;
-  }
-
-  // Flush the cache if the size of the cache is too large.
-  if (AliasCache.size() > AliasAnalysisMaxCacheSize) {
-    AliasCache.clear();
   }
 
   // Calculate the aliasing result and store it in the cache.
@@ -807,24 +776,35 @@ bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(
   return EA->mayReleaseReferenceContent(releasedReference, accessedPointer);
 }
 
-void AliasAnalysis::initialize(SILPassManager *PM) {
-  SEA = PM->getAnalysis<SideEffectAnalysis>();
-  EA = PM->getAnalysis<EscapeAnalysis>();
-}
+namespace {
+
+class AliasAnalysisContainer : public FunctionAnalysisBase<AliasAnalysis> {
+  SideEffectAnalysis *SEA = nullptr;
+  EscapeAnalysis *EA = nullptr;
+
+public:
+  AliasAnalysisContainer() : FunctionAnalysisBase(SILAnalysisKind::Alias) {}
+
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return K & InvalidationKind::Instructions;
+  }
+
+  // Computes loop information for the given function using dominance
+  // information.
+  virtual std::unique_ptr<AliasAnalysis>
+  newFunctionAnalysis(SILFunction *F) override {
+    assert(EA && SEA && "dependent analysis not initialized");
+    return std::make_unique<AliasAnalysis>(SEA, EA);
+  }
+
+  virtual void initialize(SILPassManager *PM) override {
+    SEA = PM->getAnalysis<SideEffectAnalysis>();
+    EA = PM->getAnalysis<EscapeAnalysis>();
+  }
+};
+
+} // end anonymous namespace
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
-  return new AliasAnalysis(M);
-}
-
-AliasKeyTy AliasAnalysis::toAliasKey(SILValue V1, SILValue V2,
-                                     SILType Type1, SILType Type2) {
-  size_t idx1 = ValueToIndex.getIndex(V1);
-  assert(idx1 != std::numeric_limits<size_t>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  size_t idx2 = ValueToIndex.getIndex(V2);
-  assert(idx2 != std::numeric_limits<size_t>::max() &&
-         "~0 index reserved for empty/tombstone keys");
-  void *t1 = Type1.getOpaqueValue();
-  void *t2 = Type2.getOpaqueValue();
-  return {idx1, idx2, t1, t2};
+  return new AliasAnalysisContainer();
 }

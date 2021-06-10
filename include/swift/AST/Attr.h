@@ -162,10 +162,6 @@ protected:
       kind : NumInlineKindBits
     );
 
-    SWIFT_INLINE_BITFIELD(ActorIndependentAttr, DeclAttribute, NumActorIndependentKindBits,
-      kind : NumActorIndependentKindBits
-    );
-
     SWIFT_INLINE_BITFIELD(OptimizeAttr, DeclAttribute, NumOptimizationModeBits,
       mode : NumOptimizationModeBits
     );
@@ -298,6 +294,9 @@ public:
 
     /// Whether this attribute is only valid when concurrency is enabled.
     ConcurrencyOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 16),
+
+    /// Whether this attribute is only valid when distributed is enabled.
+    DistributedOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 17),
   };
 
   LLVM_READNONE
@@ -390,6 +389,10 @@ public:
 
   static bool isConcurrencyOnly(DeclAttrKind DK) {
     return getOptions(DK) & ConcurrencyOnly;
+  }
+
+  static bool isDistributedOnly(DeclAttrKind DK) {
+    return getOptions(DK) & DistributedOnly;
   }
 
   static bool isUserInaccessible(DeclAttrKind DK) {
@@ -858,6 +861,7 @@ public:
   /// Determine whether the name associated with this attribute was
   /// implicit.
   bool isNameImplicit() const { return Bits.ObjCAttr.ImplicitName; }
+  void setNameImplicit(bool newValue) { Bits.ObjCAttr.ImplicitName = newValue; }
 
   /// Set the name of this entity.
   void setName(ObjCSelector name, bool implicit) {
@@ -884,11 +888,6 @@ public:
   /// @objc inference rules.
   void setSwift3Inferred(bool inferred = true) {
     Bits.ObjCAttr.Swift3Inferred = inferred;
-  }
-
-  /// Clear the name of this entity.
-  void clearName() {
-    NameData = nullptr;
   }
 
   /// Retrieve the source locations for the names in a non-implicit
@@ -1217,25 +1216,6 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ReferenceOwnership;
-  }
-};
-
-/// Represents an actorIndependent/actorIndependent(unsafe) decl attribute.
-class ActorIndependentAttr : public DeclAttribute {
-public:
-  ActorIndependentAttr(SourceLoc atLoc, SourceRange range, ActorIndependentKind kind)
-      : DeclAttribute(DAK_ActorIndependent, atLoc, range, /*Implicit=*/false) {
-    Bits.ActorIndependentAttr.kind = unsigned(kind);
-  }
-
-  ActorIndependentAttr(ActorIndependentKind kind, bool IsImplicit=false)
-    : ActorIndependentAttr(SourceLoc(), SourceRange(), kind) {
-      setImplicit(IsImplicit);
-    }
-
-  ActorIndependentKind getKind() const { return ActorIndependentKind(Bits.ActorIndependentAttr.kind); }
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ActorIndependent;
   }
 };
 

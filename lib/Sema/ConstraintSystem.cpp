@@ -2486,52 +2486,6 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
     bool foundThrow() { return FoundThrow; }
   };
 
-  // A walker that looks for 'async' and 'await' expressions
-  // that aren't nested within closures or nested declarations.
-  class FindInnerAsync : public ASTWalker {
-    bool FoundAsync = false;
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If we've found an 'await', record it and terminate the traversal.
-      if (isa<AwaitExpr>(expr)) {
-        FoundAsync = true;
-        return { false, nullptr };
-      }
-
-      // Do not recurse into other closures.
-      if (isa<ClosureExpr>(expr))
-        return { false, expr };
-
-      return { true, expr };
-    }
-
-    bool walkToDeclPre(Decl *decl) override {
-      // Do not walk into function or type declarations.
-      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-        if (patternBinding->isSpawnLet())
-          FoundAsync = true;
-
-        return true;
-      }
-
-      return false;
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override { 
-      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
-        if (forEach->getAwaitLoc().isValid()) {
-          FoundAsync = true;
-          return { false, nullptr };
-        }
-      }
-
-      return { true, stmt };
-    }
-
-  public:
-    bool foundAsync() { return FoundAsync; }
-  };
-
   // If either 'throws' or 'async' was explicitly specified, use that
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
@@ -2552,13 +2506,11 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
 
   auto throwFinder = FindInnerThrows(*this, expr);
   body->walk(throwFinder);
-  auto asyncFinder = FindInnerAsync();
-  body->walk(asyncFinder);
   auto result = ASTExtInfoBuilder()
-    .withThrows(throwFinder.foundThrow())
-    .withAsync(asyncFinder.foundAsync())
-    .withConcurrent(concurrent)
-    .build();
+                    .withThrows(throwFinder.foundThrow())
+                    .withAsync(bool(findAsyncNode(expr)))
+                    .withConcurrent(concurrent)
+                    .build();
   closureEffectsCache[expr] = result;
   return result;
 }
@@ -3248,8 +3200,8 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
 
   const auto &solution = solutions.front();
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
-    auto *lhs = binaryOp->getArg()->getElement(0);
-    auto *rhs = binaryOp->getArg()->getElement(1);
+    auto *lhs = binaryOp->getLHS();
+    auto *rhs = binaryOp->getRHS();
 
     auto lhsType =
         solution.simplifyType(solution.getType(lhs))->getRValueType();
@@ -3724,10 +3676,16 @@ static bool diagnoseAmbiguity(
         assert(fn);
 
         if (fn->getNumParams() == 1) {
+          auto argExpr =
+              simplifyLocatorToAnchor(solution.Fixes.front()->getLocator());
+          assert(argExpr);
+
           const auto &param = fn->getParams()[0];
+          auto argType = solution.simplifyType(cs.getType(argExpr));
+
           DE.diagnose(noteLoc, diag::candidate_has_invalid_argument_at_position,
                       solution.simplifyType(param.getPlainType()),
-                      /*position=*/1, param.isInOut());
+                      /*position=*/1, param.isInOut(), argType);
         } else {
           DE.diagnose(noteLoc, diag::candidate_partial_match,
                       fn->getParamListAsString(fn->getParams()));
@@ -3818,12 +3776,14 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     const auto &solution = *entry.first;
     const auto *fix = entry.second;
 
-    if (fix->getLocator()->isForContextualType()) {
+    auto *locator = fix->getLocator();
+
+    if (locator->isForContextualType()) {
       contextualFixes.push_back({&solution, fix});
       continue;
     }
 
-    auto *calleeLocator = solution.getCalleeLocator(fix->getLocator());
+    auto *calleeLocator = solution.getCalleeLocator(locator);
     fixesByCallee[calleeLocator].push_back({&solution, fix});
   }
 
@@ -4393,14 +4353,6 @@ bool constraints::hasAppliedSelf(const OverloadChoice &choice,
          doesMemberRefApplyCurriedSelf(baseType, decl);
 }
 
-bool constraints::conformsToKnownProtocol(DeclContext *dc, Type type,
-                                          KnownProtocolKind protocol) {
-  if (auto *proto =
-          TypeChecker::getProtocol(dc->getASTContext(), SourceLoc(), protocol))
-    return (bool)TypeChecker::conformsToProtocol(type, proto, dc);
-  return false;
-}
-
 /// Check whether given type conforms to `RawPepresentable` protocol
 /// and return the witness type.
 Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
@@ -4411,22 +4363,12 @@ Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
   if (!rawReprType)
     return Type();
 
-  auto conformance = TypeChecker::conformsToProtocol(type, rawReprType, DC);
+  auto conformance = TypeChecker::conformsToProtocol(type, rawReprType,
+                                                     DC->getParentModule());
   if (conformance.isInvalid())
     return Type();
 
   return conformance.getTypeWitnessByName(type, cs.getASTContext().Id_RawValue);
-}
-
-Type constraints::isRawRepresentable(
-    ConstraintSystem &cs, Type type,
-    KnownProtocolKind rawRepresentableProtocol) {
-  Type rawTy = isRawRepresentable(cs, type);
-  if (!rawTy ||
-      !conformsToKnownProtocol(cs.DC, rawTy, rawRepresentableProtocol))
-    return Type();
-
-  return rawTy;
 }
 
 void ConstraintSystem::generateConstraints(
@@ -4581,46 +4523,13 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // It's only valid to use `&` in argument positions, but we need
   // to figure out exactly where it was used.
   if (auto *argExpr = getAsExpr<InOutExpr>(locator->getAnchor())) {
-    auto *argList = cs.getParentExpr(argExpr);
-    assert(argList);
+    auto argInfo = cs.isArgumentExpr(argExpr);
+    assert(argInfo && "Incorrect use of `inout` expression");
 
-    // `inout` expression might be wrapped in a number of
-    // parens e.g. `test(((&x)))`.
-    if (isa<ParenExpr>(argList)) {
-      for (;;) {
-        auto nextParent = cs.getParentExpr(argList);
-        assert(nextParent && "Incorrect use of `inout` expression");
+    Expr *call;
+    unsigned argIdx;
 
-        // e.g. `test((&x), x: ...)`
-        if (isa<TupleExpr>(nextParent)) {
-          argList = nextParent;
-          break;
-        }
-
-        // e.g. `test(((&x)))`
-        if (isa<ParenExpr>(nextParent)) {
-          argList = nextParent;
-          continue;
-        }
-
-        break;
-      }
-    }
-
-    unsigned argIdx = 0;
-    if (auto *tuple = dyn_cast<TupleExpr>(argList)) {
-      auto arguments = tuple->getElements();
-
-      for (auto idx : indices(arguments)) {
-        if (arguments[idx]->getSemanticsProvidingExpr() == argExpr) {
-          argIdx = idx;
-          break;
-        }
-      }
-    }
-
-    auto *call = cs.getParentExpr(argList);
-    assert(call);
+    std::tie(call, argIdx) = *argInfo;
 
     ParameterTypeFlags flags;
     locator = cs.getConstraintLocator(
@@ -4792,6 +4701,61 @@ bool constraints::isStandardComparisonOperator(ASTNode node) {
     return opName->isStandardComparisonOperator();
   }
   return false;
+}
+
+Optional<std::pair<Expr *, unsigned>>
+ConstraintSystem::isArgumentExpr(Expr *expr) {
+  auto *argList = getParentExpr(expr);
+  if (!argList) {
+    return None;
+  }
+
+  if (isa<ParenExpr>(argList)) {
+    for (;;) {
+      auto *parent = getParentExpr(argList);
+      if (!parent)
+        return None;
+
+      if (isa<TupleExpr>(parent)) {
+        argList = parent;
+        break;
+      }
+
+      // Drop all of the semantically insignificant parens
+      // that might be wrapping an argument e.g. `test(((42)))`
+      if (isa<ParenExpr>(parent)) {
+        argList = parent;
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  if (!(isa<ParenExpr>(argList) || isa<TupleExpr>(argList)))
+    return None;
+
+  auto *application = getParentExpr(argList);
+  if (!application)
+    return None;
+
+  if (!(isa<ApplyExpr>(application) || isa<SubscriptExpr>(application) ||
+        isa<ObjectLiteralExpr>(application)))
+    return None;
+
+  unsigned argIdx = 0;
+  if (auto *tuple = dyn_cast<TupleExpr>(argList)) {
+    auto arguments = tuple->getElements();
+
+    for (auto idx : indices(arguments)) {
+      if (arguments[idx]->getSemanticsProvidingExpr() == expr) {
+        argIdx = idx;
+        break;
+      }
+    }
+  }
+
+  return std::make_pair(application, argIdx);
 }
 
 bool constraints::isOperatorArgument(ConstraintLocator *locator,
@@ -4972,7 +4936,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
                                              bool isDefaultWrappedValue,
-                                             bool isSpawnLetWrapper) {
+                                             bool isAsyncLetWrapper) {
   auto &Context = DC->getASTContext();
   bool isInDefaultArgumentContext = false;
   if (auto *init = dyn_cast<Initializer>(DC)) {
@@ -4994,7 +4958,7 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
-  if (isSpawnLetWrapper)
+  if (isAsyncLetWrapper)
     closure->setThunkKind(AutoClosureExpr::Kind::AsyncLet);
 
   Expr *result = closure;
@@ -5707,4 +5671,61 @@ bool constraints::isOperatorDisjunction(Constraint *disjunction) {
 
   auto *decl = getOverloadChoiceDecl(choices.front());
   return decl ? decl->isOperator() : false;
+}
+
+ASTNode constraints::findAsyncNode(ClosureExpr *closure) {
+  auto *body = closure->getBody();
+  if (!body)
+    return ASTNode();
+
+  // A walker that looks for 'async' and 'await' expressions
+  // that aren't nested within closures or nested declarations.
+  class FindInnerAsync : public ASTWalker {
+    ASTNode AsyncNode;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // If we've found an 'await', record it and terminate the traversal.
+      if (isa<AwaitExpr>(expr)) {
+        AsyncNode = expr;
+        return {false, nullptr};
+      }
+
+      // Do not recurse into other closures.
+      if (isa<ClosureExpr>(expr))
+        return {false, expr};
+
+      return {true, expr};
+    }
+
+    bool walkToDeclPre(Decl *decl) override {
+      // Do not walk into function or type declarations.
+      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+        if (patternBinding->isAsyncLet())
+          AsyncNode = patternBinding;
+
+        return true;
+      }
+
+      return false;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
+        if (forEach->getAwaitLoc().isValid()) {
+          AsyncNode = forEach;
+          return {false, nullptr};
+        }
+      }
+
+      return {true, stmt};
+    }
+
+  public:
+    ASTNode getAsyncNode() { return AsyncNode; }
+  };
+
+  FindInnerAsync asyncFinder;
+  body->walk(asyncFinder);
+
+  return asyncFinder.getAsyncNode();
 }

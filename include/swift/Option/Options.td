@@ -51,6 +51,11 @@ def ArgumentIsPath : OptionFlag;
 // and read/parsed from there when reconstituting a .swiftmodule from it.
 def ModuleInterfaceOption : OptionFlag;
 
+// The option should be written into a .swiftinterface module interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+// The option can be safely ignored by the older compiler.
+def ModuleInterfaceOptionIgnorable : OptionFlag;
+
 // The option causes the output of a supplementary output, or is the path option
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
@@ -63,6 +68,9 @@ def SwiftSymbolGraphExtractOption : OptionFlag;
 
 // The option should be accepted by swift-api-digester.
 def SwiftAPIDigesterOption : OptionFlag;
+
+// The option only functions in the new driver.
+def NewDriverOnlyOption : OptionFlag;
 
 /////////
 // Options
@@ -1074,6 +1082,14 @@ def target_variant : Separate<["-"], "target-variant">,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
 
+def clang_target : Separate<["-"], "clang-target">,
+  Flags<[FrontendOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
+  HelpText<"Separately set the target we should use for internal Clang instance">;
+
+def disable_clang_target : Separate<["-"], "disable-clang-target">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Disable a separately specified target triple for Clang instance to use">;
+
 def profile_generate : Flag<["-"], "profile-generate">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Generate instrumented code to collect execution counts">;
@@ -1181,7 +1197,7 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
   Alias<working_directory>;
 
 def user_module_version : Separate<["-"], "user-module-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable, NewDriverOnlyOption]>,
   HelpText<"Module version specified from Swift module authors">,
   MetaVarName<"<vers>">;
 
@@ -1243,6 +1259,11 @@ def skip_inherited_docs : Flag<["-"], "skip-inherited-docs">,
          NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
   HelpText<"Skip emitting doc comments for members inherited through classes or "
            "default implementations">;
+
+def include_spi_symbols : Flag<["-"], "include-spi-symbols">,
+  Flags<[SwiftSymbolGraphExtractOption, FrontendOption,
+         NoInteractiveOption, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Add symbols with SPI information to the symbol graph">;
 
 // swift-api-digester-only options
 def dump_sdk: Flag<["-", "--"], "dump-sdk">,

@@ -20,7 +20,7 @@ class Canary {
   }
 }
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(SwiftStdlib 5.5, *) {
   let task = detach {
     let canary = Canary()
     _ = await Task.withCancellationHandler {
