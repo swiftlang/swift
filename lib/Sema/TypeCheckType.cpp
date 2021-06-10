@@ -713,11 +713,7 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
           if (const auto boundTy = openerFn(unboundTy))
             return boundTy;
 
-        // Complain if we're allowed to and bail out with an error.
-        if (!options.contains(TypeResolutionFlags::SilenceErrors))
-          diagnoseUnboundGenericType(type, loc);
-
-        return ErrorType::get(resolution.getASTContext());
+        return type;
       }
     }
 
@@ -915,11 +911,19 @@ Type TypeResolution::applyUnboundGenericArguments(
         return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
       }
 
-      assert(!resultType->hasTypeParameter());
-      return resultType;
+      if (!resultType->hasTypeParameter())
+        return resultType;
+
+      auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
+      if (parentSig) {
+        for (auto gp : parentSig->getGenericParams())
+          subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+              genericSig->getConcreteType(gp);
+      }
+    } else {
+      subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
 
-    subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     skipRequirementsCheck |= parentTy->hasTypeVariable();
   } else if (auto genericEnv =
                  decl->getDeclContext()->getGenericEnvironmentOfContext()) {
@@ -1497,16 +1501,21 @@ static Type resolveNestedIdentTypeComponent(TypeResolution resolution,
 
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
+    bool hasUnboundOpener = !!resolution.getUnboundTypeOpener();
+
     if (options.contains(TypeResolutionFlags::SilenceErrors)) {
-      if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member)
+      if (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
+                                                     hasUnboundOpener)
             != TypeChecker::UnsupportedMemberTypeAccessKind::None)
         return ErrorType::get(ctx);
     }
 
-    switch (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member)) {
+    switch (TypeChecker::isUnsupportedMemberTypeAccess(parentTy, member,
+                                                       hasUnboundOpener)) {
     case TypeChecker::UnsupportedMemberTypeAccessKind::None:
       break;
 
+    case TypeChecker::UnsupportedMemberTypeAccessKind::NominalTypeOfUnboundGeneric:
     case TypeChecker::UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric:
     case TypeChecker::UnsupportedMemberTypeAccessKind::AssociatedTypeOfUnboundGeneric:
       diagnoseUnboundGenericType(parentTy, parentRange.End);
@@ -1644,6 +1653,23 @@ resolveIdentTypeComponent(TypeResolution resolution,
       return ErrorType::get(result->getASTContext());
 
     parentRange.End = nestedComp->getEndLoc();
+  }
+
+  // Diagnose an error if the last component's generic arguments are missing.
+  auto lastComp = components.back();
+  auto options = resolution.getOptions();
+
+  if (result->is<UnboundGenericType>() &&
+      !isa<GenericIdentTypeRepr>(lastComp) &&
+      !resolution.getUnboundTypeOpener() &&
+      !options.is(TypeResolverContext::TypeAliasDecl)) {
+
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnoseUnboundGenericType(result,
+                                 lastComp->getNameLoc().getBaseNameLoc());
+    }
+
+    return ErrorType::get(result->getASTContext());
   }
 
   return result;
