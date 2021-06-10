@@ -2575,7 +2575,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
           if (!consumeIf(tok::r_paren, ownershipLocEnd))
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
-      } else if (Tok.isAny(tok::identifier, tok::kw_self) &&
+      } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
                  peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
       } else {
@@ -2584,7 +2584,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         continue;
       }
 
-      if (Tok.isNot(tok::identifier, tok::kw_self)) {
+      if (Tok.isNot(tok::identifier, tok::kw_self, tok::code_complete)) {
         diagnose(Tok, diag::expected_capture_specifier_name);
         skipUntil(tok::comma, tok::r_square);
         continue;
@@ -2602,10 +2602,20 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       if (peekToken().isNot(tok::equal)) {
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
-        name = Context.getIdentifier(Tok.getText());
-        auto initializerResult = parseExprIdentifier();
-        status |= initializerResult;
-        initializer = initializerResult.get();
+        if (!Tok.is(tok::code_complete)) {
+          name = Context.getIdentifier(Tok.getText());
+          auto initializerResult = parseExprIdentifier();
+          status |= initializerResult;
+          initializer = initializerResult.get();
+        } else {
+          auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+          if (CodeCompletion)
+            CodeCompletion->completePostfixExprBeginning(CCE);
+          name = Identifier();
+          initializer = CCE;
+          consumeToken();
+          status.setHasCodeCompletion();
+        }
 
         // It is a common error to try to capture a nested field instead of just
         // a local name, reject it with a specific error message.
@@ -2617,7 +2627,13 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       } else {
         // Otherwise, the name is a new declaration.
-        consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
+        if (!Tok.is(tok::code_complete)) {
+          consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
+        } else {
+          // Ignore completion token because it's a new declaration.
+          name = Identifier();
+          consumeToken(tok::code_complete);
+        }
         equalLoc = consumeToken(tok::equal);
 
         auto ExprResult = parseExpr(diag::expected_init_capture_specifier);
