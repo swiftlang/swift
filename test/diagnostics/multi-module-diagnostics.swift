@@ -59,6 +59,14 @@ open class SubClass: ParentClass {
 // CHECK-OUTOFDATE-NOT: moda.ParentClass:{{.*}}: note:
 // CHECK-OUTOFDATE: moda.swift:{{.*}}: note:
 
+// Underlying file is empty, the locations are now completely invalid (ie. not
+// within the buffer). Make sure there's no crash and that we fallback to using
+// the generated source.
+// RUN: rm %t/moda.swift
+// RUN: touch %t/moda.swift
+// RUN: not %target-swift-frontend -typecheck -I %t/mods -D MODB %s 2>&1 | %FileCheck -check-prefix=CHECK-EMPTY %s
+// CHECK-EMPTY: moda.ParentClass:{{.*}}: note:
+
 // The file and line from a location directive should be used whether or not it
 // exists - the actual source still comes from the original file, so that's what
 // matters in terms of whether generated code is used or not
