@@ -52,7 +52,11 @@ void FutureFragment::destroy() {
   }
 }
 
-FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
+FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
+                                             AsyncContext *waitingTaskContext,
+                                             TaskContinuationFunction *resumeFn,
+                                             AsyncContext *callerContext,
+                                             OpaqueValue *result) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
 
@@ -60,6 +64,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
   auto fragment = futureFragment();
 
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
+  bool contextIntialized = false;
   while (true) {
     switch (queueHead.getStatus()) {
     case Status::Error:
@@ -78,6 +83,16 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
       _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is now complete. We'll need to add ourselves to the queue.
       break;
+    }
+
+    if (!contextIntialized) {
+      contextIntialized = true;
+      auto context =
+          reinterpret_cast<TaskFutureWaitAsyncContext *>(waitingTaskContext);
+      context->errorResult = nullptr;
+      context->successResultPointer = result;
+      context->ResumeParent = resumeFn;
+      context->Parent = callerContext;
     }
 
     // Put the waiting task at the beginning of the wait queue.
@@ -687,26 +702,22 @@ static void swift_task_future_waitImpl(
   waitingTask->ResumeTask = task_future_wait_resume_adapter;
   waitingTask->ResumeContext = callContext;
 
-  // Stash the result pointer for when we resume later.
-  auto context = static_cast<TaskFutureWaitAsyncContext *>(callContext);
-  context->ResumeParent = resumeFn;
-  context->Parent = callerContext;
-  context->successResultPointer = result;
-  context->errorResult = nullptr;
-
   // Wait on the future.
   assert(task->isFuture());
 
-  switch (task->waitFuture(waitingTask)) {
+  switch (task->waitFuture(waitingTask, callContext, resumeFn, callerContext,
+                           result)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
     return;
 
-  case FutureFragment::Status::Success:
+  case FutureFragment::Status::Success: {
     // Run the task with a successful result.
-    context->fillWithSuccess(task->futureFragment());
-    // FIXME: force tail call
-    return waitingTask->runInFullyEstablishedContext();
+    auto future = task->futureFragment();
+    future->getResultType()->vw_initializeWithCopy(result,
+                                                   future->getStoragePtr());
+    return resumeFn(callerContext);
+  }
 
   case FutureFragment::Status::Error:
     fatalError(0, "future reported an error, but wait cannot throw");
@@ -724,33 +735,31 @@ void swift_task_future_wait_throwingImpl(
   waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = callContext;
 
-  // Stash the result pointer for when we resume later.
-  auto context = static_cast<TaskFutureWaitAsyncContext *>(callContext);
-  context->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
-  context->Parent = callerContext;
-  context->successResultPointer = result;
-  context->errorResult = nullptr;
+  auto resumeFn = reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
 
   // Wait on the future.
   assert(task->isFuture());
 
-  switch (task->waitFuture(waitingTask)) {
+  switch (task->waitFuture(waitingTask, callContext, resumeFn, callerContext,
+                           result)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
     return;
 
-  case FutureFragment::Status::Success:
-    // Run the task with a successful result.
-    context->fillWithSuccess(task->futureFragment());
-    // FIXME: force tail call
-    return waitingTask->runInFullyEstablishedContext();
+  case FutureFragment::Status::Success: {
+    auto future = task->futureFragment();
+    future->getResultType()->vw_initializeWithCopy(result,
+                                                   future->getStoragePtr());
+    return resumeFunction(callerContext, nullptr /*error*/);
+  }
 
- case FutureFragment::Status::Error:
+  case FutureFragment::Status::Error: {
     // Run the task with an error result.
-    context->fillWithError(task->futureFragment());
-    // FIXME: force tail call
-    return waitingTask->runInFullyEstablishedContext();
+    auto future = task->futureFragment();
+    auto error = future->getError();
+    swift_errorRetain(error);
+    return resumeFunction(callerContext, error);
+  }
   }
 }
 
