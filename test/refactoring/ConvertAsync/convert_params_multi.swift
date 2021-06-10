@@ -25,6 +25,13 @@ manyWithError { res1, res2, err in
 // MANYBOUND-NEXT: print("got error \(bad)")
 // MANYBOUND-NEXT: }
 
+// FIXME: This case is a little tricky: Being in the else block of 'if let str = res1'
+// should allow us to place 'if let i = res2' in the failure block. However, this
+// is a success condition, so we still place it in the success block. Really what
+// we need to do here is check to see if manyWithError has an existing async
+// alternative that still returns optional success values, and allow success
+// classification in that case. Otherwise, we'd probably be better off leaving
+// the condition unhandled, as it's not clear what the user is doing.
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MANYUNBOUND-ERR %s
 manyWithError { res1, res2, err in
   print("before")

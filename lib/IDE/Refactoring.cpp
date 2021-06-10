@@ -4933,6 +4933,12 @@ private:
   const ParamDecl *ErrParam;
   bool IsResultParam;
 
+  /// This is set to \c true if we're currently classifying on a known condition
+  /// path, where \c CurrentBlock is set to the appropriate block. This lets us
+  /// be more lenient with unhandled conditions as we already know the block
+  /// we're supposed to be in.
+  bool IsKnownConditionPath = false;
+
   CallbackClassifier(ClassifiedBlocks &Blocks, const FuncDecl *Callee,
                      ArrayRef<const ParamDecl *> SuccessParams,
                      llvm::DenseSet<SwitchStmt *> &HandledSwitches,
@@ -5248,7 +5254,12 @@ private:
       // placeholders added (ideally we'd remove them)
       // TODO: Remove known conditions and split the `if` statement
 
-      if (CallbackConditions.empty()) {
+      if (IsKnownConditionPath) {
+        // If we're on a known condition path, we can be lenient as we already
+        // know what block we're in and can therefore just add the conditional
+        // straight to it.
+        CurrentBlock->addNode(Statement);
+      } else if (CallbackConditions.empty()) {
         // Technically this has a similar problem, ie. the else could have
         // conditions that should be in either success/error
         CurrentBlock->addNode(Statement);
@@ -5311,19 +5322,45 @@ private:
 
     if (ElseStmt) {
       if (auto *BS = dyn_cast<BraceStmt>(ElseStmt)) {
-        setNodes(ElseBlock, ThenBlock, NodesToPrint::inBraceStmt(BS));
+        // If this is a guard statement, we know that we'll always exit,
+        // allowing us to classify any additional nodes into the opposite block.
+        auto AlwaysExits = isa<GuardStmt>(Statement);
+        setNodes(ElseBlock, ThenBlock, NodesToPrint::inBraceStmt(BS),
+                 AlwaysExits);
       } else {
+        // If we reached here, we should have an else if statement. Given we
+        // know we're in the else of a known condition, temporarily flip the
+        // current block, and set that we know what path we're on.
+        llvm::SaveAndRestore<bool> CondScope(IsKnownConditionPath, true);
+        llvm::SaveAndRestore<ClassifiedBlock *> BlockScope(CurrentBlock,
+                                                           ElseBlock);
         classifyNodes(ArrayRef<ASTNode>(ElseStmt),
                       /*endCommentLoc*/ SourceLoc());
       }
     }
   }
 
+  /// Adds \p Nodes to \p Block, potentially flipping the current block if we
+  /// can determine that the nodes being added will cause control flow to leave
+  /// the scope.
+  ///
+  /// \param Block The block to add the nodes to.
+  /// \param OtherBlock The block for the opposing condition path.
+  /// \param Nodes The nodes to add.
+  /// \param AlwaysExitsScope Whether the nodes being added always exit the
+  /// scope, and therefore whether the current block should be flipped.
   void setNodes(ClassifiedBlock *Block, ClassifiedBlock *OtherBlock,
-                NodesToPrint Nodes) {
-    if (Nodes.hasTrailingReturnOrBreak()) {
-      CurrentBlock = OtherBlock;
+                NodesToPrint Nodes, bool AlwaysExitsScope = false) {
+    // Drop an explicit trailing 'return' or 'break' if we can.
+    bool HasTrailingReturnOrBreak = Nodes.hasTrailingReturnOrBreak();
+    if (HasTrailingReturnOrBreak)
       Nodes.dropTrailingReturnOrBreakIfPossible();
+
+    // If we know we're exiting the scope, we can set IsKnownConditionPath, as
+    // we know any future nodes should be classified into the other block.
+    if (HasTrailingReturnOrBreak || AlwaysExitsScope) {
+      CurrentBlock = OtherBlock;
+      IsKnownConditionPath = true;
       Block->addAllNodes(std::move(Nodes));
     } else {
       Block->addAllNodes(std::move(Nodes));
