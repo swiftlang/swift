@@ -113,10 +113,8 @@ if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
-  if(building_darwin_sdks)
-    add_subdirectory(Darwin)
-  endif()
+  # On Apple platforms, we aren't building any overlays (other than Darwin in
+  # Platform above). Instead, we're picking them up from the SDK.
 
   if(WINDOWS IN_LIST SWIFT_SDKS)
     add_subdirectory(Windows)

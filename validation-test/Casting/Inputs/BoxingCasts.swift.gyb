@@ -198,7 +198,7 @@ contents = [
 %       nextTestNumber()
 BoxingCasts.test("${testFunctionName()}(): Casting ${box.name}(${content.name}) to ${target}") {
   // TODO: Selectively enable/disable cases that work with earlier stdlib
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     ${testFunctionName()}()
   }
 }
@@ -224,7 +224,7 @@ func ${testFunctionName()}() {
 %         nextTestNumber()
 BoxingCasts.test("${testFunctionName()}(): Casting ${box.name}(${innerBox.name}(${content.name})) to ${target}") {
   // TODO: Selectively enable/disable cases that work with earlier stdlib
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
     ${testFunctionName()}()
   }
 }

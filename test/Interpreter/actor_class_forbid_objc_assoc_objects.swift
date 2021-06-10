@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -Xfrontend -enable-experimental-concurrency %s -o %t/out
+// RUN: %target-codesign %t/out
 // RUN: %target-run %t/out
 
 // REQUIRES: concurrency

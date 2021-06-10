@@ -344,7 +344,7 @@ ${TestSuite}.test("init(uncheckedBounds:)")
   expectEqual(upperInt, r.upperBound.value)
 }
 
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
   // Debug check was introduced in https://github.com/apple/swift/pull/34961
   ${TestSuite}.test("init(uncheckedBounds:) with invalid values")
   .xfail(

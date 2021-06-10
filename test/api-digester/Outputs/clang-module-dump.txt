@@ -136,24 +136,6 @@
           "name": "NSObjectProtocol",
           "printedName": "NSObjectProtocol",
           "usr": "c:objc(pl)NSObject"
-        },
-        {
-          "kind": "Conformance",
-          "name": "Equatable",
-          "printedName": "Equatable",
-          "usr": "s:SQ"
-        },
-        {
-          "kind": "Conformance",
-          "name": "Hashable",
-          "printedName": "Hashable",
-          "usr": "s:SH"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg",
-          "usr": "s:s7CVarArgP"
         }
       ]
     },
@@ -412,24 +394,6 @@
           "name": "NSObjectProtocol",
           "printedName": "NSObjectProtocol",
           "usr": "c:objc(pl)NSObject"
-        },
-        {
-          "kind": "Conformance",
-          "name": "Equatable",
-          "printedName": "Equatable",
-          "usr": "s:SQ"
-        },
-        {
-          "kind": "Conformance",
-          "name": "Hashable",
-          "printedName": "Hashable",
-          "usr": "s:SH"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg",
-          "usr": "s:s7CVarArgP"
         }
       ]
     },
@@ -592,24 +556,6 @@
           "name": "NSObjectProtocol",
           "printedName": "NSObjectProtocol",
           "usr": "c:objc(pl)NSObject"
-        },
-        {
-          "kind": "Conformance",
-          "name": "Equatable",
-          "printedName": "Equatable",
-          "usr": "s:SQ"
-        },
-        {
-          "kind": "Conformance",
-          "name": "Hashable",
-          "printedName": "Hashable",
-          "usr": "s:SH"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg",
-          "usr": "s:s7CVarArgP"
         }
       ]
     }

@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -typecheck %S/Inputs/sdk-protocol-class/os3.swift
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar61260194
 
 import ObjectiveC
 
