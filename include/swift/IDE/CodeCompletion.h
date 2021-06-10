@@ -33,12 +33,14 @@ class Decl;
 class DeclContext;
 class FrontendOptions;
 class ModuleDecl;
+class SourceFile;
 
 namespace ide {
 
 class CodeCompletionCache;
 class CodeCompletionContext;
 class CodeCompletionResultBuilder;
+struct CodeCompletionResultSink;
 struct RequestedCachedModule;
 
 /// A routine to remove code completion tokens from code completion
@@ -424,6 +426,13 @@ enum class CodeCompletionFlairBit: uint8_t {
 
   /// E.g. type decl introducer ('enum', 'class', etc.) in a function body.
   RareKeywordAtCurrentPosition = 1 << 4,
+
+  /// E.g. protocol names at an expression position.
+  RareTypeAtCurrentPosition = 1 << 5,
+
+  /// E.g. referencing a type, function, etc… at top level position in a non
+  /// script/main.swift file
+  ExpressionAtNonScriptOrMainFileScope = 1 << 6,
 };
 
 using CodeCompletionFlair = OptionSet<CodeCompletionFlairBit>;
@@ -752,6 +761,12 @@ public:
            getOperatorKind() != CodeCompletionOperatorKind::None);
   }
 
+  /// Copy this result to \p Sink with \p newFlair . Note that this does NOT
+  /// copy the value of \c CompletionString , \c AssociatedUSRs etc. it only
+  /// copies the pointers to them.
+  CodeCompletionResult *withFlair(CodeCompletionFlair newFlair,
+                                  CodeCompletionResultSink &Sink);
+
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
@@ -805,6 +820,11 @@ public:
 
   CodeCompletionFlair getFlair() const {
     return static_cast<CodeCompletionFlair>(Flair);
+  }
+
+  /// Modify "flair" of this result *in place*.
+  void setFlair(CodeCompletionFlair flair) {
+    Flair = unsigned(flair.toRaw());
   }
 
   bool isNotRecommended() const {
@@ -961,7 +981,7 @@ public:
   virtual void
   handleResultsAndModules(CodeCompletionContext &context,
                           ArrayRef<RequestedCachedModule> requestedModules,
-                          DeclContext *DCForModules) = 0;
+                          DeclContext *DC) = 0;
 };
 
 /// A simplified code completion consumer interface that clients can use to get
@@ -1014,14 +1034,15 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
                                            const ModuleDecl *module,
                                            ArrayRef<std::string> accessPath,
                                            bool needLeadingDot,
-                                           const DeclContext *currDeclContext);
+                                           const SourceFile *SF);
 
 /// Copy code completion results from \p sourceSink to \p targetSink, possibly
-/// restricting by \p onlyTypes.
-void copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
-                               CodeCompletionResultSink &sourceSink,
-                               bool onlyTypes,
-                               bool onlyPrecedenceGroups);
+/// restricting by \p onlyTypes. Returns copied results in \p targetSink.
+MutableArrayRef<CodeCompletionResult *>
+copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                          CodeCompletionResultSink &sourceSink,
+                          bool onlyTypes,
+                          bool onlyPrecedenceGroups);
 
 } // end namespace ide
 } // end namespace swift

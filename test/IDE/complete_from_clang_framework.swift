@@ -78,8 +78,8 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment3()[#Void#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment4()[#Void#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[FreeFunction]/OtherModule[Foo]: fooFuncWithComment5()[#Void#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]:     FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
-// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]:     FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
+// CLANG_FOO-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[Class]/OtherModule[Foo]:        FooClassBase[#FooClassBase#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[Class]/OtherModule[Foo]:        FooClassDerived[#FooClassDerived#]{{; name=.+$}}
 // CLANG_FOO-DAG: Decl[GlobalVar]/OtherModule[Foo]:    FOO_MACRO_1[#Int32#]{{; name=.+$}}
@@ -198,9 +198,9 @@ func testCompleteModuleQualifiedFoo2() {
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]: .FooSubEnum1Y[#FooSubEnum1#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo.FooSub]: .FooSubUnnamedEnumeratorA1[#Int#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[GlobalVar]/OtherModule[Foo]:     .fooIntVar[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      ._InternalProt[#_InternalProt#]
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      .FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
-// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]:      .FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: ._InternalProt[#_InternalProt#]
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: .FooProtocolBase[#FooProtocolBase#]{{; name=.+$}}
+// CLANG_QUAL_FOO_2-DAG: Decl[Protocol]/OtherModule[Foo]/Flair[RareType]: .FooProtocolDerived[#FooProtocolDerived#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum1[#FooEnum1#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum2[#FooEnum2#]{{; name=.+$}}
 // CLANG_QUAL_FOO_2-DAG: Decl[Struct]/OtherModule[Foo]:        .FooEnum3[#FooEnum3#]{{; name=.+$}}
