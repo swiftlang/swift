@@ -5344,6 +5344,10 @@ ERROR(availability_enum_element_no_potential,
       none, "enum cases with associated values cannot be marked potentially unavailable with "
       "'@available'", ())
 
+WARNING(availability_enum_element_no_potential_warn,
+        none, "enum cases with associated values cannot be marked potentially unavailable with "
+        "'@available'", ())
+
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (Identifier, DeclName, StringRef, llvm::VersionTuple))

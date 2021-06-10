@@ -453,6 +453,10 @@ def disable_conformance_availability_errors : Flag<["-"],
   "disable-conformance-availability-errors">,
   HelpText<"Diagnose conformance availability violations as warnings">;
 
+def warn_on_potentially_unavailable_enum_case : Flag<["-"],
+  "warn-on-potentially-unavailable-enum-case">,
+  HelpText<"Downgrade potential unavailability of enum case to a warning">;
+
 def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
   HelpText<"Deprecated, will be removed in future versions.">;
 

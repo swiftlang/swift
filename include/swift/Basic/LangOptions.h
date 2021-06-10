@@ -134,6 +134,9 @@ namespace swift {
     /// Should conformance availability violations be diagnosed as errors?
     bool EnableConformanceAvailabilityErrors = false;
 
+    /// Should potential unavailability on enum cases be downgraded to a warning?
+    bool WarnOnPotentiallyUnavailableEnumCase = false;
+
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
     unsigned TypoCorrectionLimit = 0;
