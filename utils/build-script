@@ -53,12 +53,6 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 # These versions are community sourced. At any given time only the Xcode
 # version used by Swift CI is officially supported. See ci.swift.org
 _SUPPORTED_XCODE_BUILDS = [
-    ("12.2 beta 3", "12B5035g"),
-    ("12.2 Release Candidate", "12B5044c"),
-    ("12.2", "12B45b"),
-    ("12.3", "12C33"),
-    ("12.4", "12D4e"),
-    ("12.5 beta 3", "12E5244e"),
     ("12.5", "12E262"),
     ("13.0 beta", "13A5154h")
 ]
