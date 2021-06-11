@@ -51,3 +51,12 @@ func testBadDefaultInit() {
   _ = NotInitializableOptionalStruct() // expected-error {{missing argument for parameter 'opt' in call}}
   _ = NotInitializableOptionalClass() // expected-error {{'NotInitializableOptionalClass' cannot be constructed because it has no accessible initializers}}
 }
+
+// expected-error@+1{{actor 'NotInitializableActor' has no initializers}}
+actor NotInitializableActor {
+
+  // expected-note@+1{{stored property 'a' without initial value prevents synthesized initializers}}
+  var a: Int
+  // expected-note@+1{{stored property 'b' without initial value prevents synthesized initializers}}
+  var b: Float
+}

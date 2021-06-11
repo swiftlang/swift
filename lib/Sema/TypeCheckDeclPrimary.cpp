@@ -1225,6 +1225,7 @@ static std::string getFixItStringForDecodable(ClassDecl *CD,
 static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   ASTContext &C = classDecl->getASTContext();
   C.Diags.diagnose(classDecl, diag::class_without_init,
+                   classDecl->isExplicitActor(),
                    classDecl->getDeclaredType());
 
   // HACK: We've got a special case to look out for and diagnose specifically to

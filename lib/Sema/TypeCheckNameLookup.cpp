@@ -358,8 +358,25 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   return result;
 }
 
+static bool doesTypeAliasFullyConstrainAllOuterGenericParams(
+    TypeAliasDecl *aliasDecl) {
+  auto parentSig = aliasDecl->getDeclContext()->getGenericSignatureOfContext();
+  auto genericSig = aliasDecl->getGenericSignature();
+
+  if (!parentSig || !genericSig)
+    return false;
+
+  for (auto *paramType : parentSig->getGenericParams()) {
+    if (!genericSig->isConcreteType(paramType))
+      return false;
+  }
+
+  return true;
+}
+
 TypeChecker::UnsupportedMemberTypeAccessKind
-TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
+TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
+                                           bool hasUnboundOpener) {
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -376,13 +393,18 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
     // underlying type is not dependent.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
       if (!aliasDecl->isGeneric() &&
-          aliasDecl->getUnderlyingType()->hasTypeParameter()) {
+          aliasDecl->getUnderlyingType()->hasTypeParameter() &&
+          !doesTypeAliasFullyConstrainAllOuterGenericParams(aliasDecl)) {
         return UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric;
       }
     }
 
     if (isa<AssociatedTypeDecl>(typeDecl))
       return UnsupportedMemberTypeAccessKind::AssociatedTypeOfUnboundGeneric;
+
+    if (isa<NominalTypeDecl>(typeDecl))
+      if (!hasUnboundOpener)
+        return UnsupportedMemberTypeAccessKind::NominalTypeOfUnboundGeneric;
   }
 
   if (type->isExistentialType() &&
@@ -433,7 +455,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       continue;
     }
 
-    if (isUnsupportedMemberTypeAccess(type, typeDecl)
+    if (isUnsupportedMemberTypeAccess(type, typeDecl, true)
           != TypeChecker::UnsupportedMemberTypeAccessKind::None) {
       auto memberType = typeDecl->getDeclaredInterfaceType();
 
