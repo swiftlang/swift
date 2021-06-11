@@ -672,6 +672,11 @@ SIMPLE_DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
   APIBreakingToAdd | APIBreakingToRemove,
   119)
 
+SIMPLE_DECL_ATTR(_assemblyVision, EmitAssemblyVisionRemarks,
+  OnFunc | UserInaccessible | NotSerialized |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  120)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

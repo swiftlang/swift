@@ -85,3 +85,10 @@ public func mix5() -> (Klass, Klass) {
     let x = getGlobal()
     return (x, Klass())
 }
+
+@_assemblyVision
+public func mix4a() -> (Klass, Klass) {
+    let x = getGlobal()
+    return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+                        // expected-remark @-1 {{heap allocated ref of type 'Klass'}}
+}
