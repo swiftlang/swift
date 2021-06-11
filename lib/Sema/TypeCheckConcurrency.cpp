@@ -1407,6 +1407,12 @@ namespace {
           }
         }
 
+        // "Defer" blocks are treated as if they are in their enclosing context.
+        if (auto func = dyn_cast<FuncDecl>(dc)) {
+          if (func->isDeferBody())
+            continue;
+        }
+
         // Check isolation of the context itself. We do this separately
         // from the closure check because closures capture specific variables
         // while general isolation is declaration-based.
