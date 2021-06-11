@@ -489,6 +489,23 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   return 0;
 }
 
+static void setRefactoringFields(sourcekitd_object_t &Req, TestOptions Opts,
+                                 sourcekitd_uid_t RefactoringKind,
+                                 llvm::MemoryBuffer *SourceBuf) {
+  if (Opts.Offset && !Opts.Line && !Opts.Col) {
+    auto LineCol = resolveToLineCol(Opts.Offset, SourceBuf);
+    Opts.Line = LineCol.first;
+    Opts.Col = LineCol.second;
+  }
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                        RequestSemanticRefactoring);
+  sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, RefactoringKind);
+  sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());
+  sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);
+  sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);
+  sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
@@ -721,16 +738,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
-#define SEMANTIC_REFACTORING(KIND, NAME, ID) case SourceKitRequest::KIND:                 \
-    {                                                                                     \
-      sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestSemanticRefactoring); \
-      sourcekitd_request_dictionary_set_uid(Req, KeyActionUID, KindRefactoring##KIND);    \
-      sourcekitd_request_dictionary_set_string(Req, KeyName, Opts.Name.c_str());          \
-      sourcekitd_request_dictionary_set_int64(Req, KeyLine, Opts.Line);                   \
-      sourcekitd_request_dictionary_set_int64(Req, KeyColumn, Opts.Col);                  \
-      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);               \
-      break;                                                                              \
-    }
+#define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
+  case SourceKitRequest::KIND:                                                 \
+    setRefactoringFields(Req, Opts, KindRefactoring##KIND, SourceBuf.get());   \
+    break;
 #include "swift/IDE/RefactoringKinds.def"
 
   case SourceKitRequest::MarkupToXML: {
