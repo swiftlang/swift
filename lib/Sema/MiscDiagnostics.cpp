@@ -4541,6 +4541,15 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
       auto *firstArg = BE->getLHS();
       auto *secondArg = BE->getRHS();
 
+      // Make sure that both arguments are valid before doing anything else,
+      // this helps us to debug reports of crashes in `conformsToKnownProtocol`
+      // referencing arguments (rdar://78920375).
+      //
+      // Since this diagnostic should only be run on type-checked AST,
+      // it's unclear what caused one of the arguments to have null type.
+      assert(firstArg->getType() && "Expected valid type for first argument");
+      assert(secondArg->getType() && "Expected valid type for second argument");
+
       // Both arguments must conform to FloatingPoint protocol.
       if (!TypeChecker::conformsToKnownProtocol(firstArg->getType(),
                                                 KnownProtocolKind::FloatingPoint,
