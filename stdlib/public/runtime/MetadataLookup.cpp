@@ -1959,23 +1959,9 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
 
 __attribute__((constructor))
 static void installGetClassHook() {
-  // FIXME: delete this #if and dlsym once we don't
-  // need to build with older libobjc headers
-#if !OBJC_GETCLASSHOOK_DEFINED
-  using objc_hook_getClass =  BOOL(*)(const char * _Nonnull name,
-                                      Class _Nullable * _Nonnull outClass);
-  auto objc_setHook_getClass =
-    (void(*)(objc_hook_getClass _Nonnull,
-             objc_hook_getClass _Nullable * _Nonnull))
-    dlsym(RTLD_DEFAULT, "objc_setHook_getClass");
-#endif
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability"
-  if (&objc_setHook_getClass) {
-    objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook);
+  if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_getClass)) {
+    SWIFT_RUNTIME_WEAK_USE(objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook));
   }
-#pragma clang diagnostic pop
 }
 
 #endif

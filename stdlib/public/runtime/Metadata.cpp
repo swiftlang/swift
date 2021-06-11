@@ -2580,14 +2580,6 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
 }
 
 static bool installLazyClassNameHook() {
-#if !OBJC_SETHOOK_LAZYCLASSNAMER_DEFINED
-  using objc_hook_lazyClassNamer =
-    const char * _Nullable (*)(_Nonnull Class cls);
-  auto objc_setHook_lazyClassNamer =
-    (void (*)(objc_hook_lazyClassNamer, objc_hook_lazyClassNamer *))
-    dlsym(RTLD_NEXT, "objc_setHook_lazyClassNamer");  
-#endif
-
   static objc_hook_lazyClassNamer oldHook;
   auto myHook = [](Class theClass) -> const char * {
     ClassMetadata *metadata = (ClassMetadata *)theClass;
@@ -2596,14 +2588,12 @@ static bool installLazyClassNameHook() {
     return oldHook(theClass);
   };
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability"
-  if (objc_setHook_lazyClassNamer == nullptr)
-    return false;
-  objc_setHook_lazyClassNamer(myHook, &oldHook);
-#pragma clang diagnostic pop
+  if (SWIFT_RUNTIME_WEAK_CHECK(objc_setHook_lazyClassNamer)) {
+    SWIFT_RUNTIME_WEAK_USE(objc_setHook_lazyClassNamer(myHook, &oldHook));
+    return true;
+  }
 
-  return true;
+  return false;
 }
 
 __attribute__((constructor)) SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static bool
@@ -3077,11 +3067,6 @@ getSuperclassMetadata(ClassMetadata *self, bool allowDependency) {
   return {MetadataDependency(), second};
 }
 
-// Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
-// We test availability with a nullptr check, but the compiler doesn't see that.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability-new"
-
 static SWIFT_CC(swift) MetadataDependency
 _swift_initClassMetadataImpl(ClassMetadata *self,
                              ClassLayoutFlags layoutFlags,
@@ -3108,11 +3093,6 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     (void)unused;
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
-
-  // Temporary workaround until objc_loadClassref is in the SDK.
-  static auto objc_loadClassref =
-    (Class (*)(void *))
-    dlsym(RTLD_NEXT, "objc_loadClassref");
 #endif
 
   // Copy field offsets, generic arguments and (if necessary) vtable entries
@@ -3149,10 +3129,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // The compiler enforces that @objc methods in extensions of classes
     // with resilient ancestry have the correct availability, so it should
     // be safe to ignore the stub in this case.
-    if (stub != nullptr &&
-        objc_loadClassref != nullptr &&
-        &_objc_realizeClassFromSwift != nullptr) {
-      _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
+    if (stub != nullptr && SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift)) {
+      SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub)));
     } else {
       swift_instantiateObjCClass(self);
     }
@@ -3163,8 +3141,6 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   return MetadataDependency();
 }
-
-#pragma clang diagnostic pop
 
 void swift::swift_initClassMetadata(ClassMetadata *self,
                                     ClassLayoutFlags layoutFlags,
@@ -3189,12 +3165,6 @@ swift::swift_initClassMetadata2(ClassMetadata *self,
 
 #if SWIFT_OBJC_INTEROP
 
-// Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
-// We test availability with a nullptr check, but the compiler doesn't see that.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunguarded-availability-new"
-
-
 static SWIFT_CC(swift) MetadataDependency
 _swift_updateClassMetadataImpl(ClassMetadata *self,
                                ClassLayoutFlags layoutFlags,
@@ -3202,7 +3172,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets,
                                bool allowDependency) {
-  bool requiresUpdate = (&_objc_realizeClassFromSwift != nullptr);
+  bool requiresUpdate = SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
 
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even
@@ -3250,7 +3220,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
     initObjCClass(self, numFields, fieldTypes, fieldOffsets);
 
     // See remark above about how this slides field offset globals.
-    _objc_realizeClassFromSwift((Class)self, (Class)self);
+    SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift((Class)self, (Class)self));
   }
 
   return MetadataDependency();
@@ -3277,7 +3247,6 @@ swift::swift_updateClassMetadata2(ClassMetadata *self,
                                         /*allowDependency*/ true);
 }
 
-#pragma clang diagnostic pop
 #endif
 
 #ifndef NDEBUG
