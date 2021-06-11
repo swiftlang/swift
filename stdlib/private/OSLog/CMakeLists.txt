@@ -14,10 +14,10 @@ add_swift_target_library(swiftOSLogTestHelper
   OSLogPrivacy.swift
   OSLogFloatFormatting.swift
 
-  SWIFT_MODULE_DEPENDS_IOS Darwin ObjectiveC
-  SWIFT_MODULE_DEPENDS_OSX Darwin ObjectiveC
-  SWIFT_MODULE_DEPENDS_TVOS Darwin ObjectiveC
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin ObjectiveC
+  SWIFT_MODULE_DEPENDS_IOS Darwin _Concurrency
+  SWIFT_MODULE_DEPENDS_OSX Darwin _Concurrency
+  SWIFT_MODULE_DEPENDS_TVOS Darwin _Concurrency
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin _Concurrency
   TARGET_SDKS ALL_APPLE_PLATFORMS
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT never_install
