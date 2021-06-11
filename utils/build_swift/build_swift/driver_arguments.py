@@ -183,6 +183,7 @@ def _apply_default_arguments(args):
         args.test_tvos = False
         args.test_watchos = False
         args.test_android = False
+        args.test_cmark = False
         args.test_swiftpm = False
         args.test_swift_driver = False
         args.test_swiftsyntax = False
@@ -1069,6 +1070,8 @@ def create_argument_parser():
            help='skip cleaning up swiftpm')
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
            help='skip cleaning up Swift driver')
+    option('--skip-test-cmark', toggle_false('test_cmark'),
+           help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),

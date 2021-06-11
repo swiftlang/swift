@@ -86,7 +86,7 @@ class CMark(cmake_product.CMakeProduct):
         if self.is_cross_compile_target(host_target):
             return False
 
-        return self.args.test
+        return self.args.test_cmark
 
     def test(self, host_target):
         """
