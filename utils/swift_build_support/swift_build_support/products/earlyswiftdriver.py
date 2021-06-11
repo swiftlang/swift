@@ -47,7 +47,7 @@ class EarlySwiftDriver(product.Product):
         if self.args.build_early_swift_driver:
             if toolchain.host_toolchain().find_tool("swift") is None:
                 warn_msg = 'Host toolchain could not locate a '\
-                           'compiler to build swift-drver. '\
+                           'compiler to build swift-driver. '\
                            '(Try `--skip-early-swift-driver`)'
                 print('-- Warning: {}', warn_msg)
                 return False
