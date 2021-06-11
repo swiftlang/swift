@@ -31,6 +31,14 @@ struct StructWithOwnerAndState {
   var state: TrivialState
 }
 
+struct _SwiftEmptyArrayStorage {
+  var nonTrivialField: Klass = Klass()
+}
+
+class EmptyArrayStorage {
+  var state: TrivialState = .first
+}
+
 ///////////
 // Tests //
 ///////////
@@ -83,4 +91,18 @@ bb0(%0 : $StructWithOwner, %1 : $TrivialState):
   strong_retain %3 : $Klass // expected-remark {{retain of type 'Klass'}}
                             // expected-note @-3 {{of 'x'}}
   return %3 : $Klass
+}
+
+// Please keep these next to this test to make the note on the decl not far from its check.
+var swiftEmptyArrayStorage: _SwiftEmptyArrayStorage
+sil_global hidden @$s20opt_remark_generator22swiftEmptyArrayStorageAA06_SwiftefG0Vvp : $_SwiftEmptyArrayStorage
+
+sil @retainOnEmptyArrayStorage : $@convention(thin) () -> @owned EmptyArrayStorage {
+bb0:
+  %0 = global_addr @$s20opt_remark_generator22swiftEmptyArrayStorageAA06_SwiftefG0Vvp : $*_SwiftEmptyArrayStorage
+  %1 = address_to_pointer %0 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $EmptyArrayStorage
+  strong_retain %2 : $EmptyArrayStorage // expected-remark {{retain of type 'EmptyArrayStorage'}}
+                                        // expected-note @-9 {{of 'swiftEmptyArrayStorage'}}
+  return %2 : $EmptyArrayStorage
 }
