@@ -1529,7 +1529,7 @@ NOTE(requires_stored_property_inits_here,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
      "initial values%select{| or use @NSManaged}2", (Type, bool, bool))
 ERROR(class_without_init,none,
-      "class %0 has no initializers", (Type))
+      "%select{class|actor}0 %1 has no initializers", (bool, Type))
 NOTE(note_no_in_class_init_1,none,
      "stored property %0 without initial value prevents synthesized "
      "initializers",
