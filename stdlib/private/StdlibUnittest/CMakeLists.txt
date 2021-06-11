@@ -11,8 +11,10 @@ if (NOT IS_BUILD_TYPE_OPTIMIZED)
 endif()
 
 set(swift_stdlib_unittest_link_libraries "")
+set(swift_stdlib_unittest_modules "")
 if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
   list(APPEND swift_stdlib_unittest_link_libraries "swift_Concurrency")
+  list(APPEND swift_stdlib_unittest_modules "_Concurrency")
 endif()
 if (SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
   list(APPEND swift_stdlib_unittest_link_libraries "swift_Distributed")
@@ -39,18 +41,18 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   TestHelpers.swift
   TypeIndexed.swift
 
-  SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivateThreadExtras SwiftPrivateLibcExtras
-  SWIFT_MODULE_DEPENDS_IOS Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_OSX Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_TVOS Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_FREESTANDING Darwin _Concurrency
-  SWIFT_MODULE_DEPENDS_LINUX Glibc _Concurrency
-  SWIFT_MODULE_DEPENDS_FREEBSD Glibc _Concurrency
-  SWIFT_MODULE_DEPENDS_OPENBSD Glibc _Concurrency
-  SWIFT_MODULE_DEPENDS_CYGWIN Glibc _Concurrency
-  SWIFT_MODULE_DEPENDS_HAIKU Glibc _Concurrency
-  SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK _Concurrency
+  SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivateThreadExtras SwiftPrivateLibcExtras ${swift_stdlib_unittest_modules}
+  SWIFT_MODULE_DEPENDS_IOS Darwin
+  SWIFT_MODULE_DEPENDS_OSX Darwin
+  SWIFT_MODULE_DEPENDS_TVOS Darwin
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
+  SWIFT_MODULE_DEPENDS_FREESTANDING Darwin
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_OPENBSD Glibc
+  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+  SWIFT_MODULE_DEPENDS_HAIKU Glibc
+  SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT stdlib-experimental
   DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}"
