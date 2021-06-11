@@ -20,7 +20,7 @@ public actor MyActor {
 }
 
 // CHECK: #if compiler(>=5.3) && $Actors
-// CHECK-NEXT: extension MyActor
+// CHECK-NEXT: extension FeatureTest.MyActor
 public extension MyActor {
   // CHECK-NOT: $Actors
   // CHECK: testFunc
@@ -56,7 +56,7 @@ public func globalAsync() async { }
 public protocol MP3: AnyObject, MP { }
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension MP2 {
+// CHECK-NEXT: extension FeatureTest.MP2 {
 // CHECK-NEXT: func inMP2
 extension MP2 {
   public func inMP2() { }
@@ -114,12 +114,12 @@ public struct IsRP: RP {
 public func acceptsRP<T: RP>(_: T) { }
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension Array : FeatureTest.MP where Element : FeatureTest.MP {
+// CHECK-NEXT: extension Swift.Array : FeatureTest.MP where Element : FeatureTest.MP {
 extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 // CHECK: }
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension OldSchool : Swift.UnsafeSendable {
+// CHECK-NEXT: extension FeatureTest.OldSchool : Swift.UnsafeSendable {
 extension OldSchool: UnsafeSendable { }
 // CHECK-NEXT: }
 
@@ -151,9 +151,9 @@ public func stage(with actor: MyActor) { }
 // CHECK-NEXT: #endif
 public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () async -> Void) { }
 
-// CHECK-NOT: extension MyActor : Swift.Sendable
+// CHECK-NOT: extension FeatureTest.MyActor : Swift.Sendable
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension OldSchool : FeatureTest.MP {
+// CHECK-NEXT: extension FeatureTest.OldSchool : FeatureTest.MP {
 // CHECK-NEXT: #endif
 
