@@ -2460,7 +2460,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
   // speculative parse to validate it and look for 'in'.
   if (Tok.isAny(
           tok::at_sign, tok::l_paren, tok::l_square, tok::identifier,
-          tok::kw__)) {
+          tok::kw__, tok::code_complete)) {
     BacktrackingScope backtrack(*this);
 
     // Consume attributes.
@@ -2496,11 +2496,11 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       }
 
       // Okay, we have a closure signature.
-    } else if (Tok.isIdentifierOrUnderscore()) {
+    } else if (Tok.isIdentifierOrUnderscore() || Tok.is(tok::code_complete)) {
       // Parse identifier (',' identifier)*
       consumeToken();
       while (consumeIf(tok::comma)) {
-        if (Tok.isIdentifierOrUnderscore()) {
+        if (Tok.isIdentifierOrUnderscore() || Tok.is(tok::code_complete)) {
           consumeToken();
           continue;
         }
@@ -2575,7 +2575,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
           if (!consumeIf(tok::r_paren, ownershipLocEnd))
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
-      } else if (Tok.isAny(tok::identifier, tok::kw_self) &&
+      } else if (Tok.isAny(tok::identifier, tok::kw_self, tok::code_complete) &&
                  peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
       } else {
@@ -2584,7 +2584,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         continue;
       }
 
-      if (Tok.isNot(tok::identifier, tok::kw_self)) {
+      if (Tok.isNot(tok::identifier, tok::kw_self, tok::code_complete)) {
         diagnose(Tok, diag::expected_capture_specifier_name);
         skipUntil(tok::comma, tok::r_square);
         continue;
@@ -2602,10 +2602,20 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       if (peekToken().isNot(tok::equal)) {
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
-        name = Context.getIdentifier(Tok.getText());
-        auto initializerResult = parseExprIdentifier();
-        status |= initializerResult;
-        initializer = initializerResult.get();
+        if (!Tok.is(tok::code_complete)) {
+          name = Context.getIdentifier(Tok.getText());
+          auto initializerResult = parseExprIdentifier();
+          status |= initializerResult;
+          initializer = initializerResult.get();
+        } else {
+          auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+          if (CodeCompletion)
+            CodeCompletion->completePostfixExprBeginning(CCE);
+          name = Identifier();
+          initializer = CCE;
+          consumeToken();
+          status.setHasCodeCompletion();
+        }
 
         // It is a common error to try to capture a nested field instead of just
         // a local name, reject it with a specific error message.
@@ -2617,7 +2627,13 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
       } else {
         // Otherwise, the name is a new declaration.
-        consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
+        if (!Tok.is(tok::code_complete)) {
+          consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
+        } else {
+          // Ignore completion token because it's a new declaration.
+          name = Identifier();
+          consumeToken(tok::code_complete);
+        }
         equalLoc = consumeToken(tok::equal);
 
         auto ExprResult = parseExpr(diag::expected_init_capture_specifier);
@@ -2687,7 +2703,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       bool HasNext;
       do {
         SyntaxParsingContext ClParamCtx(SyntaxContext, SyntaxKind::ClosureParam);
-        if (Tok.isNot(tok::identifier, tok::kw__)) {
+        if (Tok.isNot(tok::identifier, tok::kw__, tok::code_complete)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           status.setIsParseError();
           break;
@@ -2698,7 +2714,10 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         if (Tok.is(tok::identifier)) {
           nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
         } else {
-          nameLoc = consumeToken(tok::kw__);
+          assert(Tok.isAny(tok::kw__ , tok::code_complete));
+          // Consume and ignore code_completion token so that completion don't
+          // suggest anything for the parameter name declaration.
+          nameLoc = consumeToken();
         }
         auto var = new (Context)
             ParamDecl(SourceLoc(), SourceLoc(),
