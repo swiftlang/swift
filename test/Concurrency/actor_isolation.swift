@@ -834,3 +834,16 @@ func test_invalid_reference_to_actor_member_without_a_call_note() {
     }
   }
 }
+
+// Actor isolation and "defer"
+actor Counter {
+  var counter: Int = 0
+
+  func next() -> Int {
+    defer {
+      counter = counter + 1
+    }
+
+    return counter
+  }
+}
