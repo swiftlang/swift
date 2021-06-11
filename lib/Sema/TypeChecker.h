@@ -846,13 +846,15 @@ enum class UnsupportedMemberTypeAccessKind : uint8_t {
   TypeAliasOfUnboundGeneric,
   TypeAliasOfExistential,
   AssociatedTypeOfUnboundGeneric,
-  AssociatedTypeOfExistential
+  AssociatedTypeOfExistential,
+  NominalTypeOfUnboundGeneric
 };
 
 /// Check whether the given declaration can be written as a
 /// member of the given base type.
 UnsupportedMemberTypeAccessKind
-isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl);
+isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
+                              bool hasUnboundOpener);
 
 /// @}
 
