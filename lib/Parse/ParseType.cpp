@@ -234,16 +234,16 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
 
     if (!Tok.isAtStartOfLine()) {
       if (isOptionalToken(Tok)) {
-        ty = parseTypeOptional(ty.get());
+        ty = parseTypeOptional(ty);
         continue;
       }
       if (isImplicitlyUnwrappedOptionalToken(Tok)) {
-        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
+        ty = parseTypeImplicitlyUnwrappedOptional(ty);
         continue;
       }
       // Parse legacy array types for migration.
       if (Tok.is(tok::l_square)) {
-        ty = parseTypeArray(ty.get());
+        ty = parseTypeArray(ty);
         continue;
       }
     }
@@ -1183,12 +1183,11 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
 ///     type-array '[' ']'
 ///     type-array '[' expr ']'
 ///
-ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
+ParserResult<TypeRepr> Parser::parseTypeArray(ParserResult<TypeRepr> Base) {
   assert(Tok.isFollowingLSquare());
   Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
   SourceLoc lsquareLoc = consumeToken();
-  ArrayTypeRepr *ATR = nullptr;
-  
+
   // Handle a postfix [] production, a common typo for a C-like array.
 
   // If we have something that might be an array size expression, parse it as
@@ -1201,19 +1200,23 @@ ParserResult<TypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
   
   SourceLoc rsquareLoc;
   if (parseMatchingToken(tok::r_square, rsquareLoc,
-                         diag::expected_rbracket_array_type, lsquareLoc))
-    return makeParserErrorResult(Base);
+                         diag::expected_rbracket_array_type, lsquareLoc)) {
+    Base.setIsParseError();
+    return Base;
+  }
+
+  auto baseTyR = Base.get();
 
   // If we parsed something valid, diagnose it with a fixit to rewrite it to
   // Swift syntax.
   diagnose(lsquareLoc, diag::new_array_syntax)
-    .fixItInsert(Base->getStartLoc(), "[")
+    .fixItInsert(baseTyR->getStartLoc(), "[")
     .fixItRemove(lsquareLoc);
   
   // Build a normal array slice type for recovery.
-  ATR = new (Context) ArrayTypeRepr(Base,
-                              SourceRange(Base->getStartLoc(), rsquareLoc));
-  return makeParserResult(ATR);
+  ArrayTypeRepr *ATR = new (Context) ArrayTypeRepr(
+      baseTyR, SourceRange(baseTyR->getStartLoc(), rsquareLoc));
+  return makeParserResult(ParserStatus(Base), ATR);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeCollection() {
@@ -1318,22 +1321,22 @@ SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
 ParserResult<TypeRepr>
-Parser::parseTypeOptional(TypeRepr *base) {
+Parser::parseTypeOptional(ParserResult<TypeRepr> base) {
   SourceLoc questionLoc = consumeOptionalToken();
-  auto TyR = new (Context) OptionalTypeRepr(base, questionLoc);
+  auto TyR = new (Context) OptionalTypeRepr(base.get(), questionLoc);
   SyntaxContext->createNodeInPlace(SyntaxKind::OptionalType);
-  return makeParserResult(TyR);
+  return makeParserResult(ParserStatus(base), TyR);
 }
 
 /// Parse a single implicitly unwrapped optional suffix, given that we
 /// are looking at the exclamation mark.
 ParserResult<TypeRepr>
-Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
+Parser::parseTypeImplicitlyUnwrappedOptional(ParserResult<TypeRepr> base) {
   SourceLoc exclamationLoc = consumeImplicitlyUnwrappedOptionalToken();
   auto TyR =
-      new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc);
+      new (Context) ImplicitlyUnwrappedOptionalTypeRepr(base.get(), exclamationLoc);
   SyntaxContext->createNodeInPlace(SyntaxKind::ImplicitlyUnwrappedOptionalType);
-  return makeParserResult(TyR);
+  return makeParserResult(ParserStatus(base), TyR);
 }
 
 //===----------------------------------------------------------------------===//
