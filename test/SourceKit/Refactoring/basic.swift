@@ -129,6 +129,7 @@ func hasCallToAsyncAlternative() {
 // CHECK1-NEXT: ACTIONS END
 
 // RUN: %sourcekitd-test -req=cursor -pos=1:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK2
+// RUN: %sourcekitd-test -req=cursor -offset=16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK2
 
 // RUN: %sourcekitd-test -req=cursor -pos=12:8 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK3
 // RUN: %sourcekitd-test -req=cursor -pos=21:5 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK4
