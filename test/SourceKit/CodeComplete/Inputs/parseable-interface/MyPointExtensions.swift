@@ -1,4 +1,4 @@
-import MyPoint
+import MyPointModule
 
 public extension MyPoint {
 	var magnitude: Double {

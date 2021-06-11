@@ -38,21 +38,21 @@ public enum NoRawValueWithExplicitHashable {
 case a, b, c
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: extension NoRawValueWithExplicitHashable : Swift.Hashable {
+// CHECK-LABEL: extension synthesized.NoRawValueWithExplicitHashable : Swift.Hashable {
 extension NoRawValueWithExplicitHashable : Hashable {
   // CHECK-NEXT: public func foo()
   public func foo() {}
 } // CHECK: {{^}$}}
 
-// CHECK: extension HasRawValue : Swift.Equatable {}
-// CHECK: extension HasRawValue : Swift.Hashable {}
-// CHECK: extension HasRawValue : Swift.RawRepresentable {}
+// CHECK: extension synthesized.HasRawValue : Swift.Equatable {}
+// CHECK: extension synthesized.HasRawValue : Swift.Hashable {}
+// CHECK: extension synthesized.HasRawValue : Swift.RawRepresentable {}
 
-// CHECK: extension ObjCEnum : Swift.Equatable {}
-// CHECK: extension ObjCEnum : Swift.Hashable {}
-// CHECK: extension ObjCEnum : Swift.RawRepresentable {}
+// CHECK: extension synthesized.ObjCEnum : Swift.Equatable {}
+// CHECK: extension synthesized.ObjCEnum : Swift.Hashable {}
+// CHECK: extension synthesized.ObjCEnum : Swift.RawRepresentable {}
 
-// CHECK: extension NoRawValueWithExplicitEquatable : Swift.Hashable {}
+// CHECK: extension synthesized.NoRawValueWithExplicitEquatable : Swift.Hashable {}
 // NEGATIVE-NOT: extension {{.+}}NoRawValueWithExplicitEquatable : Swift.Equatable
 
 // NEGATIVE-NOT: NoRawValueWithExplicitHashable : Swift.Equatable
