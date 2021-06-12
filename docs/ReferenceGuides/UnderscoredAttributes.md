@@ -158,7 +158,7 @@ Indicates that a protocol is a marker protocol;
 one that represents some meaningful property at compile-time
 but has no runtime representation.
 
-For more details, see [SE-0302](https://github.com/apple/swift-evolution/blob/main/proposals/0302-sendable-and-sendable-closures.md#marker-protocols), which introduces marker protocols.
+For more details, see [SE-0302](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 
 At the moment, the language only has 1 marker protocol: `Sendable`.
 
