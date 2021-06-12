@@ -295,15 +295,15 @@ See [Generics.rst](/docs/Generics.rst) for more details.
 
 ## `@_spi(spiName)`
 
-Marks a declaration as SPI (System Programming Interface),
-instead of API. Modules exposing SPI and using library evolution
-generate an additional `.private.swiftinterface` file
-(with `-emit-private-module-interface-path`) in addition
-to the usual `.swiftinterface` file.
+Marks a declaration as SPI (System Programming Interface), instead of API.
+Modules exposing SPI and using library evolution generate an additional
+`.private.swiftinterface` file (with `-emit-private-module-interface-path`)
+in addition to the usual `.swiftinterface` file. This private interface exposes
+both API and SPI.
 
-Clients can access SPI by marking the import as
-`@_spi(spiName) import Module`. This makes it easy to find out which
-clients are using certain SPIs by doing a textual search.
+Clients can access SPI by marking the import as `@_spi(spiName) import Module`.
+This design makes it easy to find out which clients are using certain SPIs by
+doing a textual search.
 
 ## `@_staticInitializeObjCMetadata`
 
