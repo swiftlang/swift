@@ -502,12 +502,16 @@ protected:
     if (!cs || !thenVar || (elseChainVar && !*elseChainVar))
       return nullptr;
 
-    // If there is a #available in the condition, the 'then' will need to
-    // be wrapped in a call to buildLimitedAvailability(_:), if available.
     Expr *thenVarRefExpr = buildVarRef(
         thenVar, ifStmt->getThenStmt()->getEndLoc());
-    if (findAvailabilityCondition(ifStmt->getCond()) &&
-        builderSupports(ctx.Id_buildLimitedAvailability)) {
+
+    /// If there is a #available in the condition, wrap the 'then' in a call to 
+    /// buildLimitedAvailability(_:).
+    auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
+    bool supportsAvailable = availabilityCond && 
+                             builderSupports(ctx.Id_buildLimitedAvailability);
+    auto apiAvailability = availabilityCond->getAvailability();
+    if (supportsAvailable && !apiAvailability->isUnavailability()) {
       thenVarRefExpr = buildCallIfWanted(
           ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
           { thenVarRefExpr }, { Identifier() });
@@ -526,19 +530,25 @@ protected:
       assert(isOptional);
       elseLoc = ifStmt->getEndLoc();
       elseExpr = buildNoneExpr(elseLoc);
-
-    // - If there's an `else if`, the chain expression from that
-    //   should already be producing a chain result.
-    } else if (isElseIf) {
-      elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
-      elseLoc = ifStmt->getElseLoc();
-
-    // - Otherwise, wrap it to produce a chain result.
     } else {
       elseLoc = ifStmt->getElseLoc();
-      elseExpr = buildWrappedChainPayload(
-          buildVarRef(*elseChainVar, ifStmt->getEndLoc()),
-          payloadIndex + 1, numPayloads, isOptional);
+      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+      /// If there is a #unavailable in the condition, wrap the 'else' in a call
+      /// to buildLimitedAvailability(_:).
+      if (supportsAvailable && apiAvailability->isUnavailability()) {
+        elseVarRefExpr = buildCallIfWanted(
+            ifStmt->getEndLoc(), ctx.Id_buildLimitedAvailability,
+            { elseVarRefExpr }, { Identifier() });
+      }
+      // - If there's an `else if`, the chain expression from that
+      //   should already be producing a chain result.
+      if (isElseIf) {
+        elseExpr = elseVarRefExpr;
+      // - Otherwise, wrap it to produce a chain result.
+      } else {
+        elseExpr = buildWrappedChainPayload(
+            elseVarRefExpr, payloadIndex + 1, numPayloads, isOptional);
+      }
     }
 
     // The operand should have optional type if we had optional results,
@@ -1265,9 +1275,18 @@ public:
     // this warning to an error.
     if (auto availabilityCond = findAvailabilityCondition(ifStmt->getCond())) {
       SourceLoc loc = availabilityCond->getStartLoc();
-      Type thenBodyType = solution.simplifyType(
+      Type bodyType;
+      if (availabilityCond->getAvailability()->isUnavailability()) {
+        // For #unavailable, we need to check the "else".
+        Type elseBodyType = solution.simplifyType(
+          solution.getType(target.captured.second[1]));
+        bodyType = elseBodyType;
+      } else {
+        Type thenBodyType = solution.simplifyType(
           solution.getType(target.captured.second[0]));
-      thenBodyType.findIf([&](Type type) {
+        bodyType = thenBodyType;
+      }
+      bodyType.findIf([&](Type type) {
         auto nominal = type->getAnyNominal();
         if (!nominal)
           return false;
