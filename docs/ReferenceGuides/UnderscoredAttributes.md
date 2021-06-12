@@ -77,7 +77,7 @@ extension Text {
 `@_disfavoredOverload` is a stop-gap design; eventually the type-checker
 behavior should be fixed and the attribute should be removed/made into a no-op.
 
-It's main use case is to work around clearly undesirable overload resolution,
+Its main use case is to work around clearly undesirable overload resolution,
 not to arbitrarily manipulate overload priority.
 
 ## `@_dynamicReplacement(for:)`
