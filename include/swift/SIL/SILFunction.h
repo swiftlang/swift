@@ -320,6 +320,9 @@ private:
   /// The function's effects attribute.
   unsigned EffectsKindAttr : NumEffectsKindBits;
 
+  /// The function is in a statically linked module.
+  unsigned IsStaticallyLinked : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -541,6 +544,12 @@ public:
 
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
+  }
+
+  bool isStaticallyLinked() const { return IsStaticallyLinked; }
+
+  void setIsStaticallyLinked(bool value) {
+    IsStaticallyLinked = value;
   }
 
   /// Returns true if this is a reabstraction thunk of escaping function type
