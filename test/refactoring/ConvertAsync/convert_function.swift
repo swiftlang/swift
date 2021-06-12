@@ -1,3 +1,5 @@
+// RUN: %empty-directory(%t)
+
 enum CustomError : Error {
   case Bad
 }
@@ -309,3 +311,21 @@ func rdar78693050(_ completion: () -> Void) {
 // RDAR78693050-NEXT:   }
 // RDAR78693050-NEXT:   return
 // RDAR78693050-NEXT: }
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=DISCARDABLE-RESULT %s
+func withDefaultedCompletion(arg: String, completion: @escaping (String) -> Void = {_ in}) {
+  completion(arg)
+}
+
+// DISCARDABLE-RESULT:      @discardableResult
+// DISCARDABLE-RESULT-NEXT: func withDefaultedCompletion(arg: String) async -> String {
+// DISCARDABLE-RESULT-NEXT:   return arg
+// DISCARDABLE-RESULT-NEXT: }
+
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=DEFAULT-ARG %s
+func withDefaultArg(x: String = "") {
+}
+
+// DEFAULT-ARG:      convert_function.swift [[# @LINE-3]]:1 -> [[# @LINE-2]]:2
+// DEFAULT-ARG-NOT:  @discardableResult
+// DEFAULT-ARG-NEXT: {{^}}func withDefaultArg(x: String = "") async

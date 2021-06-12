@@ -4413,6 +4413,14 @@ struct AsyncHandlerParamDesc : public AsyncHandlerDesc {
     OS << tok::r_paren;
   }
 
+  /// Retrieves the parameter decl for the completion handler parameter, or
+  /// \c nullptr if no valid completion parameter is present.
+  const ParamDecl *getHandlerParam() const {
+    if (!isValid())
+      return nullptr;
+    return Func->getParameters()->get(Index);
+  }
+
   bool operator==(const AsyncHandlerParamDesc &Other) const {
     return Handler == Other.Handler && Type == Other.Type &&
            HasError == Other.HasError && Index == Other.Index;
@@ -6313,6 +6321,13 @@ private:
 
   void addFuncDecl(const FuncDecl *FD) {
     auto *Params = FD->getParameters();
+    auto *HandlerParam = TopHandler.getHandlerParam();
+
+    // If the completion handler parameter has a default argument, the async
+    // version is effectively @discardableResult, as not all the callers care
+    // about receiving the completion call.
+    if (HandlerParam && HandlerParam->isDefaultArgument())
+      OS << tok::at_sign << "discardableResult" << "\n";
 
     // First chunk: start -> the parameter to remove (if any)
     SourceLoc LeftEndLoc = Params->getLParenLoc().getAdvancedLoc(1);
