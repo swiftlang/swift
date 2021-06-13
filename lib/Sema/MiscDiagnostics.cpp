@@ -2893,7 +2893,20 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                       !initExpr->isImplicit()) {
                     noParens = isIsTest = true;
                   }
-                  
+                  // In cases where the value is optional, the cast expr is
+                  // wrapped inside OptionalEvaluationExpr. Unwrap it to get
+                  // ConditionalCheckedCastExpr.
+                  if (auto oeExpr =
+                          dyn_cast<OptionalEvaluationExpr>(initExpr)) {
+                    if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                            oeExpr->getSubExpr())) {
+                      if (!ccExpr->isImplicit()) {
+                        initExpr = ccExpr;
+                        noParens = isIsTest = true;
+                      }
+                    }
+                  }
+
                   auto diagIF = Diags.diagnose(var->getLoc(),
                                                diag::pbd_never_used_stmtcond,
                                             var->getName());

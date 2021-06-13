@@ -330,6 +330,11 @@ func test(_ a : Int?, b : Any) {
   if let x = b as? Int {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{16-19=is}}
   }
 
+  // SR-14646. Special case, turn this into an 'is' test with optional value. 
+  let bb: Any? = 3
+  if let bbb = bb as? Int {  // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{19-22=is}}
+  }
+
   // SR-1112
 
   let xxx: Int? = 0
@@ -356,7 +361,7 @@ let optionalString: String? = "check"
 if let string = optionalString {}  // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=}} {{31-31= != nil}}
 
 let optionalAny: Any? = "check"
-if let string = optionalAny as? String {} // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=(}} {{39-39=) != nil}}
+if let string = optionalAny as? String {} // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=}} {{29-32=is}}
 
 // Due to the complexities of global variable tracing, these will not generate warnings
 let unusedVariable = ""
@@ -503,4 +508,10 @@ func testVariablesBoundInPatterns() {
   case let .optional(b: .none): // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
     break
   }
+}
+// Tests fix to SR-1464
+func testUselessCastWithInvalidParam(foo: Any?) -> Int {
+  class Foo { }
+  if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}
+  else { return 54 }
 }
