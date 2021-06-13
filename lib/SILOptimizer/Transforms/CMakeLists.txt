@@ -24,7 +24,7 @@ target_sources(swiftSILOptimizer PRIVATE
   MergeCondFail.cpp
   Outliner.cpp
   ObjectOutliner.cpp
-  OptRemarkGenerator.cpp
+  AssemblyVisionRemarkGenerator.cpp
   PerformanceInliner.cpp
   PhiArgumentOptimizations.cpp
   PruneVTables.cpp

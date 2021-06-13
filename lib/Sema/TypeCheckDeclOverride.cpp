@@ -1480,6 +1480,7 @@ namespace  {
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
+    UNINTERESTING_ATTR(EmitAssemblyVisionRemarks)
     UNINTERESTING_ATTR(SetterAccess)
     UNINTERESTING_ATTR(TypeEraser)
     UNINTERESTING_ATTR(SPIAccessControl)

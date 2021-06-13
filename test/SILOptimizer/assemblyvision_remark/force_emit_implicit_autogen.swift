@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -O -Rpass-missed=sil-opt-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify -Xllvm -optremarkgen-visit-implicit-autogen-funcs=1
+// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify -Xllvm -assemblyvisionremarkgen-visit-implicit-autogen-funcs=1
 
 // From the constructor.
 class Klass {} // expected-remark {{heap allocated ref of type 'Klass'}}
