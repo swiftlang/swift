@@ -606,3 +606,66 @@ func testSR14678_Optional() -> (Int, Int)? {
      (print("hello"), 0)
   }
 }
+
+// SR-13239
+func callit<T>(_ f: () -> T) -> T {
+  f()
+}
+
+func callitArgs<T>(_ : Int, _ f: () -> T) -> T {
+  f()
+}
+
+func callitArgsFn<T>(_ : Int, _ f: () -> () -> T) -> T {
+  f()()
+}
+
+func callitGenericArg<T>(_ a: T, _ f: () -> T) -> T { 
+  f()
+}
+
+func callitTuple<T>(_ : Int, _ f: () -> (T, Int)) -> T {
+  f().0
+}
+
+func testSR13239_Tuple() -> Int {
+  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
+  callitTuple(1) {
+    (print("hello"), 0) 
+  }
+}
+
+func testSR13239() -> Int {
+  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
+  callit {
+    print("hello")
+  }
+}
+
+func testSR13239_Args() -> Int {
+  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
+  callitArgs(1) {
+    print("hello") 
+  }
+}
+
+func testSR13239_ArgsFn() -> Int {
+  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
+  callitArgsFn(1) {
+    { print("hello") } 
+  }
+}
+
+func testSR13239MultiExpr() -> Int {
+  callit {
+    print("hello") 
+    return print("hello") // expected-error {{cannot convert return expression of type '()' to return type 'Int'}}
+  }
+}
+
+func testSR13239_GenericArg() -> Int {
+  // Generic argument is inferred as Int from first argument literal, so no conflict in this case.
+  callitGenericArg(1) {
+    print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+  }
+}
