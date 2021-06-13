@@ -53,3 +53,12 @@ def syntax_buildable_child_type(type_name, syntax_kind, is_token,
         buildable_type += '?'
 
     return buildable_type
+
+
+def syntax_buildable_default_init_value(child, token):
+    if child.is_optional:
+        return " = nil"
+    elif token and token.text:
+        return " = Tokens.`%s`" % lowercase_first_word(token.name)
+    else:
+        return ""
