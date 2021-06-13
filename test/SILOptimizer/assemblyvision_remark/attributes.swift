@@ -23,7 +23,7 @@ public func forceOptRemark() {
                 // expected-note @-2 {{of 'x'}}
 }
 
-@_semantics("optremark.sil-opt-remark-gen")
+@_semantics("optremark.sil-assembly-vision-remark-gen")
 @inline(never)
 public func forceOptRemark2() {
     let x = getGlobal()
@@ -55,7 +55,7 @@ public func allocateInlineCallee3() -> Klass {
 }
 
 @_semantics("optremark.sil-inliner")
-@_semantics("optremark.sil-opt-remark-gen")
+@_semantics("optremark.sil-assembly-vision-remark-gen")
 public func mix1() -> (Klass, Klass) {
     let x = getGlobal()
     return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
@@ -68,7 +68,7 @@ public func mix2() -> (Klass, Klass) {
     return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
 }
 
-@_semantics("optremark.sil-opt-remark-gen")
+@_semantics("optremark.sil-assembly-vision-remark-gen")
 public func mix3() -> (Klass, Klass) {
     let x = getGlobal()
     return (x, Klass()) // expected-remark {{heap allocated ref of type 'Klass'}}
@@ -84,4 +84,11 @@ public func mix4() -> (Klass, Klass) {
 public func mix5() -> (Klass, Klass) {
     let x = getGlobal()
     return (x, Klass())
+}
+
+@_assemblyVision
+public func mix4a() -> (Klass, Klass) {
+    let x = getGlobal()
+    return (x, Klass()) // expected-remark {{Pure call. Always profitable to inline "main.Klass.__allocating_init()"}}
+                        // expected-remark @-1 {{heap allocated ref of type 'Klass'}}
 }

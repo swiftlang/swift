@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-opt-remark-ignore-always-infer -optremarkgen-declless-debugvalue-use-sildebugvar-info -sil-opt-remark-generator -sil-remarks-missed=sil-opt-remark-gen -verify %s -o /dev/null
+// RUN: %target-sil-opt -sil-opt-remark-ignore-always-infer -assemblyvisionremarkgen-declless-debugvalue-use-sildebugvar-info -assembly-vision-remark-generator -sil-remarks-missed=sil-assembly-vision-remark-gen -verify %s -o /dev/null
 
 sil_stage canonical
 

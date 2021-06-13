@@ -1,14 +1,11 @@
-// RUN: %target-swiftc_driver -O -Rpass-missed=sil-opt-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
+// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s -o /dev/null -Xfrontend -verify
 
-// REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_no_asserts
 
-import Foundation
-
-//////////////////
-// Generic Code //
-//////////////////
+///////////////////
+// Generic Casts //
+///////////////////
 
 public func forcedCast<NS, T>(_ ns: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
@@ -208,21 +205,102 @@ public func condCast6<NS: AnyObject, T: AnyObject>(_ ns: NS) -> T? {
   return x
 }
 
-//////////////////
-// String Casts //
-//////////////////
+/////////////////////////
+// Existential Casting //
+/////////////////////////
 
-// We need to be able to recognize the conformances. We can't do this yet! But
-// we will be able to!
-
-@inline(never)
-public func testForcedCastNStoSwiftString(_ nsString: NSString) -> String {
-  let o: String = forcedCast(nsString)
-  return o
+public protocol Existential1 {
 }
 
-@inline(never)
-public func testConditionalCastNStoSwiftString(_ nsString: NSString) -> String? {
-  let o: String? = condCast(nsString)
-  return o
+public protocol Existential2 {
+}
+
+public func forcedCast(_ ns: Existential1) -> Existential2 {
+  // Make sure the colon info is right so that the arrow is under the a.
+  //
+  // TODO: We should also note the retain as being on 'ns'.
+  return ns as! Existential2 // expected-remark @:13 {{unconditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                  // expected-note @-5:26 {{of 'ns'}}
+}
+
+public func forcedCast2(_ ns: Existential1) -> Existential2 {
+  // Make sure the colon info is right so that the arrow is under the a.
+  //
+  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
+  // Maybe we can recover this info somehow. We should also note the retain as being on 'ns'
+  let x = ns
+  return x as! Existential2  // expected-remark @:12 {{unconditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                  // expected-note @-7:27 {{of 'ns'}}
+}
+
+public func forcedCast3(_ ns: Existential1) -> Existential2 {
+  // Make sure the colon info is right so that the arrow is under the a.
+  //
+  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
+  // Maybe we can recover this info somehow.
+  var x = ns // expected-warning {{variable 'x' was never mutated}}
+  return x as! Existential2  // expected-remark @:12 {{unconditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                  // expected-note @-7:27 {{of 'ns'}}
+}
+
+// TODO: We should be able to identify NS2 in this case with opaque values.
+public func forcedCast4(_ ns: Existential1, _ ns2: Existential1) -> Existential2 {
+  // Make sure the colon info is right so that the arrow is under the a.
+  var x = ns
+  x = ns2
+  return x as! Existential2  // expected-remark @:12 {{unconditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+}
+
+public func condCast(_ ns: Existential1) -> Existential2? {
+  // Make sure the colon info is right so that the arrow is under the a.
+  return ns as? Existential2 // expected-remark @:13 {{conditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                  // expected-note @-3:24 {{of 'ns'}}
+}
+
+public func condCast2(_ ns: Existential1) -> Existential2? {
+  // Make sure the colon info is right so that the arrow is under the a.
+  //
+  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
+  // Maybe we can recover this info somehow.
+  let x = ns
+  return x as? Existential2  // expected-remark @:12 {{conditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                  // expected-note @-7:25 {{of 'ns'}}
+}
+
+public func condCast3(_ ns: Existential1) -> Existential2? {
+  // Make sure the colon info is right so that the arrow is under the a.
+  //
+  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
+  // Maybe we can recover this info somehow.
+  var x = ns // expected-warning {{variable 'x' was never mutated}}
+  return x as? Existential2  // expected-remark @:12 {{conditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+                  // expected-note @-7:25 {{of 'ns'}}
+}
+
+// TODO: We should be able to identify NS2 here!
+public func condCast4(_ ns: Existential1, _ ns2: Existential1) -> Existential2? {
+  // Make sure the colon info is right so that the arrow is under the a.
+  var x = ns
+  x = ns2
+  return x as? Existential2 // expected-remark @:12 {{conditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+}
+
+public func condCast5(_ ns: Existential1) -> Existential2? {
+  // Make sure the colon info is right so that the arrow is under the a.
+  //
+  // Today, we lose that x was assigned.
+  if let x = ns as? Existential2 {  // expected-remark @:17 {{conditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+    return x                        // expected-note @-5:25 {{of 'ns'}}
+  }
+  return nil
+}
+
+public func condCast6(_ ns: Existential1) -> Existential2? {
+  // Make sure the colon info is right so that the arrow is under the a.
+  //
+  // Today, we lose that x was assigned.
+  guard let x = ns as? Existential2 else {  // expected-remark @:20 {{conditional runtime cast of value with type 'Existential1' to 'Existential2'}}
+    return nil                   // expected-note @-5:25 {{of 'ns'}}
+  }
+  return x
 }
