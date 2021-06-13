@@ -72,7 +72,7 @@ Android NDK, as well as the directories that contain the `libicuucswift.so` and
 `libicui18nswift.so` you downloaded or built in step one:
 
 ```
-$ ARM_DIR=path/to/libicu-libiconv-android
+$ ARM_DIR=path/to/libiconv-libicu-android/armeabi-v7a
 $ NDK_PATH=path/to/android-ndk-r21e
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
@@ -103,7 +103,7 @@ $ NDK_PATH="path/to/android-ndk-r21e"
 $ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \          # The Swift compiler built in the previous step
                                                                      # The location of the tools used to build Android binaries
     -tools-directory ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/ \
-    -target armv7a-unknown-linux-androideabi21 \                     # Targeting Android armv7 at API 21
+    -target armv7-unknown-linux-androideabi21 \                      # Targeting Android armv7 at API 21
     -sdk ${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/sysroot \ # The SDK is the Android unified sysroot and the resource-dir is where you just built the Swift stdlib.
     -resource-dir build/Ninja-ReleaseAssert/swift-linux-x86_64/lib/swift
     hello.swift
