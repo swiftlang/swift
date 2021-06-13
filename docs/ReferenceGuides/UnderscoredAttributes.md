@@ -13,14 +13,23 @@ go through the Swift evolution process before being stabilized.
 
 The attributes are organized in alphabetical order.
 
-## `@_alignment`
+## `@_alignment(numericValue)`
+
+Allows controlling the alignment of a type.
+
+The alignment value specified must be a power of two, and cannot be less
+than the "natural" alignment of the type that would otherwise be used by
+the Swift ABI. This attribute is intended for the SIMD types in the standard
+library which use it to increase the alignment of their internal storage to at
+least 16 bytes.
 
 ## `@_alwaysEmitIntoClient`
 
-Forces the body of a function to be emitted into client code. Note that this is
-distinct from `@inline(__always)`; it doesn't force inlining at call-sites, it
-only means that the implementation is compiled into the module which uses the
-code.
+Forces the body of a function to be emitted into client code.
+
+Note that this is distinct from `@inline(__always)`; it doesn't force inlining
+at call-sites, it only means that the implementation is compiled into the
+module which uses the code.
 
 This means that `@_alwaysEmitIntoClient` definitions are _not_ part of the
 defining module's ABI, so changing the implementation at a later stage
@@ -28,28 +37,26 @@ does not break ABI. (TODO: Does it matter if the `@_alwaysEmitIntoClient`
 definition is used in the defining module, say in an `@inlinable function?)
 
 Most notably, default argument expressions are implicitly
-`@_alwaysEmitIntoClient`, which means that adding
-a default argument to a function which did not have one previously
-does not break ABI.
+`@_alwaysEmitIntoClient`, which means that adding a default argument to a
+function which did not have one previously does not break ABI.
 
 ## `@_borrowed`
 
-## `@_cdecl`
+## `@_cdecl("cName")`
 
 Similar to `@_silgen_name` but uses the C calling convention.
-This attribute doesn't have very well-defined semantics.
 
-Type bridging is not done, so the parameter and return types should
-correspond directly to types accessible in C.
-In most cases, it is preferable to define a static method on an `@objc`
-class instead of using `@_cdecl`.
+This attribute doesn't have very well-defined semantics. Type bridging is not
+done, so the parameter and return types should correspond directly to types
+accessible in C. In most cases, it is preferable to define a static method
+on an `@objc` class instead of using `@_cdecl`.
 
 For potential ideas on stabilization, see
 [Formalizing `@cdecl`](https://forums.swift.org/t/formalizing-cdecl/40677).
 
 ## `@_disfavoredOverload`
 
-Marks a declaration that the type checker should try to avoid using. When the
+Marks an overload that the type checker should try to avoid using. When the
 expression type checker is considering overloads, it will prefer a solution
 with fewer `@_disfavoredOverload` declarations over one with more of them.
 
@@ -118,6 +125,40 @@ func g() {
 
 ## `@_hasMissingDesignatedInitializers`
 
+An attribute that indicates that there may be designated initializers that are
+not printed in the swiftinterface file for a particular class. This attribute
+is needed for the initializer model to maintain correctness when library
+evolution is enabled. This is because a class may have non-public designated
+initializers, and Swift allows the inheritance of convenience initializers
+if and only if the subclass overrides (or has synthesized overrides) of every
+designated initializer in its superclass. Consider the following code:
+
+```swift
+// Lib.swift
+open class A {
+  init(invisible: ()) {}
+
+  public init(visible: ()) {}
+  public convenience init(hi: ()) { self.init(invisible: ()) }
+}
+
+// Client.swift
+class B : A {
+  var x: String
+
+  public override init(visible: ()) {
+    self.x = "Garbage"
+    super.init(visible: ())
+  }
+}
+```
+
+In this case, if `B` were allowed to inherit the convenience initializer
+`A.init(invisible:)` then an instance created via `B(hi: ())` would fail
+to initialize `B.x` resulting in a memory safety hole. What's worse is
+there is no way to close this safety hole because the user cannot override
+the invisible designated initializer because they lack sufficient visibility.
+
 ## `@_hasStorage`
 
 ## `@_implementationOnly`
@@ -127,7 +168,25 @@ This prevents types from that module being exposed in API
 (types of public functions, constraints in public extension etc.)
 and ABI (usage in `@inlinable` code).
 
-## `@_implements`
+## `@_implements(ProtocolName, Requirement)`
+
+An attribute that indicates that a function with one name satisfies
+a protocol requirement with a different name. This is especially useful
+when two protocols declare a requirement with the same name, but the
+conforming type wishes to offer two separate implementations.
+
+```swift
+protocol P { func foo() }
+
+protocol Q { func foo() }
+
+struct S : P, Q {
+  @_implements(P, foo())
+  func foo_p() {}
+  @_implements(Q, foo())
+  func foo_q() {}
+}
+```
 
 ## `@_implicitSelfCapture`
 
@@ -151,6 +210,12 @@ class C {
 (Note that it is "inherit", not "inherits", unlike below.)
 
 ## `@_inheritsConvenienceInitializers`
+
+An attribute that signals that a class declaration inherits its convenience
+initializers from its superclass. This implies that all designated initializers
+-- even those that may not be visible in a swiftinterface file -- are
+overridden. This attribute is often printed alongside
+`@_hasMissingDesignatedInitializers` in this case.
 
 ## `@_marker`
 
@@ -225,7 +290,7 @@ For more details, see [the educational note on temporary pointer usage](/userdoc
 
 ## `@_optimize(...)`
 
-## `@_originallyDefinedIn`
+## `@_originallyDefinedIn(module: "ModuleName", availabilitySpec...)`
 
 Marks a declaration as being originally defined in a different module,
 changing the name mangling. This can be used to move declarations
@@ -246,7 +311,7 @@ Here are the necessary changes:
    - `@available` indicating when the declaration was introduced in ToasterKit.
    - `@_originallyDefinedIn` indicating the original module and when the
      declaration was moved to ToasterKitCore.
-   ```
+   ```swift
    @available(toasterOS 42, *)
    @_originallyDefinedIn(module: "ToasterKit", toasterOS 57)
    enum Toast {
@@ -261,20 +326,28 @@ Here are the necessary changes:
    This ensures when an app is built for deployment targets prior to the symbols' move,
    the app will look for these symbols in ToasterKit instead of ToasterKitCore.
 
-## `@_private(sourceFile:)`
+More generally, mutliple availabilities can be specified, like so:
+
+```swift
+@available(toasterOS 42, bowlOS 54, mugOS 54, *)
+@_originallyDefinedIn(module: "ToasterKit", toasterOS 57, bowlOS 69, mugOS 69)
+enum Toast { ... }
+```
+
+## `@_private(sourceFile: "FileName.swift")`
 
 Fully bypasses access control, allowing access to private declarations
 in the imported module. The imported module needs to be compiled with
 `-Xfrontend -enable-private-imports` for this to work.
 
-## `@_semantics`
+## `@_semantics("uniquely.recognized.id")`
 
 Marks a function as having particular high-level semantics that are
 specially recognized by the SIL optimizer.
 
 ## `@_show_in_interface`
 
-## `@_silgen_name`
+## `@_silgen_name("cName")`
 
 Changes the symbol name for a function, similar to an ASM label in C,
 except that the platform symbol mangling (leading underscore on Darwin)
