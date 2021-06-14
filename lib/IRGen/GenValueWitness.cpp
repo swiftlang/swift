@@ -22,14 +22,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "ConstantBuilder.h"
 #include "Explosion.h"
@@ -514,7 +516,28 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
     if (auto *typeLayoutEntry =
             conditionallyGetTypeLayoutEntry(IGM, concreteType)) {
-      typeLayoutEntry->destroy(IGF, object);
+      if (concreteType.getNominalOrBoundGenericNominal()
+              ->getAttrs()
+              .hasAttribute<GenerateLayoutBytecodeAttr>()) {
+        auto castAddr = IGF.Builder.CreateBitCast(object.getAddress(),
+                                                  IGF.Builder.getInt8PtrTy());
+        auto layoutStr = typeLayoutEntry->layoutString(IGF.IGM);
+        assert(layoutStr &&
+               "@_GenerateLayoutBytecode but failed to make layout string");
+        llvm::Constant *layoutArray = IGM.getAddrOfGlobalString(
+            llvm::StringRef((char *)layoutStr->data(), layoutStr->size()));
+        auto castStr =
+            IGF.Builder.CreateBitCast(layoutArray, IGF.Builder.getInt8PtrTy());
+        llvm::Value *metadata = &*(fn->arg_begin() + 1);
+        metadata->setName("typeMetadata");
+        IGF.Builder.CreateCall(
+            IGF.IGM.getGenericDestroyFn(),
+            {castAddr,
+             IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy),
+             castStr});
+      } else {
+        typeLayoutEntry->destroy(IGF, object);
+      }
     } else {
       type.destroy(IGF, object, concreteType, true);
     }

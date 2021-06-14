@@ -2395,11 +2395,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
         getRuntimeCompatVersion();
   }
 
-  if (Args.hasArg(
-          options::
-              OPT_enable_autolinking_runtime_compatibility_bytecode_layouts)) {
-    Opts.AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary = true;
-  }
+  Opts.AutolinkRuntimeCompatibilityBytecodeLayoutsLibrary = Args.hasArg(
+      options::OPT_enable_autolinking_runtime_compatibility_bytecode_layouts);
 
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
