@@ -170,21 +170,24 @@ public:
   using StoredSize = typename Runtime::StoredSize;
 
 private:
+  /// The maximum number of bytes to read when reading metadata. Anything larger
+  /// will automatically return failure. This prevents us from reading absurd
+  /// amounts of data when we encounter corrupt values for sizes/counts.
+  static const uint64_t MaxMetadataSize = 1048576; // 1MB
+
   /// A cache of built types, keyed by the address of the type.
   std::unordered_map<StoredPointer, BuiltType> TypeCache;
 
-  using MetadataRef = RemoteRef<TargetMetadata<Runtime>>;
-  using OwnedMetadataRef =
-    std::unique_ptr<const TargetMetadata<Runtime>, delete_with_free>;
+  using MetadataRef = RemoteRef<const TargetMetadata<Runtime>>;
+  using OwnedMetadataRef = MemoryReader::ReadBytesResult;
 
   /// A cache of read type metadata, keyed by the address of the metadata.
   std::unordered_map<StoredPointer, OwnedMetadataRef>
     MetadataCache;
 
-  using ContextDescriptorRef = RemoteRef<TargetContextDescriptor<Runtime>>;
-  using OwnedContextDescriptorRef =
-    std::unique_ptr<const TargetContextDescriptor<Runtime>,
-                    delete_with_free>;
+  using ContextDescriptorRef =
+      RemoteRef<const TargetContextDescriptor<Runtime>>;
+  using OwnedContextDescriptorRef = MemoryReader::ReadBytesResult;
 
   /// A reference to a context descriptor that may be in an unloaded image.
   class ParentContextDescriptorRef {
@@ -984,7 +987,9 @@ public:
 
     auto cached = ContextDescriptorCache.find(address);
     if (cached != ContextDescriptorCache.end())
-      return ContextDescriptorRef(address, cached->second.get());
+      return ContextDescriptorRef(
+          address, reinterpret_cast<const TargetContextDescriptor<Runtime> *>(
+                       cached->second.get()));
 
     // Read the flags to figure out how much space we should read.
     ContextDescriptorFlags flags;
@@ -993,9 +998,9 @@ public:
       return nullptr;
     
     TypeContextDescriptorFlags typeFlags(flags.getKindSpecificFlags());
-    unsigned baseSize = 0;
-    unsigned genericHeaderSize = sizeof(GenericContextDescriptorHeader);
-    unsigned metadataInitSize = 0;
+    uint64_t baseSize = 0;
+    uint64_t genericHeaderSize = sizeof(GenericContextDescriptorHeader);
+    uint64_t metadataInitSize = 0;
     bool hasVTable = false;
 
     auto readMetadataInitSize = [&]() -> unsigned {
@@ -1059,7 +1064,7 @@ public:
     // Determine the full size of the descriptor. This is reimplementing a fair
     // bit of TrailingObjects but for out-of-process; maybe there's a way to
     // factor the layout stuff out...
-    unsigned genericsSize = 0;
+    uint64_t genericsSize = 0;
     if (flags.isGeneric()) {
       GenericContextDescriptorHeader header;
       auto headerAddr = address
@@ -1077,7 +1082,7 @@ public:
           * sizeof(TargetGenericRequirementDescriptor<Runtime>);
     }
 
-    unsigned vtableSize = 0;
+    uint64_t vtableSize = 0;
     if (hasVTable) {
       TargetVTableDescriptorHeader<Runtime> header;
       auto headerAddr = address
@@ -1092,22 +1097,20 @@ public:
       vtableSize = sizeof(header)
         + header.VTableSize * sizeof(TargetMethodDescriptor<Runtime>);
     }
-    
-    unsigned size = baseSize + genericsSize + metadataInitSize + vtableSize;
-    auto buffer = (uint8_t *)malloc(size);
-    if (buffer == nullptr) {
-      return nullptr;
-    }
-    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
-      free(buffer);
-      return nullptr;
-    }
 
-    auto descriptor
-      = reinterpret_cast<TargetContextDescriptor<Runtime> *>(buffer);
+    uint64_t size = baseSize + genericsSize + metadataInitSize + vtableSize;
+    if (size > MaxMetadataSize)
+      return nullptr;
+    auto readResult = Reader->readBytes(RemoteAddress(address), size);
+    if (!readResult)
+      return nullptr;
+
+    auto descriptor =
+        reinterpret_cast<const TargetContextDescriptor<Runtime> *>(
+            readResult.get());
 
     ContextDescriptorCache.insert(
-      std::make_pair(address, OwnedContextDescriptorRef(descriptor)));
+        std::make_pair(address, std::move(readResult)));
     return ContextDescriptorRef(address, descriptor);
   }
   
@@ -1633,7 +1636,9 @@ protected:
   MetadataRef readMetadata(StoredPointer address) {
     auto cached = MetadataCache.find(address);
     if (cached != MetadataCache.end())
-      return MetadataRef(address, cached->second.get());
+      return MetadataRef(address,
+                         reinterpret_cast<const TargetMetadata<Runtime> *>(
+                             cached->second.get()));
 
     StoredPointer KindValue = 0;
     if (!Reader->readInteger(RemoteAddress(address), &KindValue))
@@ -1807,18 +1812,15 @@ private:
   }
 
   MetadataRef _readMetadata(StoredPointer address, size_t sizeAfter) {
-    auto size = sizeAfter;
-    uint8_t *buffer = (uint8_t *) malloc(size);
-    if (!buffer)
+    if (sizeAfter > MaxMetadataSize)
+      return nullptr;
+    auto readResult = Reader->readBytes(RemoteAddress(address), sizeAfter);
+    if (!readResult)
       return nullptr;
 
-    if (!Reader->readBytes(RemoteAddress(address), buffer, size)) {
-      free(buffer);
-      return nullptr;
-    }
-
-    auto metadata = reinterpret_cast<TargetMetadata<Runtime>*>(buffer);
-    MetadataCache.insert(std::make_pair(address, OwnedMetadataRef(metadata)));
+    auto metadata =
+        reinterpret_cast<const TargetMetadata<Runtime> *>(readResult.get());
+    MetadataCache.insert(std::make_pair(address, std::move(readResult)));
     return MetadataRef(address, metadata);
   }
 
