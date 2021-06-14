@@ -185,6 +185,14 @@ extension Result where Failure == Swift.Error {
       self = .failure(error)
     }
   }
+  
+  public init (catching body: () async throws -> Success) async {
+        do {
+            self = .success(try await body())
+        }catch {
+            self = .failure(error)
+        }
+    }
 }
 
 extension Result: Equatable where Success: Equatable, Failure: Equatable { }
