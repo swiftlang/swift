@@ -342,6 +342,10 @@ protected:
     Immutable : 1
   );
 
+  SWIFT_INLINE_BITFIELD(HopToExecutorInst, NonValueInstruction, 1,
+    mandatory : 1
+  );
+
   SWIFT_INLINE_BITFIELD(DestroyValueInst, NonValueInstruction, 1,
                         PoisonRefs : 1);
 

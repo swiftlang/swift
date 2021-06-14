@@ -1845,6 +1845,17 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   return builder.build(id);
 }
 
+static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+  // Create type parameters and add conformance constraints.
+  auto actorParam = makeGenericParam();
+  builder.addParameter(actorParam);
+  builder.addConformanceRequirement(actorParam, actorProto);
+  builder.setResult(makeConcrete(TupleType::getEmpty(ctx)));
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -2825,6 +2836,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::WithUnsafeThrowingContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/true);
+
+  case BuiltinValueKind::HopToActor:
+    return getHopToActor(Context, Id);
 
   case BuiltinValueKind::AutoDiffCreateLinearMapContext:
     return getAutoDiffCreateLinearMapContext(Context, Id);

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "insert-hop-to-executor"
+#define DEBUG_TYPE "optimize-hop-to-executor"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/ApplySite.h"
@@ -233,17 +233,22 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
         actorIdx = BlockState::Unknown;
         continue;
       }
-      if (auto *hop = dyn_cast<HopToExecutorInst>(inst)) {
-        int newActorIdx = actors.lookup(hop->getOperand());
-        if (newActorIdx == actorIdx) {
-          // There is a dominating hop_to_executor with the same operand.
-          hop->eraseFromParent();
-          changed = true;
-          continue;
-        }
+      auto *hop = dyn_cast<HopToExecutorInst>(inst);
+      if (!hop)
+        continue;
+
+      int newActorIdx = actors.lookup(hop->getOperand());
+      if (newActorIdx != actorIdx) {
         actorIdx = newActorIdx;
         continue;
       }
+      if (hop->isMandatory())
+        continue;
+
+      // There is a dominating hop_to_executor with the same operand.
+      LLVM_DEBUG(llvm::dbgs() << "Redundant executor " << *hop);
+      hop->eraseFromParent();
+      changed = true;
     }
     assert(actorIdx == state.exit);
   }
@@ -279,8 +284,10 @@ bool OptimizeHopToExecutor::removeDeadHopToExecutors() {
     for (auto iter = state.block->rbegin(); iter != state.block->rend();) {
       SILInstruction *inst = &*iter++;
       auto *hop = dyn_cast<HopToExecutorInst>(inst);
-      if (hop && needActor == BlockState::NoExecutorNeeded) {
+      if (hop && !hop->isMandatory()
+          && needActor == BlockState::NoExecutorNeeded) {
         // Remove the dead hop_to_executor.
+        LLVM_DEBUG(llvm::dbgs() << "Dead executor " << *hop);
         hop->eraseFromParent();
         changed = true;
         continue;

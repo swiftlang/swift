@@ -2154,6 +2154,8 @@ public:
   }
 
   void visitHopToExecutorInst(HopToExecutorInst *HTEI) {
+    if (HTEI->isMandatory())
+      *this << "[mandatory] ";
     *this << getIDAndType(HTEI->getTargetExecutor());
   }
 

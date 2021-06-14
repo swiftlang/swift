@@ -1570,6 +1570,14 @@ static ManagedValue emitBuiltinWithUnsafeThrowingContinuation(
                                            /*throws=*/true);
 }
 
+static ManagedValue emitBuiltinHopToActor(SILGenFunction &SGF, SILLocation loc,
+                                          SubstitutionMap subs,
+                                          ArrayRef<ManagedValue> args,
+                                          SGFContext C) {
+  SGF.emitHopToActorValue(loc, args[0]);
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
 static ManagedValue emitBuiltinAutoDiffCreateLinearMapContext(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {

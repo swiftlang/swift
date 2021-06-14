@@ -3024,7 +3024,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
-    UNARY_INSTRUCTION(HopToExecutor)
     UNARY_INSTRUCTION(ExtractExecutor)
     REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
     REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
@@ -3048,6 +3047,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
+  case SILInstructionKind::HopToExecutorInst: {
+    bool mandatory = false;
+    if (parseSILOptional(mandatory, *this, "mandatory")
+        || parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createHopToExecutor(InstLoc, Val, mandatory);
+    break;
+  }
   case SILInstructionKind::DestroyValueInst: {
     bool poisonRefs = false;
     if (parseSILOptional(poisonRefs, *this, "poison")
