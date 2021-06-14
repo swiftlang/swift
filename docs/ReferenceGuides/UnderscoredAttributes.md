@@ -99,11 +99,23 @@ For more details, see
 
 ## `@_distributedActorIndependent`
 
-## `@_effects`
+## `@_effects(effectname)`
+
+Tells the compiler that the implementation of the defined function is limited
+to certain side effects. The attribute argument specifies the kind of side
+effect limitations that apply to the function including any other functions
+it calls. This is used to provide information to the optimizer that it can't
+already infer from static analysis.
+
+Changing the implementation in a way that violates the optimizer's assumptions
+about the effects results in undefined behavior.
+
+For more details, see [OptimizerEffects.rst](/docs/Proposals/OptimizerEffects.rst).
 
 ## `@_exported`
 
-Use to mark an imported module to re-export all its declarations.
+Re-exports all declarations from an imported module.
+
 This attribute is most commonly used by overlays.
 
 ```swift
@@ -126,13 +138,15 @@ func g() {
 
 ## `@_hasMissingDesignatedInitializers`
 
-An attribute that indicates that there may be designated initializers that are
-not printed in the swiftinterface file for a particular class. This attribute
-is needed for the initializer model to maintain correctness when library
-evolution is enabled. This is because a class may have non-public designated
-initializers, and Swift allows the inheritance of convenience initializers
-if and only if the subclass overrides (or has synthesized overrides) of every
-designated initializer in its superclass. Consider the following code:
+Indicates that there may be designated initializers that are
+not printed in the swiftinterface file for a particular class.
+
+This attribute is needed for the initializer model to maintain correctness when
+library evolution is enabled. This is because a class may have non-public
+designated initializers, and Swift allows the inheritance of convenience
+initializers if and only if the subclass overrides (or has synthesized
+overrides) of every designated initializer in its superclass. Consider the
+following code:
 
 ```swift
 // Lib.swift
@@ -289,7 +303,14 @@ For more details, see [the educational note on temporary pointer usage](/userdoc
 
 ## `@_objc_non_lazy_realization`
 
-## `@_optimize(...)`
+## `@_optimize([none|size|speed])`
+
+Controls the compiler's optimization mode. This attribute is analogous to the
+command-line flags `-Onone`, `-Osize` and `-Ospeed` respectively, but limited
+to a single function body.
+
+`@_optimize(none)` is handy for diagnosing and reducing compiler bugs as well
+as improving debugging in Release builds.
 
 ## `@_originallyDefinedIn(module: "ModuleName", availabilitySpec...)`
 
@@ -343,8 +364,13 @@ in the imported module. The imported module needs to be compiled with
 
 ## `@_semantics("uniquely.recognized.id")`
 
-Marks a function as having particular high-level semantics that are
-specially recognized by the SIL optimizer.
+Allows the optimizer to make use of some key invariants in performance critical
+data types, especially `Array`. Since the implementation of these data types
+is written in Swift using unsafe APIs, without these attributes the optimizer
+would need to make conservative assumptions.
+
+Changing the implementation in a way that violates the optimizer's assumptions
+about the semantics results in undefined behavior.
 
 ## `@_show_in_interface`
 
