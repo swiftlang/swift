@@ -13,6 +13,8 @@ sil [transparent] [serialized] @test_hop_to_executor_actor : $@convention(thin) 
 bb0(%0 : $Act):
   // CHECK: hop_to_executor %0 : $Act
   hop_to_executor %0 : $Act
+  // CHECK: hop_to_executor [mandatory] %0 : $Act
+  hop_to_executor [mandatory] %0 : $Act
   %2 = tuple ()
   return %2 : $()
 }

@@ -239,3 +239,42 @@ bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $MyActor):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @redundantMandatoryHop : $@convention(method) @async (@guaranteed MyActor) -> () {
+// CHECK:       bb0(%0 : @guaranteed $MyActor):
+// CHECK-NEXT:    hop_to_executor %0
+// CHECK:         apply
+// CHECK:         hop_to_executor [mandatory] %0
+// CHECK:       } // end sil function 'redundantMandatoryHop'
+sil [ossa] @redundantMandatoryHop : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor %0 : $MyActor
+  %f = function_ref @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
+  apply %f(%0) : $@convention(method) (@guaranteed MyActor) -> ()
+  hop_to_executor [mandatory] %0 : $MyActor
+  apply %f(%0) : $@convention(method) (@guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simpleMandatoryHop : $@convention(method) @async (@guaranteed MyActor) -> () {
+// CHECK:         hop_to_executor [mandatory]
+// CHECK:       } // end sil function 'simpleMandatoryHop'
+sil [ossa] @simpleMandatoryHop : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor [mandatory] %0 : $MyActor
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simpleMandatoryHopAndSuspend : $@convention(method) @async (@guaranteed MyActor) -> () {
+// CHECK:         hop_to_executor [mandatory]
+// CHECK:         apply
+// CHECK:       } // end sil function 'simpleMandatoryHopAndSuspend'
+sil [ossa] @simpleMandatoryHopAndSuspend : $@convention(method) @async (@guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $MyActor):
+  hop_to_executor [mandatory] %0 : $MyActor
+  %async_f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply %async_f() : $@convention(thin) @async () -> ()
+  %r = tuple ()
+  return %r : $()
+}
