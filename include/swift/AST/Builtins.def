@@ -512,6 +512,9 @@ BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 /// the continuation is resumed.
 BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
 
+/// Force the current task to be rescheduled on the specified actor.
+BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.

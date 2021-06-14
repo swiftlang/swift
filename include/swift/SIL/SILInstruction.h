@@ -3477,11 +3477,15 @@ class HopToExecutorInst
   friend SILBuilder;
 
   HopToExecutorInst(SILDebugLocation debugLoc, SILValue executor,
-                    bool hasOwnership)
-      : UnaryInstructionBase(debugLoc, executor) { }
+                    bool hasOwnership, bool isMandatory)
+      : UnaryInstructionBase(debugLoc, executor) {
+    SILNode::Bits.HopToExecutorInst.mandatory = isMandatory;
+  }
 
 public:
   SILValue getTargetExecutor() const { return getOperand(); }
+
+  bool isMandatory() const { return SILNode::Bits.HopToExecutorInst.mandatory; }
 };
 
 /// Extract the ex that the code is executing on the operand executor already.

@@ -692,7 +692,7 @@ void SILGenFunction::emitConstructorPrologActorHop(
 
   if (auto executor = emitExecutor(loc, *maybeIso, None)) {
     ExpectedExecutor = *executor;
-    B.createHopToExecutor(loc, *executor);
+    B.createHopToExecutor(loc, *executor, /*mandatory*/ false);
   }
 }
 
