@@ -739,30 +739,17 @@ public func _asyncMainDrainQueue() -> Never
 
 @available(SwiftStdlib 5.5, *)
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
-#if os(Windows)
   Task.detached {
     do {
+#if !os(Windows)
+      Builtin.hopToActor(MainActor.shared)
+#endif
       try await asyncFun()
       exit(0)
     } catch {
       _errorInMain(error)
     }
   }
-#else
-  @MainActor @Sendable
-  func _doMain(_ asyncFun: @escaping () async throws -> ()) async {
-    do {
-      try await asyncFun()
-    } catch {
-      _errorInMain(error)
-    }
-  }
-
-  Task.detached {
-    await _doMain(asyncFun)
-    exit(0)
-  }
-#endif
   _asyncMainDrainQueue()
 }
 
