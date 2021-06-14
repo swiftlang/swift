@@ -7435,7 +7435,7 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
   } else if (auto nameRepr = extension->getExtendedTypeRepr()) {
     // Type repr is not always available so we need to be defensive
     // about its presence and validity.
-    if (nameRepr->isInvalid()))
+    if (nameRepr->isInvalid())
       return true;
 
     if (auto noteLoc = nameRepr->getEndLoc()) {
