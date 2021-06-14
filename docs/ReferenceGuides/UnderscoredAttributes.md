@@ -94,7 +94,8 @@ This is similar to method swizzling in other languages such as Objective-C,
 except that the replacement happens at program start (or loading a shared
 library), instead of at an arbitrary point in time.
 
-For more details, see [Dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
+For more details, see
+[the forum post on Dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
 
 ## `@_distributedActorIndependent`
 
@@ -391,11 +392,11 @@ See [TransparentAttr.md](/docs/TransparentAttr.md) for more details.
 
 ## `@_weakLinked`
 
-## `@_unsafeMainActor`
+## `@_unsafeMainActor`, `@_unsafeSendable`
 
-## `@_unsafeSendable`
+Marks a parameter's (function) type as `@MainActor` (`@Sendable) in Swift 6 and
+within Swift 5 code that has adopted concurrency, but non-`@MainActor`
+(non-`@Sendable) everywhere else.
 
-Allows a function type to be treated as `@Sendable` without enforcement.
-
-This is unsafe as it can allow access to shared mutable state without
-synchronization, which would be an error with `@Sendable` enforcement.
+See the [forum post on Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
+for more details.
