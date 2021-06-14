@@ -562,7 +562,8 @@ public:
           return TypeWalker::Action::Continue;
 
         if (isPublicOrUsableFromInline(inherited) &&
-            conformanceDeclaredInModule(M, nominal, inherited)) {
+            conformanceDeclaredInModule(M, nominal, inherited) &&
+            !M->isImportedImplementationOnly(inherited->getParentModule())) {
           protocolsToPrint.push_back({inherited, protoAndAvailability.second});
           return TypeWalker::Action::SkipChildren;
         }
