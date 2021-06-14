@@ -21,7 +21,11 @@
 #include "SwitchBuilder.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/ADT/None.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/Endian.h"
+#include <cstdint>
 
 using namespace swift;
 using namespace irgen;
@@ -37,7 +41,7 @@ ScalarKind swift::irgen::refcountingToScalarKind(ReferenceCounting refCounting) 
   case ReferenceCounting::Error:
     return ScalarKind::ErrorReference;
   case ReferenceCounting::Unknown:
-    return ScalarKind::UnknownReference; 
+    return ScalarKind::UnknownReference;
   case ReferenceCounting::ObjC:
     return ScalarKind::ObjCReference;
   }
@@ -139,6 +143,12 @@ llvm::Optional<uint32_t> TypeLayoutEntry::fixedXICount(IRGenModule &IGM) const {
 llvm::Value *TypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   assert(isEmpty());
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty, true);
+}
+
+llvm::Optional<std::vector<uint8_t>>
+TypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  assert(isEmpty());
+  return {{}};
 }
 
 llvm::Value *TypeLayoutEntry::extraInhabitantCount(IRGenFunction &IGF) const {
@@ -770,6 +780,63 @@ llvm::Value *ScalarTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
       IGF.IGM.Int1Ty, typeInfo.isBitwiseTakable(ResilienceExpansion::Maximal));
 }
 
+llvm::Optional<std::vector<uint8_t>>
+ScalarTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  switch (scalarKind) {
+  case ScalarKind::POD: {
+    assert(typeInfo.isFixedSize());
+    Size size = cast<FixedTypeInfo>(typeInfo).getFixedSize();
+    switch (size.getValueInBits()) {
+    case 8:
+      return {{'c'}};
+    case 16:
+      return {{'s'}};
+    case 32:
+      return {{'l'}};
+    case 64:
+      return {{'L'}};
+    default:
+      assert(false && "unsupported size");
+    }
+  }
+  case ScalarKind::ErrorReference:
+    return {{'r'}};
+  case ScalarKind::NativeStrongReference:
+    return {{'N'}};
+  case ScalarKind::NativeWeakReference:
+    return {{'W'}};
+  case ScalarKind::UnknownWeakReference:
+    return {{'w'}};
+  case ScalarKind::UnknownReference:
+  case ScalarKind::UnknownUnownedReference:
+    return {{'u'}};
+  case ScalarKind::BridgeReference:
+    return {{'B'}};
+  case ScalarKind::BlockReference:
+    return {{'b'}};
+  case ScalarKind::ThickFunc: {
+    // Return a struct of { pointer sized POD, native reference }
+    size_t pointerBits = IGM.TargetInfo.PointerSpareBits.size();
+    uint8_t pointerPOD;
+    if (pointerBits <= 8) {
+      pointerPOD = 's';
+    } else if (pointerBits <= 16) {
+      pointerPOD = 's';
+    } else if (pointerBits <= 32) {
+      pointerPOD = 'l';
+    } else if (pointerBits <= 64) {
+      pointerPOD = 'L';
+    } else {
+      assert(false && "Unhandled pointer size");
+    }
+    return {{'a', 0x0, 0x0, 0x0, 0x2, '3', 0x0, 0x0, 0x0, 0x1, pointerPOD, '3',
+             0x0, 0x0, 0x0, 0x1, 'N'}};
+  }
+  default:
+    return llvm::NoneType::None;
+  }
+}
+
 void ScalarTypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   switch (scalarKind) {
   case ScalarKind::POD:
@@ -1135,6 +1202,70 @@ llvm::Value *AlignedGroupEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return isBitwiseTakable;
 }
 
+llvm::Optional<std::vector<uint8_t>>
+AlignedGroupEntry::layoutString(IRGenModule &IGM) const {
+  // a numFields (alignment,fieldLength,field)+
+  // ALIGNED_GROUP:= 'a' SIZE (ALIGNMENT SIZE VALUE)+
+  std::vector<uint8_t> layoutStr;
+  for (auto *entry : entries) {
+    uint64_t alignmentMask;
+    if (entry->fixedAlignment(IGM)) {
+      alignmentMask = entry->fixedAlignment(IGM)->getMaskValue();
+    } else {
+      alignmentMask = UINT64_MAX;
+    }
+    switch (alignmentMask) {
+    case (1 << 0) - 1:
+      layoutStr.push_back('0');
+      break;
+    case (1 << 1) - 1:
+      layoutStr.push_back('1');
+      break;
+    case (1 << 2) - 1:
+      layoutStr.push_back('2');
+      break;
+    case (1 << 3) - 1:
+      layoutStr.push_back('3');
+      break;
+    case (1 << 4) - 1:
+      layoutStr.push_back('4');
+      break;
+    case (1 << 5) - 1:
+      layoutStr.push_back('5');
+      break;
+    case (1 << 6) - 1:
+      layoutStr.push_back('6');
+      break;
+    case (1 << 7) - 1:
+      layoutStr.push_back('7');
+      break;
+    case UINT64_MAX:
+      // Static alignment unknown, check type metadata at runtime
+      layoutStr.push_back('?');
+      break;
+    default:
+      assert(false && "unknown alignment mask");
+    }
+    auto entryStr = entry->layoutString(IGM);
+    if (!entryStr) {
+      return llvm::NoneType::None;
+    }
+    uint32_t entryStrSize;
+    llvm::support::endian::write32be(&entryStrSize, entryStr->size());
+    layoutStr.insert(layoutStr.end(), (uint8_t *)(&entryStrSize),
+                     (uint8_t *)(&entryStrSize + 1));
+    layoutStr.insert(layoutStr.end(), entryStr->begin(), entryStr->end());
+  }
+  std::vector<uint8_t> header{'a'};
+  uint32_t payloadLen;
+  llvm::support::endian::write32be(&payloadLen, entries.size());
+  header.insert(header.end(), (uint8_t *)(&payloadLen),
+                (uint8_t *)(&payloadLen + 1));
+
+  layoutStr.insert(layoutStr.begin(), header.begin(), header.end());
+  return {layoutStr};
+}
+
 static Address alignAddress(IRGenFunction &IGF, Address addr,
                             llvm::Value *alignMask) {
   auto &Builder = IGF.Builder;
@@ -1463,6 +1594,11 @@ ArchetypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, archetype);
 }
 
+llvm::Optional<std::vector<uint8_t>>
+ArchetypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  return llvm::NoneType::None;
+}
+
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
   emitDestroyCall(IGF, archetype, addr);
 }
@@ -1570,6 +1706,86 @@ llvm::Value *EnumTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
         Builder.CreateAnd(isBitwiseTakable, entry->isBitwiseTakable(IGF));
   }
   return isBitwiseTakable;
+}
+
+llvm::Optional<std::vector<uint8_t>>
+EnumTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  // If there are no cases, we can treat this as a scalar
+  if (cases.empty()) {
+    if (numEmptyCases <= UINT8_MAX) {
+      return {{'b'}};
+    } else if (numEmptyCases <= UINT16_MAX) {
+      return {{'c'}};
+    } else if (numEmptyCases <= UINT32_MAX) {
+      return {{'l'}};
+    } else {
+      return {{'L'}};
+    }
+  }
+  std::vector<uint8_t> layoutStr;
+  if (isMultiPayloadEnum()) {
+    // MULTIENUM := 'E' SIZE SIZE SIZE+ VALUE+
+    // E numEmptyPayloads numPayloads legnthOfEachPayload payloads
+    layoutStr.push_back('E');
+
+    uint32_t numEmptyCasesBE;
+    uint32_t numCasesBE;
+    llvm::support::endian::write32be(&numEmptyCasesBE, numEmptyCases);
+    llvm::support::endian::write32be(&numCasesBE, cases.size());
+    layoutStr.insert(layoutStr.end(), (uint8_t *)(&numEmptyCasesBE),
+                     (uint8_t *)(&numEmptyCasesBE + 1));
+    layoutStr.insert(layoutStr.end(), (uint8_t *)(&numCasesBE),
+                     (uint8_t *)(&numCasesBE + 1));
+
+    std::vector<uint32_t> lengths;
+    std::vector<std::vector<uint8_t>> payloads;
+    for (auto &entry : cases) {
+      llvm::Optional<std::vector<uint8_t>> payloadLayout =
+          entry->layoutString(IGM);
+      if (!payloadLayout) {
+        return llvm::NoneType::None;
+      }
+      assert(payloadLayout->size() <= UINT32_MAX &&
+             "Enum layout exceeds length limit");
+      payloads.push_back(*payloadLayout);
+      std::string sizeString;
+      lengths.push_back(payloadLayout->size());
+    }
+    for (auto length : lengths) {
+      uint32_t lengthBE;
+      llvm::support::endian::write32be(&lengthBE, length);
+      layoutStr.insert(layoutStr.end(), (uint8_t *)(&lengthBE),
+                       (uint8_t *)(&lengthBE + 1));
+    }
+
+    for (auto payload : payloads) {
+      layoutStr.insert(layoutStr.end(), payload.begin(), payload.end());
+    }
+  } else {
+    // SINGLEENUM := 'e' SIZE SIZE VALUE
+    // e NumEmptyPayloads LengthOfPayload Payload
+    layoutStr.push_back('e');
+    uint32_t numEmptyCasesBE;
+    llvm::support::endian::write32be(&numEmptyCasesBE, numEmptyCases);
+    layoutStr.insert(layoutStr.end(), (uint8_t *)(&numEmptyCasesBE),
+                     (uint8_t *)(&numEmptyCasesBE + 1));
+
+    llvm::Optional<std::vector<uint8_t>> payloadLayout =
+        cases[0]->layoutString(IGM);
+    if (!payloadLayout) {
+      return llvm::NoneType::None;
+    }
+    assert(payloadLayout->size() <= UINT32_MAX &&
+           "Enum layout exceeds length limit");
+
+    uint32_t payloadLengthBE;
+    llvm::support::endian::write32be(&payloadLengthBE, payloadLayout->size());
+    layoutStr.insert(layoutStr.end(), (uint8_t *)(&payloadLengthBE),
+                     (uint8_t *)(&payloadLengthBE + 1));
+    layoutStr.insert(layoutStr.end(), payloadLayout->begin(),
+                     payloadLayout->end());
+  }
+  return {layoutStr};
 }
 
 void EnumTypeLayoutEntry::computeProperties() {
@@ -2682,6 +2898,11 @@ ResilientTypeLayoutEntry::isBitwiseTakable(IRGenFunction &IGF) const {
   return emitLoadOfIsBitwiseTakable(IGF, ty);
 }
 
+llvm::Optional<std::vector<uint8_t>>
+ResilientTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  return llvm::NoneType::None;
+}
+
 void ResilientTypeLayoutEntry::computeProperties() {
   hasResilientField = true;
   if (ty.getASTType()->hasArchetype())
@@ -2898,6 +3119,11 @@ void TypeInfoBasedTypeLayoutEntry::storeEnumTagSinglePayload(
       Address(Builder.CreateBitCast(addr.getAddress(), addressType), alignment);
   typeInfo.storeEnumTagSinglePayload(IGF, tag, numEmptyCases, addr,
                                      representative, true);
+}
+
+llvm::Optional<std::vector<uint8_t>>
+TypeInfoBasedTypeLayoutEntry::layoutString(IRGenModule &IGM) const {
+  return llvm::NoneType::None;
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
