@@ -2053,7 +2053,7 @@ bool PullbackCloner::Implementation::run() {
   // This vector will contain all indirect parameter adjoint buffers.
   SmallVector<SILValue, 4> indParamAdjoints;
   // This vector will identify the locations where initialization is needed.
-  SmallVector<bool, 8> outputsToInitialize;
+  SmallBitVector outputsToInitialize;
 
   auto conv = getOriginal().getConventions();
   auto origParams = getOriginal().getArgumentsWithoutIndirectResults();
