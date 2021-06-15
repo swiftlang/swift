@@ -4571,7 +4571,8 @@ struct CallbackCondition {
   /// }
   /// ```
   CallbackCondition(const Decl *Subject, const CaseLabelItem *CaseItem) {
-    if (auto *EEP = dyn_cast<EnumElementPattern>(CaseItem->getPattern())) {
+    if (auto *EEP = dyn_cast<EnumElementPattern>(
+            CaseItem->getPattern()->getSemanticsProvidingPattern())) {
       // `case .<func>(let <bind>)`
       initFromEnumPattern(Subject, EEP);
     }
