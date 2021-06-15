@@ -71,6 +71,8 @@ public:
   // Derived classes can use this to store a Job Id.
   uint32_t Id = 0;
 
+  void *Reserved[2] = {};
+
   // We use this union to avoid having to do a second indirect branch
   // when resuming an asynchronous task, which we expect will be the
   // common case.
@@ -127,10 +129,10 @@ public:
 
 // The compiler will eventually assume these.
 #if SWIFT_POINTER_IS_8_BYTES
-static_assert(sizeof(Job) == 6 * sizeof(void*),
+static_assert(sizeof(Job) == 8 * sizeof(void*),
               "Job size is wrong");
 #else
-static_assert(sizeof(Job) == 8 * sizeof(void*),
+static_assert(sizeof(Job) == 10 * sizeof(void*),
               "Job size is wrong");
 #endif
 static_assert(alignof(Job) == 2 * alignof(void*),
@@ -200,7 +202,7 @@ public:
 
   /// Private storage for the use of the runtime.
   struct alignas(2 * alignof(void*)) OpaquePrivateStorage {
-    void *Storage[8];
+    void *Storage[6];
 
     /// Initialize this storage during the creation of a task.
     void initialize(AsyncTask *task);
