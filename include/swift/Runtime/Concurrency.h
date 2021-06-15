@@ -125,12 +125,6 @@ swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 // TODO: "async let wait" and "async let destroy" would be expressed
 //       similar to like TaskFutureWait;
 
-/// This matches the ABI of a closure `<T>(Builtin.NativeObject) async -> T`
-using TaskFutureWaitSignature =
-    SWIFT_CC(swiftasync)
-    void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
-
 /// Wait for a non-throwing future task to complete.
 ///
 /// This can be called from any thread. Its Swift signature is
@@ -141,12 +135,9 @@ using TaskFutureWaitSignature =
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_future_wait(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
-
-using TaskFutureWaitThrowingSignature =
-    SWIFT_CC(swiftasync)
-    void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
+         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *,
+         TaskContinuationFunction *,
+         AsyncContext *);
 
 /// Wait for a potentially-throwing future task to complete.
 ///
@@ -157,15 +148,12 @@ using TaskFutureWaitThrowingSignature =
 ///    async throws -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_task_future_wait_throwing(OpaqueValue *,
-                                     SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                     AsyncTask *, Metadata *);
-
-using TaskGroupFutureWaitThrowingSignature =
-SWIFT_CC(swiftasync)
-  void(OpaqueValue *,
-       SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, TaskGroup *,
-       const Metadata *successType);
+void swift_task_future_wait_throwing(
+  OpaqueValue *,
+  SWIFT_ASYNC_CONTEXT AsyncContext *,
+  AsyncTask *,
+  ThrowingTaskFutureWaitContinuationFunction *,
+  AsyncContext *);
 
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
@@ -180,8 +168,9 @@ SWIFT_CC(swiftasync)
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swiftasync)
 void swift_taskGroup_wait_next_throwing(
-    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
-    TaskGroup *group, const Metadata *successType);
+    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskGroup *group, ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+    AsyncContext *callContext);
 
 /// Initialize a `TaskGroup` in the passed `group` memory location.
 /// The caller is responsible for retaining and managing the group's lifecycle.
@@ -192,7 +181,7 @@ void swift_taskGroup_wait_next_throwing(
 /// func swift_taskGroup_initialize(group: Builtin.RawPointer)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_taskGroup_initialize(TaskGroup *group);
+void swift_taskGroup_initialize(TaskGroup *group, const Metadata *T);
 
 /// Attach a child task to the parent task's task group record.
 ///
@@ -310,7 +299,8 @@ using AsyncLetWaitSignature =
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_wait(OpaqueValue *,
                          SWIFT_ASYNC_CONTEXT AsyncContext *,
-                         AsyncLet *, Metadata *);
+                         AsyncLet *, TaskContinuationFunction *,
+                         AsyncContext *);
 
 /// Wait for a potentially-throwing async-let to complete.
 ///
@@ -324,7 +314,9 @@ void swift_asyncLet_wait(OpaqueValue *,
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_wait_throwing(OpaqueValue *,
                                   SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                  AsyncLet *, Metadata *);
+                                  AsyncLet *,
+                                  ThrowingTaskFutureWaitContinuationFunction *,
+                                  AsyncContext *);
 
 /// Its Swift signature is
 ///

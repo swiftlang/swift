@@ -1744,7 +1744,7 @@ FUNCTION(TaskGroupInitialize,
          swift_taskGroup_initialize, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_taskGroup_destroy(TaskGroup *group);

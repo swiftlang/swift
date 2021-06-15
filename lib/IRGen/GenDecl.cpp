@@ -2655,7 +2655,9 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
         asyncFnPtr.getAuthInfo().getCorrespondingCodeAuthInfo();
     auto newFnPtr = FunctionPointer(
         FunctionPointer::Kind::Function, asyncFnPtr.getPointer(IGF),
-        codeAuthInfo, Signature::forAsyncAwait(IGM, silFunctionType));
+        codeAuthInfo,
+        Signature::forAsyncAwait(IGM, silFunctionType,
+                                 /*useSpecialConvention*/ false));
     SmallVector<llvm::Value *, 16> forwardedArgs;
     for (auto &arg : IGF.CurFn->args())
       forwardedArgs.push_back(&arg);
@@ -3114,8 +3116,9 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
              isLazilyEmittedFunction(*f, getSILModule())) {
     IRGen.addLazyFunction(f);
   }
-
-  Signature signature = getSignature(f->getLoweredFunctionType());
+  auto fpKind = irgen::classifyFunctionPointerKind(f);
+  Signature signature =
+      getSignature(f->getLoweredFunctionType(), fpKind.useSpecialConvention());
   addLLVMFunctionAttributes(f, signature);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);

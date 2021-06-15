@@ -128,6 +128,11 @@ using TaskContinuationFunction =
   SWIFT_CC(swiftasync)
   void (SWIFT_ASYNC_CONTEXT AsyncContext *);
 
+using ThrowingTaskFutureWaitContinuationFunction =
+  SWIFT_CC(swiftasync)
+  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
+
+
 template <class AsyncSignature>
 class AsyncFunctionPointer;
 template <class AsyncSignature>

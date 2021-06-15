@@ -1437,7 +1437,7 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
-  auto genericParam = makeGenericParam().build(builder);
+  auto genericParam = makeGenericParam().build(builder); // <T>
   builder.addParameter(makeConcrete(ctx.getIntType())); // flags
   builder.addParameter(
       makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
@@ -1520,7 +1520,8 @@ static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _parameters(),
+                            _generics(_unrestricted),
+                            _parameters(_metatype(_typeparam(0))),
                             _rawPointer);
 }
 
