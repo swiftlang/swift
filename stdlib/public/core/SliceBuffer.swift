@@ -245,12 +245,18 @@ internal struct _SliceBuffer<Element>
     return target + c
   }
 
-  public __consuming func _copyContents(
+  @inlinable
+  internal __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
-    // This customization point is not implemented for internal types.
-    // Accidentally calling it would be a catastrophic performance bug.
-    fatalError("unsupported")
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    _invariantCheck()
+    guard buffer.count > 0 else { return (makeIterator(), 0) }
+    let c = Swift.min(self.count, buffer.count)
+    buffer.baseAddress!.initialize(
+      from: firstElementAddress,
+      count: c)
+    _fixLifetime(owner)
+    return (IndexingIterator(_elements: self, _position: startIndex + c), c)
   }
 
   /// True, if the array is native and does not need a deferred type check.
