@@ -1315,6 +1315,9 @@ public:
   bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
 
   /// Retrieve the extended type definition as written in the source, if it exists.
+  ///
+  /// Repr would not be available if the extension was been loaded
+  /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
