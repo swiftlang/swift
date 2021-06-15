@@ -5,7 +5,7 @@ library developers. Usage of these attributes outside of the Swift monorepo
 is STRONGLY DISCOURAGED.
 
 The Swift reference has a chapter discussing [stable attributes][Attributes].
-This document is intended to serve as a counter-part describing underscored
+This document is intended to serve as a counterpart describing underscored
 attributes, whose semantics are subject to change and most likely need to
 go through the Swift evolution process before being stabilized.
 
@@ -34,7 +34,7 @@ module which uses the code.
 This means that `@_alwaysEmitIntoClient` definitions are _not_ part of the
 defining module's ABI, so changing the implementation at a later stage
 does not break ABI. (TODO: Does it matter if the `@_alwaysEmitIntoClient`
-definition is used in the defining module, say in an `@inlinable function?)
+definition is used in the defining module, say in an `@inlinable` function?)
 
 Most notably, default argument expressions are implicitly
 `@_alwaysEmitIntoClient`, which means that adding a default argument to a
@@ -94,8 +94,8 @@ This is similar to method swizzling in other languages such as Objective-C,
 except that the replacement happens at program start (or loading a shared
 library), instead of at an arbitrary point in time.
 
-For more details, see
-[the forum post on Dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
+For more details, see the forum post on
+[Dynamic method replacement](https://forums.swift.org/t/dynamic-method-replacement/16619).
 
 ## `@_distributedActorIndependent`
 
@@ -234,13 +234,12 @@ overridden. This attribute is often printed alongside
 
 ## `@_marker`
 
-Indicates that a protocol is a marker protocol;
-one that represents some meaningful property at compile-time
-but has no runtime representation.
+Indicates that a protocol is a marker protocol. Marker protocols represent some
+meaningful property at compile-time but have no runtime representation.
 
 For more details, see [SE-0302](https://github.com/apple/swift-evolution/blob/main/proposals/0302-concurrent-value-and-concurrent-closures.md#marker-protocols), which introduces marker protocols.
 
-At the moment, the language only has 1 marker protocol: `Sendable`.
+At the moment, the language only has one marker protocol: `Sendable`.
 
 Fun fact: Rust has a very similar concept called
 [marker traits](https://doc.rust-lang.org/std/marker/index.html),
@@ -420,9 +419,9 @@ See [TransparentAttr.md](/docs/TransparentAttr.md) for more details.
 
 ## `@_unsafeMainActor`, `@_unsafeSendable`
 
-Marks a parameter's (function) type as `@MainActor` (`@Sendable) in Swift 6 and
+Marks a parameter's (function) type as `@MainActor` (`@Sendable`) in Swift 6 and
 within Swift 5 code that has adopted concurrency, but non-`@MainActor`
-(non-`@Sendable) everywhere else.
+(non-`@Sendable`) everywhere else.
 
-See the [forum post on Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
+See the forum post on [Concurrency in Swift 5 and 6](https://forums.swift.org/t/concurrency-in-swift-5-and-6/49337)
 for more details.
