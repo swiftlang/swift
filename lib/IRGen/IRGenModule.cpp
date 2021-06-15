@@ -612,6 +612,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // Job.SchedulerPrivate
     Int32Ty,              // Job.Flags
     Int32Ty,              // Job.ID
+    Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // Job.RunJob/Job.ResumeTask
     SwiftContextPtrTy,    // Task.ResumeContext
     IntPtrTy              // Task.Status
@@ -632,6 +633,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int8PtrTy, Int8PtrTy, // SchedulerPrivate
     Int32Ty,              // flags
     Int32Ty,              // ID
+    Int8PtrTy, Int8PtrTy, // Reserved
     FunctionPtrTy,        // RunJob/ResumeTask
   });
   SwiftJobPtrTy = SwiftJobTy->getPointerTo(DefaultAS);
