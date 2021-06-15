@@ -1457,11 +1457,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
                 if [[ ! -f "${DEST_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_LIB_PATH}" ]]; then
-                        if [[ "$OS" == "tvos" ]]; then
-                            call lipo -remove i386 "${HOST_LIB_PATH}" -output "${DEST_LIB_PATH}" || call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
-                        else
-                           call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
-                        fi
+                        call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
                     elif [[ "${VERBOSE_BUILD}" ]]; then
                         echo "no file exists at ${HOST_LIB_PATH}"
                     fi
@@ -1473,11 +1469,7 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 DEST_SIM_LIB_PATH="${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
                 if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
-                        if [[ "$OS" == "tvos" ]]; then
-                            call lipo -remove i386 "${HOST_SIM_LIB_PATH}" -output "${DEST_SIM_LIB_PATH}" || call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
-                        else
-                            call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
-                        fi
+                        call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
                     elif [[ -f "${HOST_LIB_PATH}" ]]; then
                         # The simulator .a might not exist if the host
                         # Xcode is old. In that case, copy over the
