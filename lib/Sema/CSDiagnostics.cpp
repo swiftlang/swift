@@ -7432,9 +7432,15 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
   if (auto *whereClause = extension->getTrailingWhereClause()) {
     auto sourceRange = whereClause->getSourceRange();
     note.fixItInsertAfter(sourceRange.End, ", Self == <#Type#> ");
-  } else {
-    auto nameRepr = extension->getExtendedTypeRepr();
-    note.fixItInsertAfter(nameRepr->getEndLoc(), " where Self == <#Type#>");
+  } else if (auto nameRepr = extension->getExtendedTypeRepr()) {
+    // Type repr is not always available so we need to be defensive
+    // about its presence and validity.
+    if (nameRepr->isInvalid())
+      return true;
+
+    if (auto noteLoc = nameRepr->getEndLoc()) {
+      note.fixItInsertAfter(noteLoc, " where Self == <#Type#>");
+    }
   }
 
   return true;
