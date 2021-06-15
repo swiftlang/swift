@@ -95,7 +95,8 @@ function(get_test_dependencies SDK result_var_name)
       llvm-readelf
       llvm-readobj
       llvm-strings
-      not)
+      not
+      split-file)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
