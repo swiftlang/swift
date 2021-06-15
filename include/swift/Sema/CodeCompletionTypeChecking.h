@@ -36,9 +36,21 @@ namespace swift {
 
   class TypeCheckCompletionCallback {
   public:
-    /// Called for each solution produced while  type-checking an expression
+    /// Called for each solution produced while type-checking an expression
     /// that the code completion expression participates in.
     virtual void sawSolution(const constraints::Solution &solution) = 0;
+
+    /// Type checking produced a solution that may or may not contain the type
+    /// of the code completion's base.
+    /// This is being used when type checking result builders. Type checking
+    /// result builders might skip entire expressions if type checking fails,
+    /// thus the code completion expression might have no type set.
+    /// FIXME: Remove this, once type checking result builders no longer skips
+    /// expressions.
+    virtual void sawPotentialSolution(const constraints::Solution &solution) = 0;
+
+    /// True if a \c sawSolution callback was received.
+    virtual bool gotCallback() const = 0;
     virtual ~TypeCheckCompletionCallback() {}
   };
 
@@ -75,13 +87,14 @@ namespace swift {
 
     /// True if at least one solution was passed via the \c sawSolution
     /// callback.
-    bool gotCallback() const { return GotCallback; }
+    bool gotCallback() const override { return GotCallback; }
 
     /// Typecheck the code completion expression in isolation, calling
     /// \c sawSolution for each solution formed.
     void fallbackTypeCheck();
 
     void sawSolution(const constraints::Solution &solution) override;
+    void sawPotentialSolution(const constraints::Solution &solution) override;
   };
 
   /// Used to collect and store information needed to perform unresolved member
@@ -107,13 +120,14 @@ namespace swift {
 
     /// True if at least one solution was passed via the \c sawSolution
     /// callback.
-    bool gotCallback() const { return GotCallback; }
+    bool gotCallback() const override { return GotCallback; }
 
     /// Typecheck the code completion expression in its outermost expression
     /// context, calling \c sawSolution for each solution formed.
     void fallbackTypeCheck(DeclContext *DC);
 
     void sawSolution(const constraints::Solution &solution) override;
+    void sawPotentialSolution(const constraints::Solution &solution) override;
   };
 
 }

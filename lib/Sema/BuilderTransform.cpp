@@ -26,6 +26,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/DenseMap.h"
@@ -1604,7 +1605,12 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
   }
   }
 
+  auto &Context = func->getASTContext();
   ConstraintSystemOptions options = ConstraintSystemFlags::AllowFixes;
+  if (Context.CompletionCallback) {
+    options |= ConstraintSystemFlags::SuppressDiagnostics;
+    options |= ConstraintSystemFlags::ForCodeCompletion;
+  }
   auto resultInterfaceTy = func->getResultInterfaceType();
   auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
 
@@ -1625,6 +1631,20 @@ Optional<BraceStmt *> TypeChecker::applyResultBuilderBodyTransform(
           cs.getConstraintLocator(func->getBody()))) {
     if (result->isFailure())
       return nullptr;
+  }
+
+  if (Context.CompletionCallback) {
+    SmallVector<Solution, 4> solutions;
+    cs.solveForCodeCompletion(solutions);
+    // filterSolutionsForCodeCompletion only needs the completionExpr if
+    // the solution application target is a pattern expr. Since it's not, we
+    // can just pass nullptr here.
+    filterSolutionsForCodeCompletion(SolutionApplicationTarget(func), solutions,
+                                     /*completionExpr=*/nullptr);
+    for (auto &solution : solutions) {
+      Context.CompletionCallback->sawPotentialSolution(solution);
+    }
+    return None;
   }
 
   // Solve the constraint system.

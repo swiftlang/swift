@@ -759,7 +759,10 @@ private:
 
 // Determine if the target expression is the implicit BinaryExpr generated for
 // pattern-matching in a switch/if/guard case (<completion> ~= matchValue).
-static bool isForPatternMatch(SolutionApplicationTarget &target) {
+static bool isForPatternMatch(const SolutionApplicationTarget &target) {
+  if (target.getAsExpr() == nullptr) {
+    return false;
+  }
   if (target.getExprContextualTypePurpose() != CTP_Condition)
     return false;
   Expr *condition = target.getAsExpr();
@@ -781,9 +784,9 @@ static bool isForPatternMatch(SolutionApplicationTarget &target) {
 
 /// Remove any solutions from the provided vector that both require fixes and have a
 /// score worse than the best.
-static void filterSolutions(SolutionApplicationTarget &target,
-                            SmallVectorImpl<Solution> &solutions,
-                            CodeCompletionExpr *completionExpr) {
+void TypeChecker::filterSolutionsForCodeCompletion(
+    const SolutionApplicationTarget &target,
+    SmallVectorImpl<Solution> &solutions, CodeCompletionExpr *completionExpr) {
   // FIXME: this is only needed because in pattern matching position, the
   // code completion expression always becomes an expression pattern, which
   // requires the ~= operator to be defined on the type being matched against.
@@ -895,13 +898,14 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
     // If solve failed to generate constraints or with some other
     // issue, we need to fallback to type-checking a sub-expression.
-    if (!cs.solveForCodeCompletion(target, solutions))
+    if (!cs.generateConstraintsAndSolveForCodeCompletionExpr(target, solutions))
       return CompletionResult::Fallback;
 
     // FIXME: instead of filtering, expose the score and viability to clients.
     // Remove any solutions that both require fixes and have a score that is
     // worse than the best.
-    filterSolutions(target, solutions, contextAnalyzer.getCompletionExpr());
+    filterSolutionsForCodeCompletion(target, solutions,
+                                     contextAnalyzer.getCompletionExpr());
 
     // Similarly, if the type-check didn't produce any solutions, fall back
     // to type-checking a sub-expression in isolation.
@@ -1220,6 +1224,15 @@ sawSolution(const constraints::Solution &S) {
   }
 }
 
+void DotExprTypeCheckCompletionCallback::
+sawPotentialSolution(const constraints::Solution &S) {
+  auto *ParsedExpr = CompletionExpr->getBase();
+  auto *SemanticExpr = ParsedExpr->getSemanticsProvidingExpr();
+  if (S.hasType(SemanticExpr)) {
+    sawSolution(S);
+  }
+}
+
 void UnresolvedMemberTypeCheckCompletionCallback::
 sawSolution(const constraints::Solution &S) {
   GotCallback = true;
@@ -1241,4 +1254,11 @@ sawSolution(const constraints::Solution &S) {
 
   bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
   Results.push_back({ExpectedTy, SingleExprBody});
+}
+
+void UnresolvedMemberTypeCheckCompletionCallback::
+sawPotentialSolution(const constraints::Solution &S) {
+  if (S.hasType(CompletionExpr)) {
+    sawSolution(S);
+  }
 }

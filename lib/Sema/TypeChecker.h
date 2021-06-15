@@ -555,6 +555,11 @@ FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
                                           DeclRefKind refKind,
                                           ConcreteDeclRef &refdDecl);
 
+void filterSolutionsForCodeCompletion(
+    const constraints::SolutionApplicationTarget &target,
+    SmallVectorImpl<constraints::Solution> &solutions,
+    CodeCompletionExpr *completionExpr);
+
 /// Type check the given expression and provide results back to code completion
 /// via specified callback.
 ///
