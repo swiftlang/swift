@@ -127,12 +127,6 @@ bool IsDefaultActorRequest::evaluate(
   return true;
 }
 
-static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
-                                          NominalTypeDecl *parent) {
-  return decl->getFormalAccess() <
-         std::min(parent->getFormalAccess(), AccessLevel::Public);
-}
-
 VarDecl *GlobalActorInstanceRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   auto globalActorAttr = nominal->getAttrs().getAttribute<GlobalActorAttr>();
@@ -147,106 +141,18 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
     return nullptr;
   }
 
-  auto *module = nominal->getParentModule();
-
   // Global actors have a static property "shared" that provides an actor
   // instance. The value must
   SmallVector<ValueDecl *, 4> decls;
   nominal->lookupQualified(
       nominal, DeclNameRef(ctx.Id_shared), NL_QualifiedDefault, decls);
-  VarDecl *sharedVar = nullptr;
-  llvm::TinyPtrVector<VarDecl *> candidates;
   for (auto decl : decls) {
     auto var = dyn_cast<VarDecl>(decl);
     if (!var)
       continue;
 
-    auto varDC = var->getDeclContext();
-    if (var->isStatic() &&
-        !isDeclNotAsAccessibleAsParent(var, nominal) &&
-        !(isa<ExtensionDecl>(varDC) &&
-          cast<ExtensionDecl>(varDC)->isConstrainedExtension()) &&
-        TypeChecker::conformsToProtocol(
-            varDC->mapTypeIntoContext(var->getValueInterfaceType()),
-            actorProto, module)) {
-      sharedVar = var;
-      break;
-    }
-
-    candidates.push_back(var);
-  }
-
-  // If we found a suitable candidate, we're done.
-  if (sharedVar)
-    return sharedVar;
-
-  // Complain about the lack of a suitable 'shared' property.
-  {
-    auto primaryDiag = nominal->diagnose(
-        diag::global_actor_missing_shared, nominal->getName());
-
-    // If there were no candidates, provide a Fix-It with a prototype.
-    if (candidates.empty() && nominal->getBraces().Start.isValid()) {
-      // Figure out the indentation we need.
-      SourceLoc sharedInsertionLoc = Lexer::getLocForEndOfToken(
-          ctx.SourceMgr, nominal->getBraces().Start);
-
-      StringRef extraIndent;
-      StringRef currentIndent = Lexer::getIndentationForLine(
-          ctx.SourceMgr, sharedInsertionLoc, &extraIndent);
-      std::string stubIndent = (currentIndent + extraIndent).str();
-
-      // From the string to add the declaration.
-      std::string sharedDeclString = "\n" + stubIndent;
-      if (nominal->getFormalAccess() >= AccessLevel::Public)
-        sharedDeclString += "public ";
-
-      sharedDeclString += "static let shared = <#actor instance#>";
-
-      primaryDiag.fixItInsert(sharedInsertionLoc, sharedDeclString);
-    }
-  }
-
-  // Remark about all of the candidates that failed (and why).
-  for (auto candidate : candidates) {
-    if (!candidate->isStatic()) {
-      candidate->diagnose(diag::global_actor_shared_not_static)
-        .fixItInsert(candidate->getAttributeInsertionLoc(true), "static ");
-      continue;
-    }
-
-    if (isDeclNotAsAccessibleAsParent(candidate, nominal)) {
-      AccessLevel needAccessLevel = std::min(
-          nominal->getFormalAccess(), AccessLevel::Public);
-      auto diag = candidate->diagnose(
-          diag::global_actor_shared_inaccessible,
-          getAccessLevelSpelling(candidate->getFormalAccess()),
-          getAccessLevelSpelling(needAccessLevel));
-      if (auto attr = candidate->getAttrs().getAttribute<AccessControlAttr>()) {
-        if (needAccessLevel == AccessLevel::Internal) {
-          diag.fixItRemove(attr->getRange());
-        } else {
-          diag.fixItReplace(
-              attr->getRange(), getAccessLevelSpelling(needAccessLevel));
-        }
-      } else {
-        diag.fixItInsert(
-            candidate->getAttributeInsertionLoc(true),
-            getAccessLevelSpelling(needAccessLevel));
-      }
-      continue;
-    }
-
-    if (auto ext = dyn_cast<ExtensionDecl>(candidate->getDeclContext())) {
-      if (ext->isConstrainedExtension()) {
-        candidate->diagnose(diag::global_actor_shared_constrained_extension);
-        continue;
-      }
-    }
-
-    Type varType = candidate->getDeclContext()->mapTypeIntoContext(
-        candidate->getValueInterfaceType());
-    candidate->diagnose(diag::global_actor_shared_non_actor_type, varType);
+    if (var->getDeclContext() == nominal && var->isStatic())
+      return var;
   }
 
   return nullptr;
