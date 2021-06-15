@@ -4536,22 +4536,6 @@ ERROR(concurrency_lib_missing,none,
 ERROR(async_main_no_concurrency,none,
       "'_Concurrency' module not imported, required for async main", ())
 
-ERROR(global_actor_missing_shared,none,
-      "global actor %0 requires a static property 'shared' that produces an "
-      "actor instance", (Identifier))
-NOTE(global_actor_shared_not_static,none,
-     "'shared' property in global actor is not 'static'", ())
-NOTE(global_actor_shared_inaccessible,none,
-     "'shared' property has more restrictive access (%0) than its global actor "
-     "(%1)",
-     (StringRef, StringRef))
-NOTE(global_actor_shared_constrained_extension,none,
-     "'shared' property in global actor cannot be in a constrained extension",
-     ())
-NOTE(global_actor_shared_non_actor_type,none,
-     "'shared' property type %0 does not conform to the 'Actor' protocol",
-     (Type))
-
 ERROR(multiple_global_actors,none,
       "declaration can not have multiple global actor attributes (%0 and %1)",
       (Identifier, Identifier))
