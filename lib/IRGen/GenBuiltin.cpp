@@ -227,11 +227,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::StartAsyncLet) {
+    auto taskOptions = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
     auto asyncLet = emitBuiltinStartAsyncLet(
         IGF,
+        taskOptions,
         taskFunction,
         taskContext,
         substitutions
@@ -276,16 +278,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture)
         ? args.claimNext()
         : nullptr;
-    auto futureResultType =
-        ((Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) ||
-         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture))
-          ? args.claimNext()
-          : nullptr;
+    auto taskOptions = args.claimNext();
+    auto futureResultType = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, taskGroup, futureResultType, taskFunction, taskContext,
+        IGF,
+        flags,
+        taskGroup,
+        taskOptions,
+        futureResultType,
+        taskFunction, taskContext,
         substitutions);
 
     // Cast back to NativeObject/RawPointer.

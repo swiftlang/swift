@@ -174,6 +174,7 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
 }
 
 llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                             llvm::Value *taskOptions,
                                              llvm::Value *taskFunction,
                                              llvm::Value *localContextInfo,
                                              SubstitutionMap subs) {
@@ -190,8 +191,10 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
 
   // This is @_silgen_name("swift_asyncLet_start")
+  IGF.IGM.getAsyncLetStartFn()->dump();
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
                                       {alet,
+                                       taskOptions,
                                        futureResultTypeMetadata,
                                        taskFunction,
                                        localContextInfo
