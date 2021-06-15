@@ -904,6 +904,9 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   llvm_unreachable("covered switch");
 }
 
+/// Return true if all OperandOwnership invariants hold.
+bool checkOperandOwnershipInvariants(const Operand *operand);
+
 /// Return the OperandOwnership for a forwarded operand when the forwarding
 /// operation has this "forwarding ownership" (as returned by
 /// getForwardingOwnershipKind()). \p allowUnowned is true for a subset of
