@@ -1374,8 +1374,9 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
-  ManagedValue emitAsyncLetStart(
-      SILLocation loc, Type functionType, ManagedValue taskFunction);
+  ManagedValue emitAsyncLetStart(SILLocation loc,
+                                 SILValue taskOptions,
+                                 Type functionType, ManagedValue taskFunction);
 
   ManagedValue emitAsyncLetGet(SILLocation loc, SILValue asyncLet);
 

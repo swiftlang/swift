@@ -3849,23 +3849,34 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 }
 
 llvm::Value *irgen::emitTaskCreate(
-    IRGenFunction &IGF, llvm::Value *flags,
+    IRGenFunction &IGF,
+    llvm::Value *flags,
     llvm::Value *taskGroup,
+    llvm::Value *taskOptions,
     llvm::Value *futureResultType,
-    llvm::Value *taskFunction, llvm::Value *localContextInfo,
+    llvm::Value *taskFunction,
+    llvm::Value *localContextInfo,
     SubstitutionMap subs) {
   llvm::CallInst *result;
+  taskOptions = IGF.Builder.CreateBitOrPointerCast(
+      taskOptions, IGF.IGM.SwiftTaskOptionRecordPtrTy);
   if (taskGroup && futureResultType) {
     taskGroup = IGF.Builder.CreateBitOrPointerCast(
         taskGroup, IGF.IGM.SwiftTaskGroupPtrTy);
     result = IGF.Builder.CreateCall(
         IGF.IGM.getTaskCreateGroupFutureFn(),
-        {flags, taskGroup, futureResultType,
+        {flags,
+         taskGroup,
+         taskOptions,
+         futureResultType,
          taskFunction, localContextInfo});
   } else if (futureResultType) {
     result = IGF.Builder.CreateCall(
       IGF.IGM.getTaskCreateFutureFn(),
-      {flags, futureResultType, taskFunction, localContextInfo});
+      {flags,
+       taskOptions,
+       futureResultType,
+       taskFunction, localContextInfo});
   } else {
     llvm_unreachable("no future?!");
   }

@@ -1426,6 +1426,9 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
       SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
   }).borrow(SGF, loc).forward(SGF);
 
+  // Task options
+  auto taskOptions = args[1].borrow(SGF, loc).forward(SGF);;
+
   // Ensure that the closure has the appropriate type.
   auto extInfo =
       ASTExtInfoBuilder()
@@ -1442,7 +1445,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
   AbstractionPattern origParam(genericSig, functionTy);
   CanType substParamType = functionTy.subst(subs)->getCanonicalType();
   auto reabstractedFun =
-      SGF.emitSubstToOrigValue(loc, args[1], origParam, substParamType);
+      SGF.emitSubstToOrigValue(loc, args[2], origParam, substParamType);
 
   auto function = emitFunctionArgumentForAsyncTaskEntryPoint(
       SGF, loc, reabstractedFun, futureResultType);
@@ -1452,7 +1455,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
       ctx.getIdentifier(
           getBuiltinName(BuiltinValueKind::CreateAsyncTaskFuture)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, futureResultMetadata, function.forward(SGF) });
+      { flags, taskOptions, futureResultMetadata, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
@@ -1463,6 +1466,7 @@ static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
   ASTContext &ctx = SGF.getASTContext();
   auto flags = args[0].forward(SGF);
   auto group = args[1].borrow(SGF, loc).forward(SGF);
+  auto taskOptions = args[2].borrow(SGF, loc).forward(SGF);
 
   // Form the metatype of the result type.
   CanType futureResultType =
@@ -1480,14 +1484,14 @@ static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
       SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
   }).borrow(SGF, loc).forward(SGF);
 
-  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[2],
+  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[3],
                                                              futureResultType);
   auto apply = SGF.B.createBuiltin(
       loc,
       ctx.getIdentifier(
           getBuiltinName(BuiltinValueKind::CreateAsyncTaskGroupFuture)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, group, futureResultMetadata, function.forward(SGF) });
+      { flags, group, taskOptions, futureResultMetadata, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 

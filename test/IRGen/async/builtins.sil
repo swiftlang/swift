@@ -32,28 +32,28 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future
-sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, @guaranteed @async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, @in_guaranteed T) -> () {
-bb0(%0 : $Int, %1: @guaranteed $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, %3: $*T):
-  %5 = copy_value %1 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>
-  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%2]])
+sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, Optional<Builtin.RawPointer>, @guaranteed @async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, @in_guaranteed T) -> () {
+bb0(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %2: @guaranteed $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, %4: $*T):
+  %5 = copy_value %2 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>
+  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%3]])
   %9 = metatype $@thick T.Type
   %10 = init_existential_metatype %9 : $@thick T.Type, $@thick Any.Type
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create_future(
-  %20 = builtin "createAsyncTaskFuture"<T>(%0 : $Int, %10 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTaskFuture"<T>(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %10 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %21 = tuple ()
   return %21 : $()
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_void_future
-sil hidden [ossa] @launch_void_future : $@convention(method) (Int, @guaranteed @async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
-bb0(%0 : $Int, %1: @guaranteed $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):
-  %5 = copy_value %1 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>
-  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%2]])
+sil hidden [ossa] @launch_void_future : $@convention(method) (Int, Optional<Builtin.RawPointer>, @guaranteed @async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
+bb0(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %2: @guaranteed $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):
+  %5 = copy_value %2 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>
+  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%3]])
   %8 = metatype $@thick ().Type                   // user: %9
   %9 = init_existential_metatype %8 : $@thick ().Type, $@thick Any.Type // user: %10
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create_future(
-  %20 = builtin "createAsyncTaskFuture"<()>(%0 : $Int, %9 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTaskFuture"<()>(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %9 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %21 = tuple ()
   return %21 : $()

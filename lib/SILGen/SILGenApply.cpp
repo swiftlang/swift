@@ -5791,7 +5791,9 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
 }
 
 ManagedValue SILGenFunction::emitAsyncLetStart(
-    SILLocation loc, Type functionType, ManagedValue taskFunction) {
+    SILLocation loc,
+    SILValue taskOptions,
+    Type functionType, ManagedValue taskFunction) {
   ASTContext &ctx = getASTContext();
   Type resultType = functionType->castTo<FunctionType>()->getResult();
   Type replacementTypes[] = {resultType};
@@ -5800,8 +5802,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
   auto subs = SubstitutionMap::get(startBuiltin->getGenericSignature(),
                                    replacementTypes,
                                    ArrayRef<ProtocolConformanceRef>{});
-
-  CanType origParamType = startBuiltin->getParameters()->get(1)
+  CanType origParamType = startBuiltin->getParameters()->get(2)
       ->getInterfaceType()->getCanonicalType();
   CanType substParamType = origParamType.subst(subs)->getCanonicalType();
 
@@ -5816,7 +5817,7 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       loc,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::StartAsyncLet)),
       getLoweredType(ctx.TheRawPointerType), subs,
-      { taskFunction.forward(*this) });
+      { taskOptions, taskFunction.forward(*this) });
 
   return ManagedValue::forUnmanaged(apply);
 }
