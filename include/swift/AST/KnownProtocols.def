@@ -74,6 +74,7 @@ PROTOCOL(SIMDScalar)
 PROTOCOL(BinaryInteger)
 PROTOCOL(RangeReplaceableCollection)
 PROTOCOL(SerialExecutor)
+PROTOCOL(GlobalActor)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
