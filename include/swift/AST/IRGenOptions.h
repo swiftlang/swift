@@ -204,6 +204,9 @@ public:
   /// The libraries and frameworks specified on the command line.
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
+  /// The public dependent libraries specified on the command line.
+  std::vector<std::string> PublicLinkLibraries;
+
   /// If non-empty, the (unmangled) name of a dummy symbol to emit that can be
   /// used to force-load this module.
   std::string ForceLoadSymbolName;
