@@ -91,9 +91,9 @@ static AsyncLetImpl *asImpl(const AsyncLet *alet) {
 
 SWIFT_CC(swift)
 static void swift_asyncLet_startImpl(AsyncLet *alet,
+                                     TaskOptionRecord *options,
                                      const Metadata *futureResultType,
-                                     void *closureEntryPoint,
-                                     void *closureContext) {
+                                     void *closureEntryPoint, void *closureContext) {
   AsyncTask *parent = swift_task_getCurrent();
   assert(parent && "async-let cannot be created without parent task");
 
@@ -103,9 +103,9 @@ static void swift_asyncLet_startImpl(AsyncLet *alet,
 
   auto childTaskAndContext = swift_task_create_async_let_future(
       flags.getOpaqueValue(),
+      options,
       futureResultType,
-      closureEntryPoint,
-      closureContext);
+      closureEntryPoint, closureContext);
 
   AsyncTask *childTask = childTaskAndContext.Task;
 
@@ -120,6 +120,7 @@ static void swift_asyncLet_startImpl(AsyncLet *alet,
   swift_task_addStatusRecord(record);
 
   // schedule the task
+  // TODO: use the executor that may have been suggested in options
   swift_task_enqueueGlobal(childTask);
 }
 

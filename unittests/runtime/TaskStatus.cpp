@@ -57,6 +57,7 @@ static void withSimpleTask(JobFlags flags, T &&value,
                            BodyFunctionRef body) {
   auto taskAndContext =
       swift_task_create_f(flags.getOpaqueValue(),
+                          nullptr,
                           reinterpret_cast<TaskContinuationFunction *>(
                               &simpleTaskInvokeFunction<T>),
                           sizeof(ValueContext<T>));

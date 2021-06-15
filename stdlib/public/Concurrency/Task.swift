@@ -125,7 +125,7 @@ extension Task {
   public var result: Result<Success, Failure> {
     get async {
       do {
-        return .success(try await get())
+        return .success(try await value)
       } catch {
         return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
       }
@@ -439,7 +439,7 @@ extension Task where Failure == Never {
     flags.isContinuingAsyncTask = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
 
     // Copy all task locals to the newly created task.
     // We must copy them rather than point to the current task since the new task
@@ -484,7 +484,7 @@ extension Task where Failure == Error {
     flags.isContinuingAsyncTask = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
 
     // Copy all task locals to the newly created task.
     // We must copy them rather than point to the current task since the new task
@@ -547,7 +547,7 @@ extension Task where Failure == Never {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -602,7 +602,7 @@ extension Task where Failure == Error {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
