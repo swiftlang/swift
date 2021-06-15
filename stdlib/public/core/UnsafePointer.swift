@@ -359,7 +359,7 @@ public struct UnsafePointer<Pointee>: _Pointer, Sendable {
 /// deinitialized is in an *uninitialized* state. Uninitialized memory must be
 /// initialized before it can be accessed for reading.
 ///
-/// You can use methods like `initialize(to:count:)`, `initialize(from:count:)`,
+/// You can use methods like `initialize(repeating:count:)`, `initialize(from:count:)`,
 /// and `moveInitialize(from:count:)` to initialize the memory referenced by a
 /// pointer with a value or series of values.
 ///
@@ -635,7 +635,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
   ///
   /// Do not assign an instance of a nontrivial type through `pointee` to
   /// uninitialized memory. Instead, use an initializing method, such as
-  /// `initialize(to:count:)`.
+  /// `initialize(repeating:count:)`.
   @inlinable // unsafe-performance
   public var pointee: Pointee {
     @_transparent unsafeAddress {
@@ -961,7 +961,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer, Sendable {
   ///
   /// Do not assign an instance of a nontrivial type through the subscript to
   /// uninitialized memory. Instead, use an initializing method, such as
-  /// `initialize(to:count:)`.
+  /// `initialize(repeating:count:)`.
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
