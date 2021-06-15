@@ -362,6 +362,8 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
       // Issue the warning.
       storeInst->getModule().getASTContext().Diags.diagnose(
         storeInst->getLoc().getSourceLoc(), diag::warn_dead_weak_store);
+      //!!!
+      llvm::report_fatal_error("Found a weak lifetime warning!");
     }
   }
 }
