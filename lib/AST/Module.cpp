@@ -1427,9 +1427,19 @@ bool ModuleDecl::isStdlibModule() const {
 }
 
 bool ModuleDecl::hasStandardSubstitutions() const {
-  return !getParent() &&
-      (getName() == getASTContext().StdlibModuleName ||
-       getName() == getASTContext().Id_Concurrency);
+  if (getParent())
+    return false;
+
+  if (getName() == getASTContext().StdlibModuleName)
+    return true;
+
+  // The _Concurrency module gets standard substitutions with "new enough"
+  // versions of the module.
+  if (getName() == getASTContext().Id_Concurrency &&
+      getASTContext().getProtocol(KnownProtocolKind::SerialExecutor))
+    return true;
+
+  return false;
 }
 
 bool ModuleDecl::isSwiftShimsModule() const {
