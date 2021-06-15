@@ -265,6 +265,16 @@ func testPatterns() async throws {
   // STRING-TUPLE-RESULT-NEXT:   print("oh no")
   // STRING-TUPLE-RESULT-NEXT: }
 
+  // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=STRING-TUPLE-RESULT %s
+  stringTupleResult { res in
+    switch res {
+    case let .success((x, y)):
+      print(x, y)
+    case .failure:
+      print("oh no")
+    }
+  }
+
   // RUN: %refactor-check-compiles -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MIXED-TUPLE-RESULT %s
   mixedTupleResult { res in
     if case .failure(let err) = res {
