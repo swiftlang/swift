@@ -296,9 +296,39 @@ func baz() {
 Additionally, if they are of a tuple or struct type, their stored members
 without observers may also be passed inout as non-ephemeral pointers.
 
-For more details, see [the educational note on temporary pointer usage](/userdocs/diagnostics/temporary-pointers.md).
+For more details, see the educational note on
+[temporary pointer usage](/userdocs/diagnostics/temporary-pointers.md).
 
 ## `@_nonoverride`
+
+Warns when a protocol restates a requirement from another protocol that
+it refines, without annotated the declaration with either `override` or
+`@_nonoverride`, when the `-warn-implicit-overrides` flag is passed.
+
+An `override` annotation causes the overriding declaration to be treated
+identically to the overridden declaration; a conforming type can only
+provide one implementation ("witness"). Restating a protocol requirement
+and then marking it as an `override` is generally only needed to help
+associated type inference, and many `override` annotations correlate
+closely with ABI FIXMEs.
+
+Meanwhile, `@_nonoverride` is the "opposite" of `override`, allowing two
+protocol requirements to be treated independently; a conforming type can
+provide a distinct witness for each requirement (for example, by using
+`@_implements`). Use `@_nonoverride` when semantics differ between the
+two requirements. For example, `BidirectionalCollection.index(_:offsetBy:)`
+allows negative offsets, while `Collection.index(_:offsetBy:)` does not,
+and therefore the former is marked `@_nonoverride`.
+
+The `@_nonoverride` annotation can also be specified on class members in
+addition to protocol members. Since it is the "opposite" of `override`, it can
+be used to suppress "near-miss" diagnostics for declarations that are similar
+to but not meant to override another declaration, and it can be used to
+intentionally break the override chain, creating an overload instead of an
+override.
+
+This attribute and the corresponding `-warn-implicit-overrides` flag are
+used when compiling the standard library and overlays.
 
 ## `@_objc_non_lazy_realization`
 
@@ -373,6 +403,11 @@ about the semantics results in undefined behavior.
 
 ## `@_show_in_interface`
 
+Shows underscored protocols from the standard library in the generated interface.
+
+By default, SourceKit hides underscored protocols from the generated swiftinterface,
+but this attribute can be used to override that behavior.
+
 ## `@_silgen_name("cName")`
 
 Changes the symbol name for a function, similar to an ASM label in C,
@@ -383,6 +418,9 @@ Since this has label-like behavior, it may not correspond to any declaration;
 if so, it is assumed that the function is implemented in C.
 
 A function defined by `@_silgen_name` is assumed to use the Swift ABI.
+
+For more details, see the
+[Standard Library Programmer's Manual](https://github.com/apple/swift/blob/main/docs/StandardLibraryProgrammersManual.md#_silgen_name).
 
 ## `@_specialize(...)`
 
@@ -413,7 +451,23 @@ in debug builds.
 
 See [TransparentAttr.md](/docs/TransparentAttr.md) for more details.
 
-## `@_typeEraser`
+## `@_typeEraser(Proto)`
+
+Marks a concrete nominal type as one that implements type erasure for a
+protocol `Proto`.
+
+A type eraser has the following restrictions:
+
+1. It must be a concrete nominal type.
+2. It must not have more restrictive access than `Proto`.
+3. It must conform to `Proto`.
+4. It must have an initializer of the form `init<T: Proto>(erasing: T)`.
+  - Other generic requirements are permitted as long as the `init` can always
+    be called with a value of any type conforming to `Proto`.
+  - The `init` cannot have more restrictive access than `Proto`.
+
+This feature was designed to be used for compiler-driven type erasure for
+dynamic replacement of functions with an opaque return type.
 
 ## `@_weakLinked`
 
