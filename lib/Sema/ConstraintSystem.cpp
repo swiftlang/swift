@@ -3709,7 +3709,7 @@ static bool diagnoseAmbiguity(
   return diagnosed;
 }
 
-using Fix = std::pair<const Solution *, const ConstraintFix *>;
+using FixInContext = std::pair<const Solution *, const ConstraintFix *>;
 
 // Attempts to diagnose function call ambiguities of types inferred for a result
 // generic parameter from contextual type and a closure argument that
@@ -3725,17 +3725,16 @@ using Fix = std::pair<const Solution *, const ConstraintFix *>;
 //   }
 // Where generic argument `T` can be inferred both as `Int` from contextual
 // result and `Void` from the closure argument result.
-static bool
-diagnoseContextualFunctionCallGenericAmbiguity(ConstraintSystem &cs,
-                                               ArrayRef<Fix> contextualFixes,
-                                               ArrayRef<Fix> allFixes) {
+static bool diagnoseContextualFunctionCallGenericAmbiguity(
+    ConstraintSystem &cs, ArrayRef<FixInContext> contextualFixes,
+    ArrayRef<FixInContext> allFixes) {
 
   if (contextualFixes.empty())
     return false;
 
   auto contextualFix = contextualFixes.front();
   if (!std::all_of(contextualFixes.begin() + 1, contextualFixes.end(),
-                   [&contextualFix](Fix fix) {
+                   [&contextualFix](FixInContext fix) {
                      return fix.second->getLocator() ==
                             contextualFix.second->getLocator();
                    }))
@@ -3763,16 +3762,22 @@ diagnoseContextualFunctionCallGenericAmbiguity(ConstraintSystem &cs,
     return false;
 
   auto typeParamResultInvolvesTypeVar =
-      [&applyFnType](unsigned paramIdx, TypeVariableType *typeVar) {
+      [&cs, &applyFnType](unsigned paramIdx, TypeVariableType *typeVar) {
+        assert(paramIdx < applyFnType->getNumParams());
         auto param = applyFnType->getParams()[paramIdx];
-        auto paramType = param.getParameterType()->castTo<FunctionType>();
-
-        bool contains = false;
-        paramType->getResult().visit([&](Type ty) {
-          if (ty->isEqual(typeVar))
-            contains = true;
-        });
-        return contains;
+        if (param.isVariadic()) {
+          auto paramType = param.getParameterType();
+          // Variadic parameter is constructed as an ArraySliceType(which is
+          // just sugared type for a bound generic) with the closure type as
+          // element.
+          auto baseType =
+              paramType->getDesugaredType()->castTo<BoundGenericType>();
+          auto paramFnType =
+              baseType->getGenericArgs()[0]->castTo<FunctionType>();
+          return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
+        }
+        auto paramFnType = param.getParameterType()->castTo<FunctionType>();
+        return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
       };
 
   llvm::SmallVector<ClosureExpr *, 4> closureArguments;
@@ -3805,7 +3810,7 @@ diagnoseContextualFunctionCallGenericAmbiguity(ConstraintSystem &cs,
   for (auto &fix : contextualFixes)
     genericParamInferredTypes.insert(fix.first->getFixedType(resultTypeVar));
 
-  if (llvm::all_of(allFixes, [&](Fix fix) {
+  if (llvm::all_of(allFixes, [&](FixInContext fix) {
         auto fixLocator = fix.second->getLocator();
         if (fixLocator->isForContextualType())
           return true;
@@ -3896,14 +3901,15 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // d. Diagnose remaining (uniqued based on kind + locator) fixes
   //    iff they appear in all of the solutions.
 
-  llvm::SmallSetVector<Fix, 4> fixes;
+  llvm::SmallSetVector<FixInContext, 4> fixes;
   for (auto &solution : solutions) {
     for (auto *fix : solution.Fixes)
       fixes.insert({&solution, fix});
   }
 
-  llvm::MapVector<ConstraintLocator *, SmallVector<Fix, 4>> fixesByCallee;
-  llvm::SmallVector<Fix, 4> contextualFixes;
+  llvm::MapVector<ConstraintLocator *, SmallVector<FixInContext, 4>>
+      fixesByCallee;
+  llvm::SmallVector<FixInContext, 4> contextualFixes;
 
   for (const auto &entry : fixes) {
     const auto &solution = *entry.first;
@@ -3923,7 +3929,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   bool diagnosed = false;
 
   // All of the fixes which have been considered already.
-  llvm::SmallSetVector<Fix, 4> consideredFixes;
+  llvm::SmallSetVector<FixInContext, 4> consideredFixes;
 
   for (const auto &ambiguity : solutionDiff.overloads) {
     auto fixes = fixesByCallee.find(ambiguity.locator);
@@ -3946,7 +3952,8 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   // overload choices.
   fixes.set_subtract(consideredFixes);
 
-  llvm::MapVector<std::pair<FixKind, ConstraintLocator *>, SmallVector<Fix, 4>>
+  llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
+                  SmallVector<FixInContext, 4>>
       fixesByKind;
 
   for (const auto &entry : fixes) {

@@ -628,6 +628,10 @@ func callitTuple<T>(_ : Int, _ f: () -> (T, Int)) -> T {
   f().0
 }
 
+func callitVariadic<T>(_ fs: () -> T...) -> T {
+  fs.first!()
+}
+
 func testSR13239_Tuple() -> Int {
   // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
   callitTuple(1) {
@@ -668,4 +672,20 @@ func testSR13239_GenericArg() -> Int {
   callitGenericArg(1) {
     print("hello") // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
   }
+}
+
+func testSR13239_Variadic() -> Int {
+  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
+  callitVariadic({
+    print("hello")
+  })
+}
+
+func testSR13239_Variadic_Twos() -> Int {
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callitVariadic({
+    print("hello")
+  }, {
+    print("hello")
+  })
 }
