@@ -1399,7 +1399,18 @@ void PotentialBindings::infer(Constraint *constraint) {
   }
 
   case ConstraintKind::ApplicableFunction:
-  case ConstraintKind::DynamicCallableApplicableFunction:
+  case ConstraintKind::DynamicCallableApplicableFunction: {
+    auto overloadTy = constraint->getSecondType();
+    // If current type variable represents an overload set
+    // being applied to the arguments, it can't be delayed
+    // by application constraints, because it doesn't
+    // depend on argument/result types being resolved first.
+    if (overloadTy->isEqual(TypeVar))
+      break;
+
+    LLVM_FALLTHROUGH;
+  }
+
   case ConstraintKind::BindOverload: {
     DelayedBy.push_back(constraint);
     break;

@@ -1132,3 +1132,34 @@ func rdar76058892() {
     }
   }
 }
+
+// rdar://78917861 - Invalid generic type parameter inference
+
+func rdar78917861() {
+  class Cell {}
+  class MyCell : Cell {}
+
+  class DataCollection<D, C: Cell> {
+  }
+
+  class MyCollection {
+    typealias DataType = String
+    typealias CellType = MyCell
+
+    var data: DataCollection<DataType, CellType>
+
+    init() {
+      self.data = DataCollection<DataType, CellType>()
+    }
+  }
+
+  class Test {
+    let collection = MyCollection()
+
+    lazy var prop: DataCollection = {
+      collection.data // Ok
+      // Since contextual type `DataCollection` doesn't specify generic parameters they have to be inferred
+      // but that has to wait until the closure is resolved because types can flow both ways
+    }()
+  }
+}
