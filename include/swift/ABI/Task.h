@@ -481,7 +481,13 @@ public:
   /// \c Executing, then \c waitingTask has been added to the
   /// wait queue and will be scheduled when the future completes. Otherwise,
   /// the future has completed and can be queried.
-  FutureFragment::Status waitFuture(AsyncTask *waitingTask);
+  /// The waiting task's async context will be intialized with the parameters if
+  /// the current's task state is executing.
+  FutureFragment::Status waitFuture(AsyncTask *waitingTask,
+                                    AsyncContext *waitingTaskContext,
+                                    TaskContinuationFunction *resumeFn,
+                                    AsyncContext *callerContext,
+                                    OpaqueValue *result);
 
   /// Complete this future.
   ///

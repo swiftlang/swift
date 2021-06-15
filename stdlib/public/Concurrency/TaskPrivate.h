@@ -132,14 +132,14 @@ namespace {
 ///   @_silgen_name("swift_asyncLet_waitThrowing")
 ///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
 ///
+///   @_silgen_name("swift_taskGroup_wait_next_throwing")
+///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   SwiftError *errorResult;
 
   OpaqueValue *successResultPointer;
-
-  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
-      asyncResumeEntryPoint;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType(),
@@ -153,35 +153,6 @@ public:
   void fillWithError(AsyncTask::FutureFragment *future) {
     fillWithError(future->getError());
   }
-  void fillWithError(SwiftError *error) {
-    errorResult = error;
-    swift_errorRetain(error);
-  }
-};
-
-/// The layout of a frame to call the following function:
-///
-///   @_silgen_name("swift_taskGroup_wait_next_throwing")
-///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
-///
-class TaskGroupNextAsyncContext : public AsyncContext {
-public:
-  SwiftError *errorResult;
-
-  OpaqueValue *successResultPointer;
-
-  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
-      asyncResumeEntryPoint;
-
-  // Arguments.
-  TaskGroup *group;
-
-  const Metadata *successType;
-
-  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
-    successType->vw_initializeWithCopy(successResultPointer, src);
-  }
-
   void fillWithError(SwiftError *error) {
     errorResult = error;
     swift_errorRetain(error);

@@ -114,12 +114,13 @@ bb0:
   // CHECK:      [[TASKGROUP:%.*]] = alloca [32 x i8*], align 16
   // CHECK:      [[T0:%.*]] = bitcast [32 x i8*]* [[TASKGROUP]] to i8*
   // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
-  // CHECK-NEXT: call swiftcc void @swift_taskGroup_initialize(i8* [[T0]])
-  %0 = builtin "createTaskGroup"() : $Builtin.RawPointer
+  // CHECK-NEXT: call swiftcc void @swift_taskGroup_initialize(i8* [[T0]], %swift.type* {{.*}})
+  %0 = metatype $@thin Builtin.Int32.Type
+  %1 = builtin "createTaskGroup"<Builtin.Int32>(%0: $@thin Builtin.Int32.Type) : $Builtin.RawPointer
 
   // CHECK-NEXT: call swiftcc void @swift_taskGroup_destroy(i8* [[T0]])
   // CHECK-NEXT: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[T0]])
-  builtin "destroyTaskGroup"(%0 : $Builtin.RawPointer) : $()
+  builtin "destroyTaskGroup"(%1 : $Builtin.RawPointer) : $()
 
   %21 = tuple ()
   return %21 : $()
