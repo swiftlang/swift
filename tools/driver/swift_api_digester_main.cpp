@@ -610,7 +610,8 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
 
     // It's not safe to stop inheriting convenience inits, it changes
     // the set of initializers that are available.
-    if (inheritsConvenienceInitializers() &&
+    if (!Ctx.checkingABI() &&
+        inheritsConvenienceInitializers() &&
         !R->inheritsConvenienceInitializers())
       R->emitDiag(R->getLoc(), diag::not_inheriting_convenience_inits);
     break;
