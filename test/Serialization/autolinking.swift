@@ -22,6 +22,11 @@
 // RUN: %target-swift-frontend -runtime-compatibility-version none -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift -autolink-force-load | %FileCheck --check-prefix=FORCE-LOAD %s
 // RUN: %target-swift-frontend -runtime-compatibility-version none -emit-ir -parse-stdlib -module-name someModule -module-link-name 0module %S/../Inputs/empty.swift -autolink-force-load | %FileCheck --check-prefix=FORCE-LOAD-HEX %s
 
+// RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t -module-name someModule -module-link-name module %S/../Inputs/empty.swift -public-autolink-library anotherLib
+// RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-dynamic-replacements -runtime-compatibility-version none -emit-ir -lmagic %s -I %t > %t/public-autolink.txt
+// RUN: %FileCheck %s < %t/public-autolink.txt
+// RUN: %FileCheck -check-prefix=PUBLIC-DEP %s < %t/public-autolink.txt
+
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.
 // UNSUPPORTED: autolink-extract
@@ -51,3 +56,7 @@ import someModule
 // FORCE-LOAD-CLIENT-macho: declare extern_weak {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
 // FORCE-LOAD-CLIENT-COFF: declare extern {{(dllimport )?}}void @"_swift_FORCE_LOAD_$_module"()
 
+// PUBLIC-DEP: !llvm.linker.options = !{
+// PUBLIC-DEP-DAG: !{{[0-9]+}} = !{!{{"-lmagic"|"/DEFAULTLIB:magic.lib"}}}
+// PUBLIC-DEP-DAG: !{{[0-9]+}} = !{!{{"-lmodule"|"/DEFAULTLIB:module.lib"}}}
+// PUBLIC-DEP-DAG: !{{[0-9]+}} = !{!{{"-lanotherLib"|"/DEFAULTLIB:anotherLib.lib"}}}
