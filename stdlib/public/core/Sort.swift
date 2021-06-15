@@ -401,8 +401,8 @@ internal func _merge<Element>(
     // `x` is uninitialized memory:
     //
     // Storage: [4, 4, 7, 8, 9, 16, x, x,  x,  x,  x]
-    //                           ^  ^                 ^
-    //                     srcHigh  destLow        destHigh (past the end)
+    //                              ^                 ^
+    //                       srcHigh/destLow        destHigh (past the end)
     //
     // Buffer:                     [8, 8, 10, 12, 15, x, ...]
     //                              ^                 ^
