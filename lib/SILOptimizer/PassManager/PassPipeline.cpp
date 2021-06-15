@@ -154,8 +154,12 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
-  P.addDiagnoseLifetimeIssues();
 
+  // Only issue weak lifetime warnings for users who select object lifetime
+  // optimization. The risk of spurious warnings outweighs the benefits.
+  if (P.getOptions().EnableCopyPropagation) {
+    P.addDiagnoseLifetimeIssues();
+  }
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 }
