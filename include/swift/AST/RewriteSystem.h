@@ -186,6 +186,16 @@ public:
   }
 };
 
+/// See the implementation of MutableTerm::checkForOverlap() for a discussion.
+enum class OverlapKind {
+  /// Terms do not overlap.
+  None,
+  /// First kind of overlap (TUV vs U).
+  First,
+  /// Second kind of overlap (TU vs UV).
+  Second
+};
+
 /// A term is a sequence of one or more atoms.
 ///
 /// The Term type is a uniqued, permanently-allocated representation,
@@ -248,6 +258,10 @@ public:
   /// to become valid.
   MutableTerm() {}
 
+  explicit MutableTerm(decltype(Atoms)::const_iterator begin,
+                       decltype(Atoms)::const_iterator end)
+    : Atoms(begin, end) {}
+
   explicit MutableTerm(llvm::SmallVector<Atom, 3> &&atoms)
     : Atoms(std::move(atoms)) {}
 
@@ -261,7 +275,13 @@ public:
     Atoms.push_back(atom);
   }
 
+  void append(const MutableTerm &other) {
+    Atoms.append(other.begin(), other.end());
+  }
+
   int compare(const MutableTerm &other, const ProtocolGraph &protos) const;
+
+  bool empty() const { return Atoms.empty(); }
 
   size_t size() const { return Atoms.size(); }
 
@@ -300,7 +320,9 @@ public:
 
   bool rewriteSubTerm(const MutableTerm &lhs, const MutableTerm &rhs);
 
-  bool checkForOverlap(const MutableTerm &other, MutableTerm &result) const;
+  OverlapKind checkForOverlap(const MutableTerm &other,
+                              MutableTerm &t,
+                              MutableTerm &v) const;
 
   void dump(llvm::raw_ostream &out) const;
 };
@@ -359,8 +381,10 @@ public:
     return term.rewriteSubTerm(LHS, RHS);
   }
 
-  bool checkForOverlap(const Rule &other, MutableTerm &result) const {
-    return LHS.checkForOverlap(other.LHS, result);
+  OverlapKind checkForOverlap(const Rule &other,
+                              MutableTerm &t,
+                              MutableTerm &v) const {
+    return LHS.checkForOverlap(other.LHS, t, v);
   }
 
   bool canReduceLeftHandSide(const Rule &other) const {
@@ -478,6 +502,9 @@ public:
   void dump(llvm::raw_ostream &out) const;
 
 private:
+  Optional<std::pair<MutableTerm, MutableTerm>>
+  computeCriticalPair(const Rule &lhs, const Rule &rhs) const;
+
   Atom mergeAssociatedTypes(Atom lhs, Atom rhs) const;
   void processMergedAssociatedTypes();
 };
