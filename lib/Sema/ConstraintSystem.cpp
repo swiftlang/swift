@@ -3761,24 +3761,31 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
   if (!GP)
     return false;
 
-  auto typeParamResultInvolvesTypeVar =
-      [&cs, &applyFnType](unsigned paramIdx, TypeVariableType *typeVar) {
-        assert(paramIdx < applyFnType->getNumParams());
-        auto param = applyFnType->getParams()[paramIdx];
-        if (param.isVariadic()) {
-          auto paramType = param.getParameterType();
-          // Variadic parameter is constructed as an ArraySliceType(which is
-          // just sugared type for a bound generic) with the closure type as
-          // element.
-          auto baseType =
-              paramType->getDesugaredType()->castTo<BoundGenericType>();
-          auto paramFnType =
-              baseType->getGenericArgs()[0]->castTo<FunctionType>();
-          return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
-        }
-        auto paramFnType = param.getParameterType()->castTo<FunctionType>();
-        return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
-      };
+  auto applyLoc =
+      cs.getConstraintLocator(AE, {LocatorPathElt::ApplyArgument()});
+  auto argMatching =
+      contextualFix.first->argumentMatchingChoices.find(applyLoc);
+  if (argMatching == contextualFix.first->argumentMatchingChoices.end()) {
+    return false;
+  }
+
+  auto typeParamResultInvolvesTypeVar = [&cs, &applyFnType, &argMatching](
+                                            unsigned argIdx,
+                                            TypeVariableType *typeVar) {
+    auto argParamMatch = argMatching->second.parameterBindings[argIdx];
+    auto param = applyFnType->getParams()[argParamMatch.front()];
+    if (param.isVariadic()) {
+      auto paramType = param.getParameterType();
+      // Variadic parameter is constructed as an ArraySliceType(which is
+      // just sugared type for a bound generic) with the closure type as
+      // element.
+      auto baseType = paramType->getDesugaredType()->castTo<BoundGenericType>();
+      auto paramFnType = baseType->getGenericArgs()[0]->castTo<FunctionType>();
+      return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
+    }
+    auto paramFnType = param.getParameterType()->castTo<FunctionType>();
+    return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
+  };
 
   llvm::SmallVector<ClosureExpr *, 4> closureArguments;
   // A single closure argument.
