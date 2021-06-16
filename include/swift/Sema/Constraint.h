@@ -271,7 +271,7 @@ enum class ConversionRestrictionKind {
   CGFloatToDouble,
   /// Implicit conversion between Swift and C pointers:
   //    - Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int>
-  //    - Unsafe[Mutable]Pointer<Int{8, 16, ...}> -> Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
+  //    - Unsafe[Mutable]Pointer<Int{8, 16, ...}> <-> Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
   PointerToCPointer,
 };
 
