@@ -11114,7 +11114,11 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     return matchPointerBaseTypes(ptr1, ptr2);
   }
-    
+
+  case ConversionRestrictionKind::PointerToCPointer: {
+    return SolutionKind::Error; // not yet implemented
+  }
+
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
     Type baseType1 = *isArrayType(type1);

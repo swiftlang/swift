@@ -6645,7 +6645,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return result;
     }
     
-    case ConversionRestrictionKind::PointerToPointer: {
+    case ConversionRestrictionKind::PointerToPointer:
+    case ConversionRestrictionKind::PointerToCPointer: {
       TypeChecker::requirePointerArgumentIntrinsics(ctx, expr->getLoc());
       Type unwrappedToTy = toType->getOptionalObjectType();
 
