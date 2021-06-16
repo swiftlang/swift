@@ -1574,7 +1574,6 @@ namespace {
               var, isolation.getGlobalActor());
 
         case ActorIsolation::ActorInstance:
-        case ActorIsolation::DistributedActorInstance:
           // FIXME: Local functions could presumably capture an isolated
           // parameter that isn't'self'.
           if (isPotentiallyIsolated &&
@@ -2424,7 +2423,7 @@ namespace {
 
         // An escaping partial application of something that is part of
         // the actor's isolated state is never permitted.
-        if (partialApply && partialApply->isEscaping) {
+        if (isEscapingPartialApply) {
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_partial_apply,
               member->getDescriptiveKind(),
@@ -3031,9 +3030,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (evaluateOrDefault(evaluator, HasIsolatedSelfRequest{value}, false)) {
     auto actor = value->getDeclContext()->getSelfNominalTypeDecl();
     assert(actor && "could not find the actor that 'self' is isolated to");
-    return actor->isDistributedActor()
-        ? ActorIsolation::forDistributedActorInstance(actor)
-        : ActorIsolation::forActorInstance(actor);
+    return ActorIsolation::forActorInstance(actor);
   }
 
   // If this declaration has one of the actor isolation attributes, report
@@ -3244,7 +3241,6 @@ bool HasIsolatedSelfRequest::evaluate(
       return false;
 
     case ActorIsolation::ActorInstance:
-    case ActorIsolation::DistributedActorInstance:
       if (isolation.getActor() != selfTypeDecl)
         return false;
       break;
@@ -3288,8 +3284,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
   // If both are actor-instance isolated, we're done.
   if (isolation.getKind() == overriddenIsolation.getKind() &&
-      (isolation.getKind() == ActorIsolation::ActorInstance ||
-       isolation.getKind() == ActorIsolation::DistributedActorInstance))
+      isolation.getKind() == ActorIsolation::ActorInstance)
     return;
 
   // If the overridden declaration is from Objective-C with no actor annotation,
