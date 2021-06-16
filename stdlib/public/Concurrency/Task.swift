@@ -801,12 +801,8 @@ func _getCurrentThreadPriority() -> Int
 @available(SwiftStdlib 5.5, *)
 @_alwaysEmitIntoClient
 @usableFromInline
-internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-#if compiler(>=5.5) && $Sendable && $InheritActorContext && $ImplicitSelfCapture
-  Task { await body() }
-#else
-  Task.runDetached { await body() }
-#endif
+internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owned @Sendable @escaping () async -> Void) {
+  Task(operation: body)
 }
 
 #endif
