@@ -865,6 +865,11 @@ void MutableTerm::dump(llvm::raw_ostream &out) const {
   }
 }
 
+Term RewriteContext::getTermForType(CanType paramType,
+                                    const ProtocolDecl *proto) {
+  return Term::get(getMutableTermForType(paramType, proto), *this);
+}
+
 /// Map an interface type to a term.
 ///
 /// If \p proto is null, this is a term relative to a generic
@@ -877,8 +882,8 @@ void MutableTerm::dump(llvm::raw_ostream &out) const {
 /// The bound associated types in the interface type are ignored; the
 /// resulting term consists entirely of a root atom followed by zero
 /// or more name atoms.
-MutableTerm RewriteContext::getTermForType(CanType paramType,
-                                           const ProtocolDecl *proto) {
+MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
+                                                  const ProtocolDecl *proto) {
   assert(paramType->isTypeParameter());
 
   // Collect zero or more nested type names in reverse order.

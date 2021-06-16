@@ -37,6 +37,10 @@ struct RewriteSystemBuilder {
   ProtocolGraph Protocols;
   std::vector<std::pair<MutableTerm, MutableTerm>> Rules;
 
+  CanType getConcreteSubstitutionSchema(CanType concreteType,
+                                        const ProtocolDecl *proto,
+                                        SmallVector<Term> &result);
+
   RewriteSystemBuilder(RewriteContext &ctx, bool debug)
     : Context(ctx), Debug(debug) {}
   void addGenericSignature(CanGenericSignature sig);
@@ -47,6 +51,32 @@ struct RewriteSystemBuilder {
 };
 
 } // end namespace
+
+/// Given a concrete type that may contain type parameters in structural positions,
+/// collect all the structural type parameter components, and replace them all with
+/// fresh generic parameters. The fresh generic parameters all have a depth of 0,
+/// and the index is an index into the 'result' array.
+///
+/// For example, given the concrete type Foo<X.Y, Array<Z>>, this produces the
+/// result type Foo<τ_0_0, Array<τ_0_1>>, with result array {X.Y, Z}.
+CanType
+RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
+                                                    const ProtocolDecl *proto,
+                                                    SmallVector<Term> &result) {
+  if (!concreteType->hasTypeParameter())
+    return concreteType;
+
+  return CanType(concreteType.transformRec(
+    [&](Type t) -> Optional<Type> {
+      if (!t->isTypeParameter())
+        return None;
+
+      unsigned index = result.size();
+      result.push_back(Context.getTermForType(CanType(t), proto));
+
+      return CanGenericTypeParamType::get(/*depth=*/0, index, Context.getASTContext());
+    }));
+}
 
 void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   // Collect all protocols transitively referenced from the generic signature's
@@ -115,8 +145,12 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     llvm::dbgs() << "\n";
   }
 
+  // Compute the left hand side.
   auto subjectType = CanType(req.getFirstType());
-  auto subjectTerm = Context.getTermForType(subjectType, proto);
+  auto subjectTerm = Context.getMutableTermForType(subjectType, proto);
+
+  // Compute the right hand side.
+  MutableTerm constraintTerm;
 
   switch (req.getKind()) {
   case RequirementKind::Conformance: {
@@ -127,46 +161,63 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     // Intuitively, this means "any type ending with T conforms to P".
     auto *proto = req.getProtocolDecl();
 
-    auto constraintTerm = subjectTerm;
+    constraintTerm = subjectTerm;
     constraintTerm.add(Atom::forProtocol(proto, Context));
-
-    Rules.emplace_back(subjectTerm, constraintTerm);
     break;
   }
 
-  case RequirementKind::Superclass:
-    // FIXME: Implement
+  case RequirementKind::Superclass: {
+    // A superclass requirement T : C<X, Y> becomes a rewrite rule
+    //
+    //   T.[superclass: C<X, Y>] => T
+    auto otherType = CanType(req.getSecondType());
+
+    SmallVector<Term> substitutions;
+    otherType = getConcreteSubstitutionSchema(otherType, proto,
+                                              substitutions);
+
+    constraintTerm = subjectTerm;
+    constraintTerm.add(Atom::forSuperclass(otherType, substitutions,
+                                           Context));
     break;
+  }
 
   case RequirementKind::Layout: {
     // A layout requirement T : L becomes a rewrite rule
     //
     //   T.[L] == T
-    auto constraintTerm = subjectTerm;
+    constraintTerm = subjectTerm;
     constraintTerm.add(Atom::forLayout(req.getLayoutConstraint(),
                                        Context));
-
-    Rules.emplace_back(subjectTerm, constraintTerm);
     break;
   }
 
   case RequirementKind::SameType: {
-    // A same-type requirement T == U becomes a rewrite rule
-    //
-    //   T == U
     auto otherType = CanType(req.getSecondType());
 
-    // FIXME: Handle concrete types
-    if (!otherType->isTypeParameter())
+    if (!otherType->isTypeParameter()) {
+      // A concrete same-type requirement T == C<X, Y> becomes a
+      // rewrite rule
+      //
+      //   T.[concrete: C<X, Y>] => T
+      SmallVector<Term> substitutions;
+      otherType = getConcreteSubstitutionSchema(otherType, proto,
+                                                substitutions);
+
+      constraintTerm = subjectTerm;
+      constraintTerm.add(Atom::forConcreteType(otherType, substitutions,
+                                               Context));
       break;
+    }
 
-    auto otherTerm = Context.getTermForType(otherType, proto);
-
-    Rules.emplace_back(subjectTerm, otherTerm);
+    constraintTerm = Context.getMutableTermForType(otherType, proto);
     break;
   }
   }
+
+  Rules.emplace_back(subjectTerm, constraintTerm);
 }
+
 
 /// We use the PIMPL pattern to avoid creeping header dependencies.
 struct RequirementMachine::Implementation {
@@ -174,8 +225,8 @@ struct RequirementMachine::Implementation {
   RewriteSystem System;
   bool Complete = false;
 
-  Implementation(ASTContext &ctx)
-    : Context(ctx.Stats), System(Context) {}
+  explicit Implementation(ASTContext &ctx)
+      : Context(ctx), System(Context) {}
 };
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {

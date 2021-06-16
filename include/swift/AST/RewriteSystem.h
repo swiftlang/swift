@@ -13,6 +13,7 @@
 #ifndef SWIFT_REWRITESYSTEM_H
 #define SWIFT_REWRITESYSTEM_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -350,14 +351,20 @@ class RewriteContext final {
   RewriteContext &operator=(const RewriteContext &) = delete;
   RewriteContext &operator=(RewriteContext &&) = delete;
 
+  ASTContext &Context;
+
 public:
   /// Statistical counters.
   UnifiedStatsReporter *Stats;
 
-  RewriteContext(UnifiedStatsReporter *stats) : Stats(stats) {}
+  RewriteContext(ASTContext &ctx) : Context(ctx), Stats(ctx.Stats) {}
 
-  MutableTerm getTermForType(CanType paramType,
-                             const ProtocolDecl *proto);
+  Term getTermForType(CanType paramType, const ProtocolDecl *proto);
+
+  MutableTerm getMutableTermForType(CanType paramType,
+                                    const ProtocolDecl *proto);
+
+  ASTContext &getASTContext() { return Context; }
 };
 
 /// A rewrite rule that replaces occurrences of LHS with RHS.
