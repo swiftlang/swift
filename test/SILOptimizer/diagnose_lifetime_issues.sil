@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-lifetime-issues  -o /dev/null -verify
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-lifetime-issues -o /dev/null -verify
 
 import Builtin
 import Swift
