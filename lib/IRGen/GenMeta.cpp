@@ -5166,6 +5166,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::SerialExecutor:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
+  case KnownProtocolKind::GlobalActor:
     return SpecialProtocol::None;
   }
 

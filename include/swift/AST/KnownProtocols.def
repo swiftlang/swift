@@ -72,6 +72,7 @@ PROTOCOL(CaseIterable)
 PROTOCOL(SIMDScalar)
 PROTOCOL(BinaryInteger)
 PROTOCOL(SerialExecutor)
+PROTOCOL(GlobalActor)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
