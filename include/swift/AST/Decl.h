@@ -5233,7 +5233,7 @@ class ParamDecl : public VarDecl {
 
   TypeRepr *TyRepr = nullptr;
 
-  struct StoredDefaultArgument {
+  struct alignas(1 << DeclAlignInBits) StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
 
     /// Stores the context for the default argument as well as a bit to
@@ -5254,10 +5254,13 @@ class ParamDecl : public VarDecl {
 
     /// Whether or not this parameter is `@autoclosure`.
     IsAutoClosure = 1 << 1,
+
+    /// Whether or not this parameter is 'isolated'.
+    IsIsolated = 1 << 2,
   };
 
   /// The default value, if any, along with flags.
-  llvm::PointerIntPair<StoredDefaultArgument *, 2, OptionSet<Flags>>
+  llvm::PointerIntPair<StoredDefaultArgument *, 3, OptionSet<Flags>>
       DefaultValueAndFlags;
 
   friend class ParamSpecifierRequest;
@@ -5406,6 +5409,17 @@ public:
     auto flags = DefaultValueAndFlags.getInt();
     DefaultValueAndFlags.setInt(value ? flags | Flags::IsAutoClosure
                                       : flags - Flags::IsAutoClosure);
+  }
+
+  /// Whether or not this parameter is marked with 'isolated'.
+  bool isIsolated() const {
+    return DefaultValueAndFlags.getInt().contains(Flags::IsIsolated);
+  }
+
+  void setIsolated(bool value = true) {
+    auto flags = DefaultValueAndFlags.getInt();
+    DefaultValueAndFlags.setInt(value ? flags | Flags::IsIsolated
+                                      : flags - Flags::IsIsolated);
   }
 
   /// Does this parameter reject temporary pointer conversions?

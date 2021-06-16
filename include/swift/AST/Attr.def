@@ -662,6 +662,12 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(spawn, Spawn,
   APIBreakingToAdd | APIBreakingToRemove,
   117)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(isolated, Isolated,
+  DeclModifier | OnParam |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  118)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

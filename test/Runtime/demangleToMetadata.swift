@@ -60,6 +60,9 @@ func globalActorMetatypeFn<T>(_: T.Type) -> Any.Type {
   return Fn.self
 }
 
+@available(SwiftStdlib 5.5, *)
+func f1_actor(_: (isolated Actor) -> Void) { }
+
 DemangleToMetadataTests.test("function types") {
   // Conventions
   expectEqual(type(of: f0), _typeByName("yyc")!)
@@ -114,6 +117,13 @@ DemangleToMetadataTests.test("function types") {
   typealias MainActorFn = @MainActor () -> Float
   expectEqual(MainActorFn.self, _typeByName("SfyScMYcc")!)
   expectEqual(MainActorFn.self, globalActorMetatypeFn(Float.self))
+
+  // isolated parameters
+  if #available(SwiftStdlib 5.5, *) {
+    expectEqual(type(of: f1_actor), _typeByName("yyScA_pYiXEc")!)
+    typealias IsolatedFn = ((isolated Actor) -> Void) -> Void
+    expectEqual(IsolatedFn.self, type(of: f1_actor))
+  }
 }
 
 DemangleToMetadataTests.test("metatype types") {

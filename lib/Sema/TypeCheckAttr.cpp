@@ -139,6 +139,7 @@ public:
   IGNORED_ATTR(UnsafeMainActor)
   IGNORED_ATTR(ImplicitSelfCapture)
   IGNORED_ATTR(InheritActorContext)
+  IGNORED_ATTR(Isolated)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -292,6 +293,7 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *attr);
   void visitCompletionHandlerAsyncAttr(CompletionHandlerAsyncAttr *attr);
 };
+
 } // end anonymous namespace
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {

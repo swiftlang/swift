@@ -1494,6 +1494,11 @@ void Remangler::mangleInOut(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleIsolated(Node *node) {
+  Buffer << "Yi";
+  mangleSingleChildNode(node); // type
+}
+
 void Remangler::mangleNoDerivative(Node *node) {
   Buffer << 'k';
   mangleSingleChildNode(node); // type

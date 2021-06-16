@@ -2569,6 +2569,9 @@ void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
     appendOperator("n");
     break;
   }
+  if (flags.isIsolated())
+    appendOperator("Yi");
+
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())
