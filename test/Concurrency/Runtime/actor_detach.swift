@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: foundation
 
 import Foundation
 
