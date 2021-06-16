@@ -10,7 +10,7 @@ func foo(
 
 // CHECK-CMODULE: key.kind: source.lang.swift.ref.struct
 // CHECK-CMODULE: key.name: "StructDefinedInCModule"
-// CHECK-CMODULE: key.filepath: "{{.*}}/CModule{{/|\\\\}}CModule.h"
+// CHECK-CMODULE: key.filepath: "{{.*}}{{/|\\\\}}CModule{{/|\\\\}}CModule.h"
 
 // CHECK-SWIFTMODULE-REF: key.kind: source.lang.swift.ref.struct
 // CHECK-SWIFTMODULE-REF: key.name: "StructDefinedInSwiftModule"
