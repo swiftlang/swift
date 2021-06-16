@@ -23,7 +23,7 @@ import ImportsMissingHeader
 // CHECK: <module-includes>:1:9: note: in file included from <module-includes>:1:
 // CHECK-NEXT: #import "{{.*}}ImportsMissingHeader.h"
 
-// CHECK: {{.*}}/Inputs/custom-modules/ImportsMissingHeader.h:1:9: error: 'this-header-does-not-exist.h' file not found
+// CHECK: {{.*}}{{/|\\}}Inputs{{/|\\}}custom-modules{{/|\\}}ImportsMissingHeader.h:1:9: error: 'this-header-does-not-exist.h' file not found
 
 // CHECK-INDIRECT: <module-includes>:1:9: note: in file included from <module-includes>:1:
 // CHECK-INDIRECT-NEXT: #import "{{.*}}ImportsMissingHeaderIndirect.h"
