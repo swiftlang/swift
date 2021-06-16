@@ -257,7 +257,7 @@ extension Task where Success == Never, Failure == Never {
       }
 
       // Otherwise, query the system.
-      return TaskPriority(rawValue: UInt8(_getCurrentThreadPriority()))
+      return TaskPriority(rawValue: UInt8(0))
     }
   }
 }
@@ -266,10 +266,6 @@ extension Task where Success == Never, Failure == Never {
 extension TaskPriority {
   /// Downgrade user-interactive to user-initiated.
   var _downgradeUserInteractive: TaskPriority {
-    if self == .userInteractive {
-      return .userInitiated
-    }
-
     return self
   }
 }
@@ -519,7 +515,7 @@ extension Task where Failure == Never {
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
-    flags.priority = priority ?? .default
+    flags.priority = priority ?? .unspecified
     flags.isFuture = true
 
     // Create the asynchronous task future.
@@ -574,7 +570,7 @@ extension Task where Failure == Error {
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
-    flags.priority = priority ?? .default
+    flags.priority = priority ?? .unspecified
     flags.isFuture = true
 
     // Create the asynchronous task future.
@@ -694,7 +690,7 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `TaskPriority`
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
-    getJobFlags(_task).priority ?? .default
+    getJobFlags(_task).priority ?? .unspecified
   }
 }
 
