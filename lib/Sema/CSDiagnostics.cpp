@@ -3252,7 +3252,8 @@ bool MissingCallFailure::diagnoseAsError() {
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType:
     case ConstraintLocator::ApplyArgToParam: {
-      auto fnType = getType(anchor)->castTo<FunctionType>();
+      auto type = getType(anchor)->lookThroughAllOptionalTypes();
+      auto fnType = type->castTo<FunctionType>();
       emitDiagnostic(diag::missing_nullary_call, fnType->getResult())
           .fixItInsertAfter(insertLoc, "()");
       return true;

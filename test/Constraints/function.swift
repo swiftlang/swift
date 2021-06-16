@@ -245,3 +245,8 @@ func test_passing_noescape_function_ref_to_generic_parameter() {
     }
   }
 }
+
+// SR-14784
+func SR14784<T>(_ fs: () -> T..., a _ : Int) -> T {
+  fs.first! // expected-error{{function produces expected type 'T'; did you mean to call it with '()'?}} {{11-11=()}}
+}
