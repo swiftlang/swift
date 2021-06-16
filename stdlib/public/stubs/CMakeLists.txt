@@ -13,6 +13,7 @@ set(swift_stubs_objc_sources
     FoundationHelpers.mm
     OptionalBridgingHelper.mm
     Reflection.mm
+    SwiftNativeNSObject.mm
     SwiftNativeNSXXXBaseARC.m)
 set(swift_stubs_gyb_sources
     SwiftNativeNSXXXBase.mm.gyb)
