@@ -45,7 +45,7 @@ struct GA6<T> { // expected-error{{type 'GA6<T>' does not conform to protocol 'G
 }
 
 extension GA6 where T: Equatable {
-  static var shared: SomeActor { SomeActor() }
+  static var shared: SomeActor { SomeActor() } // expected-error{{candidate would match if 'T' conformed to 'Equatable'}}
 }
 
 @globalActor
