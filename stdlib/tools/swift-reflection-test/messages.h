@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 static const char *REQUEST_INSTANCE_KIND = "k\n";
+static const char *REQUEST_SHOULD_UNWRAP_CLASS_EXISTENTIAL = "u\n";
 static const char *REQUEST_INSTANCE_ADDRESS = "i\n";
 static const char *REQUEST_REFLECTION_INFO = "r\n";
 static const char *REQUEST_IMAGES = "m\n";
