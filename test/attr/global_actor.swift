@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
+// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -verify-ignore-unknown
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -45,7 +45,7 @@ struct GA6<T> { // expected-error{{type 'GA6<T>' does not conform to protocol 'G
 }
 
 extension GA6 where T: Equatable {
-  static var shared: SomeActor { SomeActor() } // expected-error{{candidate would match if 'T' conformed to 'Equatable'}}
+  static var shared: SomeActor { SomeActor() } // expected-note{{candidate would match if 'T' conformed to 'Equatable'}}
 }
 
 @globalActor
