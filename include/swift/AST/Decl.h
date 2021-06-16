@@ -318,9 +318,12 @@ protected:
     Hoisted : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+2+16,
+  SWIFT_INLINE_BITFIELD_FULL(PatternBindingDecl, Decl, 1+1+2+16,
     /// Whether this pattern binding declares static variables.
     IsStatic : 1,
+
+    /// Whether this pattern binding is synthesized by the debugger.
+    IsDebugger : 1,
 
     /// Whether 'static' or 'class' was used.
     StaticSpelling : 2,
@@ -1474,9 +1477,10 @@ class PatternBindingEntry {
   enum class PatternFlags {
     IsText = 1 << 0,
     IsFullyValidated = 1 << 1,
+    IsFromDebugger = 1 << 2,
   };
   /// The initializer context used for this pattern binding entry.
-  llvm::PointerIntPair<DeclContext *, 2, OptionSet<PatternFlags>>
+  llvm::PointerIntPair<DeclContext *, 3, OptionSet<PatternFlags>>
       InitContextAndFlags;
 
   /// Values captured by this initializer.
@@ -1502,6 +1506,14 @@ private:
   void setFullyValidated() {
     InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
                                PatternFlags::IsFullyValidated);
+  }
+
+  /// Set if this pattern binding came from the debugger.
+  ///
+  /// Stay away unless you are \c PatternBindingDecl::createForDebugger
+  void setFromDebugger() {
+    InitContextAndFlags.setInt(InitContextAndFlags.getInt() |
+                               PatternFlags::IsFromDebugger);
   }
 
 public:
@@ -1584,6 +1596,11 @@ private:
   }
   void setInitializerSubsumed() {
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Subsumed);
+  }
+
+  /// Returns \c true if the debugger created this pattern binding entry.
+  bool isFromDebugger() const {
+    return InitContextAndFlags.getInt().contains(PatternFlags::IsFromDebugger);
   }
 
   // Return the first variable initialized by this pattern.
@@ -1670,6 +1687,13 @@ public:
                                SourceLoc VarLoc,
                                unsigned NumPatternEntries,
                                DeclContext *Parent);
+
+  // A dedicated entrypoint that allows LLDB to create pattern bindings
+  // that look implicit to the compiler but contain user code.
+  static PatternBindingDecl *createForDebugger(ASTContext &Ctx,
+                                               StaticSpellingKind Spelling,
+                                               Pattern *Pat, Expr *E,
+                                               DeclContext *Parent);
 
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;
@@ -1871,6 +1895,9 @@ public:
                                         SmallVectorImpl<char> &scratch) const {
     return getPatternList()[i].getInitStringRepresentation(scratch);
   }
+
+  /// Returns \c true if this pattern binding was created by the debugger.
+  bool isDebuggerBinding() const { return Bits.PatternBindingDecl.IsDebugger; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
