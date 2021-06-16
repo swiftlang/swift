@@ -735,21 +735,31 @@ void SILInstruction::verifyOperandOwnership() const {
     if (isTypeDependentOperand(op))
       continue;
 
-    if (op.satisfiesConstraints())
-      continue;
+    if (!checkOperandOwnershipInvariants(&op)) {
+      errorBuilder->handleMalformedSIL([&] {
+        llvm::errs() << "Found an operand with invalid invariants.\n";
+        llvm::errs() << "Value: " << op.get();
+        llvm::errs() << "Instruction:\n";
+        printInContext(llvm::errs());
+        llvm::errs() << "OperandOwnership: " << op.getOperandOwnership()
+                     << "\n";
+      });
+    }
 
-    auto constraint = op.getOwnershipConstraint();
-    SILValue opValue = op.get();
-    auto valueOwnershipKind = opValue.getOwnershipKind();
-    errorBuilder->handleMalformedSIL([&] {
-      llvm::errs() << "Found an operand with a value that is not compatible "
-                      "with the operand's operand ownership kind map.\n";
-      llvm::errs() << "Value: " << opValue;
-      llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
-      llvm::errs() << "Instruction:\n";
-      printInContext(llvm::errs());
-      llvm::errs() << "Constraint: " << constraint << "\n";
-    });
+    if (!op.satisfiesConstraints()) {
+      auto constraint = op.getOwnershipConstraint();
+      SILValue opValue = op.get();
+      auto valueOwnershipKind = opValue.getOwnershipKind();
+      errorBuilder->handleMalformedSIL([&] {
+        llvm::errs() << "Found an operand with a value that is not compatible "
+                        "with the operand's operand ownership kind map.\n";
+        llvm::errs() << "Value: " << opValue;
+        llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
+        llvm::errs() << "Instruction:\n";
+        printInContext(llvm::errs());
+        llvm::errs() << "Constraint: " << constraint << "\n";
+      });
+    }
   }
 }
 

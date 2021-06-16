@@ -19,6 +19,16 @@
 
 using namespace swift;
 
+/// Return true if all OperandOwnership invariants hold.
+bool swift::checkOperandOwnershipInvariants(const Operand *operand) {
+  OperandOwnership opOwnership = operand->getOperandOwnership();
+  if (opOwnership == OperandOwnership::Borrow) {
+    // Must be a valid BorrowingOperand.
+    return bool(BorrowingOperand::get(operand));
+  }
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                         OperandOwnershipClassifier
 //===----------------------------------------------------------------------===//
