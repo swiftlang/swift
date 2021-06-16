@@ -108,3 +108,15 @@ class SlowServerlet: SlowServer {
     }
 }
 
+@globalActor actor FooActor {
+    static var shared = FooActor()
+}
+
+@FooActor
+class ActorConstrained: NSObject {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s{{.*}}16ActorConstrainedC3foo{{.*}}U_To
+    // CHECK:         hop_to_executor {{%.*}} : $FooActor
+    @objc func foo() async -> Bool {
+        return true
+    }
+}
