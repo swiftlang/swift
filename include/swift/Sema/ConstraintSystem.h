@@ -5214,6 +5214,10 @@ public:
   /// as the anchor, and a path to the argument at index `0`.
   ConstraintLocator *getArgumentLocator(Expr *expr);
 
+  /// Determine whether given locator represents an argument to declaration
+  /// imported from C/ObjectiveC.
+  bool isArgumentOfImportedDecl(ConstraintLocatorBuilder locator);
+
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 

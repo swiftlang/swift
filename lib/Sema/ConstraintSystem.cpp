@@ -4999,6 +4999,22 @@ bool constraints::isArgumentOfReferenceEqualityOperator(
          isOperatorArgument(locator, "!==");
 }
 
+bool ConstraintSystem::isArgumentOfImportedDecl(
+    ConstraintLocatorBuilder locator) {
+  auto last = locator.last();
+  if (!(last && last->is<LocatorPathElt::ApplyArgToParam>()))
+    return false;
+
+  auto *application = getCalleeLocator(getConstraintLocator(locator));
+
+  auto overload = findSelectedOverloadFor(application);
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *choice = overload->choice.getDecl();
+  return choice->hasClangNode();
+}
+
 ConversionEphemeralness
 ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
                                         ConstraintLocatorBuilder locator) {
