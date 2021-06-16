@@ -1342,6 +1342,25 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
   }
 }
 
+static void diagnoseGenericArgumentsOnSelf(TypeResolution resolution,
+                                           ComponentIdentTypeRepr *comp,
+                                           DeclContext *typeDC) {
+  ASTContext &ctx = resolution.getASTContext();
+  auto &diags = ctx.Diags;
+
+  auto *selfNominal = typeDC->getSelfNominalTypeDecl();
+  auto declaredType = selfNominal->getDeclaredType();
+
+  diags.diagnose(comp->getNameLoc(), diag::cannot_specialize_self);
+
+  if (selfNominal->isGeneric() && !isa<ProtocolDecl>(selfNominal)) {
+    diags.diagnose(comp->getNameLoc(), diag::specialize_explicit_type_instead,
+                   declaredType)
+        .fixItReplace(comp->getNameLoc().getSourceRange(),
+                      declaredType.getString());
+  }
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 ///
@@ -1435,40 +1454,48 @@ static Type resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     return ErrorType::get(ctx);
   }
 
-  // If we found nothing, complain and give ourselves a chance to recover.
-  if (current.isNull()) {
-    // Dynamic 'Self' in the result type of a function body.
-    if (id.isSimpleName(ctx.Id_Self)) {
-      if (auto *typeDC = DC->getInnermostTypeContext()) {
-        // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-        // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
-        // while the 'Self' type is more than just a reference to a TypeDecl.
-        auto selfType = resolution.mapTypeIntoContext(
-          typeDC->getSelfInterfaceType());
-
-        // Check if we can reference Self here, and if so, what kind of Self it is.
-        switch (getSelfTypeKind(DC, options)) {
-        case SelfTypeKind::StaticSelf:
-          return selfType;
-        case SelfTypeKind::DynamicSelf:
-          return DynamicSelfType::get(selfType, ctx);
-        case SelfTypeKind::InvalidSelf:
-          break;
-        }
-      }
-    }
-
-    // If we're not allowed to complain or we couldn't fix the
-    // source, bail out.
-    if (options.contains(TypeResolutionFlags::SilenceErrors))
-      return ErrorType::get(ctx);
-
-    return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
-                               lookupOptions);
+  // If we found a type declaration with the given name, return it now.
+  if (current) {
+    comp->setValue(currentDecl, currentDC);
+    return current;
   }
 
-  comp->setValue(currentDecl, currentDC);
-  return current;
+  // 'Self' inside of a nominal type refers to that type.
+  if (id.isSimpleName(ctx.Id_Self)) {
+    if (auto *typeDC = DC->getInnermostTypeContext()) {
+      // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+      // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+      // while the 'Self' type is more than just a reference to a TypeDecl.
+      auto selfType = resolution.mapTypeIntoContext(
+        typeDC->getSelfInterfaceType());
+
+      // Check if we can reference 'Self' here, and if so, what kind of Self it is.
+      auto selfTypeKind = getSelfTypeKind(DC, options);
+
+      // We don't allow generic arguments on 'Self'.
+      if (selfTypeKind != SelfTypeKind::InvalidSelf &&
+          isa<GenericIdentTypeRepr>(comp)) {
+        diagnoseGenericArgumentsOnSelf(resolution, comp, typeDC);
+      }
+
+      switch (selfTypeKind) {
+      case SelfTypeKind::StaticSelf:
+        return selfType;
+      case SelfTypeKind::DynamicSelf:
+        return DynamicSelfType::get(selfType, ctx);
+      case SelfTypeKind::InvalidSelf:
+        break;
+      }
+    }
+  }
+
+  // If we're not allowed to complain, bail out.
+  if (options.contains(TypeResolutionFlags::SilenceErrors))
+    return ErrorType::get(ctx);
+
+  // Complain and give ourselves a chance to recover.
+  return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
+                             lookupOptions);
 }
 
 static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
