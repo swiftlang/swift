@@ -121,6 +121,8 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
   result.PrintIfConfig = false;
   result.CurrentModule = ModuleToPrint;
   result.FullyQualifiedTypes = true;
+  result.FullyQualifiedTypesIfAmbiguous = true;
+  result.FullyQualifiedExtendedTypesIfAmbiguous = true;
   result.UseExportedModuleNames = true;
   result.AllowNullTypes = false;
   result.SkipImports = true;
@@ -2330,9 +2332,14 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
 }
 
 static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
-                                  PrintOptions Options) {
-  Options.FullyQualifiedTypes = false;
-  Options.FullyQualifiedTypesIfAmbiguous = false;
+                                  PrintOptions &Options) {
+  bool OldFullyQualifiedTypesIfAmbiguous =
+    Options.FullyQualifiedTypesIfAmbiguous;
+  Options.FullyQualifiedTypesIfAmbiguous =
+    Options.FullyQualifiedExtendedTypesIfAmbiguous;
+  SWIFT_DEFER {
+    Options.FullyQualifiedTypesIfAmbiguous = OldFullyQualifiedTypesIfAmbiguous;
+  };
 
   // Strip off generic arguments, if any.
   auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();

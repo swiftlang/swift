@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.swiftinterface %s
-// RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix NONRESILIENT --check-prefix COMMON < %t.swiftinterface
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/Test.swiftinterface %s -module-name Test
+// RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix NONRESILIENT --check-prefix COMMON < %t/Test.swiftinterface
 
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t-resilient.swiftinterface -enable-library-evolution %s
-// RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix RESILIENT --check-prefix COMMON < %t-resilient.swiftinterface
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t/TestResilient.swiftinterface -enable-library-evolution %s -module-name TestResilient
+// RUN: %FileCheck %s --check-prefix FROMSOURCE --check-prefix RESILIENT --check-prefix COMMON < %t/TestResilient.swiftinterface
 
-// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t/Test.swiftinterface -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix NONRESILIENT --check-prefix COMMON
 
-// RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-library-evolution %t-resilient.swiftinterface -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-library-evolution %t/TestResilient.swiftinterface -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-library-evolution -emit-module-interface-path - | %FileCheck %s --check-prefix FROMMODULE --check-prefix RESILIENT --check-prefix COMMON
 
 // COMMON: @frozen public struct MyStruct {

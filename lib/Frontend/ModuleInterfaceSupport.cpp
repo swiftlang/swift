@@ -590,10 +590,16 @@ public:
       DeclAttributes::print(printer, printOptions, attrs);
 
       printer << "extension ";
-      PrintOptions typePrintOptions = printOptions;
-      typePrintOptions.FullyQualifiedTypes = false;
-      typePrintOptions.FullyQualifiedTypesIfAmbiguous = false;
-      nominal->getDeclaredType().print(printer, typePrintOptions);
+      {
+        PrintOptions typePrintOptions = printOptions;
+        bool oldFullyQualifiedTypesIfAmbiguous =
+          typePrintOptions.FullyQualifiedTypesIfAmbiguous;
+        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
+          typePrintOptions.FullyQualifiedExtendedTypesIfAmbiguous;
+        nominal->getDeclaredType().print(printer, typePrintOptions);
+        typePrintOptions.FullyQualifiedTypesIfAmbiguous =
+          oldFullyQualifiedTypesIfAmbiguous;
+      }
       printer << " : ";
 
       proto->getDeclaredInterfaceType()->print(printer, printOptions);
