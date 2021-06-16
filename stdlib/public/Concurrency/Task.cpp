@@ -62,7 +62,7 @@ void FutureFragment::destroy() {
     break;
 
   case Status::Error:
-    swift_unknownObjectRelease(reinterpret_cast<OpaqueValue *>(getError()));
+    swift_errorRelease(getError());
     break;
   }
 }
@@ -432,6 +432,8 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   ExecutorRef executor = ExecutorRef::generic();
   TaskGroup *group = nullptr;
   AsyncLet *asyncLet = nullptr;
+  void *asyncLetBuffer = nullptr;
+  bool hasAsyncLetResultBuffer = false;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::Executor:
@@ -447,6 +449,20 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     case TaskOptionRecordKind::AsyncLet:
       asyncLet = cast<AsyncLetTaskOptionRecord>(option)->getAsyncLet();
       assert(asyncLet && "Missing async let storage");
+      jobFlags.task_setIsAsyncLetTask(true);
+      jobFlags.task_setIsChildTask(true);
+      break;
+
+    case TaskOptionRecordKind::AsyncLetWithBuffer:
+      auto *aletRecord = cast<AsyncLetWithBufferTaskOptionRecord>(option);
+      asyncLet = aletRecord->getAsyncLet();
+      // TODO: Actually digest the result buffer into the async let task
+      // context, so that we can emplace the eventual result there instead
+      // of in a FutureFragment.
+      hasAsyncLetResultBuffer = true;
+      asyncLetBuffer = aletRecord->getResultBuffer();
+      assert(asyncLet && "Missing async let storage");
+        
       jobFlags.task_setIsAsyncLetTask(true);
       jobFlags.task_setIsChildTask(true);
       break;
@@ -504,19 +520,38 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   assert(amountToAllocate % MaximumAlignment == 0);
 
-  constexpr unsigned initialSlabSize = 512;
+  unsigned initialSlabSize = 512;
 
   void *allocation = nullptr;
   if (asyncLet) {
     assert(parent);
-    allocation = _swift_task_alloc_specific(parent,
-                                        amountToAllocate + initialSlabSize);
+    
+    // If there isn't enough room in the fixed async let allocation to
+    // set up the initial context, then we'll have to allocate more space
+    // from the parent.
+    if (asyncLet->getSizeOfPreallocatedSpace() < amountToAllocate) {
+      hasAsyncLetResultBuffer = false;
+    }
+    
+    // DEPRECATED. This is separated from the above condition because we
+    // also have to handle an older async let ABI that did not provide
+    // space for the initial slab in the compiler-generated preallocation.
+    if (!hasAsyncLetResultBuffer) {
+      allocation = _swift_task_alloc_specific(parent,
+                                          amountToAllocate + initialSlabSize);
+    } else {
+      allocation = asyncLet->getPreallocatedSpace();
+      assert(asyncLet->getSizeOfPreallocatedSpace() >= amountToAllocate
+             && "async let does not preallocate enough space for child task");
+      initialSlabSize = asyncLet->getSizeOfPreallocatedSpace()
+                          - amountToAllocate;
+    }
   } else {
     allocation = malloc(amountToAllocate);
   }
 #if SWIFT_TASK_PRINTF_DEBUG
-  fprintf(stderr, "[%lu] allocate task %p, parent = %p\n",
-          _swift_get_thread_id(), allocation, parent);
+  fprintf(stderr, "[%lu] allocate task %p, parent = %p, slab %u\n",
+          _swift_get_thread_id(), allocation, parent, initialSlabSize);
 #endif
 
   AsyncContext *initialContext =
@@ -598,15 +633,15 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 #endif
 
   // Initialize the task-local allocator.
-  if (asyncLet) {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-                                                   &completeTask);
+  initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+                            asyncLet       ? &completeTask
+                          : closureContext ? &completeTaskWithClosure
+                                           : &completeTaskAndRelease);
+  if (asyncLet && initialSlabSize > 0) {
     assert(parent);
     void *initialSlab = (char*)allocation + amountToAllocate;
     task->Private.initializeWithSlab(task, initialSlab, initialSlabSize);
   } else {
-    initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
-        closureContext ? &completeTaskWithClosure : &completeTaskAndRelease);
     task->Private.initialize(task);
   }
 
@@ -647,7 +682,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // Push the async let task status record.
   if (asyncLet) {
-    asyncLet_addImpl(task, asyncLet);
+    asyncLet_addImpl(task, asyncLet, !hasAsyncLetResultBuffer);
   }
 
   // If we're supposed to enqueue the task, do so now.
