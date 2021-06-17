@@ -1705,10 +1705,6 @@ bool TypeVarBindingProducer::computeNext() {
     const auto type = binding.BindingType;
     assert(!type->hasError());
 
-    // After our first pass, note that we've explored these types.
-    if (NumTries == 0)
-      ExploredTypes.insert(type->getCanonicalType());
-
     // If we have a protocol with a default type, look for alternative
     // types to the default.
     if (NumTries == 0 && binding.hasDefaultedLiteralProtocol()) {

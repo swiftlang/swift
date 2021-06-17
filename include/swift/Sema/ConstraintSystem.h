@@ -5453,7 +5453,21 @@ public:
     if (needsToComputeNext() && !computeNext())
       return None;
 
-    return TypeVariableBinding(TypeVar, Bindings[Index++]);
+    auto &binding = Bindings[Index++];
+
+    // Record produced type as bound/explored early, otherwise
+    // it could be possible to re-discover it during `computeNext()`,
+    // which leads to duplicate bindings e.g. inferring fallback
+    // `Void` for a closure result type when `Void` was already
+    // inferred as a direct/transitive binding.
+    {
+      auto type = binding.BindingType;
+
+      BoundTypes.insert(type.getPointer());
+      ExploredTypes.insert(type->getCanonicalType());
+    }
+
+    return TypeVariableBinding(TypeVar, binding);
   }
 
   bool needsToComputeNext() const override { return Index >= Bindings.size(); }
