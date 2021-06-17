@@ -8728,19 +8728,28 @@ void ClangImporter::Implementation::importAttributes(
       // Prime the lexer.
       parser.consumeTokenWithoutFeedingReceiver();
 
+      bool hadError = false;
       SourceLoc atLoc;
       if (parser.consumeIf(tok::at_sign, atLoc)) {
-        (void)parser.parseDeclAttribute(
+        hadError = parser.parseDeclAttribute(
             MappedDecl->getAttrs(), atLoc, initContext,
-            /*isFromClangAttribute=*/true);
+            /*isFromClangAttribute=*/true).isError();
       } else {
-        // Complain about the missing '@'.
+        SourceLoc staticLoc;
+        StaticSpellingKind staticSpelling;
+        hadError = parser.parseDeclModifierList(
+            MappedDecl->getAttrs(), staticLoc, staticSpelling,
+            /*isFromClangAttribute=*/true);
+      }
+
+      if (hadError) {
+        // Complain about the unhandled attribute or modifier.
         auto &clangSrcMgr = getClangASTContext().getSourceManager();
         ClangSourceBufferImporter &bufferImporter =
           getBufferImporterForDiagnostics();
         SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
           clangSrcMgr, swiftAttr->getLocation());
-        diagnose(attrLoc, diag::clang_swift_attr_without_at,
+        diagnose(attrLoc, diag::clang_swift_attr_unhandled,
                  swiftAttr->getAttribute());
       }
       continue;
