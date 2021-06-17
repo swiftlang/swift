@@ -76,6 +76,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementEnvironment.cpp
   RequirementMachine.cpp
   RewriteSystem.cpp
+  RewriteSystemCompletion.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp
