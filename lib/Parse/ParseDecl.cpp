@@ -3582,7 +3582,8 @@ ParserStatus Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
 //      'actor'
 bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
                                    SourceLoc &StaticLoc,
-                                   StaticSpellingKind &StaticSpelling) {
+                                   StaticSpellingKind &StaticSpelling,
+                                   bool isFromClangAttribute) {
   SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::ModifierList);
   bool isError = false;
   bool hasModifier = false;
@@ -3650,7 +3651,8 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 
       SyntaxParsingContext ModContext(SyntaxContext,
                                       SyntaxKind::DeclModifier);
-      isError |= parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, Kind);
+      isError |= parseNewDeclAttribute(
+          Attributes, /*AtLoc=*/{}, Kind, isFromClangAttribute);
       hasModifier = true;
       continue;
     }
