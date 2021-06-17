@@ -282,11 +282,11 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
     for (auto index : swift::indices(indices)) {
       dependsOnSolutions.push_back(&(*dependsOnSets[index])[indices[index]]);
     }
+    ContextualSolutions.push_back(std::make_unique<SmallVector<Solution, 2>>());
 
-    followup.push_back(
-        std::make_unique<ComponentStep>(CS, Index, Constraints, Component,
-                                         std::move(dependsOnSolutions),
-                                         Solutions));
+    followup.push_back(std::make_unique<ComponentStep>(
+        CS, Index, Constraints, Component, std::move(dependsOnSolutions),
+        *ContextualSolutions.back()));
   } while (nextCombination(dependsOnSetsRef, indices));
 
   /// Wait until all of the component steps are done.
@@ -294,6 +294,10 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
 }
 
 StepResult DependentComponentSplitterStep::resume(bool prevFailed) {
+  for (auto &ComponentStepSolutions : ContextualSolutions) {
+    Solutions.append(std::make_move_iterator(ComponentStepSolutions->begin()),
+                     std::make_move_iterator(ComponentStepSolutions->end()));
+  }
   return done(/*isSuccess=*/!Solutions.empty());
 }
 
