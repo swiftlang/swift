@@ -237,7 +237,7 @@ extension String {
 }
 
 extension String.UnicodeScalarView: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -256,14 +256,14 @@ public typealias UnicodeScalar = Unicode.Scalar
 
 
 extension String.UTF16View: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }
 
 extension String.UTF8View: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF8View.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF8View.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
@@ -310,7 +310,7 @@ extension Substring {
 }
 
 extension Substring: _CustomPlaygroundQuickLookable {
-  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "Substring.customPlaygroundQuickLook will be removed in Swift 5.0")
+  @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
   }
