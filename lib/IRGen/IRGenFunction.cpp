@@ -526,9 +526,15 @@ static llvm::Value *unsafeContinuationFromTask(IRGenFunction &IGF,
 
 static llvm::Value *emitLoadOfResumeContextFromTask(IRGenFunction &IGF,
                                                     llvm::Value *task) {
+  // Task.ResumeContext is at field index 8 within SwiftTaskTy. The offset comes
+  // from 7 pointers (two within the single RefCountedStructTy) and 2 Int32
+  // fields.
+  const unsigned taskResumeContextIndex = 8;
+  const Size taskResumeContextOffset = (7 * IGF.IGM.getPointerSize()) + Size(8);
+
   auto addr = Address(task, IGF.IGM.getPointerAlignment());
   auto resumeContextAddr = IGF.Builder.CreateStructGEP(
-    addr, 6, (5 * IGF.IGM.getPointerSize()) + Size(8));
+    addr, taskResumeContextIndex, taskResumeContextOffset);
   llvm::Value *resumeContext = IGF.Builder.CreateLoad(resumeContextAddr);
   if (auto &schema = IGF.getOptions().PointerAuth.TaskResumeContext) {
     auto info = PointerAuthInfo::emit(IGF, schema,
