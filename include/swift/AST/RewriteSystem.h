@@ -125,6 +125,11 @@ private:
 public:
   Kind getKind() const;
 
+  bool isSuperclassOrConcreteType() const {
+    auto kind = getKind();
+    return (kind == Kind::Superclass || kind == Kind::ConcreteType);
+  }
+
   Identifier getName() const;
 
   const ProtocolDecl *getProtocol() const;
@@ -175,6 +180,10 @@ public:
                               RewriteContext &ctx);
 
   int compare(Atom other, const ProtocolGraph &protos) const;
+
+  Atom prependPrefixToConcreteSubstitutions(
+      const MutableTerm &prefix,
+      RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
 
@@ -274,6 +283,10 @@ public:
 
   void add(Atom atom) {
     Atoms.push_back(atom);
+  }
+
+  void append(Term other) {
+    Atoms.append(other.begin(), other.end());
   }
 
   void append(const MutableTerm &other) {
