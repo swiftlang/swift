@@ -8308,7 +8308,7 @@ static void checkGenericSignature(CanGenericSignature canSig,
         assert(compareDependentTypes(firstType, secondType) < 0 &&
                "Out-of-order type parameters in same-type constraint");
       } else {
-        assert(canSig->isCanonicalTypeInContext(secondType) &&
+        assert(canSig->isCanonicalTypeInContext(secondType, builder) &&
                "Concrete same-type isn't canonical in its own context");
       }
       break;
