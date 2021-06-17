@@ -1865,6 +1865,22 @@ extension Array {
   }
 }
 
+#if INTERNAL_CHECKS_ENABLED
+extension Array {
+  // This allows us to test the `_copyContents` implementation in
+  // `_ArrayBuffer`. (It's like `_copyToContiguousArray` but it always makes a
+  // copy.)
+  @_alwaysEmitIntoClient
+  public func _copyToNewArray() -> [Element] {
+    Array(unsafeUninitializedCapacity: self.count) { buffer, count in
+      var (it, c) = self._buffer._copyContents(initializing: buffer)
+      _precondition(it.next() == nil)
+      count = c
+    }
+  }
+}
+#endif
+
 #if _runtime(_ObjC)
 // We isolate the bridging of the Cocoa Array -> Swift Array here so that
 // in the future, we can eagerly bridge the Cocoa array. We need this function
