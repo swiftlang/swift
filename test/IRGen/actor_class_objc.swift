@@ -5,7 +5,7 @@
 import Foundation
 
 // CHECK: %T16actor_class_objc7MyClassC = type <{ %swift.refcounted, %swift.defaultactor, %TSi }>
-// CHECK: %swift.defaultactor = type { [10 x i8*] }
+// CHECK: %swift.defaultactor = type { [12 x i8*] }
 
 // CHECK-LABEL: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass" = global
 //   Metaclass is an instance of the root class.
@@ -20,14 +20,14 @@ import Foundation
 //   Flags: uses Swift refcounting
 // CHECK-SAME: i32 2,
 //   Instance size
-// CHECK-64-SAME: i32 104,
-// CHECK-32-SAME: i32 52,
+// CHECK-64-SAME: i32 120,
+// CHECK-32-SAME: i32 60,
 //   Alignment mask
 // CHECK-64-SAME: i16 15,
 // CHECK-32-SAME: i16 7,
 //   Field offset for 'x'
-// CHECK-64-SAME: i64 96,
-// CHECK-32-SAME: i32 48,
+// CHECK-64-SAME: i64 112,
+// CHECK-32-SAME: i32 56,
 
 public actor MyClass: NSObject {
   public var x: Int
