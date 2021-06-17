@@ -1,34 +1,40 @@
 # REQUIRES: standalone_build
+# REQUIRES: ninja
 
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t/build
 # RUN: mkdir -p %t/source
 # RUN: split-file %s %t/source
-# RUN: %{cmake-generate} -DSWIFT_TOOLS_ENABLE_LTO="thin" -DCMAKE_MODULE_PATH=%swift_src_root/cmake/modules -S %t/source -B %t/build | %FileCheck --check-prefix=CHECK-THIN %s
+# RUN: %{cmake-generate} -DSWIFT_TOOLS_ENABLE_LTO="thin" -DCMAKE_MODULE_PATH=%swift_src_root/cmake/modules -S %t/source -B %t/build
+# RUN: %{ninja-dryrun} -C %t/build 2>&1 | %FileCheck --check-prefix=THIN-CHECK %s
 
-# CHECK-THIN: COMPILE_OPTIONS
-# CHECK-THIN-SAME: -flto=thin
-# CHECK-THIN: LINK_OPTIONS
-# CHECK-THIN-SAME: -flto=thin
-
-# RUN: %empty-directory(%t/build)
-# RUN: %{cmake-generate} -DSWIFT_TOOLS_ENABLE_LTO="full" -DCMAKE_MODULE_PATH=%swift_src_root/cmake/modules -S %t/source -B %t/build | %FileCheck --check-prefix=CHECK-FULL %s
-
-# CHECK-FULL: COMPILE_OPTIONS
-# CHECK-FULL-SAME: -flto=full
-# CHECK-FULL: LINK_OPTIONS
-# CHECK-FULL-SAME: -flto=full
+# THIN-CHECK: -flto=thin
+# THIN-CHECK-SAME: source/hello.c
+# THIN-CHECK: -flto=thin
+# THIN-CHECK-SAME: placeholder
 
 # RUN: %empty-directory(%t/build)
-# RUN: %{cmake-generate} -DSWIFT_TOOLS_ENABLE_LTO="" -DCMAKE_MODULE_PATH=%swift_src_root/cmake/modules -S %t/source -B %t/build | %FileCheck %s
+# RUN: %{cmake-generate} -DSWIFT_TOOLS_ENABLE_LTO="full" -DCMAKE_MODULE_PATH=%swift_src_root/cmake/modules -S %t/source -B %t/build
+# RUN: %{ninja-dryrun} -C %t/build 2>&1 | %FileCheck --check-prefix=FULL-CHECK %s
 
-# CHECK-NOT: COMPILE_OPTIONS {{.*}}-flto=
-# CHECK-NOT: LINK_OPTIONS {{.*}}-flto=
+# FULL-CHECK: -flto=full
+# FULL-CHECK-SAME: source/hello.c
+# FULL-CHECK: -flto=full
+# FULL-CHECK-SAME: placeholder
+
+# RUN: %empty-directory(%t/build)
+# RUN: %{cmake-generate} -DSWIFT_TOOLS_ENABLE_LTO="" -DCMAKE_MODULE_PATH=%swift_src_root/cmake/modules -S %t/source -B %t/build
+# RUN: %{ninja-dryrun} -C %t/build 2>&1 | %FileCheck %s
+# RUN: %empty-directory(%t/build)
+# RUN: %{cmake-generate} -DCMAKE_MODULE_PATH=%swift_src_root/cmake/modules -S %t/source -B %t/build
+# RUN: %{ninja-dryrun} -C %t/build 2>&1 | %FileCheck %s
+
+# CHECK-NOT: -flto=
 
 #--- CMakeLists.txt
 cmake_minimum_required(VERSION ${MIN_VERSION})
 
-project(character)
+project(lto_characterization)
 
 include(AddSwift)
 
@@ -40,11 +46,6 @@ set(SWIFT_SDK_OSX_ARCH_X86_64_TRIPLE "x86_64-apple-macos")
 add_executable(placeholder hello.c)
 
 _add_host_variant_c_compile_link_flags(placeholder)
-
-get_target_property(placeholder_compile_options placeholder COMPILE_OPTIONS)
-message(STATUS "COMPILE_OPTIONS ${placeholder_compile_options}")
-get_target_property(placeholder_link_options placeholder LINK_OPTIONS)
-message(STATUS "LINK_OPTIONS ${placeholder_link_options}")
 
 #--- hello.c
 int main(){}
