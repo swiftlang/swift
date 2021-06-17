@@ -104,15 +104,13 @@ void _swift_tsan_release(void *addr);
 /// Special values used with DispatchQueueIndex to indicate the global and main
 /// executors.
 #define DISPATCH_QUEUE_GLOBAL_EXECUTOR (void *)1
-#define DISPATCH_QUEUE_MAIN_EXECUTOR (void *)2
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
-// FIXME: remove this and switch to a representation that uses
-// _dispatch_main_q somehow
-extern "C" SWIFT_CC(swift)
-ExecutorRef _swift_task_getMainExecutor();
-#pragma clang diagnostic pop
+inline SerialExecutorWitnessTable *
+_swift_task_getDispatchQueueSerialExecutorWitnessTable() {
+  extern SerialExecutorWitnessTable wtable
+    SWIFT_ASM_LABEL_WITH_PREFIX("$ss17DispatchQueueShimCScfsWP");
+  return &wtable;
+}
 
 // ==== ------------------------------------------------------------------------
 

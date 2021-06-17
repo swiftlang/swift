@@ -390,8 +390,7 @@ static void swift_task_enqueueMainExecutorImpl(Job *job) {
   // This is an inline function that compiles down to a pointer to a global.
   auto mainQueue = dispatch_get_main_queue();
 
-  dispatchEnqueue(mainQueue, job, (dispatch_qos_class_t)priority,
-                  DISPATCH_QUEUE_MAIN_EXECUTOR);
+  dispatchEnqueue(mainQueue, job, (dispatch_qos_class_t)priority, mainQueue);
 
 #endif
 }
@@ -402,6 +401,23 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
                                         swift_task_enqueueMainExecutorImpl);
   else
     swift_task_enqueueMainExecutorImpl(job);
+}
+
+void swift::swift_task_enqueueOnDispatchQueue(Job *job,
+                                              HeapObject *_queue) {
+  JobPriority priority = job->getPriority();
+  auto queue = reinterpret_cast<dispatch_queue_t>(_queue);
+  dispatchEnqueue(queue, job, (dispatch_qos_class_t)priority, queue);
+}
+
+ExecutorRef swift::swift_task_getMainExecutor() {
+  return ExecutorRef::forOrdinary(
+           reinterpret_cast<HeapObject*>(&_dispatch_main_q),
+           _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+}
+
+bool ExecutorRef::isMainExecutor() const {
+  return Identity == reinterpret_cast<HeapObject*>(&_dispatch_main_q);
 }
 
 #define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE

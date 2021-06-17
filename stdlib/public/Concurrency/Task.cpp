@@ -238,10 +238,9 @@ static ExecutorRef executorForEnqueuedJob(Job *job) {
   void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
   if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
     return ExecutorRef::generic();
-  else if (jobQueue == DISPATCH_QUEUE_MAIN_EXECUTOR)
-    return _swift_task_getMainExecutor();
   else
-    swift_unreachable("jobQueue was not a known value.");
+    return ExecutorRef::forOrdinary(reinterpret_cast<HeapObject*>(jobQueue),
+                    _swift_task_getDispatchQueueSerialExecutorWitnessTable());
 }
 
 static void jobInvoke(void *obj, void *unused, uint32_t flags) {

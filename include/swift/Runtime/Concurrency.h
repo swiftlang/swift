@@ -563,6 +563,10 @@ void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
 
+/// Enqueue the given job on the main executor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueOnDispatchQueue(Job *job, HeapObject *queue);
+
 /// A hook to take over global enqueuing.
 typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -679,6 +683,10 @@ AsyncTask *swift_task_getCurrent(void);
 /// Return the current thread's active executor reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 ExecutorRef swift_task_getCurrentExecutor(void);
+
+/// Return the main-actor executor reference.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ExecutorRef swift_task_getMainExecutor(void);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCurrentExecutor(ExecutorRef executor);
