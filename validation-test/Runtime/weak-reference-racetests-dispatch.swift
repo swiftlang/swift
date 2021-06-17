@@ -1,4 +1,5 @@
 // RUN: %target-build-swift %s %import-libdispatch -o %t_binary
+// RUN: %target-codesign %t_binary
 // RUN: %target-run %t_binary
 // REQUIRES: executable_test
 // REQUIRES: stress_test
