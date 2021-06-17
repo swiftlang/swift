@@ -4,7 +4,8 @@
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 // RUN: %line-directive %t/main.swift -- %target-build-swift %t/main.swift %S/Inputs/DictionaryKeyValueTypes.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Arrays -Xfrontend -disable-access-control
 //
-// RUN: %target-codesign %t/Arrays && %line-directive %t/main.swift -- %target-run %t/Arrays
+// RUN: %target-codesign %t/Arrays
+// RUN: %enable-cow-checking %line-directive %t/main.swift -- %target-run %t/Arrays
 // REQUIRES: executable_test
 
 import Swift
