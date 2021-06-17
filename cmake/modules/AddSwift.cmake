@@ -98,7 +98,7 @@ function(_add_host_variant_swift_sanitizer_flags target)
     elseif (LLVM_USE_SANITIZER STREQUAL "Leaks")
       # Not supported
     else()
-      message(FATAL_ERROR "Unsupported value of LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
+      message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
     endif()
 
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:${_Swift_SANITIZER_FLAGS}>)
