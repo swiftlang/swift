@@ -1357,6 +1357,17 @@ void RewriteSystem::processMergedAssociatedTypes() {
 /// There is also an additional wrinkle. If we're in case 2, and the
 /// last atom of V is a superclass or concrete type atom A, we prepend
 /// T to each substitution of A.
+///
+/// For example, suppose we have the following two rules:
+///
+/// A.B -> C
+/// B.[concrete: Foo<X>] -> B
+///
+/// The overlapped term is A.B.[concrete: Foo<X>], so the critical pair
+/// is (C.[concrete: Foo<A.X>], A.B). We prepended 'A' to the
+/// concrete substitution 'X' to get 'A.X'; the new concrete term
+/// is now rooted at the same level as A.B in the rewrite system,
+/// not just B.
 Optional<std::pair<MutableTerm, MutableTerm>>
 RewriteSystem::computeCriticalPair(const Rule &lhs, const Rule &rhs) const {
   MutableTerm t, v;

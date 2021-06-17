@@ -219,7 +219,8 @@ enum class OverlapKind {
 /// The first atom in the term must be a protocol, generic parameter, or
 /// associated type atom.
 ///
-/// A layout constraint atom must only appear at the end of a term.
+/// A layout, superclass or concrete type atom must only appear at the
+/// end of a term.
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class Term final {
