@@ -13,6 +13,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_stdlib_asserts
+// REQUIRES: foundation
 
 import Foundation
 import StdlibUnittest
