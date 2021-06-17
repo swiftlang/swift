@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swiftgyb
+// RUN: %enable-cow-checking %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
