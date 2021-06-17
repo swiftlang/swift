@@ -9204,7 +9204,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 }
 
 DeclContext *ClangImporter::Implementation::importDeclContextImpl(
-    const clang::DeclContext *dc) {
+    const clang::Decl *ImportingDecl, const clang::DeclContext *dc) {
   // Every declaration should come from a module, so we should not see the
   // TranslationUnit DeclContext here.
   assert(!dc->isTranslationUnit());
@@ -9217,7 +9217,8 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   // leads to the first category of the given name. We'd like to keep these
   // categories separated.
   auto useCanonical = !isa<clang::ObjCCategoryDecl>(decl);
-  auto swiftDecl = importDecl(decl, CurrentVersion, useCanonical);
+  auto swiftDecl = importDeclForDeclContext(ImportingDecl, decl->getName(),
+                                            decl, CurrentVersion, useCanonical);
   if (!swiftDecl)
     return nullptr;
 
@@ -9270,6 +9271,71 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
       GenericSignature());
 }
 
+Decl *
+ClangImporter::Implementation::importDeclForDeclContext(
+    const clang::Decl *importingDecl,
+    StringRef writtenName,
+    const clang::NamedDecl *contextDecl,
+    Version version,
+    bool useCanonicalDecl)
+{
+  auto key = std::make_tuple(importingDecl, writtenName, contextDecl, version,
+                             useCanonicalDecl);
+  auto iter = find(llvm::reverse(contextDeclsBeingImported), key);
+
+  // No cycle? Remember that we're importing this, then import normally.
+  if (iter == contextDeclsBeingImported.rend()) {
+    contextDeclsBeingImported.push_back(key);
+    auto imported = importDecl(contextDecl, version, useCanonicalDecl);
+    contextDeclsBeingImported.pop_back();
+    return imported;
+  }
+
+  // There's a cycle. Is the declaration imported enough to break the cycle
+  // gracefully? If so, we'll have it in the decl cache.
+  if (auto cached = importDeclCached(contextDecl, version, useCanonicalDecl))
+    return cached;
+
+  // Can't break it? Warn and return nullptr, which is at least better than
+  // stack overflow by recursion.
+
+  // Avoid emitting warnings repeatedly.
+  if (!contextDeclsWarnedAbout.insert(contextDecl).second)
+    return nullptr;
+
+  auto convertLoc = [&](clang::SourceLocation clangLoc) {
+    return getBufferImporterForDiagnostics()
+      .resolveSourceLocation(getClangASTContext().getSourceManager(),
+                             clangLoc);
+  };
+
+  auto getDeclName = [](const clang::Decl *D) -> StringRef {
+    if (auto ND = dyn_cast<clang::NamedDecl>(D))
+      return ND->getName();
+    return "<anonymous>";
+  };
+
+  SourceLoc loc = convertLoc(importingDecl->getLocation());
+  diagnose(loc, diag::swift_name_circular_context_import,
+           writtenName, getDeclName(importingDecl));
+
+  // Diagnose other decls involved in the cycle.
+  for (auto entry : make_range(contextDeclsBeingImported.rbegin(), iter)) {
+    auto otherDecl = std::get<0>(entry);
+    auto otherWrittenName = std::get<1>(entry);
+    diagnose(convertLoc(otherDecl->getLocation()),
+             diag::swift_name_circular_context_import_other,
+             otherWrittenName, getDeclName(otherDecl));
+  }
+
+  if (auto *parentModule = contextDecl->getOwningModule()) {
+    diagnose(loc, diag::unresolvable_clang_decl_is_a_framework_bug,
+             parentModule->getFullModuleName());
+  }
+
+  return nullptr;
+}
+
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(
   const clang::Decl *decl,
@@ -9287,13 +9353,15 @@ ClangImporter::Implementation::importDeclContextOf(
     }
 
     // Import the DeclContext.
-    importedDC = importDeclContextImpl(dc);
+    importedDC = importDeclContextImpl(decl, dc);
     break;
   }
 
   case EffectiveClangContext::TypedefContext: {
     // Import the typedef-name as a declaration.
-    auto importedDecl = importDecl(context.getTypedefName(), CurrentVersion);
+    auto importedDecl = importDeclForDeclContext(
+        decl, context.getTypedefName()->getName(), context.getTypedefName(),
+        CurrentVersion);
     if (!importedDecl) return nullptr;
 
     // Dig out the imported DeclContext.
@@ -9311,17 +9379,19 @@ ClangImporter::Implementation::importDeclContextOf(
       if (auto clangDecl
             = lookupTable->resolveContext(context.getUnresolvedName())) {
         // Import the Clang declaration.
-        auto decl = importDecl(clangDecl, CurrentVersion);
-        if (!decl) return nullptr;
+        auto swiftDecl = importDeclForDeclContext(decl,
+                                                  context.getUnresolvedName(),
+                                                  clangDecl, CurrentVersion);
+        if (!swiftDecl) return nullptr;
 
         // Look through typealiases.
-        if (auto typealias = dyn_cast<TypeAliasDecl>(decl))
+        if (auto typealias = dyn_cast<TypeAliasDecl>(swiftDecl))
           importedDC = typealias->getDeclaredInterfaceType()->getAnyNominal();
         else // Map to a nominal type declaration.
-          importedDC = dyn_cast<NominalTypeDecl>(decl);
-        break;
+          importedDC = dyn_cast<NominalTypeDecl>(swiftDecl);
       }
     }
+    break;
   }
   }
 
