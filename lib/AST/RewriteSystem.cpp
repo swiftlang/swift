@@ -493,29 +493,33 @@ int Atom::compare(Atom other, const ProtocolGraph &graph) const {
 ///   [concrete: Foo<X1, ..., Xn>]
 ///   [superclass: Foo<X1, ..., Xn>]
 ///
-/// Return a new atom where the prefix T is prepended to each of the
+/// Return a new atom where the function fn is applied to each of the
 /// substitutions:
 ///
-///   [concrete: Foo<T.X1, ..., T.Xn>]
-///   [superclass: Foo<T.X1, ..., T.Xn>]
+///   [concrete: Foo<fn(X1), ..., fn(Xn)>]
+///   [superclass: Foo<fn(X1), ..., fn(Xn)>]
 ///
 /// Asserts if this is not a superclass or concrete type atom.
-Atom Atom::prependPrefixToConcreteSubstitutions(
-    const MutableTerm &prefix,
+Atom Atom::transformConcreteSubstitutions(
+    llvm::function_ref<Term(Term)> fn,
     RewriteContext &ctx) const {
   assert(isSuperclassOrConcreteType());
 
-  if (prefix.empty())
+  if (getSubstitutions().empty())
     return *this;
 
+  bool anyChanged = false;
   SmallVector<Term, 2> substitutions;
   for (auto term : getSubstitutions()) {
-    MutableTerm mutTerm;
-    mutTerm.append(prefix);
-    mutTerm.append(term);
+    auto newTerm = fn(term);
+    if (newTerm != term)
+      anyChanged = true;
 
-    substitutions.push_back(Term::get(mutTerm, ctx));
+    substitutions.push_back(newTerm);
   }
+
+  if (!anyChanged)
+    return *this;
 
   switch (getKind()) {
   case Kind::Superclass:
@@ -532,6 +536,34 @@ Atom Atom::prependPrefixToConcreteSubstitutions(
   }
 
   llvm_unreachable("Bad atom kind");
+}
+
+/// For a superclass or concrete type atom
+///
+///   [concrete: Foo<X1, ..., Xn>]
+///   [superclass: Foo<X1, ..., Xn>]
+///
+/// Return a new atom where the prefix T is prepended to each of the
+/// substitutions:
+///
+///   [concrete: Foo<T.X1, ..., T.Xn>]
+///   [superclass: Foo<T.X1, ..., T.Xn>]
+///
+/// Asserts if this is not a superclass or concrete type atom.
+Atom Atom::prependPrefixToConcreteSubstitutions(
+    const MutableTerm &prefix,
+    RewriteContext &ctx) const {
+  if (prefix.empty())
+    return *this;
+
+  return transformConcreteSubstitutions(
+    [&](Term term) -> Term {
+      MutableTerm mutTerm;
+      mutTerm.append(prefix);
+      mutTerm.append(term);
+
+      return Term::get(mutTerm, ctx);
+    }, ctx);
 }
 
 /// Print the atom using our mnemonic representation.
@@ -976,6 +1008,18 @@ void RewriteSystem::initialize(
     addRule(rule.first, rule.second);
 }
 
+Atom RewriteSystem::simplifySubstitutionsInSuperclassOrConcreteAtom(
+    Atom atom) const {
+  return atom.transformConcreteSubstitutions(
+    [&](Term term) -> Term {
+      MutableTerm mutTerm(term);
+      if (!simplify(mutTerm))
+        return term;
+
+      return Term::get(mutTerm, Context);
+    }, Context);
+}
+
 bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   // Simplify the rule as much as possible with the rules we have so far.
   //
@@ -993,6 +1037,9 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
   // right hand side.
   if (result < 0)
     std::swap(lhs, rhs);
+
+  if (lhs.back().isSuperclassOrConcreteType())
+    lhs.back() = simplifySubstitutionsInSuperclassOrConcreteAtom(lhs.back());
 
   assert(lhs.compare(rhs, Protos) > 0);
 
@@ -1457,7 +1504,12 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     processMergedAssociatedTypes();
   }
 
-  // This isn't necessary for correctness, it's just an optimization.
+  simplifyRightHandSides();
+
+  return CompletionResult::Success;
+}
+
+void RewriteSystem::simplifyRightHandSides() {
   for (auto &rule : Rules) {
     if (rule.isDeleted())
       continue;
@@ -1466,8 +1518,6 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     simplify(rhs);
     rule = Rule(rule.getLHS(), rhs);
   }
-
-  return CompletionResult::Success;
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {

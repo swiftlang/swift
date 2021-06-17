@@ -181,6 +181,10 @@ public:
 
   int compare(Atom other, const ProtocolGraph &protos) const;
 
+  Atom transformConcreteSubstitutions(
+      llvm::function_ref<Term(Term)> fn,
+      RewriteContext &ctx) const;
+
   Atom prependPrefixToConcreteSubstitutions(
       const MutableTerm &prefix,
       RewriteContext &ctx) const;
@@ -246,6 +250,14 @@ public:
   static Term get(const MutableTerm &term, RewriteContext &ctx);
 
   void dump(llvm::raw_ostream &out) const;
+
+  friend bool operator==(Term lhs, Term rhs) {
+    return lhs.Ptr == rhs.Ptr;
+  }
+
+  friend bool operator!=(Term lhs, Term rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 /// A term is a sequence of one or more atoms.
@@ -499,6 +511,8 @@ public:
   void initialize(std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
                   ProtocolGraph &&protos);
 
+  Atom simplifySubstitutionsInSuperclassOrConcreteAtom(Atom atom) const;
+
   bool addRule(MutableTerm lhs, MutableTerm rhs);
 
   bool simplify(MutableTerm &term) const;
@@ -518,6 +532,8 @@ public:
   CompletionResult computeConfluentCompletion(
       unsigned maxIterations,
       unsigned maxDepth);
+
+  void simplifyRightHandSides();
 
   void dump(llvm::raw_ostream &out) const;
 
