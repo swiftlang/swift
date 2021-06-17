@@ -1021,6 +1021,9 @@ Atom RewriteSystem::simplifySubstitutionsInSuperclassOrConcreteAtom(
 }
 
 bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
+  assert(!lhs.empty());
+  assert(!rhs.empty());
+
   // Simplify the rule as much as possible with the rules we have so far.
   //
   // This avoids unnecessary work in the completion algorithm.
@@ -1518,6 +1521,62 @@ void RewriteSystem::simplifyRightHandSides() {
     simplify(rhs);
     rule = Rule(rule.getLHS(), rhs);
   }
+
+#ifndef NDEBUG
+
+#define ASSERT_RULE(expr) \
+  if (!(expr)) { \
+    llvm::errs() << "&&& Malformed rewrite rule: "; \
+    rule.dump(llvm::errs()); \
+    llvm::errs() << "\n\n"; \
+    dump(llvm::errs()); \
+    assert(expr); \
+  }
+
+  for (const auto &rule : Rules) {
+    if (rule.isDeleted())
+      continue;
+
+    const auto &lhs = rule.getLHS();
+    const auto &rhs = rule.getRHS();
+
+    for (unsigned index : indices(lhs)) {
+      auto atom = lhs[index];
+
+      if (index != lhs.size() - 1) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::Layout);
+        ASSERT_RULE(!atom.isSuperclassOrConcreteType());
+      }
+
+      if (index != 0) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::GenericParam);
+      }
+
+      if (index != 0 && index != lhs.size() - 1) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::Protocol);
+      }
+    }
+
+    for (unsigned index : indices(rhs)) {
+      auto atom = rhs[index];
+
+      // FIXME: This is only true if the input requirements were valid.
+      // On invalid code, we'll need to skip this assertion (and instead
+      // assert that we diagnosed an error!)
+      ASSERT_RULE(atom.getKind() != Atom::Kind::Name);
+
+      ASSERT_RULE(atom.getKind() != Atom::Kind::Layout);
+      ASSERT_RULE(!atom.isSuperclassOrConcreteType());
+
+      if (index != 0) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::GenericParam);
+        ASSERT_RULE(atom.getKind() != Atom::Kind::Protocol);
+      }
+    }
+  }
+
+#undef ASSERT_RULE
+#endif
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
