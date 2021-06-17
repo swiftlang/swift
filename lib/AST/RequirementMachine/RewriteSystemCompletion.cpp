@@ -427,27 +427,28 @@ RewriteSystem::computeCriticalPair(const Rule &lhs, const Rule &rhs) const {
 
 /// Computes the confluent completion using the Knuth-Bendix algorithm.
 ///
-/// Returns CompletionResult::MaxIterations if we exceed \p maxIterations
+/// Returns a pair consisting of a status and number of iterations executed.
+///
+/// The status is CompletionResult::MaxIterations if we exceed \p maxIterations
 /// iterations.
 ///
-/// Returns CompletionResult::MaxDepth if we produce a rewrite rule whose
+/// The status is CompletionResult::MaxDepth if we produce a rewrite rule whose
 /// left hand side has a length exceeding \p maxDepth.
-RewriteSystem::CompletionResult
+///
+/// Otherwise, the status is CompletionResult::Success.
+std::pair<RewriteSystem::CompletionResult, unsigned>
 RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
   unsigned steps = 0;
-
-  SWIFT_DEFER {
-    if (Context.Stats) {
-      Context.Stats->getFrontendCounters()
-        .NumRequirementMachineCompletionSteps += steps;
-    }
-  };
 
   // The worklist must be processed in first-in-first-out order, to ensure
   // that we resolve all overlaps among the initial set of rules before
   // moving on to overlaps between rules introduced by completion.
   while (!Worklist.empty()) {
+    // Check if we've already done too much work.
+    if (steps >= maxIterations)
+      return std::make_pair(CompletionResult::MaxIterations, steps);
+
     auto next = Worklist.front();
     Worklist.pop_front();
 
@@ -485,13 +486,12 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     if (!addRule(first, second))
       continue;
 
-    // Check if we've already done too much work.
-    if (++steps >= maxIterations)
-      return CompletionResult::MaxIterations;
+    // Only count a 'step' once we add a new rule.
+    ++steps;
 
     const auto &newRule = Rules[i];
     if (newRule.getDepth() > maxDepth)
-      return CompletionResult::MaxDepth;
+      return std::make_pair(CompletionResult::MaxDepth, steps);
 
     // Check if the new rule X == Y obsoletes any existing rules.
     for (unsigned j : indices(Rules)) {
@@ -523,7 +523,5 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     processMergedAssociatedTypes();
   }
 
-  simplifyRightHandSides();
-
-  return CompletionResult::Success;
+  return std::make_pair(CompletionResult::Success, steps);
 }

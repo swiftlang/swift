@@ -20,6 +20,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include <vector>
 
+#include "EquivalenceClassMap.h"
 #include "ProtocolGraph.h"
 #include "RewriteSystem.h"
 
@@ -64,6 +65,8 @@ CanType
 RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
                                                     const ProtocolDecl *proto,
                                                     SmallVectorImpl<Term> &result) {
+  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
+
   if (!concreteType->hasTypeParameter())
     return concreteType;
 
@@ -225,10 +228,13 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
 struct RequirementMachine::Implementation {
   RewriteContext Context;
   RewriteSystem System;
+  EquivalenceClassMap Map;
   bool Complete = false;
 
   explicit Implementation(ASTContext &ctx)
-      : Context(ctx), System(Context) {}
+      : Context(ctx),
+        System(Context),
+        Map(Context, System.getProtocols()) {}
 };
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
@@ -264,45 +270,69 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   Impl->System.initialize(std::move(builder.Rules),
                           std::move(builder.Protocols));
 
-  // Attempt to obtain a confluent rewrite system using the completion
-  // procedure.
-  auto result = Impl->System.computeConfluentCompletion(
-      Context.LangOpts.RequirementMachineStepLimit,
-      Context.LangOpts.RequirementMachineDepthLimit);
-
-  // Check for failure.
-  switch (result) {
-  case RewriteSystem::CompletionResult::Success:
-    break;
-
-  case RewriteSystem::CompletionResult::MaxIterations:
-    llvm::errs() << "Generic signature " << sig
-                 << " exceeds maximum completion step count\n";
-    Impl->System.dump(llvm::errs());
-    abort();
-
-  case RewriteSystem::CompletionResult::MaxDepth:
-    llvm::errs() << "Generic signature " << sig
-                 << " exceeds maximum completion depth\n";
-    Impl->System.dump(llvm::errs());
-    abort();
-  }
-
-  markComplete();
+  computeCompletion(sig);
 
   if (Context.LangOpts.DebugRequirementMachine) {
     llvm::dbgs() << "}\n";
   }
 }
 
-bool RequirementMachine::isComplete() const {
-  return Impl->Complete;
-}
+/// Attempt to obtain a confluent rewrite system using the completion
+/// procedure.
+void RequirementMachine::computeCompletion(CanGenericSignature sig) {
+  unsigned remainingSteps = Context.LangOpts.RequirementMachineStepLimit;
+  bool keepGoing = true;
 
-void RequirementMachine::markComplete() {
+  while (keepGoing) {
+    // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
+    auto result = Impl->System.computeConfluentCompletion(
+        remainingSteps, Context.LangOpts.RequirementMachineDepthLimit);
+
+    assert(remainingSteps >= result.second);
+    remainingSteps -= result.second;
+
+    if (Context.Stats) {
+      Context.Stats->getFrontendCounters()
+          .NumRequirementMachineCompletionSteps += result.second;
+    }
+
+    // Check for failure.
+    switch (result.first) {
+    case RewriteSystem::CompletionResult::Success:
+      break;
+
+    case RewriteSystem::CompletionResult::MaxIterations:
+      llvm::errs() << "Generic signature " << sig
+                   << " exceeds maximum completion step count\n";
+      Impl->System.dump(llvm::errs());
+      abort();
+
+    case RewriteSystem::CompletionResult::MaxDepth:
+      llvm::errs() << "Generic signature " << sig
+                   << " exceeds maximum completion depth\n";
+      Impl->System.dump(llvm::errs());
+      abort();
+    }
+
+    // Simplify right hand sides in preparation for building the
+    // equivalence class map.
+    Impl->System.simplifyRightHandSides();
+
+    // Build the equivalence class map, which performs concrete term
+    // unification; if this added any new rules, run the completion
+    // procedure again.
+    keepGoing = Impl->System.buildEquivalenceClassMap(Impl->Map);
+  }
+
   if (Context.LangOpts.DebugRequirementMachine) {
     Impl->System.dump(llvm::dbgs());
+    Impl->Map.dump(llvm::dbgs());
   }
+
   assert(!Impl->Complete);
   Impl->Complete = true;
+}
+
+bool RequirementMachine::isComplete() const {
+  return Impl->Complete;
 }
