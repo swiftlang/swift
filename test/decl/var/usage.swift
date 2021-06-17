@@ -540,7 +540,7 @@ func testVariablesBoundInPatterns() {
     break
   }
 }
-// Tests fix to SR-1464
+// Tests fix to SR-14646
 func testUselessCastWithInvalidParam(foo: Any?) -> Int {
   class Foo { }
   if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}
