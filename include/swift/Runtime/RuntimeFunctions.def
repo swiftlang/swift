@@ -1666,6 +1666,14 @@ FUNCTION(TaskGetCurrentExecutor,
          ARGS(),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// ExecutorRef swift_task_getMainExecutor();
+FUNCTION(TaskGetMainExecutor,
+         swift_task_getMainExecutor, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(SwiftExecutorTy),
+         ARGS(),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 // void swift_defaultActor_initialize(DefaultActor *actor);
 FUNCTION(DefaultActorInitialize,
          swift_defaultActor_initialize, SwiftCC,

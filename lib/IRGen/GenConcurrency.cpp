@@ -127,7 +127,12 @@ const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
 
 void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
                                           Explosion &out) {
-  // FIXME
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetMainExecutorFn(),
+                                     {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
 }
 
 void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
