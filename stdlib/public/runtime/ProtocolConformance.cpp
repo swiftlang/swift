@@ -169,6 +169,14 @@ static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
   if (!classMetadata)
     return {_swift_class_getSuperclass(metadata), MetadataState::Complete};
 
+#if SWIFT_OBJC_INTEROP
+    // Artificial subclasses are not valid type metadata and
+    // tryGetCompleteMetadataNonblocking will crash on them. However, they're
+    // always fully set up, so we can just skip it and fetch the Subclass field.
+    if (classMetadata->isTypeMetadata() && classMetadata->isArtificialSubclass())
+      return {classMetadata->Superclass, MetadataState::Complete};
+#endif
+
   MetadataState metadataState;
   if (knownMetadataState)
     metadataState = *knownMetadataState;
