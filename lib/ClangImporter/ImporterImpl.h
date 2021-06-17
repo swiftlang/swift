@@ -913,8 +913,34 @@ public:
   ///
   /// \returns The imported declaration context, or null if it could not
   /// be converted.
-  DeclContext *importDeclContextImpl(const clang::DeclContext *dc);
+  DeclContext *importDeclContextImpl(const clang::Decl *ImportingDecl,
+                                     const clang::DeclContext *dc);
 
+private:
+  /// Declarations currently being imported by \c importDeclForDeclContext().
+  /// Used to break cycles when a swift_name attribute is circular in a way that
+  /// can't be resolved, or there is some other cycle through
+  /// \c importDeclContextOf().
+  llvm::SmallVector<std::tuple<const clang::Decl *, StringRef,
+                               const clang::NamedDecl *, Version, bool>, 8>
+      contextDeclsBeingImported;
+
+  /// Records which contexts \c importDeclForDeclContext() has already warned
+  /// were unimportable.
+  llvm::SmallPtrSet<const clang::NamedDecl *, 4> contextDeclsWarnedAbout;
+
+  /// Exactly equivalent to \c importDecl(), except with additional
+  /// cycle-breaking code.
+  ///
+  /// \param writtenName The name that should be used for the declaration
+  ///        in cycle diagnostics.
+  Decl *importDeclForDeclContext(const clang::Decl *ImportingDecl,
+                                 StringRef writtenName,
+                                 const clang::NamedDecl *ClangDecl,
+                                 Version version,
+                                 bool UseCanonicalDecl = true);
+
+public:
   /// Import the declaration context of a given Clang declaration into
   /// Swift.
   ///
