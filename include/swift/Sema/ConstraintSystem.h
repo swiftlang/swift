@@ -5369,6 +5369,9 @@ public:
   TypeVariableBinding(TypeVariableType *typeVar, PotentialBinding &binding)
       : TypeVar(typeVar), Binding(binding) {}
 
+  TypeVariableType *getTypeVariable() const { return TypeVar; }
+  Type getType() const { return Binding.BindingType; }
+
   bool isDefaultable() const { return Binding.isDefaultableBinding(); }
 
   bool hasDefaultedProtocol() const {
