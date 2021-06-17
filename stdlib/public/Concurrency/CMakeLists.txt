@@ -10,9 +10,6 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(swift_concurrency_objc_sources
-  SwiftNativeNSObject.mm)
-
 set(LLVM_OPTIONAL_SOURCES
   ${swift_concurrency_objc_sources})
 
@@ -99,6 +96,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     -Xfrontend -enable-experimental-concurrency
     -Xfrontend -define-availability
     -Xfrontend \"SwiftStdlib 5.5:macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0\"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  LINK_FLAGS "${SWIFT_RUNTIME_CONCURRENCY_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )
