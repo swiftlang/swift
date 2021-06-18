@@ -2774,6 +2774,10 @@ static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinBuildMainExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinContinuation(Decl *decl) {
   return false;
 }
