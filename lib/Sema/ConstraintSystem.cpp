@@ -3787,7 +3787,7 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
     return cs.typeVarOccursInType(typeVar, paramFnType->getResult());
   };
 
-  llvm::SmallVector<ClosureExpr *, 4> closureArguments;
+  llvm::SmallVector<ClosureExpr *, 2> closureArguments;
   // A single closure argument.
   if (auto *closure =
           getAsExpr<ClosureExpr>(AE->getArg()->getSemanticsProvidingExpr())) {
@@ -3837,7 +3837,7 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
         return true;
       })) {
 
-    if (genericParamInferredTypes.size() <= 1)
+    if (genericParamInferredTypes.size() != 2)
       return false;
 
     auto &DE = cs.getASTContext().Diags;
@@ -3848,9 +3848,16 @@ static bool diagnoseContextualFunctionCallGenericAmbiguity(
         [&](Type argType) { OS << "'" << argType << "'"; },
         [&OS] { OS << " vs. "; });
 
-    DE.diagnose(AE->getLoc(),
-                diag::conflicting_inferred_generic_parameter_result_and_closure,
+    DE.diagnose(AE->getLoc(), diag::conflicting_arguments_for_generic_parameter,
                 GP, OS.str());
+
+    DE.diagnose(AE->getLoc(),
+                diag::generic_parameter_inferred_from_result_context, GP,
+                genericParamInferredTypes.back());
+    DE.diagnose(closureArguments.front()->getStartLoc(),
+                diag::generic_parameter_inferred_from_closure, GP,
+                genericParamInferredTypes.front());
+
     return true;
   }
   return false;

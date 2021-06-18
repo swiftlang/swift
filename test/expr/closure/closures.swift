@@ -633,29 +633,33 @@ func callitVariadic<T>(_ fs: () -> T...) -> T {
 }
 
 func testSR13239_Tuple() -> Int {
-  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
-  callitTuple(1) {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitTuple(1) { // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
     (print("hello"), 0) 
   }
 }
 
 func testSR13239() -> Int {
-  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
-  callit {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callit { // expected-note@:10{{generic parameter 'T' inferred as '()' from closure return expression}}
     print("hello")
   }
 }
 
 func testSR13239_Args() -> Int {
-  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
-  callitArgs(1) {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitArgs(1) { // expected-note@:17{{generic parameter 'T' inferred as '()' from closure return expression}}
     print("hello") 
   }
 }
 
 func testSR13239_ArgsFn() -> Int {
-  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
-  callitArgsFn(1) {
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitArgsFn(1) { // expected-note@:19{{generic parameter 'T' inferred as '()' from closure return expression}}
     { print("hello") } 
   }
 }
@@ -675,8 +679,9 @@ func testSR13239_GenericArg() -> Int {
 }
 
 func testSR13239_Variadic() -> Int {
-  // expected-error@+1{{conflicting inferred types from call result and closure argument to generic parameter 'T' ('()' vs. 'Int')}}
-  callitVariadic({
+  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
+  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
+  callitVariadic({ // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
     print("hello")
   })
 }
