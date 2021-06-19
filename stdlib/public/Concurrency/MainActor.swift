@@ -15,17 +15,25 @@ import Swift
 /// A singleton actor whose executor is equivalent to the main
 /// dispatch queue.
 @available(SwiftStdlib 5.5, *)
-@globalActor public final actor MainActor: SerialExecutor, GlobalActor {
+@globalActor public final actor MainActor: GlobalActor {
   public static let shared = MainActor()
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    return asUnownedSerialExecutor()
+    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
+    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   @inlinable
-  public nonisolated func asUnownedSerialExecutor() -> UnownedSerialExecutor {
-    return UnownedSerialExecutor(ordinary: self)
+  public static var sharedUnownedExecutor: UnownedSerialExecutor {
+    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
+    return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   @inlinable

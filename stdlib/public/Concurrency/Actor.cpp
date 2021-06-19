@@ -321,8 +321,7 @@ static bool swift_task_isCurrentExecutorImpl(ExecutorRef executor) {
     return currentTracking->getActiveExecutor() == executor;
   }
 
-  return executor == _swift_task_getMainExecutor()
-      && isExecutingOnMainThread();
+  return executor.isMainExecutor() && isExecutingOnMainThread();
 }
 
 /// Logging level for unexpected executors:
@@ -365,7 +364,7 @@ void swift::swift_task_reportUnexpectedExecutor(
 
   const char *functionIsolation;
   const char *whereExpected;
-  if (executor == _swift_task_getMainExecutor()) {
+  if (executor.isMainExecutor()) {
     functionIsolation = "@MainActor function";
     whereExpected = "the main thread";
   } else {
