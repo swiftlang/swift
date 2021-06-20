@@ -1362,6 +1362,10 @@ def abort_on_module_fail: Flag<["-", "--"], "abort-on-module-fail">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Abort if a module failed to load">;
 
+def disable_fail_on_error: Flag<["-", "--"], "disable-fail-on-error">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Don't exit with a nonzero status if errors are emitted">;
+
 def debug_mapping: Flag<["-", "--"], "debug-mapping">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Dumping information for debug purposes">;
