@@ -38,7 +38,7 @@ The core SIL C++ classes have corresponding classes in _libswift_, for example `
 
 This makes _libswift_ easy to use and it allows to program in a "Swifty" style. For example one can write
 
-```
+```swift
   for inst in block.instructions {
     if let cfi = inst as? CondFailInst {
       // ...
