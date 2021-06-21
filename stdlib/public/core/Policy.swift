@@ -21,7 +21,7 @@
 /// to represent a state in your program that is impossible to reach during
 /// its execution.
 ///
-///     // An infinite loop will never terminate
+///     // An infinite loop will never terminate.
 ///     func forever() -> Never {
 ///         while true {
 ///             print("I will print forever and will not return.")
@@ -37,7 +37,7 @@
 ///     }
 ///
 /// Use `Never` as the return type when declaring a closure, function, or
-/// method that unconditionally throws an error, traps, or otherwise does 
+/// method that unconditionally throws an error, traps, or otherwise does
 /// not terminate.
 ///
 ///     // `fatalError` returns `Never`, therefore this function cannot 
