@@ -15,7 +15,7 @@ import Swift
 /// An ordered, asynchronously generated sequence of elements.
 ///
 /// AsyncStream is an interface type to adapt from code producing values to an
-/// asynchronous context iterating them. This is itended to be used to allow
+/// asynchronous context iterating them. This is intended to be used to allow
 /// callback or delegation based APIs to participate with async/await.
 ///
 /// When values are produced from a non async/await source there is a
