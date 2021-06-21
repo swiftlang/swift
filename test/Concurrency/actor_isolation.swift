@@ -857,4 +857,13 @@ actor Counter {
 
     return counter
   }
+
+  func localNext() -> Int {
+    func doIt() {
+      counter = counter + 1
+    }
+    doIt()
+
+    return counter
+  }
 }
