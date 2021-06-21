@@ -2623,16 +2623,7 @@ public:
     assert(currentResumeFn == nullptr);
     currentResumeFn =
         IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
-    auto signedResumeFn = currentResumeFn;
-    // Sign the task resume function with the C function pointer schema.
-    if (auto schema = IGF.IGM.getOptions().PointerAuth.FunctionPointers) {
-      // TODO: use the Clang type for TaskContinuationFunction*
-      // to make this work with type diversity.
-      auto authInfo =
-          PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
-      signedResumeFn = emitPointerAuthSign(IGF, signedResumeFn, authInfo);
-    }
-    return signedResumeFn;
+    return currentResumeFn;
   }
 
 
