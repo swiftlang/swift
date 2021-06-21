@@ -1,10 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// Would fail due to unavailability of swift_autoDiffCreateLinearMapContext.
-// UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: back_deployment_runtime
-
 import StdlibUnittest
 import _Differentiation
 
@@ -43,19 +39,8 @@ InoutControlFlowTests.test("MutatingBeforeControlFlow") {
 }
 
 // SR-14053
-protocol NumericDifferentiable : Numeric, Differentiable {
-  @differentiable(reverse) static func *(lhs: Self, rhs: Self) -> Self
-}
-
-extension Float: NumericDifferentiable {}
-
-struct Model2<T: NumericDifferentiable>: Differentiable {
-  var first: T
-  var second: T
-}
-
 @differentiable(reverse)
-func adjust<T: NumericDifferentiable>(model: inout Model2<T>, multiplier: T) {
+func adjust(model: inout Model, multiplier: Float) {
   model.first = model.second * multiplier
 
   // Dummy no-op if block, required to introduce control flow.
@@ -64,21 +49,21 @@ func adjust<T: NumericDifferentiable>(model: inout Model2<T>, multiplier: T) {
 }
 
 @differentiable(reverse)
-func loss2(model: Model2<Float>, multiplier: Float) -> Float {
+func loss2(model: Model, multiplier: Float) -> Float {
   var model = model
   adjust(model: &model, multiplier: multiplier)
   return model.first
 }
 
 InoutControlFlowTests.test("InoutParameterWithControlFlow") {
-  var model = Model2<Float>(first: 1, second: 3)
+  var model = Model(first: 1, second: 3)
   let grad = gradient(at: model, 5.0, of: loss2)
   expectEqual(0, grad.0.first)
   expectEqual(5, grad.0.second)
 }
 
 @differentiable(reverse)
-func adjust2<T: NumericDifferentiable>(multiplier: T, model: inout Model2<T>) {
+func adjust2(multiplier: Float, model: inout Model) {
   model.first = model.second * multiplier
 
   // Dummy no-op if block, required to introduce control flow.
@@ -87,14 +72,14 @@ func adjust2<T: NumericDifferentiable>(multiplier: T, model: inout Model2<T>) {
 }
 
 @differentiable(reverse)
-func loss3(model: Model2<Float>, multiplier: Float) -> Float {
+func loss3(model: Model, multiplier: Float) -> Float {
   var model = model
   adjust2(multiplier: multiplier, model: &model)
   return model.first
 }
 
 InoutControlFlowTests.test("LaterInoutParameterWithControlFlow") {
-  var model = Model2<Float>(first: 1, second: 3)
+  var model = Model(first: 1, second: 3)
   let grad = gradient(at: model, 5.0, of: loss3)
   expectEqual(0, grad.0.first)
   expectEqual(5, grad.0.second)
