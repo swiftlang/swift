@@ -2396,12 +2396,29 @@ void SwiftLangSupport::collectVariableTypes(
         : Receiver(std::move(Receiver)), Offset(Offset), Length(Length) {}
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
-      auto *SF = AstUnit->getCompilerInstance().getPrimarySourceFile();
+      auto &CompInst = AstUnit->getCompilerInstance();
+      auto *SF = CompInst.getPrimarySourceFile();
+
+      // Construct the range for which variable types are to be queried. If
+      // offset/length are unset, the (default) range will be used, which
+      // corresponds to the entire document.
+      SourceRange Range;
+      if (Offset.hasValue() && Length.hasValue()) {
+        auto &SM = CompInst.getSourceMgr();
+        unsigned BufferID = SF->getBufferID().getValue();
+        SourceLoc Start = Lexer::getLocForStartOfToken(SM, BufferID, *Offset);
+        SourceLoc End =
+            Lexer::getLocForStartOfToken(SM, BufferID, *Offset + *Length);
+        Range = SourceRange(Start, End);
+      }
+
       std::vector<VariableTypeInfo> Infos;
       std::string TypeBuffer;
       llvm::raw_string_ostream OS(TypeBuffer);
       VariableTypesInFile Result;
-      collectVariableType(*SF, Offset, Length, Infos, OS);
+
+      collectVariableType(*SF, Range, Infos, OS);
+
       for (auto Info : Infos) {
         Result.Results.push_back({Info.Offset, Info.Length, Info.TypeOffset, Info.HasExplicitType});
       }

@@ -225,13 +225,13 @@ namespace swift {
   };
 
   /// Collect type information for every variable declaration in \c SF
-  /// within the given range, defined by \c Offset and \c Length.
+  /// within the given range.
   /// All types will be printed to \c OS and the type offsets of the
   /// \c VariableTypeInfos will index into the string that backs this
   /// stream.
-  void collectVariableType(
-      SourceFile &SF, Optional<unsigned> Offset, Optional<unsigned> Length,
-      std::vector<VariableTypeInfo> &Scratch, llvm::raw_ostream &OS);
+  void collectVariableType(SourceFile &SF, SourceRange Range,
+                           std::vector<VariableTypeInfo> &Scratch,
+                           llvm::raw_ostream &OS);
 
   /// FIXME: All of the below goes away once CallExpr directly stores its
   /// arguments.

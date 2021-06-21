@@ -738,11 +738,8 @@ private:
   SourceManager &SM;
   unsigned int BufferId;
 
-  /// The start offset of the range in which variable types are to be collected.
-  Optional<unsigned> TotalOffset;
-
-  /// The length of the range in which variable types are to be collected.
-  Optional<unsigned> TotalLength;
+  /// The range in which variable types are to be collected.
+  SourceRange TotalRange;
 
   /// The output vector for VariableTypeInfos emitted during traversal.
   std::vector<VariableTypeInfo> &Results;
@@ -768,26 +765,31 @@ private:
     return {TypeOffsets[PrintedType], PrintedType.size()};
   }
 
+  /// Checks whether the given range overlaps the total range in which we
+  /// collect variable types.
+  bool overlapsTotalRange(SourceRange Range) {
+    return TotalRange.isInvalid() || Range.overlaps(TotalRange);
+  }
+
 public:
-  VariableTypeCollector(SourceFile &SF, Optional<unsigned> Offset,
-                        Optional<unsigned> Length,
+  VariableTypeCollector(SourceFile &SF, SourceRange Range,
                         std::vector<VariableTypeInfo> &Results,
                         llvm::raw_ostream &OS)
       : SM(SF.getASTContext().SourceMgr), BufferId(*SF.getBufferID()),
-        TotalOffset(Offset), TotalLength(Length), Results(Results), OS(OS) {}
+        TotalRange(Range), Results(Results), OS(OS) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-    if (Range.isInvalid()) {
+  bool walkToDeclPre(Decl *D, CharSourceRange DeclRange) override {
+    if (DeclRange.isInvalid()) {
       return false;
     }
-    unsigned Offset = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
-    unsigned Length = Range.getByteLength();
     // Skip this declaration and its subtree if outside the range
-    if (TotalOffset.hasValue() && TotalLength.hasValue() &&
-        (Offset < *TotalOffset || Offset >= (*TotalOffset + *TotalLength))) {
+    if (!overlapsTotalRange(D->getSourceRange())) {
       return false;
     }
     if (auto VD = dyn_cast<VarDecl>(D)) {
+      unsigned VarOffset =
+          SM.getLocOffsetInBuffer(DeclRange.getStart(), BufferId);
+      unsigned VarLength = DeclRange.getByteLength();
       // Print the type to a temporary buffer
       SmallString<64> Buffer;
       {
@@ -802,9 +804,24 @@ public:
       bool HasExplicitType =
           VD->getTypeReprOrParentPatternTypeRepr() != nullptr;
       // Add the type information to the result list.
-      Results.emplace_back(Offset, Length, HasExplicitType, Ty.first);
+      Results.emplace_back(VarOffset, VarLength, HasExplicitType, Ty.first);
     }
     return true;
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    // Skip this statement and its subtree if outside the range
+    return overlapsTotalRange(S->getSourceRange());
+  }
+
+  bool walkToExprPre(Expr *E) override {
+    // Skip this expression and its subtree if outside the range
+    return overlapsTotalRange(E->getSourceRange());
+  }
+
+  bool walkToPatternPre(Pattern *P) override {
+    // Skip this pattern and its subtree if outside the range
+    return overlapsTotalRange(P->getSourceRange());
   }
 };
 
@@ -813,10 +830,10 @@ VariableTypeInfo::VariableTypeInfo(uint32_t Offset, uint32_t Length,
     : Offset(Offset), Length(Length), HasExplicitType(HasExplicitType),
       TypeOffset(TypeOffset) {}
 
-void swift::collectVariableType(
-    SourceFile &SF, Optional<unsigned> Offset, Optional<unsigned> Length,
-    std::vector<VariableTypeInfo> &Scratch, llvm::raw_ostream &OS) {
-  VariableTypeCollector Walker(SF, Offset, Length, Scratch, OS);
+void swift::collectVariableType(SourceFile &SF, SourceRange Range,
+                                std::vector<VariableTypeInfo> &Scratch,
+                                llvm::raw_ostream &OS) {
+  VariableTypeCollector Walker(SF, Range, Scratch, OS);
   Walker.walk(SF);
 }
 
