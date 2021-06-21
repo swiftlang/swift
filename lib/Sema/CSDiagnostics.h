@@ -2496,7 +2496,7 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  std::tuple<Type, Type, unsigned> unwrappedTypes() const;
+  std::tuple<Type, Type, int> unwrappedTypes() const;
 
   bool diagnoseIfExpr() const;
 
