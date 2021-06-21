@@ -1042,7 +1042,11 @@ if(SWIFT_INCLUDE_TOOLS)
   # "libswift" must come before "tools".
   # It adds libswift module names to the global property "libswift_modules"
   # which is used in add_swift_host_tool for the lldb workaround.
-  add_subdirectory(libswift)
+  #
+  # NOTE: We do not currently support libswift with the Xcode generator.
+  if (NOT CMAKE_GENERATOR STREQUAL "Xcode")
+    add_subdirectory(libswift)
+  endif()
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.
