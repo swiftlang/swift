@@ -29,7 +29,7 @@
 ///     }
 ///
 ///     // The `.failure` case cannot be reached because it cannot be 
-///     // constructed. Therefore, Swift allows us to elide it.
+///     // constructed; this makes the following switch exhaustive.
 ///     let favouriteNumber: Result<Int, Never> = .success(42)
 ///     switch favouriteNumber {
 ///     case .success(let value):
