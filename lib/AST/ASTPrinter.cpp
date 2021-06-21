@@ -913,6 +913,7 @@ private:
   void printSynthesizedExtension(Type ExtendedType, ExtensionDecl *ExtDecl);
 
   void printExtension(ExtensionDecl* ExtDecl);
+  void printExtendedTypeName(TypeLoc ExtendedTypeLoc);
 
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
@@ -2331,8 +2332,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
-static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
-                                  PrintOptions &Options) {
+void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   bool OldFullyQualifiedTypesIfAmbiguous =
     Options.FullyQualifiedTypesIfAmbiguous;
   Options.FullyQualifiedTypesIfAmbiguous =
@@ -2342,9 +2342,8 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
   };
 
   // Strip off generic arguments, if any.
-  auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();
-
-  Ty->print(Printer, Options);
+  auto Ty = ExtendedTypeLoc.getType()->getAnyNominal()->getDeclaredType();
+  printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
 
@@ -2402,7 +2401,7 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
 
-    printExtendedTypeName(ExtendedType, Printer, Options);
+    printExtendedTypeName(TypeLoc::withoutLoc(ExtendedType));
     printInherited(ExtDecl);
 
     // We may need to combine requirements from ExtDecl (which has the members
@@ -2453,7 +2452,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
         printTypeLoc(TypeLoc::withoutLoc(extendedType));
         return;
       }
-      printExtendedTypeName(extendedType, Printer, Options);
+      printExtendedTypeName(TypeLoc(decl->getExtendedTypeRepr(), extendedType));
     });
     printInherited(decl);
 
