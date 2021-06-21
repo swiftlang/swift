@@ -56,6 +56,24 @@ public:
 
 };
 
+/******************************************************************************/
+/****************************** TASK OPTIONS **********************************/
+/******************************************************************************/
+
+class TaskGroupTaskOptionRecord : public TaskOptionRecord {
+  TaskGroup *Group;
+
+  public:
+    TaskGroupTaskOptionRecord(TaskGroup *group)
+    : TaskOptionRecord(TaskOptionRecordKind::TaskGroup),
+      Group(group) {}
+
+  TaskGroup *getGroup() const {
+    return Group;
+  }
+};
+
+
 /// Task option to specify on what executor the task should be executed.
 ///
 /// Not passing this option implies that that a "best guess" or good default

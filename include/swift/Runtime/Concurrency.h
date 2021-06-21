@@ -36,8 +36,7 @@ struct AsyncTaskAndContext {
   AsyncContext *InitialContext;
 };
 
-/// Create a task object with no future which will run the given
-/// function.
+/// Create a task object with no future which will run the given function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_f(
     size_t flags,
@@ -49,8 +48,7 @@ AsyncTaskAndContext swift_task_create_f(
 using FutureAsyncSignature =
   AsyncSignature<void(void*), /*throws*/ true>;
 
-/// Create a task object with a future which will run the given
-/// closure.
+/// Create a task object with a future which will run the given closure.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future(
     size_t flags,
@@ -58,8 +56,7 @@ AsyncTaskAndContext swift_task_create_future(
     const Metadata *futureResultType,
     void *closureEntryPoint, HeapObject * /* +1 */ closureContext);
 
-/// Create a task object with a future which will run the given
-/// function.
+/// Create a task object with a future which will run the given function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future_f(
     size_t flags,
