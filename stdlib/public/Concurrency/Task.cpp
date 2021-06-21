@@ -388,7 +388,6 @@ static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *
 SWIFT_CC(swiftasync)
 static void
 task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
-
   return _context->ResumeParent(_context->Parent);
 }
 
@@ -404,10 +403,11 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, void *closureContext,
-    bool isAsyncLetTask, // TODO: express as a bit in the rawFlags? -- ktoso
     size_t initialContextSize) {
   JobFlags flags(rawFlags);
+  bool isAsyncLetTask = flags.task_isAsyncLetTask();
   assert((futureResultType != nullptr) == flags.task_isFuture());
+  assert(!isAsyncLetTask || isAsyncLetTask == flags.task_isChildTask());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
   assert((group != nullptr) == flags.task_isGroupChildTask());
@@ -585,7 +585,6 @@ static AsyncTaskAndContext swift_task_create_group_future_common(
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, void *closureContext,
-    bool isAsyncLetTask,
     size_t initialContextSize);
 
 AsyncTaskAndContext
@@ -624,7 +623,6 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
                                                options,
                                                futureResultType,
                                                function, /*closureContext=*/nullptr,
-                                               /*isAsyncLetTask=*/false,
                                                initialContextSize);
 }
 
@@ -664,12 +662,11 @@ AsyncTaskAndContext swift::swift_task_create_future(
       options,
       futureResultType,
       taskEntry, closureContext,
-      /*isAsyncLetTask*/false,
       initialContextSize);
 }
 
 AsyncTaskAndContext swift::swift_task_create_async_let_future(
-                     size_t flags,
+                     size_t rawFlags,
                      TaskOptionRecord *options,
                      const Metadata *futureResultType,
                      void *closureEntry, void *closureContext) {
@@ -681,13 +678,14 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, (HeapObject *)closureContext);
 
+  JobFlags flags(rawFlags);
+  flags.task_setIsAsyncLetTask(true);
   return swift_task_create_group_future_common(
-      flags,
+      flags.getOpaqueValue(),
       /*group*/nullptr,
       options,
       futureResultType,
       taskEntry, closureContext,
-      /*isAsyncLetTask*/true,
       initialContextSize);
 }
 
@@ -712,7 +710,6 @@ swift::swift_task_create_group_future(
       options,
       futureResultType,
       taskEntry, closureContext,
-      /*isAsyncLetTask*/false,
       initialContextSize);
 }
 

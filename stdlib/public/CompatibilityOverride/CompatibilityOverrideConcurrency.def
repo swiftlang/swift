@@ -103,10 +103,9 @@ OVERRIDE_TASK(task_create_group_future_common, AsyncTaskAndContext, , , ,
                const Metadata *futureResultType,
                FutureAsyncSignature::FunctionType *function,
                void *closureContext,
-               bool isAsyncLetTask,
                size_t initialContextSize),
               (flags, group, options, futureResultType, function, closureContext,
-               isAsyncLetTask, initialContextSize))
+               initialContextSize))
 
 OVERRIDE_TASK(task_future_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
               SWIFT_CC(swiftasync), swift::,
