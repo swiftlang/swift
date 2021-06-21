@@ -17,9 +17,9 @@
 //===----------------------------------------------------------------------===//
 /// The return type of functions that cannot return a value.
 ///
-/// As an uninhabited type, `Never` has no values and cannot be constructed 
-/// normally, allowing you to represent a state in your program that is 
-/// impossible to reach during execution.
+/// `Never` is a type with no values and cannot be constructed, allowing you
+/// to represent a state in your program that is impossible to reach during
+/// its execution.
 ///
 ///     // An infinite loop will never terminate
 ///     func forever() -> Never {
@@ -37,8 +37,8 @@
 ///     }
 ///
 /// Use `Never` as the return type when declaring a closure, function, or
-/// method that unconditionally throws an error, traps, or does not
-/// terminate.
+/// method that unconditionally throws an error, traps, or otherwise does 
+/// not terminate.
 ///
 ///     // `fatalError` returns `Never`, therefore this function cannot 
 ///     // return a value (as the program will terminate before that point)
