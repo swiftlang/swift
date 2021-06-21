@@ -27,7 +27,7 @@ func testConstructor() {
 // CONSTRUCTOR: Begin completions
 // CONSTRUCTOR-NOT: Pattern/{{.*}}
 // CONSTRUCTOR-NOT: Decl[Constructor]
-// CONSTRUCTOR: Pattern/ExprSpecific: {#a: Int#}[#Int#]
+// CONSTRUCTOR: Pattern/Local/Flair[ArgLabels]: {#a: Int#}[#Int#]
 // CONSTRUCTOR-NOT: Pattern/{{.*}}
 // CONSTRUCTOR-NOT: Decl[Constructor]
 // CONSTRUCTOR: End completions
@@ -38,7 +38,7 @@ func testArg2Name3() {
   firstArg(#^LABELED_FIRSTARG^#,
 // LABELED_FIRSTARG: Begin completions
 // LABELED_FIRSTARG-NOT: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
-// LABELED_FIRSTARG-DAG: Pattern/ExprSpecific: {#arg1: Int#}[#Int#];
+// LABELED_FIRSTARG-DAG: Pattern/Local/Flair[ArgLabels]: {#arg1: Int#}[#Int#];
 // LABELED_FIRSTARG-NOT: ['(']{#arg1: Int#}, {#arg2: Int#}[')'][#Void#];
 // LABELED_FIRSTARG: End completions
 

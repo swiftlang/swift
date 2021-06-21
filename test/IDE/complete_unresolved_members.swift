@@ -98,9 +98,9 @@ class C2 {
 // UNRESOLVED_1:  Begin completions
 // UNRESOLVED_1-NOT:  SomeEnum1
 // UNRESOLVED_1-NOT:  SomeEnum2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_1-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal:        NotOption[#Int#]; name=NotOption
 // UNRESOLVED_1-NOT:  NotStaticOption
 }
@@ -115,9 +115,9 @@ class C3 {
 // UNRESOLVED_2:  Begin completions
 // UNRESOLVED_2-NOT:  SomeEnum1
 // UNRESOLVED_2-NOT:  SomeEnum2
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option4[#SomeOptions2#]; name=Option4
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option5[#SomeOptions2#]; name=Option5
-// UNRESOLVED_2-DAG:  Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option6[#SomeOptions2#]; name=Option6
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option4[#SomeOptions2#]; name=Option4
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option5[#SomeOptions2#]; name=Option5
+// UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option6[#SomeOptions2#]; name=Option6
 // UNRESOLVED_2-NOT:  Not
 }
 
@@ -145,15 +145,15 @@ class C4 {
 
 // Exhaustive to make sure we don't include `SomeOptions1`, `SomeOptions2`, `none` or `some` entries.
 // UNRESOLVED_3: Begin completions, 3 items
-// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
-// UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// UNRESOLVED_3-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// UNRESOLVED_3-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
 // UNRESOLVED_3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(self: SomeEnum1)
 // UNRESOLVED_3: End completions
 
 // Exhaustive to make sure we don't include `init({#(some):` or `init({#nilLiteral:` entries
 // UNRESOLVED_3_OPT: Begin completions, 9 items
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
-// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1?#]; name=nil
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#]; name=none
@@ -165,8 +165,8 @@ class C4 {
 
 // Exhaustive to make sure we don't include `init({#(some):` or `init({#nilLiteral:` entries
 // UNRESOLVED_3_OPTOPTOPT: Begin completions, 9 items
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: North[#SomeEnum1#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]: South[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: South[#SomeEnum1#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1??>#]; name=none
@@ -186,8 +186,8 @@ extension Optional where Wrapped == Somewhere {
 func testOptionalWithCustomExtension() {
   var _: Somewhere? = .#^UNRESOLVED_OPT_4^#
 // UNRESOLVED_OPT_4: Begin completions, 11 items
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     earth[#Somewhere#];
-// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Convertible]:     mars[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     earth[#Somewhere#];
+// UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:     mars[#Somewhere#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Somewhere#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_OPT_4-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#Somewhere?#]; name=nil
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Somewhere>#]; name=none
@@ -229,9 +229,9 @@ Container.EnumTaker1(.#^UNRESOLVED_20?check=UNRESOLVED_3^#
 func parserSync() {}
 
 // UNRESOLVED_4: Begin completions
-// UNRESOLVED_4-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
-// UNRESOLVED_4-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
-// UNRESOLVED_4-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: Option3[#SomeOptions1#]; name=Option3
 // UNRESOLVED_4-NOT: Option4
 // UNRESOLVED_4-NOT: Option5
 // UNRESOLVED_4-NOT: Option6
@@ -307,8 +307,8 @@ func testAvail1(_ x: EnumAvail1) {
 }
 // ENUM_AVAIL_1: Begin completions, 3 items
 // ENUM_AVAIL_1-NOT: AAA
-// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: aaa[#EnumAvail1#];
-// ENUM_AVAIL_1-DAG: Decl[EnumElement]/ExprSpecific/NotRecommended/TypeRelation[Identical]: BBB[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: aaa[#EnumAvail1#];
+// ENUM_AVAIL_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/NotRecommended/TypeRelation[Identical]: BBB[#EnumAvail1#];
 // ENUM_AVAIL_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): EnumAvail1#})[#(into: inout Hasher) -> Void#];
 // ENUM_AVAIL_1-NOT: AAA
 // ENUM_AVAIL_1: End completions
@@ -318,8 +318,8 @@ func testAvail2(_ x: OptionsAvail1) {
 }
 // OPTIONS_AVAIL_1: Begin completions
 // OPTIONS_AVAIL_1-NOT: AAA
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]: aaa[#OptionsAvail1#];
-// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/ExprSpecific/NotRecommended/TypeRelation[Identical]: BBB[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: aaa[#OptionsAvail1#];
+// OPTIONS_AVAIL_1-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/NotRecommended/TypeRelation[Identical]: BBB[#OptionsAvail1#];
 // OPTIONS_AVAIL_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#rawValue: Int#})[#OptionsAvail1#]
 // OPTIONS_AVAIL_1-NOT: AAA
 // OPTIONS_AVAIL_1: End completions
@@ -334,7 +334,7 @@ func testWithLiteral1() {
   let s: S
   _ = s.takeEnum(thing: .#^WITH_LITERAL_1^#, other: 1.0)
 // WITH_LITERAL_1: Begin completions, 2 items
-// WITH_LITERAL_1-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#S.MyEnum#];
+// WITH_LITERAL_1-NEXT: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: myCase[#S.MyEnum#];
 // WITH_LITERAL_1-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): S.MyEnum#})[#(into: inout Hasher) -> Void#];
 // WITH_LITERAL_1-NEXT: End completions
 }
@@ -359,7 +359,7 @@ func testWithLiteral3() {
     func test(s: S) {
       _ = s.takeEnum(thing: .#^WITH_LITERAL_3^#, other: 1.0)
 // WITH_LITERAL_3: Begin completions, 2 items
-// WITH_LITERAL_3-NEXT: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: myCase[#MyEnum#];
+// WITH_LITERAL_3-NEXT: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: myCase[#MyEnum#];
 // WITH_LITERAL_3-NEXT: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // WITH_LITERAL_3-NEXT: End completions
     }
@@ -376,9 +376,9 @@ func enumFromOtherFile() -> EnumFromOtherFile {
   return .#^OTHER_FILE_1^# // Don't crash.
 }
 // OTHER_FILE_1: Begin completions
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: b({#String#})[#EnumFromOtherFile#];
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: a({#Int#})[#EnumFromOtherFile#];
-// OTHER_FILE_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: c[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: b({#String#})[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a({#Int#})[#EnumFromOtherFile#];
+// OTHER_FILE_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: c[#EnumFromOtherFile#];
 // OTHER_FILE_1: End completions
 
 struct NonOptSet {
@@ -397,11 +397,11 @@ func testNonOptSet() {
   x = .#^NON_OPT_SET_1^#
 }
 // NON_OPT_SET_1: Begin completions, 6 items
-// NON_OPT_SET_1-DAG: Decl[StaticVar]/ExprSpecific/TypeRelation[Identical]:    a[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]:    a[#NonOptSet#]
 // NON_OPT_SET_1-DAG: Decl[StaticVar]/CurrNominal:        wrongType[#Int#];
 // NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init({#x: Int#}, {#y: Int#})[#NonOptSet#]
 // NON_OPT_SET_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]:  init()[#NonOptSet#]
-// NON_OPT_SET_1-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: b()[#NonOptSet#]
+// NON_OPT_SET_1-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: b()[#NonOptSet#]
 // NON_OPT_SET_1-DAG: Decl[InstanceMethod]/CurrNominal: notStatic({#(self): NonOptSet#})[#() -> NonOptSet#];
 // NON_OPT_SET_1: End completions
 
@@ -420,8 +420,8 @@ func testInStringInterpolation() {
   let y = "enum: \(.#^STRING_INTERPOLATION_INVALID?check=NOCRASH^#)" // Dont'crash.
 }
 // STRING_INTERPOLATION_1: Begin completions
-// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#MyEnum#];
-// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: foo[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: bar[#MyEnum#];
 // STRING_INTERPOLATION_1: End completions
 
 class BaseClass {
@@ -471,15 +471,15 @@ switch Generic<Int>.empty {
 case let .#^GENERIC_4?check=GENERIC_1_INT^#
 }
 // GENERIC_1_INT: Begin completions
-// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: contains({#content: Int#})[#Generic<Int>#];
-// GENERIC_1_INT-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: empty[#Generic<Int>#];
-// GENERIC_1_INT-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: create({#Int#})[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: contains({#content: Int#})[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: empty[#Generic<Int>#];
+// GENERIC_1_INT-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: create({#Int#})[#Generic<Int>#];
 // GENERIC_1_INT: End completions
 
 // GENERIC_1_U: Begin completions
-// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: contains({#content: U#})[#Generic<U>#];
-// GENERIC_1_U-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: empty[#Generic<U>#];
-// GENERIC_1_U-DAG: Decl[StaticMethod]/ExprSpecific/TypeRelation[Identical]: create({#U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: contains({#content: U#})[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: empty[#Generic<U>#];
+// GENERIC_1_U-DAG: Decl[StaticMethod]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: create({#U#})[#Generic<U>#];
 // GENERIC_1_U: End completions
 
 struct HasCreator {
@@ -505,11 +505,11 @@ struct HasOverloaded {
 func testOverload(val: HasOverloaded) {
   let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
 // OVERLOADED_METHOD_1: Begin completions, 6 items
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#]; name=North
 // OVERLOADED_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
-// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: West[#SomeEnum2#]; name=West
 // OVERLOADED_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum2#})[#(into: inout Hasher) -> Void#];
 // OVERLOADED_METHOD_1: End completions
 
@@ -527,7 +527,7 @@ func receiveHasStatic<T: HasStatic>(x: T)  {}
 func testingGenericParam1<T: HasStatic>(x: inout T, fn: (T) -> Void) -> T {
   x = .#^GENERICPARAM_1^#
 // GENERICPARAM_1: Begin completions, 1 items
-// GENERICPARAM_1: Decl[StaticVar]/{{ExprSpecific|CurrNominal}}/TypeRelation[Identical]: instance[#HasStatic#]; name=instance
+// GENERICPARAM_1: Decl[StaticVar]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: instance[#HasStatic#]; name=instance
 // GENERICPARAM_1: End completions
 
   /* Parser sync. */;
@@ -669,11 +669,11 @@ func testClosureReturnTypeForOverloaded() {
     .#^OVERLOADED_CLOSURE_RETURN^#
   }
 // OVERLOADED_CLOSURE_RETURN: Begin completions, 6 items
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#];
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#];
 // OVERLOADED_CLOSURE_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: East[#SomeEnum2#];
-// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: West[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: East[#SomeEnum2#];
+// OVERLOADED_CLOSURE_RETURN-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: West[#SomeEnum2#];
 // OVERLOADED_CLOSURE_RETURN-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): SomeEnum2#})[#(into: inout Hasher) -> Void#];
 // OVERLOADED_CLOSURE_RETURN: End completions
 }
@@ -706,8 +706,8 @@ func testSameType() {
   testSugarType(.#^SUGAR_TYPE^#
 // Ensure results aren't duplicated.
 // SUGAR_TYPE: Begin completions, 9 items
-// SUGAR_TYPE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: South[#SomeEnum1#];
-// SUGAR_TYPE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: North[#SomeEnum1#];
+// SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: South[#SomeEnum1#];
+// SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: North[#SomeEnum1#];
 // SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#];
 // SUGAR_TYPE-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Identical]: nil[#SomeEnum1?#];
 // SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<SomeEnum1>#];

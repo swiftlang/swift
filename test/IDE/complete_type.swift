@@ -43,6 +43,15 @@ typealias FooTypealias = Int
 // WITH_GLOBAL_TYPES-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES: End completions
 
+// WITH_GLOBAL_TYPES_EXPR: Begin completions
+// Global completions at expression position
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Enum]/CurrModule:      FooEnum[#FooEnum#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Class]/CurrModule:     FooClass[#FooClass#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: FooProtocol[#FooProtocol#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
+// WITH_GLOBAL_TYPES_EXPR: End completions
+
 // GLOBAL_NEGATIVE-NOT: fooObject
 // GLOBAL_NEGATIVE-NOT: fooFunc
 
@@ -337,7 +346,8 @@ struct TypeInStructInheritance2 : , #^TYPE_IN_STRUCT_INHERITANCE_2?check=WITH_GL
 
 struct TypeInStructInheritance3 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_3?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-struct TypeInStructInheritance4 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_4?check=WITH_GLOBAL_TYPES^#
+// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+struct TypeInStructInheritance4 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_4?check=WITH_GLOBAL_TYPES_EXPR^#
 
 struct TypeInStructInheritance5 : #^TYPE_IN_STRUCT_INHERITANCE_5?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
 }
@@ -348,7 +358,8 @@ struct TypeInStructInheritance6 : , #^TYPE_IN_STRUCT_INHERITANCE_6?check=WITH_GL
 struct TypeInStructInheritance7 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_7?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
 }
 
-struct TypeInStructInheritance8 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_8?check=WITH_GLOBAL_TYPES^# {
+// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+struct TypeInStructInheritance8 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_8?check=WITH_GLOBAL_TYPES_EXPR^# {
 }
 
 //===---

@@ -76,6 +76,7 @@ class CodeCompletionResultBuilder {
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
   SemanticContextKind SemanticContext;
+  CodeCompletionFlair Flair;
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
   Optional<CodeCompletionLiteralKind> LiteralKind;
@@ -87,7 +88,6 @@ class CodeCompletionResultBuilder {
   ExpectedTypeContext declTypeContext;
   CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
       CodeCompletionResult::Unknown;
-  bool IsArgumentLabels = false;
   bool Cancelled = false;
   ArrayRef<std::pair<StringRef, StringRef>> CommentWords;
   CodeCompletionResult::NotRecommendedReason NotRecReason =
@@ -155,8 +155,8 @@ public:
     SemanticContext = Kind;
   }
 
-  void setIsArgumentLabels(bool Flag = true) {
-    IsArgumentLabels = Flag;
+  void addFlair(CodeCompletionFlair Options) {
+    Flair |= Options;
   }
 
   void
