@@ -1137,8 +1137,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable) {
 
 void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
                                         unsigned idx) {
-
-
+  auto &C = PBD->getASTContext();
   auto initialization = emitPatternBindingInitialization(PBD->getPattern(idx),
                                                          JumpDest::invalid());
 
@@ -1162,8 +1161,18 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     SILValue alet;
     {
       SILLocation loc(PBD);
+
+      // Currently we don't pass any task options here, so just grab a 'nil'.
+
+      // If we can statically detect some option needs to be passed, e.g.
+      // an executor preference, we'd construct the appropriate option here and
+      // pass it to the async let start.
+      auto options = B.createManagedOptionalNone(
+          loc, SILType::getOptionalType(SILType::getRawPointerType(C)));
+
       alet = emitAsyncLetStart(
           loc,
+          options.forward(*this), // options is B.createManagedOptionalNone
           init->getType(),
           emitRValue(init).getScalarValue()
         ).forward(*this);
