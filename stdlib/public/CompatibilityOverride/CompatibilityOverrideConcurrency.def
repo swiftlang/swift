@@ -97,13 +97,15 @@ OVERRIDE_ACTOR(task_switch, void,
                (resumeToContext, resumeFunction, newExecutor))
 
 OVERRIDE_TASK(task_create_group_future_common, AsyncTaskAndContext, , , ,
-              (size_t flags, TaskGroup *group,
+              (size_t flags,
+               TaskGroup *group,
+               TaskOptionRecord *options,
                const Metadata *futureResultType,
                FutureAsyncSignature::FunctionType *function,
-               void *closureContext, bool isAsyncLetTask,
+               void *closureContext,
                size_t initialContextSize),
-              (flags, group, futureResultType, function, closureContext,
-               isAsyncLetTask, initialContextSize))
+              (flags, group, options, futureResultType, function, closureContext,
+               initialContextSize))
 
 OVERRIDE_TASK(task_future_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
               SWIFT_CC(swiftasync), swift::,
@@ -161,12 +163,13 @@ OVERRIDE_ASYNC_LET(asyncLet_start, void,
                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                    swift::,
                    (AsyncLet *alet,
+                    TaskOptionRecord *options,
                     const Metadata *futureResultType,
                     void *closureEntryPoint,
                     void *closureContext
                    ),
-                   (alet, futureResultType,
-                    closureEntryPoint, closureContext))
+                   (alet, options,
+                    futureResultType, closureEntryPoint, closureContext))
 
 OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                    SWIFT_CC(swiftasync), swift::,

@@ -95,7 +95,7 @@ extension Task where Success == Never, Failure == Never {
   /// - SeeAlso: `isCancelled()`
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
-      throw CancellationError()
+      throw _Concurrency.CancellationError()
     }
   }
 }

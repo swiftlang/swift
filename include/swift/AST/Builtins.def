@@ -806,7 +806,9 @@ BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
 
 /// createAsyncTaskFuture(): (
-///     Int, Builtin.NativeObject?, @escaping () async throws -> T
+///     Int,                            // flags
+///     Builtin.RawPointer?,            // options (TaskOptionRecord*)
+///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Create a new asynchronous task future, given flags, an (optional) parent
@@ -815,10 +817,10 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
     "createAsyncTaskFuture", "", Special)
 
 /// createAsyncTaskGroupFuture(): (
-///     Int, // flags
-///     Builtin.NativeObject?, // parent
-///     Builtin.RawPointer?, // group
-///     @escaping () async throws -> T
+///     Int,                            // flags
+///     Builtin.RawPointer?,            // group
+///     Builtin.RawPointer?,            // options (TaskOptionRecord*)
+///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
 /// Create a new asynchronous task future, given flags, a parent task,

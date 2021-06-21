@@ -1427,10 +1427,12 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(makeConcrete(ctx.getIntType()));
+  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // 1 options
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 2 operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
   return builder.build(id);
 }
@@ -1438,13 +1440,16 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
 static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder); // <T>
-  builder.addParameter(makeConcrete(ctx.getIntType())); // flags
+  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
   builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
+      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // 1 group
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // 2 options
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 3 operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+
   return builder.build(id);
 }
 
@@ -1487,11 +1492,6 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
 }
 
 static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
-//  return getBuiltinFunction(ctx, id, _thin,
-//                            _generics(_unrestricted),
-//                            _parameters(_rawPointer, <function>), TODO: seems we can't express function here?
-//                            _rawPointer)
-
   ModuleDecl *M = ctx.TheBuiltinModule;
   DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
   SynthesisContext SC(ctx, DC);
@@ -1500,6 +1500,9 @@ static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
   auto genericParam = makeGenericParam().build(builder); // <T>
 
   // AsyncLet*
+  builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
+
+  // TaskOptionRecord*
   builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
 
   // operation async function pointer: () async throws -> T

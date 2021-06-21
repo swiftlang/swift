@@ -59,6 +59,7 @@ void emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out);
 
 /// Emit the createAsyncLet builtin.
 llvm::Value *emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                      llvm::Value *taskOptions,
                                       llvm::Value *taskFunction,
                                       llvm::Value *localContextInfo,
                                       SubstitutionMap subs);
