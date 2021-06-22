@@ -262,7 +262,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_asyncLet_start(AsyncLet *alet,
                           TaskOptionRecord *options,
                           const Metadata *futureResultType,
-                          void *closureEntryPoint, void *closureContext);
+                          void *closureEntryPoint, HeapObject *closureContext);
 
 /// This matches the ABI of a closure `<T>(Builtin.RawPointer) async -> T`
 using AsyncLetWaitSignature =

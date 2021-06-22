@@ -683,38 +683,6 @@ swift::swift_task_create_f(
       function, /*closureContext=*/nullptr, initialContextSize);
 }
 
-/// Temporary hack to convert from job flags to task-creation flags,
-/// until we can eliminate the entry points that operate in terms of job
-/// flags.
-static size_t convertJobFlagsToTaskCreateFlags(size_t rawJobFlags) {
-  JobFlags jobFlags(rawJobFlags);
-  TaskCreateFlags taskCreateFlags;
-  taskCreateFlags.setPriority(jobFlags.getPriority());
-  taskCreateFlags.setIsChildTask(jobFlags.task_isChildTask());
-  taskCreateFlags.setIsAsyncLetTask(jobFlags.task_isAsyncLetTask());
-  return taskCreateFlags.getOpaqueValue();
-}
-
-AsyncTaskAndContext swift::swift_task_create_async_let_future(
-                     size_t rawFlags,
-                     TaskOptionRecord *options,
-                     const Metadata *futureResultType,
-                     void *closureEntry, void *closureContext) {
-  FutureAsyncSignature::FunctionType *taskEntry;
-  size_t initialContextSize;
-  std::tie(taskEntry, initialContextSize)
-    = getAsyncClosureEntryPointAndContextSize<
-      FutureAsyncSignature,
-      SpecialPointerAuthDiscriminators::AsyncFutureFunction
-    >(closureEntry, (HeapObject *)closureContext);
-
-  JobFlags flags(rawFlags);
-  flags.task_setIsAsyncLetTask(true);
-  return swift_task_create_common(
-      convertJobFlagsToTaskCreateFlags(flags.getOpaqueValue()), options,
-      futureResultType, taskEntry, closureContext, initialContextSize);
-}
-
 SWIFT_CC(swiftasync)
 static void swift_task_future_waitImpl(
   OpaqueValue *result,

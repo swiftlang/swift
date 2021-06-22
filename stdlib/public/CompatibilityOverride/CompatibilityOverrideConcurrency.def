@@ -166,7 +166,7 @@ OVERRIDE_ASYNC_LET(asyncLet_start, void,
                     TaskOptionRecord *options,
                     const Metadata *futureResultType,
                     void *closureEntryPoint,
-                    void *closureContext
+                    HeapObject *closureContext
                    ),
                    (alet, options,
                     futureResultType, closureEntryPoint, closureContext))
