@@ -278,7 +278,7 @@ void ClangImporter::recordModuleDependencies(
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
         clangModuleDep.ClangModuleMapFile,
-        clangModuleDep.ContextHash,
+        clangModuleDep.ID.ContextHash,
         swiftArgs,
         fileDeps);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
