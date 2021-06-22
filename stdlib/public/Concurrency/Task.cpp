@@ -715,34 +715,6 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(
       futureResultType, taskEntry, closureContext, initialContextSize);
 }
 
-AsyncTaskAndContext
-swift::swift_task_create_group_future(
-                        size_t flags,
-                        TaskGroup *group,
-                        TaskOptionRecord *options,
-                        const Metadata *futureResultType,
-                        void *closureEntry,
-                        HeapObject * /*+1*/closureContext) {
-  FutureAsyncSignature::FunctionType *taskEntry;
-  size_t initialContextSize;
-  std::tie(taskEntry, initialContextSize)
-    = getAsyncClosureEntryPointAndContextSize<
-      FutureAsyncSignature,
-      SpecialPointerAuthDiscriminators::AsyncFutureFunction
-    >(closureEntry, closureContext);
-
-  // Wire the group into the options.
-  TaskGroupTaskOptionRecord groupRecord(group);
-  if (group) {
-    groupRecord.Parent = options;
-    options = &groupRecord;
-  }
-
-  return swift_task_create_common(
-      convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
-      taskEntry, closureContext, initialContextSize);
-}
-
 SWIFT_CC(swiftasync)
 static void swift_task_future_waitImpl(
   OpaqueValue *result,

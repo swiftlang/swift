@@ -1458,42 +1458,6 @@ static ManagedValue emitBuiltinCreateAsyncTask(
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
-// Emit SIL for the named builtin: createAsyncTaskGroupFuture.
-static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
-    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args, SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto flags = args[0].forward(SGF);
-  auto group = args[1].borrow(SGF, loc).forward(SGF);
-  auto taskOptions = args[2].borrow(SGF, loc).forward(SGF);
-
-  // Form the metatype of the result type.
-  CanType futureResultType =
-      Type(
-        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
-          .subst(subs)->getCanonicalType();
-  CanType anyTypeType = ExistentialMetatypeType::get(
-      ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
-  auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
-  auto &futureResultTL = SGF.getTypeLowering(futureResultType);
-  auto futureResultMetadata = SGF.emitExistentialErasure(
-      loc, futureResultType, futureResultTL, anyTypeTL, { }, C,
-      [&](SGFContext C) -> ManagedValue {
-    return ManagedValue::forTrivialObjectRValue(
-      SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
-  }).borrow(SGF, loc).forward(SGF);
-
-  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[3],
-                                                             futureResultType);
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(
-          getBuiltinName(BuiltinValueKind::CreateAsyncTaskGroupFuture)),
-      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, group, taskOptions, futureResultMetadata, function.forward(SGF) });
-  return SGF.emitManagedRValueWithCleanup(apply);
-}
-
 // Shared implementation of withUnsafeContinuation and
 // withUnsafe[Throwing]Continuation.
 static ManagedValue emitBuiltinWithUnsafeContinuation(
