@@ -60,7 +60,7 @@ SILRemarkStreamer::create(SILModule &silModule) {
   auto &diagEngine = silModule.getASTContext().Diags;
   std::error_code errorCode;
   auto file = std::make_unique<llvm::raw_fd_ostream>(filename, errorCode,
-                                                     llvm::sys::fs::F_None);
+                                                     llvm::sys::fs::OF_None);
   if (errorCode) {
     diagEngine.diagnose(SourceLoc(), diag::cannot_open_file, filename,
                         errorCode.message());

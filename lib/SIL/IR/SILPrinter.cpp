@@ -2620,7 +2620,7 @@ void SILFunction::dump() const {
 
 void SILFunction::dump(const char *FileName) const {
   std::error_code EC;
-  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
+  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::OF_None);
   print(os);
 }
 
@@ -2869,7 +2869,7 @@ void SILModule::dump(bool Verbose) const {
 void SILModule::dump(const char *FileName, bool Verbose,
                      bool PrintASTDecls) const {
   std::error_code EC;
-  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
+  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::OF_None);
   SILPrintContext Ctx(os, Verbose);
   print(Ctx, getSwiftModule(), PrintASTDecls);
 }

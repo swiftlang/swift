@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 
   std::error_code error;
   llvm::raw_fd_ostream OS(LocalizedFilePath.str(), error,
-                          llvm::sys::fs::F_None);
+                          llvm::sys::fs::OF_None);
 
   if (OS.has_error() || error) {
     llvm::errs() << "Error has occurred while trying to write to "
