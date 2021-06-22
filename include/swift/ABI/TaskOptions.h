@@ -80,14 +80,14 @@ class TaskGroupTaskOptionRecord : public TaskOptionRecord {
 /// executor should be used instead, most often this may mean the global
 /// concurrent executor, or the enclosing actor's executor.
 class ExecutorTaskOptionRecord : public TaskOptionRecord {
-  ExecutorRef *Executor;
+  ExecutorRef Executor;
 
 public:
-  ExecutorTaskOptionRecord(ExecutorRef *executor)
+  ExecutorTaskOptionRecord(ExecutorRef executor)
     : TaskOptionRecord(TaskOptionRecordKind::Executor),
       Executor(executor) {}
 
-  ExecutorRef *getExecutor() const {
+  ExecutorRef getExecutor() const {
     return Executor;
   }
 };
