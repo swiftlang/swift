@@ -239,25 +239,16 @@ public struct TaskGroup<ChildTaskResult> {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
-    _ = _taskGroupAddPendingTask(group: _group, unconditionally: true)
-
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority
-    flags.isFuture = true
     flags.isChildTask = true
-    flags.isGroupChildTask = true
+    flags.enqueueJob = true
+    flags.addPendingGroupTaskUnconditionally = true
+
+    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
 
     // Create the asynchronous task future.
-    let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      Int(flags.bits), _group, /*options*/nil, operation)
-
-    // Attach it to the group's task record in the current task.
-    _taskGroupAttachChild(group: _group, child: childTask)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
   }
 
   /// Add a child task to the group.
@@ -286,23 +277,15 @@ public struct TaskGroup<ChildTaskResult> {
       return false
     }
 
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority
-    flags.isFuture = true
     flags.isChildTask = true
-    flags.isGroupChildTask = true
+    flags.enqueueJob = true
+
+    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
 
     // Create the asynchronous task future.
-    let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      Int(flags.bits), _group, /*options*/nil, operation)
-
-    // Attach it to the group's task record in the current task.
-    _taskGroupAttachChild(group: _group, child: childTask)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
 
     return true
   }
@@ -473,26 +456,16 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
-    // we always add, so no need to check if group was cancelled
-    _ = _taskGroupAddPendingTask(group: _group, unconditionally: true)
-
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority
-    flags.isFuture = true
     flags.isChildTask = true
-    flags.isGroupChildTask = true
+    flags.enqueueJob = true
+    flags.addPendingGroupTaskUnconditionally = true
+
+    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
 
     // Create the asynchronous task future.
-    let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      Int(flags.bits), _group, /*options*/nil, operation)
-
-    // Attach it to the group's task record in the current task.
-    _taskGroupAttachChild(group: _group, child: childTask)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
   }
 
   /// Add a child task to the group.
@@ -521,23 +494,15 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
       return false
     }
 
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority
-    flags.isFuture = true
     flags.isChildTask = true
-    flags.isGroupChildTask = true
+    flags.enqueueJob = true
+
+    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
 
     // Create the asynchronous task future.
-    let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-      Int(flags.bits), _group, /*options*/nil, operation)
-
-    // Attach it to the group's task record in the current task.
-    _taskGroupAttachChild(group: _group, child: childTask)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
 
     return true
   }
@@ -840,14 +805,6 @@ extension ThrowingTaskGroup: AsyncSequence {
 }
 
 /// ==== -----------------------------------------------------------------------
-
-/// Attach task group child to the group group to the task.
-@available(SwiftStdlib 5.5, *)
-@_silgen_name("swift_taskGroup_attachChild")
-func _taskGroupAttachChild(
-  group: Builtin.RawPointer,
-  child: Builtin.NativeObject
-)
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_destroy")
