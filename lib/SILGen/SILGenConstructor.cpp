@@ -1142,10 +1142,22 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // abstraction level. To undo this, we use a converting
         // initialization and rely on the peephole that optimizes
         // out the redundant conversion.
-        auto loweredResultTy = getLoweredType(origType, substType);
-        auto loweredSubstTy = getLoweredType(substType);
+        SILType loweredResultTy;
+        SILType loweredSubstTy;
 
-        if (loweredResultTy != loweredSubstTy) {
+        // A converting initialization isn't necessary if the member is
+        // a property wrapper. Though the initial value can have a
+        // reabstractable type, the result of the initialization is
+        // always the property wrapper type, which is never reabstractable.
+        bool needsConvertingInit = false;
+        auto *singleVar = varPattern->getSingleVar();
+        if (!(singleVar && singleVar->getOriginalWrappedProperty())) {
+          loweredResultTy = getLoweredType(origType, substType);
+          loweredSubstTy = getLoweredType(substType);
+          needsConvertingInit = loweredResultTy != loweredSubstTy;
+        }
+
+        if (needsConvertingInit) {
           Conversion conversion = Conversion::getSubstToOrig(
               origType, substType,
               loweredResultTy);
