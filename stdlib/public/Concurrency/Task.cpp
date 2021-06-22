@@ -18,6 +18,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskLocal.h"
+#include "swift/ABI/TaskOptions.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
@@ -396,15 +397,15 @@ task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   return _context->ResumeParent(_context->Parent);
 }
 
-/// All `swift_task_create*` variants funnel into this common implementation.
+/// Implementation of task creation.
 ///
 /// If \p isAsyncLetTask is true, the \p closureContext is not heap allocated,
 /// but stack-allocated (and must not be ref-counted).
 /// Also, async-let tasks are not heap allocated, but allocated with the parent
 /// task's stack allocator.
-static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
+SWIFT_CC(swift)
+static AsyncTaskAndContext swift_task_createImpl(
     size_t rawFlags,
-    TaskGroup *group, // TODO: express as an option -- ktoso
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, void *closureContext,
@@ -415,6 +416,26 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   assert(!isAsyncLetTask || isAsyncLetTask == flags.task_isChildTask());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
+
+  // Collect the options we know about.
+  ExecutorRef executor = ExecutorRef::generic();
+  TaskGroup *group = nullptr;
+  for (auto option = options; option; option = option->getParent()) {
+    switch (option->getKind()) {
+    case TaskOptionRecordKind::Executor:
+      executor = cast<ExecutorTaskOptionRecord>(option)->getExecutor();
+      break;
+
+    case TaskOptionRecordKind::TaskGroup:
+      group = cast<TaskGroupTaskOptionRecord>(option)->getGroup();
+      break;
+
+    default:
+      // Ignore unknown options.
+      break;
+    }
+  }
+
   assert((group != nullptr) == flags.task_isGroupChildTask());
 
   AsyncTask *parent = nullptr;
@@ -586,14 +607,6 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   return {task, initialContext};
 }
 
-static AsyncTaskAndContext swift_task_create_group_future_common(
-    size_t flags,
-    TaskGroup *group,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, void *closureContext,
-    size_t initialContextSize);
-
 AsyncTaskAndContext
 swift::swift_task_create_f(
     size_t flags,
@@ -625,12 +638,16 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
-  return swift_task_create_group_future_common(flags,
-                                               group,
-                                               options,
-                                               futureResultType,
-                                               function, /*closureContext=*/nullptr,
-                                               initialContextSize);
+  // Wire the group into the options.
+  TaskGroupTaskOptionRecord groupRecord(group);
+  if (group) {
+    groupRecord.Parent = options;
+    options = &groupRecord;
+  }
+
+  return swift_task_create(
+      flags, options, futureResultType, function, /*closureContext=*/nullptr,
+      initialContextSize);
 }
 
 /// Extract the entry point address and initial context size from an async closure value.
@@ -663,12 +680,8 @@ AsyncTaskAndContext swift::swift_task_create_future(
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
 
-  return swift_task_create_group_future_common(
-      flags,
-      /*group*/nullptr,
-      options,
-      futureResultType,
-      taskEntry, closureContext,
+  return swift_task_create(
+      flags, options, futureResultType, taskEntry, closureContext,
       initialContextSize);
 }
 
@@ -687,13 +700,9 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(
 
   JobFlags flags(rawFlags);
   flags.task_setIsAsyncLetTask(true);
-  return swift_task_create_group_future_common(
-      flags.getOpaqueValue(),
-      /*group*/nullptr,
-      options,
-      futureResultType,
-      taskEntry, closureContext,
-      initialContextSize);
+  return swift_task_create(
+      flags.getOpaqueValue(), options, futureResultType,
+      taskEntry, closureContext, initialContextSize);
 }
 
 AsyncTaskAndContext
@@ -711,12 +720,16 @@ swift::swift_task_create_group_future(
       FutureAsyncSignature,
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
-  return swift_task_create_group_future_common(
-      flags,
-      group,
-      options,
-      futureResultType,
-      taskEntry, closureContext,
+
+  // Wire the group into the options.
+  TaskGroupTaskOptionRecord groupRecord(group);
+  if (group) {
+    groupRecord.Parent = options;
+    options = &groupRecord;
+  }
+
+  return swift_task_create(
+      flags, options, futureResultType, taskEntry, closureContext,
       initialContextSize);
 }
 
