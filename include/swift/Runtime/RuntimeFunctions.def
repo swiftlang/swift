@@ -1585,8 +1585,7 @@ FUNCTION(TaskCreateGroupFuture,
 //     size_t taskCreateFlags,
 //     TaskOptionRecord *options,
 //     const Metadata *futureResultType,
-//     void *closureEntry, HeapObject *closureContext,
-//     size_t initialContextSize);
+//     void *closureEntry, HeapObject *closureContext);
 FUNCTION(TaskCreate,
          swift_task_create, SwiftCC,
          ConcurrencyAvailability,
@@ -1595,8 +1594,7 @@ FUNCTION(TaskCreate,
               SwiftTaskOptionRecordPtrTy,
               TypeMetadataPtrTy,
               Int8PtrTy,
-              RefCountedPtrTy,
-              SizeTy),
+              RefCountedPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 // void swift_task_switch(AsyncContext *resumeContext,

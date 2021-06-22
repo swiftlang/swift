@@ -3859,6 +3859,7 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 
 llvm::Value *irgen::emitTaskCreate(
     IRGenFunction &IGF,
+    bool isCreateAsyncTask,
     llvm::Value *flags,
     llvm::Value *taskGroup,
     llvm::Value *taskOptions,
@@ -3881,7 +3882,8 @@ llvm::Value *irgen::emitTaskCreate(
          taskFunction, localContextInfo});
   } else if (futureResultType) {
     result = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCreateFutureFn(),
+      isCreateAsyncTask ? IGF.IGM.getTaskCreateFn()
+                        : IGF.IGM.getTaskCreateFutureFn(),
       {flags,
        taskOptions,
        futureResultType,

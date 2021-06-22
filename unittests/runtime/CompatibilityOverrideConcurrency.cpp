@@ -142,14 +142,8 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
   swift_task_enqueueMainExecutor(nullptr);
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_create_f) {
-  swift_task_create_f(0, nullptr, nullptr, 0);
-}
-
-TEST_F(CompatibilityOverrideConcurrencyTest,
-       test_swift_task_create_group_future_f) {
-  swift_task_create_group_future_f(0, nullptr, nullptr, nullptr, nullptr,
-                                   0);
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_create_common) {
+  swift_task_create_common(0, nullptr, nullptr, nullptr, nullptr, 0);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_future_wait) {

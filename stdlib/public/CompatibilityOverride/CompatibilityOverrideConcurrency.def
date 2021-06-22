@@ -96,7 +96,7 @@ OVERRIDE_ACTOR(task_switch, void,
                TaskContinuationFunction *resumeFunction, ExecutorRef newExecutor),
                (resumeToContext, resumeFunction, newExecutor))
 
-OVERRIDE_TASK(task_create, AsyncTaskAndContext,
+OVERRIDE_TASK(task_create_common, AsyncTaskAndContext,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               (size_t taskCreateFlags,
                TaskOptionRecord *options,
