@@ -246,9 +246,11 @@ public struct TaskGroup<ChildTaskResult> {
     flags.addPendingGroupTaskUnconditionally = true
 
     var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-
-    // Create the asynchronous task future.
-    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
+    withUnsafeBytes(of: &groupOption) { optionsBuffer in
+      // Create the asynchronous task future.
+      _ = Builtin.createAsyncTask(
+          flags.bits, optionsBuffer.baseAddress?._rawValue, operation)
+    }
   }
 
   /// Add a child task to the group.
@@ -283,9 +285,11 @@ public struct TaskGroup<ChildTaskResult> {
     flags.enqueueJob = true
 
     var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-
-    // Create the asynchronous task future.
-    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
+    withUnsafeBytes(of: &groupOption) { optionsBuffer in
+      // Create the asynchronous task future.
+      _ = Builtin.createAsyncTask(
+          flags.bits, optionsBuffer.baseAddress?._rawValue, operation)
+    }
 
     return true
   }
@@ -463,9 +467,11 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     flags.addPendingGroupTaskUnconditionally = true
 
     var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-
-    // Create the asynchronous task future.
-    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
+    withUnsafeBytes(of: &groupOption) { optionsBuffer in
+      // Create the asynchronous task future.
+      _ = Builtin.createAsyncTask(
+          flags.bits, optionsBuffer.baseAddress?._rawValue, operation)
+    }
   }
 
   /// Add a child task to the group.
@@ -500,9 +506,11 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     flags.enqueueJob = true
 
     var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-
-    // Create the asynchronous task future.
-    _ = Builtin.createAsyncTask(flags.bits, UnsafeRawPointer(&groupOption)._rawValue, operation)
+    withUnsafeBytes(of: &groupOption) { optionsBuffer in
+      // Create the asynchronous task future.
+      _ = Builtin.createAsyncTask(
+          flags.bits, optionsBuffer.baseAddress?._rawValue, operation)
+    }
 
     return true
   }
