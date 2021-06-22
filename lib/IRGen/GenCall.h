@@ -230,7 +230,9 @@ namespace irgen {
   /// When \c futureResultType is non-null, calls the future variant to create
   /// a future.
   llvm::Value *emitTaskCreate(
-    IRGenFunction &IGF, llvm::Value *flags,
+    IRGenFunction &IGF,
+    bool isCreateAsyncTask,
+    llvm::Value *flags,
     llvm::Value *taskGroup,
     llvm::Value *taskOptions,
     llvm::Value *futureResultType,

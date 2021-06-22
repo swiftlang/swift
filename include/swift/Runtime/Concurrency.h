@@ -36,17 +36,36 @@ struct AsyncTaskAndContext {
   AsyncContext *InitialContext;
 };
 
-/// Create a task object with no future which will run the given function.
+/// Create a task object.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create(
+    size_t taskCreateFlags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    void *closureEntry, HeapObject *closureContext);
+
+/// Create a task object that will run the given function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_f(
     size_t flags,
     TaskOptionRecord *options,
-    ThinNullaryAsyncSignature::FunctionType *function, size_t initialContextSize);
+    const Metadata *futureResultType,
+    ThinNullaryAsyncSignature::FunctionType *function,
+    size_t initialContextSize);
 
 /// Caution: not all future-initializing functions actually throw, so
 /// this signature may be incorrect.
 using FutureAsyncSignature =
   AsyncSignature<void(void*), /*throws*/ true>;
+
+/// Create a task object.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create_common(
+    size_t taskCreateFlags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function, void *closureContext,
+    size_t initialContextSize);
 
 /// Create a task object with a future which will run the given closure.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -55,14 +74,6 @@ AsyncTaskAndContext swift_task_create_future(
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     void *closureEntryPoint, HeapObject * /* +1 */ closureContext);
-
-/// Create a task object with a future which will run the given function.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_future_f(
-    size_t flags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, size_t initialContextSize);
 
 /// Create a task object with a future which will run the given
 /// closure, and offer its result to the task group
@@ -73,25 +84,6 @@ AsyncTaskAndContext swift_task_create_group_future(
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     void *closureEntryPoint, HeapObject * /* +1 */ closureContext);
-
-/// Create a task object with a future which will run the given
-/// function, and offer its result to the task group
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_group_future_f(
-    size_t flags,
-    TaskGroup *group,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, size_t initialContextSize);
-
-/// Create a task object.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create(
-    size_t taskCreateFlags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, void *closureContext,
-    size_t initialContextSize);
 
 /// Allocate memory in a task.
 ///

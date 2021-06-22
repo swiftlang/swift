@@ -52,11 +52,12 @@ static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context,
 }
 
 template <class T>
-static void withSimpleTask(JobFlags flags, T &&value,
+static void withSimpleTask(TaskCreationFlags flags, T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
   auto taskAndContext =
       swift_task_create_f(flags.getOpaqueValue(),
+                          nullptr,
                           nullptr,
                           reinterpret_cast<TaskContinuationFunction *>(
                               &simpleTaskInvokeFunction<T>),
@@ -76,7 +77,7 @@ template <class T>
 static void withSimpleTask(T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef bodyFn) {
-  withSimpleTask(JobKind::Task, std::forward<T>(value), invokeFn, bodyFn);
+  withSimpleTask(TaskCreationFlags(), std::forward<T>(value), invokeFn, bodyFn);
 }
 
 static ExecutorRef createFakeExecutor(uintptr_t value) {

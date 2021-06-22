@@ -404,7 +404,7 @@ task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 /// Also, async-let tasks are not heap allocated, but allocated with the parent
 /// task's stack allocator.
 SWIFT_CC(swift)
-static AsyncTaskAndContext swift_task_createImpl(
+static AsyncTaskAndContext swift_task_create_commonImpl(
     size_t rawTaskCreateFlags,
     TaskOptionRecord *options,
     const Metadata *futureResultType,
@@ -618,65 +618,11 @@ static AsyncTaskAndContext swift_task_createImpl(
 
   // If we're supposed to enqueue the task, do so now.
   if (taskCreateFlags.enqueueJob()) {
+    swift_retain(task);
     swift_task_enqueue(task, executor);
   }
 
   return {task, initialContext};
-}
-
-AsyncTaskAndContext
-swift::swift_task_create_f(
-    size_t flags,
-    TaskOptionRecord *options,
-    ThinNullaryAsyncSignature::FunctionType *function, size_t initialContextSize) {
-  return swift_task_create_future_f(
-      flags, options,
-      /*futureResultType=*/nullptr, function, initialContextSize);
-}
-
-AsyncTaskAndContext swift::swift_task_create_future_f(
-    size_t flags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
-  assert(!JobFlags(flags).task_isGroupChildTask() &&
-  "use swift_task_create_group_future_f to initialize task group child tasks");
-  return swift_task_create_group_future_f(
-      flags,
-      /*group=*/nullptr,
-      options,
-      futureResultType,
-      function, initialContextSize);
-}
-
-/// Temporary hack to convert from job flags to task-creation flags,
-/// until we can eliminate the entry points that operate in terms of job
-/// flags.
-static size_t convertJobFlagsToTaskCreateFlags(size_t rawJobFlags) {
-  JobFlags jobFlags(rawJobFlags);
-  TaskCreateFlags taskCreateFlags;
-  taskCreateFlags.setPriority(jobFlags.getPriority());
-  taskCreateFlags.setIsChildTask(jobFlags.task_isChildTask());
-  taskCreateFlags.setIsAsyncLetTask(jobFlags.task_isAsyncLetTask());
-  return taskCreateFlags.getOpaqueValue();
-}
-
-AsyncTaskAndContext swift::swift_task_create_group_future_f(
-    size_t flags,
-    TaskGroup *group,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
-  // Wire the group into the options.
-  TaskGroupTaskOptionRecord groupRecord(group);
-  if (group) {
-    groupRecord.Parent = options;
-    options = &groupRecord;
-  }
-
-  return swift_task_create(
-      convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
-      function, /*closureContext=*/nullptr, initialContextSize);
 }
 
 /// Extract the entry point address and initial context size from an async closure value.
@@ -696,6 +642,49 @@ getAsyncClosureEntryPointAndContextSize(void *function,
           fnPtr->ExpectedContextSize};
 }
 
+SWIFT_CC(swift)
+AsyncTaskAndContext swift::swift_task_create(
+    size_t taskCreateFlags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    void *closureEntry, HeapObject *closureContext) {
+  FutureAsyncSignature::FunctionType *taskEntry;
+  size_t initialContextSize;
+  std::tie(taskEntry, initialContextSize)
+    = getAsyncClosureEntryPointAndContextSize<
+      FutureAsyncSignature,
+      SpecialPointerAuthDiscriminators::AsyncFutureFunction
+    >(closureEntry, closureContext);
+
+  return swift_task_create_common(
+      taskCreateFlags, options, futureResultType, taskEntry, closureContext,
+      initialContextSize);
+}
+
+AsyncTaskAndContext
+swift::swift_task_create_f(
+    size_t flags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    ThinNullaryAsyncSignature::FunctionType *function,
+    size_t initialContextSize) {
+  return swift_task_create_common(
+      flags, options, futureResultType,
+      function, /*closureContext=*/nullptr, initialContextSize);
+}
+
+/// Temporary hack to convert from job flags to task-creation flags,
+/// until we can eliminate the entry points that operate in terms of job
+/// flags.
+static size_t convertJobFlagsToTaskCreateFlags(size_t rawJobFlags) {
+  JobFlags jobFlags(rawJobFlags);
+  TaskCreateFlags taskCreateFlags;
+  taskCreateFlags.setPriority(jobFlags.getPriority());
+  taskCreateFlags.setIsChildTask(jobFlags.task_isChildTask());
+  taskCreateFlags.setIsAsyncLetTask(jobFlags.task_isAsyncLetTask());
+  return taskCreateFlags.getOpaqueValue();
+}
+
 AsyncTaskAndContext swift::swift_task_create_future(
                      size_t flags,
                      TaskOptionRecord *options,
@@ -709,7 +698,7 @@ AsyncTaskAndContext swift::swift_task_create_future(
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
 
-  return swift_task_create(
+  return swift_task_create_common(
       convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
       taskEntry, closureContext, initialContextSize);
 }
@@ -729,7 +718,7 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(
 
   JobFlags flags(rawFlags);
   flags.task_setIsAsyncLetTask(true);
-  return swift_task_create(
+  return swift_task_create_common(
       convertJobFlagsToTaskCreateFlags(flags.getOpaqueValue()), options,
       futureResultType, taskEntry, closureContext, initialContextSize);
 }
@@ -757,7 +746,7 @@ swift::swift_task_create_group_future(
     options = &groupRecord;
   }
 
-  return swift_task_create(
+  return swift_task_create_common(
       convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
       taskEntry, closureContext, initialContextSize);
 }
@@ -933,10 +922,12 @@ void swift::swift_task_runAndBlockThread(const void *function,
   RunAndBlockSemaphore semaphore;
 
   // Set up a task that runs the runAndBlock async function above.
-  auto flags = JobFlags(JobKind::Task, JobPriority::Default);
+  auto flags = TaskCreateFlags();
+  flags.setPriority(JobPriority::Default);
   auto pair = swift_task_create_f(
       flags.getOpaqueValue(),
       /*options=*/nullptr,
+      /*futureResultType=*/nullptr,
       reinterpret_cast<ThinNullaryAsyncSignature::FunctionType *>(
           &runAndBlock_start),
       sizeof(RunAndBlockContext));
