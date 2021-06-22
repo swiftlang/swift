@@ -393,11 +393,6 @@ task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 }
 
 /// Implementation of task creation.
-///
-/// If \p isAsyncLetTask is true, the \p closureContext is not heap allocated,
-/// but stack-allocated (and must not be ref-counted).
-/// Also, async-let tasks are not heap allocated, but allocated with the parent
-/// task's stack allocator.
 SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_create_commonImpl(
     size_t rawTaskCreateFlags,
@@ -409,15 +404,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 
   // Propagate task-creation flags to job flags as appropriate.
   JobFlags jobFlags(JobKind::Task, taskCreateFlags.getPriority());
-
-  bool isAsyncLetTask = taskCreateFlags.isAsyncLetTask();
-  if (isAsyncLetTask) {
-    jobFlags.task_setIsAsyncLetTask(true);
-    jobFlags.task_setIsChildTask(true);
-  } else {
-    jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
-  }
-
+  jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
   if (futureResultType) {
     jobFlags.task_setIsFuture(true);
     assert(initialContextSize >= sizeof(FutureAsyncContext));
@@ -426,6 +413,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Collect the options we know about.
   ExecutorRef executor = ExecutorRef::generic();
   TaskGroup *group = nullptr;
+  AsyncLet *asyncLet = nullptr;
   for (auto option = options; option; option = option->getParent()) {
     switch (option->getKind()) {
     case TaskOptionRecordKind::Executor:
@@ -436,6 +424,13 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
       group = cast<TaskGroupTaskOptionRecord>(option)->getGroup();
       assert(group && "Missing group");
       jobFlags.task_setIsGroupChildTask(true);
+      break;
+
+    case TaskOptionRecordKind::AsyncLet:
+      asyncLet = cast<AsyncLetTaskOptionRecord>(option)->getAsyncLet();
+      assert(asyncLet && "Missing async let storage");
+      jobFlags.task_setIsAsyncLetTask(true);
+      jobFlags.task_setIsChildTask(true);
       break;
     }
   }
@@ -484,7 +479,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   constexpr unsigned initialSlabSize = 512;
 
   void *allocation = nullptr;
-  if (isAsyncLetTask) {
+  if (asyncLet) {
     assert(parent);
     allocation = _swift_task_alloc_specific(parent,
                                         amountToAllocate + initialSlabSize);
@@ -530,7 +525,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
   AsyncTask *task = nullptr;
-  if (isAsyncLetTask) {
+  if (asyncLet) {
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
     task = new(allocation) AsyncTask(&taskHeapMetadata,
@@ -574,7 +569,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
 #endif
 
   // Initialize the task-local allocator.
-  if (isAsyncLetTask) {
+  if (asyncLet) {
     initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
                                                    &completeTask);
     assert(parent);
@@ -618,6 +613,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   // If we're supposed to copy task locals, do so now.
   if (taskCreateFlags.copyTaskLocals()) {
     swift_task_localsCopyTo(task);
+  }
+
+  // Push the async let task status record.
+  if (asyncLet) {
+    asyncLet_addImpl(task, asyncLet);
   }
 
   // If we're supposed to enqueue the task, do so now.

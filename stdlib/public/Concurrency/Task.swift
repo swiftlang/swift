@@ -858,8 +858,9 @@ extension UnsafeCurrentTask: Equatable {
 struct TaskOptionRecord {
   // The kind of option record.
   enum Kind: UInt8 {
-    case executor = 0
+    case executor  = 0
     case taskGroup = 1
+    case asyncLet  = 2
   }
 
   // Flags stored within an option record.

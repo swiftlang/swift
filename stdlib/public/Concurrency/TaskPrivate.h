@@ -47,6 +47,9 @@ void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 /// related to the active task.
 void runJobInEstablishedExecutorContext(Job *job);
 
+/// Initialize the async let storage for the given async-let child task.
+void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet);
+
 /// Clear the active task reference for the current thread.
 AsyncTask *_swift_task_clearCurrent();
 
