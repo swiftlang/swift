@@ -3860,7 +3860,6 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 llvm::Value *irgen::emitTaskCreate(
     IRGenFunction &IGF,
     llvm::Value *flags,
-    llvm::Value *taskGroup,
     llvm::Value *taskOptions,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction,
@@ -3869,26 +3868,13 @@ llvm::Value *irgen::emitTaskCreate(
   llvm::CallInst *result;
   taskOptions = IGF.Builder.CreateBitOrPointerCast(
       taskOptions, IGF.IGM.SwiftTaskOptionRecordPtrTy);
-  if (taskGroup && futureResultType) {
-    taskGroup = IGF.Builder.CreateBitOrPointerCast(
-        taskGroup, IGF.IGM.SwiftTaskGroupPtrTy);
-    result = IGF.Builder.CreateCall(
-        IGF.IGM.getTaskCreateGroupFutureFn(),
-        {flags,
-         taskGroup,
-         taskOptions,
-         futureResultType,
-         taskFunction, localContextInfo});
-  } else if (futureResultType) {
-    result = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCreateFn(),
-      {flags,
-       taskOptions,
-       futureResultType,
-       taskFunction, localContextInfo});
-  } else {
-    llvm_unreachable("no future?!");
-  }
+  assert(futureResultType && "No future?!");
+  result = IGF.Builder.CreateCall(
+    IGF.IGM.getTaskCreateFn(),
+    {flags,
+     taskOptions,
+     futureResultType,
+     taskFunction, localContextInfo});
   result->setDoesNotThrow();
   result->setCallingConv(IGF.IGM.SwiftCC);
 
