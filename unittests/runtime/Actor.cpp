@@ -140,8 +140,10 @@ static std::pair<AsyncTask*, Context*>
 createTaskWithContext(JobPriority priority, Fn &&fn) {
   auto invoke =
     TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
-  JobFlags flags(JobKind::Task, priority);
+  TaskCreateFlags flags;
+  flags.setPriority(priority);
   auto pair = swift_task_create_f(flags.getOpaqueValue(),
+                                  nullptr,
                                   nullptr,
                                   invoke,
                                   sizeof(Context));

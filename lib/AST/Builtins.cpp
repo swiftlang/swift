@@ -1424,7 +1424,7 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
-static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
+static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
@@ -2743,8 +2743,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
 
+  case BuiltinValueKind::CreateAsyncTask:
   case BuiltinValueKind::CreateAsyncTaskFuture:
-    return getCreateAsyncTaskFuture(Context, Id);
+    return getCreateAsyncTask(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTaskGroupFuture:
     return getCreateAsyncTaskGroupFuture(Context, Id);

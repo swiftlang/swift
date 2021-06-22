@@ -407,6 +407,97 @@ struct JobFlags {
   }
 }
 
+// ==== Task Creation Flags --------------------------------------------------
+
+/// Flags for schedulable jobs.
+///
+/// This is a port of the C++ FlagSet.
+@available(SwiftStdlib 5.5, *)
+struct TaskCreateFlags {
+  /// The actual bit representation of these flags.
+  var bits: Int = 0
+
+  /// The priority given to the job.
+  var priority: TaskPriority? {
+    get {
+      let value = Int(bits) & 0xFF
+
+      if value == 0 {
+        return nil
+      }
+
+      return TaskPriority(rawValue: UInt8(value))
+    }
+
+    set {
+      bits = (bits & ~0xFF) | Int(newValue?.rawValue ?? 0)
+    }
+  }
+
+  /// Whether this is a child task.
+  var isChildTask: Bool {
+    get {
+      (bits & (1 << 8)) != 0
+    }
+
+    set {
+      if newValue {
+        bits = bits | 1 << 8
+      } else {
+        bits = (bits & ~(1 << 8))
+      }
+    }
+  }
+
+  /// Whether to copy thread locals from the currently-executing task into the
+  /// newly-created task.
+  var copyThreadLocals: Bool {
+    get {
+      (bits & (1 << 10)) != 0
+    }
+
+    set {
+      if newValue {
+        bits = bits | 1 << 10
+      } else {
+        bits = (bits & ~(1 << 10))
+      }
+    }
+  }
+
+  /// Whether this task should inherit as much context from the
+  /// currently-executing task as it can.
+  var inheritContext: Bool {
+    get {
+      (bits & (1 << 11)) != 0
+    }
+
+    set {
+      if newValue {
+        bits = bits | 1 << 11
+      } else {
+        bits = (bits & ~(1 << 11))
+      }
+    }
+  }
+
+  /// Whether to enqueue the newly-created task on the given executor (if
+  /// specified) or the global executor.
+  var enqueueJob: Bool {
+    get {
+      (bits & (1 << 12)) != 0
+    }
+
+    set {
+      if newValue {
+        bits = bits | 1 << 12
+      } else {
+        bits = (bits & ~(1 << 12))
+      }
+    }
+  }
+}
+
 // ==== Task Creation ----------------------------------------------------------
 @available(SwiftStdlib 5.5, *)
 extension Task where Failure == Never {
@@ -432,26 +523,15 @@ extension Task where Failure == Never {
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
   ) {
     // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
-    flags.isFuture = true
-    flags.isContinuingAsyncTask = true
+    flags.inheritContext = true
+    flags.copyThreadLocals = true
+    flags.enqueueJob = true
 
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
-
-    // Copy all task locals to the newly created task.
-    // We must copy them rather than point to the current task since the new task
-    // is not structured and may out-live the current task.
-    //
-    // WARNING: This MUST be done BEFORE we enqueue the task,
-    // because it acts as-if it was running inside the task and thus does not
-    // take any extra steps to synchronize the task-local operations.
-    _taskLocalsCopy(to: task)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    // Create the asynchronous task.
+    let (task, _) = Builtin.createAsyncTask(
+      Int(flags.bits), /*options*/nil, operation)
 
     self._task = task
   }
@@ -477,26 +557,15 @@ extension Task where Failure == Error {
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
   ) {
     // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
-    flags.isFuture = true
-    flags.isContinuingAsyncTask = true
+    flags.inheritContext = true
+    flags.copyThreadLocals = true
+    flags.enqueueJob = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
-
-    // Copy all task locals to the newly created task.
-    // We must copy them rather than point to the current task since the new task
-    // is not structured and may out-live the current task.
-    //
-    // WARNING: This MUST be done BEFORE we enqueue the task,
-    // because it acts as-if it was running inside the task and thus does not
-    // take any extra steps to synchronize the task-local operations.
-    _taskLocalsCopy(to: task)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    let (task, _) = Builtin.createAsyncTask(
+        Int(flags.bits), /*options*/nil, operation)
 
     self._task = task
   }
@@ -541,16 +610,13 @@ extension Task where Failure == Never {
     operation: __owned @Sendable @escaping () async -> Success
   ) -> Task<Success, Failure> {
     // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority ?? .unspecified
-    flags.isFuture = true
+    flags.enqueueJob = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    let (task, _) = Builtin.createAsyncTask(
+        Int(flags.bits), /*options*/nil, operation)
 
     return Task(task)
   }
@@ -596,16 +662,13 @@ extension Task where Failure == Error {
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
     // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
+    var flags = TaskCreateFlags()
     flags.priority = priority ?? .unspecified
-    flags.isFuture = true
+    flags.enqueueJob = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(Int(flags.bits), /*options*/nil, operation)
-
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+    let (task, _) = Builtin.createAsyncTask(
+        Int(flags.bits), /*options*/nil, operation)
 
     return Task(task)
   }
