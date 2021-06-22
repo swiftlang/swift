@@ -600,13 +600,22 @@ function(add_swift_host_library name)
     # find all of the necessary swift libraries on Darwin.
     if (NOT ASHL_PURE_SWIFT)
       if (CMAKE_Swift_COMPILER)
-        # Add in the SDK directory for the host platform and add an rpath.
-        target_link_directories(${name} PRIVATE
-          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
         # Add in the toolchain directory so we can grab compatibility libraries
         get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
         get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
         target_link_directories(${name} PUBLIC ${TOOLCHAIN_LIB_DIR})
+
+        # Add in the SDK directory for the host platform.
+        #
+        # NOTE: We do this /after/ target_link_directorying TOOLCHAIN_LIB_DIR to
+        # ensure that we first find libraries from the toolchain, rather than
+        # from the SDK. The reason why this is important is that when we perform
+        # a stage2 build, this path is into the stage1 build. This is not a pure
+        # SDK and also contains compatibility libraries. We need to make sure
+        # that the compiler sees the actual toolchain's compatibility libraries
+        # first before the just built compability libraries or build errors occur.
+        target_link_directories(${name} PRIVATE
+          ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
       endif()
     endif()
 
@@ -808,13 +817,22 @@ function(add_swift_host_tool executable)
     # host side tools but link with clang, add the appropriate -L paths so we
     # find all of the necessary swift libraries on Darwin.
     if (CMAKE_Swift_COMPILER)
-      # Add in the SDK directory for the host platform and add an rpath.
-      target_link_directories(${executable} PRIVATE
-        ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
       # Add in the toolchain directory so we can grab compatibility libraries
       get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
       get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
       target_link_directories(${executable} PUBLIC ${TOOLCHAIN_LIB_DIR})
+
+      # Add in the SDK directory for the host platform and add an rpath.
+      #
+      # NOTE: We do this /after/ target_link_directorying TOOLCHAIN_LIB_DIR to
+      # ensure that we first find libraries from the toolchain, rather than from
+      # the SDK. The reason why this is important is that when we perform a
+      # stage2 build, this path is into the stage1 build. This is not a pure SDK
+      # and also contains compatibility libraries. We need to make sure that the
+      # compiler sees the actual toolchain's compatibility libraries first
+      # before the just built compability libraries or build errors occur.
+      target_link_directories(${executable} PRIVATE
+        ${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}/usr/lib/swift)
 
       if (ASHT_HAS_LIBSWIFT AND SWIFT_TOOLS_ENABLE_LIBSWIFT)
         # Workaround to make lldb happy: we have to explicitly add all libswift modules
