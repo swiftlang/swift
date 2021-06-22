@@ -1547,20 +1547,6 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// AsyncTaskAndContext swift_task_create_f(
-//     size_t flags,
-//     TaskOptionRecord *options,
-//     TaskContinuationFunction* function, size_t contextSize);
-FUNCTION(TaskCreateFunc,
-         swift_task_create_f, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy,
-              SwiftTaskOptionRecordPtrTy,
-              TaskContinuationFunctionPtrTy,
-              SizeTy),
-         ATTRS(NoUnwind, ArgMemOnly))
-
 // AsyncTaskAndContext swift_task_create_future(
 //     size_t flags,
 //     TaskOptionRecord *options,
@@ -1575,22 +1561,6 @@ FUNCTION(TaskCreateFuture,
               TypeMetadataPtrTy,
               Int8PtrTy,
               RefCountedPtrTy),
-         ATTRS(NoUnwind, ArgMemOnly))
-
-// AsyncTaskAndContext swift_task_create_future_f(
-//     size_t flags,
-//     TaskOptionRecord *options,
-//     const Metadata *futureResultType,
-//     TaskContinuationFunction *function, size_t contextSize);
-FUNCTION(TaskCreateFutureFunc,
-         swift_task_create_future_f, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy,
-              SwiftTaskOptionRecordPtrTy,
-              TypeMetadataPtrTy,
-              TaskContinuationFunctionPtrTy,
-              SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 // AsyncTaskAndContext swift_task_create_group_future(
@@ -1611,21 +1581,21 @@ FUNCTION(TaskCreateGroupFuture,
               RefCountedPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// AsyncTaskAndContext swift_task_create_group_future_f(
-//     size_t flags,
-//     TaskGroup *group,
-//     TaskOptionRecord *options
+// AsyncTaskAndContext swift_task_create(
+//     size_t taskCreateFlags,
+//     TaskOptionRecord *options,
 //     const Metadata *futureResultType,
-//     TaskContinuationFunction *function, size_t contextSize);
-FUNCTION(TaskCreateGroupFutureFunc,
-         swift_task_create_group_future_f, SwiftCC,
+//     void *closureEntry, HeapObject *closureContext,
+//     size_t initialContextSize);
+FUNCTION(TaskCreate,
+         swift_task_create, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(AsyncTaskAndContextTy),
          ARGS(SizeTy,
-              SwiftTaskGroupPtrTy,
               SwiftTaskOptionRecordPtrTy,
               TypeMetadataPtrTy,
-              TaskContinuationFunctionPtrTy,
+              Int8PtrTy,
+              RefCountedPtrTy,
               SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
 

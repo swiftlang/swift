@@ -87,7 +87,7 @@ AsyncTaskAndContext swift_task_create_group_future_f(
 /// Create a task object.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create(
-    size_t flags,
+    size_t taskCreateFlags,
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, void *closureContext,
