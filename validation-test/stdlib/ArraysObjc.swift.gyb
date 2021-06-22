@@ -9,7 +9,8 @@
 // REQUIRES: objc_interop
 
 // FIXME: rdar://problem/55944126
-// UNSUPPORTED: CPU=armv7s || CPU=armv7k
+// FIXME: rdar://problem/79626782 (test fails for watchsimulator-i386)
+// UNSUPPORTED: CPU=armv7s || CPU=armv7k || CPU=i386
 
 import Darwin
 import Foundation
