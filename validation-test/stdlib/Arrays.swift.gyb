@@ -8,9 +8,6 @@
 // RUN: %enable-cow-checking %line-directive %t/main.swift -- %target-run %t/Arrays
 // REQUIRES: executable_test
 
-// FIXME: Test fails for watchsimulator-i386 (rdar://79626782)
-// UNSUPPORTED: CPU=i386 && OS=watchos
-
 import Swift
 import StdlibUnittest
 import StdlibCollectionUnittest
