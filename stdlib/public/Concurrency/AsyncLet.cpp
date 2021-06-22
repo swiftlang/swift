@@ -93,15 +93,17 @@ SWIFT_CC(swift)
 static void swift_asyncLet_startImpl(AsyncLet *alet,
                                      TaskOptionRecord *options,
                                      const Metadata *futureResultType,
-                                     void *closureEntryPoint, void *closureContext) {
+                                     void *closureEntryPoint,
+                                     HeapObject *closureContext) {
   AsyncTask *parent = swift_task_getCurrent();
   assert(parent && "async-let cannot be created without parent task");
 
-  auto flags = JobFlags(JobKind::Task, parent->getPriority());
-  flags.task_setIsFuture(true);
-  flags.task_setIsChildTask(true);
+  auto flags = TaskCreateFlags();
+  flags.setPriority(parent->getPriority());
+  flags.setIsChildTask(true);
+  flags.setIsAsyncLetTask(true);
 
-  auto childTaskAndContext = swift_task_create_async_let_future(
+  auto childTaskAndContext = swift_task_create(
       flags.getOpaqueValue(),
       options,
       futureResultType,

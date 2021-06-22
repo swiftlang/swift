@@ -1660,7 +1660,7 @@ FUNCTION(DefaultActorDeallocateResilient,
 ///     TaskOptionRecord *options,
 ///     const Metadata *futureResultType,
 ///     void *closureEntryPoint,
-///     OpaqueValue *closureContext
+///     HeapObject *closureContext
 /// );
 FUNCTION(AsyncLetStart,
          swift_asyncLet_start, SwiftCC,
