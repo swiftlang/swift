@@ -25,11 +25,12 @@ func testAsyncLetInt() async -> Int {
   // CHECK: [[ESCAPING_CLOSURE:%.*]] = convert_function [[REABSTRACT_CLOSURE]] : $@async @callee_guaranteed () -> (@out Int, @error Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
   // CHECK: [[CLOSURE_ARG:%.*]] = convert_escape_to_noescape [not_guaranteed] [[ESCAPING_CLOSURE]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
   // CHECK: [[ASYNC_LET_START:%.*]] = builtin "startAsyncLet"<Int>([[OPTIONS_ARG]] : $Optional<Builtin.RawPointer>, [[CLOSURE_ARG]] : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>) : $Builtin.RawPointer
+  // CHECK: [[TASK_OPTIONS:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
   async let i = await getInt()
 
-  // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
+  // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer, Optional<Builtin.RawPointer>) -> @out τ_0_0
   // CHECK: [[INT_RESULT:%.*]] = alloc_stack $Int
-  // CHECK: apply [[ASYNC_LET_GET]]<Int>([[INT_RESULT]], [[ASYNC_LET_START]]) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
+  // CHECK: apply [[ASYNC_LET_GET]]<Int>([[INT_RESULT]], [[ASYNC_LET_START]], [[TASK_OPTIONS]]) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer, Optional<Builtin.RawPointer>) -> @out τ_0_0
   // CHECK: [[INT_RESULT_VALUE:%.*]] = load [trivial] [[INT_RESULT]] : $*Int
   // CHECK: assign [[INT_RESULT_VALUE]] to [[I]] : $*Int
   return await i
@@ -52,7 +53,7 @@ func testAsyncLetWithThrows(cond: Bool) async throws -> String {
 func testAsyncLetThrows() async throws -> String {
   async let s = try await getStringThrowingly()
 
-  // CHECK: [[ASYNC_LET_WAIT_THROWING:%.*]] = function_ref @swift_asyncLet_wait_throwing : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> (@out τ_0_0, @error Error)
+  // CHECK: [[ASYNC_LET_WAIT_THROWING:%.*]] = function_ref @swift_asyncLet_wait_throwing : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer, Optional<Builtin.RawPointer>) -> (@out τ_0_0, @error Error)
   // CHECK: try_apply [[ASYNC_LET_WAIT_THROWING]]<String>
   return try await s
 }
@@ -66,9 +67,9 @@ func testDecomposeAwait(cond: Bool) async -> Int {
   async let (i, s) = await getIntAndString()
 
   if cond {
-    // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
+    // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer, Optional<Builtin.RawPointer>) -> @out τ_0_0
     // CHECK: [[TUPLE_RESULT:%.*]] = alloc_stack $(Int, String)
-    // CHECK: apply [[ASYNC_LET_GET]]<(Int, String)>([[TUPLE_RESULT]], {{%.*}}) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
+    // CHECK: apply [[ASYNC_LET_GET]]<(Int, String)>([[TUPLE_RESULT]], {{%.*}}) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer, Optional<Builtin.RawPointer>) -> @out τ_0_0
     // CHECK: [[TUPLE_RESULT_VAL:%.*]] = load [take] [[TUPLE_RESULT]] : $*(Int, String)
     // CHECK: ([[FIRST_VAL:%.*]], [[SECOND_VAL:%.*]]) = destructure_tuple [[TUPLE_RESULT_VAL]] : $(Int, String)
     // CHECK: assign [[FIRST_VAL]] to [[I]] : $*Int

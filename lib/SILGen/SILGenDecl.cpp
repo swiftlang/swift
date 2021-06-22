@@ -1167,12 +1167,12 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
       // If we can statically detect some option needs to be passed, e.g.
       // an executor preference, we'd construct the appropriate option here and
       // pass it to the async let start.
-      auto options = B.createManagedOptionalNone(
+      auto taskOptions = B.createManagedOptionalNone(
           loc, SILType::getOptionalType(SILType::getRawPointerType(C)));
 
       alet = emitAsyncLetStart(
           loc,
-          options.forward(*this), // options is B.createManagedOptionalNone
+          taskOptions.forward(*this),
           init->getType(),
           emitRValue(init).getScalarValue()
         ).forward(*this);

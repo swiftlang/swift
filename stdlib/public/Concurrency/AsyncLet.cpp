@@ -130,22 +130,24 @@ static void swift_asyncLet_startImpl(AsyncLet *alet,
 SWIFT_CC(swiftasync)
 static void swift_asyncLet_waitImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
-    AsyncLet *alet, TaskContinuationFunction *resumeFunction,
-    AsyncContext *callContext) {
+    AsyncLet *alet,
+    TaskOptionRecord *options,
+    TaskContinuationFunction *resumeFunction, AsyncContext *callContext) {
   auto task = alet->getTask();
-  swift_task_future_wait(result, callerContext, task, resumeFunction,
-                         callContext);
+  swift_task_future_wait(result, callerContext, task, options,
+                         resumeFunction, callContext);
 }
 
 SWIFT_CC(swiftasync)
 static void swift_asyncLet_wait_throwingImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     AsyncLet *alet,
+    TaskOptionRecord *options,
     ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
     AsyncContext * callContext) {
   auto task = alet->getTask();
-  swift_task_future_wait_throwing(result, callerContext, task, resumeFunction,
-                                  callContext);
+  swift_task_future_wait_throwing(result, callerContext, task, options,
+                                  resumeFunction, callContext);
 }
 
 // =============================================================================

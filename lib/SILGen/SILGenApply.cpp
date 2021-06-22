@@ -5835,6 +5835,8 @@ ManagedValue SILGenFunction::emitCancelAsyncTask(
 
 void SILGenFunction::completeAsyncLetChildTask(
     PatternBindingDecl *patternBinding, unsigned index) {
+  auto &C = patternBinding->getASTContext();
+
   SILValue asyncLet;
   bool isThrowing;
   std::tie(asyncLet, isThrowing)= AsyncLetChildTasks[{patternBinding, index}];
@@ -5845,6 +5847,11 @@ void SILGenFunction::completeAsyncLetChildTask(
       ? SGM.getAsyncLetGetThrowing()
       : SGM.getAsyncLetGet();
 
+  /// No task options, so just pass nil
+  auto taskOptions = B.createManagedOptionalNone(
+      SILLocation(patternBinding),
+      SILType::getOptionalType(SILType::getRawPointerType(C)));
+
   // Get the result from the async-let future.
   Type replacementTypes[] = {childResultType};
   auto subs = SubstitutionMap::get(asyncLetGet->getGenericSignature(),
@@ -5852,8 +5859,9 @@ void SILGenFunction::completeAsyncLetChildTask(
                                    ArrayRef<ProtocolConformanceRef>{});
   RValue childResult = emitApplyOfLibraryIntrinsic(
       SILLocation(patternBinding), asyncLetGet, subs,
-      { ManagedValue::forTrivialObjectRValue(asyncLet) },
-      SGFContext());
+      { ManagedValue::forTrivialObjectRValue(asyncLet),
+        taskOptions
+      }, SGFContext());
 
   // Write the child result into the pattern variables.
   emitAssignToPatternVars(
