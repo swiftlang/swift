@@ -2744,7 +2744,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getCancelAsyncTask(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTask:
-  case BuiltinValueKind::CreateAsyncTaskFuture:
     return getCreateAsyncTask(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTaskGroupFuture:

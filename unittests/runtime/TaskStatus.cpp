@@ -52,7 +52,7 @@ static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context,
 }
 
 template <class T>
-static void withSimpleTask(TaskCreationFlags flags, T &&value,
+static void withSimpleTask(TaskCreateFlags flags, T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
   auto taskAndContext =
@@ -77,7 +77,7 @@ template <class T>
 static void withSimpleTask(T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef bodyFn) {
-  withSimpleTask(TaskCreationFlags(), std::forward<T>(value), invokeFn, bodyFn);
+  withSimpleTask(TaskCreateFlags(), std::forward<T>(value), invokeFn, bodyFn);
 }
 
 static ExecutorRef createFakeExecutor(uintptr_t value) {

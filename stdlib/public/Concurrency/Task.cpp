@@ -678,24 +678,6 @@ static size_t convertJobFlagsToTaskCreateFlags(size_t rawJobFlags) {
   return taskCreateFlags.getOpaqueValue();
 }
 
-AsyncTaskAndContext swift::swift_task_create_future(
-                     size_t flags,
-                     TaskOptionRecord *options,
-                     const Metadata *futureResultType,
-                     void *closureEntry, HeapObject * /* +1 */ closureContext) {
-  FutureAsyncSignature::FunctionType *taskEntry;
-  size_t initialContextSize;
-  std::tie(taskEntry, initialContextSize)
-    = getAsyncClosureEntryPointAndContextSize<
-      FutureAsyncSignature,
-      SpecialPointerAuthDiscriminators::AsyncFutureFunction
-    >(closureEntry, closureContext);
-
-  return swift_task_create_common(
-      convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
-      taskEntry, closureContext, initialContextSize);
-}
-
 AsyncTaskAndContext swift::swift_task_create_async_let_future(
                      size_t rawFlags,
                      TaskOptionRecord *options,
