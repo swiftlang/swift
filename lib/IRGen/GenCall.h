@@ -229,7 +229,6 @@ namespace irgen {
   llvm::Value *emitTaskCreate(
     IRGenFunction &IGF,
     llvm::Value *flags,
-    llvm::Value *taskGroup,
     llvm::Value *taskOptions,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction,

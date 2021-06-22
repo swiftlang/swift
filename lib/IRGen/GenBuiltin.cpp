@@ -270,14 +270,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture) {
-
+  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask) {
     auto flags = args.claimNext();
-    auto taskGroup =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture)
-        ? args.claimNext()
-        : nullptr;
     auto taskOptions = args.claimNext();
     auto futureResultType = args.claimNext();
     auto taskFunction = args.claimNext();
@@ -286,7 +280,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto newTaskAndContext = emitTaskCreate(
         IGF,
         flags,
-        taskGroup,
         taskOptions,
         futureResultType,
         taskFunction, taskContext,

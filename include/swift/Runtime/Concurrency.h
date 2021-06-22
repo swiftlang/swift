@@ -67,16 +67,6 @@ AsyncTaskAndContext swift_task_create_common(
     FutureAsyncSignature::FunctionType *function, void *closureContext,
     size_t initialContextSize);
 
-/// Create a task object with a future which will run the given
-/// closure, and offer its result to the task group
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_group_future(
-    size_t flags,
-    TaskGroup *group,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    void *closureEntryPoint, HeapObject * /* +1 */ closureContext);
-
 /// Allocate memory in a task.
 ///
 /// This must be called synchronously with the task.
