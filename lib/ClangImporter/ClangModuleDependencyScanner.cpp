@@ -200,7 +200,7 @@ void ClangImporter::recordModuleDependencies(
 
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
-    if (cache.hasDependencies(clangModuleDep.ModuleName,
+    if (cache.hasDependencies(clangModuleDep.ID.ModuleName,
                               ModuleDependenciesKind::Clang))
       continue;
 
@@ -257,7 +257,7 @@ void ClangImporter::recordModuleDependencies(
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
-    swiftArgs.push_back(clangModuleDep.ModuleName);
+    swiftArgs.push_back(clangModuleDep.ID.ModuleName);
 
     // Pass down search paths to the -emit-module action.
     // Unlike building Swift modules, we need to include all search paths to
@@ -284,7 +284,7 @@ void ClangImporter::recordModuleDependencies(
       dependencies.addModuleDependency(moduleName.ModuleName, &alreadyAddedModules);
     }
 
-    cache.recordDependencies(clangModuleDep.ModuleName,
+    cache.recordDependencies(clangModuleDep.ID.ModuleName,
                              std::move(dependencies));
   }
 }
