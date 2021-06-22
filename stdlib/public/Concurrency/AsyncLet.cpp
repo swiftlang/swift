@@ -16,9 +16,10 @@
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Concurrency.h"
-#include "swift/ABI/Task.h"
 #include "swift/ABI/AsyncLet.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/ABI/Task.h"
+#include "swift/ABI/TaskOptions.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
@@ -86,6 +87,16 @@ static AsyncLetImpl *asImpl(const AsyncLet *alet) {
       const_cast<AsyncLet*>(alet));
 }
 
+void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet) {
+  AsyncLetImpl *impl = new (asyncLet) AsyncLetImpl(task);
+
+  auto record = impl->getTaskRecord();
+  assert(impl == record && "the async-let IS the task record");
+
+  // ok, now that the group actually is initialized: attach it to the task
+  swift_task_addStatusRecord(record);
+}
+
 // =============================================================================
 // ==== start ------------------------------------------------------------------
 
@@ -95,35 +106,17 @@ static void swift_asyncLet_startImpl(AsyncLet *alet,
                                      const Metadata *futureResultType,
                                      void *closureEntryPoint,
                                      HeapObject *closureContext) {
-  AsyncTask *parent = swift_task_getCurrent();
-  assert(parent && "async-let cannot be created without parent task");
-
   auto flags = TaskCreateFlags();
-  flags.setPriority(parent->getPriority());
-  flags.setIsChildTask(true);
-  flags.setIsAsyncLetTask(true);
+  flags.setEnqueueJob(true);
 
-  auto childTaskAndContext = swift_task_create(
+  AsyncLetTaskOptionRecord asyncLetOptionRecord(alet);
+  asyncLetOptionRecord.Parent = options;
+
+  swift_task_create(
       flags.getOpaqueValue(),
-      options,
+      &asyncLetOptionRecord,
       futureResultType,
       closureEntryPoint, closureContext);
-
-  AsyncTask *childTask = childTaskAndContext.Task;
-
-  assert(childTask->isFuture());
-  assert(childTask->hasChildFragment());
-  AsyncLetImpl *impl = new (alet) AsyncLetImpl(childTask);
-
-  auto record = impl->getTaskRecord();
-  assert(impl == record && "the async-let IS the task record");
-
-  // ok, now that the group actually is initialized: attach it to the task
-  swift_task_addStatusRecord(record);
-
-  // schedule the task
-  // TODO: use the executor that may have been suggested in options
-  swift_task_enqueueGlobal(childTask);
 }
 
 // =============================================================================

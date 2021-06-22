@@ -2030,7 +2030,7 @@ public:
     Priority_width = 8,
 
     Task_IsChildTask                              = 8,
-    Task_IsAsyncLetTask                           = 9,
+    // bit 9 is unused
     Task_CopyTaskLocals                           = 10,
     Task_InheritContext                           = 11,
     Task_EnqueueJob                               = 12,
@@ -2045,9 +2045,6 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsChildTask,
                                 isChildTask,
                                 setIsChildTask)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsAsyncLetTask,
-                                isAsyncLetTask,
-                                setIsAsyncLetTask)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_CopyTaskLocals,
                                 copyTaskLocals,
                                 setCopyTaskLocals)
@@ -2148,6 +2145,8 @@ enum class TaskOptionRecordKind : uint8_t {
   Executor  = 0,
   /// Request a child task to be part of a specific task group.
   TaskGroup = 1,
+  /// Request a child task for an 'async let'.
+  AsyncLet  = 2,
 };
 
 /// Flags for cancellation records.
