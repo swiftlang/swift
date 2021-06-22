@@ -605,6 +605,13 @@ function(add_swift_host_library name)
   else()
     set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
   endif()
+
+  if(LLVM_USE_SANITIZER STREQUAL "Address")
+    target_compile_options(${name} PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address>
+      $<$<COMPILE_LANGUAGE:Swift>:-sanitize=address>
+      )
+  endif()
 endfunction()
 
 # Add a module of libswift
