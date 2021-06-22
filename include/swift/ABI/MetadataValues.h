@@ -2029,11 +2029,12 @@ public:
     Priority       = 0,
     Priority_width = 8,
 
-    Task_IsChildTask      = 8,
-    Task_IsAsyncLetTask   = 9,
-    Task_CopyThreadLocals = 10,
-    Task_InheritContext   = 11,
-    Task_EnqueueJob       = 12,
+    Task_IsChildTask                              = 8,
+    Task_IsAsyncLetTask                           = 9,
+    Task_CopyThreadLocals                         = 10,
+    Task_InheritContext                           = 11,
+    Task_EnqueueJob                               = 12,
+    Task_AddPendingGroupTaskUnconditionally       = 13,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2056,6 +2057,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_EnqueueJob,
                                 enqueueJob,
                                 setEnqueueJob)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_AddPendingGroupTaskUnconditionally,
+                                addPendingGroupTaskUnconditionally,
+                                setAddPendingGroupTaskUnconditionally)
 };
 
 /// Flags for schedulable jobs.

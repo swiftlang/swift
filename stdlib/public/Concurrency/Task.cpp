@@ -445,6 +445,12 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     }
   }
 
+  // Add to the task group, if requested.
+  if (taskCreateFlags.addPendingGroupTaskUnconditionally()) {
+    assert(group && "Missing group");
+    swift_taskGroup_addPending(group, /*unconditionally=*/true);
+  }
+
   AsyncTask *parent = nullptr;
   if (jobFlags.task_isChildTask()) {
     parent = swift_task_getCurrent();
@@ -610,6 +616,11 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   initialContext->Parent = nullptr;
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
+
+  // Attach to the group, if needed.
+  if (group) {
+    swift_taskGroup_attachChild(group, task);
+  }
 
   // If we're supposed to copy task locals, do so now.
   if (taskCreateFlags.copyThreadLocals()) {
