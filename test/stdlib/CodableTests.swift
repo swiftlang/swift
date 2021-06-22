@@ -597,6 +597,39 @@ class TestCodable : TestCodableSuper {
         }
     }
 
+    // MARK: - Optional
+    func test_Optional_enum_JSON() {
+        enum A: Codable, Equatable {
+            case a(Int?)
+        }
+
+        enum B: Codable, Equatable {
+            case b(Int? = nil)
+        }
+
+        enum C: Codable, Equatable {
+            case c(x: Int?)
+        }
+
+        enum D: Codable, Equatable {
+            case d(x: Int? = nil)
+        }
+
+        expectRoundTripEqualityThroughJSON(for: A.a(1), lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: A.a(nil), lineNumber: #line)
+
+        expectRoundTripEqualityThroughJSON(for: B.b(2), lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: B.b(nil), lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: B.b(), lineNumber: #line)
+
+        expectRoundTripEqualityThroughJSON(for: C.c(x: 3), lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: C.c(x: nil), lineNumber: #line)
+
+        expectRoundTripEqualityThroughJSON(for: D.d(x: 4), lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: D.d(x: nil), lineNumber: #line)
+        expectRoundTripEqualityThroughJSON(for: D.d(), lineNumber: #line)
+    }
+
     // MARK: - PartialRangeFrom
     func test_PartialRangeFrom_JSON() {
         let value = 0...
@@ -899,6 +932,7 @@ var tests = [
     "test_Locale_Plist" : TestCodable.test_Locale_Plist,
     "test_NSRange_JSON" : TestCodable.test_NSRange_JSON,
     "test_NSRange_Plist" : TestCodable.test_NSRange_Plist,
+    "test_Optional_enum_JSON" : TestCodable.test_Optional_enum_JSON,
     "test_PartialRangeFrom_JSON" : TestCodable.test_PartialRangeFrom_JSON,
     "test_PartialRangeFrom_Plist" : TestCodable.test_PartialRangeFrom_Plist,
     "test_PartialRangeThrough_JSON" : TestCodable.test_PartialRangeThrough_JSON,

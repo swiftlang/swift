@@ -1674,8 +1674,16 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           }
 
           // Type.self
-          auto *parameterTypeExpr = TypeExpr::createImplicit(
-              funcDC->mapTypeIntoContext(paramDecl->getInterfaceType()), C);
+          auto varType = funcDC->mapTypeIntoContext(
+                  paramDecl->getValueInterfaceType());
+
+          bool useIfPresentVariant = false;
+          if (auto objType = varType->getOptionalObjectType()) {
+            varType = objType;
+            useIfPresentVariant = true;
+          }
+
+          auto *parameterTypeExpr = TypeExpr::createImplicit(varType, C);
           auto *parameterMetaTypeExpr =
               new (C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
           // BarCodingKeys.x
@@ -1688,9 +1696,12 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           auto *nestedContainerExpr = new (C)
               DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
                           /*Implicit=*/true, AccessSemantics::DirectToStorage);
+
           // decode(_:, forKey:)
+          auto methodName = useIfPresentVariant ? C.Id_decodeIfPresent
+                                                : C.Id_decode;
           auto *decodeCall = UnresolvedDotExpr::createImplicit(
-              C, nestedContainerExpr, C.Id_decode, {Identifier(), C.Id_forKey});
+              C, nestedContainerExpr, methodName, {Identifier(), C.Id_forKey});
 
           // nestedContainer.decode(Type.self, forKey: BarCodingKeys.x)
           auto *callExpr = CallExpr::createImplicit(
