@@ -1547,22 +1547,6 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// AsyncTaskAndContext swift_task_create_future(
-//     size_t flags,
-//     TaskOptionRecord *options,
-//     const Metadata *futureResultType,
-//     void *closureEntry, HeapObject *closureContext);
-FUNCTION(TaskCreateFuture,
-         swift_task_create_future, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(AsyncTaskAndContextTy),
-         ARGS(SizeTy,
-              SwiftTaskOptionRecordPtrTy,
-              TypeMetadataPtrTy,
-              Int8PtrTy,
-              RefCountedPtrTy),
-         ATTRS(NoUnwind, ArgMemOnly))
-
 // AsyncTaskAndContext swift_task_create_group_future(
 //     size_t flags,
 //     TaskGroup *group,

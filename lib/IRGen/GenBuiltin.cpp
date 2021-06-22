@@ -271,7 +271,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture ||
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture) {
 
     auto flags = args.claimNext();
@@ -286,7 +285,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
     auto newTaskAndContext = emitTaskCreate(
         IGF,
-        Builtin.ID == BuiltinValueKind::CreateAsyncTask,
         flags,
         taskGroup,
         taskOptions,
