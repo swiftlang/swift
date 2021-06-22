@@ -2031,7 +2031,7 @@ public:
 
     Task_IsChildTask                              = 8,
     Task_IsAsyncLetTask                           = 9,
-    Task_CopyThreadLocals                         = 10,
+    Task_CopyTaskLocals                           = 10,
     Task_InheritContext                           = 11,
     Task_EnqueueJob                               = 12,
     Task_AddPendingGroupTaskUnconditionally       = 13,
@@ -2048,9 +2048,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsAsyncLetTask,
                                 isAsyncLetTask,
                                 setIsAsyncLetTask)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_CopyThreadLocals,
-                                copyThreadLocals,
-                                setCopyThreadLocals)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_CopyTaskLocals,
+                                copyTaskLocals,
+                                setCopyTaskLocals)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_InheritContext,
                                 inheritContext,
                                 setInheritContext)

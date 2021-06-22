@@ -622,7 +622,7 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   }
 
   // If we're supposed to copy task locals, do so now.
-  if (taskCreateFlags.copyThreadLocals()) {
+  if (taskCreateFlags.copyTaskLocals()) {
     swift_task_localsCopyTo(task);
   }
 

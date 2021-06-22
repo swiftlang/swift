@@ -423,7 +423,7 @@ struct TaskCreateFlags {
 
   /// Whether to copy thread locals from the currently-executing task into the
   /// newly-created task.
-  var copyThreadLocals: Bool {
+  var copyTaskLocals: Bool {
     get {
       (bits & (1 << 10)) != 0
     }
@@ -514,7 +514,7 @@ extension Task where Failure == Never {
     var flags = TaskCreateFlags()
     flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
     flags.inheritContext = true
-    flags.copyThreadLocals = true
+    flags.copyTaskLocals = true
     flags.enqueueJob = true
 
     // Create the asynchronous task.
@@ -548,7 +548,7 @@ extension Task where Failure == Error {
     var flags = TaskCreateFlags()
     flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
     flags.inheritContext = true
-    flags.copyThreadLocals = true
+    flags.copyTaskLocals = true
     flags.enqueueJob = true
 
     // Create the asynchronous task future.
