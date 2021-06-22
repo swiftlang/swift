@@ -84,6 +84,15 @@ AsyncTaskAndContext swift_task_create_group_future_f(
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, size_t initialContextSize);
 
+/// Create a task object.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create(
+    size_t flags,
+    TaskOptionRecord *options,
+    const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function, void *closureContext,
+    size_t initialContextSize);
+
 /// Allocate memory in a task.
 ///
 /// This must be called synchronously with the task.
