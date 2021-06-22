@@ -796,15 +796,20 @@ public:
         llvm::raw_svector_ostream OS(Buffer);
         PrintOptions Options;
         Options.SynthesizeSugarOnTypes = true;
-        VD->getType()->print(OS, Options);
+        auto Ty = VD->getType();
+        // Skip this declaration if the type is an error type.
+        if (Ty->is<ErrorType>()) {
+          return false;
+        }
+        Ty->print(OS, Options);
       }
       // Transfer the type to `OS` if needed and get the offsets of this string
       // in `OS`.
-      auto Ty = getTypeOffsets(Buffer.str());
+      auto TyOffsets = getTypeOffsets(Buffer.str());
       bool HasExplicitType =
           VD->getTypeReprOrParentPatternTypeRepr() != nullptr;
       // Add the type information to the result list.
-      Results.emplace_back(VarOffset, VarLength, HasExplicitType, Ty.first);
+      Results.emplace_back(VarOffset, VarLength, HasExplicitType, TyOffsets.first);
     }
     return true;
   }
