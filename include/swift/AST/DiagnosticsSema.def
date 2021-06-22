@@ -380,6 +380,12 @@ ERROR(cannot_convert_argument_value_generic,none,
 ERROR(conflicting_arguments_for_generic_parameter,none,
       "conflicting arguments to generic parameter %0 (%1)",
       (Type, StringRef))
+NOTE(generic_parameter_inferred_from_closure,none,
+     "generic parameter %0 inferred as %1 from closure return expression",
+     (Type, Type))
+NOTE(generic_parameter_inferred_from_result_context,none,
+     "generic parameter %0 inferred as %1 from context",
+     (Type, Type))
 
 // @_nonEphemeral conversion diagnostics
 ERROR(cannot_pass_type_to_non_ephemeral,none,
