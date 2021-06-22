@@ -98,14 +98,14 @@ OVERRIDE_ACTOR(task_switch, void,
 
 OVERRIDE_TASK(task_create, AsyncTaskAndContext,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
-              (size_t flags,
+              (size_t taskCreateFlags,
                TaskOptionRecord *options,
                const Metadata *futureResultType,
                FutureAsyncSignature::FunctionType *function,
                void *closureContext,
                size_t initialContextSize),
-              (flags, options, futureResultType, function, closureContext,
-               initialContextSize))
+              (taskCreateFlags, options, futureResultType, function,
+               closureContext, initialContextSize))
 
 OVERRIDE_TASK(task_future_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
               SWIFT_CC(swiftasync), swift::,

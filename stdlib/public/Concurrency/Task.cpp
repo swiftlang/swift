@@ -400,17 +400,28 @@ task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 /// task's stack allocator.
 SWIFT_CC(swift)
 static AsyncTaskAndContext swift_task_createImpl(
-    size_t rawFlags,
+    size_t rawTaskCreateFlags,
     TaskOptionRecord *options,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, void *closureContext,
     size_t initialContextSize) {
-  JobFlags flags(rawFlags);
-  bool isAsyncLetTask = flags.task_isAsyncLetTask();
-  assert((futureResultType != nullptr) == flags.task_isFuture());
-  assert(!isAsyncLetTask || isAsyncLetTask == flags.task_isChildTask());
-  assert(!flags.task_isFuture() ||
-         initialContextSize >= sizeof(FutureAsyncContext));
+  TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
+
+  // Propagate task-creation flags to job flags as appropriate.
+  JobFlags jobFlags(JobKind::Task, taskCreateFlags.getPriority());
+
+  bool isAsyncLetTask = taskCreateFlags.isAsyncLetTask();
+  if (isAsyncLetTask) {
+    jobFlags.task_setIsAsyncLetTask(true);
+    jobFlags.task_setIsChildTask(true);
+  } else {
+    jobFlags.task_setIsChildTask(taskCreateFlags.isChildTask());
+  }
+
+  if (futureResultType) {
+    jobFlags.task_setIsFuture(true);
+    assert(initialContextSize >= sizeof(FutureAsyncContext));
+  }
 
   // Collect the options we know about.
   ExecutorRef executor = ExecutorRef::generic();
@@ -423,24 +434,20 @@ static AsyncTaskAndContext swift_task_createImpl(
 
     case TaskOptionRecordKind::TaskGroup:
       group = cast<TaskGroupTaskOptionRecord>(option)->getGroup();
-      break;
-
-    default:
-      // Ignore unknown options.
+      assert(group && "Missing group");
+      jobFlags.task_setIsGroupChildTask(true);
       break;
     }
   }
 
-  assert((group != nullptr) == flags.task_isGroupChildTask());
-
   AsyncTask *parent = nullptr;
-  if (flags.task_isChildTask()) {
+  if (jobFlags.task_isChildTask()) {
     parent = swift_task_getCurrent();
     assert(parent != nullptr && "creating a child task with no active task");
 
     // Inherit the priority of the parent task if unspecified.
-    if (flags.getPriority() == JobPriority::Unspecified)
-      flags.setPriority(parent->getPriority());
+    if (jobFlags.getPriority() == JobPriority::Unspecified)
+      jobFlags.setPriority(parent->getPriority());
   }
 
   // Figure out the size of the header.
@@ -448,7 +455,7 @@ static AsyncTaskAndContext swift_task_createImpl(
   if (parent) {
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
-  if (flags.task_isGroupChildTask()) {
+  if (group) {
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
   if (futureResultType) {
@@ -521,10 +528,10 @@ static AsyncTaskAndContext swift_task_createImpl(
     // Initialize the refcount bits to "immortal", so that
     // ARC operations don't have any effect on the task.
     task = new(allocation) AsyncTask(&taskHeapMetadata,
-                             InlineRefCounts::Immortal, flags,
+                             InlineRefCounts::Immortal, jobFlags,
                              function, initialContext);
   } else {
-    task = new(allocation) AsyncTask(&taskHeapMetadata, flags,
+    task = new(allocation) AsyncTask(&taskHeapMetadata, jobFlags,
                                     function, initialContext);
   }
 
@@ -535,7 +542,7 @@ static AsyncTaskAndContext swift_task_createImpl(
   }
 
   // Initialize the group child fragment if applicable.
-  if (flags.task_isGroupChildTask()) {
+  if (group) {
     auto groupChildFragment = task->groupChildFragment();
     new (groupChildFragment) AsyncTask::GroupChildFragment(group);
   }
@@ -597,6 +604,16 @@ static AsyncTaskAndContext swift_task_createImpl(
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
+  // If we're supposed to copy task locals, do so now.
+  if (taskCreateFlags.copyThreadLocals()) {
+    swift_task_localsCopyTo(task);
+  }
+
+  // If we're supposed to enqueue the task, do so now.
+  if (taskCreateFlags.enqueueJob()) {
+    swift_task_enqueue(task, executor);
+  }
+
   return {task, initialContext};
 }
 
@@ -625,6 +642,18 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
       function, initialContextSize);
 }
 
+/// Temporary hack to convert from job flags to task-creation flags,
+/// until we can eliminate the entry points that operate in terms of job
+/// flags.
+static size_t convertJobFlagsToTaskCreateFlags(size_t rawJobFlags) {
+  JobFlags jobFlags(rawJobFlags);
+  TaskCreateFlags taskCreateFlags;
+  taskCreateFlags.setPriority(jobFlags.getPriority());
+  taskCreateFlags.setIsChildTask(jobFlags.task_isChildTask());
+  taskCreateFlags.setIsAsyncLetTask(jobFlags.task_isAsyncLetTask());
+  return taskCreateFlags.getOpaqueValue();
+}
+
 AsyncTaskAndContext swift::swift_task_create_group_future_f(
     size_t flags,
     TaskGroup *group,
@@ -639,8 +668,8 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   }
 
   return swift_task_create(
-      flags, options, futureResultType, function, /*closureContext=*/nullptr,
-      initialContextSize);
+      convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
+      function, /*closureContext=*/nullptr, initialContextSize);
 }
 
 /// Extract the entry point address and initial context size from an async closure value.
@@ -674,8 +703,8 @@ AsyncTaskAndContext swift::swift_task_create_future(
     >(closureEntry, closureContext);
 
   return swift_task_create(
-      flags, options, futureResultType, taskEntry, closureContext,
-      initialContextSize);
+      convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
+      taskEntry, closureContext, initialContextSize);
 }
 
 AsyncTaskAndContext swift::swift_task_create_async_let_future(
@@ -694,8 +723,8 @@ AsyncTaskAndContext swift::swift_task_create_async_let_future(
   JobFlags flags(rawFlags);
   flags.task_setIsAsyncLetTask(true);
   return swift_task_create(
-      flags.getOpaqueValue(), options, futureResultType,
-      taskEntry, closureContext, initialContextSize);
+      convertJobFlagsToTaskCreateFlags(flags.getOpaqueValue()), options,
+      futureResultType, taskEntry, closureContext, initialContextSize);
 }
 
 AsyncTaskAndContext
@@ -722,8 +751,8 @@ swift::swift_task_create_group_future(
   }
 
   return swift_task_create(
-      flags, options, futureResultType, taskEntry, closureContext,
-      initialContextSize);
+      convertJobFlagsToTaskCreateFlags(flags), options, futureResultType,
+      taskEntry, closureContext, initialContextSize);
 }
 
 SWIFT_CC(swiftasync)
