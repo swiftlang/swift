@@ -40,8 +40,6 @@
 /// method that unconditionally throws an error, traps, or otherwise does
 /// not terminate.
 ///
-///     // `fatalError` returns `Never`, therefore this function cannot 
-///     // return a value (as the program will terminate before that point)
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
