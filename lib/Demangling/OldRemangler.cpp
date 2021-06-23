@@ -581,13 +581,19 @@ void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
 }
 
 void Remangler::manglePartialApplyForwarder(Node *node) {
-  Buffer << "PA__T";
-  mangleSingleChildNode(node); // global
+  Buffer << "PA";
+  if (node->getNumChildren() == 1) {
+    Buffer << "__T";
+    mangleSingleChildNode(node); // global
+  }
 }
 
 void Remangler::manglePartialApplyObjCForwarder(Node *node) {
-  Buffer << "PAo__T";
-  mangleSingleChildNode(node); // global
+  Buffer << "PAo";
+  if (node->getNumChildren() == 1) {
+    Buffer << "__T";
+    mangleSingleChildNode(node); // global
+  }
 }
 
 void Remangler::mangleMergedFunction(Node *node) {
