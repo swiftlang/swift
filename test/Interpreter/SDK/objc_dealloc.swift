@@ -3,6 +3,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://79672466 - This test fails for watchsimulator-i386
+// UNSUPPORTED: OS=watchos && CPU=i386
+
 import Foundation
 
 // Check that ObjC associated objects are cleaned up when attached to native

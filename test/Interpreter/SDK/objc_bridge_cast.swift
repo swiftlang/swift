@@ -3,6 +3,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://79672466 - This test fails on watchsimulator-i386
+// UNSUPPORTED: OS=watchos && CPU=i386
+
 // Test dynamic casts that bridge value types through the runtime.
 
 import Foundation
