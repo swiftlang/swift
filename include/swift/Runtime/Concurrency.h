@@ -44,15 +44,6 @@ AsyncTaskAndContext swift_task_create(
     const Metadata *futureResultType,
     void *closureEntry, HeapObject *closureContext);
 
-/// Create a task object that will run the given function.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_f(
-    size_t flags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    ThinNullaryAsyncSignature::FunctionType *function,
-    size_t initialContextSize);
-
 /// Caution: not all future-initializing functions actually throw, so
 /// this signature may be incorrect.
 using FutureAsyncSignature =
