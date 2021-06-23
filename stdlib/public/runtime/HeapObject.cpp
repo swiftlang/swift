@@ -700,10 +700,10 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
-#if !TARGET_OS_SIMULATOR || !__x86_64__
-  const bool fastDeallocSupported = true;
-#else
+#if TARGET_OS_SIMULATOR && (__x86_64__ || __i386__)
   const bool fastDeallocSupported = false;
+#else
+  const bool fastDeallocSupported = true;
 #endif
   if (!fastDeallocSupported || !object->refCounts.getPureSwiftDeallocation()) {
     objc_destructInstance((id)object);
