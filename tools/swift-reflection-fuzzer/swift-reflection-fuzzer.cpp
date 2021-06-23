@@ -77,9 +77,9 @@ public:
     case DLQ_GetPtrAuthMask: {
       auto result = static_cast<uintptr_t *>(outBuffer);
 #if __has_feature(ptrauth_calls)
-      *result = (uintptr_t)ptrauth_strip((void*)0x0007ffffffffffff, 0);
+      *result = static_cast<uintptr_t>(ptrauth_strip(static_cast<void *>(0x0007ffffffffffff), 0));
 #else
-      *result = (uintptr_t)~0ull;
+      *result = ~uintptr_t(0);
 #endif
       return true;
     }
