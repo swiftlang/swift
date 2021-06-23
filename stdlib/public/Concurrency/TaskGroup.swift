@@ -235,19 +235,20 @@ public struct TaskGroup<ChildTaskResult> {
   /// - Returns:
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
+  @_alwaysEmitIntoClient
   public mutating func async(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.isChildTask = true
-    flags.enqueueJob = true
-    flags.addPendingGroupTaskUnconditionally = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: true
+    )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
+    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -268,6 +269,7 @@ public struct TaskGroup<ChildTaskResult> {
   /// - Returns:
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
+  @_alwaysEmitIntoClient
   public mutating func asyncUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
@@ -280,13 +282,14 @@ public struct TaskGroup<ChildTaskResult> {
       return false
     }
 
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.isChildTask = true
-    flags.enqueueJob = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
+    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 
     return true
 #else
@@ -456,19 +459,20 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// - Returns:
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
+  @_alwaysEmitIntoClient
   public mutating func async(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.isChildTask = true
-    flags.enqueueJob = true
-    flags.addPendingGroupTaskUnconditionally = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: true
+    )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
+    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 #else
     fatalError("Unsupported Swift compiler")
 #endif
@@ -489,6 +493,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// - Returns:
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
+  @_alwaysEmitIntoClient
   public mutating func asyncUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
@@ -501,13 +506,14 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
       return false
     }
 
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.isChildTask = true
-    flags.enqueueJob = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
 
     // Create the task in this group.
-    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
+    _ = Builtin.createAsyncTaskInGroup(flags, _group, operation)
 
     return true
 #else
@@ -820,6 +826,7 @@ func _taskGroupDestroy(group: __owned Builtin.RawPointer)
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_taskGroup_addPending")
+@usableFromInline
 func _taskGroupAddPendingTask(
   group: Builtin.RawPointer,
   unconditionally: Bool
