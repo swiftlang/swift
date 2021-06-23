@@ -906,10 +906,20 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   const WitnessTable *foundWitness = nullptr;
   const Metadata *foundType = nullptr;
   for (auto searchType : iterateMaybeIncompleteSuperclasses(type)) {
-    foundWitness = foundWitnesses.lookup(searchType);
-    if (foundWitness) {
-      foundType = searchType;
-      break;
+    const WitnessTable *witness = foundWitnesses.lookup(searchType);
+    if (witness) {
+      if (!foundType) {
+        foundWitness = witness;
+        foundType = searchType;
+      } else {
+        swift::warning(RuntimeErrorFlagNone,
+                       "Warning: '%s' conforms to protocol '%s', but it also "
+                       "inherits conformance from '%s'.  Relying on a "
+                       "particular conformance is undefined behaviour.\n",
+                       foundType->getDescription()->Name.get(),
+                       protocol->Name.get(),
+                       searchType->getDescription()->Name.get());
+      }
     }
   }
 
