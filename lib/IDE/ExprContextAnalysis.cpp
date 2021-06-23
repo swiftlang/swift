@@ -682,7 +682,7 @@ static bool collectPossibleCalleesForApply(
       fnType = *fnTypeOpt;
   }
 
-  if (!fnType || fnType->hasUnresolvedType() || fnType->hasError())
+  if (!fnType || fnType->hasError())
     return false;
   fnType = fnType->getWithoutSpecifierType();
 
