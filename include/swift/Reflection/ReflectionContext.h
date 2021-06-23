@@ -23,6 +23,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Support/Memory.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include "swift/ABI/Enum.h"
 #include "swift/ABI/ObjectFile.h"
@@ -642,6 +643,47 @@ public:
 
     // We don't recognize the format.
     return false;
+  }
+
+  /// Adds an image using the FindSection closure to find the swift metadata
+  /// sections. \param FindSection
+  ///     Closure that finds sections by name. ReflectionContext is in charge
+  ///     of freeing the memory buffer in the RemoteRef return value.
+  ///     process.
+  /// \return
+  ///     \b True if any of the reflection sections were registered,
+  ///     \b false otherwise.
+  bool addImage(llvm::function_ref<
+                std::pair<RemoteRef<void>, uint64_t>(ReflectionSectionKind)>
+                    FindSection) {
+    auto Sections = {
+        ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
+        ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
+        ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr};
+
+    llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
+    for (auto Section : Sections) {
+      Pairs.push_back(FindSection(Section));
+      auto LatestRemoteRef = std::get<RemoteRef<void>>(Pairs.back());
+      if (LatestRemoteRef) {
+        MemoryReader::ReadBytesResult Buffer(
+            LatestRemoteRef.getLocalBuffer(),
+            [](const void *Ptr) { free(const_cast<void *>(Ptr)); });
+
+        savedBuffers.push_back(std::move(Buffer));
+      }
+    }
+
+    // If we didn't find any sections, return.
+    if (llvm::all_of(Pairs, [](const auto &Pair) { return !Pair.first; }))
+      return false;
+
+    ReflectionInfo Info = {
+        {Pairs[0].first, Pairs[0].second}, {Pairs[1].first, Pairs[1].second},
+        {Pairs[2].first, Pairs[2].second}, {Pairs[3].first, Pairs[3].second},
+        {Pairs[4].first, Pairs[4].second}, {Pairs[5].first, Pairs[5].second}};
+    this->addReflectionInfo(Info);
+    return true;
   }
 
   void addReflectionInfo(ReflectionInfo I) {
