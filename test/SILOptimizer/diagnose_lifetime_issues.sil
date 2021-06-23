@@ -1,0 +1,121 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-lifetime-issues -o /dev/null -verify
+
+import Builtin
+import Swift
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+class Delegate {
+  func foo() { }
+}
+
+class MyDelegate : Delegate {}
+
+final class Container {
+  weak var delegate: Delegate?
+  var strongRef: Delegate
+
+  func callDelegate()
+
+  func strongDelegate(d: Delegate)
+}
+
+class WeakCycle {
+  weak var c: WeakCycle?
+}
+
+sil [ossa] @$s24diagnose_lifetime_issues10MyDelegateCACycfC : $@convention(method) (@thick MyDelegate.Type) -> @owned MyDelegate
+sil [ossa] @$s24diagnose_lifetime_issues14strongDelegate1dyAA0D0C_tF : $@convention(method) (@guaranteed Delegate, @guaranteed Container) -> ()
+
+// Test a warning for a reference that is copied, cast, and assigned
+// to an enum before it is assigned to a weak reference.
+sil [ossa] @testCastWarn : $@convention(thin) (@guaranteed Container) -> () {
+bb0(%0 : @guaranteed $Container):
+  debug_value %0 : $Container, let, name "container", argno 1
+  %2 = metatype $@thick MyDelegate.Type
+  // function_ref MyDelegate.__allocating_init()
+  %3 = function_ref @$s24diagnose_lifetime_issues10MyDelegateCACycfC : $@convention(method) (@thick MyDelegate.Type) -> @owned MyDelegate
+
+  // This is the owned allocation.
+  %4 = apply %3(%2) : $@convention(method) (@thick MyDelegate.Type) -> @owned MyDelegate
+  %11 = copy_value %4 : $MyDelegate
+
+  // This upcast+enum is not an escape.
+  %12 = upcast %11 : $MyDelegate to $Delegate
+  %13 = enum $Optional<Delegate>, #Optional.some!enumelt, %12 : $Delegate
+  %14 = ref_element_addr %0 : $Container, #Container.delegate
+  %15 = begin_access [modify] [dynamic] %14 : $*@sil_weak Optional<Delegate>
+
+  // This is the weak assignment.
+  store_weak %13 to %15 : $*@sil_weak Optional<Delegate> // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
+  destroy_value %13 : $Optional<Delegate>
+  end_access %15 : $*@sil_weak Optional<Delegate>
+  destroy_value %4 : $MyDelegate
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// Test that a reference that escapes within a borrow scope has no warning.
+sil hidden [ossa] @testBorrowNoWarn : $@convention(thin) (@guaranteed Container) -> () {
+// %0 "container"
+bb0(%0 : @guaranteed $Container):
+  debug_value %0 : $Container, let, name "container", argno 1
+  %2 = metatype $@thick MyDelegate.Type
+  // function_ref MyDelegate.__allocating_init()
+  %3 = function_ref @$s24diagnose_lifetime_issues10MyDelegateCACycfC : $@convention(method) (@thick MyDelegate.Type) -> @owned MyDelegate
+
+  // This is the owned allocation.
+  %4 = apply %3(%2) : $@convention(method) (@thick MyDelegate.Type) -> @owned MyDelegate
+  debug_value %4 : $MyDelegate, let, name "delegate"
+  %6 = begin_borrow %4 : $MyDelegate
+  %7 = upcast %6 : $MyDelegate to $Delegate
+  // function_ref Container.strongDelegate(d:)
+  %8 = function_ref @$s24diagnose_lifetime_issues14strongDelegate1dyAA0D0C_tF : $@convention(method) (@guaranteed Delegate, @guaranteed Container) -> ()
+
+  // This apply is an escape.
+  %9 = apply %8(%7, %0) : $@convention(method) (@guaranteed Delegate, @guaranteed Container) -> ()
+  end_borrow %6 : $MyDelegate
+  %11 = copy_value %4 : $MyDelegate
+  %12 = upcast %11 : $MyDelegate to $Delegate
+  %13 = enum $Optional<Delegate>, #Optional.some!enumelt, %12 : $Delegate
+  %14 = ref_element_addr %0 : $Container, #Container.delegate
+  %15 = begin_access [modify] [dynamic] %14 : $*@sil_weak Optional<Delegate>
+
+  // This is the weak assignment.
+  store_weak %13 to %15 : $*@sil_weak Optional<Delegate>
+  destroy_value %13 : $Optional<Delegate>
+  end_access %15 : $*@sil_weak Optional<Delegate>
+  destroy_value %4 : $MyDelegate
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// Helper for testReturnsAfterStore
+sil hidden [ossa] @testStoresWeakly : $@convention(method) (@owned WeakCycle) -> @owned WeakCycle {
+bb0(%0 : @owned $WeakCycle):
+  %18 = begin_borrow %0 : $WeakCycle
+  %19 = copy_value %0 : $WeakCycle
+  %20 = enum $Optional<WeakCycle>, #Optional.some!enumelt, %19 : $WeakCycle
+  %21 = ref_element_addr %18 : $WeakCycle, #WeakCycle.c
+  %22 = begin_access [modify] [dynamic] %21 : $*@sil_weak Optional<WeakCycle>
+  store_weak %20 to %22 : $*@sil_weak Optional<WeakCycle>
+  destroy_value %20 : $Optional<WeakCycle>
+  end_access %22 : $*@sil_weak Optional<WeakCycle>
+  end_borrow %18 : $WeakCycle
+  %27 = copy_value %0 : $WeakCycle
+  destroy_value %0 : $WeakCycle
+  return %27 : $WeakCycle
+}
+
+// Test no warning for a value returned after a weak store.
+sil hidden [exact_self_class] [ossa] @testReturnsAfterStore : $@convention(method) (@thick WeakCycle.Type) -> @owned WeakCycle {
+bb0(%0 : $@thick WeakCycle.Type):
+  %1 = alloc_ref $WeakCycle
+
+  %2 = function_ref @testStoresWeakly : $@convention(method) (@owned WeakCycle) -> @owned WeakCycle
+  %3 = apply %2(%1) : $@convention(method) (@owned WeakCycle) -> @owned WeakCycle
+  return %3 : $WeakCycle
+}
