@@ -191,7 +191,6 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
 
   // This is @_silgen_name("swift_asyncLet_start")
-  IGF.IGM.getAsyncLetStartFn()->dump();
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
                                       {alet,
                                        taskOptions,
