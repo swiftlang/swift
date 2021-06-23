@@ -1,4 +1,6 @@
 // REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx
+
 // RUN: %empty-directory(%t.module-cache)
 // RUN: %target-swift-frontend -emit-module -o %t.foo.swiftmodule -module-cache-path %t.module-cache -I %S/Inputs/CHeaders -I %S/Inputs/Swift %s -target %target-cpu-apple-macosx10.14
 
