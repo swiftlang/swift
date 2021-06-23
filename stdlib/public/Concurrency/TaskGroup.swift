@@ -68,7 +68,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
 ) async -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinTaskGroup
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
 
   let _group = Builtin.createTaskGroup(ChildTaskResult.self)
   var group = TaskGroup<ChildTaskResult>(group: _group)
@@ -147,7 +147,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
 ) async rethrows -> GroupResult {
-  #if compiler(>=5.5) && $BuiltinTaskGroup
+  #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
 
   let _group = Builtin.createTaskGroup(ChildTaskResult.self)
   var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
