@@ -1426,9 +1426,6 @@ static ManagedValue emitBuiltinCreateAsyncTask(
       SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
   }).borrow(SGF, loc).forward(SGF);
 
-  // Task options
-  auto taskOptions = args[1].borrow(SGF, loc).forward(SGF);;
-
   // Ensure that the closure has the appropriate type.
   auto extInfo =
       ASTExtInfoBuilder()
@@ -1445,7 +1442,7 @@ static ManagedValue emitBuiltinCreateAsyncTask(
   AbstractionPattern origParam(genericSig, functionTy);
   CanType substParamType = functionTy.subst(subs)->getCanonicalType();
   auto reabstractedFun =
-      SGF.emitSubstToOrigValue(loc, args[2], origParam, substParamType);
+      SGF.emitSubstToOrigValue(loc, args[1], origParam, substParamType);
 
   auto function = emitFunctionArgumentForAsyncTaskEntryPoint(
       SGF, loc, reabstractedFun, futureResultType);
@@ -1454,7 +1451,7 @@ static ManagedValue emitBuiltinCreateAsyncTask(
       loc,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, taskOptions, futureResultMetadata, function.forward(SGF) });
+      { flags, futureResultMetadata, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 

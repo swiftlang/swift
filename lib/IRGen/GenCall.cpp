@@ -3861,16 +3861,14 @@ llvm::Value *irgen::emitTaskCreate(
     IRGenFunction &IGF,
     llvm::Value *flags,
     llvm::Value *taskGroup,
-    llvm::Value *taskOptions,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction,
     llvm::Value *localContextInfo,
     SubstitutionMap subs) {
-  taskOptions = IGF.Builder.CreateBitOrPointerCast(
-      taskOptions, IGF.IGM.SwiftTaskOptionRecordPtrTy);
-
   // If there is a task group, emit a task group option structure to contain
   // it.
+  llvm::Value *taskOptions = llvm::ConstantInt::get(
+      IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
   if (taskGroup) {
     TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
     llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(

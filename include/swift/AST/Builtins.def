@@ -807,7 +807,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
 
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
-///     Builtin.RawPointer?,            // options (TaskOptionRecord*)
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///

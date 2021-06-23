@@ -278,10 +278,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskInGroup)
         ? args.claimNext()
         : nullptr;
-    llvm::Value *taskOptions =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTask)
-        ? args.claimNext()
-        : llvm::ConstantInt::get(IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
     auto futureResultType = args.claimNext();
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
@@ -290,7 +286,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
         IGF,
         flags,
         taskGroup,
-        taskOptions,
         futureResultType,
         taskFunction, taskContext,
         substitutions);
