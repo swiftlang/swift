@@ -39,7 +39,7 @@ bb0(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %2: @guaranteed $@async @call
   %9 = metatype $@thick T.Type
   %10 = init_existential_metatype %9 : $@thick T.Type, $@thick Any.Type
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create(
-  %20 = builtin "createAsyncTask"<T>(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %10 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTask"<T>(%0 : $Int, %10 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %21 = tuple ()
   return %21 : $()
@@ -78,7 +78,7 @@ bb0(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %2: @guaranteed $@async @call
   %8 = metatype $@thick ().Type                   // user: %9
   %9 = init_existential_metatype %8 : $@thick ().Type, $@thick Any.Type // user: %10
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create(
-  %20 = builtin "createAsyncTask"<()>(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %9 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTask"<()>(%0 : $Int, %9 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
   %21 = tuple ()
   return %21 : $()
