@@ -207,7 +207,18 @@ GlobalActorAttributeRequest::evaluate(
   if (auto decl = subject.dyn_cast<Decl *>()) {
     dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
-    loc = decl->getLoc();
+    // HACK: `getLoc`, when querying the attr from  a serialized decl,
+    // dependning on deserialization order, may launch into arbitrary
+    // type-checking when querying interface types of such decls. Which,
+    // in turn, may do things like query (to print) USRs. This ends up being
+    // prone to request evaluator cycles.
+    //
+    // Because this only applies to serialized decls, we can be confident
+    // that they already went through this type-checking as primaries, so,
+    // for now, to avoid cycles, we simply ignore the locs on serialized decls
+    // only.
+    // This is a workaround for rdar://79563942
+    loc = decl->getLoc(/* SerializedOK */ false);
   } else {
     auto closure = subject.get<ClosureExpr *>();
     dc = closure;
