@@ -789,62 +789,6 @@ extension UnsafeCurrentTask: Equatable {
 }
 
 // ==== Internal ---------------------------------------------------------------
-
-@available(SwiftStdlib 5.5, *)
-struct TaskOptionRecord {
-  // The kind of option record.
-  enum Kind: UInt8 {
-    case executor  = 0
-    case taskGroup = 1
-    case asyncLet  = 2
-  }
-
-  // Flags stored within an option record.
-  struct Flags {
-    var bits: Int = 0
-
-    init(kind: Kind) {
-      self.bits = 0
-      self.kind = kind
-    }
-
-    /// The kind of option record described by these flags.
-    var kind: Kind {
-      get {
-        Kind(rawValue: UInt8(bits & 0xFF))!
-      }
-
-      set {
-        bits = (bits & ~0xFF) | Int(newValue.rawValue)
-      }
-    }
-  }
-
-  var flags: Flags
-  var parent: UnsafeMutablePointer<TaskOptionRecord>? = nil
-
-  init(kind: Kind, parent: UnsafeMutablePointer<TaskOptionRecord>? = nil) {
-    self.flags = Flags(kind: kind)
-    self.parent = parent
-  }
-}
-
-@available(SwiftStdlib 5.5, *)
-extension TaskOptionRecord {
-  struct TaskGroup {
-    var base: TaskOptionRecord
-    var group: Builtin.RawPointer
-
-    init(
-      parent: UnsafeMutablePointer<TaskOptionRecord>? = nil,
-      group: Builtin.RawPointer
-    ) {
-      self.base = .init(kind: .taskGroup, parent: parent)
-      self.group = group
-    }
-  }
-}
-
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_getCurrent")
 func _getCurrentAsyncTask() -> Builtin.NativeObject?
