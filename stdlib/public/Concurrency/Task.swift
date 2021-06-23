@@ -36,9 +36,12 @@ import Swift
 /// individually schedulable as jobs.  Jobs are generally not interacted
 /// with by end-users directly, unless implementing a scheduler.
 @available(SwiftStdlib 5.5, *)
+@frozen
 public struct Task<Success, Failure: Error>: Sendable {
+  @usableFromInline
   internal let _task: Builtin.NativeObject
 
+  @_alwaysEmitIntoClient
   internal init(_ task: Builtin.NativeObject) {
     self._task = task
   }
@@ -381,109 +384,32 @@ struct JobFlags {
 
 // ==== Task Creation Flags --------------------------------------------------
 
-/// Flags for schedulable jobs.
-///
-/// This is a port of the C++ FlagSet.
+/// Form task creation flags for use with the createAsyncTask builtins.
 @available(SwiftStdlib 5.5, *)
-struct TaskCreateFlags {
-  /// The actual bit representation of these flags.
-  var bits: Int = 0
-
-  /// The priority given to the job.
-  var priority: TaskPriority? {
-    get {
-      let value = Int(bits) & 0xFF
-
-      if value == 0 {
-        return nil
-      }
-
-      return TaskPriority(rawValue: UInt8(value))
-    }
-
-    set {
-      bits = (bits & ~0xFF) | Int(newValue?.rawValue ?? 0)
-    }
+@_alwaysEmitIntoClient
+func taskCreateFlags(
+  priority: TaskPriority?, isChildTask: Bool, copyTaskLocals: Bool,
+  inheritContext: Bool, enqueueJob: Bool,
+  addPendingGroupTaskUnconditionally: Bool
+) -> Int {
+  var bits = 0
+  bits |= (bits & ~0xFF) | Int(priority?.rawValue ?? 0)
+  if isChildTask {
+    bits |= 1 << 8
   }
-
-  /// Whether this is a child task.
-  var isChildTask: Bool {
-    get {
-      (bits & (1 << 8)) != 0
-    }
-
-    set {
-      if newValue {
-        bits = bits | 1 << 8
-      } else {
-        bits = (bits & ~(1 << 8))
-      }
-    }
+  if copyTaskLocals {
+    bits |= 1 << 10
   }
-
-  /// Whether to copy thread locals from the currently-executing task into the
-  /// newly-created task.
-  var copyTaskLocals: Bool {
-    get {
-      (bits & (1 << 10)) != 0
-    }
-
-    set {
-      if newValue {
-        bits = bits | 1 << 10
-      } else {
-        bits = (bits & ~(1 << 10))
-      }
-    }
+  if inheritContext {
+    bits |= 1 << 11
   }
-
-  /// Whether this task should inherit as much context from the
-  /// currently-executing task as it can.
-  var inheritContext: Bool {
-    get {
-      (bits & (1 << 11)) != 0
-    }
-
-    set {
-      if newValue {
-        bits = bits | 1 << 11
-      } else {
-        bits = (bits & ~(1 << 11))
-      }
-    }
+  if enqueueJob {
+    bits |= 1 << 12
   }
-
-  /// Whether to enqueue the newly-created task on the given executor (if
-  /// specified) or the global executor.
-  var enqueueJob: Bool {
-    get {
-      (bits & (1 << 12)) != 0
-    }
-
-    set {
-      if newValue {
-        bits = bits | 1 << 12
-      } else {
-        bits = (bits & ~(1 << 12))
-      }
-    }
+  if addPendingGroupTaskUnconditionally {
+    bits |= 1 << 13
   }
-
-  /// Whether to add a pending group task unconditionally as part of creating
-  /// the task.
-  var addPendingGroupTaskUnconditionally: Bool {
-    get {
-      (bits & (1 << 13)) != 0
-    }
-
-    set {
-      if newValue {
-        bits = bits | 1 << 13
-      } else {
-        bits = (bits & ~(1 << 13))
-      }
-    }
-  }
+  return bits
 }
 
 // ==== Task Creation ----------------------------------------------------------
@@ -506,20 +432,20 @@ extension Task where Failure == Never {
   ///     Task.currentPriority.
   ///   - operation: the operation to execute
   @discardableResult
+  @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.inheritContext = true
-    flags.copyTaskLocals = true
-    flags.enqueueJob = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: true,
+      inheritContext: true, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false)
 
     // Create the asynchronous task.
-    let (task, _) = Builtin.createAsyncTask(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
 #else
@@ -543,20 +469,21 @@ extension Task where Failure == Error {
   ///     Task.currentPriority.
   ///   - operation: the operation to execute
   @discardableResult
+  @_alwaysEmitIntoClient
   public init(
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
   ) {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
-    // Set up the job flags for a new task.
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.inheritContext = true
-    flags.copyTaskLocals = true
-    flags.enqueueJob = true
+    // Set up the task flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: true,
+      inheritContext: true, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     self._task = task
 #else
@@ -599,18 +526,20 @@ extension Task where Failure == Never {
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
   @discardableResult
+  @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> Success
   ) -> Task<Success, Failure> {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.enqueueJob = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false)
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     return Task(task)
 #else
@@ -654,18 +583,21 @@ extension Task where Failure == Error {
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
   @discardableResult
+  @_alwaysEmitIntoClient
   public static func detached(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
-    var flags = TaskCreateFlags()
-    flags.priority = priority
-    flags.enqueueJob = true
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false
+    )
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(Int(flags.bits), operation)
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
 
     return Task(task)
 #else
