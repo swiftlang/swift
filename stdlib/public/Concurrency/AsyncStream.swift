@@ -15,7 +15,7 @@ import Swift
 /// An ordered, asynchronously generated sequence of elements.
 ///
 /// AsyncStream is an interface type to adapt from code producing values to an
-/// asynchronous context iterating them. This is itended to be used to allow
+/// asynchronous context iterating them. This is intended to be used to allow
 /// callback or delegation based APIs to participate with async/await.
 ///
 /// When values are produced from a non async/await source there is a
@@ -57,13 +57,13 @@ public struct AsyncStream<Element> {
     let storage: _Storage
 
     /// Resume the task awaiting the next iteration point by having it return
-    /// nomally from its suspension point or buffer the value if no awaiting
+    /// normally from its suspension point or buffer the value if no awaiting
     /// next iteration is active.
     ///
     /// - Parameter value: The value to yield from the continuation.
     ///
     /// This can be called more than once and returns to the caller immediately
-    /// without blocking for any awaiting consuption from the iteration.
+    /// without blocking for any awaiting consumption from the iteration.
     public func yield(_ value: __owned Element) {
       storage.yield(value)
     }
@@ -86,7 +86,7 @@ public struct AsyncStream<Element> {
     /// is disposed of after any terminal state is reached.
     ///
     /// Cancelling an active iteration will first invoke the onTermination callback
-    /// and then resume yeilding nil. This means that any cleanup state can be
+    /// and then resume yielding nil. This means that any cleanup state can be
     /// emitted accordingly in the cancellation handler
     public var onTermination: (@Sendable (Termination) -> Void)? {
       get {
@@ -108,7 +108,7 @@ public struct AsyncStream<Element> {
   /// - Parameter build: The work associated with yielding values to the AsyncStream.
   ///
   /// The maximum number of pending elements limited by dropping the oldest
-  /// value when a new value comes in if the buffer would excede the limit
+  /// value when a new value comes in if the buffer would exceed the limit
   /// placed upon it. By default this limit is unlimited.
   ///
   /// The build closure passes in a Continuation which can be used in
@@ -130,7 +130,7 @@ public struct AsyncStream<Element> {
 extension AsyncStream: AsyncSequence {
   /// The asynchronous iterator for iterating a AsyncStream.
   ///
-  /// This type is specificially not Sendable. It is not intended to be used
+  /// This type is specifically not Sendable. It is not intended to be used
   /// from multiple concurrent contexts. Any such case that next is invoked
   /// concurrently and contends with another call to next is a programmer error
   /// and will fatalError.
@@ -145,7 +145,7 @@ extension AsyncStream: AsyncSequence {
     ///
     /// If the task this iterator is running in is canceled while next is
     /// awaiting a value, this will terminate the AsyncStream and next may return nil
-    /// immediately (or will return nil on subseuqent calls)
+    /// immediately (or will return nil on subsequent calls)
     public mutating func next() async -> Element? {
       await produce()
     }
@@ -166,7 +166,7 @@ extension AsyncStream.Continuation {
   /// - Parameter result: A result to yield from the continuation.
   ///
   /// This can be called more than once and returns to the caller immediately
-  /// without blocking for any awaiting consuption from the iteration.
+  /// without blocking for any awaiting consumption from the iteration.
   public func yield(
     with result: Result<Element, Never>
   ) {
@@ -181,7 +181,7 @@ extension AsyncStream.Continuation {
   /// next iteration is active where the `Element` is `Void`.
   ///
   /// This can be called more than once and returns to the caller immediately
-  /// without blocking for any awaiting consuption from the iteration.
+  /// without blocking for any awaiting consumption from the iteration.
   public func yield() where Element == Void {
     storage.yield(())
   }
