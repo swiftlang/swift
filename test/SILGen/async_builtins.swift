@@ -18,8 +18,8 @@ public struct X {
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV12launchFutureyyxlF : $@convention(method) <T> (@in_guaranteed T, X) -> ()
   func launchFuture<T>(_ value: T) {
-    // CHECK: builtin "createAsyncTask"<T>([[ZERO:%.*]] : $Int, [[OPT:%.*]] : $Optional<Builtin.RawPointer>, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
-    _ = Builtin.createAsyncTask(0, nil) { () async throws -> T in
+    // CHECK: builtin "createAsyncTask"<T>([[ZERO:%.*]] : $Int, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+    _ = Builtin.createAsyncTask(0) { () async throws -> T in
       return value
     }
   }
@@ -33,7 +33,7 @@ public struct X {
   }
 
   public func launchRocker<T>(closure: @escaping () async throws -> T) {
-    _ = Builtin.createAsyncTask(0, nil, closure)
+    _ = Builtin.createAsyncTask(0, closure)
   }
 }
 
