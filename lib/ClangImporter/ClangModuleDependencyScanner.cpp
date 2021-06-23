@@ -232,6 +232,7 @@ void ClangImporter::recordModuleDependencies(
     while(It != allArgs.end()) {
       StringRef arg = *It;
       // Remove the -target arguments because we should use the target triple
+      // specified with `-clang-target` on the scanner invocation, or
       // from the depending Swift modules.
       if (arg == "-target") {
         It += 2;
@@ -252,6 +253,16 @@ void ClangImporter::recordModuleDependencies(
       swiftArgs.push_back("-Xclang");
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back(clangArg);
+    }
+
+    // If the scanner is invoked with '-clang-target', ensure this is the target
+    // used to build this PCM.
+    if (Impl.SwiftContext.LangOpts.ClangTarget.hasValue()) {
+      llvm::Triple triple = Impl.SwiftContext.LangOpts.ClangTarget.getValue();
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back("-target");
+      swiftArgs.push_back("-Xcc");
+      swiftArgs.push_back(triple.str());
     }
 
     // Swift frontend action: -emit-pcm
