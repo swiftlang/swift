@@ -200,7 +200,7 @@ void ClangImporter::recordModuleDependencies(
 
   for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
     // If we've already cached this information, we're done.
-    if (cache.hasDependencies(clangModuleDep.ModuleName,
+    if (cache.hasDependencies(clangModuleDep.ID.ModuleName,
                               ModuleDependenciesKind::Clang))
       continue;
 
@@ -247,7 +247,8 @@ void ClangImporter::recordModuleDependencies(
 
     // Add all args the non-path arguments required to be passed in, according
     // to the Clang scanner
-    for (const auto &clangArg : clangModuleDep.NonPathCommandLine) {
+    for (const auto &clangArg :
+         clangModuleDep.getAdditionalArgsWithoutModulePaths()) {
       swiftArgs.push_back("-Xcc");
       swiftArgs.push_back("-Xclang");
       swiftArgs.push_back("-Xcc");
@@ -257,7 +258,7 @@ void ClangImporter::recordModuleDependencies(
     // Swift frontend action: -emit-pcm
     swiftArgs.push_back("-emit-pcm");
     swiftArgs.push_back("-module-name");
-    swiftArgs.push_back(clangModuleDep.ModuleName);
+    swiftArgs.push_back(clangModuleDep.ID.ModuleName);
 
     // Pass down search paths to the -emit-module action.
     // Unlike building Swift modules, we need to include all search paths to
@@ -277,14 +278,14 @@ void ClangImporter::recordModuleDependencies(
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencies::forClangModule(
         clangModuleDep.ClangModuleMapFile,
-        clangModuleDep.ContextHash,
+        clangModuleDep.ID.ContextHash,
         swiftArgs,
         fileDeps);
     for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
       dependencies.addModuleDependency(moduleName.ModuleName, &alreadyAddedModules);
     }
 
-    cache.recordDependencies(clangModuleDep.ModuleName,
+    cache.recordDependencies(clangModuleDep.ID.ModuleName,
                              std::move(dependencies));
   }
 }
