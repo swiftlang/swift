@@ -43,7 +43,7 @@ func copyTo_async() async {
       await TL.$other.withValue(9999) {
         printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
         printTaskLocal(TL.$other) // CHECK: TaskLocal<Int>(defaultValue: 0) (9999)
-        let handle = async {
+        let handle = Task {
           printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
           printTaskLocal(TL.$other) // CHECK: TaskLocal<Int>(defaultValue: 0) (9999)
           TL.$number.withValue(3333) {
@@ -52,7 +52,7 @@ func copyTo_async() async {
           }
         }
 
-        _ = await handle.get()
+        _ = await handle.value
       }
     }
   }
@@ -64,7 +64,7 @@ func copyTo_async_noWait() async {
   TL.$number.withValue(1111) {
     TL.$number.withValue(2222) {
       TL.$other.withValue(9999) {
-        async {
+        Task {
           printTaskLocal(TL.$number) // CHECK: TaskLocal<Int>(defaultValue: 0) (2222)
           printTaskLocal(TL.$other) // CHECK: TaskLocal<Int>(defaultValue: 0) (9999)
           TL.$number.withValue(3333) {
@@ -81,10 +81,50 @@ func copyTo_async_noWait() async {
 }
 
 @available(SwiftStdlib 5.5, *)
+class CustomClass {
+  @TaskLocal
+  static var current: CustomClass?
+
+  init() {
+    print("init \(ObjectIdentifier(self))")
+  }
+
+  deinit {
+    print("deinit \(ObjectIdentifier(self))")
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+func test_async_retains() async {
+  let instance = CustomClass()
+  CustomClass.$current.withValue(instance) {
+    print("BEFORE send: \(String(reflecting: CustomClass.current))")
+    // don't await on the un-structured tasks on purpose, we want to see that the tasks
+    // themselves keep the object alive even if we don't hold onto them
+    Task {
+      print("in async task: \(String(reflecting: CustomClass.current))")
+    }
+    Task {
+      print("in async task: \(String(reflecting: CustomClass.current))")
+    }
+    print("AFTER send: \(String(reflecting: CustomClass.current))")
+  }
+
+  // CHECK: init
+  // CHECK: BEFORE send: Optional(main.CustomClass)
+  // CHECK: in async task: Optional(main.CustomClass)
+  // CHECK: in async task: Optional(main.CustomClass)
+  // the deinit MUST NOT happen before the async tasks runs
+  // CHECK: deinit
+  await Task.sleep(2 * 1_000_000_000)
+}
+
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await copyTo_async()
     await copyTo_async()
     await copyTo_async_noWait()
+    await test_async_retains()
   }
 }
