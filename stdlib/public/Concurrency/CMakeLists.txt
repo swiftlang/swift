@@ -71,6 +71,12 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskLocal.swift
   ThreadSanitizer.cpp
   Mutex.cpp
+  AsyncStreamBuffer.swift
+  AsyncStream.swift
+  AsyncThrowingStream.swift
+  AsyncStream.cpp
+  Deque.swift
+  YieldingContinuation.swift
   ${swift_concurrency_objc_sources}
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
