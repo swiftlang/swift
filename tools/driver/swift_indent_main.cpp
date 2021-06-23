@@ -220,7 +220,7 @@ public:
         Destination = Filename;
       else
         Destination = OutputFilename;
-      llvm::raw_fd_ostream out(Destination, EC, llvm::sys::fs::F_None);
+      llvm::raw_fd_ostream out(Destination, EC, llvm::sys::fs::OF_None);
       if (out.has_error() || EC) {
         Diags.diagnose(SourceLoc(), diag::error_opening_output, Filename,
                        EC.message());

@@ -146,7 +146,7 @@ std::error_code swift::atomicallyWritingToFile(
 
     if (!OS.hasValue()) {
       std::error_code error;
-      OS.emplace(outputPath, error, fs::F_None);
+      OS.emplace(outputPath, error, fs::OF_None);
       if (error) {
         return error;
       }

@@ -44,7 +44,7 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
 bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
                      const TBDGenOptions &Opts) {
   std::error_code EC;
-  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::OF_None);
   if (EC) {
     M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
                                       OutputFilename, EC.message());

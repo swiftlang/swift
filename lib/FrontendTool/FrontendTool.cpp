@@ -127,7 +127,7 @@ static std::unique_ptr<llvm::raw_fd_ostream>
 getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
   std::error_code errorCode;
   auto os = std::make_unique<llvm::raw_fd_ostream>(
-              OutputFilename, errorCode, llvm::sys::fs::F_None);
+              OutputFilename, errorCode, llvm::sys::fs::OF_None);
   if (errorCode) {
     Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                        OutputFilename, errorCode.message());
@@ -249,7 +249,7 @@ private:
     std::unique_ptr<llvm::raw_fd_ostream> OS;
     OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
                                       EC,
-                                      llvm::sys::fs::F_None));
+                                      llvm::sys::fs::OF_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
       SourceManager dummyMgr;
@@ -718,7 +718,7 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
   auto ldSymbols =
       getPublicSymbols(TBDGenDescriptor::forModule(module, tbdOpts));
   std::error_code EC;
-  llvm::raw_fd_ostream OS(Path, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(Path, EC, llvm::sys::fs::OF_None);
   if (EC) {
     Instance.getDiags().diagnose(SourceLoc(), diag::error_opening_output, Path,
                                  EC.message());
@@ -1062,7 +1062,7 @@ static bool printSwiftFeature(CompilerInstance &instance) {
   const FrontendOptions &opts = invocation.getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
 
   if (out.has_error() || EC) {
     context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,

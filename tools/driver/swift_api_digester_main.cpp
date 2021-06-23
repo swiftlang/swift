@@ -2183,7 +2183,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   std::unique_ptr<llvm::raw_ostream> FileOS;
   if (!OutputPath.empty()) {
     std::error_code EC;
-    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
+    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::OF_None));
     OS = FileOS.get();
   }
   bool FailOnError;
@@ -2328,7 +2328,7 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
 
   auto &typeMemberDiffs = Ctx.getTypeMemberDiffs();
   std::error_code EC;
-  llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::OF_None);
   removeRedundantAndSort(AllItems);
   removeRedundantAndSort(typeMemberDiffs);
   removeRedundantAndSort(AllNoEscapingFuncs);
@@ -2374,7 +2374,7 @@ static int deserializeDiffItems(APIDiffItemStore &Store, StringRef DiffPath,
     StringRef OutputPath) {
   Store.addStorePath(DiffPath);
   std::error_code EC;
-  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::OF_None);
   APIDiffItemStore::serialize(FS, Store.getAllDiffItems());
   return 0;
 }
@@ -2382,7 +2382,7 @@ static int deserializeDiffItems(APIDiffItemStore &Store, StringRef DiffPath,
 static int deserializeNameCorrection(APIDiffItemStore &Store,
                                      StringRef OutputPath) {
   std::error_code EC;
-  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::OF_None);
   std::set<NameCorrectionInfo> Result;
   for (auto *Item: Store.getAllDiffItems()) {
     if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {

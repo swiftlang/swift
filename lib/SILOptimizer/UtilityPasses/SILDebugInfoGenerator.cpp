@@ -114,7 +114,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
 
       std::error_code EC;
       llvm::raw_fd_ostream OutFile(FileName, EC,
-                                   llvm::sys::fs::OpenFlags::F_None);
+                                   llvm::sys::fs::OpenFlags::OF_None);
       assert(!OutFile.has_error() && !EC && "Can't write SIL debug file");
 
       PrintContext Ctx(OutFile);

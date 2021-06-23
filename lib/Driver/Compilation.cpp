@@ -1614,7 +1614,7 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   llvm::sys::fs::rename(path, path + "~");
 
   std::error_code error;
-  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::OF_None);
   if (out.has_error()) {
     // FIXME: How should we report this error?
     out.clear_error();
@@ -1718,7 +1718,7 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       return true;
 
     std::error_code error;
-    llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream out(filelistInfo.path, error, llvm::sys::fs::OF_None);
     if (out.has_error()) {
       out.clear_error();
       diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
@@ -1826,7 +1826,7 @@ Compilation::Result Compilation::performSingleCommand(const Job *Cmd) {
 static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
                                 ArrayRef<InputPair> inputFiles) {
   std::error_code error;
-  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::OF_None);
   if (out.has_error()) {
     out.clear_error();
     diags.diagnose(SourceLoc(), diag::error_unable_to_make_temporary_file,
@@ -1923,7 +1923,7 @@ void Compilation::addDependencyPathOrCreateDummy(
   } else if (!depPath.empty()) {
     // Create dummy empty file
     std::error_code EC;
-    llvm::raw_fd_ostream(depPath, EC, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream(depPath, EC, llvm::sys::fs::OF_None);
   }
 }
 

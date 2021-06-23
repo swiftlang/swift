@@ -1140,7 +1140,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &instance) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
   if (out.has_error() || EC) {
     Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
                            EC.message());
@@ -1182,7 +1182,7 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
   ModuleDependenciesCache cache;
@@ -1232,7 +1232,7 @@ bool swift::dependencies::batchScanDependencies(
   for (; ientries != batchInput->end() and iresults != batchScanResults.end();
        ++ientries, ++iresults) {
     std::error_code EC;
-    llvm::raw_fd_ostream out((*ientries).outputPath, EC, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream out((*ientries).outputPath, EC, llvm::sys::fs::OF_None);
     if ((*iresults).getError())
       return true;
 
@@ -1264,7 +1264,7 @@ bool swift::dependencies::batchPrescanDependencies(
        ientries != batchInput->end() and iresults != batchPrescanResults.end();
        ++ientries, ++iresults) {
     std::error_code EC;
-    llvm::raw_fd_ostream out((*ientries).outputPath, EC, llvm::sys::fs::F_None);
+    llvm::raw_fd_ostream out((*ientries).outputPath, EC, llvm::sys::fs::OF_None);
     if ((*iresults).getError())
       return true;
 

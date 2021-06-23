@@ -526,7 +526,7 @@ bool swift::performLLVM(const IRGenOptions &Opts,
   if (!OutputFilename.empty()) {
     // Try to open the output file.  Clobbering an existing file is fine.
     // Open in binary mode if we're doing binary output.
-    llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
+    llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::OF_None;
     std::error_code EC;
     RawOS.emplace(OutputFilename, EC, OSFlags);
 

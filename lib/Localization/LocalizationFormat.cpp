@@ -76,7 +76,7 @@ void SerializedLocalizationWriter::insert(swift::DiagID id,
 bool SerializedLocalizationWriter::emit(llvm::StringRef filePath) {
   assert(llvm::sys::path::extension(filePath) == ".db");
   std::error_code error;
-  llvm::raw_fd_ostream OS(filePath, error, llvm::sys::fs::F_None);
+  llvm::raw_fd_ostream OS(filePath, error, llvm::sys::fs::OF_None);
   if (OS.has_error()) {
     return true;
   }
