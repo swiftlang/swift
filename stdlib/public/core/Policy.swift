@@ -82,7 +82,7 @@ public typealias Float64 = Double
 //===----------------------------------------------------------------------===//
 /// The default type for an otherwise-unconstrained integer literal.
 public typealias IntegerLiteralType = Int
-/// The default type for an otherwise-unconstrained floating point literal.
+/// The default type for an otherwise-unconstrained floating-point literal.
 public typealias FloatLiteralType = Double
 
 /// The default type for an otherwise-unconstrained Boolean literal.
