@@ -671,18 +671,6 @@ AsyncTaskAndContext swift::swift_task_create(
       initialContextSize);
 }
 
-AsyncTaskAndContext
-swift::swift_task_create_f(
-    size_t flags,
-    TaskOptionRecord *options,
-    const Metadata *futureResultType,
-    ThinNullaryAsyncSignature::FunctionType *function,
-    size_t initialContextSize) {
-  return swift_task_create_common(
-      flags, options, futureResultType,
-      function, /*closureContext=*/nullptr, initialContextSize);
-}
-
 SWIFT_CC(swiftasync)
 static void swift_task_future_waitImpl(
   OpaqueValue *result,
@@ -856,12 +844,13 @@ void swift::swift_task_runAndBlockThread(const void *function,
   // Set up a task that runs the runAndBlock async function above.
   auto flags = TaskCreateFlags();
   flags.setPriority(JobPriority::Default);
-  auto pair = swift_task_create_f(
+  auto pair = swift_task_create_common(
       flags.getOpaqueValue(),
       /*options=*/nullptr,
       /*futureResultType=*/nullptr,
       reinterpret_cast<ThinNullaryAsyncSignature::FunctionType *>(
           &runAndBlock_start),
+      nullptr,
       sizeof(RunAndBlockContext));
   auto context = static_cast<RunAndBlockContext*>(pair.InitialContext);
   context->Function = function;

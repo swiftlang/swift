@@ -56,12 +56,13 @@ static void withSimpleTask(TaskCreateFlags flags, T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
   auto taskAndContext =
-      swift_task_create_f(flags.getOpaqueValue(),
-                          nullptr,
-                          nullptr,
-                          reinterpret_cast<TaskContinuationFunction *>(
-                              &simpleTaskInvokeFunction<T>),
-                          sizeof(ValueContext<T>));
+      swift_task_create_common(flags.getOpaqueValue(),
+                               nullptr,
+                               nullptr,
+                               reinterpret_cast<TaskContinuationFunction *>(
+                                 &simpleTaskInvokeFunction<T>),
+                               nullptr,
+                               sizeof(ValueContext<T>));
 
   auto valueContext =
     static_cast<ValueContext<T>*>(taskAndContext.InitialContext);

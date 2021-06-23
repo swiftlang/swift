@@ -142,11 +142,12 @@ createTaskWithContext(JobPriority priority, Fn &&fn) {
     TaskContinuationFromLambda<Fn, Context>::get(std::move(fn));
   TaskCreateFlags flags;
   flags.setPriority(priority);
-  auto pair = swift_task_create_f(flags.getOpaqueValue(),
-                                  nullptr,
-                                  nullptr,
-                                  invoke,
-                                  sizeof(Context));
+  auto pair = swift_task_create_common(flags.getOpaqueValue(),
+                                       nullptr,
+                                       nullptr,
+                                       invoke,
+                                       nullptr,
+                                       sizeof(Context));
   return std::make_pair(pair.Task,
                         static_cast<Context*>(pair.InitialContext));
 }
