@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,11 +16,7 @@ import Swift
 /// A unit of scheduleable work.
 ///
 /// Unless you're implementing a scheduler,
-/// you don't generally interact with partial tasks directly.
-@available(SwiftStdlib 5.5, *)
-public typealias PartialAsyncTask = UnownedJob
-
-/// A job is a unit of scheduleable work.
+/// you don't generally interact with jobs directly.
 @available(SwiftStdlib 5.5, *)
 @frozen
 public struct UnownedJob {
