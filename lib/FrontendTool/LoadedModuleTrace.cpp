@@ -707,7 +707,7 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   if (loadedModuleTracePath.empty())
     return false;
   std::error_code EC;
-  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
+  llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
 
   if (out.has_error() || EC) {
     ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
