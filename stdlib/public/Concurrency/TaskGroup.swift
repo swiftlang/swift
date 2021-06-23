@@ -239,18 +239,18 @@ public struct TaskGroup<ChildTaskResult> {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     var flags = TaskCreateFlags()
     flags.priority = priority
     flags.isChildTask = true
     flags.enqueueJob = true
     flags.addPendingGroupTaskUnconditionally = true
 
-    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-    withUnsafePointer(to: &groupOption) { optionsPtr in
-      // Create the asynchronous task future.
-      _ = Builtin.createAsyncTask(
-          flags.bits, optionsPtr._rawValue, operation)
-    }
+    // Create the task in this group.
+    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 
   /// Add a child task to the group.
@@ -272,6 +272,7 @@ public struct TaskGroup<ChildTaskResult> {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -284,14 +285,13 @@ public struct TaskGroup<ChildTaskResult> {
     flags.isChildTask = true
     flags.enqueueJob = true
 
-    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-    withUnsafePointer(to: &groupOption) { optionsPtr in
-      // Create the asynchronous task future.
-      _ = Builtin.createAsyncTask(
-          flags.bits, optionsPtr._rawValue, operation)
-    }
+    // Create the task in this group.
+    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
 
     return true
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 
   /// Wait for the next child task to complete,
@@ -460,18 +460,18 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     var flags = TaskCreateFlags()
     flags.priority = priority
     flags.isChildTask = true
     flags.enqueueJob = true
     flags.addPendingGroupTaskUnconditionally = true
 
-    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-    withUnsafePointer(to: &groupOption) { optionsPtr in
-      // Create the asynchronous task future.
-      _ = Builtin.createAsyncTask(
-          flags.bits, optionsPtr._rawValue, operation)
-    }
+    // Create the task in this group.
+    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 
   /// Add a child task to the group.
@@ -493,6 +493,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
@@ -505,14 +506,13 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     flags.isChildTask = true
     flags.enqueueJob = true
 
-    var groupOption = TaskOptionRecord.TaskGroup(group: _group)
-    withUnsafePointer(to: &groupOption) { optionsPtr in
-      // Create the asynchronous task future.
-      _ = Builtin.createAsyncTask(
-          flags.bits, optionsPtr._rawValue, operation)
-    }
+    // Create the task in this group.
+    _ = Builtin.createAsyncTaskInGroup(flags.bits, _group, operation)
 
     return true
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
   }
 
   /// Wait for the next child task to complete,
