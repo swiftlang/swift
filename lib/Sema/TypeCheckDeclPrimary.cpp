@@ -169,6 +169,14 @@ static void checkInheritanceClause(
     if (!inheritedTy || inheritedTy->hasError())
       continue;
 
+
+//    if (inheritedTy->isActorType()) {
+//      auto classDecl = dyn_cast<ClassDecl>(decl);
+//      if(isa<ProtocolDecl>(decl) || (classDecl && !classDecl->isExplicitActor())) {
+//        assert(false && "only explicit actor or protocol may conform to 'Actor' protocol");
+//      }
+//    }
+
     // For generic parameters and associated types, the GSB checks constraints;
     // however, we still want to fire off the requests to produce diagnostics
     // in some circular validation cases.
@@ -2396,9 +2404,11 @@ public:
     if (auto superclass = CD->getSuperclassDecl()) {
       // Actors cannot have superclasses, nor can they be superclasses.
       if (CD->isActor() && !superclass->isNSObject())
-        CD->diagnose(diag::actor_inheritance);
+        CD->diagnose(diag::actor_inheritance,
+                     /*distributed=*/CD->isDistributedActor());
       else if (superclass->isActor())
-        CD->diagnose(diag::actor_inheritance);
+        CD->diagnose(diag::actor_inheritance,
+                     /*distributed=*/CD->isDistributedActor());
     }
 
     // Force lowering of stored properties.

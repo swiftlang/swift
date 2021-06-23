@@ -4349,7 +4349,15 @@ ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
 ERROR(actor_inheritance,none,
-      "actor types do not support inheritance", ())
+      "%select{actor|distributed actor}0 types do not support inheritance",
+      (bool))
+
+ERROR(actor_protocol_illegal_inheritance,none,
+      "non-actor type %0 cannot conform to the 'Actor' protocol",
+      (DeclName))
+ERROR(distributed_actor_protocol_illegal_inheritance,none,
+      "non-distributed actor type %0 cannot conform to the 'DistributedActor' protocol",
+      (DeclName))
 
 // FIXME: This diagnostic was temporarily downgraded from an error because
 // it spuriously triggers when building the Foundation module from its textual
