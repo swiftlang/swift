@@ -28,9 +28,9 @@
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Support/CommandLine.h"
-#include <stdio.h>
-#include <stddef.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstddef>
+#include <cstdint>
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <TargetConditionals.h>
