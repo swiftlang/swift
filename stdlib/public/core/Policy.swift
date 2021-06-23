@@ -29,6 +29,11 @@
 ///         }
 ///     }
 ///
+///     // Calling `fatalError` terminates the program.
+///     func crashAndBurn() -> Never {
+///         fatalError("Something very, very bad happened")
+///     }
+///
 /// As `Never` is a type with no values, it cannot be constructed. This allows
 /// you to represent a state in your program that is impossible to reach
 /// during its execution.
@@ -45,11 +50,6 @@
 /// Use `Never` as the return type when declaring a closure, function, or
 /// method that unconditionally throws an error, traps, or otherwise does
 /// not terminate.
-///
-///     // Calling `fatalError` terminates the program.
-///     func crashAndBurn() -> Never {
-///         fatalError("Something very, very bad happened")
-///     }
 @frozen
 public enum Never {}
 
