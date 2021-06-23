@@ -513,7 +513,7 @@ extension Task where Failure == Never {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     var flags = TaskCreateFlags()
-    flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
+    flags.priority = priority
     flags.inheritContext = true
     flags.copyTaskLocals = true
     flags.enqueueJob = true
@@ -550,7 +550,7 @@ extension Task where Failure == Error {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     var flags = TaskCreateFlags()
-    flags.priority = priority ?? Task<Never, Never>.currentPriority._downgradeUserInteractive
+    flags.priority = priority
     flags.inheritContext = true
     flags.copyTaskLocals = true
     flags.enqueueJob = true
@@ -606,7 +606,7 @@ extension Task where Failure == Never {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     var flags = TaskCreateFlags()
-    flags.priority = priority ?? .unspecified
+    flags.priority = priority
     flags.enqueueJob = true
 
     // Create the asynchronous task future.
@@ -661,7 +661,7 @@ extension Task where Failure == Error {
 #if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     var flags = TaskCreateFlags()
-    flags.priority = priority ?? .unspecified
+    flags.priority = priority
     flags.enqueueJob = true
 
     // Create the asynchronous task future.
