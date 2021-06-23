@@ -3139,6 +3139,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void
+  visitOpaqueReturnParameterizedTypeRepr(OpaqueReturnParameterizedTypeRepr *T) {
+    printCommon("type_opaque_return_parameterized") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
     printCommon("type_placeholder");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';

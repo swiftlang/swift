@@ -437,6 +437,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def enable_experimental_opaque_return_types :
+  Flag<["-"], "enable-experimental-opaque-return-types">,
+  HelpText<"Enable experimental extensions to opaque return type support">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;

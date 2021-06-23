@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
@@ -823,7 +824,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ///   func-signature:
 ///     func-arguments ('async'|'reasync')? func-throws? func-signature-result?
 ///   func-signature-result:
-///     '->' type
+///     '->' generic-params? type
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
@@ -864,9 +865,21 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       arrowLoc = consumeToken(tok::colon);
     }
 
-    // Check for effect specifiers after the arrow, but before the type, and
-    // correct it.
+    // Check for effect specifiers after the arrow, but before the generic
+    // parameters, and correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
+
+    GenericParamList *GenericParams = nullptr;
+    if (Context.LangOpts.EnableExperimentalOpaqueReturnTypes) {
+      auto GenericParamsResult = maybeParseGenericParams();
+      GenericParams = GenericParamsResult.getPtrOrNull();
+      Status |= GenericParamsResult;
+
+      // Check for effect specifiers after the generic parameters, but before
+      // the return type, and correct it.
+      parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc,
+                             &rethrows);
+    }
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -874,6 +887,16 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     Status |= ResultType;
     if (Status.isErrorOrHasCompletion())
       return Status;
+
+    if (GenericParams != nullptr) {
+      // The `Base` for our `OpaqueReturnParameterizedTypeRepr` should not be
+      // `nullptr`
+      assert(
+          retType != nullptr &&
+          "Expected non-null return type if `parseDeclReturnType` succeeded");
+      retType = new (Context)
+          OpaqueReturnParameterizedTypeRepr(retType, GenericParams);
+    }
 
     // Check for effect specifiers after the type and correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
