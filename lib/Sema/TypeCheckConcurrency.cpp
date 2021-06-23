@@ -1313,10 +1313,10 @@ namespace {
           }
         }
 
-        // "Defer" blocks are treated as if they are in their enclosing context.
-        if (auto func = dyn_cast<FuncDecl>(dc)) {
-          if (func->isDeferBody())
-            continue;
+        if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+          // @Sendable functions are nonisolated.
+          if (func->isSendable())
+            return ReferencedActor(var, ReferencedActor::SendableFunction);
         }
 
         // Check isolation of the context itself. We do this separately
@@ -1325,9 +1325,14 @@ namespace {
         switch (auto isolation = getActorIsolationOfContext(dc)) {
         case ActorIsolation::Independent:
         case ActorIsolation::Unspecified:
-          if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-            if (func->isSendable())
-              return ReferencedActor(var, ReferencedActor::SendableFunction);
+          // Local functions can capture an isolated parameter.
+          // FIXME: This really should be modeled by getActorIsolationOfContext.
+          if (isa<FuncDecl>(dc) && cast<FuncDecl>(dc)->isLocalCapture()) {
+            // FIXME: Local functions could presumably capture an isolated
+            // parameter that isn't 'self'.
+            if (isPotentiallyIsolated &&
+                (var->isSelfParameter() || var->isSelfParamCapture()))
+              continue;
           }
 
           return ReferencedActor(var, ReferencedActor::NonIsolatedContext);
@@ -1339,12 +1344,6 @@ namespace {
 
         case ActorIsolation::ActorInstance:
         case ActorIsolation::DistributedActorInstance:
-          // FIXME: Local functions could presumably capture an isolated
-          // parameter that isn't'self'.
-          if (isPotentiallyIsolated &&
-              (var->isSelfParameter() || var->isSelfParamCapture()))
-            return ReferencedActor(var, ReferencedActor::Isolated);
-
           break;
         }
       }
@@ -2398,6 +2397,7 @@ namespace {
       return getExplicitGlobalActor(closure);
     }
 
+  public:
     /// Determine the isolation of a particular closure.
     ///
     /// This function assumes that enclosing closures have already had their
@@ -2619,6 +2619,12 @@ void swift::checkPropertyWrapperActorIsolation(
    PatternBindingDecl *binding, Expr *expr) {
   ActorIsolationChecker checker(binding->getDeclContext());
   expr->walk(checker);
+}
+
+ClosureActorIsolation
+swift::determineClosureActorIsolation(AbstractClosureExpr *closure) {
+  ActorIsolationChecker checker(closure->getParent());
+  return checker.determineClosureIsolation(closure);
 }
 
 /// Determine actor isolation solely from attributes.
