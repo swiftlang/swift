@@ -9468,7 +9468,12 @@ ConstraintSystem::simplifyKeyPathConstraint(
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::Identity:
       break;
-      
+
+    case KeyPathExpr::Component::Kind::CodeCompletion: {
+      anyComponentsUnresolved = true;
+      capability = ReadOnly;
+      break;
+    }
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:

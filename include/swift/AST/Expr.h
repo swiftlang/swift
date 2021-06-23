@@ -5462,6 +5462,7 @@ public:
   /// - a resolved ValueDecl, referring to
   /// - a subscript index expression, which may or may not be resolved
   /// - an optional chaining, forcing, or wrapping component
+  /// - a code completion token
   class Component {
   public:
     enum class Kind: unsigned {
@@ -5476,6 +5477,7 @@ public:
       Identity,
       TupleElement,
       DictionaryKey,
+      CodeCompletion,
     };
   
   private:
@@ -5651,8 +5653,12 @@ public:
                                      SourceLoc loc) {
       return Component(fieldNumber, elementType, loc);
     }
-      
-      
+
+    static Component forCodeCompletion(SourceLoc Loc) {
+      return Component(nullptr, {}, nullptr, {}, {}, Kind::CodeCompletion,
+                       Type(), Loc);
+    }
+
     SourceLoc getLoc() const {
       return Loc;
     }
@@ -5690,6 +5696,7 @@ public:
       case Kind::UnresolvedSubscript:
       case Kind::UnresolvedProperty:
       case Kind::Invalid:
+      case Kind::CodeCompletion:
         return false;
       }
       llvm_unreachable("unhandled kind");
@@ -5710,6 +5717,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -5730,6 +5738,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5753,6 +5762,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5776,6 +5786,7 @@ public:
       case Kind::Property:
       case Kind::Identity:
       case Kind::TupleElement:
+      case Kind::CodeCompletion:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5796,6 +5807,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         return false;
       }
       llvm_unreachable("unhandled kind");
@@ -5816,6 +5828,7 @@ public:
       case Kind::Identity:
       case Kind::TupleElement:
       case Kind::DictionaryKey:
+      case Kind::CodeCompletion:
         llvm_unreachable("no decl ref for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5836,6 +5849,7 @@ public:
         case Kind::Property:
         case Kind::Subscript:
         case Kind::DictionaryKey:
+        case Kind::CodeCompletion:
           llvm_unreachable("no field number for this kind");
       }
       llvm_unreachable("unhandled kind");
