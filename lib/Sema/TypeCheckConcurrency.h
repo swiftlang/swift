@@ -30,6 +30,7 @@ class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
+class ClosureActorIsolation;
 class ClosureExpr;
 class ConcreteDeclRef;
 class CustomAttr;
@@ -58,6 +59,16 @@ void checkInitializerActorIsolation(Initializer *init, Expr *expr);
 void checkEnumElementActorIsolation(EnumElementDecl *element, Expr *expr);
 void checkPropertyWrapperActorIsolation(
     PatternBindingDecl *binding, Expr *expr);
+
+/// Determine the isolation of a particular closure.
+///
+/// This forwards to \c ActorIsolationChecker::determineClosureActorIsolation
+/// and thus assumes that enclosing closures have already had their isolation
+/// checked.
+///
+/// This does not set the closure's actor isolation
+ClosureActorIsolation
+determineClosureActorIsolation(AbstractClosureExpr *closure);
 
 /// Describes the kind of operation that introduced the concurrent refernece.
 enum class ConcurrentReferenceKind {
