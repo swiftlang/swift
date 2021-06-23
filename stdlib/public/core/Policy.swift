@@ -46,7 +46,6 @@
 ///         print("My favorite number is", value)
 ///     }
 ///
-///
 /// Use `Never` as the return type when declaring a closure, function, or
 /// method that unconditionally throws an error, traps, or otherwise does
 /// not terminate.
