@@ -508,6 +508,10 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context) {
   asImpl(this)->offer(completedTask, context);
 }
 
+bool TaskGroup::isCancelled() {
+  return asImpl(this)->isCancelled();
+}
+
 static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
                                 PollResult result) {
   /// Fill in the result value

@@ -557,7 +557,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     // In a task group we would not have allowed the `add` to create a child anymore,
     // however better safe than sorry and `async let` are not expressed as task groups,
     // so they may have been spawned in any case still.
-    if (swift_task_isCancelled(parent))
+    if (swift_task_isCancelled(parent) ||
+        (group && group->isCancelled()))
       swift_task_cancel(task);
 
     // Initialize task locals with a link to the parent task.
