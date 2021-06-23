@@ -7466,8 +7466,8 @@ SourceRange CheckedCastBaseFailure::getCastRange() const {
   llvm_unreachable("There is no other kind of checked cast!");
 }
 
-std::tuple<Type, Type, unsigned>
-CoercibleOptionalCheckedCastFailure::unwrapedTypes() const {
+std::tuple<Type, Type, int>
+CoercibleOptionalCheckedCastFailure::unwrappedTypes() const {
   SmallVector<Type, 4> fromOptionals;
   SmallVector<Type, 4> toOptionals;
   Type unwrappedFromType =
@@ -7483,8 +7483,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseIfExpr() const {
     return false;
 
   Type unwrappedFrom, unwrappedTo;
-  unsigned extraFromOptionals;
-  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrapedTypes();
+  std::tie(unwrappedFrom, unwrappedTo, std::ignore) = unwrappedTypes();
 
   SourceRange diagFromRange = getFromRange();
   SourceRange diagToRange = getToRange();
@@ -7515,8 +7514,8 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseForcedCastExpr() const {
   auto fromType = getFromType();
   auto toType = getToType();
   Type unwrappedFrom, unwrappedTo;
-  unsigned extraFromOptionals;
-  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrapedTypes();
+  int extraFromOptionals;
+  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrappedTypes();
 
   SourceRange diagFromRange = getFromRange();
   SourceRange diagToRange = getToRange();
@@ -7558,8 +7557,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseConditionalCastExpr() const {
   auto fromType = getFromType();
   auto toType = getToType();
   Type unwrappedFrom, unwrappedTo;
-  unsigned extraFromOptionals;
-  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrapedTypes();
+  std::tie(unwrappedFrom, unwrappedTo, std::ignore) = unwrappedTypes();
 
   SourceRange diagFromRange = getFromRange();
   SourceRange diagToRange = getToRange();
