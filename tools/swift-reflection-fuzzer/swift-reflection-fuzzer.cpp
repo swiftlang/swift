@@ -28,9 +28,9 @@
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Support/CommandLine.h"
-#include <cstdio>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 
 #if defined(__APPLE__) && defined(__MACH__)
 #include <TargetConditionals.h>
@@ -77,7 +77,8 @@ public:
     case DLQ_GetPtrAuthMask: {
       auto result = static_cast<uintptr_t *>(outBuffer);
 #if __has_feature(ptrauth_calls)
-      *result = static_cast<uintptr_t>(ptrauth_strip(static_cast<void *>(0x0007ffffffffffff), 0));
+      *result = static_cast<uintptr_t>(
+          ptrauth_strip(static_cast<void *>(0x0007ffffffffffff), 0));
 #else
       *result = ~uintptr_t(0);
 #endif
