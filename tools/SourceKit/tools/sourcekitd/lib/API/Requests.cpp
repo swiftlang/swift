@@ -16,6 +16,7 @@
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/VariableTypeArray.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -193,6 +194,10 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, Respon
 
 static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec);
+
+static void
+reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
+                       ResponseReceiver Rec);
 
 static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseReceiver Rec);
 
@@ -1154,6 +1159,19 @@ static void handleSemanticRequest(
       });
   }
 
+  if (ReqUID == RequestCollectVariableType) {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+    Optional<unsigned> Offset = Req.getOptionalInt64(KeyOffset).map(
+        [](int64_t v) -> unsigned { return v; });
+    Optional<unsigned> Length = Req.getOptionalInt64(KeyLength).map(
+        [](int64_t v) -> unsigned { return v; });
+    return Lang.collectVariableTypes(
+        *SourceFile, Args, Offset, Length,
+        [Rec](const RequestResult<VariableTypesInFile> &Result) {
+          reportVariableTypeInfo(Result, Rec);
+        });
+  }
+
   if (ReqUID == RequestFindLocalRenameRanges) {
     int64_t Line = 0, Column = 0, Length = 0;
     if (Req.getInt64(KeyLine, Line, /*isOptional=*/false))
@@ -1978,6 +1996,30 @@ static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> 
     ArrBuilder.add(R);
   }
   Dict.setCustomBuffer(KeyExpressionTypeList, ArrBuilder.createBuffer());
+  Rec(Builder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportVariableTypeInfo
+//===----------------------------------------------------------------------===//
+
+static void
+reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
+                       ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const VariableTypesInFile &Info = Result.value();
+
+  ResponseBuilder Builder;
+  auto Dict = Builder.getDictionary();
+  VariableTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
+  for (auto &R : Info.Results) {
+    ArrBuilder.add(R);
+  }
+  Dict.setCustomBuffer(KeyVariableTypeList, ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
 }
 
