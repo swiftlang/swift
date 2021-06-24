@@ -2781,7 +2781,7 @@ static bool usesFeatureBuiltinContinuation(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinTaskGroup(Decl *decl) {
+static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
   return false;
 }
 
