@@ -17,7 +17,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/ProtocolGraph.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -27,6 +26,8 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <algorithm>
+
+#include "ProtocolGraph.h"
 
 namespace llvm {
   class raw_ostream;

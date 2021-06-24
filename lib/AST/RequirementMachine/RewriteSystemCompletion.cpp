@@ -25,13 +25,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/RewriteSystem.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <deque>
 #include <vector>
+
+#include "RewriteSystem.h"
 
 using namespace swift;
 using namespace rewriting;
