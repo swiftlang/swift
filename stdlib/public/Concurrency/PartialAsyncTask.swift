@@ -44,7 +44,7 @@ public struct UnownedJob {
 /// `resume(with:)`,
 /// or `resume()` method.
 ///
-/// - Important: You must call a resume methods exactly once
+/// - Important: You must call a resume method exactly once
 ///   on every execution path throughout the program.
 ///   Resuming from a continuation more than once is undefined behavior.
 ///   Never resuming leaves the task in a suspended state indefinitely,
@@ -243,7 +243,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 #endif
 
 /// Suspends the current task,
-/// then calls the given closure with the an unsafe continuation for the current task.
+/// then calls the given closure with an unsafe continuation for the current task.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
 /// You must resume the continuation exactly once.
@@ -260,7 +260,7 @@ public func withUnsafeContinuation<T>(
 }
 
 /// Suspends the current task,
-/// then calls the given closure with the an unsafe throwing continuation for the current task.
+/// then calls the given closure with an unsafe throwing continuation for the current task.
 ///
 /// - Parameter fn: A closure that takes an `UnsafeContinuation` parameter.
 /// You must resume the continuation exactly once.

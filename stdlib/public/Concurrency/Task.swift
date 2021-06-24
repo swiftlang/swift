@@ -84,16 +84,17 @@ extension Task {
   /// If the awaited on task gets cancelled externally the `get()` will throw
   /// a cancellation error.
   ///
-  /// If the task gets cancelled internally, e.g. by checking for cancellation
-  /// and throwing a specific error or using `checkCancellation` the error
-  /// thrown out of the task will be re-thrown here.
+  /// If the task gets cancelled internally --
+  /// for example, by checking for cancellation
+  /// and throwing a specific error, or by calling `checkCancellation()`,
+  /// then the error thrown by the task is rethrown here.
   public var value: Success {
     get async throws {
       return try await _taskFutureGetThrowing(_task)
     }
   }
 
-  /// Wait for the task to complete, returning (or throwing) its result.
+  /// Wait for the task to complete, returning its result.
   ///
   /// ### Priority
   /// If the task has not completed yet, its priority will be elevated to the
@@ -104,24 +105,10 @@ extension Task {
   /// If the awaited on task gets cancelled externally the `get()` will throw
   /// a cancellation error.
   ///
-  /// If the task gets cancelled internally, e.g. by checking for cancellation
-  /// and throwing a specific error or using `checkCancellation` the error
-  /// thrown out of the task will be re-thrown here.
-
-  /// Wait for the task to complete, returning its `Result`.
-  ///
-  /// ### Priority
-  /// If the task has not completed yet, its priority will be elevated to the
-  /// priority of the current task. Note that this may not be as effective as
-  /// creating the task with the "right" priority to in the first place.
-  ///
-  /// ### Cancellation
-  /// If the awaited on task gets cancelled externally the `get()` will throw
-  /// a cancellation error.
-  ///
-  /// If the task gets cancelled internally, e.g. by checking for cancellation
-  /// and throwing a specific error or using `checkCancellation` the error
-  /// thrown out of the task will be re-thrown here.
+  /// If the task gets cancelled internally --
+  /// for example, by checking for cancellation
+  /// and throwing a specific error, or by calling `checkCancellation()`,
+  /// then the error thrown by the task is returned here.
   public var result: Result<Success, Failure> {
     get async {
       do {

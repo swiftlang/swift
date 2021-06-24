@@ -43,7 +43,7 @@ extension AsyncSequence {
   ///     }
   ///     // Prints: 1  2  3  4  Error: MyError()
   ///
-  /// - Parameter isIncluded: A error-throwing closure that takes an element of
+  /// - Parameter predicate: A error-throwing closure that takes an element of
   ///   the asynchronous sequence as its argument and returns a Boolean value
   ///   that indicates whether to include the element in the modified sequence.
   /// - Returns: An asynchronous sequence that contains, in order, the elements
