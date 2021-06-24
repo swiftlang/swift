@@ -915,7 +915,7 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether the given class is an distributed actor.
+/// Determine whether the given class is a distributed actor.
 class IsDistributedActorRequest :
     public SimpleRequest<IsDistributedActorRequest,
         bool(NominalTypeDecl *),
