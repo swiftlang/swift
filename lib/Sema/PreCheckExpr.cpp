@@ -1534,8 +1534,18 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     return simplifyNestedTypeExpr(UDE);
   }
 
-  // TODO: Fold DiscardAssignmentExpr into a placeholder type here once parsing
-  // them is supported.
+  // Fold '_' into a placeholder type if it hasn't been marked as a "correct"
+  // discard assignment expr (on the LHS of an assignment). If we're inside a
+  // SequenceExpr, skip this step since we might have a correct
+  // DiscardAssignmentExpr that hasn't been marked as correct yet. The whole
+  // tree will be rechecked once SequenceExpr folding completes, anyway.
+  if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
+    if (!CorrectDiscardAssignmentExprs.count(DAE) && SequenceExprDepth == 0) {
+      auto *placeholderRepr =
+          new (getASTContext()) PlaceholderTypeRepr(DAE->getLoc());
+      return new (getASTContext()) TypeExpr(placeholderRepr);
+    }
+  }
 
   // Fold T? into an optional type when T is a TypeExpr.
   if (isa<OptionalEvaluationExpr>(E) || isa<BindOptionalExpr>(E)) {
@@ -1742,6 +1752,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return nullptr;
       if (auto *TyE = dyn_cast<TypeExpr>(E))
         return TyE->getTypeRepr();
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
+        return new (getASTContext()) PlaceholderTypeRepr(DAE->getLoc());
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
           return TupleTypeRepr::createEmpty(ctx, TE->getSourceRange());
