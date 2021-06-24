@@ -39,6 +39,9 @@ public:
 
   /// Upon a future task's completion, offer it to the task group it belongs to.
   void offer(AsyncTask *completed, AsyncContext *context);
+
+  /// Checks the cancellation status of the group.
+  bool isCancelled();
 };
 
 } // end namespace swift
