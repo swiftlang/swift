@@ -1427,7 +1427,7 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
 static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
-  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
+  builder.addParameter(makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // 0 flags
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
       makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 1 operation
@@ -1438,7 +1438,7 @@ static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
 static ValueDecl *getCreateAsyncTaskInGroup(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder); // <T>
-  builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
+  builder.addParameter(makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // 0 flags
   builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // 1 group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(

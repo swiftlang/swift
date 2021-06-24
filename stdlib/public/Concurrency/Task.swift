@@ -860,29 +860,6 @@ public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 
 @available(SwiftStdlib 5.5, *)
-public func _runChildTask<T>(
-  operation: @Sendable @escaping () async throws -> T
-) async -> Builtin.NativeObject {
-  let currentTask = Builtin.getCurrentAsyncTask()
-
-  // Set up the job flags for a new task.
-  var flags = JobFlags()
-  flags.kind = .task
-  flags.priority = getJobFlags(currentTask).priority ?? .unspecified
-  flags.isFuture = true
-  flags.isChildTask = true
-
-  // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(
-      Int(flags.bits), operation)
-
-  // Enqueue the resulting job.
-  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-  return task
-}
-
-@available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_cancel")
 func _taskCancel(_ task: Builtin.NativeObject)
 
