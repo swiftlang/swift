@@ -39,7 +39,7 @@ struct RewriteSystemBuilder {
 
   CanType getConcreteSubstitutionSchema(CanType concreteType,
                                         const ProtocolDecl *proto,
-                                        SmallVector<Term> &result);
+                                        SmallVectorImpl<Term> &result);
 
   RewriteSystemBuilder(RewriteContext &ctx, bool debug)
     : Context(ctx), Debug(debug) {}
@@ -62,7 +62,7 @@ struct RewriteSystemBuilder {
 CanType
 RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
                                                     const ProtocolDecl *proto,
-                                                    SmallVector<Term> &result) {
+                                                    SmallVectorImpl<Term> &result) {
   if (!concreteType->hasTypeParameter())
     return concreteType;
 
@@ -172,7 +172,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
     //   T.[superclass: C<X, Y>] => T
     auto otherType = CanType(req.getSecondType());
 
-    SmallVector<Term> substitutions;
+    SmallVector<Term, 1> substitutions;
     otherType = getConcreteSubstitutionSchema(otherType, proto,
                                               substitutions);
 
@@ -200,7 +200,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
       // rewrite rule
       //
       //   T.[concrete: C<X, Y>] => T
-      SmallVector<Term> substitutions;
+      SmallVector<Term, 1> substitutions;
       otherType = getConcreteSubstitutionSchema(otherType, proto,
                                                 substitutions);
 
