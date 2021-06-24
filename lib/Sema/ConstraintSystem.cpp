@@ -4273,6 +4273,10 @@ void constraints::simplifyLocator(ASTNode &anchor,
       path = path.slice(1);
       continue;
 
+   case ConstraintLocator::TupleType:
+      path = path.slice(1);
+      continue;
+
     case ConstraintLocator::NamedTupleElement:
     case ConstraintLocator::TupleElement: {
       // Extract tuple element.
