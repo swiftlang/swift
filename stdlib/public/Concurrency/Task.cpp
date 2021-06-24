@@ -450,10 +450,20 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
   if (jobFlags.task_isChildTask()) {
     parent = swift_task_getCurrent();
     assert(parent != nullptr && "creating a child task with no active task");
+  }
 
-    // Inherit the priority of the parent task if unspecified.
-    if (jobFlags.getPriority() == JobPriority::Unspecified)
-      jobFlags.setPriority(parent->getPriority());
+  // Inherit the priority of the currently-executing task if unspecified and
+  // we want to inherit.
+  if (jobFlags.getPriority() == JobPriority::Unspecified &&
+      (jobFlags.task_isChildTask() || taskCreateFlags.inheritContext())) {
+    AsyncTask *currentTask = parent;
+    if (!currentTask)
+      currentTask = swift_task_getCurrent();
+
+    if (currentTask)
+      jobFlags.setPriority(currentTask->getPriority());
+    else
+      jobFlags.setPriority(swift_task_getCurrentThreadPriority());
   }
 
   // Figure out the size of the header.
