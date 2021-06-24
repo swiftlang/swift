@@ -19,6 +19,7 @@ import _Concurrency
 /// `DistributedActor`.
 ///
 /// FIXME: !!! We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
+@_marker
 public protocol AnyActor: AnyObject {}
 
 // ==== Distributed Actor -----------------------------------------------------

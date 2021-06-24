@@ -15,8 +15,7 @@ import Swift
 /// A singleton actor whose executor is equivalent to the main
 /// dispatch queue.
 @available(SwiftStdlib 5.5, *)
-@globalActor public final actor MainActor {
-//@globalActor public final actor MainActor: GlobalActor { // TODO: specialize this case?
+@globalActor public final actor MainActor: GlobalActor {
   public static let shared = MainActor()
 
   @inlinable
