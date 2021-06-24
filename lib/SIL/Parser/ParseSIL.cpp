@@ -1259,8 +1259,7 @@ bool SILParser::parseSILType(SILType &Result,
       TypeAttributes::Convention::makeSwiftConvention("thin");
   }
 
-  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
-                                           /*isSILFuncDecl*/ IsFuncDecl);
+  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type);
 
   if (TyR.isNull())
     return true;
