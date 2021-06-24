@@ -1178,7 +1178,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     auto element = text.substr(splitIdx).substr(1);
     if (element == "RawPointer") {
       Buffer << 'p';
-    } else if (stripPrefix(element, "Float")) {
+    } else if (stripPrefix(element, "FPIEEE")) {
       Buffer << 'f' << element << '_';
     } else if (stripPrefix(element, "Int")) {
       Buffer << 'i' << element << '_';

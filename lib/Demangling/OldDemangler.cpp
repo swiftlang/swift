@@ -1877,7 +1877,7 @@ private:
               return nullptr;
             return Factory.createNode(
                 Node::Kind::BuiltinTypeName,
-                (DemanglerPrinter() << "Builtin.Vec" << elts << "xFloat"
+                (DemanglerPrinter() << "Builtin.Vec" << elts << "xFPIEEE"
                                     << size).str());
           }
           if (Mangled.nextIf('p'))
