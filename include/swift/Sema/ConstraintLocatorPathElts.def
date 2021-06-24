@@ -164,6 +164,10 @@ SIMPLE_LOCATOR_PATH_ELT(SubscriptMember)
 /// The missing argument synthesized by the solver.
 CUSTOM_LOCATOR_PATH_ELT(SynthesizedArgument)
 
+/// A tuple type, which provides context for subsequent tuple element
+/// path components.
+CUSTOM_LOCATOR_PATH_ELT(TupleType)
+
 /// Tuple elements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyTupleElement)
   /// A tuple element referenced by position.

@@ -1547,6 +1547,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       SmallVector<LocatorPathElt, 4> path;
       (void)locator.getLocatorParts(path);
 
+      while (!path.empty() && path.back().is<LocatorPathElt::TupleType>())
+        path.pop_back();
+
       if (!path.empty()) {
         // Direct pattern matching between tuple pattern and tuple type.
         if (path.back().is<LocatorPathElt::PatternMatch>()) {
@@ -4723,6 +4726,15 @@ bool ConstraintSystem::repairFailures(
     // mismatches within the same tuple type can be coalesced later.
     auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
     path.pop_back();
+
+    // Drop the tuple type path elements too, but extract each tuple type first.
+    if (path.back().is<LocatorPathElt::TupleType>()) {
+      rhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
+      path.pop_back();
+      lhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
+      path.pop_back();
+    }
+
     auto *tupleLocator = getConstraintLocator(locator.getAnchor(), path);
 
     // Let this fail if it's a contextual mismatch with sequence element types,
@@ -5225,9 +5237,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::Tuple: {
+      // Add each tuple type to the locator before matching the element types.
+      // This is useful for diagnostics, because the error message can use the
+      // full tuple type for several element mismatches. Use the original types
+      // to preserve sugar such as typealiases.
+      auto tmpTupleLoc = locator.withPathElement(LocatorPathElt::TupleType(type1));
+      auto tupleLoc = tmpTupleLoc.withPathElement(LocatorPathElt::TupleType(type2));
       auto result = matchTupleTypes(cast<TupleType>(desugar1),
                                     cast<TupleType>(desugar2),
-                                    kind, subflags, locator);
+                                    kind, subflags, tupleLoc);
       if (result != SolutionKind::Error)
         return result;
 
