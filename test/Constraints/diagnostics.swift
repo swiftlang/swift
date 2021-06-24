@@ -576,6 +576,14 @@ func r22263468(_ a : String?) {
   _ = MyTuple(42, a) // expected-error {{tuple type '(Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
 }
 
+// rdar://71829040 - "ambiguous without more context" error for tuple type mismatch.
+func r71829040() {
+  func object(forKey: String) -> Any? { nil }
+
+  let flags: [String: String]
+  // expected-error@+1 {{tuple type '(String, Bool)' is not convertible to tuple type '(String, String)'}}
+  flags = Dictionary(uniqueKeysWithValues: ["keyA", "keyB"].map { ($0, object(forKey: $0) as? Bool ?? false) })
+}
 
 // rdar://22470302 - Crash with parenthesized call result.
 class r22470302Class {
