@@ -2821,7 +2821,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   SyntaxContext->setCreateSyntax(SyntaxKind::CustomAttribute);
 
   // Parse a custom attribute.
-  auto type = parseType(diag::expected_type);
+  auto type = parseType(diag::expected_type, ParseTypeReason::CustomAttribute);
   if (type.hasCodeCompletion() || type.isNull()) {
     if (Tok.is(tok::l_paren) && isCustomAttributeArgument())
       skipSingle();
