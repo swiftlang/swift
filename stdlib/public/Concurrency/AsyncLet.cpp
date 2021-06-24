@@ -101,11 +101,11 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet) {
 // ==== start ------------------------------------------------------------------
 
 SWIFT_CC(swift)
-static void swift_asyncLet_startImpl(AsyncLet *alet,
-                                     TaskOptionRecord *options,
-                                     const Metadata *futureResultType,
-                                     void *closureEntryPoint,
-                                     HeapObject *closureContext) {
+void swift::swift_asyncLet_start(AsyncLet *alet,
+                                 TaskOptionRecord *options,
+                                 const Metadata *futureResultType,
+                                 void *closureEntryPoint,
+                                 HeapObject *closureContext) {
   auto flags = TaskCreateFlags();
   flags.setEnqueueJob(true);
 
