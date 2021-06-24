@@ -37,12 +37,15 @@ func test_taskGroup_cancel_then_add() async {
     let none = await group.next()
     print("next second: \(none)") // CHECK: next second: nil
 
-    group.spawn { 3 }
-    print("added third, unconditionally") // CHECK: added third, unconditionally
-    print("group isCancelled: \(group.isCancelled)") // CHECK: group isCancelled: true
-
+    group.spawn {
+      print("child task isCancelled: \(Task.isCancelled)") // CHECK: child task isCancelled: true
+      return 3
+    }
     let three = await group.next()!
     print("next third: \(three)") // CHECK: next third: 3
+
+    print("added third, unconditionally") // CHECK: added third, unconditionally
+    print("group isCancelled: \(group.isCancelled)") // CHECK: group isCancelled: true
 
     return one + (none ?? 0)
   }
