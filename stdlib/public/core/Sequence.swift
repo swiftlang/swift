@@ -1150,7 +1150,7 @@ extension Sequence {
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     var it = self.makeIterator()
     guard var ptr = buffer.baseAddress else { return (it, buffer.startIndex) }
-    for idx in buffer.startIndex..<buffer.count {
+    for idx in buffer.indices {
       guard let x = it.next() else {
         return (it, idx)
       }
