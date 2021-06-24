@@ -869,11 +869,11 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     // parameters, and correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
 
-    GenericParamList *GenericParams = nullptr;
+    GenericParamList *genericParams = nullptr;
     if (Context.LangOpts.EnableExperimentalOpaqueReturnTypes) {
-      auto GenericParamsResult = maybeParseGenericParams();
-      GenericParams = GenericParamsResult.getPtrOrNull();
-      Status |= GenericParamsResult;
+      auto genericParamsResult = maybeParseGenericParams();
+      genericParams = genericParamsResult.getPtrOrNull();
+      Status |= genericParamsResult;
 
       // Check for effect specifiers after the generic parameters, but before
       // the return type, and correct it.
@@ -888,14 +888,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     if (Status.isErrorOrHasCompletion())
       return Status;
 
-    if (GenericParams != nullptr) {
-      // The `Base` for our `OpaqueReturnParameterizedTypeRepr` should not be
-      // `nullptr`
-      assert(
-          retType != nullptr &&
-          "Expected non-null return type if `parseDeclReturnType` succeeded");
+    if (genericParams != nullptr) {
       retType = new (Context)
-          OpaqueReturnParameterizedTypeRepr(retType, GenericParams);
+          NamedOpaqueReturnTypeRepr(retType, genericParams);
     }
 
     // Check for effect specifiers after the type and correct it.

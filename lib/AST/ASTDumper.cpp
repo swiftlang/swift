@@ -168,6 +168,16 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out);
 }
 
+void GenericParamList::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void GenericParamList::print(raw_ostream &out, const PrintOptions &PO) const {
+  StreamPrinter printer(out);
+  print(printer, PO);
+}
+
 static void printTrailingRequirements(ASTPrinter &Printer,
                                       ArrayRef<RequirementRepr> Reqs,
                                       bool printWhereKeyword) {
@@ -185,27 +195,21 @@ static void printTrailingRequirements(ASTPrinter &Printer,
       [&] { Printer << ", "; });
 }
 
-void GenericParamList::print(llvm::raw_ostream &OS) const {
-  OS << '<';
+void GenericParamList::print(ASTPrinter &Printer, const PrintOptions &PO) const {
+  Printer << '<';
   interleave(*this,
              [&](const GenericTypeParamDecl *P) {
-               OS << P->getName();
+               Printer << P->getName();
                if (!P->getInherited().empty()) {
-                 OS << " : ";
-                 P->getInherited()[0].getType().print(OS);
+                 Printer << " : ";
+                 P->getInherited()[0].getType().print(Printer, PO);
                }
              },
-             [&] { OS << ", "; });
+             [&] { Printer << ", "; });
 
-  StreamPrinter Printer(OS);
   printTrailingRequirements(Printer, getRequirements(),
                             /*printWhereKeyword*/true);
-  OS << '>';
-}
-
-void GenericParamList::dump() const {
-  print(llvm::errs());
-  llvm::errs() << '\n';
+  Printer << '>';
 }
 
 void TrailingWhereClause::print(llvm::raw_ostream &OS,
@@ -3140,7 +3144,7 @@ public:
   }
 
   void
-  visitOpaqueReturnParameterizedTypeRepr(OpaqueReturnParameterizedTypeRepr *T) {
+  visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
     printCommon("type_opaque_return_parameterized") << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';

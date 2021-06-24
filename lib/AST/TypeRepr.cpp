@@ -435,27 +435,29 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ".Protocol";
 }
 
-SourceLoc OpaqueReturnParameterizedTypeRepr::getStartLocImpl() const {
-  return GenericParams->getLAngleLoc();
-}
-
-SourceLoc OpaqueReturnParameterizedTypeRepr::getEndLocImpl() const {
-  return Base->getEndLoc();
-}
-
-SourceLoc OpaqueReturnParameterizedTypeRepr::getLocImpl() const {
-  return Base->getLoc();
-}
-
-void OpaqueReturnParameterizedTypeRepr::printImpl(
-    ASTPrinter &Printer, const PrintOptions &Opts) const {
-  printTypeRepr(Base, Printer, Opts);
-}
-
 void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
                                      const PrintOptions &Opts) const {
   Printer.printKeyword("some", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getStartLocImpl() const {
+  return GenericParams->getLAngleLoc();
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getEndLocImpl() const {
+  return Base->getEndLoc();
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getLocImpl() const {
+  return Base->getLoc();
+}
+
+void NamedOpaqueReturnTypeRepr::printImpl(
+    ASTPrinter &Printer, const PrintOptions &Opts) const {
+  GenericParams->print(Printer, Opts);
+  Printer << ' ';
+  printTypeRepr(Base, Printer, Opts);
 }
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,

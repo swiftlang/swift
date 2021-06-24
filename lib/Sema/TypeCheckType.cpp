@@ -2084,8 +2084,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                        : ErrorType::get(getASTContext());
   }
 
-  case TypeReprKind::OpaqueReturnParameterized:
-    return resolveType(cast<OpaqueReturnParameterizedTypeRepr>(repr)->getBase(),
+  case TypeReprKind::NamedOpaqueReturn:
+    return resolveType(cast<NamedOpaqueReturnTypeRepr>(repr)->getBase(),
                        options);
 
   case TypeReprKind::Placeholder: {

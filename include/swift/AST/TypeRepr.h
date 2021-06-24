@@ -1109,23 +1109,25 @@ private:
 /// constraints that the concrete types satisfy:
 ///
 /// func foo() -> <T: Collection> T { return [1] }
-class OpaqueReturnParameterizedTypeRepr : public TypeRepr {
+class NamedOpaqueReturnTypeRepr : public TypeRepr {
   TypeRepr *Base;
   GenericParamList *GenericParams;
 
 public:
-  OpaqueReturnParameterizedTypeRepr(TypeRepr *Base,
+  NamedOpaqueReturnTypeRepr(TypeRepr *Base,
                                     GenericParamList *GenericParams)
-      : TypeRepr(TypeReprKind::OpaqueReturnParameterized), Base(Base),
-        GenericParams(GenericParams) {}
+      : TypeRepr(TypeReprKind::NamedOpaqueReturn), Base(Base),
+        GenericParams(GenericParams) {
+    assert(Base && GenericParams);
+  }
 
   TypeRepr *getBase() const { return Base; }
   GenericParamList *getGenericParams() const { return GenericParams; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::OpaqueReturnParameterized;
+    return T->getKind() == TypeReprKind::NamedOpaqueReturn;
   }
-  static bool classof(const OpaqueReturnParameterizedTypeRepr *T) {
+  static bool classof(const NamedOpaqueReturnTypeRepr *T) {
     return true;
   }
 
@@ -1263,6 +1265,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::InOut:
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
+  case TypeReprKind::NamedOpaqueReturn:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:
@@ -1281,8 +1284,6 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Isolated:
   case TypeReprKind::Placeholder:
     return true;
-  case TypeReprKind::OpaqueReturnParameterized:
-    return cast<OpaqueReturnParameterizedTypeRepr>(this)->getBase()->isSimple();
   }
   llvm_unreachable("bad TypeRepr kind");
 }

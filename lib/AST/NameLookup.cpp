@@ -2263,7 +2263,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     return { };
 
   case TypeReprKind::OpaqueReturn:
-  case TypeReprKind::OpaqueReturnParameterized:
+  case TypeReprKind::NamedOpaqueReturn:
     return { };
 
   case TypeReprKind::Fixed:
