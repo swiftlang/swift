@@ -159,18 +159,6 @@ OVERRIDE_TASK(task_asyncMainDrainQueue, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               , )
 
-OVERRIDE_ASYNC_LET(asyncLet_start, void,
-                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                   swift::,
-                   (AsyncLet *alet,
-                    TaskOptionRecord *options,
-                    const Metadata *futureResultType,
-                    void *closureEntryPoint,
-                    HeapObject *closureContext
-                   ),
-                   (alet, options,
-                    futureResultType, closureEntryPoint, closureContext))
-
 OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                    SWIFT_CC(swiftasync), swift::,
                    (OpaqueValue *result,

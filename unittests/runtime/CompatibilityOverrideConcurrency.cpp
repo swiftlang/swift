@@ -169,10 +169,6 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
   swift_continuation_throwingResumeWithError(nullptr, nullptr);
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_start) {
-  swift_asyncLet_start(nullptr, nullptr, nullptr, nullptr, nullptr);
-}
-
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_asyncLet_wait) {
   swift_asyncLet_wait(nullptr, nullptr, nullptr, nullptr, nullptr);
 }
