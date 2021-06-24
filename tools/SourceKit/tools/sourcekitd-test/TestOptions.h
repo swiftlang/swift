@@ -64,6 +64,7 @@ enum class SourceKitRequest {
   SyntaxTree,
   EnableCompileNotifications,
   CollectExpresstionType,
+  CollectVariableType,
   GlobalConfiguration,
   DependencyUpdated,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
