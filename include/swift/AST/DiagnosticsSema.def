@@ -3649,6 +3649,10 @@ ERROR(not_a_generic_definition,none,
       "cannot specialize a non-generic definition", ())
 ERROR(not_a_generic_type,none,
       "cannot specialize non-generic type %0", (Type))
+ERROR(cannot_specialize_self,none,
+      "cannot specialize 'Self'", ())
+NOTE(specialize_explicit_type_instead,none,
+     "did you mean to explicitly reference %0 instead?", (Type))
 ERROR(type_parameter_count_mismatch,none,
       "generic type %0 specialized with %select{too many|too few}3 type "
       "parameters (got %2, but expected %1)",
