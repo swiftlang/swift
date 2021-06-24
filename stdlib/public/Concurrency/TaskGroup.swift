@@ -658,12 +658,12 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     _taskGroupIsEmpty(_group)
   }
 
-  /// Cancel all of the remaining tasks in the group.
+  /// Cancel all the remaining, and future, tasks in the group.
   ///
-  /// After canceling a group, adding a new task to it always fails.
-  ///
-  /// Any results, including errors thrown by tasks affected by this
-  /// cancellation, are silently discarded.
+  /// A cancelled group will not will create new tasks when the `asyncUnlessCancelled`,
+  /// function is used. It will, however, continue to create tasks when the plain `async`
+  /// function is used. Such tasks will be created yet immediately cancelled, allowing
+  /// the tasks to perform some short-cut implementation, if they are responsive to cancellation.
   ///
   /// This function may be called even from within child (or any other) tasks,
   /// and causes the group to be canceled.
