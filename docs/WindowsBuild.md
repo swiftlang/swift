@@ -140,7 +140,7 @@ ninja -C S:\b\1
 ## Running Swift tests on Windows
 
 ```cmd
-path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-windows-x86_64-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\1 check-swift
 ```
 
