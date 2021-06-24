@@ -12,7 +12,7 @@
 // This file provides link compatibility shims to work through some ABI
 // changes.
 //===----------------------------------------------------------------------===//
-#include "../public/SwiftShims/Visibility.h"
+#include "swift/Runtime/Config.h"
 
 #define OLD_SYMBOL(NAME) \
   SWIFT_EXPORT_FROM(swift_Concurrency) extern "C" void const * const NAME = nullptr;
