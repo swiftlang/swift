@@ -810,7 +810,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(EndAsyncLet, "endAsyncLet", "", Special)
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task, given flags, options, and a function to
+/// Create a new asynchronous task given flags and a function to
 /// execute.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
     "createAsyncTask", "", Special)
@@ -821,10 +821,33 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
 ///     @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
+/// Create a new asynchronous task given flags, a task group, and a function
+/// to execute.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
     "createAsyncTaskInGroup", "", Special)
+
+/// createAsyncTaskWithExecutor(): (
+///     Int,                            // task-creation flags
+//      Builtin.Executor,               // executor
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task given flags, an executor, and a function to
+/// execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskWithExecutor,
+    "createAsyncTaskWithExecutor", "", Special)
+
+/// createAsyncTaskInGroupWithExecutor(): (
+///     Int,                            // flags
+///     Builtin.RawPointer,             // group
+///     Builtin.Executor,               // executor
+///     @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task given flags, a task group, an executor,
+/// and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroupWithExecutor,
+    "createAsyncTaskInGroupWithExecutor", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed

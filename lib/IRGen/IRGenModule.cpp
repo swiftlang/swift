@@ -638,6 +638,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     ExecutorFirstTy,      // identity
     ExecutorSecondTy,     // implementation
   });
+  SwiftExecutorTaskOptionRecordTy = createStructType(
+      *this, "swift.executor_task_option", {
+    SwiftTaskOptionRecordTy,    // Base option record
+    SwiftExecutorTy,            // Executor
+  });
   SwiftJobTy = createStructType(*this, "swift.job", {
     RefCountedStructTy,   // object header
     Int8PtrTy, Int8PtrTy, // SchedulerPrivate

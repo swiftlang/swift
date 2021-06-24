@@ -605,6 +605,9 @@ struct OperandOwnershipBuiltinClassifier
 #include "swift/AST/Builtins.def"
 
   OperandOwnership check(BuiltinInst *bi) { return visit(bi); }
+
+  OperandOwnership
+  visitCreateAsyncTask(BuiltinInst *bi, StringRef attr, int operationIndex);
 };
 
 } // end anonymous namespace
@@ -767,14 +770,17 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION = 2;
 const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION = 3;
+const int PARAMETER_INDEX_CREATE_ASYNC_TASK_WITH_EXECUTOR_FUNCTION = 3;
+const int PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION = 4;
 
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
-                                                        StringRef attr) {
+                                                        StringRef attr,
+                                                        int operationIndex) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION))
+  if (&op == &bi->getOperandRef(operationIndex))
     return OperandOwnership::DestroyingConsume;
-  
+
   // FIXME: These are considered InteriorPointer because they may propagate a
   // pointer into a borrowed values. If they do not propagate an interior pointer,
   // then they should be InstantaneousUse instead and should not require a
@@ -783,17 +789,31 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
 }
 
 OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
+                                                        StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_FUTURE_FUNCTION);
+}
+
+OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroup(BuiltinInst *bi,
                                                                StringRef attr) {
-  // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION))
-    return OperandOwnership::DestroyingConsume;
-  
-  // FIXME: These are considered InteriorPointer because they may propagate a
-  // pointer into a borrowed values. If they do not propagate an interior pointer,
-  // then they should be InstantaneousUse instead and should not require a
-  // guaranteed value.
-  return OperandOwnership::InteriorPointer;
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_FUTURE_FUNCTION);
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskWithExecutor(
+    BuiltinInst *bi, StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_WITH_EXECUTOR_FUNCTION);
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskInGroupWithExecutor(
+      BuiltinInst *bi, StringRef attr) {
+  return visitCreateAsyncTask(
+      bi, attr, PARAMETER_INDEX_CREATE_ASYNC_TASK_GROUP_WITH_EXECUTOR_FUNCTION);
 }
 
 OperandOwnership OperandOwnershipBuiltinClassifier::
