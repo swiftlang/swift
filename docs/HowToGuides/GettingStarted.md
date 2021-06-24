@@ -246,6 +246,7 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
    the tests.
+   macOS:
    - Via Ninja:
      ```sh
      utils/build-script --skip-build-benchmarks \
@@ -259,10 +260,14 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
        --sccache --release-debuginfo --swift-disable-dead-stripping --test \
        --xcode
      ```
+   Linux (uses Ninja):
+     ```sh
+     utils/build-script --release-debuginfo --test --skip-early-swift-driver
+     ```
    This will create a directory
    `swift-project/build/Ninja-RelWithDebInfoAssert`
    (with `Xcode` instead of `Ninja` if you used `--xcode`)
-   containing the build artifacts.
+   containing the Swift compiler and standard library and clang/LLVM build artifacts.
    - If the build succeeds: Once the build is complete, the tests will run.
      - If the tests are passing: Great! We can go to the next step.
      - If some tests are failing:
@@ -271,6 +276,10 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
          handy later when you run the tests after making a change.
    - If the build fails:
      See [Troubleshooting build issues](#troubleshooting-build-issues).
+
+   If you would like to additionally build the Swift corelibs,
+   ie swift-corelibs-libdispatch, swift-corelibs-foundation, and swift-corelibs-xctest,
+   on Linux, add the `--xctest` flag to `build-script`.
 
 In the following sections, for simplicity, we will assume that you are using a
 `Ninja-RelWithDebInfoAssert` build on macOS running on an Intel-based Mac,
