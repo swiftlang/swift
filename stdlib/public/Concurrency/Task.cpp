@@ -720,6 +720,22 @@ swift::swift_task_create_group_future(
       initialContextSize);
 }
 
+#ifdef __ARM_ARCH_7K__
+__attribute__((noinline))
+SWIFT_CC(swiftasync) static void workaround_function_swift_task_future_waitImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    AsyncTask *task, TaskContinuationFunction resumeFunction,
+    AsyncContext *callContext) {
+  // Make sure we don't eliminate calls to this function.
+  asm volatile("" // Do nothing.
+               :  // Output list, empty.
+               : "r"(result), "r"(callerContext), "r"(task) // Input list.
+               : // Clobber list, empty.
+  );
+  return;
+}
+#endif
+
 SWIFT_CC(swiftasync)
 static void swift_task_future_waitImpl(
   OpaqueValue *result,
@@ -739,7 +755,12 @@ static void swift_task_future_waitImpl(
                            result)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
+#ifdef __ARM_ARCH_7K__
+    return workaround_function_swift_task_future_waitImpl(
+        result, callerContext, task, resumeFn, callContext);
+#else
     return;
+#endif
 
   case FutureFragment::Status::Success: {
     // Run the task with a successful result.
@@ -753,6 +774,22 @@ static void swift_task_future_waitImpl(
     swift_Concurrency_fatalError(0, "future reported an error, but wait cannot throw");
   }
 }
+
+#ifdef __ARM_ARCH_7K__
+__attribute__((noinline))
+SWIFT_CC(swiftasync) static void workaround_function_swift_task_future_wait_throwingImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    AsyncTask *task, ThrowingTaskFutureWaitContinuationFunction resumeFunction,
+    AsyncContext *callContext) {
+  // Make sure we don't eliminate calls to this function.
+  asm volatile("" // Do nothing.
+               :  // Output list, empty.
+               : "r"(result), "r"(callerContext), "r"(task) // Input list.
+               : // Clobber list, empty.
+  );
+  return;
+}
+#endif
 
 SWIFT_CC(swiftasync)
 void swift_task_future_wait_throwingImpl(
@@ -774,7 +811,12 @@ void swift_task_future_wait_throwingImpl(
                            result)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
+#ifdef __ARM_ARCH_7K__
+    return workaround_function_swift_task_future_wait_throwingImpl(
+        result, callerContext, task, resumeFunction, callContext);
+#else
     return;
+#endif
 
   case FutureFragment::Status::Success: {
     auto future = task->futureFragment();
