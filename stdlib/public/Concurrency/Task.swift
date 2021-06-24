@@ -452,7 +452,47 @@ extension Task where Failure == Never {
     fatalError("Unsupported Swift compiler")
 #endif
   }
-}
+
+  /// Run given `operation` as asynchronously in its own top-level task.
+  ///
+  /// The `async` function should be used when creating asynchronous work
+  /// that operates on behalf of the synchronous function that calls it.
+  /// Like `Task.detached`, the async function creates a separate, top-level
+  /// task.
+  ///
+  /// Unlike `Task.detached`, the task creating by the `Task` initializer
+  /// inherits the priority and actor context of the caller, so the `operation`
+  /// is treated more like an asynchronous extension to the synchronous
+  /// operation.
+  ///
+  /// - Parameters:
+  ///   - priority: priority of the task. If nil, the priority will come from
+  ///     Task.currentPriority.
+  ///   - operation: the operation to execute
+  @discardableResult
+  @available(*, deprecated, message: "Experimental entry point--do not use")
+  @_alwaysEmitIntoClient
+  public init(
+    priority: TaskPriority? = nil,
+    on executor: Executor,
+    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
+  ) {
+#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
+    // Set up the job flags for a new task.
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: false, copyTaskLocals: true,
+      inheritContext: true, enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false)
+
+    // Create the asynchronous task.
+    let (task, _) = Builtin.createAsyncTaskWithExecutor(
+        flags, unsafeBitCast(executor, to: Builtin.Executor.self), operation)
+
+    self._task = task
+#else
+    fatalError("Unsupported Swift compiler")
+#endif
+  }}
 
 @available(SwiftStdlib 5.5, *)
 extension Task where Failure == Error {
