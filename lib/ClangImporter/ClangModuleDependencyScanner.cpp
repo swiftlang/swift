@@ -215,7 +215,7 @@ void ClangImporter::recordModuleDependencies(
 
     // Ensure the arguments we collected is sufficient to create a Clang
     // invocation.
-    assert(createClangInvocation(this, Opts, allArgs));
+    assert(createClangInvocation(this, Opts, nullptr, allArgs));
 
     std::vector<std::string> swiftArgs;
     // We are using Swift frontend mode.

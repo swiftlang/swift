@@ -390,13 +390,19 @@ func rdar_51641323() {
 
 // Protocol requirements cannot have opaque return types
 protocol OpaqueProtocolRequirement {
-  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{20-26=<#AssocType#>}}
-  func method() -> some P
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: P\n}}{{21-27=<#AssocType#>}}
+  func method1() -> some P
 
-  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{13-19=<#AssocType#>}}
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: C & P & Q\n}}{{21-35=<#AssocType#>}}
+  func method2() -> some C & P & Q
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: Nonsense\n}}{{21-34=<#AssocType#>}}
+  func method3() -> some Nonsense
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: P\n}}{{13-19=<#AssocType#>}}
   var prop: some P { get }
 
-  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{18-24=<#AssocType#>}}
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>: P\n}}{{18-24=<#AssocType#>}}
   subscript() -> some P { get }
 }
 
