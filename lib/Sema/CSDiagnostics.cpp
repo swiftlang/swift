@@ -3177,7 +3177,7 @@ bool TupleContextualFailure::diagnoseAsError() {
   auto purpose = getContextualTypePurpose();
   if (isNumElementsMismatch())
     diagnostic = diag::tuple_types_not_convertible_nelts;
-  else if ((purpose == CTP_Initialization) && !getContextualType(getAnchor()))
+  else if (purpose == CTP_Unused)
     diagnostic = diag::tuple_types_not_convertible;
   else if (auto diag = getDiagnosticFor(purpose, getToType()))
     diagnostic = *diag;

@@ -573,7 +573,7 @@ func r22263468(_ a : String?) {
   // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
   // re-think the way errors in tuple elements are detected because it's currently impossible to detect
   // exactly what went wrong here and aggregate fixes for different elements at the same time.
-  _ = MyTuple(42, a) // expected-error {{tuple type 'MyTuple' (aka '(Int, String)') is not convertible to tuple type '(Int, String?)'}}
+  _ = MyTuple(42, a) // expected-error {{tuple type '(Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
 }
 
 
