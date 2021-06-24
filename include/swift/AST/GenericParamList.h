@@ -81,8 +81,6 @@ class RequirementRepr {
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(ASTPrinter &OS) const;
-
 public:
   /// Construct a new type-constraint requirement.
   ///

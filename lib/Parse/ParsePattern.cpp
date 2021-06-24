@@ -824,7 +824,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ///   func-signature:
 ///     func-arguments ('async'|'reasync')? func-throws? func-signature-result?
 ///   func-signature-result:
-///     '->' generic-params? type
+///     '->' type
 ///
 /// Note that this leaves retType as null if unspecified.
 ParserStatus
@@ -865,21 +865,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       arrowLoc = consumeToken(tok::colon);
     }
 
-    // Check for effect specifiers after the arrow, but before the generic
-    // parameters, and correct it.
+    // Check for effect specifiers after the arrow, but before the return type,
+    // and correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
-
-    GenericParamList *genericParams = nullptr;
-    if (Context.LangOpts.EnableExperimentalOpaqueReturnTypes) {
-      auto genericParamsResult = maybeParseGenericParams();
-      genericParams = genericParamsResult.getPtrOrNull();
-      Status |= genericParamsResult;
-
-      // Check for effect specifiers after the generic parameters, but before
-      // the return type, and correct it.
-      parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc,
-                             &rethrows);
-    }
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -887,11 +875,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     Status |= ResultType;
     if (Status.isErrorOrHasCompletion())
       return Status;
-
-    if (genericParams != nullptr) {
-      retType = new (Context)
-          NamedOpaqueReturnTypeRepr(retType, genericParams);
-    }
 
     // Check for effect specifiers after the type and correct it.
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);

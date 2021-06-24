@@ -1114,8 +1114,7 @@ class NamedOpaqueReturnTypeRepr : public TypeRepr {
   GenericParamList *GenericParams;
 
 public:
-  NamedOpaqueReturnTypeRepr(TypeRepr *Base,
-                                    GenericParamList *GenericParams)
+  NamedOpaqueReturnTypeRepr(TypeRepr *Base, GenericParamList *GenericParams)
       : TypeRepr(TypeReprKind::NamedOpaqueReturn), Base(Base),
         GenericParams(GenericParams) {
     assert(Base && GenericParams);
@@ -1127,9 +1126,7 @@ public:
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::NamedOpaqueReturn;
   }
-  static bool classof(const NamedOpaqueReturnTypeRepr *T) {
-    return true;
-  }
+  static bool classof(const NamedOpaqueReturnTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const;

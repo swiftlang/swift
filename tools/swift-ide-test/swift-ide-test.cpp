@@ -763,12 +763,11 @@ DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
                                  llvm::cl::desc("Disable implicit import of _Concurrency module"),
                                  llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-EnableExperimentalOpaqueReturnTypes("enable-experimental-opaque-return-types",
-                                    llvm::cl::desc("Enable experimental extensions to opaque return type support"),
-                                    llvm::cl::Hidden,
-                                    llvm::cl::cat(Category),
-                                    llvm::cl::init(false));
+static llvm::cl::opt<bool> EnableExperimentalOpaqueReturnTypes(
+    "enable-experimental-opaque-return-types",
+    llvm::cl::desc(
+        "Enable experimental extensions to opaque return type support"),
+    llvm::cl::Hidden, llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",

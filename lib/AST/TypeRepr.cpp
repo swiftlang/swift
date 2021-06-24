@@ -453,8 +453,8 @@ SourceLoc NamedOpaqueReturnTypeRepr::getLocImpl() const {
   return Base->getLoc();
 }
 
-void NamedOpaqueReturnTypeRepr::printImpl(
-    ASTPrinter &Printer, const PrintOptions &Opts) const {
+void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
+                                          const PrintOptions &Opts) const {
   GenericParams->print(Printer, Opts);
   Printer << ' ';
   printTypeRepr(Base, Printer, Opts);

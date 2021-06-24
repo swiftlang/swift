@@ -9,5 +9,4 @@ func f4() async -> <T> () { }
 
 func g0() -> <T> { } // expected-error{{expected type for function result}}
 func g1() -> async <T> () { } // expected-error{{'async' may only occur before '->'}}
-func g2() -> <T> async () { } // expected-error{{'async' may only occur before '->'}}
-func g3() -> <T> () async { } // expected-error{{'async' may only occur before '->'}}
+func g2() -> <T> () async { } // expected-error{{'async' may only occur before '->'}}

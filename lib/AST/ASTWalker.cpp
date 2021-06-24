@@ -1858,8 +1858,7 @@ bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
 }
 
-bool Traversal::visitNamedOpaqueReturnTypeRepr(
-    NamedOpaqueReturnTypeRepr *T) {
+bool Traversal::visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T) {
   return doIt(T->getBase());
 }
 
