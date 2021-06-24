@@ -55,7 +55,7 @@ bb0(%0 : $Int, %1 : $Optional<Builtin.RawPointer>, %2: @guaranteed $@async @call
 // CHECK: [[GROUP_GEP:%.*]] = getelementptr inbounds %swift.task_group_task_option, %swift.task_group_task_option* [[OPTIONS]], i32 0, i32 1
 // CHECK: store i8* %0, i8** [[GROUP_GEP]], align 1
 // CHECK: [[OPTIONS_PTR:%.*]] = ptrtoint %swift.task_group_task_option* [[OPTIONS]] to [[INT]]
-// CHECK: call swiftcc %swift.async_task_and_context @swift_task_create(i64 %3, i64 [[OPTIONS_PTR]],
+// CHECK: call swiftcc %swift.async_task_and_context @swift_task_create([[INT]] %3, [[INT]] [[OPTIONS_PTR]],
 sil hidden @launch_future_in_group : $@convention(thin) (Builtin.RawPointer, @guaranteed @async @callee_guaranteed () -> (Int, @error Error), Int) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $@async @callee_guaranteed () -> (Int, @error Error), %3: $Int):
   %6 = metatype $@thick Int.Type
