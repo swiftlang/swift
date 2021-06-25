@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency | %FileCheck --enable-var-scope %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
 @propertyWrapper
@@ -147,9 +147,9 @@ actor Dog {
     // CHECK:   [[GLOBAL_BOOL_ACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[GLOBAL_BOOL_ADDR]] : $*Bool
     // CHECK:   [[THE_BOOL:%[0-9]+]] = load [trivial] [[GLOBAL_BOOL_ACCESS]] : $*Bool
     // CHECK:   end_access [[GLOBAL_BOOL_ACCESS]] : $*Bool
-    // CHECK:   end_borrow [[BORROWED_CAT]] : $Cat
 
     // CHECK:   hop_to_executor [[SELF]] : $Dog
+    // CHECK:   end_borrow [[BORROWED_CAT]] : $Cat
     // CHECK:   destroy_value [[CAT]] : $Cat
     // CHECK:   return [[THE_BOOL]] : $Bool
     // CHECK: } // end sil function '$s4test3DogC15accessGlobalVarSbyYaF'
@@ -437,3 +437,170 @@ actor Dog {
     }
 } // END OF DOG ACTOR
 
+class Point {
+    var pt: (Int, Int) = (0, 0)
+}
+
+@MainActor
+var globalCircle: ((Int, Int)?, Float) = (nil, 1.1)
+
+struct Container {
+    @MainActor static var counter: Int = 10
+    @MainActor static var this: Container?
+    @MainActor static var staticCircle: ((Int, Int)?, Float) = (nil, 2.1)
+
+    var noniso: Int = 20
+
+    @GlobalCat var iso: Float = 1.0
+    @GlobalCat var isoRef: CatBox = CatBox()
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple1SfyYaF : $@convention(method) @async (@guaranteed Container) -> Float {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 1
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ADDR]] : $*Float
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple1SfyYaF'
+    func accessTuple1() async -> Float {
+        return await globalCircle.1
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple2SiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 0
+    // CHECK:     switch_enum_addr [[SCRUTINEE:%[0-9]+]] : $*Optional<(Int, Int)>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+
+    // CHECK: [[SOME_BB]]:
+    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
+    // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple2SiSgyYaFZ'
+    static func accessTuple2() async -> Int? {
+        return await globalCircle.0!.0
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple3SfyYaF : $@convention(method) @async (@guaranteed Container) -> Float {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 1
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ADDR]] : $*Float
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple3SfyYaF'
+    func accessTuple3() async -> Float {
+        return await Container.staticCircle.1
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV12accessTuple4SiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:     [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     [[ADDR:%[0-9]+]] = tuple_element_addr [[ACCESS]] : $*(Optional<(Int, Int)>, Float), 0
+    // CHECK:     switch_enum_addr [[SCRUTINEE:%[0-9]+]] : $*Optional<(Int, Int)>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+
+    // CHECK: [[SOME_BB]]:
+    // CHECK:     [[TUPLE_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[SCRUTINEE]] : $*Optional<(Int, Int)>, #Optional.some!enumelt
+    // CHECK:     [[ELM_ADDR:%[0-9]+]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
+    // CHECK:     {{%[0-9]+}} = load [trivial] [[ELM_ADDR]] : $*Int
+    // CHECK:     end_access [[ACCESS]] : $*(Optional<(Int, Int)>, Float)
+    // CHECK:     hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV12accessTuple4SiSgyYaFZ'
+    static func accessTuple4() async -> Int? {
+        return await Container.staticCircle.0!.0
+    }
+
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV8getCountSiyYaFZ : $@convention(method) @async (@thin Container.Type) -> Int {
+    // CHECK:   hop_to_executor {{%[0-9]+}} : $MainActor
+    // CHECK:   {{%[0-9]+}} = begin_access [read] [dynamic] {{%[0-9]+}} : $*Int
+    // CHECK:   {{%[0-9]+}} = load [trivial] {{%[0-9]+}} : $*Int
+    // CHECK:   hop_to_executor {{%[0-9]+}} : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV8getCountSiyYaFZ'
+    static func getCount() async -> Int {
+        return await counter
+    }
+
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV8getValueSiSgyYaFZ : $@convention(method) @async (@thin Container.Type) -> Optional<Int> {
+    // CHECK: bb0(%0 : $@thin Container.Type):
+    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
+    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
+    // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
+    // CHECK:    cond_br {{%[0-9]+}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+    //
+    // CHECK: [[TRUE_BB]]:
+    // CHECK:    {{%[0-9]+}} = load [trivial] {{%[0-9]+}} : $*Int
+    // CHECK:    end_access [[ACCESS]] : $*Optional<Container>
+    // CHECK:    hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    //
+    // CHECK: [[FALSE_BB]]:
+    // CHECK:    end_access [[ACCESS]] : $*Optional<Container>
+    // CHECK:    hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    //
+    // CHECK: } // end sil function '$s4test9ContainerV8getValueSiSgyYaFZ'
+    static func getValue() async -> Int? {
+        return await this?.noniso
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV10getOrCrashSfyYaFZ : $@convention(method) @async (@thin Container.Type) -> Float {
+    // CHECK: bb0({{%[0-9]+}} : $@thin Container.Type):
+    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
+    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
+    // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
+    // CHECK:    switch_enum_addr %11 : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+    //
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+    //
+    // CHECK: [[SOME_BB]]:
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr %11 : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr %22 : $*Container, #Container.iso
+    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
+    // CHECK:       {{%[0-9]+}} = load [trivial] [[ELEM_ADDR]] : $*Float
+    // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV10getOrCrashSfyYaFZ'
+    static func getOrCrash() async -> Float {
+        return await this!.iso
+    }
+
+    // CHECK-LABEL: sil hidden [ossa] @$s4test9ContainerV13getRefOrCrashAA6CatBoxCyYaFZ : $@convention(method) @async (@thin Container.Type) -> @owned CatBox {
+    // CHECK: bb0({{%[0-9]+}} : $@thin Container.Type):
+    // CHECK:    [[MAIN:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MainActor
+    // CHECK:    [[PREV:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:    hop_to_executor [[MAIN]] : $MainActor
+    // CHECK:    [[ACCESS:%[0-9]+]] = begin_access [read] [dynamic] {{%[0-9]+}} : $*Optional<Container>
+    // CHECK:    switch_enum_addr %11 : $*Optional<Container>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[CRASH_BB:bb[0-9]+]]
+    //
+    // CHECK: [[CRASH_BB]]:
+    // CHECK-NOT:   hop_to_executor {{%[0-9]+}}
+    // CHECK:       unreachable
+    //
+    // CHECK: [[SOME_BB]]:
+    // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr %11 : $*Optional<Container>, #Optional.some!enumelt
+    // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr %22 : $*Container, #Container.iso
+    // CHECK:       [[PREV_AGAIN:%[0-9]+]] = builtin "getCurrentExecutor"() : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
+    // CHECK:       {{%[0-9]+}} = load [copy] [[ELEM_ADDR]] : $*CatBox
+    // CHECK:       hop_to_executor [[PREV]] : $Optional<Builtin.Executor>
+    // CHECK:       hop_to_executor [[PREV_AGAIN]] : $Optional<Builtin.Executor>
+    // CHECK: } // end sil function '$s4test9ContainerV13getRefOrCrashAA6CatBoxCyYaFZ'
+    static func getRefOrCrash() async -> CatBox {
+        return await this!.isoRef
+    }
+}
