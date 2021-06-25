@@ -20,12 +20,11 @@ extension C2 {
 }
 
 // a version of C2 that requires both sync and async methods (differing only by
-// completion handler) in ObjC, is not possible to conform to with 'async' in
-// a Swift protocol
+// completion handler) in ObjC.
 class C3 : NSObject, RequiredObserver {}
 extension C3 {
-  func hello() -> Bool { true } // expected-note {{'hello()' previously declared here}}
-  func hello() async -> Bool { true } // expected-error {{invalid redeclaration of 'hello()'}}
+  func hello() -> Bool { true }
+  func hello() async -> Bool { true }
 }
 
 // the only way to conform to 'RequiredObserver' in Swift is to not use 'async'
