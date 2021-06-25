@@ -16,9 +16,10 @@
 
 #include "GenIntegerLiteral.h"
 
+#include "swift/ABI/MetadataValues.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/GlobalVariable.h"
-#include "swift/ABI/MetadataValues.h"
 
 #include "BitPatternBuilder.h"
 #include "Explosion.h"
@@ -177,12 +178,12 @@ ConstantIntegerLiteralMap::get(IRGenModule &IGM, APInt &&value) {
   // TODO: make this shared within the image
   auto arrayTy = llvm::ArrayType::get(IGM.SizeTy, numChunks);
   auto initV = llvm::ConstantArray::get(arrayTy, chunks);
-  auto globalArray =
-    new llvm::GlobalVariable(*IGM.getModule(), arrayTy, /*constant*/ true,
-                             llvm::GlobalVariable::PrivateLinkage, initV,
-                             IGM.EnableValueNames
-                               ? Twine("intliteral.") + value.toString(10, true)
-                               : "");
+  auto globalArray = new llvm::GlobalVariable(
+      *IGM.getModule(), arrayTy, /*constant*/ true,
+      llvm::GlobalVariable::PrivateLinkage, initV,
+      IGM.EnableValueNames
+          ? Twine("intliteral.") + llvm::toString(value, 10, true)
+          : "");
   globalArray->setUnnamedAddr(llvm::GlobalVariable::UnnamedAddr::Global);
 
   // Various clients expect this to be a i64*, not an [N x i64]*, so cast down.

@@ -2760,7 +2760,7 @@ static void addDiagFileOutputForPersistentPCHAction(
     llvm::sys::path::append(outPathBuf, stem);
     outPathBuf += '-';
     auto code = llvm::hash_value(ModuleOutPath);
-    outPathBuf += llvm::APInt(64, code).toString(36, /*Signed=*/false);
+    llvm::APInt(64, code).toString(outPathBuf, 36, /*Signed=*/false);
     llvm::sys::path::replace_extension(outPathBuf, suffix);
   }
 

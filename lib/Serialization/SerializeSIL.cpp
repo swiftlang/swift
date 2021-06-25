@@ -1555,7 +1555,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::IntegerLiteralInst: {
     // Use SILOneOperandLayout to specify the type and the literal.
-    llvm::SmallString<char> Str;
+    llvm::SmallString<10> Str;
     SILType Ty;
     switch (SI.getKind()) {
     default: llvm_unreachable("Out of sync with parent switch");

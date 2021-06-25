@@ -1346,12 +1346,12 @@ public:
     *this << ILI->getType() << ", " << lit;
   }
   void visitFloatLiteralInst(FloatLiteralInst *FLI) {
-    *this << FLI->getType() << ", 0x";
-    APInt bits = FLI->getBits();
-    *this << bits.toString(16, /*Signed*/ false);
+    llvm::SmallString<12> hex;
     llvm::SmallString<12> decimal;
+    FLI->getBits().toString(hex, 16, /*Signed*/ false);
     FLI->getValue().toString(decimal);
-    *this << " // " << decimal;
+    *this << FLI->getType()
+          << (llvm::Twine(", 0x") + hex + " // " + decimal).str();
   }
   static StringRef getStringEncodingName(StringLiteralInst::Encoding kind) {
     switch (kind) {
