@@ -642,8 +642,6 @@ static AsyncTaskAndContext swift_task_create_commonImpl(
     swift_retain(task);
     swift_task_enqueue(task, executor);
   }
-  
-  _swift_tsan_release(static_cast<Job *>(task));
 
   return {task, initialContext};
 }
