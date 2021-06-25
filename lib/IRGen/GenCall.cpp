@@ -3857,26 +3857,46 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 }
 
 llvm::Value *irgen::emitTaskCreate(
-    IRGenFunction &IGF, llvm::Value *flags,
+    IRGenFunction &IGF,
+    llvm::Value *flags,
     llvm::Value *taskGroup,
     llvm::Value *futureResultType,
-    llvm::Value *taskFunction, llvm::Value *localContextInfo,
+    llvm::Value *taskFunction,
+    llvm::Value *localContextInfo,
     SubstitutionMap subs) {
-  llvm::CallInst *result;
-  if (taskGroup && futureResultType) {
-    taskGroup = IGF.Builder.CreateBitOrPointerCast(
-        taskGroup, IGF.IGM.SwiftTaskGroupPtrTy);
-    result = IGF.Builder.CreateCall(
-        IGF.IGM.getTaskCreateGroupFutureFn(),
-        {flags, taskGroup, futureResultType,
-         taskFunction, localContextInfo});
-  } else if (futureResultType) {
-    result = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCreateFutureFn(),
-      {flags, futureResultType, taskFunction, localContextInfo});
-  } else {
-    llvm_unreachable("no future?!");
+  // If there is a task group, emit a task group option structure to contain
+  // it.
+  llvm::Value *taskOptions = llvm::ConstantInt::get(
+      IGF.IGM.SwiftTaskOptionRecordPtrTy, 0);
+  if (taskGroup) {
+    TaskOptionRecordFlags optionsFlags(TaskOptionRecordKind::TaskGroup);
+    llvm::Value *optionsFlagsVal = llvm::ConstantInt::get(
+        IGF.IGM.SizeTy, optionsFlags.getOpaqueValue());
+
+    auto optionsRecord = IGF.createAlloca(
+        IGF.IGM.SwiftTaskGroupTaskOptionRecordTy, Alignment(),
+        "task_group_options");
+    auto optionsBaseRecord = IGF.Builder.CreateStructGEP(
+        optionsRecord, 0, Size());
+    IGF.Builder.CreateStore(
+        optionsFlagsVal,
+        IGF.Builder.CreateStructGEP(optionsBaseRecord, 0, Size()));
+    IGF.Builder.CreateStore(
+        taskOptions, IGF.Builder.CreateStructGEP(optionsBaseRecord, 1, Size()));
+
+    IGF.Builder.CreateStore(
+        taskGroup, IGF.Builder.CreateStructGEP(optionsRecord, 1, Size()));
+    taskOptions = IGF.Builder.CreateBitOrPointerCast(
+        optionsRecord.getAddress(), IGF.IGM.SwiftTaskOptionRecordPtrTy);
   }
+
+  assert(futureResultType && "no future?!");
+  llvm::CallInst *result = IGF.Builder.CreateCall(
+    IGF.IGM.getTaskCreateFn(),
+    {flags,
+     taskOptions,
+     futureResultType,
+     taskFunction, localContextInfo});
   result->setDoesNotThrow();
   result->setCallingConv(IGF.IGM.SwiftCC);
 

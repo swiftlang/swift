@@ -173,8 +173,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::StartAsyncLet:
-    case BuiltinValueKind::CreateAsyncTaskFuture:
-    case BuiltinValueKind::CreateAsyncTaskGroupFuture:
+    case BuiltinValueKind::CreateAsyncTask:
+    case BuiltinValueKind::CreateAsyncTaskInGroup:
     case BuiltinValueKind::ConvertTaskToJob:
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:

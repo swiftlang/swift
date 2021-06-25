@@ -67,7 +67,7 @@ public func testGeneric(c: C) {
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
 // CHECK:   [[MD:%.*]] = mark_dependence [[PA]]
 // CHECK:   [[CONV:%.*]] = convert_function [[MD]]
-// CHECK:   [[BAL:%.*]] = builtin "startAsyncLet"<String>([[CONV]]
+// CHECK:   [[BAL:%.*]] = builtin "startAsyncLet"<String>({{.*}}, [[CONV]]
 // CHECK:   builtin "endAsyncLet"([[BAL]] : $Builtin.RawPointer, [[MD]]
 // CHECK: } // end sil function '$s22closure_lifetime_fixup12testAsyncLetyS2SYaF'
 

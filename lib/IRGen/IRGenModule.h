@@ -733,7 +733,10 @@ public:
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
   llvm::PointerType *SwiftAsyncLetPtrTy;
+  llvm::IntegerType *SwiftTaskOptionRecordPtrTy;
   llvm::PointerType *SwiftTaskGroupPtrTy;
+  llvm::StructType  *SwiftTaskOptionRecordTy;
+  llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
   llvm::IntegerType *ExecutorSecondTy;

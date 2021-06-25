@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -parse-stdlib -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5 -enable-experimental-concurrency -parse-stdlib -sil-verify-all | %FileCheck %s --dump-input always
 // REQUIRES: concurrency
 
 import Swift
@@ -17,13 +17,14 @@ enum SomeError: Error {
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A11AsyncLetIntSiyYaF : $@convention(thin) @async () -> Int
 func testAsyncLetInt() async -> Int {
   // CHECK: [[I:%.*]] = mark_uninitialized [var] %0
+  // CHECK: [[OPTIONS_ARG:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
   // CHECK: [[CLOSURE:%.*]] = function_ref @$s4test0A11AsyncLetIntSiyYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async () -> Int
   // CHECK: [[THICK_CLOSURE:%.*]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) @Sendable @async () -> Int to $@Sendable @async @callee_guaranteed () -> Int
   // CHECK: [[REABSTRACT_THUNK:%.*]] = function_ref @$sSiIeghHd_Sis5Error_pIegHrzo_TR : $@convention(thin) @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
   // CHECK: [[REABSTRACT_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[THICK_CLOSURE]]) : $@convention(thin) @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
   // CHECK: [[ESCAPING_CLOSURE:%.*]] = convert_function [[REABSTRACT_CLOSURE]] : $@async @callee_guaranteed () -> (@out Int, @error Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
   // CHECK: [[CLOSURE_ARG:%.*]] = convert_escape_to_noescape [not_guaranteed] [[ESCAPING_CLOSURE]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
-  // CHECK: [[ASYNC_LET_START:%.*]] = builtin "startAsyncLet"<Int>([[CLOSURE_ARG]] : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>) : $Builtin.RawPointer
+  // CHECK: [[ASYNC_LET_START:%.*]] = builtin "startAsyncLet"<Int>([[OPTIONS_ARG]] : $Optional<Builtin.RawPointer>, [[CLOSURE_ARG]] : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>) : $Builtin.RawPointer
   async let i = await getInt()
 
   // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
