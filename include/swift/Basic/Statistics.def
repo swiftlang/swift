@@ -220,6 +220,14 @@ FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)
 /// Number of synthesized accessor bodies.
 FRONTEND_STATISTIC(Sema, NumAccessorBodiesSynthesized)
 
+/// Number of requirement machines constructed. Rough proxy for
+/// amount of work the requirement machine does analyzing type signatures.
+FRONTEND_STATISTIC(Sema, NumRequirementMachines)
+
+/// Number of requirement machines constructed. Rough proxy for
+/// amount of work the requirement machine does analyzing type signatures.
+FRONTEND_STATISTIC(Sema, NumRequirementMachineCompletionSteps)
+
 /// Number of generic signature builders constructed. Rough proxy for
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)

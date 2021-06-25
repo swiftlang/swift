@@ -158,7 +158,7 @@ void ProtocolGraph::computeInheritedProtocols() {
   }
 }
 
-/// Recursively compute the 'depth' of e protocol, which is inductively defined
+/// Recursively compute the 'depth' of a protocol, which is inductively defined
 /// as one greater than the depth of all inherited protocols, with a protocol
 /// that does not inherit any other protocol having a depth of one.
 unsigned ProtocolGraph::computeProtocolDepth(const ProtocolDecl *proto) {
