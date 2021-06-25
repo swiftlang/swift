@@ -2416,6 +2416,7 @@ namespace {
       return getExplicitGlobalActor(closure);
     }
 
+  public:
     /// Determine the isolation of a particular closure.
     ///
     /// This function assumes that enclosing closures have already had their
@@ -2548,6 +2549,12 @@ void swift::checkPropertyWrapperActorIsolation(
    PatternBindingDecl *binding, Expr *expr) {
   ActorIsolationChecker checker(binding->getDeclContext());
   expr->walk(checker);
+}
+
+ClosureActorIsolation
+swift::determineClosureActorIsolation(AbstractClosureExpr *closure) {
+  ActorIsolationChecker checker(closure->getParent());
+  return checker.determineClosureIsolation(closure);
 }
 
 /// Determine actor isolation solely from attributes.
