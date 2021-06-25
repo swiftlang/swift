@@ -4079,6 +4079,16 @@ public:
 /// single parameter of `Result` type.
 enum class HandlerType { INVALID, PARAMS, RESULT };
 
+/// A single return type of a refactored async function. If the async function
+/// returns a tuple, each element of the tuple (represented by a \c
+/// LabeledReturnType) might have a label, otherwise the \p Label is empty.
+struct LabeledReturnType {
+  Identifier Label;
+  swift::Type Ty;
+
+  LabeledReturnType(Identifier Label, swift::Type Ty) : Label(Label), Ty(Ty) {}
+};
+
 /// Given a function with an async alternative (or one that *could* have an
 /// async alternative), stores information about the completion handler.
 /// The completion handler can be either a variable (which includes a parameter)
@@ -4327,12 +4337,26 @@ struct AsyncHandlerDesc {
     }
   }
 
+  /// If the async function returns a tuple, the label of the \p Index -th
+  /// element in the returned tuple. If the function doesn't return a tuple or
+  /// the element is unlabeled, an empty identifier is returned.
+  Identifier getAsyncReturnTypeLabel(size_t Index) const {
+    assert(Index < getSuccessParams().size());
+    if (getSuccessParams().size() <= 1) {
+      // There can't be any labels if the async function doesn't return a tuple.
+      return Identifier();
+    } else {
+      return getSuccessParams()[Index].getInternalLabel();
+    }
+  }
+
   /// Gets the return value types for the async equivalent of this handler.
-  ArrayRef<swift::Type>
-  getAsyncReturnTypes(SmallVectorImpl<swift::Type> &Scratch) const {
-    for (auto &Param : getSuccessParams()) {
-      auto Ty = Param.getParameterType();
-      Scratch.push_back(getSuccessParamAsyncReturnType(Ty));
+  ArrayRef<LabeledReturnType>
+  getAsyncReturnTypes(SmallVectorImpl<LabeledReturnType> &Scratch) const {
+    for (size_t I = 0; I < getSuccessParams().size(); ++I) {
+      auto Ty = getSuccessParams()[I].getParameterType();
+      Scratch.emplace_back(getAsyncReturnTypeLabel(I),
+                           getSuccessParamAsyncReturnType(Ty));
     }
     return Scratch;
   }
@@ -6371,7 +6395,7 @@ private:
       return;
     }
 
-    SmallVector<Type, 2> Scratch;
+    SmallVector<LabeledReturnType, 2> Scratch;
     auto ReturnTypes = TopHandler.getAsyncReturnTypes(Scratch);
     if (ReturnTypes.empty()) {
       OS << " ";
@@ -6385,7 +6409,14 @@ private:
         OS << "(";
 
       llvm::interleave(
-          ReturnTypes, [&](Type Ty) { Ty->print(OS); }, [&]() { OS << ", "; });
+          ReturnTypes,
+          [&](LabeledReturnType TypeAndLabel) {
+            if (!TypeAndLabel.Label.empty()) {
+              OS << TypeAndLabel.Label << tok::colon << " ";
+            }
+            TypeAndLabel.Ty->print(OS);
+          },
+          [&]() { OS << ", "; });
 
       if (ReturnTypes.size() > 1)
         OS << ")";
@@ -7164,7 +7195,14 @@ private:
         //     completion(result.0, result.1)
         //   }
         // }
-        OS << ResultName << tok::period << Index;
+        OS << ResultName << tok::period;
+
+        auto Label = HandlerDesc.getAsyncReturnTypeLabel(Index);
+        if (!Label.empty()) {
+          OS << Label;
+        } else {
+          OS << Index;
+        }
       } else {
         OS << ResultName;
       }
@@ -7212,9 +7250,14 @@ private:
   /// returned results via a completion handler described by \p HandlerDesc.
   void addAsyncFuncReturnType(const AsyncHandlerDesc &HandlerDesc) {
     // Type or (Type1, Type2, ...)
-    SmallVector<Type, 2> Scratch;
+    SmallVector<LabeledReturnType, 2> Scratch;
     addTupleOf(HandlerDesc.getAsyncReturnTypes(Scratch), OS,
-               [&](auto Ty) { Ty->print(OS); });
+               [&](LabeledReturnType LabelAndType) {
+                 if (!LabelAndType.Label.empty()) {
+                   OS << LabelAndType.Label << tok::colon << " ";
+                 }
+                 LabelAndType.Ty->print(OS);
+               });
   }
 
   /// If \p FD is generic, adds a type annotation with the return type of the
