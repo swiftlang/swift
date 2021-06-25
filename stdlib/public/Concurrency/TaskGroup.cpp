@@ -648,6 +648,23 @@ task_group_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   return resumeWithError(context->Parent, context->errorResult);
 }
 
+#ifdef __ARM_ARCH_7K__
+__attribute__((noinline))
+SWIFT_CC(swiftasync) static void workaround_function_swift_taskGroup_wait_next_throwingImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskGroup *_group,
+    ThrowingTaskFutureWaitContinuationFunction resumeFunction,
+    AsyncContext *callContext) {
+  // Make sure we don't eliminate calls to this function.
+  asm volatile("" // Do nothing.
+               :  // Output list, empty.
+               : "r"(result), "r"(callerContext), "r"(_group) // Input list.
+               : // Clobber list, empty.
+  );
+  return;
+}
+#endif
+
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
 SWIFT_CC(swiftasync)
@@ -675,7 +692,12 @@ static void swift_taskGroup_wait_next_throwingImpl(
   case PollStatus::MustWait:
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
+#ifdef __ARM_ARCH_7K__
+    return workaround_function_swift_taskGroup_wait_next_throwingImpl(
+        resultPointer, callerContext, _group, resumeFunction, rawContext);
+#else
     return;
+#endif
 
   case PollStatus::Empty:
   case PollStatus::Error:
