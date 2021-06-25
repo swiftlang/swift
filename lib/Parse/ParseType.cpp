@@ -548,6 +548,27 @@ ParserResult<TypeRepr> Parser::parseType(
       applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc));
 }
 
+ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
+  GenericParamList *genericParams = nullptr;
+  if (Context.LangOpts.EnableExperimentalOpaqueReturnTypes) {
+    auto result = maybeParseGenericParams();
+    genericParams = result.getPtrOrNull();
+    if (result.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+  }
+
+  auto typeResult = parseType(MessageID);
+  if (auto type = typeResult.getPtrOrNull()) {
+    return makeParserResult(
+        ParserStatus(typeResult),
+        genericParams ? new (Context)
+                            NamedOpaqueReturnTypeRepr(type, genericParams)
+                      : type);
+  } else {
+    return typeResult;
+  }
+}
+
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletion)
@@ -556,7 +577,7 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
     return makeParserCodeCompletionStatus();
   }
 
-  auto result = parseType(MessageID);
+  auto result = parseTypeWithOpaqueParams(MessageID);
 
   if (!result.isParseErrorOrHasCompletion()) {
     if (Tok.is(tok::r_square)) {
