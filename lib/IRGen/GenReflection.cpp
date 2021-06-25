@@ -1437,7 +1437,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
 
   if (needsFieldDescriptor) {
     FieldTypeMetadataBuilder builder(*this, D);
-    FieldDescriptors.push_back(builder.emit());
+    builder.emit();
   }
 }
 
