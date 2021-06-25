@@ -582,6 +582,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
+  _swift_tsan_release(task);
+
   return {task, initialContext};
 }
 
