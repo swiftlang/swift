@@ -671,6 +671,7 @@ SWIFT_CC(swiftasync)
 static void swift_taskGroup_wait_next_throwingImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *_group,
+    TaskOptionRecord *options,
     ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
     AsyncContext *rawContext) {
   auto waitingTask = swift_task_getCurrent();
