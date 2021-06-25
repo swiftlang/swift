@@ -1988,7 +1988,7 @@ NOTE(wrapped_type_satisfies_requirement,none,
      "wrapped type %0 satisfies this requirement; did you mean to unwrap?", (Type))
 NOTE(candidate_types_conformance_requirement,none,
      "candidate requires that %0 conform to %1 "
-     "(requirement specified as %2 == %3%4)",
+     "(requirement specified as %2 : %3%4)",
      (Type, Type, Type, Type, StringRef))
 NOTE(candidate_types_equal_requirement,none,
      "candidate requires that the types %0 and %1 be equivalent "
