@@ -8308,7 +8308,7 @@ static void checkGenericSignature(CanGenericSignature canSig,
         assert(compareDependentTypes(firstType, secondType) < 0 &&
                "Out-of-order type parameters in same-type constraint");
       } else {
-        assert(canSig->isCanonicalTypeInContext(secondType) &&
+        assert(canSig->isCanonicalTypeInContext(secondType, builder) &&
                "Concrete same-type isn't canonical in its own context");
       }
       break;
@@ -8737,14 +8737,6 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
 
     verifyGenericSignature(context, canGenericSig);
   }
-}
-
-bool AbstractGenericSignatureRequest::isCached() const {
-  return true;
-}
-
-bool InferredGenericSignatureRequest::isCached() const {
-  return true;
 }
       
 /// Check whether the inputs to the \c AbstractGenericSignatureRequest are
