@@ -148,14 +148,6 @@ void swift::swift_storeEnumTagSinglePayloadGeneric(OpaqueValue *value,
                                 numExtraInhabitants, storeExtraInhabitantTag);
 }
 
-static uint32_t getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
-                                                    uint32_t numExtraCases,
-                                                    const Metadata *enumType);
-static void storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
-                                                  uint32_t index,
-                                                  uint32_t numExtraCases,
-                                                  const Metadata *enumType);
-
 void
 swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                                      EnumLayoutFlags layoutFlags,
@@ -209,8 +201,9 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   // Unconditionally overwrite the enum-tag witnesses.
   // The compiler does not generate meaningful enum-tag witnesses for
   // enums in this state.
-  vwtable->getEnumTagSinglePayload = getMultiPayloadEnumTagSinglePayload;
-  vwtable->storeEnumTagSinglePayload = storeMultiPayloadEnumTagSinglePayload;
+  vwtable->getEnumTagSinglePayload = swift_getMultiPayloadEnumTagSinglePayload;
+  vwtable->storeEnumTagSinglePayload =
+      swift_storeMultiPayloadEnumTagSinglePayload;
 
   vwtable->publishLayout(layout);
 }
@@ -287,19 +280,19 @@ static void storeMultiPayloadExtraInhabitantTag(OpaqueValue *value,
   storeMultiPayloadTag(value, layout, ~(tag - 1));
 }
 
-static uint32_t getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
-                                                    uint32_t numExtraCases,
-                                                    const Metadata *enumType) {
+uint32_t
+swift::swift_getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
+                                                 uint32_t numExtraCases,
+                                                 const Metadata *enumType) {
   return getEnumTagSinglePayloadImpl(value, numExtraCases, enumType,
                                      enumType->vw_size(),
                                      enumType->vw_getNumExtraInhabitants(),
                                      getMultiPayloadExtraInhabitantTag);
 }
 
-static void storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
-                                                  uint32_t index,
-                                                  uint32_t numExtraCases,
-                                                  const Metadata *enumType) {
+void swift::swift_storeMultiPayloadEnumTagSinglePayload(
+    OpaqueValue *value, uint32_t index, uint32_t numExtraCases,
+    const Metadata *enumType) {
   storeEnumTagSinglePayloadImpl(value, index, numExtraCases, enumType,
                                 enumType->vw_size(),
                                 enumType->vw_getNumExtraInhabitants(),
