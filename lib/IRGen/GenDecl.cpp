@@ -585,8 +585,7 @@ void IRGenModule::emitRuntimeRegistration() {
   if (SwiftProtocols.empty() && ProtocolConformances.empty() &&
       RuntimeResolvableTypes.empty() &&
       (!ObjCInterop || (ObjCProtocols.empty() && ObjCClasses.empty() &&
-                        ObjCCategoryDecls.empty())) &&
-      FieldDescriptors.empty())
+                        ObjCCategoryDecls.empty())))
     return;
   
   // Find the entry point.
@@ -746,10 +745,6 @@ void IRGenModule::emitRuntimeRegistration() {
     for (ExtensionDecl *ext : ObjCCategoryDecls) {
       CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
     }
-  }
-
-  if (!FieldDescriptors.empty()) {
-    emitFieldDescriptors();
   }
 
   RegIGF.Builder.CreateRetVoid();
@@ -3822,58 +3817,6 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   auto initializer = llvm::ConstantArray::get(arrayTy, elts);
 
   var->setInitializer(initializer);
-  var->setSection(sectionName);
-  var->setAlignment(llvm::MaybeAlign(4));
-
-  disableAddressSanitizer(*this, var);
-  
-  addUsedGlobal(var);
-  return var;
-}
-
-llvm::Constant *IRGenModule::emitFieldDescriptors() {
-  std::string sectionName;
-  switch (TargetInfo.OutputObjectFormat) {
-  case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
-    break;
-  case llvm::Triple::ELF:
-  case llvm::Triple::Wasm:
-    sectionName = "swift5_fieldmd";
-    break;
-  case llvm::Triple::XCOFF:
-  case llvm::Triple::COFF:
-    sectionName = ".sw5flmd$B";
-    break;
-  case llvm::Triple::GOFF:
-  case llvm::Triple::UnknownObjectFormat:
-    llvm_unreachable("Don't know how to emit field records table for "
-                     "the selected object format.");
-  }
-
-  // Do nothing if the list is empty.
-  if (FieldDescriptors.empty())
-    return nullptr;
-
-  // Define the global variable for the field record list.
-  // We have to do this before defining the initializer since the entries will
-  // contain offsets relative to themselves.
-  auto arrayTy =
-      llvm::ArrayType::get(FieldDescriptorPtrTy, FieldDescriptors.size());
-
-  // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
-  // resolve relocations relative to it.
-  auto var = new llvm::GlobalVariable(
-      Module, arrayTy,
-      /*isConstant*/ true, llvm::GlobalValue::PrivateLinkage,
-      /*initializer*/ nullptr, "\x01l_type_metadata_table");
-
-  SmallVector<llvm::Constant *, 8> elts;
-  for (auto *descriptor : FieldDescriptors)
-    elts.push_back(
-        llvm::ConstantExpr::getBitCast(descriptor, FieldDescriptorPtrTy));
-
-  var->setInitializer(llvm::ConstantArray::get(arrayTy, elts));
   var->setSection(sectionName);
   var->setAlignment(llvm::MaybeAlign(4));
 
