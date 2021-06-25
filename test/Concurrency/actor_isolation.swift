@@ -763,6 +763,20 @@ func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make
 // ----------------------------------------------------------------------
 // Actor protocols.
 // ----------------------------------------------------------------------
+
+@available(SwiftStdlib 5.5, *)
+actor A: Actor { // ok
+}
+
+@available(SwiftStdlib 5.5, *)
+class C: Actor, UnsafeSendable {
+  // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}}
+  // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    fatalError()
+  }
+}
+
 @available(SwiftStdlib 5.5, *)
 protocol P: Actor {
   func f()
