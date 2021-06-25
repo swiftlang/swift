@@ -456,7 +456,8 @@ static void collectPossibleCalleesByQualifiedLookup(
   llvm::DenseMap<std::pair<char, CanType>, size_t> known;
   auto *baseNominal = baseInstanceTy->getAnyNominal();
   for (auto *VD : decls) {
-    if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
+    if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD) &&
+         !isa<EnumElementDecl>(VD)) ||
         VD->shouldHideFromEditor())
       continue;
     if (!isMemberDeclApplied(&DC, baseInstanceTy, VD))
@@ -479,6 +480,11 @@ static void collectPossibleCalleesByQualifiedLookup(
       } else if (isa<SubscriptDecl>(VD)) {
         if (isOnMetaType != VD->isStatic())
           continue;
+      } else if (isa<EnumElementDecl>(VD)) {
+        if (!isOnMetaType)
+          continue;
+        declaredMemberType =
+            declaredMemberType->castTo<AnyFunctionType>()->getResult();
       }
     }
 
