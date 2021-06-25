@@ -400,7 +400,7 @@ bool RequirementFailure::diagnoseAsNote() {
   const auto *reqDC = getRequirementDC();
 
   emitDiagnosticAt(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(),
-                   getRHS(), req.getFirstType(), req.getSecondType(), "");
+                   getRHS(), req.getFirstType(), req.getSecondType());
   return true;
 }
 
