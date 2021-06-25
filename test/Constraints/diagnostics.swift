@@ -1213,6 +1213,43 @@ func voidFuncWithNestedVoidFunc() {
   }
 }
 
+func voidFuncWithEffects1() throws {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{35-35= -> <#Return Type#>}}
+}
+
+func voidFuncWithEffects2() async throws {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
+}
+
+// expected-error@+1 {{'async' must precede 'throws'}}
+func voidFuncWithEffects3() throws async {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
+}
+
+func voidFuncWithEffects4() async {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{34-34= -> <#Return Type#>}}
+}
+
+func voidFuncWithEffects5(_ closure: () throws -> Void) rethrows {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{65-65= -> <#Return Type#>}}
+}
+
+func voidGenericFuncWithEffects<T>(arg: T) async where T: CustomStringConvertible {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{49-49= -> <#Return Type#>}}
+}
+
 // Special cases: These should not offer a note + fix-it
 
 func voidFuncExplicitType() -> Void {
