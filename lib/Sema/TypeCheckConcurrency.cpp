@@ -207,7 +207,18 @@ GlobalActorAttributeRequest::evaluate(
   if (auto decl = subject.dyn_cast<Decl *>()) {
     dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
-    loc = decl->getLoc();
+    // HACK: `getLoc`, when querying the attr from  a serialized decl,
+    // dependning on deserialization order, may launch into arbitrary
+    // type-checking when querying interface types of such decls. Which,
+    // in turn, may do things like query (to print) USRs. This ends up being
+    // prone to request evaluator cycles.
+    //
+    // Because this only applies to serialized decls, we can be confident
+    // that they already went through this type-checking as primaries, so,
+    // for now, to avoid cycles, we simply ignore the locs on serialized decls
+    // only.
+    // This is a workaround for rdar://79563942
+    loc = decl->getLoc(/* SerializedOK */ false);
   } else {
     auto closure = subject.get<ClosureExpr *>();
     dc = closure;
@@ -2143,12 +2154,14 @@ namespace {
     }
 
     /// Check whether we are in an actor's initializer or deinitializer.
-    static bool isActorInitOrDeInitContext(const DeclContext *dc) {
+    /// \returns nullptr iff we are not in such a declaration. Otherwise,
+    ///          returns a pointer to the declaration.
+    static AbstractFunctionDecl const* isActorInitOrDeInitContext(const DeclContext *dc) {
       while (true) {
         // Non-Sendable closures are considered part of the enclosing context.
         if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
           if (isSendableClosure(closure, /*forActorIsolation=*/false))
-            return false;
+            return nullptr;
 
           dc = dc->getParent();
           continue;
@@ -2158,7 +2171,7 @@ namespace {
           // If this is an initializer or deinitializer of an actor, we're done.
           if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
               getSelfActorDecl(dc->getParent()))
-            return true;
+            return func;
 
           // Non-Sendable local functions are considered part of the enclosing
           // context.
@@ -2166,7 +2179,7 @@ namespace {
             if (auto fnType =
                     func->getInterfaceType()->getAs<AnyFunctionType>()) {
               if (fnType->isSendable())
-                return false;
+                return nullptr;
 
               dc = dc->getParent();
               continue;
@@ -2174,8 +2187,15 @@ namespace {
           }
         }
 
-        return false;
+        return nullptr;
       }
+    }
+
+    static bool isConvenienceInit(AbstractFunctionDecl const* fn) {
+      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(fn))
+        return ctor->isConvenienceInit();
+
+      return false;
     }
 
     /// Check a reference to a local or global.
@@ -2251,9 +2271,10 @@ namespace {
         bool continueToCheckingLocalIsolation = false;
         // Must reference distributed actor-isolated state on 'self'.
         //
-        // FIXME: For now, be loose about access to "self" in actor
-        // initializers/deinitializers. We'll want to tighten this up once
-        // we decide exactly how the model should go.
+        // FIXME(78484431): For now, be loose about access to "self" in actor
+        // initializers/deinitializers for distributed actors.
+        // We'll want to tighten this up once we decide exactly
+        // how the model should go.
         auto isolatedActor = getIsolatedActor(base);
         if (!isolatedActor &&
             !(isolatedActor.isActorSelf() &&
@@ -2311,14 +2332,12 @@ namespace {
         if (isolatedActor)
           return false;
 
-        // An instance member of an actor can be referenced from an initializer
-        // or deinitializer.
-        // FIXME: We likely want to narrow this down to only stored properties,
-        // but this matches existing behavior.
-        if (isolatedActor.isActorSelf() &&
-            member->isInstanceMember() &&
-            isActorInitOrDeInitContext(getDeclContext()))
-          return false;
+        // An instance member of an actor can be referenced from an actor's
+        // designated initializer or deinitializer.
+        if (isolatedActor.isActorSelf() && member->isInstanceMember())
+          if (auto fn = isActorInitOrDeInitContext(getDeclContext()))
+            if (!isConvenienceInit(fn))
+              return false;
 
         // An escaping partial application of something that is part of
         // the actor's isolated state is never permitted.
@@ -2936,8 +2955,10 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
-  case DeclKind::Constructor:
     return MemberIsolationPropagation::GlobalActor;
+
+  case DeclKind::Constructor:
+    return MemberIsolationPropagation::AnyIsolation;
 
   case DeclKind::Func:
   case DeclKind::Accessor:
@@ -3020,6 +3041,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
       defaultIsolation = ActorIsolation::forIndependent();
     }
   }
+
+  // An actor's convenience init is assumed to be actor-independent.
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
+    if (nominal->isActor())
+      if (auto ctor = dyn_cast<ConstructorDecl>(value))
+        if (ctor->isConvenienceInit())
+          defaultIsolation = ActorIsolation::forIndependent();
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](
@@ -3180,10 +3208,6 @@ bool HasIsolatedSelfRequest::evaluate(
 
   switch (*memberIsolation) {
   case MemberIsolationPropagation::GlobalActor:
-    // Treat constructors as being actor-isolated... for now.
-    if (isa<ConstructorDecl>(value))
-      break;
-
     return false;
 
   case MemberIsolationPropagation::AnyIsolation:
@@ -3218,6 +3242,13 @@ bool HasIsolatedSelfRequest::evaluate(
       if (isolation.getActor() != selfTypeDecl)
         return false;
       break;
+    }
+  }
+
+  // In an actor's convenience init, self is not isolated.
+  if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
+    if (ctor->isConvenienceInit()) {
+      return false;
     }
   }
 

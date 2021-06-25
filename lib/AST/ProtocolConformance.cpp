@@ -1250,10 +1250,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Actor classes conform to the actor protocol.
   if (auto classDecl = dyn_cast<ClassDecl>(mutableThis)) {
-    if (classDecl->isActor())
-      addSynthesized(KnownProtocolKind::Actor);
     if (classDecl->isDistributedActor())
       addSynthesized(KnownProtocolKind::DistributedActor);
+    else if (classDecl->isActor())
+      addSynthesized(KnownProtocolKind::Actor);
   }
 
   // Global actors conform to the GlobalActor protocol.

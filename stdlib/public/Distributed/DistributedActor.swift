@@ -13,6 +13,17 @@
 import Swift
 import _Concurrency
 
+// ==== Any Actor -------------------------------------------------------------
+
+/// Shared "base" protocol for both (local) `Actor` and (potentially remote)
+/// `DistributedActor`.
+///
+/// FIXME: !!! We'd need Actor to also conform to this, but don't want to add that conformance in _Concurrency yet.
+@_marker
+public protocol AnyActor: AnyObject {}
+
+// ==== Distributed Actor -----------------------------------------------------
+
 /// Common protocol to which all distributed actors conform implicitly.
 ///
 /// It is not possible to conform to this protocol manually explicitly.
@@ -24,7 +35,7 @@ import _Concurrency
 /// which involves enqueuing new partial tasks to be executed at some
 /// point.
 @available(SwiftStdlib 5.5, *)
-public protocol DistributedActor: Actor, Codable {
+public protocol DistributedActor: AnyActor, Codable {
 
     /// Creates new (local) distributed actor instance, bound to the passed transport.
     ///
@@ -90,48 +101,6 @@ extension DistributedActor {
         var container = encoder.singleValueContainer()
         try container.encode(self.actorAddress)
     }
-}
-/******************************************************************************/
-/***************************** Actor Transport ********************************/
-/******************************************************************************/
-
-@available(SwiftStdlib 5.5, *)
-public protocol ActorTransport: Sendable {
-    /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
-    /// The returned value is either a local actor or proxy to a remote actor.
-    func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
-    throws -> ActorResolved<Act> where Act: DistributedActor
-
-    /// Create an `ActorAddress` for the passed actor type.
-    ///
-    /// This function is invoked by an distributed actor during its initialization,
-    /// and the returned address value is stored along with it for the time of its
-    /// lifetime.
-    ///
-    /// The address MUST uniquely identify the actor, and allow resolving it.
-    /// E.g. if an actor is created under address `addr1` then immediately invoking
-    /// `transport.resolve(address: addr1, as: Greeter.self)` MUST return a reference
-    /// to the same actor.
-    func assignAddress<Act>(
-        _ actorType: Act.Type
-    ) -> ActorAddress
-        where Act: DistributedActor
-
-    func actorReady<Act>(
-        _ actor: Act
-    ) where Act: DistributedActor
-
-    /// Called during actor deinit/destroy.
-    func resignAddress(
-        _ address: ActorAddress
-    )
-
-}
-
-@available(SwiftStdlib 5.5, *)
-public enum ActorResolved<Act: DistributedActor> {
-    case resolved(Act)
-    case makeProxy
 }
 
 /******************************************************************************/

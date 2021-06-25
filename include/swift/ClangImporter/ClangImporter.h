@@ -25,6 +25,9 @@ namespace llvm {
   class Triple;
   class FileCollectorBase;
   template<typename Fn> class function_ref;
+  namespace vfs {
+    class FileSystem;
+  }
 }
 
 namespace clang {
@@ -158,6 +161,7 @@ public:
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
+                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
                         ArrayRef<std::string> invocationArgStrs,
                         std::vector<std::string> *CC1Args = nullptr);
   ClangImporter(const ClangImporter &) = delete;

@@ -1424,30 +1424,25 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
-static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
+static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // 1 options
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 2 operation
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 1 operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
   return builder.build(id);
 }
 
-static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
+static ValueDecl *getCreateAsyncTaskInGroup(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder); // <T>
   builder.addParameter(makeConcrete(ctx.getIntType())); // 0 flags
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // 1 group
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // 2 options
+  builder.addParameter(makeConcrete(ctx.TheRawPointerType)); // 1 group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 3 operation
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo))); // 2 operation
   builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
 
   return builder.build(id);
@@ -2761,11 +2756,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
 
-  case BuiltinValueKind::CreateAsyncTaskFuture:
-    return getCreateAsyncTaskFuture(Context, Id);
+  case BuiltinValueKind::CreateAsyncTask:
+    return getCreateAsyncTask(Context, Id);
 
-  case BuiltinValueKind::CreateAsyncTaskGroupFuture:
-    return getCreateAsyncTaskGroupFuture(Context, Id);
+  case BuiltinValueKind::CreateAsyncTaskInGroup:
+    return getCreateAsyncTaskInGroup(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);

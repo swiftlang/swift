@@ -453,26 +453,19 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
     indices.push_back(*tupleFix->Index);
   }
 
-  auto &cs = getConstraintSystem();
   auto *locator = getLocator();
   ContextualTypePurpose purpose;
-  Type fromType;
-  Type toType;
-
-  if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
-    purpose = cs.getContextualTypePurpose(locator->getAnchor());
-    fromType = getFromType();
-    toType = getToType();
-  } else if (auto contextualTypeInfo =
-                 getStructuralTypeContext(solution, locator)) {
-    std::tie(purpose, fromType, toType) = *contextualTypeInfo;
+  if (isExpr<CoerceExpr>(locator->getAnchor())) {
+    purpose = CTP_CoerceOperand;
+  } else if (auto *assignExpr = getAsExpr<AssignExpr>(locator->getAnchor())) {
+    purpose = isa<SubscriptExpr>(assignExpr->getDest()) ? CTP_SubscriptAssignSource
+                                                        : CTP_AssignSource;
   } else {
-    return false;
+    auto &cs = getConstraintSystem();
+    purpose = cs.getContextualTypePurpose(locator->getAnchor());
   }
 
-  TupleContextualFailure failure(solution, purpose,
-                                 fromType->lookThroughAllOptionalTypes(),
-                                 toType->lookThroughAllOptionalTypes(),
+  TupleContextualFailure failure(solution, purpose, getFromType(), getToType(),
                                  indices, locator);
   return failure.diagnose(asNote);
 }
