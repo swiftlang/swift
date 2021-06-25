@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ProtocolGraph.h"
+#include "ProtocolGraph.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Requirement.h"

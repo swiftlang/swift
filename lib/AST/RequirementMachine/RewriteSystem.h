@@ -17,7 +17,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraint.h"
-#include "swift/AST/ProtocolGraph.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -27,6 +26,8 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <algorithm>
+
+#include "ProtocolGraph.h"
 
 namespace llvm {
   class raw_ostream;
@@ -219,7 +220,8 @@ enum class OverlapKind {
 /// The first atom in the term must be a protocol, generic parameter, or
 /// associated type atom.
 ///
-/// A layout constraint atom must only appear at the end of a term.
+/// A layout, superclass or concrete type atom must only appear at the
+/// end of a term.
 ///
 /// Out-of-line methods are documented in RewriteSystem.cpp.
 class Term final {

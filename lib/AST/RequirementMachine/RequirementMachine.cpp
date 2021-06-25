@@ -15,12 +15,13 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/ProtocolGraph.h"
 #include "swift/AST/Requirement.h"
-#include "swift/AST/RewriteSystem.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include <vector>
+
+#include "ProtocolGraph.h"
+#include "RewriteSystem.h"
 
 using namespace swift;
 using namespace rewriting;
