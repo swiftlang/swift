@@ -49,7 +49,10 @@ actor Convenient {
         guard val > 0 else { throw BogusError.blah }
         self.x = 10
         say(msg: "hello?")  // expected-error {{this use of actor 'self' can only appear in an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         Task { self }       // expected-error {{actor 'self' can only be captured by a closure from an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
     }
 
     init(asyncThrowyDesignated val: Int) async throws {
@@ -95,15 +98,26 @@ actor MyActor {
 
     func helloWorld() {}
 
+    convenience init(ci1 c: Bool) {
+        self.init(i1: c)
+        Task { self }
+        callMethod(self)
+    }
+
     init(i1 c:  Bool) {
         self.x = 0
         _ = self.x
         self.y = self.x
 
         Task { self }     // expected-error{{actor 'self' can only be captured by a closure from an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         self.helloWorld() // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         callMethod(self) // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         passInout(&self.x) // expected-error{{actor 'self' can only be passed 'inout' from an async initializer}}
 
         self.x = self.y
@@ -115,9 +129,13 @@ actor MyActor {
         _ = self.hax
 
         _ = computedProp    // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         computedProp = 1    // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         Task { // expected-error {{actor 'self' can only be captured by a closure from an async initializer}}
+               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
             _ = await self.hax
             await self.helloWorld()
         }
@@ -129,9 +147,14 @@ actor MyActor {
         self.y = self.x
 
         Task { self }     // expected-error{{actor 'self' can only be captured by a closure from an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         self.helloWorld() // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         callMethod(self) // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         passInout(&self.x) // expected-error{{actor 'self' can only be passed 'inout' from an async initializer}}
 
         self.x = self.y
@@ -140,9 +163,13 @@ actor MyActor {
         _ = self.hax
 
         _ = computedProp    // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         computedProp = 1    // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         Task { // expected-error {{actor 'self' can only be captured by a closure from an async initializer}}
+               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
             _ = await self.hax
             await self.helloWorld()
         }
@@ -154,9 +181,14 @@ actor MyActor {
         self.y = self.x
 
         Task { self }     // expected-error{{actor 'self' can only be captured by a closure from an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         self.helloWorld() // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         callMethod(self) // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         passInout(&self.x) // expected-error{{actor 'self' can only be passed 'inout' from an async initializer}}
 
         self.x = self.y
@@ -165,9 +197,13 @@ actor MyActor {
         _ = self.hax
 
         _ = computedProp    // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         computedProp = 1    // expected-error{{this use of actor 'self' can only appear in an async initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         Task { // expected-error {{actor 'self' can only be captured by a closure from an async initializer}}
+               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
             _ = await self.hax
             await self.helloWorld()
         }
@@ -179,9 +215,14 @@ actor MyActor {
         self.y = self.x
 
         Task { self }     // expected-error{{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         self.helloWorld() // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         callMethod(self) // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         passInout(&self.x) // expected-error{{actor 'self' cannot be passed 'inout' from a global-actor isolated initializer}}
 
         self.x = self.y
@@ -190,9 +231,13 @@ actor MyActor {
         _ = self.hax
 
         _ = computedProp    // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         computedProp = 1    // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         Task { // expected-error {{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
+               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
             _ = await self.hax
             await self.helloWorld()
         }
@@ -228,9 +273,14 @@ actor MyActor {
         self.y = self.x
 
         Task { self }     // expected-error{{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         self.helloWorld() // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                          // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         callMethod(self) // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                         // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         passInout(&self.x) // expected-error{{actor 'self' cannot be passed 'inout' from a global-actor isolated initializer}}
 
         self.x = self.y
@@ -239,9 +289,13 @@ actor MyActor {
         _ = self.hax
 
         _ = computedProp    // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
+
         computedProp = 1    // expected-error{{this use of actor 'self' cannot appear in a global-actor isolated initializer}}
+                            // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         Task { // expected-error {{actor 'self' cannot be captured by a closure from a global-actor isolated initializer}}
+               // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
             _ = await self.hax
             await self.helloWorld()
         }
@@ -257,6 +311,7 @@ actor X {
     init(v1 start: Int) {
         self.counter = start
         Task { await self.setCounter(start + 1) } // expected-error {{actor 'self' can only be captured by a closure from an async initializer}}
+                                                  // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         if self.counter != start {
             fatalError("where's my protection?")
@@ -319,8 +374,10 @@ actor EscapeArtist {
         let unchainedSelf = self
 
         unchainedSelf.nonisolated() // expected-error {{this use of actor 'self' can only appear in an async initializer}}
+                                    // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
 
         let _ = { unchainedSelf.nonisolated() } // expected-error {{actor 'self' can only be captured by a closure from an async initializer}}
+                                                // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
     }
 
     init(attempt5: Bool) {
@@ -336,6 +393,7 @@ actor EscapeArtist {
             self.nonisolated()
         }
         fn()    // expected-error {{this use of actor 'self' can only appear in an async initializer}}
+                // expected-note@-1 {{convenience initializers allow non-isolated use of 'self' once initialized}}
     }
 
     func isolatedMethod() { x += 1 }

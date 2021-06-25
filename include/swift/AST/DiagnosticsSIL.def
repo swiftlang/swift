@@ -177,6 +177,10 @@ ERROR(self_disallowed_actor_init,none,
       "actor 'self' %select{can only|cannot}0 %1 from "
       "%select{an async|a global-actor isolated}0 initializer",
       (bool, StringRef))
+NOTE(actor_convenience_init,none,
+     "convenience initializers allow non-isolated use of 'self' once "
+     "initialized",
+     ())
 
 
 

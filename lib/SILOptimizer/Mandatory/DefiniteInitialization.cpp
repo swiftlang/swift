@@ -496,7 +496,8 @@ namespace {
 
     void reportIllegalUseForActorInit(const DIMemoryUse &Use,
                                       ActorInitKind ActorKind,
-                                      StringRef ProblemDesc) const;
+                                      StringRef ProblemDesc,
+                                      bool suggestConvenienceInit) const;
 
     void handleLoadUseFailureForActorInit(const DIMemoryUse &Use,
                                           ActorInitKind ActorKind) const;
@@ -1223,7 +1224,8 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 
   // 'self' cannot be passed 'inout' from some kinds of actor initializers.
   if (isRestrictedActorInitSelf(Use, &ActorKind))
-    reportIllegalUseForActorInit(Use, ActorKind, "be passed 'inout'");
+    reportIllegalUseForActorInit(Use, ActorKind, "be passed 'inout'",
+                                 /*suggestConvenienceInit=*/false);
 
   // One additional check: 'let' properties may never be passed inout, because
   // they are only allowed to have their initial value set, not a subsequent
@@ -1398,7 +1400,8 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 
     // no escaping uses of 'self' are allowed in restricted actor inits.
     if (isRestrictedActorInitSelf(Use, &ActorKind))
-      reportIllegalUseForActorInit(Use, ActorKind, "be captured by a closure");
+      reportIllegalUseForActorInit(Use, ActorKind, "be captured by a closure",
+                                   /*suggestConvenienceInit=*/true);
 
     return;
   }
@@ -1809,7 +1812,8 @@ bool LifetimeChecker::isRestrictedActorInitSelf(const DIMemoryUse& Use,
 void LifetimeChecker::reportIllegalUseForActorInit(
                                            const DIMemoryUse &Use,
                                            ActorInitKind ActorKind,
-                                           StringRef ProblemDesc) const {
+                                           StringRef ProblemDesc,
+                                           bool suggestConvenienceInit) const {
   switch(ActorKind) {
   case ActorInitKind::None:
   case ActorInitKind::PlainAsync:
@@ -1825,6 +1829,9 @@ void LifetimeChecker::reportIllegalUseForActorInit(
              true, ProblemDesc);
     break;
   }
+
+  if (suggestConvenienceInit)
+    diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
 }
 
 void LifetimeChecker::handleLoadUseFailureForActorInit(
@@ -1864,6 +1871,13 @@ void LifetimeChecker::handleLoadUseFailureForActorInit(
     diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, true);
     break;
   }
+
+  // We cannot easily determine which argument in the call the use of 'self'
+  // appears in. If we could, then we could determine whether the callee
+  // is 'isolated' to that parameter, in order to avoid suggesting a convenience
+  // init in those cases. Thus, the phrasing of the note should be informative.
+  if (isa<ApplyInst>(Inst))
+    diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
 }
 
 /// Check and diagnose various failures when a load use is not fully
