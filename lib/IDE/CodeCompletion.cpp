@@ -858,6 +858,8 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
 
   if (D->getAttrs().getDeprecated(D->getASTContext()))
     setNotRecommended(NotRecommendedReason::Deprecated);
+  else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
+    setNotRecommended(NotRecommendedReason::SoftDeprecated);
 }
 
 namespace {

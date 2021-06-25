@@ -42,10 +42,11 @@ CodeCompletionDiagnosticSeverity getSeverity(DiagnosticKind DiagKind) {
 }
 
 class CodeCompletionDiagnostics {
+  ASTContext &Ctx;
   DiagnosticEngine &Engine;
 
 public:
-  CodeCompletionDiagnostics(ASTContext &Ctx) : Engine(Ctx.Diags) {}
+  CodeCompletionDiagnostics(ASTContext &Ctx) : Ctx(Ctx), Engine(Ctx.Diags) {}
 
   template <typename... ArgTypes>
   bool
@@ -75,7 +76,12 @@ bool CodeCompletionDiagnostics::getDiagnostics(
 bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
     const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
     llvm::raw_ostream &Out) {
-  const AvailableAttr *Attr = D->getAttrs().getDeprecated(D->getASTContext());
+  bool isSoftDeprecated = false;
+  const AvailableAttr *Attr = D->getAttrs().getDeprecated(Ctx);
+  if (!Attr) {
+    Attr = D->getAttrs().getSoftDeprecated(Ctx);
+    isSoftDeprecated = true;
+  }
   if (!Attr)
     return true;
 
@@ -91,22 +97,47 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
   if (Attr->Deprecated)
     DeprecatedVersion = Attr->Deprecated.getValue();
 
-  if (Attr->Message.empty() && Attr->Rename.empty()) {
-    getDiagnostics(severity, Out, diag::availability_deprecated,
-                   RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                   Attr->Deprecated.hasValue(), DeprecatedVersion,
-                   /*message*/ StringRef());
-  } else if (!Attr->Message.empty()) {
-    EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    getDiagnostics(severity, Out, diag::availability_deprecated,
-                   RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                   Attr->Deprecated.hasValue(), DeprecatedVersion,
-                   EncodedMessage.Message);
+  if (!isSoftDeprecated) {
+    if (Attr->Message.empty() && Attr->Rename.empty()) {
+      getDiagnostics(severity, Out, diag::availability_deprecated,
+                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
+                     Attr->Deprecated.hasValue(), DeprecatedVersion,
+                     /*message*/ StringRef());
+    } else if (!Attr->Message.empty()) {
+      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
+      getDiagnostics(severity, Out, diag::availability_deprecated,
+                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
+                     Attr->Deprecated.hasValue(), DeprecatedVersion,
+                     EncodedMessage.Message);
+    } else {
+      getDiagnostics(severity, Out, diag::availability_deprecated_rename,
+                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
+                     Attr->Deprecated.hasValue(), DeprecatedVersion, false,
+                     /*ReplaceKind*/ 0, Attr->Rename);
+    }
   } else {
-    getDiagnostics(severity, Out, diag::availability_deprecated_rename,
-                   RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                   Attr->Deprecated.hasValue(), DeprecatedVersion, false,
-                   /*ReplaceKind*/ 0, Attr->Rename);
+    // '100000' is used as a version number in API that will be deprecated in an
+    // upcoming release. This number is to match the 'API_TO_BE_DEPRECATED'
+    // macro defined in Darwin platforms.
+    static llvm::VersionTuple DISTANT_FUTURE_VESION(100000);
+    bool isDistantFuture = DeprecatedVersion >= DISTANT_FUTURE_VESION;
+
+    if (Attr->Message.empty() && Attr->Rename.empty()) {
+      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated,
+                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
+                     !isDistantFuture, DeprecatedVersion,
+                     /*message*/ StringRef());
+    } else if (!Attr->Message.empty()) {
+      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
+      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated,
+                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
+                     !isDistantFuture, DeprecatedVersion,
+                     EncodedMessage.Message);
+    } else {
+      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated_rename,
+                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
+                     !isDistantFuture, DeprecatedVersion, Attr->Rename);
+    }
   }
   return false;;
 }
@@ -123,32 +154,27 @@ bool swift::ide::getCompletionDiagnostics(
   CodeCompletionDiagnostics Diag(ctx);
   switch (reason) {
   case NotRecommendedReason::Deprecated:
+  case NotRecommendedReason::SoftDeprecated:
     return Diag.getDiagnosticForDeprecated(D, severity, Out);
-    break;
   case NotRecommendedReason::InvalidAsyncContext:
     // FIXME: Could we use 'diag::async_in_nonasync_function'?
-    Diag.getDiagnostics(severity, Out, diag::ide_async_in_nonasync_context,
+    return Diag.getDiagnostics(severity, Out, diag::ide_async_in_nonasync_context,
                         D->getName());
-    break;
   case NotRecommendedReason::CrossActorReference:
-    Diag.getDiagnostics(severity, Out, diag::ide_cross_actor_reference_swift5,
+    return Diag.getDiagnostics(severity, Out, diag::ide_cross_actor_reference_swift5,
                         D->getName());
-    break;
   case NotRecommendedReason::RedundantImport:
-    Diag.getDiagnostics(severity, Out, diag::ide_redundant_import,
+    return Diag.getDiagnostics(severity, Out, diag::ide_redundant_import,
                         D->getName());
-    break;
   case NotRecommendedReason::RedundantImportIndirect:
-    Diag.getDiagnostics(severity, Out, diag::ide_redundant_import_indirect,
+    return Diag.getDiagnostics(severity, Out, diag::ide_redundant_import_indirect,
                         D->getName());
-    break;
   case NotRecommendedReason::VariableUsedInOwnDefinition:
-    Diag.getDiagnostics(severity, Out, diag::recursive_accessor_reference,
+    return Diag.getDiagnostics(severity, Out, diag::recursive_accessor_reference,
                         D->getName().getBaseIdentifier(), /*"getter"*/ 0);
-    break;
   case NotRecommendedReason::None:
     llvm_unreachable("invalid not recommended reason");
   }
-  return false;
+  return true;
 }
 

@@ -617,6 +617,7 @@ public:
     RedundantImport,
     RedundantImportIndirect,
     Deprecated,
+    SoftDeprecated,
     InvalidAsyncContext,
     CrossActorReference,
     VariableUsedInOwnDefinition,

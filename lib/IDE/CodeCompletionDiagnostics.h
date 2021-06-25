@@ -21,6 +21,8 @@ class ValueDecl;
 
 namespace ide {
 
+/// Populate \p severity and \p Out with the diagnostics for \p D.
+/// Returns \c true if it fails to generate the diagnostics.
 bool getCompletionDiagnostics(CodeCompletionResult::NotRecommendedReason reason,
                               const ValueDecl *D,
                               CodeCompletionDiagnosticSeverity &severity,

@@ -33,6 +33,19 @@ WARNING(ide_redundant_import, none,
 NOTE(ide_redundant_import_indirect, none,
      "module %0 is already imported via another module import", (DeclName))
 
+WARNING(ide_availability_softdeprecated, Deprecation,
+        "%select{getter for |setter for |}0%1 will be deprecated"
+        " in %select{a future version|%select{a future version of %3|%3 %5}4}2"
+        "%select{|: %6}6",
+        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
+         StringRef))
+
+WARNING(ide_availability_softdeprecated_rename, Deprecation,
+        "%select{getter for |setter for |}0%1 will be deprecated"
+        " in %select{a future version|%select{a future version of %3|%3 %5}4}2"
+        ": renamed to '%6'",
+        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, StringRef))
+
 //===----------------------------------------------------------------------===//
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
