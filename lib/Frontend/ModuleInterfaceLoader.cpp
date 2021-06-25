@@ -1346,7 +1346,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
              diag::error_extracting_version_from_module_interface);
     return true;
   }
-  if (extractCompilerFlagsFromInterface(SB, ArgSaver, SubArgs)) {
+  if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver, SubArgs)) {
     diagnose(interfacePath, diagnosticLoc,
              diag::error_extracting_version_from_module_interface);
     return true;

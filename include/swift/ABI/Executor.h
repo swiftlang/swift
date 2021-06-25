@@ -82,6 +82,15 @@ public:
     return ExecutorRef(actor, 0);
   }
 
+  /// Given a pointer to a serial executor and its SerialExecutor
+  /// conformance, return an executor reference for it.
+  static ExecutorRef forOrdinary(HeapObject *identity,
+                           const SerialExecutorWitnessTable *witnessTable) {
+    assert(identity);
+    assert(witnessTable);
+    return ExecutorRef(identity, reinterpret_cast<uintptr_t>(witnessTable));
+  }
+
   HeapObject *getIdentity() const {
     return Identity;
   }
@@ -111,6 +120,9 @@ public:
   bool mustSwitchToRun(ExecutorRef newExecutor) const {
     return Identity != newExecutor.Identity;
   }
+
+  /// Is this executor the main executor?
+  bool isMainExecutor() const;
 
   bool operator==(ExecutorRef other) const {
     return Identity == other.Identity;

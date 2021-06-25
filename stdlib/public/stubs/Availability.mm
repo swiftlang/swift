@@ -21,7 +21,6 @@
 #include "swift/Runtime/Debug.h"
 #include <TargetConditionals.h>
 #include "../SwiftShims/FoundationShims.h"
-#include <dlfcn.h>
 
 struct os_system_version_s {
     unsigned int major;
@@ -29,13 +28,12 @@ struct os_system_version_s {
     unsigned int patch;
 };
 
+// This is in libSystem, so it's OK to refer to it directly here
+extern "C" int os_system_version_get_current_version(struct os_system_version_s * _Nonnull) SWIFT_RUNTIME_WEAK_IMPORT;
+
 static os_system_version_s getOSVersion() {
-  auto lookup =
-    (int(*)(struct os_system_version_s * _Nonnull))
-    dlsym(RTLD_DEFAULT, "os_system_version_get_current_version");
-  
   struct os_system_version_s vers = { 0, 0, 0 };
-  lookup(&vers);
+  os_system_version_get_current_version(&vers);
   return vers;
 }
 

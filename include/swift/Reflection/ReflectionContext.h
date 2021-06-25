@@ -687,7 +687,16 @@ public:
 
     return false;
   }
-  
+
+  /// Returns the address of the nominal type descriptor given a metadata
+  /// address.
+  StoredPointer nominalTypeDescriptorFromMetadata(StoredPointer MetadataAddress) {
+    auto Metadata = readMetadata(MetadataAddress);
+    if (!Metadata)
+      return 0;
+    return super::readAddressOfNominalTypeDescriptor(Metadata, true);
+  }
+
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
   const TypeInfo *

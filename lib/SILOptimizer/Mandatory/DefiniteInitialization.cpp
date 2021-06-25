@@ -384,6 +384,13 @@ namespace {
 
   using BlockStates = BasicBlockData<LiveOutBlockState>;
 
+  enum class ActorInitKind {
+    None,           // not an actor init
+    Plain,          // synchronous, not isolated to global-actor
+    PlainAsync,     // asynchronous, not isolated to global-actor
+    GlobalActorIsolated  // isolated to global-actor (sync or async).
+  };
+
   /// LifetimeChecker - This is the main heavy lifting for definite
   /// initialization checking of a memory object.
   class LifetimeChecker {
@@ -479,6 +486,21 @@ namespace {
 
     bool diagnoseReturnWithoutInitializingStoredProperties(
         const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use);
+
+    /// Returns true iff the use involves 'self' in a restricted kind of
+    /// actor initializer. If a non-null Kind pointer was passed in,
+    /// then the specific kind of restricted actor initializer will be
+    /// written out. Otherwise, the None initializer kind will be written out.
+    bool isRestrictedActorInitSelf(const DIMemoryUse& Use,
+                               ActorInitKind *Kind = nullptr) const;
+
+    void reportIllegalUseForActorInit(const DIMemoryUse &Use,
+                                      ActorInitKind ActorKind,
+                                      StringRef ProblemDesc,
+                                      bool suggestConvenienceInit) const;
+
+    void handleLoadUseFailureForActorInit(const DIMemoryUse &Use,
+                                          ActorInitKind ActorKind) const;
 
     void handleLoadUseFailure(const DIMemoryUse &Use,
                               bool SuperInitDone,
@@ -866,9 +888,13 @@ void LifetimeChecker::doIt() {
 
 void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
   bool IsSuperInitComplete, FailedSelfUse;
+  ActorInitKind ActorKind = ActorInitKind::None;
   // If the value is not definitively initialized, emit an error.
   if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
+  // Check if it involves 'self' in a restricted actor init.
+  if (isRestrictedActorInitSelf(Use, &ActorKind))
+    return handleLoadUseFailureForActorInit(Use, ActorKind);
 }
 
 static void replaceValueMetatypeInstWithMetatypeArgument(
@@ -1177,6 +1203,7 @@ static FullApplySite findApply(SILInstruction *I, bool &isSelfParameter) {
 
 void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   bool IsSuperInitDone, FailedSelfUse;
+  ActorInitKind ActorKind = ActorInitKind::None;
 
   // inout uses are generally straight-forward: the memory must be initialized
   // before the "address" is passed as an l-value.
@@ -1194,6 +1221,11 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     diagnoseInitError(Use, diagID);
     return;
   }
+
+  // 'self' cannot be passed 'inout' from some kinds of actor initializers.
+  if (isRestrictedActorInitSelf(Use, &ActorKind))
+    reportIllegalUseForActorInit(Use, ActorKind, "be passed 'inout'",
+                                 /*suggestConvenienceInit=*/false);
 
   // One additional check: 'let' properties may never be passed inout, because
   // they are only allowed to have their initial value set, not a subsequent
@@ -1357,12 +1389,20 @@ static bool isLoadForReturn(SingleValueInstruction *loadInst) {
 }
 
 void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
+
   // The value must be fully initialized at all escape points.  If not, diagnose
   // the error.
   bool SuperInitDone, FailedSelfUse, FullyUninitialized;
+  ActorInitKind ActorKind = ActorInitKind::None;
 
   if (isInitializedAtUse(Use, &SuperInitDone, &FailedSelfUse,
                          &FullyUninitialized)) {
+
+    // no escaping uses of 'self' are allowed in restricted actor inits.
+    if (isRestrictedActorInitSelf(Use, &ActorKind))
+      reportIllegalUseForActorInit(Use, ActorKind, "be captured by a closure",
+                                   /*suggestConvenienceInit=*/true);
+
     return;
   }
 
@@ -1744,6 +1784,100 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
   }
 
   return true;
+}
+
+bool LifetimeChecker::isRestrictedActorInitSelf(const DIMemoryUse& Use,
+                                            ActorInitKind *Kind) const {
+
+  auto result = [&](ActorInitKind k, bool isRestricted) -> bool {
+    if (Kind)
+      *Kind = k;
+    return isRestricted;
+  };
+
+  // Currently: being synchronous, or global-actor isolated, means the actor's
+  // self is restricted within the init.
+  if (auto *ctor = TheMemory.isActorInitSelf()) {
+    if (getActorIsolation(ctor).isGlobalActor())  // global-actor isolated?
+      return result(ActorInitKind::GlobalActorIsolated, true);
+    else if (!ctor->hasAsync()) // synchronous?
+      return result(ActorInitKind::Plain, true);
+    else
+      return result(ActorInitKind::PlainAsync, false);
+  }
+
+  return result(ActorInitKind::None, false);
+}
+
+void LifetimeChecker::reportIllegalUseForActorInit(
+                                           const DIMemoryUse &Use,
+                                           ActorInitKind ActorKind,
+                                           StringRef ProblemDesc,
+                                           bool suggestConvenienceInit) const {
+  switch(ActorKind) {
+  case ActorInitKind::None:
+  case ActorInitKind::PlainAsync:
+    llvm::report_fatal_error("this actor init is never problematic!");
+
+  case ActorInitKind::Plain:
+    diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
+             false, ProblemDesc);
+    break;
+
+  case ActorInitKind::GlobalActorIsolated:
+    diagnose(Module, Use.Inst->getLoc(), diag::self_disallowed_actor_init,
+             true, ProblemDesc);
+    break;
+  }
+
+  if (suggestConvenienceInit)
+    diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
+}
+
+void LifetimeChecker::handleLoadUseFailureForActorInit(
+                                           const DIMemoryUse &Use,
+                                           ActorInitKind ActorKind) const {
+  assert(TheMemory.isAnyInitSelf());
+  SILInstruction *Inst = Use.Inst;
+
+  // While enum instructions have no side-effects, they do wrap-up `self`
+  // such that it can escape our analysis. So, enum instruction uses are only
+  // acceptable if the enum is part of a specific pattern of usage that is
+  // generated for a failable initializer.
+  if (auto *enumInst = dyn_cast<EnumInst>(Inst)) {
+    if (isFailableInitReturnUseOfEnum(enumInst))
+      return;
+
+    // Otherwise, if the use has no possibility of side-effects, then its OK.
+  } else if (!Inst->mayHaveSideEffects()) {
+    return;
+
+  // While loads can have side-effects, we are not concerned by them here.
+  } else if (isa<LoadInst>(Inst)) {
+    return;
+  }
+
+  // Everything else is disallowed!
+  switch(ActorKind) {
+  case ActorInitKind::None:
+  case ActorInitKind::PlainAsync:
+    llvm::report_fatal_error("this actor init is never problematic!");
+
+  case ActorInitKind::Plain:
+    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, false);
+    break;
+
+  case ActorInitKind::GlobalActorIsolated:
+    diagnose(Module, Use.Inst->getLoc(), diag::self_use_actor_init, true);
+    break;
+  }
+
+  // We cannot easily determine which argument in the call the use of 'self'
+  // appears in. If we could, then we could determine whether the callee
+  // is 'isolated' to that parameter, in order to avoid suggesting a convenience
+  // init in those cases. Thus, the phrasing of the note should be informative.
+  if (isa<ApplyInst>(Inst))
+    diagnose(Module, Use.Inst->getLoc(), diag::actor_convenience_init);
 }
 
 /// Check and diagnose various failures when a load use is not fully

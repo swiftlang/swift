@@ -2649,9 +2649,14 @@ public:
       break;
     }
     case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      // TODO: Implement.
+    case ActorIsolation::GlobalActorUnsafe: {
+      auto contextIsolation = getActorIsolationOfContext(
+          const_cast<DeclContext *>(CurrDeclContext));
+      if (contextIsolation != isolation) {
+        implicitlyAsync = true;
+      }
       break;
+    }
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
       return;

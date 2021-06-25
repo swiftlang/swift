@@ -127,7 +127,12 @@ const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
 
 void irgen::emitBuildMainActorExecutorRef(IRGenFunction &IGF,
                                           Explosion &out) {
-  // FIXME
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetMainExecutorFn(),
+                                     {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
 }
 
 void irgen::emitBuildDefaultActorExecutorRef(IRGenFunction &IGF,
@@ -169,6 +174,7 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
 }
 
 llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                             llvm::Value *taskOptions,
                                              llvm::Value *taskFunction,
                                              llvm::Value *localContextInfo,
                                              SubstitutionMap subs) {
@@ -187,6 +193,7 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   // This is @_silgen_name("swift_asyncLet_start")
   auto *call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
                                       {alet,
+                                       taskOptions,
                                        futureResultTypeMetadata,
                                        taskFunction,
                                        localContextInfo

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2020 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,10 +12,6 @@
 
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
-
-/// TODO: remove this before shipping
-@available(SwiftStdlib 5.5, *)
-public typealias PartialAsyncTask = UnownedJob
 
 /// A job is a unit of scheduleable work.
 @available(SwiftStdlib 5.5, *)

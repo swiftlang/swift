@@ -34,6 +34,7 @@ class Job;
 struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
+class TaskOptionRecord;
 class TaskGroup;
 
 extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
@@ -536,6 +537,8 @@ inline void Job::runInFullyEstablishedContext() {
   else
     return runSimpleInFullyEstablishedContext(); // 'return' forces tail call
 }
+
+// ==== ------------------------------------------------------------------------
 
 /// An asynchronous context within a task.  Generally contexts are
 /// allocated using the task-local stack alloc/dealloc operations, but

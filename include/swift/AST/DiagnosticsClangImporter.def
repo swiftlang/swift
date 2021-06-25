@@ -82,8 +82,8 @@ NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
      "please report this issue to the owners of '%0'",
      (StringRef))
 
-WARNING(clang_swift_attr_without_at,none,
-        "Swift attribute '%0' does not start with '@'", (StringRef))
+WARNING(clang_swift_attr_unhandled,none,
+        "Ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "

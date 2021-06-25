@@ -47,9 +47,11 @@ LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
 LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
 LANGUAGE_FEATURE(BuiltinExecutor, 0, "Builtin.Executor type", true)
 LANGUAGE_FEATURE(BuiltinContinuation, 0, "Continuation builtins", true)
-LANGUAGE_FEATURE(BuiltinTaskGroup, 0, "TaskGroup builtins", true)
+LANGUAGE_FEATURE(BuiltinTaskGroupWithArgument, 0, "TaskGroup builtins", true)
 LANGUAGE_FEATURE(InheritActorContext, 0, "@_inheritActorContext attribute", true)
 LANGUAGE_FEATURE(ImplicitSelfCapture, 0, "@_implicitSelfCapture attribute", true)
 LANGUAGE_FEATURE(BuiltinBuildExecutor, 0, "Executor-building builtins", true)
+LANGUAGE_FEATURE(BuiltinBuildMainExecutor, 0, "MainActor executor building builtin", true)
+LANGUAGE_FEATURE(BuiltinCreateAsyncTaskInGroup, 0, "MainActor executor building builtin", true)
 
 #undef LANGUAGE_FEATURE

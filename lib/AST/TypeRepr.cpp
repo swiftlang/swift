@@ -441,6 +441,25 @@ void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Constraint, Printer, Opts);
 }
 
+SourceLoc NamedOpaqueReturnTypeRepr::getStartLocImpl() const {
+  return GenericParams->getLAngleLoc();
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getEndLocImpl() const {
+  return Base->getEndLoc();
+}
+
+SourceLoc NamedOpaqueReturnTypeRepr::getLocImpl() const {
+  return Base->getLoc();
+}
+
+void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
+                                          const PrintOptions &Opts) const {
+  GenericParams->print(Printer, Opts);
+  Printer << ' ';
+  printTypeRepr(Base, Printer, Opts);
+}
+
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
   switch (getKind()) {

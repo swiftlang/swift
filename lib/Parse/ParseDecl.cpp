@@ -2821,7 +2821,7 @@ ParserResult<CustomAttr> Parser::parseCustomAttribute(
   SyntaxContext->setCreateSyntax(SyntaxKind::CustomAttribute);
 
   // Parse a custom attribute.
-  auto type = parseType(diag::expected_type);
+  auto type = parseType(diag::expected_type, ParseTypeReason::CustomAttribute);
   if (type.hasCodeCompletion() || type.isNull()) {
     if (Tok.is(tok::l_paren) && isCustomAttributeArgument())
       skipSingle();
@@ -3554,7 +3554,8 @@ ParserStatus Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
 //      'distributed'
 bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
                                    SourceLoc &StaticLoc,
-                                   StaticSpellingKind &StaticSpelling) {
+                                   StaticSpellingKind &StaticSpelling,
+                                   bool isFromClangAttribute) {
   SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::ModifierList);
   bool isError = false;
   bool hasModifier = false;
@@ -3622,7 +3623,8 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 
       SyntaxParsingContext ModContext(SyntaxContext,
                                       SyntaxKind::DeclModifier);
-      isError |= parseNewDeclAttribute(Attributes, /*AtLoc=*/{}, Kind);
+      isError |= parseNewDeclAttribute(
+          Attributes, /*AtLoc=*/{}, Kind, isFromClangAttribute);
       hasModifier = true;
       continue;
     }

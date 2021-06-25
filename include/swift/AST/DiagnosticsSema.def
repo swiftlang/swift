@@ -380,6 +380,12 @@ ERROR(cannot_convert_argument_value_generic,none,
 ERROR(conflicting_arguments_for_generic_parameter,none,
       "conflicting arguments to generic parameter %0 (%1)",
       (Type, StringRef))
+NOTE(generic_parameter_inferred_from_closure,none,
+     "generic parameter %0 inferred as %1 from closure return expression",
+     (Type, Type))
+NOTE(generic_parameter_inferred_from_result_context,none,
+     "generic parameter %0 inferred as %1 from context",
+     (Type, Type))
 
 // @_nonEphemeral conversion diagnostics
 ERROR(cannot_pass_type_to_non_ephemeral,none,
@@ -4343,7 +4349,15 @@ ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
 ERROR(actor_inheritance,none,
-      "actor types do not support inheritance", ())
+      "%select{actor|distributed actor}0 types do not support inheritance",
+      (bool))
+
+ERROR(actor_protocol_illegal_inheritance,none,
+      "non-actor type %0 cannot conform to the 'Actor' protocol",
+      (DeclName))
+ERROR(distributed_actor_protocol_illegal_inheritance,none,
+      "non-distributed actor type %0 cannot conform to the 'DistributedActor' protocol",
+      (DeclName))
 
 // FIXME: This diagnostic was temporarily downgraded from an error because
 // it spuriously triggers when building the Foundation module from its textual

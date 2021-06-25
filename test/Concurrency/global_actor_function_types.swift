@@ -33,7 +33,7 @@ func someSlowOperation() async -> Int { 5 }
 
 func acceptOnSomeGlobalActor<T>(_: @SomeGlobalActor () -> T) { }
 
-func testClosures() async {
+func testClosures(i: Int) async {
   // Global actors on synchronous closures become part of the type
   let cl1 = { @SomeGlobalActor in
     onSomeGlobalActor()
@@ -45,6 +45,10 @@ func testClosures() async {
     await someSlowOperation()
   }
   let _: Double = cl2 // expected-error{{cannot convert value of type '() async -> Int' to specified type 'Double'}}
+
+  let cl3 = { @SomeGlobalActor [i] in
+    print(i + onSomeGlobalActor())
+  }
 
   // okay to be explicit
   acceptOnSomeGlobalActor { @SomeGlobalActor in

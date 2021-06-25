@@ -26,6 +26,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -913,6 +914,7 @@ private:
   void printSynthesizedExtension(Type ExtendedType, ExtensionDecl *ExtDecl);
 
   void printExtension(ExtensionDecl* ExtDecl);
+  void printExtendedTypeName(TypeLoc ExtendedTypeLoc);
 
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
@@ -2331,8 +2333,7 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
-static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
-                                  PrintOptions &Options) {
+void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   bool OldFullyQualifiedTypesIfAmbiguous =
     Options.FullyQualifiedTypesIfAmbiguous;
   Options.FullyQualifiedTypesIfAmbiguous =
@@ -2342,9 +2343,8 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
   };
 
   // Strip off generic arguments, if any.
-  auto Ty = ExtendedType->getAnyNominal()->getDeclaredType();
-
-  Ty->print(Printer, Options);
+  auto Ty = ExtendedTypeLoc.getType()->getAnyNominal()->getDeclaredType();
+  printTypeLoc(TypeLoc(ExtendedTypeLoc.getTypeRepr(), Ty));
 }
 
 
@@ -2402,7 +2402,7 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
     printAttributes(ExtDecl);
     Printer << tok::kw_extension << " ";
 
-    printExtendedTypeName(ExtendedType, Printer, Options);
+    printExtendedTypeName(TypeLoc::withoutLoc(ExtendedType));
     printInherited(ExtDecl);
 
     // We may need to combine requirements from ExtDecl (which has the members
@@ -2453,7 +2453,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
         printTypeLoc(TypeLoc::withoutLoc(extendedType));
         return;
       }
-      printExtendedTypeName(extendedType, Printer, Options);
+      printExtendedTypeName(TypeLoc(decl->getExtendedTypeRepr(), extendedType));
     });
     printInherited(decl);
 
@@ -2768,11 +2768,19 @@ static bool usesFeatureBuiltinBuildExecutor(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureBuiltinBuildMainExecutor(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureBuiltinContinuation(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureBuiltinTaskGroup(Decl *decl) {
+static bool usesFeatureBuiltinTaskGroupWithArgument(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureBuiltinCreateAsyncTaskInGroup(Decl *decl) {
   return false;
 }
 
@@ -5847,4 +5855,114 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
       Results.push_back(TypeLoc::withoutLoc(proto->getDeclaredInterfaceType()));
     }
   }
+}
+
+//===----------------------------------------------------------------------===//
+//  Generic param list printing.
+//===----------------------------------------------------------------------===//
+
+void RequirementRepr::dump() const {
+  print(llvm::errs());
+  llvm::errs() << "\n";
+}
+
+void RequirementRepr::print(raw_ostream &out) const {
+  StreamPrinter printer(out);
+  print(printer);
+}
+
+void RequirementRepr::print(ASTPrinter &out) const {
+  auto printLayoutConstraint =
+      [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
+        LayoutConstraintLoc.getLayoutConstraint()->print(out, PrintOptions());
+      };
+
+  switch (getKind()) {
+  case RequirementReprKind::LayoutConstraint:
+    if (auto *repr = getSubjectRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    out << " : ";
+    printLayoutConstraint(getLayoutConstraintLoc());
+    break;
+
+  case RequirementReprKind::TypeConstraint:
+    if (auto *repr = getSubjectRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    out << " : ";
+    if (auto *repr = getConstraintRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    break;
+
+  case RequirementReprKind::SameType:
+    if (auto *repr = getFirstTypeRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    out << " == ";
+    if (auto *repr = getSecondTypeRepr()) {
+      repr->print(out, PrintOptions());
+    }
+    break;
+  }
+}
+
+void GenericParamList::dump() const {
+  print(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void GenericParamList::print(raw_ostream &out, const PrintOptions &PO) const {
+  StreamPrinter printer(out);
+  print(printer, PO);
+}
+
+static void printTrailingRequirements(ASTPrinter &Printer,
+                                      ArrayRef<RequirementRepr> Reqs,
+                                      bool printWhereKeyword) {
+  if (Reqs.empty())
+    return;
+
+  if (printWhereKeyword)
+    Printer << " where ";
+  interleave(
+      Reqs,
+      [&](const RequirementRepr &req) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        req.print(Printer);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+      },
+      [&] { Printer << ", "; });
+}
+
+void GenericParamList::print(ASTPrinter &Printer,
+                             const PrintOptions &PO) const {
+  Printer << '<';
+  interleave(
+      *this,
+      [&](const GenericTypeParamDecl *P) {
+        Printer << P->getName();
+        if (!P->getInherited().empty()) {
+          Printer << " : ";
+
+          auto loc = P->getInherited()[0];
+          if (willUseTypeReprPrinting(loc, nullptr, PO)) {
+            loc.getTypeRepr()->print(Printer, PO);
+          } else {
+            loc.getType()->print(Printer, PO);
+          }
+        }
+      },
+      [&] { Printer << ", "; });
+
+  printTrailingRequirements(Printer, getRequirements(),
+                            /*printWhereKeyword*/ true);
+  Printer << '>';
+}
+
+void TrailingWhereClause::print(llvm::raw_ostream &OS,
+                                bool printWhereKeyword) const {
+  StreamPrinter Printer(OS);
+  printTrailingRequirements(Printer, getRequirements(), printWhereKeyword);
 }
