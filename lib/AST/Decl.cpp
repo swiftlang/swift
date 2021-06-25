@@ -2483,6 +2483,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
   if (sig1.IsInstanceMember != sig2.IsInstanceMember)
     return false;
 
+  // If one is an async function and the other is not, they can't conflict.
+  if (sig1.IsAsyncFunction != sig2.IsAsyncFunction)
+    return false;
+
   // If one is a compound name and the other is not, they do not conflict
   // if one is a property and the other is a non-nullary function.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
@@ -2709,7 +2713,6 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     = static_cast<bool>(getDeclContext()->getExtendedProtocolDecl());
   signature.IsInstanceMember = isInstanceMember();
   signature.IsVariable = isa<VarDecl>(this);
-  signature.IsFunction = isa<AbstractFunctionDecl>(this);
   signature.IsEnumElement = isa<EnumElementDecl>(this);
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
@@ -2721,6 +2724,13 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     if (func->isUnaryOperator()) {
       signature.UnaryOperator = func->getAttrs().getUnaryOperatorKind();
     }
+  }
+
+  // Functions include async/not-async.
+  if (auto func = dyn_cast<AbstractFunctionDecl>(this)) {
+    signature.IsFunction = true;
+    if (func->hasAsync())
+      signature.IsAsyncFunction = true;
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))

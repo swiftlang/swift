@@ -6,8 +6,8 @@
 func redecl1() async { } // expected-note{{previously declared here}}
 func redecl1() async throws { } // expected-error{{invalid redeclaration of 'redecl1()'}}
 
-func redecl2() -> String { "" } // expected-note{{previously declared here}}
-func redecl2() async -> String { "" } // expected-error{{invalid redeclaration of 'redecl2()'}}
+func redecl2() -> String { "" } // okay
+func redecl2() async -> String { "" } // okay
 
 // Override checking
 
