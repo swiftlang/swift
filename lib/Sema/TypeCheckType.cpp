@@ -2065,7 +2065,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
-      
+
   case TypeReprKind::OpaqueReturn: {
     // Only valid as the return type of a function, which should be handled
     // during function decl type checking.
@@ -2083,6 +2083,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return !constraintType->hasError() ? ErrorType::get(constraintType)
                                        : ErrorType::get(getASTContext());
   }
+
+  case TypeReprKind::NamedOpaqueReturn:
+    return resolveType(cast<NamedOpaqueReturnTypeRepr>(repr)->getBase(),
+                       options);
 
   case TypeReprKind::Placeholder: {
     auto &ctx = getASTContext();

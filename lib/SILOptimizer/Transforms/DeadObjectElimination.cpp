@@ -62,6 +62,19 @@ STATISTIC(DeadAllocApplyEliminated,
 
 using UserList = llvm::SmallSetVector<SILInstruction *, 16>;
 
+namespace {
+
+/// Side effects of a destructor.
+enum class DestructorEffects {
+  None,
+
+  /// The destructor contains a "destroyArray" builtin which destroys the tail
+  /// elements of the object - like in Array.
+  DestroysTailElems,
+
+  Unknown
+};
+
 // Analyzing the body of this class destructor is valid because the object is
 // dead. This means that the object is never passed to objc_setAssociatedObject,
 // so its destructor cannot be extended at runtime.
@@ -98,14 +111,21 @@ static SILFunction *getDestructor(AllocRefInst *ARI) {
   return Fn;
 }
 
+static bool isDestroyArray(SILInstruction *inst) {
+  BuiltinInst *bi = dyn_cast<BuiltinInst>(inst);
+  return bi && bi->getBuiltinInfo().ID == BuiltinValueKind::DestroyArray;
+}
+
 /// Analyze the destructor for the class of ARI to see if any instructions in it
 /// could have side effects on the program outside the destructor. If it does
 /// not, then we can eliminate the destructor.
-static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
+static DestructorEffects doesDestructorHaveSideEffects(AllocRefInst *ARI) {
   SILFunction *Fn = getDestructor(ARI);
   // If we can't find a constructor then assume it has side effects.
   if (!Fn)
-    return true;
+    return DestructorEffects::Unknown;
+
+  DestructorEffects effects = DestructorEffects::None;
 
   // A destructor only has one argument, self.
   assert(Fn->begin()->getNumArguments() == 1 &&
@@ -115,7 +135,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
   LLVM_DEBUG(llvm::dbgs() << "    Analyzing destructor.\n");
 
   // For each BB in the destructor...
-  for (auto &BB : *Fn)
+  for (auto &BB : *Fn) {
     // For each instruction I in BB...
     for (auto &I : BB) {
       LLVM_DEBUG(llvm::dbgs() << "        Visiting: " << I);
@@ -125,6 +145,14 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
         LLVM_DEBUG(llvm::dbgs() << "            SAFE! Instruction has no side "
                    "effects.\n");
         continue;
+      }
+
+      if (auto *fl = dyn_cast<FixLifetimeInst>(&I)) {
+        // A fix_lifetime of self does cannot have a side effect, because in the
+        // destructor, Self is deleted.
+        if (stripCasts(fl->getOperand()) == Self)
+          continue;
+        return DestructorEffects::Unknown;
       }
 
       // RefCounting operations on Self are ok since we are already in the
@@ -142,7 +170,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
         } else {
           LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Ref count operation "
                      "not on self.\n");
-          return true;
+          return DestructorEffects::Unknown;
         }
       }
 
@@ -162,7 +190,7 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
         } else {
           LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! dealloc_ref on value "
                      "besides self.\n");
-          return true;
+          return DestructorEffects::Unknown;
         }
       }
 
@@ -174,13 +202,28 @@ static bool doesDestructorHaveSideEffects(AllocRefInst *ARI) {
           continue;
         }
 
+      if (isDestroyArray(&I)) {
+        // Check if the "destroyArray" destroys the tail elements of the object,
+        // like in Array.
+        SILValue addr = I.getOperand(1);
+        auto *atp = dyn_cast<AddressToPointerInst>(addr);
+        if (!atp)
+          return DestructorEffects::Unknown;
+        auto *rta = dyn_cast<RefTailAddrInst>(atp->getOperand());
+        if (!rta)
+          return DestructorEffects::Unknown;
+        effects = DestructorEffects::DestroysTailElems;
+        if (rta->getOperand() == Self)
+          continue;
+      }
+
       LLVM_DEBUG(llvm::dbgs() << "            UNSAFE! Unknown instruction.\n");
       // Otherwise, we can't remove the deallocation completely.
-      return true;
+      return DestructorEffects::Unknown;
     }
-
+  }
   // We didn't find any side effects.
-  return false;
+  return effects;
 }
 
 //===----------------------------------------------------------------------===//
@@ -317,11 +360,6 @@ static bool onlyStoresToTailObjects(BuiltinInst *destroyArray,
   return true;
 }
 
-static bool isDestroyArray(SILInstruction *inst) {
-  BuiltinInst *bi = dyn_cast<BuiltinInst>(inst);
-  return bi && bi->getBuiltinInfo().ID == BuiltinValueKind::DestroyArray;
-}
-
 /// Inserts releases of all stores in \p users.
 static void insertCompensatingReleases(SILInstruction *before,
                                        const UserList &users) {
@@ -424,7 +462,6 @@ hasUnremovableUsers(SILInstruction *allocation, UserList *Users,
 //                     NonTrivial DeadObject Elimination
 //===----------------------------------------------------------------------===//
 
-namespace {
 /// Determine if an object is dead. Compute its original lifetime. Find the
 /// lifetime endpoints reached by each store of a refcounted object into the
 /// object.
@@ -687,7 +724,8 @@ static bool isAllocatingApply(SILInstruction *Inst) {
 
 namespace {
 class DeadObjectElimination : public SILFunctionTransform {
-  llvm::DenseMap<SILType, bool> DestructorAnalysisCache;
+
+  llvm::DenseMap<SILType, DestructorEffects> DestructorAnalysisCache;
 
   InstructionDeleter deleter;
 
@@ -754,12 +792,12 @@ DeadObjectElimination::removeInstructions(ArrayRef<SILInstruction*> toRemove) {
 bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
   // Ok, we have an alloc_ref. Check the cache to see if we have already
   // computed the destructor behavior for its SILType.
-  bool HasSideEffects;
+  DestructorEffects destructorEffects;
   SILType Type = ARI->getType();
   auto CacheSearchResult = DestructorAnalysisCache.find(Type);
   if (CacheSearchResult != DestructorAnalysisCache.end()) {
     // Ok we found a value in the cache.
-    HasSideEffects = CacheSearchResult->second;
+    destructorEffects = CacheSearchResult->second;
   } else {
     // We did not find a value in the cache for our destructor. Analyze the
     // destructor to make sure it has no side effects. For now this only
@@ -769,24 +807,34 @@ bool DeadObjectElimination::processAllocRef(AllocRefInst *ARI) {
     //
     // TODO: We should be able to handle destructors that do nothing but release
     // members of the object.
-    HasSideEffects = doesDestructorHaveSideEffects(ARI);
-    DestructorAnalysisCache[Type] = HasSideEffects;
+    destructorEffects = doesDestructorHaveSideEffects(ARI);
+    DestructorAnalysisCache[Type] = destructorEffects;
   }
 
   // Our destructor has no side effects, so if we can prove that no loads
   // escape, then we can completely remove the use graph of this alloc_ref.
   UserList UsersToRemove;
   if (hasUnremovableUsers(ARI, &UsersToRemove,
-                          /*acceptRefCountInsts=*/ !HasSideEffects,
-                          /*onlyAcceptTrivialStores*/false)) {
+      /*acceptRefCountInsts=*/ destructorEffects != DestructorEffects::Unknown,
+      /*onlyAcceptTrivialStores*/false)) {
     LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
     return false;
   }
 
-  auto iter = std::find_if(UsersToRemove.begin(), UsersToRemove.end(),
-                           isDestroyArray);
-  if (iter != UsersToRemove.end())
-    insertCompensatingReleases(*iter, UsersToRemove);
+  // Find the instruction which releases the object's tail elements.
+  SILInstruction *releaseOfTailElems = nullptr;
+  for (SILInstruction *user : UsersToRemove) {
+    if (isDestroyArray(user) ||
+       (destructorEffects == DestructorEffects::DestroysTailElems &&
+        isa<RefCountingInst>(user) && user->mayRelease())) {
+      // Bail if we find multiple such instructions.
+      if (releaseOfTailElems)
+        return false;
+      releaseOfTailElems = user;
+    }
+  }
+  if (releaseOfTailElems)
+    insertCompensatingReleases(releaseOfTailElems, UsersToRemove);
 
   // Remove the AllocRef and all of its users.
   removeInstructions(

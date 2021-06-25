@@ -75,6 +75,36 @@ function(_set_target_prefix_and_suffix target kind sdk)
   endif()
 endfunction()
 
+function(_add_host_variant_swift_sanitizer_flags target)
+  if(LLVM_USE_SANITIZER)
+    if(LLVM_USE_SANITIZER STREQUAL "Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address")
+    elseif(LLVM_USE_SANITIZER STREQUAL "HWAddress")
+      # Not supported?
+    elseif(LLVM_USE_SANITIZER MATCHES "Memory(WithOrigins)?")
+      # Not supported
+      if(LLVM_USE_SANITIZER STREQUAL "MemoryWithOrigins")
+        # Not supported
+      endif()
+    elseif(LLVM_USE_SANITIZER STREQUAL "Undefined")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Thread")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=thread")
+    elseif(LLVM_USE_SANITIZER STREQUAL "DataFlow")
+      # Not supported
+    elseif(LLVM_USE_SANITIZER STREQUAL "Address;Undefined" OR
+           LLVM_USE_SANITIZER STREQUAL "Undefined;Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address -sanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Leaks")
+      # Not supported
+    else()
+      message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
+    endif()
+
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:${_Swift_SANITIZER_FLAGS}>)
+  endif()
+endfunction()
+
 # Usage:
 # _add_host_variant_c_compile_link_flags(name)
 function(_add_host_variant_c_compile_link_flags name)
@@ -100,6 +130,8 @@ function(_add_host_variant_c_compile_link_flags name)
       MACCATALYST_BUILD_FLAVOR ""
       DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
     target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-target;${target}>)
+
+   _add_host_variant_swift_sanitizer_flags(${name})
   endif()
 
   set(_sysroot

@@ -336,3 +336,62 @@ TEST_F(SemaTest, TestTransitiveProtocolInferenceThroughEquivalenceChains) {
   verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                  {protocolTy0, protocolTy1});
 }
+
+TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
+  ConstraintSystemOptions options;
+  ConstraintSystem cs(DC, options);
+
+  auto verifyInference = [&](TypeVariableType *typeVar, unsigned numExpected) {
+    auto bindings = cs.getBindingsFor(typeVar);
+    TypeVarBindingProducer producer(bindings);
+
+    llvm::SmallPtrSet<Type, 2> inferredTypes;
+
+    while (auto binding = producer()) {
+      ASSERT_TRUE(binding.hasValue());
+      ASSERT_EQ(binding->getTypeVariable(), typeVar);
+      ASSERT_TRUE(inferredTypes.insert(binding->getType()).second);
+    }
+
+    ASSERT_EQ(inferredTypes.size(), numExpected);
+  };
+
+  auto *closureResultLoc =
+      cs.getConstraintLocator({}, ConstraintLocator::ClosureResult);
+
+  auto *closureResult = cs.createTypeVariable(closureResultLoc, /*options=*/0);
+
+  cs.addConstraint(ConstraintKind::Subtype, getStdlibType("Int"), closureResult,
+                   closureResultLoc);
+  cs.addConstraint(ConstraintKind::Subtype, closureResult, getStdlibType("Void"),
+                   closureResultLoc);
+
+  verifyInference(closureResult, 2);
+
+  auto closureResultWithTransitiveVoid = cs.createTypeVariable(closureResultLoc,
+                                                               /*options=*/0);
+
+  auto contextualVar = cs.createTypeVariable({}, /*options=*/0);
+
+  cs.addConstraint(ConstraintKind::Subtype, getStdlibType("Void"),
+                   contextualVar, cs.getConstraintLocator({}));
+
+  cs.addConstraint(ConstraintKind::Subtype, contextualVar,
+                   closureResultWithTransitiveVoid, closureResultLoc);
+
+  cs.addConstraint(ConstraintKind::Subtype, getStdlibType("Int"),
+                   closureResultWithTransitiveVoid, closureResultLoc);
+
+  verifyInference(closureResultWithTransitiveVoid, 2);
+
+  auto closureResultWithoutVoid =
+      cs.createTypeVariable(closureResultLoc, /*options=*/0);
+
+  // Supertype triggers `Void` inference
+  cs.addConstraint(ConstraintKind::Subtype, getStdlibType("Int"),
+                   closureResultWithoutVoid, closureResultLoc);
+  cs.addConstraint(ConstraintKind::Subtype, closureResultWithoutVoid,
+                   getStdlibType("String"), closureResultLoc);
+
+  verifyInference(closureResultWithoutVoid, 3);
+}

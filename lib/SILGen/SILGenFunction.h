@@ -1374,8 +1374,9 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
-  ManagedValue emitAsyncLetStart(
-      SILLocation loc, Type functionType, ManagedValue taskFunction);
+  ManagedValue emitAsyncLetStart(SILLocation loc,
+                                 SILValue taskOptions,
+                                 Type functionType, ManagedValue taskFunction);
 
   ManagedValue emitAsyncLetGet(SILLocation loc, SILValue asyncLet);
 
@@ -2071,9 +2072,6 @@ public:
 
   /// Destroy and deallocate an initialized local variable.
   void destroyLocalVariable(SILLocation L, VarDecl *D);
-  
-  /// Deallocate an uninitialized local variable.
-  void deallocateUninitializedLocalVariable(SILLocation L, VarDecl *D);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);

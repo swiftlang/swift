@@ -469,7 +469,8 @@ public:
 };
 
 /// Extract compiler arguments from an interface file buffer.
-bool extractCompilerFlagsFromInterface(StringRef buffer, llvm::StringSaver &ArgSaver,
+bool extractCompilerFlagsFromInterface(StringRef interfacePath,
+                                       StringRef buffer, llvm::StringSaver &ArgSaver,
                                        SmallVectorImpl<const char *> &SubArgs);
 
 /// Extract the user module version number from an interface file.

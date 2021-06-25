@@ -21,8 +21,6 @@ All existing requests inherit the [`SimpleRequest`](https://github.com/apple/swi
 
 Each request can issue other requests, also through the evaluator. The evaluator automatically tracks such dependencies (by keeping a stack of the currently-active request evaluations). This information is valuable for a few reasons. First, it can help with debugging both correctness and performance, allowing one to visualize the dependencies evaluated when compiling a program. The current protocol has both full-graph visualization (via GraphViz output) and dependencies-for-a-single-request visualization (via a tree-like dump). Second, it ensures that we can detect cyclic dependencies (e.g., a cyclic inheritance hierarchy) correctly, because they show up as cycles in the dependency graph, allowing for proper diagnostics (for the user) and recovery (in the compiler). Third, it can eventually be leveraged to enable better incremental compilation--providing the ability to discover what information affected a particular type-checking decision, and propagate the effects of a specific change through the dependency graph.
 
-The complete dependency graph formed by processing a source file can be visualized by passing the frontend option `-output-request-graphviz <filename>`. The dependency graph will be emitted using the [GraphViz](https://www.graphviz.org) format.
-
 The frontend option `-debug-cycles` will provide debugging output for any cycle detected while processing the given source files. For example, running the [`circular_inheritance.swift` test](https://github.com/apple/swift/blob/main/test/decl/class/circular_inheritance.swift) from the Swift repository using this flag, e.g.,
 
 ```

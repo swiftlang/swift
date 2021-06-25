@@ -146,11 +146,11 @@ public struct CheckedContinuation<T, E: Error> {
   /// After `resume` enqueues the task, control is immediately returned to
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
-  public func resume(returning x: __owned T) {
+  public func resume(returning value: __owned T) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
-      c.resume(returning: x)
+      c.resume(returning: value)
     } else {
-      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
+      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(value)!\n")
     }
   }
   
@@ -166,11 +166,11 @@ public struct CheckedContinuation<T, E: Error> {
   /// After `resume` enqueues the task, control is immediately returned to
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
-  public func resume(throwing x: __owned E) {
+  public func resume(throwing error: __owned E) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
-      c.resume(throwing: x)
+      c.resume(throwing: error)
     } else {
-      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
+      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(error)!\n")
     }
   }
 }

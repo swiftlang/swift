@@ -135,10 +135,12 @@ cmake -B "S:\b\1" ^
 ninja -C S:\b\1
 ```
 
+> **NOTE:** Linking with debug information (`-D LLVM_ENABLE_PDB=YES`) is very memory intensive.  When building with parallel jobs, it is possible to consume upwards of 32 GiB of RAM.  You can append `-D LLVM_PARALLEL_LINK_JOBS=N -D DLLVM_PARALLEL_LINK_JOBS=N` to reduce the number of parallel link operations to `N` which should help reduce the memory pressure.  You may need to set this to a low number (e.g. 1) if you see build failures due to memory exhaustion.
+
 ## Running Swift tests on Windows
 
 ```cmd
-path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\Library\icu-67\usr\bin;S:\b\1\bin;S:\b\1\tools\swift\libdispatch-windows-x86_64-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\1 check-swift
 ```
 

@@ -1061,13 +1061,13 @@ public:
   TypeRepr *getFieldType() const { return FieldTypeAndMutable.getPointer(); }
   bool isMutable() const { return FieldTypeAndMutable.getInt(); }
 };
-  
-/// TypeRepr for opaque return types.
+
+/// A TypeRepr for anonymous opaque return types.
 ///
-/// This can occur in the return position of a function declaration, or the
-/// top-level type of a property, to specify that the concrete return type
-/// should be abstracted from callers, given a set of generic constraints that
-/// the concrete return type satisfies:
+/// This can occur in the return type of a function declaration, or the type of
+/// a property, to specify that the concrete return type should be abstracted
+/// from callers, given a set of generic constraints that the concrete return
+/// type satisfies:
 ///
 /// func foo() -> some Collection { return [1,2,3] }
 /// var bar: some SignedInteger = 1
@@ -1097,6 +1097,41 @@ private:
   SourceLoc getStartLocImpl() const { return OpaqueLoc; }
   SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
   SourceLoc getLocImpl() const { return OpaqueLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A TypeRepr for a type with a generic parameter list of named opaque return
+/// types.
+///
+/// This can occur only as the return type of a function declaration, to specify
+/// subtypes which should be abstracted from callers, given a set of generic
+/// constraints that the concrete types satisfy:
+///
+/// func foo() -> <T: Collection> T { return [1] }
+class NamedOpaqueReturnTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  GenericParamList *GenericParams;
+
+public:
+  NamedOpaqueReturnTypeRepr(TypeRepr *Base, GenericParamList *GenericParams)
+      : TypeRepr(TypeReprKind::NamedOpaqueReturn), Base(Base),
+        GenericParams(GenericParams) {
+    assert(Base && GenericParams);
+  }
+
+  TypeRepr *getBase() const { return Base; }
+  GenericParamList *getGenericParams() const { return GenericParams; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::NamedOpaqueReturn;
+  }
+  static bool classof(const NamedOpaqueReturnTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const;
+  SourceLoc getEndLocImpl() const;
+  SourceLoc getLocImpl() const;
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -1227,6 +1262,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::InOut:
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
+  case TypeReprKind::NamedOpaqueReturn:
     return false;
   case TypeReprKind::SimpleIdent:
   case TypeReprKind::GenericIdent:

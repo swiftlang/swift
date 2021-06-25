@@ -1547,6 +1547,9 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       SmallVector<LocatorPathElt, 4> path;
       (void)locator.getLocatorParts(path);
 
+      while (!path.empty() && path.back().is<LocatorPathElt::TupleType>())
+        path.pop_back();
+
       if (!path.empty()) {
         // Direct pattern matching between tuple pattern and tuple type.
         if (path.back().is<LocatorPathElt::PatternMatch>()) {
@@ -4723,6 +4726,15 @@ bool ConstraintSystem::repairFailures(
     // mismatches within the same tuple type can be coalesced later.
     auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
     path.pop_back();
+
+    // Drop the tuple type path elements too, but extract each tuple type first.
+    if (path.back().is<LocatorPathElt::TupleType>()) {
+      rhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
+      path.pop_back();
+      lhs = path.back().getAs<LocatorPathElt::TupleType>()->getType();
+      path.pop_back();
+    }
+
     auto *tupleLocator = getConstraintLocator(locator.getAnchor(), path);
 
     // Let this fail if it's a contextual mismatch with sequence element types,
@@ -5225,9 +5237,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     case TypeKind::Tuple: {
+      // Add each tuple type to the locator before matching the element types.
+      // This is useful for diagnostics, because the error message can use the
+      // full tuple type for several element mismatches. Use the original types
+      // to preserve sugar such as typealiases.
+      auto tmpTupleLoc = locator.withPathElement(LocatorPathElt::TupleType(type1));
+      auto tupleLoc = tmpTupleLoc.withPathElement(LocatorPathElt::TupleType(type2));
       auto result = matchTupleTypes(cast<TupleType>(desugar1),
                                     cast<TupleType>(desugar2),
-                                    kind, subflags, locator);
+                                    kind, subflags, tupleLoc);
       if (result != SolutionKind::Error)
         return result;
 
@@ -6310,12 +6328,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto requirement = signature->getRequirements()[req->getIndex()];
 
         auto *memberLoc = getConstraintLocator(anchor, path.front());
-        auto *memberRef = findResolvedMemberRef(memberLoc);
+        auto overload = findSelectedOverloadFor(memberLoc);
 
         // To figure out what is going on here we need to wait until
         // member overload is set in the constraint system.
-        if (!memberRef)
+        if (!overload) {
+          // If it's not allowed to generate new constraints
+          // there is no way to control re-activation, so this
+          // check has to fail.
+          if (!flags.contains(TMF_GenerateConstraints))
+            return SolutionKind::Error;
+
           return formUnsolved(/*activate=*/true);
+        }
+
+        auto *memberRef = overload->choice.getDeclOrNull();
+        if (!memberRef)
+          return SolutionKind::Error;
 
         // If this is a `Self` conformance requirement from a static member
         // reference on a protocol metatype, let's produce a tailored diagnostic.
@@ -6549,7 +6578,9 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   if (!castExpr)
     return nullptr;
 
-  unsigned extraOptionals = fromOptionals.size() - toOptionals.size();
+  // "from" could be less optional than "to" e.g. `0 as Any?`, so
+  // we need to store the difference as a signed integer.
+  int extraOptionals = fromOptionals.size() - toOptionals.size();
   // Removing the optionality from to type when the force cast expr is an IUO.
   const auto *const TR = castExpr->getCastTypeRepr();
   if (isExpr<ForcedCheckedCastExpr>(anchor) && TR &&

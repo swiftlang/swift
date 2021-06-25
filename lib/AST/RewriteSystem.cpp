@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/RewriteSystem.h"
+#include "swift/Basic/Defer.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <deque>
@@ -18,6 +20,377 @@
 
 using namespace swift;
 using namespace rewriting;
+
+/// Atoms are uniqued and immutable, stored as a single pointer;
+/// the Storage type is the allocated backing storage.
+struct Atom::Storage final
+  : public llvm::FoldingSetNode,
+    public llvm::TrailingObjects<Storage, const ProtocolDecl *, Term> {
+  friend class Atom;
+
+  unsigned Kind : 3;
+  unsigned NumProtocols : 15;
+  unsigned NumSubstitutions : 14;
+
+  union {
+    Identifier Name;
+    CanType ConcreteType;
+    LayoutConstraint Layout;
+    const ProtocolDecl *Proto;
+    GenericTypeParamType *GenericParam;
+  };
+
+  explicit Storage(Identifier name) {
+    Kind = unsigned(Atom::Kind::Name);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Name = name;
+  }
+
+  explicit Storage(LayoutConstraint layout) {
+    Kind = unsigned(Atom::Kind::Layout);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Layout = layout;
+  }
+
+  explicit Storage(const ProtocolDecl *proto) {
+    Kind = unsigned(Atom::Kind::Protocol);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    Proto = proto;
+  }
+
+  explicit Storage(GenericTypeParamType *param) {
+    Kind = unsigned(Atom::Kind::GenericParam);
+    NumProtocols = 0;
+    NumSubstitutions = 0;
+    GenericParam = param;
+  }
+
+  Storage(ArrayRef<const ProtocolDecl *> protos, Identifier name) {
+    assert(!protos.empty());
+
+    Kind = unsigned(Atom::Kind::AssociatedType);
+    NumProtocols = protos.size();
+    assert(NumProtocols == protos.size() && "Overflow");
+    NumSubstitutions = 0;
+    Name = name;
+
+    for (unsigned i : indices(protos))
+      getProtocols()[i] = protos[i];
+  }
+
+  Storage(Atom::Kind kind, CanType type, ArrayRef<Term> substitutions) {
+    assert(kind == Atom::Kind::Superclass ||
+           kind == Atom::Kind::ConcreteType);
+    assert(type->hasTypeParameter() != substitutions.empty());
+
+    Kind = unsigned(kind);
+    NumProtocols = 0;
+    NumSubstitutions = substitutions.size();
+    ConcreteType = type;
+
+    for (unsigned i : indices(substitutions))
+      getSubstitutions()[i] = substitutions[i];
+  }
+
+  size_t numTrailingObjects(OverloadToken<const ProtocolDecl *>) const {
+    return NumProtocols;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Term>) const {
+    return NumSubstitutions;
+  }
+
+  MutableArrayRef<const ProtocolDecl *> getProtocols() {
+    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
+  }
+
+  ArrayRef<const ProtocolDecl *> getProtocols() const {
+    return {getTrailingObjects<const ProtocolDecl *>(), NumProtocols};
+  }
+
+  MutableArrayRef<Term> getSubstitutions() {
+    return {getTrailingObjects<Term>(), NumSubstitutions};
+  }
+
+  ArrayRef<Term> getSubstitutions() const {
+    return {getTrailingObjects<Term>(), NumSubstitutions};
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+};
+
+Atom::Kind Atom::getKind() const {
+  return Kind(Ptr->Kind);
+}
+
+/// Get the identifier associated with an unbound name atom or an
+/// associated type atom.
+Identifier Atom::getName() const {
+  assert(getKind() == Kind::Name ||
+         getKind() == Kind::AssociatedType);
+  return Ptr->Name;
+}
+
+/// Get the single protocol declaration associate with a protocol atom.
+const ProtocolDecl *Atom::getProtocol() const {
+  assert(getKind() == Kind::Protocol);
+  return Ptr->Proto;
+}
+
+/// Get the list of protocols associated with an associated type atom.
+ArrayRef<const ProtocolDecl *> Atom::getProtocols() const {
+  assert(getKind() == Kind::AssociatedType);
+  auto protos = Ptr->getProtocols();
+  assert(!protos.empty());
+  return protos;
+}
+
+/// Get the generic parameter associated with a generic parameter atom.
+GenericTypeParamType *Atom::getGenericParam() const {
+  assert(getKind() == Kind::GenericParam);
+  return Ptr->GenericParam;
+}
+
+/// Get the layout constraint associated with a layout constraint atom.
+LayoutConstraint Atom::getLayoutConstraint() const {
+  assert(getKind() == Kind::Layout);
+  return Ptr->Layout;
+}
+
+/// Get the superclass type associated with a superclass atom.
+CanType Atom::getSuperclass() const {
+  assert(getKind() == Kind::Superclass);
+  return Ptr->ConcreteType;
+}
+
+/// Get the concrete type associated with a concrete type atom.
+CanType Atom::getConcreteType() const {
+  assert(getKind() == Kind::ConcreteType);
+  return Ptr->ConcreteType;
+}
+
+ArrayRef<Term> Atom::getSubstitutions() const {
+  assert(getKind() == Kind::Superclass ||
+         getKind() == Kind::ConcreteType);
+  return Ptr->getSubstitutions();
+}
+
+/// Creates a new name atom.
+Atom Atom::forName(Identifier name,
+                   RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Name));
+  id.AddPointer(name.get());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(name);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a new protocol atom.
+Atom Atom::forProtocol(const ProtocolDecl *proto,
+                       RewriteContext &ctx) {
+  assert(proto != nullptr);
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Protocol));
+  id.AddPointer(proto);
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(proto);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a new associated type atom for a single protocol.
+Atom Atom::forAssociatedType(const ProtocolDecl *proto,
+                             Identifier name,
+                             RewriteContext &ctx) {
+  SmallVector<const ProtocolDecl *, 1> protos;
+  protos.push_back(proto);
+
+  return forAssociatedType(protos, name, ctx);
+}
+
+/// Creates a merged associated type atom to represent a nested
+/// type that conforms to multiple protocols, all of which have
+/// an associated type with the same name.
+Atom Atom::forAssociatedType(ArrayRef<const ProtocolDecl *> protos,
+                             Identifier name,
+                             RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::AssociatedType));
+  id.AddInteger(protos.size());
+  for (const auto *proto : protos)
+    id.AddPointer(proto);
+  id.AddPointer(name.get());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
+      protos.size(), 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(protos, name);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a generic parameter atom, representing a generic
+/// parameter in the top-level generic signature from which the
+/// rewrite system is built.
+Atom Atom::forGenericParam(GenericTypeParamType *param,
+                           RewriteContext &ctx) {
+  assert(param->isCanonical());
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::GenericParam));
+  id.AddPointer(param);
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(param);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a layout atom, representing a layout constraint.
+Atom Atom::forLayout(LayoutConstraint layout,
+                     RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Layout));
+  id.AddPointer(layout.getPointer());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(layout);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a superclass atom, representing a superclass constraint.
+Atom Atom::forSuperclass(CanType type, ArrayRef<Term> substitutions,
+                         RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::Superclass));
+  id.AddPointer(type.getPointer());
+  id.AddInteger(unsigned(substitutions.size()));
+
+  for (auto substitution : substitutions)
+    id.AddPointer(substitution.getOpaquePointer());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
+      0, substitutions.size());
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(Kind::Superclass, type, substitutions);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
+
+/// Creates a concrete type atom, representing a superclass constraint.
+Atom Atom::forConcreteType(CanType type, ArrayRef<Term> substitutions,
+                           RewriteContext &ctx) {
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(unsigned(Kind::ConcreteType));
+  id.AddPointer(type.getPointer());
+  id.AddInteger(unsigned(substitutions.size()));
+  for (auto substitution : substitutions)
+    id.AddPointer(substitution.getOpaquePointer());
+
+  void *insertPos = nullptr;
+  if (auto *atom = ctx.Atoms.FindNodeOrInsertPos(id, insertPos))
+    return atom;
+
+  unsigned size = Storage::totalSizeToAlloc<const ProtocolDecl *, Term>(
+      0, substitutions.size());
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *atom = new (mem) Storage(Kind::ConcreteType, type, substitutions);
+
+#ifndef NDEBUG
+  llvm::FoldingSetNodeID newID;
+  atom->Profile(newID);
+  assert(id == newID);
+#endif
+
+  ctx.Atoms.InsertNode(atom, insertPos);
+
+  return atom;
+}
 
 /// Linear order on atoms.
 ///
@@ -48,18 +421,26 @@ using namespace rewriting;
 ///
 /// * For layout atoms, we use LayoutConstraint::compare().
 int Atom::compare(Atom other, const ProtocolGraph &graph) const {
+  // Exit early if the atoms are equal.
+  if (Ptr == other.Ptr)
+    return 0;
+
   auto kind = getKind();
   auto otherKind = other.getKind();
 
   if (kind != otherKind)
     return int(kind) < int(otherKind) ? -1 : 1;
 
+  int result = 0;
+
   switch (kind) {
   case Kind::Name:
-    return getName().compare(other.getName());
+    result = getName().compare(other.getName());
+    break;
 
   case Kind::Protocol:
-    return graph.compareProtocols(getProtocol(), other.getProtocol());
+    result = graph.compareProtocols(getProtocol(), other.getProtocol());
+    break;
 
   case Kind::AssociatedType: {
     auto protos = getProtocols();
@@ -75,7 +456,8 @@ int Atom::compare(Atom other, const ProtocolGraph &graph) const {
         return result;
     }
 
-    return getName().compare(other.getName());
+    result = getName().compare(other.getName());
+    break;
   }
 
   case Kind::GenericParam: {
@@ -88,19 +470,122 @@ int Atom::compare(Atom other, const ProtocolGraph &graph) const {
     if (param->getIndex() != otherParam->getIndex())
       return param->getIndex() < otherParam->getIndex() ? -1 : 1;
 
-    return 0;
+    break;
   }
 
-  case Kind::Layout: {
-    return getLayoutConstraint().compare(other.getLayoutConstraint());
+  case Kind::Layout:
+    result = getLayoutConstraint().compare(other.getLayoutConstraint());
+    break;
+
+  case Kind::Superclass:
+  case Kind::ConcreteType: {
+    assert(false && "Cannot compare concrete types yet");
+    break;
   }
+  }
+
+  assert(result != 0 && "Two distinct atoms should not compare equal");
+  return result;
+}
+
+/// For a superclass or concrete type atom
+///
+///   [concrete: Foo<X1, ..., Xn>]
+///   [superclass: Foo<X1, ..., Xn>]
+///
+/// Return a new atom where the function fn is applied to each of the
+/// substitutions:
+///
+///   [concrete: Foo<fn(X1), ..., fn(Xn)>]
+///   [superclass: Foo<fn(X1), ..., fn(Xn)>]
+///
+/// Asserts if this is not a superclass or concrete type atom.
+Atom Atom::transformConcreteSubstitutions(
+    llvm::function_ref<Term(Term)> fn,
+    RewriteContext &ctx) const {
+  assert(isSuperclassOrConcreteType());
+
+  if (getSubstitutions().empty())
+    return *this;
+
+  bool anyChanged = false;
+  SmallVector<Term, 2> substitutions;
+  for (auto term : getSubstitutions()) {
+    auto newTerm = fn(term);
+    if (newTerm != term)
+      anyChanged = true;
+
+    substitutions.push_back(newTerm);
+  }
+
+  if (!anyChanged)
+    return *this;
+
+  switch (getKind()) {
+  case Kind::Superclass:
+    return Atom::forSuperclass(getSuperclass(), substitutions, ctx);
+  case Kind::ConcreteType:
+    return Atom::forConcreteType(getConcreteType(), substitutions, ctx);
+
+  case Kind::GenericParam:
+  case Kind::Name:
+  case Kind::Protocol:
+  case Kind::AssociatedType:
+  case Kind::Layout:
+    break;
   }
 
   llvm_unreachable("Bad atom kind");
 }
 
+/// For a superclass or concrete type atom
+///
+///   [concrete: Foo<X1, ..., Xn>]
+///   [superclass: Foo<X1, ..., Xn>]
+///
+/// Return a new atom where the prefix T is prepended to each of the
+/// substitutions:
+///
+///   [concrete: Foo<T.X1, ..., T.Xn>]
+///   [superclass: Foo<T.X1, ..., T.Xn>]
+///
+/// Asserts if this is not a superclass or concrete type atom.
+Atom Atom::prependPrefixToConcreteSubstitutions(
+    const MutableTerm &prefix,
+    RewriteContext &ctx) const {
+  if (prefix.empty())
+    return *this;
+
+  return transformConcreteSubstitutions(
+    [&](Term term) -> Term {
+      MutableTerm mutTerm;
+      mutTerm.append(prefix);
+      mutTerm.append(term);
+
+      return Term::get(mutTerm, ctx);
+    }, ctx);
+}
+
 /// Print the atom using our mnemonic representation.
 void Atom::dump(llvm::raw_ostream &out) const {
+  auto dumpSubstitutions = [&]() {
+    if (getSubstitutions().size() > 0) {
+      out << " with <";
+
+      bool first = true;
+      for (auto substitution : getSubstitutions()) {
+        if (first) {
+          first = false;
+        } else {
+          out << ", ";
+        }
+        substitution.dump(out);
+      }
+
+      out << ">";
+    }
+  };
+
   switch (getKind()) {
   case Kind::Name:
     out << getName();
@@ -133,16 +618,156 @@ void Atom::dump(llvm::raw_ostream &out) const {
     out << "[layout: ";
     getLayoutConstraint()->print(out);
     out << "]";
+    return;
+
+  case Kind::Superclass:
+    out << "[superclass: " << getSuperclass();
+    dumpSubstitutions();
+    out << "]";
+    return;
+
+  case Kind::ConcreteType:
+    out << "[concrete: " << getConcreteType();
+    dumpSubstitutions();
+    out << "]";
+    return;
   }
 
   llvm_unreachable("Bad atom kind");
+}
+
+void Atom::Storage::Profile(llvm::FoldingSetNodeID &id) const {
+  id.AddInteger(Kind);
+
+  switch (Atom::Kind(Kind)) {
+  case Atom::Kind::Name:
+    id.AddPointer(Name.get());
+    return;
+
+  case Atom::Kind::Layout:
+    id.AddPointer(Layout.getPointer());
+    return;
+
+  case Atom::Kind::Protocol:
+    id.AddPointer(Proto);
+    return;
+
+  case Atom::Kind::GenericParam:
+    id.AddPointer(GenericParam);
+    return;
+
+  case Atom::Kind::AssociatedType: {
+    auto protos = getProtocols();
+    id.AddInteger(protos.size());
+
+    for (const auto *proto : protos)
+      id.AddPointer(proto);
+
+    id.AddPointer(Name.get());
+    return;
+  }
+
+  case Atom::Kind::Superclass:
+  case Atom::Kind::ConcreteType: {
+    id.AddPointer(ConcreteType.getPointer());
+
+    id.AddInteger(NumSubstitutions);
+    for (auto term : getSubstitutions())
+      id.AddPointer(term.getOpaquePointer());
+
+    return;
+  }
+  }
+
+  llvm_unreachable("Bad atom kind");
+}
+
+/// Terms are uniqued and immutable, stored as a single pointer;
+/// the Storage type is the allocated backing storage.
+struct Term::Storage final
+  : public llvm::FoldingSetNode,
+    public llvm::TrailingObjects<Storage, Atom> {
+  friend class Atom;
+
+  unsigned Size;
+
+  explicit Storage(unsigned size) : Size(size) {}
+
+  size_t numTrailingObjects(OverloadToken<Atom>) const {
+    return Size;
+  }
+
+  MutableArrayRef<Atom> getElements() {
+    return {getTrailingObjects<Atom>(), Size};
+  }
+
+  ArrayRef<Atom> getElements() const {
+    return {getTrailingObjects<Atom>(), Size};
+  }
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+};
+
+size_t Term::size() const { return Ptr->Size; }
+
+ArrayRef<Atom>::const_iterator Term::begin() const {
+  return Ptr->getElements().begin();
+}
+
+ArrayRef<Atom>::const_iterator Term::end() const {
+  return Ptr->getElements().end();
+}
+
+Atom Term::back() const {
+  return Ptr->getElements().back();
+}
+
+Atom Term::operator[](size_t index) const {
+  return Ptr->getElements()[index];
+}
+
+void Term::dump(llvm::raw_ostream &out) const {
+  MutableTerm(*this).dump(out);
+}
+
+Term Term::get(const MutableTerm &mutableTerm, RewriteContext &ctx) {
+  unsigned size = mutableTerm.size();
+  assert(size > 0 && "Term must have at least one atom");
+
+  llvm::FoldingSetNodeID id;
+  id.AddInteger(size);
+  for (auto atom : mutableTerm)
+    id.AddPointer(atom.getOpaquePointer());
+
+  void *insertPos = nullptr;
+  if (auto *term = ctx.Terms.FindNodeOrInsertPos(id, insertPos))
+    return term;
+
+  void *mem = ctx.Allocator.Allocate(
+      Storage::totalSizeToAlloc<Atom>(size),
+      alignof(Storage));
+  auto *term = new (mem) Storage(size);
+  for (unsigned i = 0; i < size; ++i)
+    term->getElements()[i] = mutableTerm[i];
+
+  ctx.Terms.InsertNode(term, insertPos);
+
+  return term;
+}
+
+void Term::Storage::Profile(llvm::FoldingSetNodeID &id) const {
+  id.AddInteger(Size);
+
+  for (auto atom : getElements())
+    id.AddPointer(atom.getOpaquePointer());
 }
 
 /// Linear order on terms.
 ///
 /// First we compare length, then perform a lexicographic comparison
 /// on atoms if the two terms have the same length.
-int Term::compare(const Term &other, const ProtocolGraph &graph) const {
+int MutableTerm::compare(const MutableTerm &other,
+                         const ProtocolGraph &graph) const {
   if (size() != other.size())
     return size() < other.size() ? -1 : 1;
 
@@ -164,8 +789,8 @@ int Term::compare(const Term &other, const ProtocolGraph &graph) const {
 
 /// Find the start of \p other in this term, returning end() if
 /// \p other does not occur as a subterm of this term.
-decltype(Term::Atoms)::const_iterator
-Term::findSubTerm(const Term &other) const {
+decltype(MutableTerm::Atoms)::const_iterator
+MutableTerm::findSubTerm(const MutableTerm &other) const {
   if (other.size() > size())
     return end();
 
@@ -173,8 +798,8 @@ Term::findSubTerm(const Term &other) const {
 }
 
 /// Non-const variant of the above.
-decltype(Term::Atoms)::iterator
-Term::findSubTerm(const Term &other) {
+decltype(MutableTerm::Atoms)::iterator
+MutableTerm::findSubTerm(const MutableTerm &other) {
   if (other.size() > size())
     return end();
 
@@ -186,7 +811,8 @@ Term::findSubTerm(const Term &other) {
 /// order on terms. Returns true if the term contained \p lhs;
 /// otherwise returns false, in which case the term remains
 /// unchanged.
-bool Term::rewriteSubTerm(const Term &lhs, const Term &rhs) {
+bool MutableTerm::rewriteSubTerm(const MutableTerm &lhs,
+                                 const MutableTerm &rhs) {
   // Find the start of lhs in this term.
   auto found = findSubTerm(lhs);
 
@@ -231,19 +857,25 @@ bool Term::rewriteSubTerm(const Term &lhs, const Term &rhs) {
 ///
 /// An overlap occurs if one of the following two cases holds:
 ///
-/// 1) If this == TUV and other == U, then \p result is TUV.
-/// 2) If this == TU and other == UV, then \p result is TUV.
-/// 3) If neither holds, we return false.
+/// 1) If this == TUV and other == U.
+/// 2) If this == TU and other == UV.
+///
+/// In both cases, we return the subterms T and V, together with
+/// an 'overlap kind' identifying the first or second case.
+///
+/// If both rules have identical left hand sides, either case could
+/// apply, but we arbitrarily pick case 1.
 ///
 /// Note that this relation is not commutative; we need to check
 /// for overlap between both (X and Y) and (Y and X).
-bool Term::checkForOverlap(const Term &other, Term &result) const {
-  assert(result.size() == 0);
-
+OverlapKind
+MutableTerm::checkForOverlap(const MutableTerm &other,
+                             MutableTerm &t,
+                             MutableTerm &v) const {
   // If the other term is longer than this term, there's no way
   // we can overlap.
   if (other.size() > size())
-    return false;
+    return OverlapKind::None;
 
   auto first1 = begin();
   auto last1 = end();
@@ -257,12 +889,15 @@ bool Term::checkForOverlap(const Term &other, Term &result) const {
   // X.Y.Z
   //   X.Y.Z
   //     X.Y.Z
-  while (last2 - first2 <= last1 - first1) {
+  while (last1 - first1 >= last2 - first2) {
     if (std::equal(first2, last2, first1)) {
-      // If this == TUV and other == U, the overlap is TUV, so just
-      // copy this term over.
-      result = *this;
-      return true;
+      // We have an overlap of the first kind, where
+      // this == TUV and other == U.
+      //
+      // Get the subterms for T and V.
+      t = MutableTerm(begin(), first1);
+      v = MutableTerm(first1 + other.size(), end());
+      return OverlapKind::First;
     }
 
     ++first1;
@@ -278,24 +913,24 @@ bool Term::checkForOverlap(const Term &other, Term &result) const {
     --last2;
 
     if (std::equal(first1, last1, first2)) {
-      // If this == TU and other == UV, the overlap is the term
-      // TUV, which can be formed by concatenating a prefix of this
-      // term with the entire other term.
-      std::copy(begin(), first1,
-                std::back_inserter(result.Atoms));
-      std::copy(other.begin(), other.end(),
-                std::back_inserter(result.Atoms));
-      return true;
+      // We have an overlap of the second kind, where
+      // this == TU and other == UV.
+      //
+      // Get the subterms for T and V.
+      t = MutableTerm(begin(), first1);
+      assert(!t.empty());
+      v = MutableTerm(last2, other.end());
+      return OverlapKind::Second;
     }
 
     ++first1;
   }
 
   // No overlap found.
-  return false;
+  return OverlapKind::None;
 }
 
-void Term::dump(llvm::raw_ostream &out) const {
+void MutableTerm::dump(llvm::raw_ostream &out) const {
   bool first = true;
 
   for (auto atom : Atoms) {
@@ -308,6 +943,48 @@ void Term::dump(llvm::raw_ostream &out) const {
   }
 }
 
+Term RewriteContext::getTermForType(CanType paramType,
+                                    const ProtocolDecl *proto) {
+  return Term::get(getMutableTermForType(paramType, proto), *this);
+}
+
+/// Map an interface type to a term.
+///
+/// If \p proto is null, this is a term relative to a generic
+/// parameter in a top-level signature. The term is rooted in a generic
+/// parameter atom.
+///
+/// If \p proto is non-null, this is a term relative to a protocol's
+/// 'Self' type. The term is rooted in a protocol atom.
+///
+/// The bound associated types in the interface type are ignored; the
+/// resulting term consists entirely of a root atom followed by zero
+/// or more name atoms.
+MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
+                                                  const ProtocolDecl *proto) {
+  assert(paramType->isTypeParameter());
+
+  // Collect zero or more nested type names in reverse order.
+  SmallVector<Atom, 3> atoms;
+  while (auto memberType = dyn_cast<DependentMemberType>(paramType)) {
+    atoms.push_back(Atom::forName(memberType->getName(), *this));
+    paramType = memberType.getBase();
+  }
+
+  // Add the root atom at the end.
+  if (proto) {
+    assert(proto->getSelfInterfaceType()->isEqual(paramType));
+    atoms.push_back(Atom::forProtocol(proto, *this));
+  } else {
+    atoms.push_back(Atom::forGenericParam(
+        cast<GenericTypeParamType>(paramType), *this));
+  }
+
+  std::reverse(atoms.begin(), atoms.end());
+
+  return MutableTerm(atoms);
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   LHS.dump(out);
   out << " => ";
@@ -316,21 +993,37 @@ void Rule::dump(llvm::raw_ostream &out) const {
     out << " [deleted]";
 }
 
-void RewriteSystem::initialize(std::vector<std::pair<Term, Term>> &&rules,
-                               ProtocolGraph &&graph) {
+void RewriteSystem::initialize(
+    std::vector<std::pair<MutableTerm, MutableTerm>> &&rules,
+    ProtocolGraph &&graph) {
   Protos = graph;
 
   // FIXME: Probably this sort is not necessary
   std::sort(rules.begin(), rules.end(),
-            [&](std::pair<Term, Term> lhs,
-                std::pair<Term, Term> rhs) -> int {
+            [&](std::pair<MutableTerm, MutableTerm> lhs,
+                std::pair<MutableTerm, MutableTerm> rhs) -> int {
               return lhs.first.compare(rhs.first, graph) < 0;
             });
   for (const auto &rule : rules)
     addRule(rule.first, rule.second);
 }
 
-bool RewriteSystem::addRule(Term lhs, Term rhs) {
+Atom RewriteSystem::simplifySubstitutionsInSuperclassOrConcreteAtom(
+    Atom atom) const {
+  return atom.transformConcreteSubstitutions(
+    [&](Term term) -> Term {
+      MutableTerm mutTerm(term);
+      if (!simplify(mutTerm))
+        return term;
+
+      return Term::get(mutTerm, Context);
+    }, Context);
+}
+
+bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs) {
+  assert(!lhs.empty());
+  assert(!rhs.empty());
+
   // Simplify the rule as much as possible with the rules we have so far.
   //
   // This avoids unnecessary work in the completion algorithm.
@@ -347,6 +1040,9 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
   // right hand side.
   if (result < 0)
     std::swap(lhs, rhs);
+
+  if (lhs.back().isSuperclassOrConcreteType())
+    lhs.back() = simplifySubstitutionsInSuperclassOrConcreteAtom(lhs.back());
 
   assert(lhs.compare(rhs, Protos) > 0);
 
@@ -382,10 +1078,19 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
     if (i == j)
       continue;
 
+    // We don't have to check for overlap with deleted rules.
+    if (Rules[j].isDeleted())
+      continue;
+
     // The overlap check is not commutative so we have to check both
     // directions.
     Worklist.emplace_back(i, j);
     Worklist.emplace_back(j, i);
+
+    if (DebugCompletion) {
+      llvm::dbgs() << "$ Queued up (" << i << ", " << j << ") and ";
+      llvm::dbgs() << "(" << j << ", " << i << ")\n";
+    }
   }
 
   // Tell the caller that we added a new rule.
@@ -393,7 +1098,7 @@ bool RewriteSystem::addRule(Term lhs, Term rhs) {
 }
 
 /// Reduce a term by applying all rewrite rules until fixed point.
-bool RewriteSystem::simplify(Term &term) const {
+bool RewriteSystem::simplify(MutableTerm &term) const {
   bool changed = false;
 
   if (DebugSimplify) {
@@ -485,7 +1190,7 @@ Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
   // of the two sets.
   assert(minimalProtos.size() <= protos.size() + otherProtos.size());
 
-  return Atom::forAssociatedType(minimalProtos, lhs.getName());
+  return Atom::forAssociatedType(minimalProtos, lhs.getName(), Context);
 }
 
 /// Consider the following example:
@@ -583,7 +1288,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
     }
 
     // Build the term X.[P1&P2:T].
-    Term mergedTerm = lhs;
+    MutableTerm mergedTerm = lhs;
     mergedTerm.back() = mergedAtom;
 
     // Add the rule X.[P1:T] => X.[P1&P2:T].
@@ -618,22 +1323,82 @@ void RewriteSystem::processMergedAssociatedTypes() {
           //
           //   [P1&P2].[Q] => [P1&P2]
           //
-          auto otherRHS = otherRule.getRHS();
-          assert(otherRHS.size() == 1);
-          assert(otherRHS[0] == otherLHS[0]);
+          MutableTerm newLHS;
+          newLHS.add(mergedAtom);
+          newLHS.add(otherLHS[1]);
 
-          otherRHS.back() = mergedAtom;
+          MutableTerm newRHS;
+          newRHS.add(mergedAtom);
 
-          auto newLHS = otherRHS;
-          newLHS.add(Atom::forProtocol(otherLHS[1].getProtocol()));
-
-          addRule(newLHS, otherRHS);
+          addRule(newLHS, newRHS);
         }
       }
     }
   }
 
   MergedAssociatedTypes.clear();
+}
+
+/// Compute a critical pair from two rewrite rules.
+///
+/// There are two cases:
+///
+/// 1) lhs == TUV -> X, rhs == U -> Y. The overlapped term is TUV;
+///    applying lhs and rhs, respectively, yields the critical pair
+///    (X, TYV).
+///
+/// 2) lhs == TU -> X, rhs == UV -> Y. The overlapped term is once
+///    again TUV; applying lhs and rhs, respectively, yields the
+///    critical pair (XV, TY).
+///
+/// If lhs and rhs have identical left hand sides, either case could
+/// apply, but we arbitrarily pick case 1.
+///
+/// There is also an additional wrinkle. If we're in case 2, and the
+/// last atom of V is a superclass or concrete type atom A, we prepend
+/// T to each substitution of A.
+Optional<std::pair<MutableTerm, MutableTerm>>
+RewriteSystem::computeCriticalPair(const Rule &lhs, const Rule &rhs) const {
+  MutableTerm t, v;
+
+  switch (lhs.checkForOverlap(rhs, t, v)) {
+  case OverlapKind::None:
+    return None;
+
+  case OverlapKind::First: {
+    // lhs == TUV -> X, rhs == U -> Y.
+
+    // Note: This includes the case where the two rules have exactly
+    // equal left hand sides; that is, lhs == U -> X, rhs == U -> Y.
+    //
+    // In this case, T and V are both empty.
+
+    // Compute the term TYV.
+    t.append(rhs.getRHS());
+    t.append(v);
+    return std::make_pair(lhs.getRHS(), t);
+  }
+
+  case OverlapKind::Second: {
+    // lhs == TU -> X, rhs == UV -> Y.
+
+    if (v.back().isSuperclassOrConcreteType()) {
+      v.back() = v.back().prependPrefixToConcreteSubstitutions(
+          t, Context);
+    }
+
+    // Compute the term XV.
+    MutableTerm xv;
+    xv.append(lhs.getRHS());
+    xv.append(v);
+
+    // Compute the term TY.
+    t.append(rhs.getRHS());
+    return std::make_pair(xv, t);
+  }
+  }
+
+  llvm_unreachable("Bad overlap kind");
 }
 
 /// Computes the confluent completion using the Knuth-Bendix algorithm
@@ -647,39 +1412,56 @@ void RewriteSystem::processMergedAssociatedTypes() {
 RewriteSystem::CompletionResult
 RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
+  unsigned steps = 0;
+
+  SWIFT_DEFER {
+    if (Context.Stats) {
+      Context.Stats->getFrontendCounters()
+        .NumRequirementMachineCompletionSteps += steps;
+    }
+  };
+
   // The worklist must be processed in first-in-first-out order, to ensure
   // that we resolve all overlaps among the initial set of rules before
   // moving on to overlaps between rules introduced by completion.
   while (!Worklist.empty()) {
-    auto pair = Worklist.front();
+    auto next = Worklist.front();
     Worklist.pop_front();
 
-    Term first;
+    const auto &lhs = Rules[next.first];
+    const auto &rhs = Rules[next.second];
 
-    const auto &lhs = Rules[pair.first];
-    const auto &rhs = Rules[pair.second];
+    if (DebugCompletion) {
+      llvm::dbgs() << "$ Check for overlap: (#" << next.first << ") ";
+      lhs.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+      llvm::dbgs() << "                -vs- (#" << next.second << ") ";
+      rhs.dump(llvm::dbgs());
+      llvm::dbgs() << ":\n";
+    }
 
-    // If either rule was deleted since, we don't have to check for overlap.
-    if (lhs.isDeleted() || rhs.isDeleted())
+    auto pair = computeCriticalPair(lhs, rhs);
+    if (!pair) {
+      if (DebugCompletion) {
+        llvm::dbgs() << " no overlap\n\n";
+      }
       continue;
+    }
 
-    if (!lhs.checkForOverlap(rhs, first))
-      continue;
+    MutableTerm first, second;
 
-    assert(first.size() > 0);
+    // We have a critical pair (X, Y).
+    std::tie(first, second) = *pair;
 
-    // We have two rules whose left hand sides overlap. This means
-    // one of the following two cases is true:
-    //
-    // 1) lhs == TUV and rhs == U
-    // 2) lhs == TU and rhs == UV
-    Term second = first;
+    if (DebugCompletion) {
+      llvm::dbgs() << "$$ First term of critical pair is ";
+      first.dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
 
-    // In both cases, rewrite the term TUV using both rules to
-    // produce two new terms X and Y.
-    lhs.apply(first);
-    rhs.apply(second);
-
+      llvm::dbgs() << "$$ Second term of critical pair is ";
+      second.dump(llvm::dbgs());
+      llvm::dbgs() << "\n\n";
+    }
     unsigned i = Rules.size();
 
     // Try to repair the confluence violation by adding a new rule
@@ -688,7 +1470,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       continue;
 
     // Check if we've already done too much work.
-    if (--maxIterations == 0)
+    if (++steps >= maxIterations)
       return CompletionResult::MaxIterations;
 
     const auto &newRule = Rules[i];
@@ -708,8 +1490,14 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
         continue;
 
       // If this rule reduces some existing rule, delete the existing rule.
-      if (rule.canReduceLeftHandSide(newRule))
+      if (rule.canReduceLeftHandSide(newRule)) {
+        if (DebugCompletion) {
+          llvm::dbgs() << "$ Deleting rule ";
+          rule.dump(llvm::dbgs());
+          llvm::dbgs() << "\n";
+        }
         rule.markDeleted();
+      }
     }
 
     // If this new rule merges any associated types, process the merge now
@@ -719,20 +1507,76 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     processMergedAssociatedTypes();
   }
 
-  // This isn't necessary for correctness, it's just an optimization.
+  simplifyRightHandSides();
+
+  return CompletionResult::Success;
+}
+
+void RewriteSystem::simplifyRightHandSides() {
   for (auto &rule : Rules) {
+    if (rule.isDeleted())
+      continue;
+
     auto rhs = rule.getRHS();
     simplify(rhs);
     rule = Rule(rule.getLHS(), rhs);
   }
 
-  // Just for aesthetics in dump().
-  std::sort(Rules.begin(), Rules.end(),
-            [&](Rule lhs, Rule rhs) -> int {
-              return lhs.getLHS().compare(rhs.getLHS(), Protos) < 0;
-            });
+#ifndef NDEBUG
 
-  return CompletionResult::Success;
+#define ASSERT_RULE(expr) \
+  if (!(expr)) { \
+    llvm::errs() << "&&& Malformed rewrite rule: "; \
+    rule.dump(llvm::errs()); \
+    llvm::errs() << "\n\n"; \
+    dump(llvm::errs()); \
+    assert(expr); \
+  }
+
+  for (const auto &rule : Rules) {
+    if (rule.isDeleted())
+      continue;
+
+    const auto &lhs = rule.getLHS();
+    const auto &rhs = rule.getRHS();
+
+    for (unsigned index : indices(lhs)) {
+      auto atom = lhs[index];
+
+      if (index != lhs.size() - 1) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::Layout);
+        ASSERT_RULE(!atom.isSuperclassOrConcreteType());
+      }
+
+      if (index != 0) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::GenericParam);
+      }
+
+      if (index != 0 && index != lhs.size() - 1) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::Protocol);
+      }
+    }
+
+    for (unsigned index : indices(rhs)) {
+      auto atom = rhs[index];
+
+      // FIXME: This is only true if the input requirements were valid.
+      // On invalid code, we'll need to skip this assertion (and instead
+      // assert that we diagnosed an error!)
+      ASSERT_RULE(atom.getKind() != Atom::Kind::Name);
+
+      ASSERT_RULE(atom.getKind() != Atom::Kind::Layout);
+      ASSERT_RULE(!atom.isSuperclassOrConcreteType());
+
+      if (index != 0) {
+        ASSERT_RULE(atom.getKind() != Atom::Kind::GenericParam);
+        ASSERT_RULE(atom.getKind() != Atom::Kind::Protocol);
+      }
+    }
+  }
+
+#undef ASSERT_RULE
+#endif
 }
 
 void RewriteSystem::dump(llvm::raw_ostream &out) const {
