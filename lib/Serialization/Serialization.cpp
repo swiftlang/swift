@@ -78,6 +78,10 @@ using llvm::BCBlockRAII;
 
 ASTContext &SerializerBase::getASTContext() const { return M->getASTContext(); }
 
+static StringRef withNullAsEmptyStringRef(const char *data) {
+  return StringRef(data ? data : "");
+}
+
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
   using Int32Info = std::numeric_limits<uint32_t>;
@@ -5554,7 +5558,7 @@ void swift::serializeToBuffers(
   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
   const SILModule *M) {
 
-  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
+  assert(!withNullAsEmptyStringRef(options.OutputPath).empty());
   {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftmodule, to buffer");
@@ -5575,7 +5579,7 @@ void swift::serializeToBuffers(
                         std::move(buf), options.OutputPath);
   }
 
-  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
+  if (!withNullAsEmptyStringRef(options.DocOutputPath).empty()) {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
@@ -5592,7 +5596,7 @@ void swift::serializeToBuffers(
                            std::move(buf), options.DocOutputPath);
   }
 
-  if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
+  if (!withNullAsEmptyStringRef(options.SourceInfoOutputPath).empty()) {
     FrontendStatsTracer tracer(getContext(DC).Stats,
                                "Serialization, swiftsourceinfo, to buffer");
     llvm::SmallString<1024> buf;
@@ -5614,12 +5618,12 @@ void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M,
                       const fine_grained_dependencies::SourceFileDepGraph *DG) {
-  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
+  assert(!withNullAsEmptyStringRef(options.OutputPath).empty());
 
   if (StringRef(options.OutputPath) == "-") {
     // Special-case writing to stdout.
     Serializer::writeToStream(llvm::outs(), DC, M, options, DG);
-    assert(StringRef::withNullAsEmpty(options.DocOutputPath).empty());
+    assert(withNullAsEmptyStringRef(options.DocOutputPath).empty());
     return;
   }
 
@@ -5634,7 +5638,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (hadError)
     return;
 
-  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
+  if (!withNullAsEmptyStringRef(options.DocOutputPath).empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
@@ -5645,7 +5649,7 @@ void swift::serialize(ModuleOrSourceFile DC,
     });
   }
 
-  if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
+  if (!withNullAsEmptyStringRef(options.SourceInfoOutputPath).empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.SourceInfoOutputPath,
                          [&](raw_ostream &out) {
