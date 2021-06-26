@@ -146,15 +146,14 @@ func takesNoEscapeFunction(fn: () -> ()) { // expected-note {{parameter 'fn' is 
 
 
 class FooClass {
-  var stored : Optional<(()->Int)->Void> = nil
+  var stored : Optional<(()->Int)->Void> = nil  // expected-note {{add explicit @escaping to function parameter #0}} {{26-26=@escaping }}
   var computed : (()->Int)->Void {
     get { return stored! }
     set(newValue) { stored = newValue } // ok
   }
   var computedEscaping : (@escaping ()->Int)->Void {
     get { return stored! }
-    set(newValue) { stored = newValue } // expected-error{{assigning non-escaping parameter 'newValue' to an @escaping closure}}
-    // expected-note@-1 {{parameter 'newValue' is implicitly non-escaping}}
+    set(newValue) { stored = newValue } // expected-error{{converting escaping to non-escaping functions of type '() -> Int' in parameter position #0 of function type member 'stored' is not allowed}}
   }
 }
 
@@ -230,3 +229,29 @@ extension SR_9760 {
 
 // SR-9178
 func foo<T>(_ x: @escaping T) {} // expected-error 1{{@escaping attribute only applies to function types}}
+
+// SR-14720
+class SR14720 {
+  let ok: (@escaping () -> Void) -> Void // OK
+  let callback: (() -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #0}} {{18-18=@escaping }}
+  let callback1: (() -> Void, () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #1}} {{31-31=@escaping }} 
+  let callbackAuto: (@autoclosure () -> Void) -> Void // expected-note {{add explicit @escaping to function parameter #0}} {{34-34= @escaping}}
+  let callbackOpt: ((() -> Void) -> Void)? // expected-note{{add explicit @escaping to function parameter #0}} {{22-22=@escaping }}
+
+  init(f: @escaping (@escaping() -> Void) -> Void) {
+    self.callback = f // expected-error{{converting escaping to non-escaping functions of type '() -> Void' in parameter position #0 of function type member 'callback' is not allowed}}
+    self.ok = f // Ok
+  }
+
+  init(af: @escaping (@escaping() -> Void) -> Void) {
+    self.callbackOpt = af // expected-error{{converting escaping to non-escaping functions of type '() -> Void' in parameter position #0 of function type member 'callbackOpt' is not allowed}}
+  }
+
+  init(a: @escaping (@escaping () -> Void) -> Void) {
+    self.callbackAuto = a // expected-error{{converting escaping to non-escaping functions of type '() -> Void' in parameter position #0 of function type member 'callbackAuto' is not allowed}}
+  }
+
+  init(f: @escaping (() -> Void, @escaping() -> Void) -> Void) {
+    self.callback1 = f // expected-error{{converting escaping to non-escaping functions of type '() -> Void' in parameter position #1 of function type member 'callback1' is not allowed}}
+  }
+}
