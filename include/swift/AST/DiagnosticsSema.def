@@ -3890,6 +3890,13 @@ ERROR(converting_noattrfunc_to_type,none,
       "converting %select{non-escaping|non-concurrent function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
+ERROR(converting_noattrfunc_contravariant_parameter_position,none,
+      "converting escaping to non-escaping functions of type %2 in parameter position "
+      "#%0 of function type member %1 is not allowed",
+      (unsigned, Identifier, Type))
+NOTE(add_explicit_escaping,none,
+     "add explicit @escaping to function parameter #%0",
+     (unsigned))
 
 ERROR(converting_func_loses_global_actor,none,
       "converting function value of type %0 to %1 loses global actor %2",

@@ -905,6 +905,81 @@ bool AttributedFuncToTypeConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool AttributedFuncToTypeConversionFailure::
+    diagnoseFunctionParameterEscapenessMismatch(AssignExpr *AE) const {
+  auto loc = getLocator();
+  if (attributeKind != Escaping)
+    return false;
+
+  if (!loc->findLast<LocatorPathElt::FunctionArgument>())
+    return false;
+
+  auto *URDE = dyn_cast<UnresolvedDotExpr>(AE->getDest());
+  if (!URDE)
+    return false;
+
+  auto &solution = getSolution();
+  auto memberLoc = getConstraintLocator(URDE, ConstraintLocator::Member);
+  auto overload = solution.getOverloadChoiceIfAvailable(memberLoc);
+  if (!overload)
+    return false;
+
+  auto decl = dyn_cast_or_null<VarDecl>(overload->choice.getDecl());
+  if (!decl)
+    return false;
+
+  // The tuple locator element will give us the exact parameter mismatch
+  // position.
+  auto tupleElt = loc->getLastElementAs<LocatorPathElt::TupleElement>();
+  auto mismatchPosition = tupleElt ? tupleElt->getIndex() : 0;
+
+  auto destInterfaceType =
+      decl->getInterfaceType()->lookThroughAllOptionalTypes();
+  auto destInterfaceFnType = destInterfaceType->castTo<FunctionType>();
+  auto param = destInterfaceFnType->getParams()[mismatchPosition];
+  emitDiagnostic(diag::converting_noattrfunc_contravariant_parameter_position,
+                 mismatchPosition, decl->getName(), param.getParameterType());
+
+  auto note = emitDiagnosticAt(decl->getLoc(), diag::add_explicit_escaping,
+                               mismatchPosition);
+
+  auto declRepr = decl->getTypeReprOrParentPatternTypeRepr();
+  class TopLevelFuncReprFinder : public ASTWalker {
+    bool walkToTypeReprPre(TypeRepr *TR) override {
+      FnRepr = dyn_cast<FunctionTypeRepr>(TR);
+      return FnRepr == nullptr;
+    }
+
+  public:
+    FunctionTypeRepr *FnRepr;
+    TopLevelFuncReprFinder() : FnRepr(nullptr) {}
+  };
+
+  // Look to find top-level function repr that maybe inside optional
+  // representations.
+  TopLevelFuncReprFinder fnFinder;
+  declRepr->walk(fnFinder);
+
+  auto declFnRepr = fnFinder.FnRepr;
+  if (!declFnRepr)
+    return false;
+
+  auto argsRepr = declFnRepr->getArgsTypeRepr();
+  auto argRepr = argsRepr->getElement(mismatchPosition).Type;
+  if (!param.isAutoClosure()) {
+    note.fixItInsert(argRepr->getStartLoc(), "@escaping ");
+  } else {
+    auto attrRepr = dyn_cast<AttributedTypeRepr>(argRepr);
+    if (attrRepr) {
+      auto autoclosureEndLoc = Lexer::getLocForEndOfToken(
+          getASTContext().SourceMgr,
+          attrRepr->getAttrs().getLoc(TAK_autoclosure));
+      note.fixItInsertAfter(autoclosureEndLoc, " @escaping");
+    }
+  }
+  return true;
+}
+
 bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
   auto convertTo = getToType();
   // If the other side is not a function, we have common case diagnostics
@@ -961,6 +1036,11 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
       diagnostic = diag::passing_noattrfunc_to_attrfunc;
     }
   } else if (auto *AE = getAsExpr<AssignExpr>(getRawAnchor())) {
+    // Attempt to diagnose escape/non-escape mismatch in function
+    // parameter position.
+    if (diagnoseFunctionParameterEscapenessMismatch(AE))
+      return true;
+
     if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getSrc())) {
       PD = dyn_cast<ParamDecl>(DRE->getDecl());
       diagnostic = diag::assigning_noattrfunc_to_attrfunc;
