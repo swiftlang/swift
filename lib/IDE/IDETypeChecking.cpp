@@ -808,20 +808,6 @@ public:
       auto TyOffset = getTypeOffset(Buffer.str());
       bool HasExplicitType =
           VD->getTypeReprOrParentPatternTypeRepr() != nullptr;
-      // Handle typed if/guard/while-let as a special case (e.g. `if let x: Int
-      // = Optional.some(4)`), since the `TypedPattern` is not the top-level
-      // pattern here - instead it is an implicit `OptionalSomePattern`
-      if (!HasExplicitType) {
-        if (auto *somePattern =
-                dyn_cast_or_null<OptionalSomePattern>(VD->getParentPattern())) {
-          if (somePattern->isImplicit()) {
-            if (auto *typedPattern =
-                    dyn_cast<TypedPattern>(somePattern->getSubPattern())) {
-              HasExplicitType = typedPattern->getTypeRepr() != nullptr;
-            }
-          }
-        }
-      }
       // Add the type information to the result list.
       Results.emplace_back(VarOffset, VarLength, HasExplicitType, TyOffset);
     }
