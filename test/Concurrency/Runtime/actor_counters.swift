@@ -28,6 +28,12 @@ actor Counter {
     value = value + 1
     return current
   }
+
+  deinit {
+      for i in 0..<value {
+          assert(scratchBuffer[i] == 1)
+      }
+  }
 }
 
 
