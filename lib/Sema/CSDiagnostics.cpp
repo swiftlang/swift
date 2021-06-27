@@ -905,6 +905,24 @@ bool AttributedFuncToTypeConversionFailure::diagnoseAsError() {
   return true;
 }
 
+static VarDecl *getDestinationVarDecl(AssignExpr *AE,
+                                      const Solution &solution) {
+  ConstraintLocator *locator = nullptr;
+  if (auto *URDE = dyn_cast<UnresolvedDotExpr>(AE->getDest())) {
+    locator = solution.getConstraintLocator(URDE, {ConstraintLocator::Member});
+  } else if (auto *declRef = dyn_cast<DeclRefExpr>(AE->getDest())) {
+    locator = solution.getConstraintLocator(declRef);
+  }
+  if (!locator)
+    return nullptr;
+
+  auto overload = solution.getOverloadChoiceIfAvailable(locator);
+  if (!overload)
+    return nullptr;
+
+  return dyn_cast_or_null<VarDecl>(overload->choice.getDecl());
+}
+
 bool AttributedFuncToTypeConversionFailure::
     diagnoseFunctionParameterEscapenessMismatch(AssignExpr *AE) const {
   auto loc = getLocator();
@@ -914,17 +932,8 @@ bool AttributedFuncToTypeConversionFailure::
   if (!loc->findLast<LocatorPathElt::FunctionArgument>())
     return false;
 
-  auto *URDE = dyn_cast<UnresolvedDotExpr>(AE->getDest());
-  if (!URDE)
-    return false;
-
   auto &solution = getSolution();
-  auto memberLoc = getConstraintLocator(URDE, ConstraintLocator::Member);
-  auto overload = solution.getOverloadChoiceIfAvailable(memberLoc);
-  if (!overload)
-    return false;
-
-  auto decl = dyn_cast_or_null<VarDecl>(overload->choice.getDecl());
+  auto decl = getDestinationVarDecl(AE, solution);
   if (!decl)
     return false;
 
@@ -938,7 +947,8 @@ bool AttributedFuncToTypeConversionFailure::
   auto destInterfaceFnType = destInterfaceType->castTo<FunctionType>();
   auto param = destInterfaceFnType->getParams()[mismatchPosition];
   emitDiagnostic(diag::converting_noattrfunc_contravariant_parameter_position,
-                 mismatchPosition, decl->getName(), param.getParameterType());
+                 mismatchPosition, decl->getName(), param.getParameterType(),
+                 decl->getDescriptiveKind());
 
   auto note = emitDiagnosticAt(decl->getLoc(), diag::add_explicit_escaping,
                                mismatchPosition);
