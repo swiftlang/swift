@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library -sanitize=thread) | grep -v "^Worker"
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library -sanitize=thread)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -7,12 +7,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: linux
 // UNSUPPORTED: windows
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 @available(SwiftStdlib 5.5, *)
 actor Counter {
@@ -66,7 +60,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   for i in 0..<numWorkers {
     workers.append(
       detach { [counters] in
-        usleep(UInt32.random(in: 0..<100) * 1000)
+        await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
