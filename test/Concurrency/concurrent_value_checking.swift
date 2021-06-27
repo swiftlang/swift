@@ -156,6 +156,14 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
   _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-sendable type 'NC'}}
 }
 
+// ----------------------------------------------------------------------
+// Sendable restriction on nonisolated declarations.
+// ----------------------------------------------------------------------
+actor ANI {
+  // FIXME: improve diagnostics to talk about nonisolated
+  nonisolated let nc = NC() // expected-warning{{cannot use property 'nc' with a non-sendable type 'NC' across actors}}
+  nonisolated func f() -> NC? { nil } // expected-warning{{cannot call function returning non-sendable type 'NC?' across actors}}
+}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on conformances.

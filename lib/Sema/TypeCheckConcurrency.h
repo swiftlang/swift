@@ -78,6 +78,8 @@ enum class ConcurrentReferenceKind {
   LocalCapture,
   /// Concurrent function
   ConcurrentFunction,
+  /// Nonisolated declaration.
+  Nonisolated,
 };
 
 /// The isolation restriction in effect for a given declaration that is
