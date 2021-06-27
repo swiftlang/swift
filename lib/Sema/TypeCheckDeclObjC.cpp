@@ -403,7 +403,8 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
   auto behavior = behaviorLimitForObjCReason(Reason, VD->getASTContext());
 
   switch (auto restriction = ActorIsolationRestriction::forDeclaration(
-              const_cast<ValueDecl *>(VD), /*fromExpression=*/false)) {
+              const_cast<ValueDecl *>(VD), VD->getDeclContext(),
+              /*fromExpression=*/false)) {
   case ActorIsolationRestriction::CrossActorSelf:
     // FIXME: Substitution map?
     diagnoseNonConcurrentTypesInReference(
