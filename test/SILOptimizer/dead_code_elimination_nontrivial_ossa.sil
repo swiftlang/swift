@@ -611,3 +611,44 @@ bb3:
   return %9999 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dce_deadendlifetime1 :
+// CHECK-NOT: end_lifetime
+// CHECK-LABEL: } // end sil function 'dce_deadendlifetime1'
+sil [ossa] @dce_deadendlifetime1 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(undef : $Klass)
+
+bb2:
+  br bb3(undef : $Klass)
+
+bb3(%2 : @owned $Klass):
+  end_lifetime %2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadendlifetime2 :
+// CHECK-NOT: end_lifetime
+// CHECK-LABEL: } // end sil function 'dce_deadendlifetime2'
+sil [ossa] @dce_deadendlifetime2 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(undef : $Klass)
+
+bb2:
+  br bb3(undef : $Klass)
+
+bb3(%2 : @owned $Klass):
+  br bb4(%2 : $Klass)
+
+bb4(%3 : @owned $Klass):
+  end_lifetime %3 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
