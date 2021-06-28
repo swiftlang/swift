@@ -521,6 +521,8 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     if (cast<ValueDecl>(decl)->isLocalCapture())
       return forUnrestricted();
 
+    auto isolation = getActorIsolation(cast<ValueDecl>(decl));
+
     // 'let' declarations are immutable, so they can be accessed across
     // actors.
     bool isAccessibleAcrossActors = false;
@@ -555,7 +557,7 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     }
 
     // Determine the actor isolation of the given declaration.
-    switch (auto isolation = getActorIsolation(cast<ValueDecl>(decl))) {
+    switch (isolation) {
     case ActorIsolation::ActorInstance:
       // Protected actor instance members can only be accessed on 'self'.
       return forActorSelf(isolation.getActor(),
