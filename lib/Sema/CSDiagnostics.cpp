@@ -399,8 +399,14 @@ bool RequirementFailure::diagnoseAsNote() {
   const auto &req = getRequirement();
   const auto *reqDC = getRequirementDC();
 
+  // Layout requirement doesn't have a second type, let's always
+  // `AnyObject`.
+  auto requirementTy = req.getKind() == RequirementKind::Layout
+                           ? getASTContext().getAnyObjectType()
+                           : req.getSecondType();
+
   emitDiagnosticAt(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(),
-                   getRHS(), req.getFirstType(), req.getSecondType(), "");
+                   getRHS(), req.getFirstType(), requirementTy);
   return true;
 }
 
