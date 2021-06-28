@@ -378,22 +378,53 @@ bool GenericSignatureImpl::requiresProtocol(Type type,
                                             ProtocolDecl *proto) const {
   assert(type->isTypeParameter() && "Expected a type parameter");
 
-  auto &builder = *getGenericSignatureBuilder();
-  auto equivClass =
-    builder.resolveEquivalenceClass(
-                                  type,
-                                  ArchetypeResolutionKind::CompleteWellFormed);
-  if (!equivClass) return false;
+  auto computeViaGSB = [&]() {
+    auto &builder = *getGenericSignatureBuilder();
+    auto equivClass =
+      builder.resolveEquivalenceClass(
+                                    type,
+                                    ArchetypeResolutionKind::CompleteWellFormed);
+    if (!equivClass) return false;
 
-  // FIXME: Optionally deal with concrete conformances here
-  // or have a separate method do that additionally?
-  //
-  // If this type parameter was mapped to a concrete type, then there
-  // are no requirements.
-  if (equivClass->concreteType) return false;
+    // FIXME: Optionally deal with concrete conformances here
+    // or have a separate method do that additionally?
+    //
+    // If this type parameter was mapped to a concrete type, then there
+    // are no requirements.
+    if (equivClass->concreteType) return false;
 
-  // Check whether the representative conforms to this protocol.
-  return equivClass->conformsTo.count(proto) > 0;
+    // Check whether the representative conforms to this protocol.
+    return equivClass->conformsTo.count(proto) > 0;
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->requiresProtocol(type, proto);
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    bool rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    bool gsbResult = computeViaGSB();
+
+    if (gsbResult != rqmResult) {
+      llvm::errs() << "RequirementMachine::requiresProtocol() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "Protocol: "; proto->dumpRef(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
+      llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 /// Determine whether the given dependent type is equal to a concrete type.

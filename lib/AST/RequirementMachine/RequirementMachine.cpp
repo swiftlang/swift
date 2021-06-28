@@ -352,3 +352,24 @@ bool RequirementMachine::requiresClass(Type depType) const {
   auto layout = equivClass->getLayoutConstraint();
   return (layout && layout->isClass());
 }
+
+bool RequirementMachine::requiresProtocol(Type depType,
+                                          const ProtocolDecl *proto) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return false;
+
+  if (equivClass->isConcreteType())
+    return false;
+
+  for (auto *otherProto : equivClass->getConformsTo()) {
+    if (otherProto == proto)
+      return true;
+  }
+
+  return false;
+}

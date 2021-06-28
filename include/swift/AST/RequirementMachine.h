@@ -50,6 +50,7 @@ public:
   ~RequirementMachine();
 
   bool requiresClass(Type depType) const;
+  bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
 };
 
 } // end namespace swift
