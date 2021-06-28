@@ -186,7 +186,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   case RequirementKind::Layout: {
     // A layout requirement T : L becomes a rewrite rule
     //
-    //   T.[L] == T
+    //   T.[layout: L] == T
     constraintTerm = subjectTerm;
     constraintTerm.add(Atom::forLayout(req.getLayoutConstraint(),
                                        Context));
