@@ -78,6 +78,8 @@ enum class ConcurrentReferenceKind {
   LocalCapture,
   /// Concurrent function
   ConcurrentFunction,
+  /// Nonisolated declaration.
+  Nonisolated,
 };
 
 /// The isolation restriction in effect for a given declaration that is
@@ -184,7 +186,8 @@ public:
   /// \param fromExpression Indicates that the reference is coming from an
   /// expression.
   static ActorIsolationRestriction forDeclaration(
-      ConcreteDeclRef declRef, bool fromExpression = true);
+      ConcreteDeclRef declRef, const DeclContext *fromDC,
+      bool fromExpression = true);
 
   operator Kind() const { return kind; };
 };
