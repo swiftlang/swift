@@ -2788,7 +2788,8 @@ bool ConformanceChecker::checkActorIsolation(
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
-                  witness, /*fromExpression=*/false)) {
+                  witness, witness->getDeclContext(),
+                  /*fromExpression=*/false)) {
   case ActorIsolationRestriction::DistributedActorSelf: {
     if (witness->isSynthesized()) {
       // Some of our synthesized properties get special treatment,
