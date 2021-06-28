@@ -85,61 +85,75 @@ OverlapKind
 MutableTerm::checkForOverlap(const MutableTerm &other,
                              MutableTerm &t,
                              MutableTerm &v) const {
-  // If the other term is longer than this term, there's no way
-  // we can overlap.
-  if (other.size() > size())
-    return OverlapKind::None;
+  assert(!empty());
+  assert(!other.empty());
 
-  auto first1 = begin();
-  auto last1 = end();
-  auto first2 = other.begin();
-  auto last2 = other.end();
-
-  // Look for an overlap of the first kind, where the other term is
-  // wholly contained in this term.
-  //
-  // A.B.C.D.E
-  // X.Y.Z
-  //   X.Y.Z
-  //     X.Y.Z
-  while (last1 - first1 >= last2 - first2) {
-    if (std::equal(first2, last2, first1)) {
-      // We have an overlap of the first kind, where
-      // this == TUV and other == U.
-      //
-      // Get the subterms for T and V.
-      t = MutableTerm(begin(), first1);
-      v = MutableTerm(first1 + other.size(), end());
-      return OverlapKind::First;
-    }
-
-    ++first1;
+  if (*this == other) {
+    // If this term is equal to the other term, we have an overlap.
+    t = MutableTerm();
+    v = MutableTerm();
+    return OverlapKind::First;
   }
 
-  // Look for an overlap of the second kind, where a prefix of the
-  // other term is equal to some suffix of this term.
-  //
-  // A.B.C.D.E
-  //       X.Y
-  //         X
-  while (first1 != last1) {
-    --last2;
+  if (size() > other.size()) {
+    // If this term is longer than the other term, check if it contains
+    // the other term.
+    auto first1 = begin();
+    while (first1 <= end() - other.size()) {
+      if (std::equal(other.begin(), other.end(), first1)) {
+        // We have an overlap.
+        t = MutableTerm(begin(), first1);
+        v = MutableTerm(first1 + other.size(), end());
 
-    if (std::equal(first1, last1, first2)) {
-      // We have an overlap of the second kind, where
-      // this == TU and other == UV.
-      //
-      // Get the subterms for T and V.
+        // If both T and V are empty, we have two equal terms, which
+        // should have been handled above.
+        assert(!t.empty() || !v.empty());
+        assert(t.size() + other.size() + v.size() == size());
+
+        return OverlapKind::First;
+      }
+
+      ++first1;
+    }
+  }
+
+  // Finally, check if a suffix of this term is equal to a prefix of
+  // the other term.
+  unsigned count = std::min(size(), other.size());
+  auto first1 = end() - count;
+  auto last2 = other.begin() + count;
+
+  // Initial state, depending on size() <=> other.size():
+  //
+  // ABC   -- count = 3, first1 = this[0], last2 = other[3]
+  // XYZ
+  //
+  // ABC   -- count = 2, first1 = this[1], last2 = other[2]
+  //  XY
+  //
+  // ABC   -- count = 3, first1 = this[0], last2 = other[3]
+  // XYZW
+
+  // Advance by 1, since we don't need to check for full containment
+  ++first1;
+  --last2;
+
+  while (last2 != other.begin()) {
+    if (std::equal(other.begin(), last2, first1)) {
       t = MutableTerm(begin(), first1);
-      assert(!t.empty());
       v = MutableTerm(last2, other.end());
+
+      assert(!t.empty());
+      assert(!v.empty());
+      assert(t.size() + other.size() - v.size() == size());
+
       return OverlapKind::Second;
     }
 
     ++first1;
+    --last2;
   }
 
-  // No overlap found.
   return OverlapKind::None;
 }
 
