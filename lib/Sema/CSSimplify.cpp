@@ -8699,6 +8699,22 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
 
+  // Let's look through all optionals associated with contextual
+  // type to make it possible to infer parameter/result type of
+  // the closure faster e.g.:
+  //
+  // func test(_: ((Int) -> Void)?) {
+  //   ...
+  // }
+  //
+  // test { $0 + ... }
+  //
+  // In this case dropping optionality from contextual type
+  // `((Int) -> Void)?` allows `resolveClosure` to infer type
+  // of `$0` directly (via `getContextualParamAt`) instead of
+  // having to use type variable inference mechanism.
+  contextualType = contextualType->lookThroughAllOptionalTypes();
+
   auto getContextualParamAt =
       [&contextualType, &inferredClosureType](
           unsigned index) -> Optional<AnyFunctionType::Param> {
