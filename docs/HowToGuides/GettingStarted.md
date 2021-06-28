@@ -240,25 +240,26 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    [using both Ninja and Xcode](#using-both-ninja-and-xcode).
 3. Build the toolchain with optimizations, debuginfo, and assertions and run
    the tests.
-   macOS:
-   - Via Ninja:
+   - macOS:
+     - Via Ninja:
+       ```sh
+       utils/build-script --skip-build-benchmarks \
+         --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
+         --sccache --release-debuginfo --swift-disable-dead-stripping --test
+       ```
+     - Via Xcode:
+       ```sh
+       utils/build-script --skip-build-benchmarks \
+         --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
+         --sccache --release-debuginfo --swift-disable-dead-stripping \
+         --xcode
+       ```
+       **Note:** Building `--xcode` together with `--test` is a common source of issues. So to run
+       tests is recommended to use `ninja` because is normally more stable.
+   - Linux (uses Ninja):
      ```sh
-     utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --swift-disable-dead-stripping --test
-     ```
-   - Via Xcode:
-     ```sh
-     utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --swift-disable-dead-stripping \
-       --xcode
-     ```
-     **Note:** Building `--xcode` together with `--test` is a common source of issues. So to run
-     tests is recommended to use `ninja` because is normally more stable. 
-   Linux (uses Ninja):
-     ```sh
-     utils/build-script --release-debuginfo --test --skip-early-swift-driver
+     utils/build-script --release-debuginfo --test --skip-early-swift-driver \
+       --skip-early-swiftsyntax
      ```
    This will create a directory
    `swift-project/build/Ninja-RelWithDebInfoAssert`
