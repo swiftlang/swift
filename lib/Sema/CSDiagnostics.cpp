@@ -5343,8 +5343,17 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     if (FD->getResultTypeRepr() == nullptr &&
         FD->getParameters()->getStartLoc().isValid() &&
         !FD->getBaseIdentifier().empty()) {
-      auto fixItLoc = Lexer::getLocForEndOfToken(
-          getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
+      // Insert the fix-it after the parameter list, and after any
+      // effects specifiers.
+      SourceLoc loc = FD->getParameters()->getEndLoc();
+      if (auto asyncLoc = FD->getAsyncLoc())
+        loc = asyncLoc;
+
+      if (auto throwsLoc = FD->getThrowsLoc())
+        if (throwsLoc.getOpaquePointerValue() > loc.getOpaquePointerValue())
+          loc = throwsLoc;
+
+      auto fixItLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, loc);
       emitDiagnostic(diag::add_return_type_note)
           .fixItInsert(fixItLoc, " -> <#Return Type#>");
     }
