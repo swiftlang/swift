@@ -1262,7 +1262,7 @@ func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where '
 f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
 
 let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
-func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' == 'P2')}}
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' : 'P2')}}
 f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
 
 // SR-12242
