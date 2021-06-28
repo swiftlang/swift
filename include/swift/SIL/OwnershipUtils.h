@@ -263,7 +263,12 @@ struct BorrowingOperand {
   BorrowingOperandKind kind;
 
   BorrowingOperand(Operand *op)
-      : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {}
+      : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {
+    if (kind == BorrowingOperandKind::Branch
+        && op->get().getOwnershipKind() != OwnershipKind::Guaranteed) {
+      kind = BorrowingOperandKind::Invalid;
+    }
+  }
   BorrowingOperand(const BorrowingOperand &other)
       : op(other.op), kind(other.kind) {}
   BorrowingOperand &operator=(const BorrowingOperand &other) {
@@ -288,6 +293,11 @@ struct BorrowingOperand {
     auto kind = BorrowingOperandKind::get(user->getKind());
     if (!kind)
       return {nullptr, kind};
+
+    if (kind == BorrowingOperandKind::Branch
+        && op->get().getOwnershipKind() != OwnershipKind::Guaranteed) {
+      return {nullptr, BorrowingOperandKind::Invalid};
+    }
     return {op, kind};
   }
 

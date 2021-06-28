@@ -314,8 +314,9 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
                        }) == userBlock->end()) {
         continue;
       }
-    } else if (auto borrowingOperand = BorrowingOperand::get(consumingUse)) {
+    } else if (auto borrowingOperand = BorrowingOperand::get(nonConsumingUse)) {
       assert(borrowingOperand.isReborrow());
+      // a reborrow is expected to be consumed by the same phi.
       continue;
     }
 
