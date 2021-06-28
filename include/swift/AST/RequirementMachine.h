@@ -22,6 +22,7 @@ class CanType;
 class GenericSignature;
 class ProtocolDecl;
 class Requirement;
+class Type;
 
 /// Wraps a rewrite system with higher-level operations in terms of
 /// generic signatures and interface types.
@@ -47,6 +48,8 @@ class RequirementMachine final {
 
 public:
   ~RequirementMachine();
+
+  bool requiresClass(Type depType) const;
 };
 
 } // end namespace swift

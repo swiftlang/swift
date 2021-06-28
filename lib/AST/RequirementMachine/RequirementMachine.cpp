@@ -336,3 +336,19 @@ void RequirementMachine::computeCompletion(CanGenericSignature sig) {
 bool RequirementMachine::isComplete() const {
   return Impl->Complete;
 }
+
+bool RequirementMachine::requiresClass(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return false;
+
+  if (equivClass->isConcreteType())
+    return false;
+
+  auto layout = equivClass->getLayoutConstraint();
+  return (layout && layout->isClass());
+}
