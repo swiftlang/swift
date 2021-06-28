@@ -203,6 +203,11 @@ public:
   friend bool operator!=(Atom lhs, Atom rhs) {
     return !(lhs == rhs);
   }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Atom atom) {
+    atom.dump(out);
+    return out;
+  }
 };
 
 /// See the implementation of MutableTerm::checkForOverlap() for a discussion.
@@ -263,6 +268,11 @@ public:
 
   friend bool operator!=(Term lhs, Term rhs) {
     return !(lhs == rhs);
+  }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Term term) {
+    term.dump(out);
+    return out;
   }
 };
 
@@ -357,6 +367,12 @@ public:
                               MutableTerm &v) const;
 
   void dump(llvm::raw_ostream &out) const;
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                       const MutableTerm &term) {
+    term.dump(out);
+    return out;
+  }
 };
 
 /// A global object that can be shared by multiple rewrite systems.
@@ -456,6 +472,12 @@ public:
   }
 
   void dump(llvm::raw_ostream &out) const;
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                       const Rule &rule) {
+    rule.dump(out);
+    return out;
+  }
 };
 
 /// A term rewrite system for working with types in a generic signature.

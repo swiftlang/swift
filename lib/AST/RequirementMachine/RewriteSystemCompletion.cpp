@@ -293,17 +293,12 @@ void RewriteSystem::processMergedAssociatedTypes() {
     // X.[P2:T] => X.[P1&P2:T]
     if (DebugMerge) {
       llvm::dbgs() << "## Associated type merge candidate ";
-      lhs.dump(llvm::dbgs());
-      llvm::dbgs() << " => ";
-      rhs.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      llvm::dbgs() << lhs << " => " << rhs << "\n";
     }
 
     auto mergedAtom = mergeAssociatedTypes(lhs.back(), rhs.back());
     if (DebugMerge) {
-      llvm::dbgs() << "### Merged atom ";
-      mergedAtom.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      llvm::dbgs() << "### Merged atom " << mergedAtom << "\n";
     }
 
     // Build the term X.[P1&P2:T].
@@ -331,9 +326,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
           //
           //   [P2:T].[Q] => [P2:T]
           if (DebugMerge) {
-            llvm::dbgs() << "### Lifting conformance rule ";
-            otherRule.dump(llvm::dbgs());
-            llvm::dbgs() << "\n";
+            llvm::dbgs() << "### Lifting conformance rule " << otherRule << "\n";
           }
 
           // We know that [P1:T] or [P2:T] conforms to Q, therefore the
@@ -462,11 +455,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
     if (DebugCompletion) {
       llvm::dbgs() << "$ Check for overlap: (#" << next.first << ") ";
-      lhs.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      llvm::dbgs() << lhs << "\n";
       llvm::dbgs() << "                -vs- (#" << next.second << ") ";
-      rhs.dump(llvm::dbgs());
-      llvm::dbgs() << ":\n";
+      llvm::dbgs() << rhs << ":\n";
     }
 
     auto pair = computeCriticalPair(lhs, rhs);
@@ -483,13 +474,8 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     std::tie(first, second) = *pair;
 
     if (DebugCompletion) {
-      llvm::dbgs() << "$$ First term of critical pair is ";
-      first.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-
-      llvm::dbgs() << "$$ Second term of critical pair is ";
-      second.dump(llvm::dbgs());
-      llvm::dbgs() << "\n\n";
+      llvm::dbgs() << "$$ First term of critical pair is " << first << "\n";
+      llvm::dbgs() << "$$ Second term of critical pair is " << second << "\n\n";
     }
     unsigned i = Rules.size();
 
@@ -521,9 +507,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       // If this rule reduces some existing rule, delete the existing rule.
       if (rule.canReduceLeftHandSide(newRule)) {
         if (DebugCompletion) {
-          llvm::dbgs() << "$ Deleting rule ";
-          rule.dump(llvm::dbgs());
-          llvm::dbgs() << "\n";
+          llvm::dbgs() << "$ Deleting rule " << rule << " because "
+                       << "its left hand side contains " << newRule
+                       << "\n";
         }
         rule.markDeleted();
       }
