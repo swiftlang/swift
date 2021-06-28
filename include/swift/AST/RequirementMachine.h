@@ -20,6 +20,7 @@ class AssociatedTypeDecl;
 class CanGenericSignature;
 class CanType;
 class GenericSignature;
+class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
 class Type;
@@ -50,6 +51,7 @@ public:
   ~RequirementMachine();
 
   bool requiresClass(Type depType) const;
+  LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
 };
 

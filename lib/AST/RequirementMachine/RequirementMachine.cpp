@@ -353,6 +353,18 @@ bool RequirementMachine::requiresClass(Type depType) const {
   return (layout && layout->isClass());
 }
 
+LayoutConstraint RequirementMachine::getLayoutConstraint(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return LayoutConstraint();
+
+  return equivClass->getLayoutConstraint();
+}
+
 bool RequirementMachine::requiresProtocol(Type depType,
                                           const ProtocolDecl *proto) const {
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
