@@ -13,6 +13,10 @@
 #ifndef SWIFT_REQUIREMENTMACHINE_H
 #define SWIFT_REQUIREMENTMACHINE_H
 
+namespace llvm {
+class raw_ostream;
+}
+
 namespace swift {
 
 class ASTContext;
@@ -53,6 +57,8 @@ public:
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
+
+  void dump(llvm::raw_ostream &out) const;
 };
 
 } // end namespace swift

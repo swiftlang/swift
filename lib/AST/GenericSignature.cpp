@@ -316,6 +316,7 @@ bool GenericSignatureImpl::requiresClass(Type type) const {
       llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
       llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
       llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      getRequirementMachine()->dump(llvm::errs());
       abort();
     }
 #endif
@@ -417,6 +418,7 @@ bool GenericSignatureImpl::requiresProtocol(Type type,
       llvm::errs() << "\n";
       llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
       llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      getRequirementMachine()->dump(llvm::errs());
       abort();
     }
 #endif
@@ -482,6 +484,7 @@ LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) const {
       llvm::errs() << "\n";
       llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
       llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      getRequirementMachine()->dump(llvm::errs());
       abort();
     }
 #endif
