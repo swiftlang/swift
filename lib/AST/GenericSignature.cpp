@@ -22,6 +22,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/RequirementMachine.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/STLExtras.h"
 #include <functional>
@@ -163,6 +164,17 @@ GenericSignatureImpl::getGenericSignatureBuilder() const {
 
   // generic signature builders are stored on the ASTContext.
   return getASTContext().getOrCreateGenericSignatureBuilder(
+                                             CanGenericSignature(this));
+}
+
+RequirementMachine *
+GenericSignatureImpl::getRequirementMachine() const {
+  // The requirement machine is associated with the canonical signature.
+  if (!isCanonical())
+    return getCanonicalSignature()->getRequirementMachine();
+
+  // Requirement machines are stored on the ASTContext.
+  return getASTContext().getOrCreateRequirementMachine(
                                              CanGenericSignature(this));
 }
 
