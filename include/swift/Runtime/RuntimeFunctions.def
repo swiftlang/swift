@@ -600,7 +600,7 @@ FUNCTION(GetFunctionMetadataDifferentiable,
 //                                          const Metadata *globalActor);
 FUNCTION(GetFunctionMetadataGlobalActor,
          swift_getFunctionTypeMetadataGlobalActor,
-         C_CC, AlwaysAvailable,
+         C_CC, ConcurrencyAvailability,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy,
               SizeTy,
