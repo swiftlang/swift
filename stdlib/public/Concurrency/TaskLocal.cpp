@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "../runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/ThreadLocal.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
@@ -59,8 +59,8 @@ template <class T> struct Pointer {
 /// THIS IS RUNTIME INTERNAL AND NOT ABI.
 class FallbackTaskLocalStorage {
   static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-      Pointer<TaskLocal::Storage>,
-      Value);
+      Pointer<TaskLocal::Storage>, Value,
+      SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY);
 
 public:
   static void set(TaskLocal::Storage *task) { Value.set(task); }
@@ -69,8 +69,8 @@ public:
 
 /// Define the thread-locals.
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
-    Pointer<TaskLocal::Storage>,
-    FallbackTaskLocalStorage::Value);
+    Pointer<TaskLocal::Storage>, FallbackTaskLocalStorage::Value,
+    SWIFT_CONCURRENCY_FALLBACK_TASK_LOCAL_STORAGE_KEY);
 
 // ==== ABI --------------------------------------------------------------------
 

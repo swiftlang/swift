@@ -24,11 +24,11 @@
 
 #include "swift/Runtime/Exclusivity.h"
 #include "../SwiftShims/Visibility.h"
-#include "ThreadLocalStorage.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 #include <memory>
 #include <inttypes.h>
 #include <stdio.h>
