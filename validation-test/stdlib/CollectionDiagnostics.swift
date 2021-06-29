@@ -154,6 +154,23 @@ struct CollectionWithNonDefaultSubSequence: Collection {
   public subscript(position: Int) -> Int { position }
 }
 
+struct MutableCollectionWithNonDefaultSubSequence: MutableCollection {
+  public var startIndex: Int
+  public var endIndex: Int
+
+  public typealias SubSequence = Self
+
+  public func index(after i: Int) -> Int { i+1 }
+  public subscript(position: Int) -> Int {
+    get { position }
+    set { _ = newValue }
+  }
+
+  public subscript(bounds: Range<Index>) -> Self {
+    Self(startIndex: bounds.startIndex, endIndex: bounds.endIndex)
+  }
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: possibly intended match
 // <unknown>:0: error: unexpected note produced: possibly intended match
