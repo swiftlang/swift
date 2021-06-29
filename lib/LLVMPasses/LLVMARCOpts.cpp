@@ -312,8 +312,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
 
     case RT_UnknownObjectRetain:
     case RT_BridgeRetain:
-    case RT_ObjCRetain:
-    case RT_Retain: {  // swift_retain(obj)
+    case RT_ObjCRetain: {
       CallInst &Retain = cast<CallInst>(*BBI);
       Value *RetainedObject = Retain.getArgOperand(0);
       RetainedObject = RC->getSwiftRCIdentityRoot(RetainedObject);
@@ -369,6 +368,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
 
     case RT_FixLifetime:
     case RT_EndBorrow:
+    case RT_Retain:
     case RT_RetainUnowned:
     case RT_CheckUnowned:
     case RT_Unknown:
