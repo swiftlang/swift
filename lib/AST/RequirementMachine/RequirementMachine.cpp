@@ -401,3 +401,16 @@ bool RequirementMachine::isConcreteType(Type depType) const {
 
   return equivClass->isConcreteType();
 }
+
+bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
+                                                       Type depType2) const {
+  auto term1 = Impl->Context.getMutableTermForType(depType1->getCanonicalType(),
+                                                   /*proto=*/nullptr);
+  Impl->System.simplify(term1);
+
+  auto term2 = Impl->Context.getMutableTermForType(depType2->getCanonicalType(),
+                                                   /*proto=*/nullptr);
+  Impl->System.simplify(term2);
+
+  return (term1 == term2);
+}

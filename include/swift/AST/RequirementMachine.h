@@ -54,10 +54,12 @@ class RequirementMachine final {
 public:
   ~RequirementMachine();
 
+  // Generic signature queries
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
   bool isConcreteType(Type depType) const;
+  bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
 
   void dump(llvm::raw_ostream &out) const;
 };
