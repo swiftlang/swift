@@ -57,6 +57,7 @@ public:
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
+  bool isConcreteType(Type depType) const;
 
   void dump(llvm::raw_ostream &out) const;
 };
