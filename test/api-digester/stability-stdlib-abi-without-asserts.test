@@ -70,5 +70,6 @@ Protocol CodingKey has added inherited protocol Sendable
 Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible, Self : Swift.Sendable>
 Protocol Error has added inherited protocol Sendable
 Protocol Error has generic signature change from to <Self : Swift.Sendable>
+Enum Never has added a conformance to an existing protocol Identifiable
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
