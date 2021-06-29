@@ -1414,9 +1414,11 @@ NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
   auto remoteFuncId = C.getIdentifier("_remote_" + localFuncName);
 
   auto remoteFuncDecls = selfTyDecl->lookupDirect(DeclName(remoteFuncId));
+
   if (remoteFuncDecls.empty())
     return nullptr;
 
+  assert(remoteFuncDecls.size() > 1 && "at-most one _remote distributed function expected, found more.");
   if (auto remoteDecl = dyn_cast<AbstractFunctionDecl>(remoteFuncDecls.front())) {
     // TODO: implement more checks here, it has to be the exact right signature.
     return remoteDecl;
