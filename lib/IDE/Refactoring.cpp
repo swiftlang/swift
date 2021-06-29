@@ -4536,7 +4536,8 @@ struct CallbackCondition {
 
   /// A bool condition expression.
   explicit CallbackCondition(const Expr *E) {
-    if (!E->getType()->isBool())
+    // FIXME: Sema should produce ErrorType.
+    if (!E->getType() || !E->getType()->isBool())
       return;
 
     auto CondType = ConditionType::IS_TRUE;
