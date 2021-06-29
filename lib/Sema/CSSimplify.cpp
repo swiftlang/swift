@@ -5894,7 +5894,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             //
             // Do some light verification before recording restriction to
             // avoid allocating constraints for obviously invalid cases.
-            if (type1IsPointer && !type1IsOptional && !type2IsOptional &&
+            if (type1IsPointer && optionalityMatches &&
                 isArgumentOfImportedDecl(locator)) {
               // UnsafeRawPointer -> UnsafePointer<[U]Int8>
               if (type1PointerKind == PTK_UnsafeRawPointer &&
@@ -11157,8 +11157,12 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
     PointerTypeKind swiftPtrKind, cPtrKind;
 
-    auto swiftPtr = type1->getAnyPointerElementType(swiftPtrKind);
-    auto cPtr = type2->getAnyPointerElementType(cPtrKind);
+    auto swiftPtr =
+        type1->lookThroughAllOptionalTypes()->getAnyPointerElementType(
+            swiftPtrKind);
+
+    auto cPtr = type2->lookThroughAllOptionalTypes()->getAnyPointerElementType(
+        cPtrKind);
 
     // Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int8>
     if (swiftPtrKind == PTK_UnsafeRawPointer ||
