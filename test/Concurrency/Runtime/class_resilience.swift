@@ -16,7 +16,6 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // XFAIL: windows
-// XFAIL: linux
 // XFAIL: openbsd
 
 import StdlibUnittest
