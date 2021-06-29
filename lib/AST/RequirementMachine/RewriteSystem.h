@@ -73,6 +73,17 @@ class Atom final {
 public:
   enum class Kind : uint8_t {
     //////
+    ////// Special atom kind that is both type-like and property-like:
+    //////
+
+    /// When appearing at the start of a term, denotes a nested
+    /// type of a protocol 'Self' type.
+    ///
+    /// When appearing at the end of a term, denotes that the
+    /// term's type conforms to the protocol.
+    Protocol,
+
+    //////
     ////// "Type-like" atom kinds:
     //////
 
@@ -92,13 +103,6 @@ public:
     //////
     ////// "Fact-like" atom kinds:
     //////
-
-    /// When appearing at the start of a term, denotes a nested
-    /// type of a protocol 'Self' type.
-    ///
-    /// When appearing at the end of a term, denotes that the
-    /// term's type conforms to the protocol.
-    Protocol,
 
     /// When appearing at the end of a term, denotes that the
     /// term's type satisfies the layout constraint.

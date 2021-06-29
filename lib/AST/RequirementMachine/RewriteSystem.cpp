@@ -393,9 +393,15 @@ Atom Atom::forConcreteType(CanType type, ArrayRef<Term> substitutions,
 
 /// Linear order on atoms.
 ///
-/// First, we order different kinds as follows:
+/// First, we order different kinds as follows, from smallest to largest:
 ///
-///   AssociatedType < GenericParam < Name < Protocol < Layout
+/// - Protocol
+/// - AssociatedType
+/// - GenericParam
+/// - Name
+/// - Layout
+/// - Superclass
+/// - ConcreteType
 ///
 /// Then we break ties when both atoms have the same kind as follows:
 ///
