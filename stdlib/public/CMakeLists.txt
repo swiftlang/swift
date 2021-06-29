@@ -19,7 +19,7 @@ endif()
 list(APPEND  SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
 
 if(SWIFT_STDLIB_SIL_DEBUGGING)
-  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-gsil")
+  list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-sil-based-debuginfo")
 endif()
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables

@@ -645,9 +645,11 @@ def print_inst_counts : Flag<["-"], "print-inst-counts">,
   HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
            "in conjunction with -print-stats.">;
 
-def debug_on_sil : Flag<["-"], "gsil">,
+def debug_on_sil : Flag<["-"], "sil-based-debuginfo">,
   HelpText<"Write the SIL into a file and generate debug-info to debug on SIL "
            " level.">;
+def legacy_gsil : Flag<["-"], "gsil">,
+  HelpText<"Deprecated, use '-sil-based-debuginfo' instead">;
 
 def print_llvm_inline_tree : Flag<["-"], "print-llvm-inline-tree">,
   HelpText<"Print the LLVM inline tree.">;
