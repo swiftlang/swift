@@ -390,6 +390,29 @@ bool RequirementMachine::requiresProtocol(Type depType,
   return false;
 }
 
+GenericSignature::RequiredProtocols
+RequirementMachine::getRequiredProtocols(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return { };
+
+  if (equivClass->isConcreteType())
+    return { };
+
+  GenericSignature::RequiredProtocols result;
+  for (auto *otherProto : equivClass->getConformsTo()) {
+    result.push_back(const_cast<ProtocolDecl *>(otherProto));
+  }
+
+  ProtocolType::canonicalizeProtocols(result);
+
+  return result;
+}
+
 bool RequirementMachine::isConcreteType(Type depType) const {
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
                                                   /*proto=*/nullptr);

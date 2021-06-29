@@ -353,26 +353,62 @@ GenericSignature::RequiredProtocols
 GenericSignatureImpl::getRequiredProtocols(Type type) const {
   assert(type->isTypeParameter() && "Expected a type parameter");
 
-  auto &builder = *getGenericSignatureBuilder();
-  auto equivClass =
-    builder.resolveEquivalenceClass(
-                                  type,
-                                  ArchetypeResolutionKind::CompleteWellFormed);
-  if (!equivClass) return { };
+  auto computeViaGSB = [&]() -> GenericSignature::RequiredProtocols {
+    auto &builder = *getGenericSignatureBuilder();
+    auto equivClass =
+      builder.resolveEquivalenceClass(
+                                    type,
+                                    ArchetypeResolutionKind::CompleteWellFormed);
+    if (!equivClass) return { };
 
-  // If this type parameter was mapped to a concrete type, then there
-  // are no requirements.
-  if (equivClass->concreteType) return { };
+    // If this type parameter was mapped to a concrete type, then there
+    // are no requirements.
+    if (equivClass->concreteType) return { };
 
-  // Retrieve the protocols to which this type conforms.
-  GenericSignature::RequiredProtocols result;
-  for (const auto &conforms : equivClass->conformsTo)
-    result.push_back(conforms.first);
+    // Retrieve the protocols to which this type conforms.
+    GenericSignature::RequiredProtocols result;
+    for (const auto &conforms : equivClass->conformsTo)
+      result.push_back(conforms.first);
 
-  // Canonicalize the resulting set of protocols.
-  ProtocolType::canonicalizeProtocols(result);
+    // Canonicalize the resulting set of protocols.
+    ProtocolType::canonicalizeProtocols(result);
 
-  return result;
+    return result;
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->getRequiredProtocols(type);
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    if (gsbResult != rqmResult) {
+      llvm::errs() << "RequirementMachine::getRequiredProtocols() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "GenericSignatureBuilder says: ";
+      for (auto *otherProto : gsbResult)
+        llvm::errs() << " " << otherProto->getName();
+      llvm::errs() << "\n";
+      llvm::errs() << "RequirementMachine says: ";
+      for (auto *otherProto : rqmResult)
+        llvm::errs() << " " << otherProto->getName();
+      llvm::errs() << "\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 bool GenericSignatureImpl::requiresProtocol(Type type,

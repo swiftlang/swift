@@ -13,6 +13,8 @@
 #ifndef SWIFT_REQUIREMENTMACHINE_H
 #define SWIFT_REQUIREMENTMACHINE_H
 
+#include "swift/AST/GenericSignature.h"
+
 namespace llvm {
 class raw_ostream;
 }
@@ -21,9 +23,7 @@ namespace swift {
 
 class ASTContext;
 class AssociatedTypeDecl;
-class CanGenericSignature;
 class CanType;
-class GenericSignature;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
@@ -58,6 +58,7 @@ public:
   bool requiresClass(Type depType) const;
   LayoutConstraint getLayoutConstraint(Type depType) const;
   bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
+  GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
   bool isConcreteType(Type depType) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
 
