@@ -13,7 +13,10 @@
 import abc
 import os
 
+from build_swift.build_swift.wrappers import xcrun
+
 from .. import cmake
+from .. import shell
 from .. import targets
 
 
@@ -204,14 +207,15 @@ class Product(object):
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
 
+    def is_darwin_host(self, host_target):
+        return host_target.startswith("macosx") or \
+            host_target.startswith("iphone") or \
+            host_target.startswith("appletv") or \
+            host_target.startswith("watch")
+
     def should_include_host_in_lipo(self, host_target):
-        if self.args.cross_compile_hosts:
-            if host_target.startswith("macosx") or \
-               host_target.startswith("iphone") or \
-               host_target.startswith("appletv") or \
-               host_target.startswith("watch"):
-                return True
-        return False
+        return self.args.cross_compile_hosts and \
+            self.is_darwin_host(host_target)
 
     def host_install_destdir(self, host_target):
         if self.args.cross_compile_hosts:
@@ -233,38 +237,62 @@ class Product(object):
         return self.args.cross_compile_hosts and \
             host_target in self.args.cross_compile_hosts
 
-    # TODO: Remove once we've moved over to cmake toolchains
-    def common_cross_c_flags(self, platform, arch):
-        cross_flags = []
+    def generate_darwin_toolchain_file(self, platform, arch):
+        shell.makedirs(self.build_dir)
+        toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
 
+        cmake_osx_sysroot = xcrun.sdk_path(platform)
+
+        target = None
         if platform == 'macosx':
             target = '{}-apple-macosx{}'.format(
                 arch, self.args.darwin_deployment_version_osx)
-            cross_flags.extend(['-arch', arch, '-target', target])
         elif platform == 'iphonesimulator':
             target = '{}-apple-ios{}'.format(
                 arch, self.args.darwin_deployment_version_ios)
-            cross_flags.extend(['-arch', arch, '-target', target])
         elif platform == 'iphoneos':
             target = '{}-apple-ios{}'.format(
                 arch, self.args.darwin_deployment_version_ios)
-            cross_flags.extend(['-arch', arch, '-target', target])
         elif platform == 'appletvsimulator':
             target = '{}-apple-tvos{}'.format(
                 arch, self.args.darwin_deployment_version_tvos)
-            cross_flags.extend(['-arch', arch, '-target', target])
         elif platform == 'appletvos':
             target = '{}-apple-tvos{}'.format(
                 arch, self.args.darwin_deployment_version_tvos)
-            cross_flags.extend(['-arch', arch, '-target', target])
         elif platform == 'watchsimulator':
             target = '{}-apple-watchos{}'.format(
                 arch, self.args.darwin_deployment_version_watchos)
-            cross_flags.extend(['-arch', arch, '-target', target])
         elif platform == 'watchos':
             target = '{}-apple-watchos{}'.format(
                 arch, self.args.darwin_deployment_version_watchos)
-            cross_flags.extend(['-arch', arch, '-target', target])
+        else:
+            raise RuntimeError("Unhandled platform?!")
+
+        toolchain_args = {}
+
+        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Darwin'
+        toolchain_args['CMAKE_OSX_SYSROOT'] = cmake_osx_sysroot
+        toolchain_args['CMAKE_OSX_ARCHITECTURES'] = arch
+
+        if self.toolchain.cc.endswith('clang'):
+            toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
+        if self.toolchain.cxx.endswith('clang++'):
+            toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
+        # Swift always supports cross compiling.
+        toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
+
+        # Sort by the key so that we always produce the same toolchain file
+        data = sorted(toolchain_args.items(), key=lambda x: x[0])
+        if not self.args.dry_run:
+            with open(toolchain_file, 'w') as f:
+                f.writelines("set({} {})\n".format(k, v) for k, v in data)
+        else:
+            print("DRY_RUN! Writing Toolchain file to path: {}".format(toolchain_file))
+
+        return toolchain_file
+
+    def common_cross_c_flags(self, platform, arch):
+        cross_flags = []
 
         if self.is_release():
             cross_flags.append('-fno-stack-protector')

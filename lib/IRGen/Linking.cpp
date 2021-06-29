@@ -758,7 +758,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
-        .getLinkage(ForDefinition);
+        .getLinkage(forDefinition);
   case Kind::KnownAsyncFunctionPointer:
     return SILLinkage::PublicExternal;
   case Kind::PartialApplyForwarder:
