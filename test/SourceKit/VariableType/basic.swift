@@ -19,6 +19,8 @@ func foo() {
   var local = 5
 }
 
+let `else` = 3
+
 // RUN: %sourcekitd-test -req=collect-var-type %s -- %s | %FileCheck %s
 // CHECK: (1:5, 1:6): Int (explicit type: 1)
 // CHECK: (2:5, 2:6): String (explicit type: 0)
@@ -30,3 +32,4 @@ func foo() {
 // CHECK: (14:7, 14:8): [Int : Int] (explicit type: 1)
 // CHECK: (15:7, 15:8): (Int) -> Int (explicit type: 1)
 // CHECK: (19:7, 19:12): Int (explicit type: 0)
+// CHECK: (22:5, 22:11): Int (explicit type: 0)
