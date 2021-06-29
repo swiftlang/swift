@@ -698,7 +698,7 @@ SWIFT_CC(swiftasync) static void workaround_function_swift_task_future_waitImpl(
 #endif
 
 SWIFT_CC(swiftasync)
-static void swift_task_future_waitImpl(
+static void swift_task_future_wait_with_optionsImpl(
   OpaqueValue *result,
   SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
   AsyncTask *task,
@@ -739,6 +739,21 @@ static void swift_task_future_waitImpl(
   }
 }
 
+SWIFT_CC(swiftasync)
+static void swift_task_future_waitImpl(
+    OpaqueValue *result,
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    AsyncTask *task,
+    TaskContinuationFunction *resumeFn,
+    AsyncContext *callContext) {
+  swift_task_future_wait_with_optionsImpl(
+      result,
+      callerContext,
+      task,
+      /*options=*/nullptr,
+      resumeFn, callContext);
+}
+
 #ifdef __ARM_ARCH_7K__
 __attribute__((noinline))
 SWIFT_CC(swiftasync) static void workaround_function_swift_task_future_wait_throwingImpl(
@@ -756,7 +771,7 @@ SWIFT_CC(swiftasync) static void workaround_function_swift_task_future_wait_thro
 #endif
 
 SWIFT_CC(swiftasync)
-void swift_task_future_wait_throwingImpl(
+void swift_task_future_wait_throwing_with_optionsImpl(
     OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     AsyncTask *task,
     TaskOptionRecord *taskOptions,
@@ -798,6 +813,19 @@ void swift_task_future_wait_throwingImpl(
     return resumeFunction(callerContext, error);
   }
   }
+}
+
+SWIFT_CC(swiftasync)
+void swift_task_future_wait_throwingImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    AsyncTask *task,
+    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    AsyncContext *callContext) {
+  swift_task_future_wait_throwing_with_optionsImpl(
+      result, callerContext,
+      task,
+      /*options=*/nullptr,
+      resumeFunction, callContext);
 }
 
 namespace {

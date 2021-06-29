@@ -96,14 +96,31 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 
-/// Wait for a non-throwing future task to complete.
+/// Wait for a non-throwing future task to complete, passing options.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_future_wait_with_options(
+///   on task: _owned Builtin.NativeObject,
+///   options: Builtin.RawPointer?
+/// ) async -> Success
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_task_future_wait_with_options(
+         OpaqueValue *,
+         SWIFT_ASYNC_CONTEXT AsyncContext *,
+         AsyncTask *,
+         TaskOptionRecord *,
+         TaskContinuationFunction *, AsyncContext *);
+
+/// Wait for a non-throwing future task to complete, passing task options.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
 /// func swift_task_future_wait(
-///   on task: _owned Builtin.NativeObject,
-///   options: Builtin.RawPointer?
+///   on task: _owned Builtin.NativeObject
 /// ) async -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
@@ -111,27 +128,45 @@ void swift_task_future_wait(
          OpaqueValue *,
          SWIFT_ASYNC_CONTEXT AsyncContext *,
          AsyncTask *,
-         TaskOptionRecord *,
          TaskContinuationFunction *, AsyncContext *);
+
+/// Wait for a potentially-throwing future task to complete, passing options.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_future_wait_throwing_with_options(
+///   on task: _owned Builtin.NativeObject,
+///   options: Builtin.RawPointer?
+/// ) async throws -> Success,
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_task_future_wait_throwing_with_options(
+  OpaqueValue *,
+  SWIFT_ASYNC_CONTEXT AsyncContext *,
+  AsyncTask *,
+  TaskOptionRecord *,
+  ThrowingTaskFutureWaitContinuationFunction *,
+  AsyncContext *);
 
 /// Wait for a potentially-throwing future task to complete.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_future_wait_throwing(on task: _owned Builtin.NativeObject)
-///    async throws -> Success
+/// func swift_task_future_wait_throwing(
+///   on task: _owned Builtin.NativeObject
+///  ) async throws -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_future_wait_throwing(
   OpaqueValue *,
   SWIFT_ASYNC_CONTEXT AsyncContext *,
   AsyncTask *,
-  TaskOptionRecord *,
   ThrowingTaskFutureWaitContinuationFunction *,
-        AsyncContext *);
+  AsyncContext *);
 
-/// Wait for a readyQueue of a Channel to become non empty.
+/// Wait for a readyQueue of a Channel to become non empty, with task options.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
@@ -139,7 +174,27 @@ void swift_task_future_wait_throwing(
 /// func swift_taskGroup_wait_next_throwing(
 ///     waitingTask: Builtin.NativeObject, // current task
 ///     group: Builtin.RawPointer,
-///     options: Builtin.RawPointer? // options
+///     options: Builtin.RawPointer?
+/// ) async -> T
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swiftasync)
+void swift_taskGroup_wait_next_throwing_with_options(
+    OpaqueValue *resultPointer,
+    SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    TaskGroup *group,
+    TaskOptionRecord *options,
+    ThrowingTaskFutureWaitContinuationFunction *resumeFn,
+    AsyncContext *callContext);
+
+/// Wait for a readyQueue of a Channel to become non empty.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_wait_next_throwing(
+///   waitingTask: Builtin.NativeObject, // current task
+///   group: Builtin.RawPointer
 /// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -148,7 +203,6 @@ void swift_taskGroup_wait_next_throwing(
     OpaqueValue *resultPointer,
     SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
     TaskGroup *group,
-    TaskOptionRecord *options,
     ThrowingTaskFutureWaitContinuationFunction *resumeFn,
     AsyncContext *callContext);
 
@@ -278,11 +332,27 @@ using AsyncLetWaitSignature =
 /// ) async -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_wait(
+void swift_asyncLet_wait_with_options(
     OpaqueValue *,
     SWIFT_ASYNC_CONTEXT AsyncContext *,
     AsyncLet *,
     TaskOptionRecord *,
+    TaskContinuationFunction *, AsyncContext *);
+
+/// Wait for a non-throwing async-let to complete.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_asyncLet_wait(
+///     _ asyncLet: _owned Builtin.RawPointer
+/// ) async -> Success
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_asyncLet_wait(
+    OpaqueValue *,
+    SWIFT_ASYNC_CONTEXT AsyncContext *,
+    AsyncLet *,
     TaskContinuationFunction *, AsyncContext *);
 
 /// Wait for a potentially-throwing async-let to complete.
@@ -296,11 +366,27 @@ void swift_asyncLet_wait(
 /// ) async throws -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_wait_throwing(
+void swift_asyncLet_wait_throwing_with_options(
     OpaqueValue *,
     SWIFT_ASYNC_CONTEXT AsyncContext *,
     AsyncLet *,
     TaskOptionRecord *,
+    ThrowingTaskFutureWaitContinuationFunction *, AsyncContext *);
+
+/// Wait for a potentially-throwing async-let to complete.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_asyncLet_wait_throwing(
+///     _ asyncLet: _owned Builtin.RawPointer
+/// ) async throws -> Success
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_asyncLet_wait_throwing(
+    OpaqueValue *,
+    SWIFT_ASYNC_CONTEXT AsyncContext *,
+    AsyncLet *,
     ThrowingTaskFutureWaitContinuationFunction *, AsyncContext *);
 
 /// Its Swift signature is
@@ -312,7 +398,17 @@ void swift_asyncLet_wait_throwing(
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_asyncLet_end(AsyncLet *, TaskOptionRecord *);
+void swift_asyncLet_end_with_options(AsyncLet *, TaskOptionRecord *);
+
+/// Its Swift signature is
+///
+/// \code
+/// func swift_asyncLet_end(
+///     _ alet: Builtin.RawPointer
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_asyncLet_end(AsyncLet *);
 
 /// Returns true if the currently executing AsyncTask has a
 /// 'TaskGroupTaskStatusRecord' present.

@@ -26,7 +26,7 @@ public func _asyncLetStart<T>(
 
 /// Similar to _taskFutureGet but for AsyncLet
 @available(SwiftStdlib 5.5, *)
-@_silgen_name("swift_asyncLet_wait")
+@_silgen_name("swift_asyncLet_wait_with_options")
 public func _asyncLetGet<T>(
   asyncLet: Builtin.RawPointer,
   options:  Builtin.RawPointer?
@@ -34,19 +34,18 @@ public func _asyncLetGet<T>(
 
 ///// Similar to _taskFutureGetThrowing but for AsyncLet
 @available(SwiftStdlib 5.5, *)
-@_silgen_name("swift_asyncLet_wait_throwing")
+@_silgen_name("swift_asyncLet_wait_throwing_with_options")
 public func _asyncLetGetThrowing<T>(
   asyncLet: Builtin.RawPointer,
   options:  Builtin.RawPointer?
 ) async throws -> T
 
 @available(SwiftStdlib 5.5, *)
-@_silgen_name("swift_asyncLet_end")
+@_silgen_name("swift_asyncLet_end_with_options")
 public func _asyncLetEnd(
   asyncLet: Builtin.RawPointer, // TODO: should this take __owned?
   options:  Builtin.RawPointer?
 )
-
 
 @_silgen_name("swift_asyncLet_extractTask")
 func _asyncLetExtractTask(
