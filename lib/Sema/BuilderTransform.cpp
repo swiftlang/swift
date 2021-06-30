@@ -1906,13 +1906,6 @@ public:
 
 ResultBuilderBodyPreCheck PreCheckResultBuilderRequest::evaluate(
     Evaluator &evaluator, PreCheckResultBuilderDescriptor owner) const {
-  // We don't want to do the precheck if it will already have happened in
-  // the enclosing expression.
-  bool skipPrecheck = false;
-  if (auto closure = dyn_cast_or_null<ClosureExpr>(
-          owner.Fn.getAbstractClosureExpr()))
-    skipPrecheck = shouldTypeCheckInEnclosingExpression(closure);
-
   return PreCheckResultBuilderApplication(
              owner.Fn, /*skipPrecheck=*/false,
              /*suppressDiagnostics=*/owner.SuppressDiagnostics)
