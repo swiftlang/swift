@@ -194,8 +194,9 @@ Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
               Protos.inheritsFrom(thisProto, newProto));
     };
 
-    if (std::find_if(protos.begin(), protos.end(), inheritsFrom)
-        == protos.end()) {
+    if (std::find_if(minimalProtos.begin(), minimalProtos.end(),
+                     inheritsFrom)
+        == minimalProtos.end()) {
       minimalProtos.push_back(newProto);
     }
   }
