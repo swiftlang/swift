@@ -895,12 +895,6 @@ void RewriteSystem::initialize(
     ProtocolGraph &&graph) {
   Protos = graph;
 
-  // FIXME: Probably this sort is not necessary
-  std::sort(rules.begin(), rules.end(),
-            [&](std::pair<MutableTerm, MutableTerm> lhs,
-                std::pair<MutableTerm, MutableTerm> rhs) -> int {
-              return lhs.first.compare(rhs.first, graph) < 0;
-            });
   for (const auto &rule : rules)
     addRule(rule.first, rule.second);
 }
