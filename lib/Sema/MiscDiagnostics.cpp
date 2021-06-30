@@ -1509,31 +1509,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
             Closures.push_back(ACE);
         }
 
-    static bool isEnclosingSelfReference(VarDecl *var,
-                                   const AbstractClosureExpr *inClosure) {
-      if (var->isSelfParameter())
-        return true;
-
-      // Capture variables have a DC of the parent function.
-      if (inClosure && var->isSelfParamCapture() &&
-          var->getDeclContext() != inClosure->getParent())
-        return true;
-
-      return false;
-    }
-
     /// Return true if this is an implicit reference to self which is required
     /// to be explicit in an escaping closure. Metatype references and value
     /// type references are excluded.
-    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E,
-                                   const AbstractClosureExpr *inClosure) {
+    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
 
-      if (!DRE || !DRE->isImplicit())
-        return false;
-
-      auto var = dyn_cast<VarDecl>(DRE->getDecl());
-      if (!var || !isEnclosingSelfReference(var, inClosure))
+      if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()) ||
+          !cast<VarDecl>(DRE->getDecl())->isSelfParameter())
         return false;
 
       // Defensive check for type. If the expression doesn't have type here, it
@@ -1616,7 +1599,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       
       SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase(), ACE)) {
+        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase())) {
           auto baseName = MRE->getMember().getDecl()->getBaseName();
           memberLoc = MRE->getLoc();
           Diags.diagnose(memberLoc,
@@ -1626,7 +1609,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase(), ACE) &&
+        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           memberLoc = DSCE->getLoc();
@@ -1641,7 +1624,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       }
       
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
+      if (isImplicitSelfParamUseLikelyToCauseCycle(E))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
 
       return { true, E };
