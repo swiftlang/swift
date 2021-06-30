@@ -224,9 +224,11 @@ FRONTEND_STATISTIC(Sema, NumAccessorBodiesSynthesized)
 /// amount of work the requirement machine does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumRequirementMachines)
 
-/// Number of requirement machines constructed. Rough proxy for
-/// amount of work the requirement machine does analyzing type signatures.
+/// Number of new rules added by Knuth-Bendix completion procedure.
 FRONTEND_STATISTIC(Sema, NumRequirementMachineCompletionSteps)
+
+/// Number of new rules added by concrete term unification.
+FRONTEND_STATISTIC(Sema, NumRequirementMachineUnifiedConcreteTerms)
 
 /// Number of generic signature builders constructed. Rough proxy for
 /// amount of work the GSB does analyzing type signatures.

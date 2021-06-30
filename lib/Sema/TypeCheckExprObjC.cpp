@@ -204,6 +204,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::Identity:
+    case KeyPathExpr::Component::Kind::CodeCompletion:
       continue;
 
     case KeyPathExpr::Component::Kind::UnresolvedProperty:

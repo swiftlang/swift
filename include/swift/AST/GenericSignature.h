@@ -33,6 +33,7 @@ namespace swift {
 class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
+class RequirementMachine;
 class SubstitutionMap;
 class GenericEnvironment;
 
@@ -302,6 +303,9 @@ public:
 
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder() const;
+
+  /// Retrieve the requirement machine for the given generic signature.
+  RequirementMachine *getRequirementMachine() const;
 
   /// Returns the generic environment that provides fresh contextual types
   /// (archetypes) that correspond to the interface types in this generic

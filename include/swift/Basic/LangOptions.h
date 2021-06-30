@@ -453,7 +453,7 @@ namespace swift {
 
     /// Maximum iteration count for requirement machine confluent completion
     /// algorithm.
-    unsigned RequirementMachineStepLimit = 1000;
+    unsigned RequirementMachineStepLimit = 2000;
 
     /// Maximum term length for requirement machine confluent completion
     /// algorithm.

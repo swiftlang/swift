@@ -20,6 +20,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include <vector>
 
+#include "EquivalenceClassMap.h"
 #include "ProtocolGraph.h"
 #include "RewriteSystem.h"
 
@@ -64,6 +65,8 @@ CanType
 RewriteSystemBuilder::getConcreteSubstitutionSchema(CanType concreteType,
                                                     const ProtocolDecl *proto,
                                                     SmallVectorImpl<Term> &result) {
+  assert(!concreteType->isTypeParameter() && "Must have a concrete type here");
+
   if (!concreteType->hasTypeParameter())
     return concreteType;
 
@@ -85,6 +88,7 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   Protocols.visitRequirements(sig->getRequirements());
   Protocols.computeTransitiveClosure();
   Protocols.computeLinearOrder();
+  Protocols.computeInheritedProtocols();
   Protocols.computeInheritedAssociatedTypes();
 
   // Add rewrite rules for each protocol.
@@ -186,7 +190,7 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
   case RequirementKind::Layout: {
     // A layout requirement T : L becomes a rewrite rule
     //
-    //   T.[L] == T
+    //   T.[layout: L] == T
     constraintTerm = subjectTerm;
     constraintTerm.add(Atom::forLayout(req.getLayoutConstraint(),
                                        Context));
@@ -224,10 +228,13 @@ void RewriteSystemBuilder::addRequirement(const Requirement &req,
 struct RequirementMachine::Implementation {
   RewriteContext Context;
   RewriteSystem System;
+  EquivalenceClassMap Map;
   bool Complete = false;
 
   explicit Implementation(ASTContext &ctx)
-      : Context(ctx), System(Context) {}
+      : Context(ctx),
+        System(Context),
+        Map(Context, System.getProtocols()) {}
 };
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
@@ -263,45 +270,170 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   Impl->System.initialize(std::move(builder.Rules),
                           std::move(builder.Protocols));
 
-  // Attempt to obtain a confluent rewrite system using the completion
-  // procedure.
-  auto result = Impl->System.computeConfluentCompletion(
-      Context.LangOpts.RequirementMachineStepLimit,
-      Context.LangOpts.RequirementMachineDepthLimit);
-
-  // Check for failure.
-  switch (result) {
-  case RewriteSystem::CompletionResult::Success:
-    break;
-
-  case RewriteSystem::CompletionResult::MaxIterations:
-    llvm::errs() << "Generic signature " << sig
-                 << " exceeds maximum completion step count\n";
-    Impl->System.dump(llvm::errs());
-    abort();
-
-  case RewriteSystem::CompletionResult::MaxDepth:
-    llvm::errs() << "Generic signature " << sig
-                 << " exceeds maximum completion depth\n";
-    Impl->System.dump(llvm::errs());
-    abort();
-  }
-
-  markComplete();
+  computeCompletion(sig);
 
   if (Context.LangOpts.DebugRequirementMachine) {
     llvm::dbgs() << "}\n";
   }
 }
 
+/// Attempt to obtain a confluent rewrite system using the completion
+/// procedure.
+void RequirementMachine::computeCompletion(CanGenericSignature sig) {
+  unsigned remainingSteps = Context.LangOpts.RequirementMachineStepLimit;
+  bool keepGoing = true;
+
+  while (keepGoing) {
+    // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
+    auto result = Impl->System.computeConfluentCompletion(
+        remainingSteps, Context.LangOpts.RequirementMachineDepthLimit);
+
+    assert(remainingSteps >= result.second);
+    remainingSteps -= result.second;
+
+    if (Context.Stats) {
+      Context.Stats->getFrontendCounters()
+          .NumRequirementMachineCompletionSteps += result.second;
+    }
+
+    // Check for failure.
+    switch (result.first) {
+    case RewriteSystem::CompletionResult::Success:
+      break;
+
+    case RewriteSystem::CompletionResult::MaxIterations:
+      llvm::errs() << "Generic signature " << sig
+                   << " exceeds maximum completion step count\n";
+      Impl->System.dump(llvm::errs());
+      abort();
+
+    case RewriteSystem::CompletionResult::MaxDepth:
+      llvm::errs() << "Generic signature " << sig
+                   << " exceeds maximum completion depth\n";
+      Impl->System.dump(llvm::errs());
+      abort();
+    }
+
+    // Simplify right hand sides in preparation for building the
+    // equivalence class map.
+    Impl->System.simplifyRightHandSides();
+
+    // Build the equivalence class map, which performs concrete term
+    // unification; if this added any new rules, run the completion
+    // procedure again.
+    keepGoing = Impl->System.buildEquivalenceClassMap(Impl->Map);
+  }
+
+  if (Context.LangOpts.DebugRequirementMachine) {
+    dump(llvm::dbgs());
+  }
+
+  assert(!Impl->Complete);
+  Impl->Complete = true;
+}
+
 bool RequirementMachine::isComplete() const {
   return Impl->Complete;
 }
 
-void RequirementMachine::markComplete() {
-  if (Context.LangOpts.DebugRequirementMachine) {
-    Impl->System.dump(llvm::dbgs());
+void RequirementMachine::dump(llvm::raw_ostream &out) const {
+  Impl->System.dump(out);
+  Impl->Map.dump(out);
+}
+
+bool RequirementMachine::requiresClass(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return false;
+
+  if (equivClass->isConcreteType())
+    return false;
+
+  auto layout = equivClass->getLayoutConstraint();
+  return (layout && layout->isClass());
+}
+
+LayoutConstraint RequirementMachine::getLayoutConstraint(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return LayoutConstraint();
+
+  return equivClass->getLayoutConstraint();
+}
+
+bool RequirementMachine::requiresProtocol(Type depType,
+                                          const ProtocolDecl *proto) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return false;
+
+  if (equivClass->isConcreteType())
+    return false;
+
+  for (auto *otherProto : equivClass->getConformsTo()) {
+    if (otherProto == proto)
+      return true;
   }
-  assert(!Impl->Complete);
-  Impl->Complete = true;
+
+  return false;
+}
+
+GenericSignature::RequiredProtocols
+RequirementMachine::getRequiredProtocols(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return { };
+
+  if (equivClass->isConcreteType())
+    return { };
+
+  GenericSignature::RequiredProtocols result;
+  for (auto *otherProto : equivClass->getConformsTo()) {
+    result.push_back(const_cast<ProtocolDecl *>(otherProto));
+  }
+
+  ProtocolType::canonicalizeProtocols(result);
+
+  return result;
+}
+
+bool RequirementMachine::isConcreteType(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return false;
+
+  return equivClass->isConcreteType();
+}
+
+bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
+                                                       Type depType2) const {
+  auto term1 = Impl->Context.getMutableTermForType(depType1->getCanonicalType(),
+                                                   /*proto=*/nullptr);
+  Impl->System.simplify(term1);
+
+  auto term2 = Impl->Context.getMutableTermForType(depType2->getCanonicalType(),
+                                                   /*proto=*/nullptr);
+  Impl->System.simplify(term2);
+
+  return (term1 == term2);
 }

@@ -85,61 +85,75 @@ OverlapKind
 MutableTerm::checkForOverlap(const MutableTerm &other,
                              MutableTerm &t,
                              MutableTerm &v) const {
-  // If the other term is longer than this term, there's no way
-  // we can overlap.
-  if (other.size() > size())
-    return OverlapKind::None;
+  assert(!empty());
+  assert(!other.empty());
 
-  auto first1 = begin();
-  auto last1 = end();
-  auto first2 = other.begin();
-  auto last2 = other.end();
-
-  // Look for an overlap of the first kind, where the other term is
-  // wholly contained in this term.
-  //
-  // A.B.C.D.E
-  // X.Y.Z
-  //   X.Y.Z
-  //     X.Y.Z
-  while (last1 - first1 >= last2 - first2) {
-    if (std::equal(first2, last2, first1)) {
-      // We have an overlap of the first kind, where
-      // this == TUV and other == U.
-      //
-      // Get the subterms for T and V.
-      t = MutableTerm(begin(), first1);
-      v = MutableTerm(first1 + other.size(), end());
-      return OverlapKind::First;
-    }
-
-    ++first1;
+  if (*this == other) {
+    // If this term is equal to the other term, we have an overlap.
+    t = MutableTerm();
+    v = MutableTerm();
+    return OverlapKind::First;
   }
 
-  // Look for an overlap of the second kind, where a prefix of the
-  // other term is equal to some suffix of this term.
-  //
-  // A.B.C.D.E
-  //       X.Y
-  //         X
-  while (first1 != last1) {
-    --last2;
+  if (size() > other.size()) {
+    // If this term is longer than the other term, check if it contains
+    // the other term.
+    auto first1 = begin();
+    while (first1 <= end() - other.size()) {
+      if (std::equal(other.begin(), other.end(), first1)) {
+        // We have an overlap.
+        t = MutableTerm(begin(), first1);
+        v = MutableTerm(first1 + other.size(), end());
 
-    if (std::equal(first1, last1, first2)) {
-      // We have an overlap of the second kind, where
-      // this == TU and other == UV.
-      //
-      // Get the subterms for T and V.
+        // If both T and V are empty, we have two equal terms, which
+        // should have been handled above.
+        assert(!t.empty() || !v.empty());
+        assert(t.size() + other.size() + v.size() == size());
+
+        return OverlapKind::First;
+      }
+
+      ++first1;
+    }
+  }
+
+  // Finally, check if a suffix of this term is equal to a prefix of
+  // the other term.
+  unsigned count = std::min(size(), other.size());
+  auto first1 = end() - count;
+  auto last2 = other.begin() + count;
+
+  // Initial state, depending on size() <=> other.size():
+  //
+  // ABC   -- count = 3, first1 = this[0], last2 = other[3]
+  // XYZ
+  //
+  // ABC   -- count = 2, first1 = this[1], last2 = other[2]
+  //  XY
+  //
+  // ABC   -- count = 3, first1 = this[0], last2 = other[3]
+  // XYZW
+
+  // Advance by 1, since we don't need to check for full containment
+  ++first1;
+  --last2;
+
+  while (last2 != other.begin()) {
+    if (std::equal(other.begin(), last2, first1)) {
       t = MutableTerm(begin(), first1);
-      assert(!t.empty());
       v = MutableTerm(last2, other.end());
+
+      assert(!t.empty());
+      assert(!v.empty());
+      assert(t.size() + other.size() - v.size() == size());
+
       return OverlapKind::Second;
     }
 
     ++first1;
+    --last2;
   }
 
-  // No overlap found.
   return OverlapKind::None;
 }
 
@@ -180,8 +194,9 @@ Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
               Protos.inheritsFrom(thisProto, newProto));
     };
 
-    if (std::find_if(protos.begin(), protos.end(), inheritsFrom)
-        == protos.end()) {
+    if (std::find_if(minimalProtos.begin(), minimalProtos.end(),
+                     inheritsFrom)
+        == minimalProtos.end()) {
       minimalProtos.push_back(newProto);
     }
   }
@@ -279,17 +294,12 @@ void RewriteSystem::processMergedAssociatedTypes() {
     // X.[P2:T] => X.[P1&P2:T]
     if (DebugMerge) {
       llvm::dbgs() << "## Associated type merge candidate ";
-      lhs.dump(llvm::dbgs());
-      llvm::dbgs() << " => ";
-      rhs.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      llvm::dbgs() << lhs << " => " << rhs << "\n";
     }
 
     auto mergedAtom = mergeAssociatedTypes(lhs.back(), rhs.back());
     if (DebugMerge) {
-      llvm::dbgs() << "### Merged atom ";
-      mergedAtom.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      llvm::dbgs() << "### Merged atom " << mergedAtom << "\n";
     }
 
     // Build the term X.[P1&P2:T].
@@ -317,9 +327,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
           //
           //   [P2:T].[Q] => [P2:T]
           if (DebugMerge) {
-            llvm::dbgs() << "### Lifting conformance rule ";
-            otherRule.dump(llvm::dbgs());
-            llvm::dbgs() << "\n";
+            llvm::dbgs() << "### Lifting conformance rule " << otherRule << "\n";
           }
 
           // We know that [P1:T] or [P2:T] conforms to Q, therefore the
@@ -419,27 +427,28 @@ RewriteSystem::computeCriticalPair(const Rule &lhs, const Rule &rhs) const {
 
 /// Computes the confluent completion using the Knuth-Bendix algorithm.
 ///
-/// Returns CompletionResult::MaxIterations if we exceed \p maxIterations
+/// Returns a pair consisting of a status and number of iterations executed.
+///
+/// The status is CompletionResult::MaxIterations if we exceed \p maxIterations
 /// iterations.
 ///
-/// Returns CompletionResult::MaxDepth if we produce a rewrite rule whose
+/// The status is CompletionResult::MaxDepth if we produce a rewrite rule whose
 /// left hand side has a length exceeding \p maxDepth.
-RewriteSystem::CompletionResult
+///
+/// Otherwise, the status is CompletionResult::Success.
+std::pair<RewriteSystem::CompletionResult, unsigned>
 RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
                                           unsigned maxDepth) {
   unsigned steps = 0;
-
-  SWIFT_DEFER {
-    if (Context.Stats) {
-      Context.Stats->getFrontendCounters()
-        .NumRequirementMachineCompletionSteps += steps;
-    }
-  };
 
   // The worklist must be processed in first-in-first-out order, to ensure
   // that we resolve all overlaps among the initial set of rules before
   // moving on to overlaps between rules introduced by completion.
   while (!Worklist.empty()) {
+    // Check if we've already done too much work.
+    if (steps >= maxIterations)
+      return std::make_pair(CompletionResult::MaxIterations, steps);
+
     auto next = Worklist.front();
     Worklist.pop_front();
 
@@ -448,11 +457,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
 
     if (DebugCompletion) {
       llvm::dbgs() << "$ Check for overlap: (#" << next.first << ") ";
-      lhs.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
+      llvm::dbgs() << lhs << "\n";
       llvm::dbgs() << "                -vs- (#" << next.second << ") ";
-      rhs.dump(llvm::dbgs());
-      llvm::dbgs() << ":\n";
+      llvm::dbgs() << rhs << ":\n";
     }
 
     auto pair = computeCriticalPair(lhs, rhs);
@@ -469,13 +476,8 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     std::tie(first, second) = *pair;
 
     if (DebugCompletion) {
-      llvm::dbgs() << "$$ First term of critical pair is ";
-      first.dump(llvm::dbgs());
-      llvm::dbgs() << "\n";
-
-      llvm::dbgs() << "$$ Second term of critical pair is ";
-      second.dump(llvm::dbgs());
-      llvm::dbgs() << "\n\n";
+      llvm::dbgs() << "$$ First term of critical pair is " << first << "\n";
+      llvm::dbgs() << "$$ Second term of critical pair is " << second << "\n\n";
     }
     unsigned i = Rules.size();
 
@@ -484,13 +486,12 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     if (!addRule(first, second))
       continue;
 
-    // Check if we've already done too much work.
-    if (++steps >= maxIterations)
-      return CompletionResult::MaxIterations;
+    // Only count a 'step' once we add a new rule.
+    ++steps;
 
     const auto &newRule = Rules[i];
     if (newRule.getDepth() > maxDepth)
-      return CompletionResult::MaxDepth;
+      return std::make_pair(CompletionResult::MaxDepth, steps);
 
     // Check if the new rule X == Y obsoletes any existing rules.
     for (unsigned j : indices(Rules)) {
@@ -507,9 +508,9 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
       // If this rule reduces some existing rule, delete the existing rule.
       if (rule.canReduceLeftHandSide(newRule)) {
         if (DebugCompletion) {
-          llvm::dbgs() << "$ Deleting rule ";
-          rule.dump(llvm::dbgs());
-          llvm::dbgs() << "\n";
+          llvm::dbgs() << "$ Deleting rule " << rule << " because "
+                       << "its left hand side contains " << newRule
+                       << "\n";
         }
         rule.markDeleted();
       }
@@ -522,7 +523,5 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
     processMergedAssociatedTypes();
   }
 
-  simplifyRightHandSides();
-
-  return CompletionResult::Success;
+  return std::make_pair(CompletionResult::Success, steps);
 }
