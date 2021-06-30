@@ -1949,6 +1949,19 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(Evaluator &evaluator,
   if (auto CE = dyn_cast<ClosureExpr>(DC)) {
     if (CE->getBodyState() == ClosureExpr::BodyState::Parsed) {
       swift::typeCheckASTNodeAtLoc(CE->getParent(), CE->getLoc());
+      // We need the actor isolation of the closure to be set so that we can
+      // annotate results that are on the same global actor.
+      // Since we are evaluating TypeCheckASTNodeAtLocRequest for every closure
+      // from outermost to innermost, we don't want to call checkActorIsolation,
+      // because that would cause actor isolation to be checked multiple times
+      // for nested closures. Instead, call determineClosureActorIsolation
+      // directly and set the closure's actor isolation manually. We can
+      // guarantee of that the actor isolation of enclosing closures have their
+      // isolation checked before nested ones are being checked by the way
+      // TypeCheckASTNodeAtLocRequest is called multiple times, as described
+      // above.
+      auto ActorIsolation = determineClosureActorIsolation(CE);
+      CE->setActorIsolation(ActorIsolation);
       if (CE->getBodyState() != ClosureExpr::BodyState::ReadyForTypeChecking)
         return false;
     }

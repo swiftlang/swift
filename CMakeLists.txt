@@ -507,6 +507,11 @@ execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
 message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VERSION}")
 message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
+if (CMAKE_Swift_COMPILER)
+  message(STATUS "Swift Compiler (${CMAKE_Swift_COMPILER}) Version: ${CMAKE_Swift_COMPILER_VERSION}")
+else()
+  message(STATUS "Swift Compiler (None).")
+endif()
 if(SWIFT_PATH_TO_CMARK_BUILD)
   execute_process(COMMAND ${SWIFT_PATH_TO_CMARK_BUILD}/src/cmark --version
     OUTPUT_VARIABLE _CMARK_VERSION
@@ -521,6 +526,13 @@ if("${SWIFT_NATIVE_CLANG_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_PREBUILT_CLANG FALSE)
 else()
   set(SWIFT_PREBUILT_CLANG TRUE)
+endif()
+
+# Also mark if we have a prebuilt swift before we do anything.
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_PREBUILT_SWIFT FALSE)
+else()
+  set(SWIFT_PREBUILT_SWIFT TRUE)
 endif()
 
 include(SwiftSharedCMakeConfig)
@@ -1042,7 +1054,11 @@ if(SWIFT_INCLUDE_TOOLS)
   # "libswift" must come before "tools".
   # It adds libswift module names to the global property "libswift_modules"
   # which is used in add_swift_host_tool for the lldb workaround.
-  add_subdirectory(libswift)
+  #
+  # NOTE: We do not currently support libswift with the Xcode generator.
+  if (NOT CMAKE_GENERATOR STREQUAL "Xcode")
+    add_subdirectory(libswift)
+  endif()
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.

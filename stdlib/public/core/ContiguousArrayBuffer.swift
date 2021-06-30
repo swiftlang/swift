@@ -13,7 +13,10 @@
 import SwiftShims
 
 #if INTERNAL_CHECKS_ENABLED
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
+// "9999" means: enable if linked with a built library, but not when linked with
+// the OS libraries.
+// Note: this must not be changed to a "real" OS version.
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @_silgen_name("swift_COWChecksEnabled")
 public func _COWChecksEnabled() -> Bool
 #endif
@@ -460,7 +463,10 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @_alwaysEmitIntoClient
   internal var isImmutable: Bool {
     get {
-      if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+      // "9999" means: enable if linked with a built library, but not when
+      // linked with the OS libraries.
+      // Note: this must not be changed to a "real" OS version.
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if (_COWChecksEnabled()) {
           return capacity == 0 || _swift_isImmutableCOWBuffer(_storage)
         }
@@ -468,7 +474,10 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       return true
     }
     nonmutating set {
-      if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+      // "9999" means: enable if linked with a built library, but not when
+      // linked with the OS libraries.
+      // Note: this must not be changed to a "real" OS version.
+      if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
         if (_COWChecksEnabled()) {
           // Make sure to not modify the empty array singleton (which has a
           // capacity of 0).
@@ -489,7 +498,10 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   
   @_alwaysEmitIntoClient
   internal var isMutable: Bool {
-    if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+      // "9999" means: enable if linked with a built library, but not when
+      // linked with the OS libraries.
+      // Note: this must not be changed to a "real" OS version.
+    if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
       if (_COWChecksEnabled()) {
         return !_swift_isImmutableCOWBuffer(_storage)
       }

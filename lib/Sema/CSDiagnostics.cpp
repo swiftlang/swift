@@ -399,8 +399,14 @@ bool RequirementFailure::diagnoseAsNote() {
   const auto &req = getRequirement();
   const auto *reqDC = getRequirementDC();
 
+  // Layout requirement doesn't have a second type, let's always
+  // `AnyObject`.
+  auto requirementTy = req.getKind() == RequirementKind::Layout
+                           ? getASTContext().getAnyObjectType()
+                           : req.getSecondType();
+
   emitDiagnosticAt(reqDC->getAsDecl(), getDiagnosticAsNote(), getLHS(),
-                   getRHS(), req.getFirstType(), req.getSecondType(), "");
+                   getRHS(), req.getFirstType(), requirementTy);
   return true;
 }
 
@@ -3177,7 +3183,7 @@ bool TupleContextualFailure::diagnoseAsError() {
   auto purpose = getContextualTypePurpose();
   if (isNumElementsMismatch())
     diagnostic = diag::tuple_types_not_convertible_nelts;
-  else if ((purpose == CTP_Initialization) && !getContextualType(getAnchor()))
+  else if (purpose == CTP_Unused)
     diagnostic = diag::tuple_types_not_convertible;
   else if (auto diag = getDiagnosticFor(purpose, getToType()))
     diagnostic = *diag;
@@ -5337,8 +5343,17 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
     if (FD->getResultTypeRepr() == nullptr &&
         FD->getParameters()->getStartLoc().isValid() &&
         !FD->getBaseIdentifier().empty()) {
-      auto fixItLoc = Lexer::getLocForEndOfToken(
-          getASTContext().SourceMgr, FD->getParameters()->getEndLoc());
+      // Insert the fix-it after the parameter list, and after any
+      // effects specifiers.
+      SourceLoc loc = FD->getParameters()->getEndLoc();
+      if (auto asyncLoc = FD->getAsyncLoc())
+        loc = asyncLoc;
+
+      if (auto throwsLoc = FD->getThrowsLoc())
+        if (throwsLoc.getOpaquePointerValue() > loc.getOpaquePointerValue())
+          loc = throwsLoc;
+
+      auto fixItLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, loc);
       emitDiagnostic(diag::add_return_type_note)
           .fixItInsert(fixItLoc, " -> <#Return Type#>");
     }
@@ -7466,8 +7481,8 @@ SourceRange CheckedCastBaseFailure::getCastRange() const {
   llvm_unreachable("There is no other kind of checked cast!");
 }
 
-std::tuple<Type, Type, unsigned>
-CoercibleOptionalCheckedCastFailure::unwrapedTypes() const {
+std::tuple<Type, Type, int>
+CoercibleOptionalCheckedCastFailure::unwrappedTypes() const {
   SmallVector<Type, 4> fromOptionals;
   SmallVector<Type, 4> toOptionals;
   Type unwrappedFromType =
@@ -7483,8 +7498,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseIfExpr() const {
     return false;
 
   Type unwrappedFrom, unwrappedTo;
-  unsigned extraFromOptionals;
-  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrapedTypes();
+  std::tie(unwrappedFrom, unwrappedTo, std::ignore) = unwrappedTypes();
 
   SourceRange diagFromRange = getFromRange();
   SourceRange diagToRange = getToRange();
@@ -7515,8 +7529,8 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseForcedCastExpr() const {
   auto fromType = getFromType();
   auto toType = getToType();
   Type unwrappedFrom, unwrappedTo;
-  unsigned extraFromOptionals;
-  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrapedTypes();
+  int extraFromOptionals;
+  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrappedTypes();
 
   SourceRange diagFromRange = getFromRange();
   SourceRange diagToRange = getToRange();
@@ -7558,8 +7572,7 @@ bool CoercibleOptionalCheckedCastFailure::diagnoseConditionalCastExpr() const {
   auto fromType = getFromType();
   auto toType = getToType();
   Type unwrappedFrom, unwrappedTo;
-  unsigned extraFromOptionals;
-  std::tie(unwrappedFrom, unwrappedTo, extraFromOptionals) = unwrapedTypes();
+  std::tie(unwrappedFrom, unwrappedTo, std::ignore) = unwrappedTypes();
 
   SourceRange diagFromRange = getFromRange();
   SourceRange diagToRange = getToRange();

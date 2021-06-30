@@ -282,6 +282,13 @@ swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
   return *MetadataAddress;
 }
 
+swift_reflection_ptr_t
+swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef ContextRef,
+                                               swift_reflection_ptr_t MetadataAddress) {
+  auto Context = ContextRef->nativeContext;
+  return Context->nominalTypeDescriptorFromMetadata(MetadataAddress);
+}
+
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {

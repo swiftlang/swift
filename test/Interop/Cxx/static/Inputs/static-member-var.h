@@ -37,6 +37,12 @@ public:
   constexpr static float definedInlineFromMethod = getFloatValue();
 };
 
+class WithStaticAndInstanceMember {
+public:
+  int myInstance;
+  static int myStatic;
+};
+
 class ClassA {
 public:
   static int notUniqueName;

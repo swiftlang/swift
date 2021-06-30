@@ -59,7 +59,6 @@ func testDeadArrayElimWithAddressOnlyValues<T>(x: T, y: T) {
 
 // CHECK-LABEL: sil hidden @$s15dead_array_elim31testDeadArrayAfterOptimizationsySiSSF
 // CHECK:      bb0(%0 : $String):
-// CHECK-NEXT:   debug_value {{.*}} name "stringParameter"
 // CHECK-NEXT:   integer_literal $Builtin.Int{{[0-9]+}}, 21
 // CHECK-NEXT:   struct $Int
 // CHECK-NEXT:   return
@@ -78,4 +77,45 @@ func testDeadArrayAfterOptimizations(_ stringParameter: String) -> Int {
   return sum
 }
 
+// CHECK-LABEL: sil hidden @$s15dead_array_elim15testNestedArraySiyF
+// CHECK:      bb0:
+// CHECK-NEXT:   integer_literal $Builtin.Int{{[0-9]+}}, 3
+// CHECK-NEXT:   struct $Int
+// CHECK-NEXT:   return
+// CHECK:      } // end sil function '$s15dead_array_elim15testNestedArraySiyF'
+func testNestedArray() -> Int {
+   struct Str {
+     var sa: [String]
+     var s: String? = nil
+     var b: Bool = true
+
+     static func opt1(_ sa: [String], _ s: String?) -> Self {
+       return .init(sa: sa, s: s, b: true)
+     }
+
+     static func opt2(_ s1: String, _ s2: String? = nil) -> Self {
+       return .opt1([s1], s2)
+     }
+
+     static func opt3(_ sa: [String], _ s: String) -> Self {
+       return .init(sa: sa, s: s, b: false)
+     }
+   }
+
+   let strArr: [Str] = [
+     .opt1(["1", "2"], "3"),
+     .opt3(["4", "5"], "6"),
+
+     .opt2("7"),
+     .opt2("8"),
+   ]
+
+   var num = 0
+   for s in strArr {
+     if s.b {
+       num += 1
+     }
+   }
+   return num
+}
 

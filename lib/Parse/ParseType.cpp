@@ -157,7 +157,8 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-simple '!'
 ///     type-collection
 ///     type-array
-ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
+ParserResult<TypeRepr> Parser::parseTypeSimple(
+    Diag<> MessageID, ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
 
   if (Tok.is(tok::kw_inout) ||
@@ -242,7 +243,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
         continue;
       }
       // Parse legacy array types for migration.
-      if (Tok.is(tok::l_square)) {
+      if (Tok.is(tok::l_square) && reason != ParseTypeReason::CustomAttribute) {
         ty = parseTypeArray(ty);
         continue;
       }
@@ -329,8 +330,8 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
 ///   type-function:
 ///     type-composition 'async'? 'throws'? '->' type
 ///
-ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
-                                         bool IsSILFuncDecl) {
+ParserResult<TypeRepr> Parser::parseType(
+    Diag<> MessageID, ParseTypeReason reason) {
   // Start a context for creating type syntax.
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
                                           SyntaxContextKind::Type);
@@ -369,7 +370,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     return parseSILBoxType(generics, attrs);
   }
 
-  ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID);
+  ParserResult<TypeRepr> ty = parseTypeSimpleOrComposition(MessageID, reason);
   status |= ParserStatus(ty);
   if (ty.isNull())
     return status;
@@ -547,6 +548,27 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc));
 }
 
+ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
+  GenericParamList *genericParams = nullptr;
+  if (Context.LangOpts.EnableExperimentalOpaqueReturnTypes) {
+    auto result = maybeParseGenericParams();
+    genericParams = result.getPtrOrNull();
+    if (result.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
+  }
+
+  auto typeResult = parseType(MessageID);
+  if (auto type = typeResult.getPtrOrNull()) {
+    return makeParserResult(
+        ParserStatus(typeResult),
+        genericParams ? new (Context)
+                            NamedOpaqueReturnTypeRepr(type, genericParams)
+                      : type);
+  } else {
+    return typeResult;
+  }
+}
+
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   if (Tok.is(tok::code_complete)) {
     if (CodeCompletion)
@@ -555,7 +577,7 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
     return makeParserCodeCompletionStatus();
   }
 
-  auto result = parseType(MessageID);
+  auto result = parseTypeWithOpaqueParams(MessageID);
 
   if (!result.isParseErrorOrHasCompletion()) {
     if (Tok.is(tok::r_square)) {
@@ -762,7 +784,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
 ///     'some'? type-simple
 ///     type-composition '&' type-simple
 ParserResult<TypeRepr>
-Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
+Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   SyntaxParsingContext SomeTypeContext(SyntaxContext, SyntaxKind::SomeType);
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
@@ -786,7 +808,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
   
   SyntaxParsingContext CompositionContext(SyntaxContext, SyntaxContextKind::Type);
   // Parse the first type
-  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID);
+  ParserResult<TypeRepr> FirstType = parseTypeSimple(MessageID, reason);
   if (FirstType.isNull())
     return FirstType;
   if (!Tok.isContextualPunctuator("&")) {
@@ -844,7 +866,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID) {
 
     // Parse next type.
     ParserResult<TypeRepr> ty =
-      parseTypeSimple(diag::expected_identifier_for_type);
+      parseTypeSimple(diag::expected_identifier_for_type, reason);
     if (ty.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     Status |= ty;

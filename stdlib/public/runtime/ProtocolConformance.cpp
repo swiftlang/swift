@@ -169,6 +169,14 @@ static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
   if (!classMetadata)
     return {_swift_class_getSuperclass(metadata), MetadataState::Complete};
 
+#if SWIFT_OBJC_INTEROP
+    // Artificial subclasses are not valid type metadata and
+    // tryGetCompleteMetadataNonblocking will crash on them. However, they're
+    // always fully set up, so we can just skip it and fetch the Subclass field.
+    if (classMetadata->isTypeMetadata() && classMetadata->isArtificialSubclass())
+      return {classMetadata->Superclass, MetadataState::Complete};
+#endif
+
   MetadataState metadataState;
   if (knownMetadataState)
     metadataState = *knownMetadataState;
@@ -906,10 +914,20 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   const WitnessTable *foundWitness = nullptr;
   const Metadata *foundType = nullptr;
   for (auto searchType : iterateMaybeIncompleteSuperclasses(type)) {
-    foundWitness = foundWitnesses.lookup(searchType);
-    if (foundWitness) {
-      foundType = searchType;
-      break;
+    const WitnessTable *witness = foundWitnesses.lookup(searchType);
+    if (witness) {
+      if (!foundType) {
+        foundWitness = witness;
+        foundType = searchType;
+      } else {
+        swift::warning(RuntimeErrorFlagNone,
+                       "Warning: '%s' conforms to protocol '%s', but it also "
+                       "inherits conformance from '%s'.  Relying on a "
+                       "particular conformance is undefined behaviour.\n",
+                       foundType->getDescription()->Name.get(),
+                       protocol->Name.get(),
+                       searchType->getDescription()->Name.get());
+      }
     }
   }
 

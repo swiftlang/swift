@@ -20,6 +20,7 @@ import Swift
 @_silgen_name("swift_asyncLet_start")
 public func _asyncLetStart<T>(
   asyncLet: Builtin.RawPointer,
+  options: Builtin.RawPointer?,
   operation: @Sendable () async throws -> T
 )
 

@@ -136,6 +136,13 @@ uintptr_t
 swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
                                    uintptr_t Object);
 
+/// Returns the nominal type descriptor given the metadata
+SWIFT_REMOTE_MIRROR_LINKAGE
+swift_reflection_ptr_t
+swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef ContextRef,
+																							 swift_reflection_ptr_t Metadata);
+
+
 /// Returns an opaque type reference for a class or closure context
 /// instance pointer, or NULL if one can't be constructed.
 ///

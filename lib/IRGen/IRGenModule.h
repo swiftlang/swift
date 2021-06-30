@@ -733,7 +733,10 @@ public:
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
   llvm::PointerType *SwiftAsyncLetPtrTy;
+  llvm::IntegerType *SwiftTaskOptionRecordPtrTy;
   llvm::PointerType *SwiftTaskGroupPtrTy;
+  llvm::StructType  *SwiftTaskOptionRecordTy;
+  llvm::StructType  *SwiftTaskGroupTaskOptionRecordTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::IntegerType *ExecutorFirstTy;
   llvm::IntegerType *ExecutorSecondTy;
@@ -1151,9 +1154,6 @@ private:
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
-
-  /// List of fields descriptors to register in runtime.
-  SmallVector<llvm::GlobalVariable *, 4> FieldDescriptors;
 
   /// Map of Objective-C protocols and protocol references, bitcast to i8*.
   /// The interesting global variables relating to an ObjC protocol.

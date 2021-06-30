@@ -224,7 +224,7 @@ void TaskLocal::Item::copyTo(AsyncTask *target) {
   assert(target && "TaskLocal item attempt to copy to null target task!");
 
   auto item = Item::createLink(target, this->key, this->valueType);
-  valueType->vw_initializeWithTake(item->getStoragePtr(), this->getStoragePtr());
+  valueType->vw_initializeWithCopy(item->getStoragePtr(), this->getStoragePtr());
 
   /// A `copyTo` may ONLY be invoked BEFORE the task is actually scheduled,
   /// so right now we can safely copy the value into the task without additional

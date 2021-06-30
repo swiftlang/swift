@@ -2878,12 +2878,31 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   
                   // If the subexpr is an "as?" cast, we can rewrite it to
                   // be an "is" test.
-                  bool isIsTest = false;
-                  if (isa<ConditionalCheckedCastExpr>(initExpr) &&
-                      !initExpr->isImplicit()) {
-                    noParens = isIsTest = true;
+                  ConditionalCheckedCastExpr *CCE = nullptr;
+
+                  // initExpr can be wrapped inside parens or try expressions.
+                  if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                          initExpr->getValueProvidingExpr())) {
+                    if (!ccExpr->isImplicit()) {
+                      CCE = ccExpr;
+                      noParens = true;
+                    }
                   }
-                  
+
+                  // In cases where the value is optional, the cast expr is
+                  // wrapped inside OptionalEvaluationExpr. Unwrap it to get
+                  // ConditionalCheckedCastExpr.
+                  if (auto oeExpr = dyn_cast<OptionalEvaluationExpr>(
+                          initExpr->getValueProvidingExpr())) {
+                    if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                            oeExpr->getSubExpr()->getValueProvidingExpr())) {
+                      if (!ccExpr->isImplicit()) {
+                        CCE = ccExpr;
+                        noParens = true;
+                      }
+                    }
+                  }
+
                   auto diagIF = Diags.diagnose(var->getLoc(),
                                                diag::pbd_never_used_stmtcond,
                                             var->getName());
@@ -2891,10 +2910,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                   diagIF.fixItReplaceChars(introducerLoc,
                                            initExpr->getStartLoc(),
                                            &"("[noParens]);
-                  
-                  if (isIsTest) {
+
+                  if (CCE) {
                     // If this was an "x as? T" check, rewrite it to "x is T".
-                    auto CCE = cast<ConditionalCheckedCastExpr>(initExpr);
                     diagIF.fixItReplace(SourceRange(CCE->getLoc(),
                                                     CCE->getQuestionLoc()),
                                         "is");

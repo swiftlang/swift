@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift
+// RUN: %target-typecheck-verify-swift -I %t -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
+
+import OtherActors
 
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
@@ -685,21 +689,72 @@ extension SomeClassInActor.ID {
 }
 
 // ----------------------------------------------------------------------
-// Initializers
+// Initializers (through typechecking only)
 // ----------------------------------------------------------------------
 @available(SwiftStdlib 5.5, *)
 actor SomeActorWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
 
-  init() {
+  init(i1: Bool) {
     self.mutableState = 42
     self.otherMutableState = 17
 
     self.isolated()
+    self.nonisolated()
   }
 
-  func isolated() { }
+  init(i2: Bool) async {
+    self.mutableState = 0
+    self.otherMutableState = 1
+
+    self.isolated()
+    self.nonisolated()
+  }
+
+  convenience init(i3: Bool) {
+    self.init(i1: i3)
+    self.isolated()     // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from a non-isolated context}}
+    self.nonisolated()
+  }
+
+  convenience init(i4: Bool) async {
+    self.init(i1: i4)
+    await self.isolated()
+    self.nonisolated()
+  }
+
+  @MainActor init(i5: Bool) {
+    self.mutableState = 42
+    self.otherMutableState = 17
+
+    self.isolated()
+    self.nonisolated()
+  }
+
+  @MainActor init(i6: Bool) async {
+    self.mutableState = 42
+    self.otherMutableState = 17
+
+    self.isolated()
+    self.nonisolated()
+  }
+
+  @MainActor convenience init(i7: Bool) {
+    self.init(i1: i7)
+    self.isolated()     // expected-error{{actor-isolated instance method 'isolated()' can not be referenced from the main actor}}
+    self.nonisolated()
+  }
+
+  @MainActor convenience init(i8: Bool) async {
+    self.init(i1: i8)
+    await self.isolated()
+    self.nonisolated()
+  }
+
+
+  func isolated() { } // expected-note 2 {{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+  nonisolated func nonisolated() {}
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -750,8 +805,37 @@ func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make
 }
 
 // ----------------------------------------------------------------------
+// nonisolated let and cross-module let
+// ----------------------------------------------------------------------
+func testCrossModuleLets(actor: OtherModuleActor) async {
+  _ = actor.a         // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{property access is 'async'}}
+  _ = await actor.a   // okay
+  _ = actor.b         // okay
+  _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{property access is 'async'}}
+  // expected-warning@-2{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
+  _ = await actor.c // expected-warning{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
+}
+
+
+// ----------------------------------------------------------------------
 // Actor protocols.
 // ----------------------------------------------------------------------
+
+@available(SwiftStdlib 5.5, *)
+actor A: Actor { // ok
+}
+
+@available(SwiftStdlib 5.5, *)
+class C: Actor, UnsafeSendable {
+  // expected-error@-1{{non-actor type 'C' cannot conform to the 'Actor' protocol}}
+  // expected-warning@-2{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+  nonisolated var unownedExecutor: UnownedSerialExecutor {
+    fatalError()
+  }
+}
+
 @available(SwiftStdlib 5.5, *)
 protocol P: Actor {
   func f()
@@ -843,6 +927,15 @@ actor Counter {
     defer {
       counter = counter + 1
     }
+
+    return counter
+  }
+
+  func localNext() -> Int {
+    func doIt() {
+      counter = counter + 1
+    }
+    doIt()
 
     return counter
   }

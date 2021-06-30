@@ -18,7 +18,7 @@ import MissingDependencyFromSwift
 // CHECK-NOT: no such module 'MissingDependencyFromSwift'
 
 import MissingDependencyFromClang
-// CHECK: {{.+}}/Inputs/broken-modules/MissingDependencyFromClang.h:1:9: error: module 'Dependency' not found
+// CHECK: {{.+}}{{/|\\}}Inputs{{/|\\}}broken-modules{{/|\\}}MissingDependencyFromClang.h:1:9: error: module 'Dependency' not found
 // CHECK: broken-modules.swift:[[@LINE-2]]:8: error: could not build Objective-C module 'MissingDependencyFromClang'
 // CHECK: error: no such module 'MissingDependencyFromClang'
 

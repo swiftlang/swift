@@ -573,9 +573,17 @@ func r22263468(_ a : String?) {
   // TODO(diagnostics): This is a regression from diagnosing missing optional unwrap for `a`, we have to
   // re-think the way errors in tuple elements are detected because it's currently impossible to detect
   // exactly what went wrong here and aggregate fixes for different elements at the same time.
-  _ = MyTuple(42, a) // expected-error {{tuple type 'MyTuple' (aka '(Int, String)') is not convertible to tuple type '(Int, String?)'}}
+  _ = MyTuple(42, a) // expected-error {{tuple type '(Int, String?)' is not convertible to tuple type 'MyTuple' (aka '(Int, String)')}}
 }
 
+// rdar://71829040 - "ambiguous without more context" error for tuple type mismatch.
+func r71829040() {
+  func object(forKey: String) -> Any? { nil }
+
+  let flags: [String: String]
+  // expected-error@+1 {{tuple type '(String, Bool)' is not convertible to tuple type '(String, String)'}}
+  flags = Dictionary(uniqueKeysWithValues: ["keyA", "keyB"].map { ($0, object(forKey: $0) as? Bool ?? false) })
+}
 
 // rdar://22470302 - Crash with parenthesized call result.
 class r22470302Class {
@@ -1205,6 +1213,43 @@ func voidFuncWithNestedVoidFunc() {
   }
 }
 
+func voidFuncWithEffects1() throws {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{35-35= -> <#Return Type#>}}
+}
+
+func voidFuncWithEffects2() async throws {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
+}
+
+// expected-error@+1 {{'async' must precede 'throws'}}
+func voidFuncWithEffects3() throws async {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{41-41= -> <#Return Type#>}}
+}
+
+func voidFuncWithEffects4() async {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{34-34= -> <#Return Type#>}}
+}
+
+func voidFuncWithEffects5(_ closure: () throws -> Void) rethrows {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{65-65= -> <#Return Type#>}}
+}
+
+func voidGenericFuncWithEffects<T>(arg: T) async where T: CustomStringConvertible {
+  return 1
+  // expected-error@-1 {{unexpected non-void return value in void function}}
+  // expected-note@-2 {{did you mean to add a return type?}}{{49-49= -> <#Return Type#>}}
+}
+
 // Special cases: These should not offer a note + fix-it
 
 func voidFuncExplicitType() -> Void {
@@ -1254,7 +1299,7 @@ func f11<T : P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where '
 f11(3, f4) // expected-error {{global function 'f11' requires that 'Int' conform to 'P2'}}
 
 let f12: (Int) -> Void = { _ in } // expected-note {{candidate '(Int) -> Void' requires 1 argument, but 2 were provided}}
-func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' == 'P2')}}
+func f12<T : P2>(_ n: T, _ f: @escaping (T) -> T) {} // expected-note {{candidate requires that 'Int' conform to 'P2' (requirement specified as 'T' : 'P2')}}
 f12(3, f4)// expected-error {{no exact matches in call to global function 'f12'}}
 
 // SR-12242

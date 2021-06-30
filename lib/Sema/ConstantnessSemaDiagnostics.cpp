@@ -335,25 +335,56 @@ static void diagnoseConstantArgumentRequirementOfCall(const CallExpr *callExpr,
 void swift::diagnoseConstantArgumentRequirement(
     const Expr *expr, const DeclContext *declContext) {
   class ConstantReqCallWalker : public ASTWalker {
-    const ASTContext &astContext;
+    DeclContext *DC;
 
   public:
-    ConstantReqCallWalker(ASTContext &ctx) : astContext(ctx) {}
+    ConstantReqCallWalker(DeclContext *DC) : DC(DC) {}
 
     // Descend until we find a call expressions. Note that the input expression
     // could be an assign expression or another expression that contains the
     // call.
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (!expr || isa<ErrorExpr>(expr) || !expr->getType())
+      // Handle closure expressions separately as we may need to
+      // manually descend into the body.
+      if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
+        return walkToClosureExprPre(closureExpr);
+      }
+      // Interpolated expressions' bodies will be type checked
+      // separately so exit early to avoid duplicate diagnostics.
+      if (!expr || isa<ErrorExpr>(expr) || !expr->getType() ||
+          isa<InterpolatedStringLiteralExpr>(expr))
         return {false, expr};
       if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
-        diagnoseConstantArgumentRequirementOfCall(callExpr, astContext);
-        return {false, expr};
+        diagnoseConstantArgumentRequirementOfCall(callExpr, DC->getASTContext());
       }
       return {true, expr};
     }
+    
+    std::pair<bool, Expr *> walkToClosureExprPre(ClosureExpr *closure) {
+      if (closure->hasSingleExpressionBody()) {
+        // Single expression closure bodies are not visited directly
+        // by the ASTVisitor, so we must descend into the body manually
+        // and set the DeclContext to that of the closure.
+        DC = closure;
+        return {true, closure};
+      }
+      return {false, closure};
+    }
+    
+    Expr *walkToExprPost(Expr *expr) override {
+      if (auto *closureExpr = dyn_cast<ClosureExpr>(expr)) {
+        // Reset the DeclContext to the outer scope if we descended
+        // into a closure expr.
+        DC = closureExpr->getParent();
+      }
+      return expr;
+    }
+    
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return {true, stmt};
+    }
   };
 
-  ConstantReqCallWalker walker(declContext->getASTContext());
+  ConstantReqCallWalker walker(const_cast<DeclContext *>(declContext));
   const_cast<Expr *>(expr)->walk(walker);
 }

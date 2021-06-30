@@ -8,7 +8,7 @@ Swift 5.5
 
 * [SE-0313][]:
 
-  Declarations inside an actor that would normally by actor-isolated can
+  Declarations inside an actor that would normally be actor-isolated can
   explicitly become non-isolated using the `nonisolated` keyword. Non-isolated
   declarations can be used to conform to synchronous protocol requirements:
 

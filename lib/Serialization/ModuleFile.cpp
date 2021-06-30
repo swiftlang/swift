@@ -794,7 +794,13 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
   if (!accessPath.empty()) {
     for (const auto &list : Core->ClassMembersForDynamicLookup->data()) {
       for (auto item : list) {
-        auto vd = cast<ValueDecl>(getDecl(item.second));
+        auto decl = getDeclChecked(item.second);
+        if (!decl) {
+          llvm::consumeError(decl.takeError());
+          continue;
+        }
+
+        auto vd = cast<ValueDecl>(decl.get());
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
@@ -808,10 +814,17 @@ void ModuleFile::lookupClassMembers(ImportPath::Access accessPath,
   }
 
   for (const auto &list : Core->ClassMembersForDynamicLookup->data()) {
-    for (auto item : list)
-      consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
+    for (auto item : list) {
+        auto decl = getDeclChecked(item.second);
+        if (!decl) {
+          llvm::consumeError(decl.takeError());
+          continue;
+        }
+
+      consumer.foundDecl(cast<ValueDecl>(decl.get()),
                          DeclVisibilityKind::DynamicLookup,
                          DynamicLookupInfo::AnyObject);
+    }
   }
 }
 

@@ -983,6 +983,16 @@ CastsTests.test("Do not overuse __SwiftValue") {
 }
 #endif
 
+#if _runtime(_ObjC)
+CastsTests.test("Artificial subclass protocol conformance") {
+  class SwiftClass: NSObject {}
+  let subclass: AnyClass = objc_allocateClassPair(SwiftClass.self,
+                                                  "ArtificialSwiftSubclass", 0)!
+  objc_registerClassPair(subclass)
+  expectFalse(subclass is P.Type)
+}
+#endif
+
 CastsTests.test("Do not overuse __SwiftValue (non-ObjC)") {
   struct Bar {}
   // This should succeed because this is what __SwiftValue boxing is for

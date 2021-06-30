@@ -59,8 +59,8 @@ if let x = foo() {
 
 var opt: Int? = .none
 
-if let x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}}
-if var x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}}
+if let x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
+if var x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1

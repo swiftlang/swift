@@ -19,6 +19,7 @@
 #include "TypeCheckType.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -207,7 +208,18 @@ GlobalActorAttributeRequest::evaluate(
   if (auto decl = subject.dyn_cast<Decl *>()) {
     dc = decl->getDeclContext();
     declAttrs = &decl->getAttrs();
-    loc = decl->getLoc();
+    // HACK: `getLoc`, when querying the attr from  a serialized decl,
+    // dependning on deserialization order, may launch into arbitrary
+    // type-checking when querying interface types of such decls. Which,
+    // in turn, may do things like query (to print) USRs. This ends up being
+    // prone to request evaluator cycles.
+    //
+    // Because this only applies to serialized decls, we can be confident
+    // that they already went through this type-checking as primaries, so,
+    // for now, to avoid cycles, we simply ignore the locs on serialized decls
+    // only.
+    // This is a workaround for rdar://79563942
+    loc = decl->getLoc(/* SerializedOK */ false);
   } else {
     auto closure = subject.get<ClosureExpr *>();
     dc = closure;
@@ -289,7 +301,7 @@ Type swift::getExplicitGlobalActor(ClosureExpr *closure) {
 
 /// Determine the isolation rules for a given declaration.
 ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
-    ConcreteDeclRef declRef, bool fromExpression) {
+    ConcreteDeclRef declRef, const DeclContext *fromDC, bool fromExpression) {
   auto decl = declRef.getDecl();
 
   switch (decl->getKind()) {
@@ -344,7 +356,12 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     // actors.
     bool isAccessibleAcrossActors = false;
     if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (var->isLet())
+      // A 'let' declaration is accessible across actors if it is either
+      // nonisolated or it is accessed from within the same module.
+      if (var->isLet() &&
+          (isolation == ActorIsolation::Independent ||
+           var->getDeclContext()->getParentModule() ==
+           fromDC->getParentModule()))
         isAccessibleAcrossActors = true;
     }
 
@@ -1313,10 +1330,10 @@ namespace {
           }
         }
 
-        // "Defer" blocks are treated as if they are in their enclosing context.
-        if (auto func = dyn_cast<FuncDecl>(dc)) {
-          if (func->isDeferBody())
-            continue;
+        if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
+          // @Sendable functions are nonisolated.
+          if (func->isSendable())
+            return ReferencedActor(var, ReferencedActor::SendableFunction);
         }
 
         // Check isolation of the context itself. We do this separately
@@ -1325,9 +1342,14 @@ namespace {
         switch (auto isolation = getActorIsolationOfContext(dc)) {
         case ActorIsolation::Independent:
         case ActorIsolation::Unspecified:
-          if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-            if (func->isSendable())
-              return ReferencedActor(var, ReferencedActor::SendableFunction);
+          // Local functions can capture an isolated parameter.
+          // FIXME: This really should be modeled by getActorIsolationOfContext.
+          if (isa<FuncDecl>(dc) && cast<FuncDecl>(dc)->isLocalCapture()) {
+            // FIXME: Local functions could presumably capture an isolated
+            // parameter that isn't 'self'.
+            if (isPotentiallyIsolated &&
+                (var->isSelfParameter() || var->isSelfParamCapture()))
+              continue;
           }
 
           return ReferencedActor(var, ReferencedActor::NonIsolatedContext);
@@ -1339,12 +1361,6 @@ namespace {
 
         case ActorIsolation::ActorInstance:
         case ActorIsolation::DistributedActorInstance:
-          // FIXME: Local functions could presumably capture an isolated
-          // parameter that isn't'self'.
-          if (isPotentiallyIsolated &&
-              (var->isSelfParameter() || var->isSelfParamCapture()))
-            return ReferencedActor(var, ReferencedActor::Isolated);
-
           break;
         }
       }
@@ -1482,7 +1498,8 @@ namespace {
       bool result = false;
       auto checkDiagnostic = [this, call, isPartialApply,
                               &result](ValueDecl *decl, SourceLoc argLoc) {
-        auto isolation = ActorIsolationRestriction::forDeclaration(decl);
+        auto isolation = ActorIsolationRestriction::forDeclaration(
+            decl, getDeclContext());
         switch (isolation) {
         case ActorIsolationRestriction::Unrestricted:
         case ActorIsolationRestriction::Unsafe:
@@ -1601,11 +1618,6 @@ namespace {
 
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
-        // we assume let-bound properties are taken care of elsewhere,
-        // since they are never implicitly async.
-        assert(!isa<VarDecl>(decl) || cast<VarDecl>(decl)->isLet() == false
-               && "unexpected let-bound property; never implicitly async!");
-
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
 
@@ -2082,7 +2094,8 @@ namespace {
         // The decl referred to by the path component cannot be within an actor.
         if (component.hasDeclRef()) {
           auto concDecl = component.getDeclRef();
-          auto isolation = ActorIsolationRestriction::forDeclaration(concDecl);
+          auto isolation = ActorIsolationRestriction::forDeclaration(
+              concDecl, getDeclContext());
 
           switch (isolation.getKind()) {
           case ActorIsolationRestriction::Unsafe:
@@ -2144,12 +2157,14 @@ namespace {
     }
 
     /// Check whether we are in an actor's initializer or deinitializer.
-    static bool isActorInitOrDeInitContext(const DeclContext *dc) {
+    /// \returns nullptr iff we are not in such a declaration. Otherwise,
+    ///          returns a pointer to the declaration.
+    static AbstractFunctionDecl const* isActorInitOrDeInitContext(const DeclContext *dc) {
       while (true) {
         // Non-Sendable closures are considered part of the enclosing context.
         if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
           if (isSendableClosure(closure, /*forActorIsolation=*/false))
-            return false;
+            return nullptr;
 
           dc = dc->getParent();
           continue;
@@ -2159,7 +2174,7 @@ namespace {
           // If this is an initializer or deinitializer of an actor, we're done.
           if ((isa<ConstructorDecl>(func) || isa<DestructorDecl>(func)) &&
               getSelfActorDecl(dc->getParent()))
-            return true;
+            return func;
 
           // Non-Sendable local functions are considered part of the enclosing
           // context.
@@ -2167,7 +2182,7 @@ namespace {
             if (auto fnType =
                     func->getInterfaceType()->getAs<AnyFunctionType>()) {
               if (fnType->isSendable())
-                return false;
+                return nullptr;
 
               dc = dc->getParent();
               continue;
@@ -2175,8 +2190,15 @@ namespace {
           }
         }
 
-        return false;
+        return nullptr;
       }
+    }
+
+    static bool isConvenienceInit(AbstractFunctionDecl const* fn) {
+      if (auto ctor = dyn_cast_or_null<ConstructorDecl>(fn))
+        return ctor->isConvenienceInit();
+
+      return false;
     }
 
     /// Check a reference to a local or global.
@@ -2191,7 +2213,8 @@ namespace {
         return checkLocalCapture(valueRef, loc, declRefExpr);
 
       switch (auto isolation =
-                  ActorIsolationRestriction::forDeclaration(valueRef)) {
+                  ActorIsolationRestriction::forDeclaration(
+                    valueRef, getDeclContext())) {
       case ActorIsolationRestriction::Unrestricted:
         return false;
 
@@ -2230,7 +2253,8 @@ namespace {
 
       auto member = memberRef.getDecl();
       switch (auto isolation =
-                  ActorIsolationRestriction::forDeclaration(memberRef)) {
+                  ActorIsolationRestriction::forDeclaration(
+                    memberRef, getDeclContext())) {
       case ActorIsolationRestriction::Unrestricted:
         return false;
 
@@ -2252,9 +2276,10 @@ namespace {
         bool continueToCheckingLocalIsolation = false;
         // Must reference distributed actor-isolated state on 'self'.
         //
-        // FIXME: For now, be loose about access to "self" in actor
-        // initializers/deinitializers. We'll want to tighten this up once
-        // we decide exactly how the model should go.
+        // FIXME(78484431): For now, be loose about access to "self" in actor
+        // initializers/deinitializers for distributed actors.
+        // We'll want to tighten this up once we decide exactly
+        // how the model should go.
         auto isolatedActor = getIsolatedActor(base);
         if (!isolatedActor &&
             !(isolatedActor.isActorSelf() &&
@@ -2312,14 +2337,12 @@ namespace {
         if (isolatedActor)
           return false;
 
-        // An instance member of an actor can be referenced from an initializer
-        // or deinitializer.
-        // FIXME: We likely want to narrow this down to only stored properties,
-        // but this matches existing behavior.
-        if (isolatedActor.isActorSelf() &&
-            member->isInstanceMember() &&
-            isActorInitOrDeInitContext(getDeclContext()))
-          return false;
+        // An instance member of an actor can be referenced from an actor's
+        // designated initializer or deinitializer.
+        if (isolatedActor.isActorSelf() && member->isInstanceMember())
+          if (auto fn = isActorInitOrDeInitContext(getDeclContext()))
+            if (!isConvenienceInit(fn))
+              return false;
 
         // An escaping partial application of something that is part of
         // the actor's isolated state is never permitted.
@@ -2398,6 +2421,7 @@ namespace {
       return getExplicitGlobalActor(closure);
     }
 
+  public:
     /// Determine the isolation of a particular closure.
     ///
     /// This function assumes that enclosing closures have already had their
@@ -2619,6 +2643,12 @@ void swift::checkPropertyWrapperActorIsolation(
    PatternBindingDecl *binding, Expr *expr) {
   ActorIsolationChecker checker(binding->getDeclContext());
   expr->walk(checker);
+}
+
+ClosureActorIsolation
+swift::determineClosureActorIsolation(AbstractClosureExpr *closure) {
+  ActorIsolationChecker checker(closure->getParent());
+  return checker.determineClosureIsolation(closure);
 }
 
 /// Determine actor isolation solely from attributes.
@@ -2930,8 +2960,10 @@ static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
-  case DeclKind::Constructor:
     return MemberIsolationPropagation::GlobalActor;
+
+  case DeclKind::Constructor:
+    return MemberIsolationPropagation::AnyIsolation;
 
   case DeclKind::Func:
   case DeclKind::Accessor:
@@ -3001,6 +3033,19 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // If this declaration has one of the actor isolation attributes, report
   // that.
   if (auto isolationFromAttr = getIsolationFromAttributes(value)) {
+    // Nonisolated declarations must involve Sendable types.
+    if (*isolationFromAttr == ActorIsolation::Independent) {
+      SubstitutionMap subs;
+      if (auto genericEnv = value->getInnermostDeclContext()
+              ->getGenericEnvironmentOfContext()) {
+        subs = genericEnv->getForwardingSubstitutionMap();
+      }
+      diagnoseNonConcurrentTypesInReference(
+          ConcreteDeclRef(value, subs),
+          value->getDeclContext()->getParentModule(), value->getLoc(),
+          ConcurrentReferenceKind::Nonisolated);
+    }
+
     return *isolationFromAttr;
   }
 
@@ -3014,6 +3059,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
       defaultIsolation = ActorIsolation::forIndependent();
     }
   }
+
+  // An actor's convenience init is assumed to be actor-independent.
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
+    if (nominal->isActor())
+      if (auto ctor = dyn_cast<ConstructorDecl>(value))
+        if (ctor->isConvenienceInit())
+          defaultIsolation = ActorIsolation::forIndependent();
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](
@@ -3174,10 +3226,6 @@ bool HasIsolatedSelfRequest::evaluate(
 
   switch (*memberIsolation) {
   case MemberIsolationPropagation::GlobalActor:
-    // Treat constructors as being actor-isolated... for now.
-    if (isa<ConstructorDecl>(value))
-      break;
-
     return false;
 
   case MemberIsolationPropagation::AnyIsolation:
@@ -3212,6 +3260,13 @@ bool HasIsolatedSelfRequest::evaluate(
       if (isolation.getActor() != selfTypeDecl)
         return false;
       break;
+    }
+  }
+
+  // In an actor's convenience init, self is not isolated.
+  if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
+    if (ctor->isConvenienceInit()) {
+      return false;
     }
   }
 

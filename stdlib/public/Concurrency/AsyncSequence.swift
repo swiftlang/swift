@@ -16,7 +16,7 @@ import Swift
 /// elements.
 ///
 /// An `AsyncSequence` resembles the `Sequence` type --- offering a list of
-/// values you can step through one at a time --- and adds asynchroncity. An
+/// values you can step through one at a time --- and adds asynchronicity. An
 /// `AsyncSequence` may have all, some, or none of its values available when
 /// you first use it. Instead, you use `await` to receive values as they become
 /// available.

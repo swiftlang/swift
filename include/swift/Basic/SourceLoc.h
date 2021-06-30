@@ -123,6 +123,14 @@ public:
   /// includes both this range and the other one.
   void widen(SourceRange Other);
 
+  /// Checks whether this range contains the given location. Note that the given
+  /// location should correspond to the start of a token, since locations inside
+  /// the last token may be considered outside the range by this function.
+  bool contains(SourceLoc Loc) const;
+
+  /// Checks whether this range overlaps with the given range.
+  bool overlaps(SourceRange Other) const;
+
   bool operator==(const SourceRange &other) const {
     return Start == other.Start && End == other.End;
   }
