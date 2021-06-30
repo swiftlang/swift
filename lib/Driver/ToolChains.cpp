@@ -585,8 +585,8 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
     context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
-    context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
   }
+  context.Args.AddLastArg(Arguments, options::OPT_include_spi_symbols);
 
   return II;
 }
