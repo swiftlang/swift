@@ -727,4 +727,13 @@ struct TuplifiedStructWithInvalidClosure {
       42
     }
   }
+
+  @TupleBuilder var nestedErrorsDiagnosedByParser: some Any {
+    tuplify(true) { _ in
+      tuplify { _ in
+        self. // expected-error {{expected member name following '.'}}
+      }
+      42
+    }
+  }
 }

@@ -1869,12 +1869,8 @@ public:
           E, DC, /*replaceInvalidRefsWithErrors=*/true);
       HasError |= transaction.hasErrors();
 
-      if (!HasError) {
-        E->forEachChildExpr([&](Expr *expr) {
-          HasError |= isa<ErrorExpr>(expr);
-          return HasError ? nullptr : expr;
-        });
-      }
+      if (!HasError)
+        HasError |= containsErrorExpr(E);
 
       if (SuppressDiagnostics)
         transaction.abort();
@@ -1894,6 +1890,29 @@ public:
 
     // Otherwise, recurse into the statement normally.
     return std::make_pair(true, S);
+  }
+
+  /// Check whether given expression (including single-statement
+  /// closures) contains `ErrorExpr` as one of its sub-expressions.
+  bool containsErrorExpr(Expr *expr) {
+    bool hasError = false;
+
+    expr->forEachChildExpr([&](Expr *expr) -> Expr * {
+      hasError |= isa<ErrorExpr>(expr);
+      if (hasError)
+        return nullptr;
+
+      if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+        if (shouldTypeCheckInEnclosingExpression(closure)) {
+          hasError |= containsErrorExpr(closure->getSingleExpressionBody());
+          return hasError ? nullptr : expr;
+        }
+      }
+
+      return expr;
+    });
+
+    return hasError;
   }
 
   /// Ignore patterns.
