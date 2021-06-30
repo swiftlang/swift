@@ -1,0 +1,7 @@
+# REQUIRES: standalone_build
+
+# RUN: %empty-directory(%t)
+# RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --cmake %cmake --libdispatch --cross-compile-hosts=android-aarch64 --skip-local-build --android --android-ndk %t/ndk/ --android-arch aarch64 --android-icu-uc %t/lib/libicuuc.so --android-icu-uc-include %t/include/ --android-icu-i18n %t/lib/libicui18n.so --android-icu-i18n-include %t/include/ --android-icu-data %t/lib/libicudata.so 2>&1 | %FileCheck %s
+
+# CHECK: -DCMAKE_Swift_FLAGS{{.*}}-target {{.*}}unknown-linux-android{{.*}} -sdk
+# CHECK: -DCMAKE_SYSTEM_NAME=Android {{.*}} -DCMAKE_ANDROID_NDK
