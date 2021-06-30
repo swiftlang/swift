@@ -302,9 +302,9 @@ static int printDiags();
 static void getSemanticInfo(sourcekitd_variant_t Info, StringRef Filename);
 
 static Optional<int64_t> getReqOptValueAsInt(StringRef Value) {
-  if (Value.equals_lower("true"))
+  if (Value.equals_insensitive("true"))
     return 1;
-  if (Value.equals_lower("false"))
+  if (Value.equals_insensitive("false"))
     return 0;
   int64_t Ret;
   if (Value.find_first_not_of("-0123456789") != StringRef::npos ||

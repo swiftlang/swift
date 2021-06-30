@@ -45,8 +45,8 @@ bool swift::canBeMemberName(StringRef identifier) {
 }
 
 bool swift::isPreposition(StringRef word) {
-#define PREPOSITION(Word)                       \
-  if (word.equals_lower(#Word))                 \
+#define PREPOSITION(Word)                                                      \
+  if (word.equals_insensitive(#Word))                                          \
     return true;
 #include "PartsOfSpeech.def"
 
@@ -55,11 +55,11 @@ bool swift::isPreposition(StringRef word) {
 
 PartOfSpeech swift::getPartOfSpeech(StringRef word) {
   // FIXME: This implementation is woefully inefficient.
-#define PREPOSITION(Word)                       \
-  if (word.equals_lower(#Word))                 \
+#define PREPOSITION(Word)                                                      \
+  if (word.equals_insensitive(#Word))                                          \
     return PartOfSpeech::Preposition;
-#define VERB(Word)                              \
-  if (word.equals_lower(#Word))                 \
+#define VERB(Word)                                                             \
+  if (word.equals_insensitive(#Word))                                          \
     return PartOfSpeech::Verb;
 #include "PartsOfSpeech.def"
 
@@ -417,7 +417,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
   }
 
   // Check for an exact match.
-  return nameWord.equals_lower(typeWord);
+  return nameWord.equals_insensitive(typeWord);
 }
 
 /// Match the beginning of the name to the given type name.
