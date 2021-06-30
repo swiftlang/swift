@@ -932,26 +932,27 @@ bool AttributedFuncToTypeConversionFailure::
   if (!loc->findLast<LocatorPathElt::FunctionArgument>())
     return false;
 
-  auto &solution = getSolution();
-  auto decl = getDestinationVarDecl(AE, solution);
-  if (!decl)
-    return false;
+  auto destType = getType(AE->getDest())->lookThroughAllOptionalTypes();
+  auto destFnType = destType->castTo<FunctionType>();
+  auto sourceType = getType(AE->getSrc())->lookThroughAllOptionalTypes();
 
   // The tuple locator element will give us the exact parameter mismatch
   // position.
   auto tupleElt = loc->getLastElementAs<LocatorPathElt::TupleElement>();
   auto mismatchPosition = tupleElt ? tupleElt->getIndex() : 0;
+  auto param = destFnType->getParams()[mismatchPosition];
 
-  auto destInterfaceType =
-      decl->getInterfaceType()->lookThroughAllOptionalTypes();
-  auto destInterfaceFnType = destInterfaceType->castTo<FunctionType>();
-  auto param = destInterfaceFnType->getParams()[mismatchPosition];
-  emitDiagnostic(diag::converting_noattrfunc_contravariant_parameter_position,
-                 mismatchPosition, decl->getName(), param.getParameterType(),
-                 decl->getDescriptiveKind());
+  emitDiagnostic(diag::cannot_convert_assign, sourceType, destType);
+  emitDiagnosticAt(AE->getDest()->getLoc(),
+                   diag::escape_expected_at_parameter_position,
+                   mismatchPosition, param.getParameterType());
 
-  auto note = emitDiagnosticAt(decl->getLoc(), diag::add_explicit_escaping,
-                               mismatchPosition);
+  auto &solution = getSolution();
+  auto decl = getDestinationVarDecl(AE, solution);
+  // We couldn't find a declaration to add an extra note with a fix-it but
+  // the main diagnostic was already covered.
+  if (!decl)
+    return true;
 
   auto declRepr = decl->getTypeReprOrParentPatternTypeRepr();
   class TopLevelFuncReprFinder : public ASTWalker {
@@ -972,8 +973,10 @@ bool AttributedFuncToTypeConversionFailure::
 
   auto declFnRepr = fnFinder.FnRepr;
   if (!declFnRepr)
-    return false;
+    return true;
 
+  auto note = emitDiagnosticAt(decl->getLoc(), diag::add_explicit_escaping,
+                               mismatchPosition);
   auto argsRepr = declFnRepr->getArgsTypeRepr();
   auto argRepr = argsRepr->getElement(mismatchPosition).Type;
   if (!param.isAutoClosure()) {

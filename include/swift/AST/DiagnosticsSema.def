@@ -3890,10 +3890,9 @@ ERROR(converting_noattrfunc_to_type,none,
       "converting %select{non-escaping|non-concurrent function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
-ERROR(converting_noattrfunc_contravariant_parameter_position,none,
-      "converting escaping to non-escaping functions of type %2 in parameter position "
-      "#%0 of function type %3 %1 is not allowed",
-      (unsigned, Identifier, Type, DescriptiveDeclKind))
+NOTE(escape_expected_at_parameter_position,none,
+     "parameter #%0 expects escaping value of type %1",
+     (unsigned, Type))
 NOTE(add_explicit_escaping,none,
      "add explicit @escaping to function parameter #%0",
      (unsigned))
