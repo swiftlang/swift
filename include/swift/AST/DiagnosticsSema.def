@@ -4608,6 +4608,8 @@ ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
+ERROR(global_actor_non_final_class,none,
+      "non-final class %0 cannot be a global actor", (DeclName))
       
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
