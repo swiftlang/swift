@@ -5422,7 +5422,7 @@ public:
       switch (Reason) {
       case DeclVisibilityKind::MemberOfProtocolConformedToByCurrentNominal:
       case DeclVisibilityKind::MemberOfProtocolDerivedByCurrentNominal:
-        if (!C->isFinal())
+        if (!C->isSemanticallyFinal())
           needRequired = true;
         break;
       case DeclVisibilityKind::MemberOfSuper:
@@ -5458,7 +5458,7 @@ public:
     if (D->shouldHideFromEditor())
       return;
 
-    if (D->isFinal())
+    if (D->isSemanticallyFinal())
       return;
 
     bool hasIntroducer = hasFuncIntroducer ||

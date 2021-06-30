@@ -2374,6 +2374,10 @@ public:
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
+  /// Is this declaration semantically 'final', meaning that the type checker
+  /// should treat it as final even if the ABI does not?
+  bool isSemanticallyFinal() const;
+
   /// Is this declaration 'final'?
   bool isFinal() const;
 

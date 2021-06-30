@@ -871,7 +871,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return true;
 
   // The presence of 'final' blocks the inference of 'dynamic'.
-  if (decl->isFinal())
+  if (decl->isSemanticallyFinal())
     return false;
 
   // Types are never 'dynamic'.
@@ -1868,7 +1868,7 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (dc->isTypeContext()) {
     if (auto classDecl = dc->getSelfClassDecl()) {
       // For a class, we also need the function or class to be 'final'.
-      if (!classDecl->isFinal() && !FD->isFinal() &&
+      if (!classDecl->isSemanticallyFinal() && !FD->isFinal() &&
           FD->getStaticLoc().isValid() &&
           FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
         FD->diagnose(diag::nonfinal_operator_in_class,

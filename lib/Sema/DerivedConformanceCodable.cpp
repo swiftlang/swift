@@ -1789,7 +1789,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   }
 
   // This constructor should be marked as `required` for non-final classes.
-  if (classDecl && !classDecl->isFinal()) {
+  if (classDecl && !classDecl->isSemanticallyFinal()) {
     auto *reqAttr = new (C) RequiredAttr(/*IsImplicit=*/true);
     initDecl->getAttrs().add(reqAttr);
   }
