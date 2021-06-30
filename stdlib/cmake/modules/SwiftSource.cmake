@@ -643,7 +643,7 @@ function(_compile_swift_files
   endif()
 
   set(swift_compiler_tool_dep)
-  if(SWIFT_INCLUDE_TOOLS)
+  if(SWIFT_INCLUDE_TOOLS AND NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
     # Depend on the binary itself, in addition to the symlink.
     set(swift_compiler_tool_dep "swift-frontend")
   endif()
