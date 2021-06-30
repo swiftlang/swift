@@ -2418,6 +2418,7 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
   case Kind::Identity:
   case Kind::TupleElement:
   case Kind::DictionaryKey:
+  case Kind::CodeCompletion:
     llvm_unreachable("no hashable conformances for this kind");
   }
 }

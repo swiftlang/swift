@@ -614,7 +614,15 @@ class CompletionContextFinder : public ASTWalker {
 
   /// Stack of all "interesting" contexts up to code completion expression.
   llvm::SmallVector<Context, 4> Contexts;
-  CodeCompletionExpr *CompletionExpr = nullptr;
+
+  /// If we are completing inside an expression, the \c CodeCompletionExpr that
+  /// represents the code completion token.
+
+  /// The AST node that represents the code completion token, either as an
+  /// expression or a KeyPath component.
+  llvm::PointerUnion<CodeCompletionExpr *, const KeyPathExpr::Component *>
+      CompletionNode;
+
   Expr *InitialExpr = nullptr;
   DeclContext *InitialDC;
 
@@ -660,8 +668,17 @@ public:
     }
 
     if (auto *CCE = dyn_cast<CodeCompletionExpr>(E)) {
-      CompletionExpr = CCE;
+      CompletionNode = CCE;
       return std::make_pair(false, nullptr);
+    }
+    if (auto *KeyPath = dyn_cast<KeyPathExpr>(E)) {
+      for (auto &component : KeyPath->getComponents()) {
+        if (component.getKind() ==
+            KeyPathExpr::Component::Kind::CodeCompletion) {
+          CompletionNode = &component;
+          return std::make_pair(false, nullptr);
+        }
+      }
     }
 
     return std::make_pair(true, E);
@@ -687,12 +704,21 @@ public:
   }
 
   bool hasCompletionExpr() const {
-    return CompletionExpr;
+    return CompletionNode.dyn_cast<CodeCompletionExpr *>() != nullptr;
   }
 
   CodeCompletionExpr *getCompletionExpr() const {
-    assert(CompletionExpr);
-    return CompletionExpr;
+    assert(hasCompletionExpr());
+    return CompletionNode.get<CodeCompletionExpr *>();
+  }
+
+  bool hasCompletionKeyPathComponent() const {
+    return CompletionNode.dyn_cast<const KeyPathExpr::Component *>() != nullptr;
+  }
+
+  const KeyPathExpr::Component *getCompletionKeyPathComponent() const {
+    assert(hasCompletionKeyPathComponent());
+    return CompletionNode.get<const KeyPathExpr::Component *>();
   }
 
   struct Fallback {
@@ -706,7 +732,11 @@ public:
   /// of the enclosing context e.g. when completion is an argument
   /// to a call.
   Optional<Fallback> getFallbackCompletionExpr() const {
-    assert(CompletionExpr);
+    if (!hasCompletionExpr()) {
+      // Creating a fallback expression only makes sense if we are completing in
+      // an expression, not when we're completing in a key path.
+      return None;
+    }
 
     Optional<Fallback> fallback;
     bool separatePrecheck = false;
@@ -742,8 +772,8 @@ public:
     if (fallback)
       return fallback;
 
-    if (CompletionExpr->getBase() && CompletionExpr != InitialExpr)
-      return Fallback{CompletionExpr, fallbackDC, separatePrecheck};
+    if (getCompletionExpr()->getBase() && getCompletionExpr() != InitialExpr)
+      return Fallback{getCompletionExpr(), fallbackDC, separatePrecheck};
     return None;
   }
 
@@ -798,7 +828,7 @@ static void filterSolutions(SolutionApplicationTarget &target,
   // the other formed solutions (which require fixes). We should generate enum
   // pattern completions separately, but for now ignore the
   // _OptionalNilComparisonType solution.
-  if (isForPatternMatch(target)) {
+  if (isForPatternMatch(target) && completionExpr) {
     solutions.erase(llvm::remove_if(solutions, [&](const Solution &S) {
       ASTContext &ctx = S.getConstraintSystem().getASTContext();
       if (!S.hasType(completionExpr))
@@ -855,7 +885,8 @@ bool TypeChecker::typeCheckForCodeCompletion(
 
   // If there was no completion expr (e.g. if the code completion location was
   // among tokens that were skipped over during parser error recovery) bail.
-  if (!contextAnalyzer.hasCompletionExpr())
+  if (!contextAnalyzer.hasCompletionExpr() &&
+      !contextAnalyzer.hasCompletionKeyPathComponent())
     return false;
 
   // Interpolation components are type-checked separately.
@@ -901,7 +932,11 @@ bool TypeChecker::typeCheckForCodeCompletion(
     // FIXME: instead of filtering, expose the score and viability to clients.
     // Remove any solutions that both require fixes and have a score that is
     // worse than the best.
-    filterSolutions(target, solutions, contextAnalyzer.getCompletionExpr());
+    CodeCompletionExpr *completionExpr = nullptr;
+    if (contextAnalyzer.hasCompletionExpr()) {
+      completionExpr = contextAnalyzer.getCompletionExpr();
+    }
+    filterSolutions(target, solutions, completionExpr);
 
     // Similarly, if the type-check didn't produce any solutions, fall back
     // to type-checking a sub-expression in isolation.
@@ -1241,4 +1276,56 @@ sawSolution(const constraints::Solution &S) {
 
   bool SingleExprBody = isImplicitSingleExpressionReturn(CS, CompletionExpr);
   Results.push_back({ExpectedTy, SingleExprBody});
+}
+
+void KeyPathTypeCheckCompletionCallback::sawSolution(
+    const constraints::Solution &S) {
+  // Determine the code completion.
+  size_t ComponentIndex = 0;
+  for (auto &Component : KeyPath->getComponents()) {
+    if (Component.getKind() == KeyPathExpr::Component::Kind::CodeCompletion) {
+      break;
+    } else {
+      ComponentIndex++;
+    }
+  }
+  assert(ComponentIndex < KeyPath->getComponents().size() &&
+         "Didn't find a code compleiton component?");
+
+  auto &CS = S.getConstraintSystem();
+  Type BaseType;
+  if (ComponentIndex == 0) {
+    // We are completing on the root and need to extract the key path's root
+    // type.
+    if (KeyPath->getRootType()) {
+      BaseType = S.getResolvedType(KeyPath->getRootType());
+    } else {
+      // The key path doesn't have a root TypeRepr set, so we can't look the key
+      // path's root up through it. Build a constraint locator and look the
+      // root type up through it.
+      // FIXME: Improve the linear search over S.typeBindings when it's possible
+      // to look up type variables by their locators.
+      auto RootLocator =
+          S.getConstraintLocator(KeyPath, {ConstraintLocator::KeyPathRoot});
+      auto BaseVariableType =
+          llvm::find_if(S.typeBindings, [&RootLocator](const auto &Entry) {
+            return Entry.first->getImpl().getLocator() == RootLocator;
+          })->getSecond();
+      BaseType = S.simplifyType(BaseVariableType);
+    }
+  } else {
+    // We are completing after a component. Get the previous component's result
+    // type.
+    BaseType = S.simplifyType(CS.getType(KeyPath, ComponentIndex - 1));
+  }
+
+  // If ExpectedTy is a duplicate of any other result, ignore this solution.
+  if (llvm::any_of(Results, [&](const Result &R) {
+    return R.BaseType->isEqual(BaseType);
+  })) {
+    return;
+  }
+  if (BaseType) {
+    Results.push_back({BaseType, /*OnRoot=*/(ComponentIndex == 0)});
+  }
 }
