@@ -22,7 +22,6 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <algorithm>
@@ -37,6 +36,7 @@ namespace swift {
 
 namespace rewriting {
 
+class EquivalenceClassMap;
 class MutableTerm;
 class RewriteContext;
 class Term;
@@ -73,6 +73,17 @@ class Atom final {
 public:
   enum class Kind : uint8_t {
     //////
+    ////// Special atom kind that is both type-like and property-like:
+    //////
+
+    /// When appearing at the start of a term, denotes a nested
+    /// type of a protocol 'Self' type.
+    ///
+    /// When appearing at the end of a term, denotes that the
+    /// term's type conforms to the protocol.
+    Protocol,
+
+    //////
     ////// "Type-like" atom kinds:
     //////
 
@@ -90,15 +101,8 @@ public:
     Name,
 
     //////
-    ////// "Fact-like" atom kinds:
+    ////// "Property-like" atom kinds:
     //////
-
-    /// When appearing at the start of a term, denotes a nested
-    /// type of a protocol 'Self' type.
-    ///
-    /// When appearing at the end of a term, denotes that the
-    /// term's type conforms to the protocol.
-    Protocol,
 
     /// When appearing at the end of a term, denotes that the
     /// term's type satisfies the layout constraint.
@@ -125,6 +129,17 @@ private:
 
 public:
   Kind getKind() const;
+
+  /// A property records something about a type term; either a protocol
+  /// conformance, a layout constraint, or a superclass or concrete type
+  /// constraint.
+  bool isProperty() const {
+    auto kind = getKind();
+    return (kind == Atom::Kind::Protocol ||
+            kind == Atom::Kind::Layout ||
+            kind == Atom::Kind::Superclass ||
+            kind == Atom::Kind::ConcreteType);
+  }
 
   bool isSuperclassOrConcreteType() const {
     auto kind = getKind();
@@ -199,6 +214,11 @@ public:
   friend bool operator!=(Atom lhs, Atom rhs) {
     return !(lhs == rhs);
   }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Atom atom) {
+    atom.dump(out);
+    return out;
+  }
 };
 
 /// See the implementation of MutableTerm::checkForOverlap() for a discussion.
@@ -259,6 +279,11 @@ public:
 
   friend bool operator!=(Term lhs, Term rhs) {
     return !(lhs == rhs);
+  }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out, Term term) {
+    term.dump(out);
+    return out;
   }
 };
 
@@ -353,6 +378,23 @@ public:
                               MutableTerm &v) const;
 
   void dump(llvm::raw_ostream &out) const;
+
+  friend bool operator==(const MutableTerm &lhs, const MutableTerm &rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+
+    return std::equal(lhs.begin(), lhs.end(), rhs.begin());
+  }
+
+  friend bool operator!=(const MutableTerm &lhs, const MutableTerm &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                       const MutableTerm &term) {
+    term.dump(out);
+    return out;
+  }
 };
 
 /// A global object that can be shared by multiple rewrite systems.
@@ -452,6 +494,12 @@ public:
   }
 
   void dump(llvm::raw_ostream &out) const;
+
+  friend llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                                       const Rule &rule) {
+    rule.dump(out);
+    return out;
+  }
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -531,11 +579,12 @@ public:
     MaxDepth
   };
 
-  CompletionResult computeConfluentCompletion(
-      unsigned maxIterations,
-      unsigned maxDepth);
+  std::pair<CompletionResult, unsigned>
+  computeConfluentCompletion(unsigned maxIterations, unsigned maxDepth);
 
   void simplifyRightHandSides();
+
+  bool buildEquivalenceClassMap(EquivalenceClassMap &map);
 
   void dump(llvm::raw_ostream &out) const;
 
