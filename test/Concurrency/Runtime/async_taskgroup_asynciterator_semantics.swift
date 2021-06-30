@@ -4,7 +4,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: linux
-// XFAIL: windows
 
 struct Boom: Error {}
 
