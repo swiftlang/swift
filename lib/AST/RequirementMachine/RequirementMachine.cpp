@@ -85,6 +85,7 @@ void RewriteSystemBuilder::addGenericSignature(CanGenericSignature sig) {
   Protocols.visitRequirements(sig->getRequirements());
   Protocols.computeTransitiveClosure();
   Protocols.computeLinearOrder();
+  Protocols.computeInheritedProtocols();
   Protocols.computeInheritedAssociatedTypes();
 
   // Add rewrite rules for each protocol.
