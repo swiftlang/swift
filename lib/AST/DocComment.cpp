@@ -115,7 +115,7 @@ bool extractParameterOutline(
     }
 
     auto HeadingContent = HeadingText->getLiteralContent();
-    if (!HeadingContent.rtrim().equals_lower("parameters:")) {
+    if (!HeadingContent.rtrim().equals_insensitive("parameters:")) {
       NormalItems.push_back(Child);
       continue;
     }

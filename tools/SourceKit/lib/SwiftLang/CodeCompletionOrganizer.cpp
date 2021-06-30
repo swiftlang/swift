@@ -544,7 +544,8 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
       match = completion->getName().startswith_lower(filterText);
     }
 
-    bool isExactMatch = match && completion->getName().equals_lower(filterText);
+    bool isExactMatch =
+        match && completion->getName().equals_insensitive(filterText);
 
     if (isExactMatch) {
       if (!exactMatch) { // first match
