@@ -41,6 +41,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataLayout.h"
 #include "StructLayout.h"
 #include "TypeInfo.h"
 
@@ -815,15 +816,72 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   });
 }
 
+namespace {
+struct BoundGenericTypeCharacteristics {
+  SILType concreteType;
+  const TypeInfo *TI;
+  FixedPacking packing;
+};
+
+ValueWitnessFlags getValueWitnessFlags(const TypeInfo *TI, SILType concreteType,
+                                       FixedPacking packing) {
+  ValueWitnessFlags flags;
+
+  // If we locally know that the type has fixed layout, we can emit
+  // meaningful flags for it.
+  if (auto *fixedTI = dyn_cast<FixedTypeInfo>(TI)) {
+    assert(packing == FixedPacking::OffsetZero ||
+           packing == FixedPacking::Allocate);
+    bool isInline = packing == FixedPacking::OffsetZero;
+    bool isBitwiseTakable =
+        fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal);
+    assert(isBitwiseTakable || !isInline);
+    flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
+                .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
+                .withInlineStorage(isInline)
+                .withBitwiseTakable(isBitwiseTakable);
+  } else {
+    flags = flags.withIncomplete(true);
+  }
+
+  if (concreteType.getEnumOrBoundGenericEnum())
+    flags = flags.withEnumWitnesses(true);
+
+  return flags;
+}
+
+unsigned getExtraInhabitantCount(const TypeInfo *TI, IRGenModule &IGM) {
+  unsigned value = 0;
+  if (auto *fixedTI = dyn_cast<FixedTypeInfo>(TI)) {
+    value = fixedTI->getFixedExtraInhabitantCount(IGM);
+  }
+  return value;
+}
+
+void addSize(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
+  if (auto staticSize = TI->getStaticSize(IGM))
+    return B.add(staticSize);
+  // Just fill in 0 here if the type can't be statically laid out.
+  return B.addSize(Size(0));
+}
+
+void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
+  if (auto value = TI->getStaticStride(IGM))
+    return B.add(value);
+
+  // Just fill in null here if the type can't be statically laid out.
+  return B.addSize(Size(0));
+}
+} // end anonymous namespace
+
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
-static void addValueWitness(IRGenModule &IGM,
-                            ConstantStructBuilder &B,
-                            ValueWitness index,
-                            FixedPacking packing,
-                            CanType abstractType,
-                            SILType concreteType,
-                            const TypeInfo &concreteTI) {
+static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
+                            ValueWitness index, FixedPacking packing,
+                            CanType abstractType, SILType concreteType,
+                            const TypeInfo &concreteTI,
+                            const Optional<BoundGenericTypeCharacteristics>
+                                boundGenericCharacteristics = llvm::None) {
   auto addFunction = [&](llvm::Constant *fn) {
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
@@ -880,57 +938,51 @@ static void addValueWitness(IRGenModule &IGM,
     goto standard;
 
   case ValueWitness::Size: {
-    if (auto value = concreteTI.getStaticSize(IGM))
-      return B.add(value);
-
-    // Just fill in 0 here if the type can't be statically laid out.
-    return B.addSize(Size(0));
+    if (boundGenericCharacteristics)
+      return addSize(B, boundGenericCharacteristics->TI, IGM);
+    return addSize(B, &concreteTI, IGM);
   }
 
   case ValueWitness::Flags: {
-    ValueWitnessFlags flags;
-
-    // If we locally know that the type has fixed layout, we can emit
-    // meaningful flags for it.
-    if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
-      assert(packing == FixedPacking::OffsetZero ||
-             packing == FixedPacking::Allocate);
-      bool isInline = packing == FixedPacking::OffsetZero;
-      bool isBitwiseTakable =
-          fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal);
-      assert(isBitwiseTakable || !isInline);
-      flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
-                  .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
-                  .withInlineStorage(isInline)
-                  .withBitwiseTakable(isBitwiseTakable);
-    } else {
-      flags = flags.withIncomplete(true);
-    }
-
-    if (concreteType.getEnumOrBoundGenericEnum())
-      flags = flags.withEnumWitnesses(true);
-
-    return B.addInt32(flags.getOpaqueValue());
+    if (boundGenericCharacteristics)
+      return B.addInt32(
+          getValueWitnessFlags(boundGenericCharacteristics->TI,
+                               boundGenericCharacteristics->concreteType,
+                               boundGenericCharacteristics->packing)
+              .getOpaqueValue());
+    return B.addInt32(getValueWitnessFlags(&concreteTI, concreteType, packing)
+                          .getOpaqueValue());
   }
 
   case ValueWitness::ExtraInhabitantCount: {
-    unsigned value = 0;
-    if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
-      value = fixedTI->getFixedExtraInhabitantCount(IGM);
-    }
-    return B.addInt32(value);
+    if (boundGenericCharacteristics)
+      return B.addInt32(
+          getExtraInhabitantCount(boundGenericCharacteristics->TI, IGM));
+    return B.addInt32(getExtraInhabitantCount(&concreteTI, IGM));
   }
 
   case ValueWitness::Stride: {
-    if (auto value = concreteTI.getStaticStride(IGM))
-      return B.add(value);
-
-    // Just fill in null here if the type can't be statically laid out.
-    return B.addSize(Size(0));
+    if (boundGenericCharacteristics)
+      return addStride(B, boundGenericCharacteristics->TI, IGM);
+    return addStride(B, &concreteTI, IGM);
   }
 
-  case ValueWitness::GetEnumTagSinglePayload:
+  case ValueWitness::GetEnumTagSinglePayload: {
+    if (boundGenericCharacteristics)
+      if (auto *enumDecl = boundGenericCharacteristics->concreteType
+                               .getEnumOrBoundGenericEnum())
+        if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
+          return B.add(llvm::ConstantExpr::getBitCast(
+              IGM.getGetMultiPayloadEnumTagSinglePayloadFn(), IGM.Int8PtrTy));
+    goto standard;
+  }
   case ValueWitness::StoreEnumTagSinglePayload: {
+    if (boundGenericCharacteristics)
+      if (auto *enumDecl = boundGenericCharacteristics->concreteType
+                               .getEnumOrBoundGenericEnum())
+        if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
+          return B.add(llvm::ConstantExpr::getBitCast(
+              IGM.getStoreMultiPayloadEnumTagSinglePayloadFn(), IGM.Int8PtrTy));
     goto standard;
   }
 
@@ -949,7 +1001,7 @@ static void addValueWitness(IRGenModule &IGM,
     buildValueWitnessFunction(IGM, fn, index, packing, abstractType,
                               concreteType, concreteTI);
   addFunction(fn);
-}
+ }
 
 static bool shouldAddEnumWitnesses(CanType abstractType) {
   // Needs to handle UnboundGenericType.
@@ -964,22 +1016,21 @@ static llvm::StructType *getValueWitnessTableType(IRGenModule &IGM,
 }
 
 /// Collect the value witnesses for a particular type.
-static void addValueWitnesses(IRGenModule &IGM,
-                              ConstantStructBuilder &B,
-                              FixedPacking packing,
-                              CanType abstractType,
-                              SILType concreteType,
-                              const TypeInfo &concreteTI) {
+static void addValueWitnesses(IRGenModule &IGM, ConstantStructBuilder &B,
+                              FixedPacking packing, CanType abstractType,
+                              SILType concreteType, const TypeInfo &concreteTI,
+                              const Optional<BoundGenericTypeCharacteristics>
+                                  boundGenericCharacteristics = llvm::None) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
-    addValueWitness(IGM, B, ValueWitness(i), packing,
-                    abstractType, concreteType, concreteTI);
+    addValueWitness(IGM, B, ValueWitness(i), packing, abstractType,
+                    concreteType, concreteTI, boundGenericCharacteristics);
   }
   if (shouldAddEnumWitnesses(abstractType)) {
     for (auto i = unsigned(ValueWitness::First_EnumValueWitness);
          i <= unsigned(ValueWitness::Last_EnumValueWitness);
          ++i) {
-      addValueWitness(IGM, B, ValueWitness(i), packing,
-                      abstractType, concreteType, concreteTI);
+      addValueWitness(IGM, B, ValueWitness(i), packing, abstractType,
+                      concreteType, concreteTI, boundGenericCharacteristics);
     }
   }
 }
@@ -995,6 +1046,19 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
                                              ConstantStructBuilder &B,
                                              CanType abstractType,
                                              bool &canBeConstant) {
+  Optional<BoundGenericTypeCharacteristics> boundGenericCharacteristics;
+  if (auto boundGenericType = dyn_cast<BoundGenericType>(abstractType)) {
+    CanType concreteFormalType = getFormalTypeInContext(abstractType);
+
+    auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
+    const auto *boundConcreteTI = &IGM.getTypeInfo(concreteLoweredType);
+    auto packing = boundConcreteTI->getFixedPacking(IGM);
+    boundGenericCharacteristics = {concreteLoweredType, boundConcreteTI,
+                                   packing};
+
+    abstractType =
+        boundGenericType->getDecl()->getDeclaredType()->getCanonicalType();
+  }
   CanType concreteFormalType = getFormalTypeInContext(abstractType);
 
   auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
@@ -1003,10 +1067,12 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
 
   // For now, assume that we never have any interest in dynamically
   // changing the value witnesses for something that's fixed-layout.
-  canBeConstant = concreteTI.isFixedSize();
+  canBeConstant = boundGenericCharacteristics
+                      ? boundGenericCharacteristics->TI->isFixedSize()
+                      : concreteTI.isFixedSize();
 
-  addValueWitnesses(IGM, B, packing, abstractType,
-                    concreteLoweredType, concreteTI);
+  addValueWitnesses(IGM, B, packing, abstractType, concreteLoweredType,
+                    concreteTI, boundGenericCharacteristics);
 }
 
 static constexpr uint64_t sizeAndAlignment(Size size, Alignment alignment) {
