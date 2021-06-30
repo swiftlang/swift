@@ -223,10 +223,6 @@ createDistributedActor_init_local(ClassDecl *classDecl,
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&createBody_DistributedActor_init_transport);
 
-  // This constructor is 'required', all distributed actors MUST invoke it.
-  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-  initDecl->getAttrs().add(reqAttr);
-
   auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
   initDecl->getAttrs().add(nonIsoAttr);
 
@@ -349,9 +345,6 @@ createDistributedActor_init_resolve(ClassDecl *classDecl,
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&createDistributedActor_init_resolve_body);
-
-  // This constructor is 'required', all distributed actors MUST have it.
-  initDecl->getAttrs().add(new (C) RequiredAttr(/*IsImplicit*/true));
 
   auto *nonIsoAttr = new (C) NonisolatedAttr(/*IsImplicit*/true);
   initDecl->getAttrs().add(nonIsoAttr);

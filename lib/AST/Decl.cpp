@@ -3349,9 +3349,6 @@ AccessLevel ValueDecl::getFormalAccess() const {
 }
 
 bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
-  assert(isa<ClassDecl>(this) || isa<ConstructorDecl>(this) ||
-         isPotentiallyOverridable());
-
   AccessLevel access =
       getAdjustedFormalAccess(this, useDC,
                               /*treatUsableFromInlineAsPublic*/false);

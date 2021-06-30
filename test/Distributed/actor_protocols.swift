@@ -49,10 +49,10 @@ actor A2: DistributedActor {
     fatalError()
   }
 
-  required init(transport: ActorTransport) {
+  init(transport: ActorTransport) {
     fatalError()
   }
-  required init(resolve address: ActorAddress, using transport: ActorTransport) throws {
+  init(resolve address: ActorAddress, using transport: ActorTransport) throws {
     fatalError()
   }
 }
