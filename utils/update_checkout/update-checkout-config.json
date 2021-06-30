@@ -10,16 +10,24 @@
             "remote": { "id": "apple/swift-llbuild" } },
         "swift-argument-parser": {
             "remote": { "id": "apple/swift-argument-parser" } },
+        "swift-atomics": {
+            "remote": { "id": "apple/swift-atomics" } },       
+        "swift-collections": {
+            "remote": { "id": "apple/swift-collections" } },
         "swift-crypto": {
             "remote": { "id": "apple/swift-crypto" } },
         "swift-driver": {
             "remote": { "id": "apple/swift-driver" } },
+        "swift-numerics": {
+            "remote": { "id": "apple/swift-numerics" } },        
         "swift-tools-support-core": {
             "remote": { "id": "apple/swift-tools-support-core" } },
         "swiftpm": {
             "remote": { "id": "apple/swift-package-manager" } },
         "swift-syntax": {
             "remote": { "id": "apple/swift-syntax" } },
+        "swift-system": {
+            "remote": { "id": "apple/swift-system" } },
         "swift-stress-tester": {
             "remote": { "id": "apple/swift-stress-tester" } },
         "swift-corelibs-xctest": {
@@ -66,9 +74,13 @@
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "0.4.3",
+                "swift-atomics": "0.0.3",
+                "swift-collections": "0.0.3",
                 "swift-crypto": "1.1.5",
                 "swift-driver": "main",
+                "swift-numerics": "0.1.0",
                 "swift-syntax": "main",
+                "swift-system": "0.0.2",
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
@@ -178,9 +190,13 @@
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "0.3.0",
+                "swift-atomics": "0.0.3",
+                "swift-collections": "0.0.3",                
                 "swift-crypto": "1.1.5",
                 "swift-driver": "main",
+                "swift-numerics": "0.1.0",
                 "swift-syntax": "main",
+                "swift-system": "0.0.2",                
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
@@ -209,9 +225,13 @@
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
                 "swift-argument-parser": "0.4.3",
-                "swift-crypto": "1.1.5",
+                "swift-atomics": "0.0.3",
+                "swift-collections": "0.0.3",                
+                "swift-crypto": "1.1.5",                
                 "swift-driver": "main",
+                "swift-numerics": "0.1.0",
                 "swift-syntax": "main",
+                "swift-system": "0.0.2",                
                 "swift-stress-tester": "main",
                 "swift-corelibs-xctest": "main",
                 "swift-corelibs-foundation": "main",
