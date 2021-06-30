@@ -23,4 +23,5 @@ OLD_SYMBOL($ss4TaskV8PriorityO11unspecifiedyA2DmFWC)
 OLD_SYMBOL($ss6detach8priority9operations4TaskV6HandleVy_xs5NeverOGAE8PriorityO_xyYaYbcntlF)
 OLD_SYMBOL($ss6detach8priority9operations4TaskV6HandleVy_xs5NeverOGAE8PriorityO_xyYaYbcntlFfA_)
 OLD_SYMBOL($ss18UnsafeContinuationVMn)
+OLD_SYMBOL($s13AsyncIterators0A8SequencePTl)
 
