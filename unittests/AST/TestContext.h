@@ -16,6 +16,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
 #include "llvm/Support/Host.h"
 
@@ -32,6 +33,7 @@ public:
   TypeCheckerOptions TypeCheckerOpts;
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
+  symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
