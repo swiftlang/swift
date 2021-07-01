@@ -13,6 +13,6 @@
 import Foundation
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers public actor SomeActor : ObjectiveC.NSObject {
-// CHECK: @objc override dynamic public init()
+// CHECK: @objc override public init()
 public actor SomeActor: NSObject {
 }

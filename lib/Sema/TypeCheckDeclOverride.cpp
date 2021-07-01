@@ -1028,7 +1028,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   } else if (baseHasOpenAccess &&
              classDecl->hasOpenAccess(dc) &&
              decl->getFormalAccess() < AccessLevel::Public &&
-             !decl->isFinal()) {
+             !decl->isSemanticallyFinal()) {
     {
       auto diag = diags.diagnose(decl, diag::override_not_accessible,
                                  /*setter*/false,
@@ -1150,7 +1150,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   if (decl->getASTContext().isSwiftVersionAtLeast(5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
-      !classDecl->isFinal()) {
+      !classDecl->isSemanticallyFinal()) {
     diags.diagnose(decl, diag::override_dynamic_self_mismatch);
     diags.diagnose(baseDecl, diag::overridden_here);
   }
@@ -1942,7 +1942,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   }
 
   // The overridden declaration cannot be 'final'.
-  if (base->isFinal() && !isAccessor) {
+  if (base->isSemanticallyFinal() && !isAccessor) {
     // Use a special diagnostic for overriding an actor's unownedExecutor
     // method.  TODO: only if it's implicit?  But then we need to
     // propagate implicitness in module interfaces.

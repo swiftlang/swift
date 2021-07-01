@@ -8,6 +8,44 @@ Swift 5.5
 
 * [SE-0313][]:
 
+	A type can be defined as a global actor. Global actors extend the notion
+	of actor isolation outside of a single actor type, so that global state
+	(and the functions that access it) can benefit from actor isolation,
+	even if the state and functions are scattered across many different
+	types, functions and modules. Global actors make it possible to safely
+	work with global variables in a concurrent program, as well as modeling
+	other global program constraints such as code that must only execute on
+  the "main thread" or "UI thread". A new global actor can be defined with
+  the `globalActor` attribute:
+
+  ```swift
+  @globalActor
+  struct DatabaseActor {
+    actor ActorType { }
+
+    static let shared: ActorType = ActorType()
+  }
+  ```
+
+  Global actor types can be used as custom attributes on various declarations,
+  which ensures that those declarations are only accessed on the actor described
+  by the global actor's `shared` instance. For example:
+
+  ```swift
+  @DatabaseActor func queryDB(query: Query) throws -> QueryResult
+
+  func runQuery(queryString: String) async throws -> QueryResult {
+    let query = try Query(parsing: queryString)
+    return try await queryDB(query: query) // 'await' because this implicitly hops to DatabaseActor.shared
+  }
+  ```
+
+  The concurrency library defines one global actor, `MainActor`, which
+  represents the main thread of execution. It should be used for any code that
+  must execute on the main thread, e.g., for updating UI.
+
+* [SE-0313][]:
+
   Declarations inside an actor that would normally be actor-isolated can
   explicitly become non-isolated using the `nonisolated` keyword. Non-isolated
   declarations can be used to conform to synchronous protocol requirements:
@@ -8525,6 +8563,7 @@ Swift 1.0
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
+[SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
