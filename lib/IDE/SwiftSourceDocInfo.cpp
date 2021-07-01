@@ -440,6 +440,7 @@ std::pair<bool, Expr*> NameMatcher::walkToExprPre(Expr *E) {
             break;
           case KeyPathExpr::Component::Kind::DictionaryKey:
           case KeyPathExpr::Component::Kind::Invalid:
+          case KeyPathExpr::Component::Kind::CodeCompletion:
             break;
           case KeyPathExpr::Component::Kind::OptionalForce:
           case KeyPathExpr::Component::Kind::OptionalChain:

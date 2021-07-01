@@ -377,6 +377,7 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+    case KeyPathExpr::Component::Kind::CodeCompletion:
       // Don't bother building the key path string if the key path didn't even
       // resolve.
       return false;
@@ -4938,7 +4939,8 @@ namespace {
           }
           break;
         }
-        case KeyPathExpr::Component::Kind::Invalid: {
+        case KeyPathExpr::Component::Kind::Invalid:
+        case KeyPathExpr::Component::Kind::CodeCompletion: {
           auto component = origComponent;
           component.setComponentType(leafTy);
           resolvedComponents.push_back(component);
