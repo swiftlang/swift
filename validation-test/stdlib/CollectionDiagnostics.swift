@@ -135,6 +135,25 @@ struct RangeReplaceableCollection_SubSequence_IsDefaulted : RangeReplaceableColl
   }
 }
 
+//
+// A Collection that does not use `Slice<Self>` as its SubSequence should
+// require its own implementation of the Range<Index> subscript getter.
+// The only valid default implementation of that Collection requirement
+// returns `Slice<Self>`.
+//
+
+// expected-error@+2 {{type 'CollectionWithNonDefaultSubSequence' does not conform to protocol 'Collection'}}
+// expected-error@+1 {{unavailable subscript 'subscript(_:)' was used to satisfy a requirement of protocol 'Collection'}}
+struct CollectionWithNonDefaultSubSequence: Collection {
+  public var startIndex: Int
+  public var endIndex: Int
+
+  public typealias SubSequence = Self
+
+  public func index(after i: Int) -> Int { i+1 }
+  public subscript(position: Int) -> Int { position }
+}
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected note produced: possibly intended match
 // <unknown>:0: error: unexpected note produced: possibly intended match
