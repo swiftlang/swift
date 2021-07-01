@@ -169,6 +169,8 @@ BridgedStringRef SILNode_debugDescription(BridgedNode node);
 OptionalBridgedOperand SILValue_firstUse(BridgedValue value);
 BridgedType SILValue_getType(BridgedValue value);
 
+SwiftInt SILType_isAddress(BridgedType);
+
 BridgedBasicBlock SILArgument_getParent(BridgedArgument argument);
 
 OptionalBridgedInstruction SILInstruction_next(BridgedInstruction inst);
