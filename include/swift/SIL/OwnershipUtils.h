@@ -255,6 +255,9 @@ struct BorrowedValue;
 /// borrowed and thus the incoming value must implicitly be borrowed until the
 /// user's corresponding end scope instruction.
 ///
+/// Invariant: For a given operand, BorrowingOperand is valid iff
+/// it has OperandOwnership::Borrow or OperandOwnership::Reborrow.
+///
 /// NOTE: We do not require that the guaranteed scope be represented by a
 /// guaranteed value in the same function: see begin_apply. In such cases, we
 /// require instead an end_* instruction to mark the end of the scope's region.
@@ -264,10 +267,14 @@ struct BorrowingOperand {
 
   BorrowingOperand(Operand *op)
       : op(op), kind(BorrowingOperandKind::get(op->getUser()->getKind())) {
-    if (kind == BorrowingOperandKind::Branch
-        && op->get().getOwnershipKind() != OwnershipKind::Guaranteed) {
+    auto ownership = op->getOperandOwnership();
+    if (ownership != OperandOwnership::Borrow
+        && ownership != OperandOwnership::Reborrow) {
+      // consuming applies and branch arguments are not borrowing operands.
       kind = BorrowingOperandKind::Invalid;
+      return;
     }
+    assert(kind != BorrowingOperandKind::Invalid && "missing case");
   }
   BorrowingOperand(const BorrowingOperand &other)
       : op(other.op), kind(other.kind) {}
@@ -284,28 +291,7 @@ struct BorrowingOperand {
   const Operand *operator->() const { return op; }
   Operand *operator->() { return op; }
 
-  operator bool() const { return kind != BorrowingOperandKind::Invalid && op; }
-
-  /// If \p op is a borrow introducing operand return it after doing some
-  /// checks.
-  static BorrowingOperand get(Operand *op) {
-    auto *user = op->getUser();
-    auto kind = BorrowingOperandKind::get(user->getKind());
-    if (!kind)
-      return {nullptr, kind};
-
-    if (kind == BorrowingOperandKind::Branch
-        && op->get().getOwnershipKind() != OwnershipKind::Guaranteed) {
-      return {nullptr, BorrowingOperandKind::Invalid};
-    }
-    return {op, kind};
-  }
-
-  /// If \p op is a borrow introducing operand return it after doing some
-  /// checks.
-  static BorrowingOperand get(const Operand *op) {
-    return get(const_cast<Operand *>(op));
-  }
+  operator bool() const { return kind != BorrowingOperandKind::Invalid; }
 
   /// If this borrowing operand results in the underlying value being borrowed
   /// over a region of code instead of just for a single instruction, visit
@@ -347,8 +333,14 @@ struct BorrowingOperand {
     llvm_unreachable("Covered switch isn't covered?!");
   }
 
-  /// Return true if the user instruction introduces a borrow scope? This is
-  /// true for both reborrows and nested borrows.
+  /// Return true if the user instruction defines a borrowed value that
+  /// introduces a borrow scope and therefore may be reborrowed. This is true
+  /// for both reborrows and nested borrows.
+  ///
+  /// Note that begin_apply does create a borrow scope, and may define
+  /// guaranteed value within that scope. The difference is that those yielded
+  /// values do not themselves introduce a borrow scope. In other words, they
+  /// cannot be reborrowed.
   ///
   /// If true, the visitBorrowIntroducingUserResults() can be called to acquire
   /// each BorrowedValue that introduces a new borrow scopes.
@@ -599,7 +591,7 @@ struct BorrowedValue {
                            &foundReborrows) const {
     bool foundAnyReborrows = false;
     for (auto *op : value->getUses()) {
-      if (auto borrowingOperand = BorrowingOperand::get(op)) {
+      if (auto borrowingOperand = BorrowingOperand(op)) {
         if (borrowingOperand.isReborrow()) {
           foundReborrows.push_back(
               {value->getParentBlock(), op->getOperandNumber()});
