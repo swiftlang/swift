@@ -288,6 +288,8 @@ private:
   FilenameAndLocation getStartLocation(Optional<SILLocation> OptLoc) {
     if (!OptLoc)
       return {};
+    if (OptLoc->isFilenameAndLocation())
+      return sanitizeCodeViewFilenameAndLocation(*OptLoc->getFilenameAndLocation());
     return decodeSourceLoc(OptLoc->getStartSourceLoc());
   }
 
