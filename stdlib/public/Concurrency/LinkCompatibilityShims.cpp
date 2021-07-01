@@ -26,4 +26,4 @@ OLD_SYMBOL($ss18UnsafeContinuationVMn)
 OLD_SYMBOL($s13AsyncIterators0A8SequencePTl)
 OLD_SYMBOL($s7Elements13AsyncSequencePTl)
 OLD_SYMBOL($s7Elements21AsyncIteratorProtocolPTl)
-
+OLD_SYMBOL($ss13AsyncSequenceMp)
