@@ -68,7 +68,7 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 
 TBDGenVisitor::TBDGenVisitor(const TBDGenDescriptor &desc,
                              APIRecorder &recorder)
-    : TBDGenVisitor(desc.getTarget(), desc.getDataLayout(),
+    : TBDGenVisitor(desc.getTarget(), desc.getDataLayoutString(),
                     desc.getParentModule(), desc.getOptions(), recorder) {}
 
 void TBDGenVisitor::addSymbolInternal(StringRef name, SymbolKind kind,
@@ -390,7 +390,9 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
   if (kind == SymbolKind::ObjectiveCClass) {
     mangled = name;
   } else {
-    llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+    if (!DataLayout)
+      DataLayout = llvm::DataLayout(DataLayoutDescription);
+    llvm::Mangler::getNameWithPrefix(mangled, name, *DataLayout);
   }
 
   addSymbolInternal(mangled, kind, source);
