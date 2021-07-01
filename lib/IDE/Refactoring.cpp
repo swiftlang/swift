@@ -1834,7 +1834,7 @@ bool RefactoringActionCollapseNestedIfStmt::performChange() {
       EditConsumer, SM,
       Lexer::getCharSourceRangeFromSourceRange(SM, OuterIf->getSourceRange()));
 
-  OS << tok::kw_if << " "; 
+  OS << tok::kw_if << " ";
 
   // Emit conditions.
   bool first = true;
@@ -6406,21 +6406,7 @@ private:
     // Print the function result type, making sure to omit a '-> Void' return.
     if (!TopHandler.willAsyncReturnVoid()) {
       OS << " -> ";
-      if (ReturnTypes.size() > 1)
-        OS << "(";
-
-      llvm::interleave(
-          ReturnTypes,
-          [&](LabeledReturnType TypeAndLabel) {
-            if (!TypeAndLabel.Label.empty()) {
-              OS << TypeAndLabel.Label << tok::colon << " ";
-            }
-            TypeAndLabel.Ty->print(OS);
-          },
-          [&]() { OS << ", "; });
-
-      if (ReturnTypes.size() > 1)
-        OS << ")";
+      addAsyncFuncReturnType(TopHandler);
     }
 
     if (FD->hasBody())
@@ -6461,10 +6447,13 @@ private:
       // for the completion handler call, e.g 'return completion(args...)'. In
       // that case, be sure not to add another return.
       auto *parent = getWalker().Parent.getAsStmt();
-      AddedReturnOrThrow = !(parent && isa<ReturnStmt>(parent) &&
-                             !cast<ReturnStmt>(parent)->isImplicit());
-      if (AddedReturnOrThrow)
+      if (parent && isa<ReturnStmt>(parent) &&
+          !cast<ReturnStmt>(parent)->isImplicit()) {
+        // The statement already has a return keyword. Don't add another one.
+        AddedReturnOrThrow = false;
+      } else {
         OS << tok::kw_return;
+      }
     } else {
       OS << tok::kw_throw;
     }
