@@ -795,14 +795,15 @@ private:
       FalseRefinement = FalseFlow;
     }
 
-    auto makeResult = ^(Optional<AvailabilityContext> TrueRefinement,
-                        Optional<AvailabilityContext> FalseRefinement) {
-      if (isUnavailability.hasValue() && isUnavailability.getValue()) {
-        // If this is an unavailability check, invert the result.
-        return std::make_pair(FalseRefinement, TrueRefinement);
-      }
-      return std::make_pair(TrueRefinement, FalseRefinement);
-    };
+    auto makeResult =
+        [isUnavailability](Optional<AvailabilityContext> TrueRefinement,
+                           Optional<AvailabilityContext> FalseRefinement) {
+          if (isUnavailability.hasValue() && isUnavailability.getValue()) {
+            // If this is an unavailability check, invert the result.
+            return std::make_pair(FalseRefinement, TrueRefinement);
+          }
+          return std::make_pair(TrueRefinement, FalseRefinement);
+        };
 
     if (NestedCount == 0)
       return makeResult(None, FalseRefinement);
@@ -823,9 +824,7 @@ private:
     OtherPlatformAvailabilitySpec *FoundOtherSpec = nullptr;
     PlatformVersionConstraintAvailabilitySpec *BestSpec = nullptr;
 
-    auto Queries = available->getQueries();
-
-    for (auto *Spec : Queries) {
+    for (auto *Spec : available->getQueries()) {
       if (auto *OtherSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
         FoundOtherSpec = OtherSpec;
         continue;

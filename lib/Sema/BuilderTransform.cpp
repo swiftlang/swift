@@ -505,16 +505,16 @@ protected:
     Expr *thenVarRefExpr = buildVarRef(
         thenVar, ifStmt->getThenStmt()->getEndLoc());
 
-    /// If there is a #available in the condition, wrap the 'then' in a call to 
-    /// buildLimitedAvailability(_:).
+    // If there is a #available in the condition, wrap the 'then' in a call to
+    // buildLimitedAvailability(_:).
     auto availabilityCond = findAvailabilityCondition(ifStmt->getCond());
-    bool supportsAvailable = availabilityCond && 
-                             builderSupports(ctx.Id_buildLimitedAvailability);
-    auto apiAvailability = availabilityCond->getAvailability();
-    if (supportsAvailable && !apiAvailability->isUnavailability()) {
-      thenVarRefExpr = buildCallIfWanted(
-          ifStmt->getThenStmt()->getEndLoc(), ctx.Id_buildLimitedAvailability,
-          { thenVarRefExpr }, { Identifier() });
+    bool supportsAvailability =
+        availabilityCond && builderSupports(ctx.Id_buildLimitedAvailability);
+    if (supportsAvailability &&
+        !availabilityCond->getAvailability()->isUnavailability()) {
+      thenVarRefExpr = buildCallIfWanted(ifStmt->getThenStmt()->getEndLoc(),
+                                         ctx.Id_buildLimitedAvailability,
+                                         {thenVarRefExpr}, {Identifier()});
     }
 
     // Prepare the `then` operand by wrapping it to produce a chain result.
@@ -530,25 +530,29 @@ protected:
       assert(isOptional);
       elseLoc = ifStmt->getEndLoc();
       elseExpr = buildNoneExpr(elseLoc);
-    } else {
+
+    // - If there's an `else if`, the chain expression from that
+    //   should already be producing a chain result.
+    } else if (isElseIf) {
+      elseExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
       elseLoc = ifStmt->getElseLoc();
-      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
-      /// If there is a #unavailable in the condition, wrap the 'else' in a call
-      /// to buildLimitedAvailability(_:).
-      if (supportsAvailable && apiAvailability->isUnavailability()) {
-        elseVarRefExpr = buildCallIfWanted(
-            ifStmt->getEndLoc(), ctx.Id_buildLimitedAvailability,
-            { elseVarRefExpr }, { Identifier() });
-      }
-      // - If there's an `else if`, the chain expression from that
-      //   should already be producing a chain result.
-      if (isElseIf) {
-        elseExpr = elseVarRefExpr;
+
       // - Otherwise, wrap it to produce a chain result.
-      } else {
-        elseExpr = buildWrappedChainPayload(
-            elseVarRefExpr, payloadIndex + 1, numPayloads, isOptional);
+    } else {
+      Expr *elseVarRefExpr = buildVarRef(*elseChainVar, ifStmt->getEndLoc());
+
+      // If there is a #unavailable in the condition, wrap the 'else' in a call
+      // to buildLimitedAvailability(_:).
+      if (supportsAvailability &&
+          availabilityCond->getAvailability()->isUnavailability()) {
+        elseVarRefExpr = buildCallIfWanted(ifStmt->getEndLoc(),
+                                           ctx.Id_buildLimitedAvailability,
+                                           {elseVarRefExpr}, {Identifier()});
       }
+
+      elseExpr = buildWrappedChainPayload(elseVarRefExpr, payloadIndex + 1,
+                                          numPayloads, isOptional);
+      elseLoc = ifStmt->getElseLoc();
     }
 
     // The operand should have optional type if we had optional results,
