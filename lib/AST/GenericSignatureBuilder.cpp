@@ -2413,7 +2413,7 @@ void DelayedRequirement::dump(llvm::raw_ostream &out) const {
   case Type:
   case Layout:
     out << ": ";
-      break;
+    break;
 
   case SameType:
     out << " == ";
@@ -5047,6 +5047,9 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
                                  equivClass->concreteTypeConstraints.end(),
                                  equivClass2->concreteTypeConstraints.begin(),
                                  equivClass2->concreteTypeConstraints.end());
+
+    for (const auto &conforms : equivClass->conformsTo)
+      (void)resolveConcreteConformance(T1, conforms.first);
   }
 
   // Make T1 the representative of T2, merging the equivalence classes.
@@ -5775,9 +5778,9 @@ void GenericSignatureBuilder::ExplicitRequirement::dump(
 
   out << getSubjectType();
   if (getKind() == RequirementKind::SameType)
-    out << " : ";
-  else
     out << " == ";
+  else
+    out << " : ";
 
   if (auto type = rhs.dyn_cast<Type>())
     out << type;
