@@ -2108,13 +2108,13 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
 }
 
 static std::unique_ptr<DiagnosticConsumer>
-createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError,
+createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError, bool DisableFailOnError,
                    bool CompilerStyleDiags, StringRef SerializedDiagPath) {
   if (!SerializedDiagPath.empty()) {
-    FailOnError = true;
+    FailOnError = !DisableFailOnError;
     return serialized_diagnostics::createConsumer(SerializedDiagPath);
   } else if (CompilerStyleDiags) {
-    FailOnError = true;
+    FailOnError = !DisableFailOnError;
     return std::make_unique<PrintingDiagnosticConsumer>();
   } else {
     FailOnError = false;
@@ -2169,6 +2169,7 @@ static bool readBreakageAllowlist(SDKContext &Ctx, llvm::StringSet<> &lines,
 static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                                 SDKNodeRoot *RightModule, StringRef OutputPath,
                                 llvm::StringSet<> ProtocolReqAllowlist,
+                                bool DisableFailOnError,
                                 bool CompilerStyleDiags,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
@@ -2193,7 +2194,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
                             BreakageAllowlistPath);
   }
   auto pConsumer = std::make_unique<FilteringDiagnosticConsumer>(
-      createDiagConsumer(*OS, FailOnError, CompilerStyleDiags,
+      createDiagConsumer(*OS, FailOnError, DisableFailOnError, CompilerStyleDiags,
                          SerializedDiagPath),
       std::move(allowedBreakages));
   SWIFT_DEFER { pConsumer->finishProcessing(); };
@@ -2215,6 +2216,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 StringRef OutputPath, CheckerOptions Opts,
                                 llvm::StringSet<> ProtocolReqAllowlist,
+                                bool DisableFailOnError,
                                 bool CompilerStyleDiags,
                                 StringRef SerializedDiagPath,
                                 StringRef BreakageAllowlistPath,
@@ -2234,7 +2236,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   RightCollector.deSerialize(RightPath);
   return diagnoseModuleChange(
       Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(), OutputPath,
-      std::move(ProtocolReqAllowlist), CompilerStyleDiags, SerializedDiagPath,
+      std::move(ProtocolReqAllowlist), DisableFailOnError, CompilerStyleDiags, SerializedDiagPath,
       BreakageAllowlistPath, DebugMapping);
 }
 
@@ -2514,6 +2516,7 @@ private:
   std::vector<std::string> PreferInterfaceForModules;
   std::string ResourceDir;
   std::string ModuleCachePath;
+  bool DisableFailOnError;
 
 public:
   SwiftAPIDigesterInvocation(const std::string &ExecPath)
@@ -2615,6 +2618,7 @@ public:
     ResourceDir = ParsedArgs.getLastArgValue(OPT_resource_dir).str();
     ModuleCachePath = ParsedArgs.getLastArgValue(OPT_module_cache_path).str();
     DebugMapping = ParsedArgs.hasArg(OPT_debug_mapping);
+    DisableFailOnError = ParsedArgs.hasArg(OPT_disable_fail_on_error);
 
     CheckerOpts.AvoidLocation = ParsedArgs.hasArg(OPT_avoid_location);
     CheckerOpts.AvoidToolArgs = ParsedArgs.hasArg(OPT_avoid_tool_args);
@@ -2817,21 +2821,21 @@ public:
       case ComparisonInputMode::BothJson: {
         return diagnoseModuleChange(
             SDKJsonPaths[0], SDKJsonPaths[1], OutputFile, CheckerOpts,
-            std::move(protocolAllowlist), CompilerStyleDiags,
+            std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
             SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
       }
       case ComparisonInputMode::BaselineJson: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getBaselineFromJson(Ctx), getSDKRoot(Ctx, false), OutputFile,
-            std::move(protocolAllowlist), CompilerStyleDiags,
+            std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
             SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
       }
       case ComparisonInputMode::BothLoad: {
         SDKContext Ctx(CheckerOpts);
         return diagnoseModuleChange(
             Ctx, getSDKRoot(Ctx, true), getSDKRoot(Ctx, false), OutputFile,
-            std::move(protocolAllowlist), CompilerStyleDiags,
+            std::move(protocolAllowlist), DisableFailOnError, CompilerStyleDiags,
             SerializedDiagPath, BreakageAllowlistPath, DebugMapping);
       }
       }
