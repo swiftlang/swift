@@ -57,9 +57,10 @@ func twoFns(_ f: (Int) -> Int, _ g: @escaping (Int) -> Int) {
 takesAny(consumeNoEscape)
 takesAny(consumeEscaping)
 
-var noEscapeParam: ((Int) -> Int) -> () = consumeNoEscape
+var noEscapeParam: ((Int) -> Int) -> () = consumeNoEscape // expected-note {{add explicit @escaping to function parameter}}{{21-21=@escaping }}
 var escapingParam: (@escaping (Int) -> Int) -> () = consumeEscaping
-noEscapeParam = escapingParam // expected-error {{converting non-escaping value to '(Int) -> Int' may allow it to escape}}
+noEscapeParam = escapingParam // expected-error {{cannot assign value of type '(@escaping (Int) -> Int) -> ()' to type '((Int) -> Int) -> ()'}}
+// expected-note@-1{{parameter #0 expects escaping value of type '(Int) -> Int'}}
 
 escapingParam = takesAny
 noEscapeParam = takesAny // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}

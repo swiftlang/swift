@@ -2868,6 +2868,23 @@ void ValueDecl::setIsObjC(bool value) {
   LazySemanticInfo.isObjC = value;
 }
 
+bool ValueDecl::isSemanticallyFinal() const {
+  // Actor types are semantically final.
+  if (auto classDecl = dyn_cast<ClassDecl>(this)) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  // As are members of actor types.
+  if (auto classDecl = getDeclContext()->getSelfClassDecl()) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  // For everything else, the same as 'final'.
+  return isFinal();
+}
+
 bool ValueDecl::isFinal() const {
   return evaluateOrDefault(getASTContext().evaluator,
                            IsFinalRequest { const_cast<ValueDecl *>(this) },
@@ -3212,13 +3229,13 @@ bool ValueDecl::shouldHideFromEditor() const {
 static AccessLevel getMaximallyOpenAccessFor(const ValueDecl *decl) {
   // Non-final classes are considered open to @testable importers.
   if (auto cls = dyn_cast<ClassDecl>(decl)) {
-    if (!cls->isFinal())
+    if (!cls->isSemanticallyFinal())
       return AccessLevel::Open;
 
   // Non-final overridable class members are considered open to
   // @testable importers.
   } else if (decl->isPotentiallyOverridable()) {
-    if (!cast<ValueDecl>(decl)->isFinal())
+    if (!cast<ValueDecl>(decl)->isSemanticallyFinal())
       return AccessLevel::Open;
   }
 
@@ -3332,9 +3349,6 @@ AccessLevel ValueDecl::getFormalAccess() const {
 }
 
 bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
-  assert(isa<ClassDecl>(this) || isa<ConstructorDecl>(this) ||
-         isPotentiallyOverridable());
-
   AccessLevel access =
       getAdjustedFormalAccess(this, useDC,
                               /*treatUsableFromInlineAsPublic*/false);

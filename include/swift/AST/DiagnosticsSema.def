@@ -3890,6 +3890,12 @@ ERROR(converting_noattrfunc_to_type,none,
       "converting %select{non-escaping|non-concurrent function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
+NOTE(escape_expected_at_parameter_position,none,
+     "parameter #%0 expects escaping value of type %1",
+     (unsigned, Type))
+NOTE(add_explicit_escaping,none,
+     "add explicit @escaping to function parameter #%0",
+     (unsigned))
 
 ERROR(converting_func_loses_global_actor,none,
       "converting function value of type %0 to %1 loses global actor %2",
@@ -4608,6 +4614,8 @@ ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
+ERROR(global_actor_non_final_class,none,
+      "non-final class %0 cannot be a global actor", (DeclName))
       
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
