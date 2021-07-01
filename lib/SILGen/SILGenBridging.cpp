@@ -2045,7 +2045,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     B.createCondBranch(loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
   }
 
-  // if __isRemoteActor(self) {
+  // // if __isRemoteActor(self)
+  // {
   //   return try await self._remote_X(...)
   // }
   {
@@ -2053,9 +2054,6 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
     auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
     assert(selfTyDecl && "distributed function declared outside of actor");
-
-//    auto selfMetatype = getLoweredType(selfTyDecl->getInterfaceType());
-//    SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
 
     auto remoteFnDecl = selfTyDecl->lookupDirectRemoteFunc(fd);
     assert(remoteFnDecl && "Could not find _remote_<dist_func_name> function");
@@ -2068,13 +2066,12 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     auto subs = F.getForwardingSubstitutionMap();
 
     SmallVector<SILValue, 8> remoteParams(params);
-//     remoteParams.emplace_back(metatypeValue);
 
-    // B.createTryApply(loc, remoteFn, subs, params, remoteReturnBB, remoteErrorBB);
     B.createTryApply(loc, remoteFn, subs, remoteParams, remoteReturnBB, remoteErrorBB);
   }
 
-  // else {
+  // // else
+  // {
   //   return (try)? (await)? self.X(...)
   // }
   {
