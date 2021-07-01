@@ -1930,7 +1930,7 @@ void Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx,
 
   switch (node->getKind()) {
   case Node::Kind::Type:
-    mangleAnyNominalType(node->getChild(0), ctx);
+    mangleAnyNominalType(node->getChild(0), ctx, depth + 1);
     break;
   case Node::Kind::OtherNominalType:
     // Mangle unknown type kinds as structures since we can't change the old
