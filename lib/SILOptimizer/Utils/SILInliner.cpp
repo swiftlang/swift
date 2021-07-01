@@ -348,6 +348,9 @@ SILInliner::inlineFullApply(FullApplySite apply,
                             SILInliner::InlineKind inlineKind,
                             SILOptFunctionBuilder &funcBuilder) {
   assert(apply.canOptimize());
+  assert(!apply.getFunction()->hasOwnership() ||
+         apply.getReferencedFunctionOrNull()->hasOwnership());
+
   SmallVector<SILValue, 8> appliedArgs;
   for (const auto arg : apply.getArguments())
     appliedArgs.push_back(arg);
