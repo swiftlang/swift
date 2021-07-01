@@ -1414,6 +1414,7 @@ NominalTypeDecl::lookupDirectRemoteFunc(AbstractFunctionDecl *func) {
   auto remoteFuncId = C.getIdentifier("_remote_" + localFuncName);
 
   auto remoteFuncDecls = selfTyDecl->lookupDirect(DeclName(remoteFuncId));
+
   if (remoteFuncDecls.empty())
     return nullptr;
 

@@ -6938,8 +6938,7 @@ bool UnableToInferClosureParameterType::diagnoseAsError() {
 bool UnableToInferClosureReturnType::diagnoseAsError() {
   auto *closure = castToExpr<ClosureExpr>(getRawAnchor());
 
-  auto diagnostic = emitDiagnostic(diag::cannot_infer_closure_result_type,
-                                   closure->hasSingleExpressionBody());
+  auto diagnostic = emitDiagnostic(diag::cannot_infer_closure_result_type);
 
   // If there is a location for an 'in' token, then the argument list was
   // specified somehow but no return type was.  Insert a "-> ReturnType "
