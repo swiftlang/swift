@@ -45,8 +45,8 @@ bool swift::canBeMemberName(StringRef identifier) {
 }
 
 bool swift::isPreposition(StringRef word) {
-#define PREPOSITION(Word)                       \
-  if (word.equals_lower(#Word))                 \
+#define PREPOSITION(Word)                                                      \
+  if (word.equals_insensitive(#Word))                                          \
     return true;
 #include "PartsOfSpeech.def"
 
@@ -55,11 +55,11 @@ bool swift::isPreposition(StringRef word) {
 
 PartOfSpeech swift::getPartOfSpeech(StringRef word) {
   // FIXME: This implementation is woefully inefficient.
-#define PREPOSITION(Word)                       \
-  if (word.equals_lower(#Word))                 \
+#define PREPOSITION(Word)                                                      \
+  if (word.equals_insensitive(#Word))                                          \
     return PartOfSpeech::Preposition;
-#define VERB(Word)                              \
-  if (word.equals_lower(#Word))                 \
+#define VERB(Word)                                                             \
+  if (word.equals_insensitive(#Word))                                          \
     return PartOfSpeech::Verb;
 #include "PartsOfSpeech.def"
 
@@ -392,8 +392,8 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
     // We can match the suffix of the type so long as everything preceding the
     // match is neither a lowercase letter nor a '_'. This ignores type
     // prefixes for acronyms, e.g., the 'NS' in 'NSURL'.
-    if (typeWord.endswith_lower(nameWord) && 
-        !clang::isLowercase(typeWord[typeWord.size()-nameWord.size()])) {
+    if (typeWord.endswith_insensitive(nameWord) &&
+        !clang::isLowercase(typeWord[typeWord.size() - nameWord.size()])) {
       // Check that everything preceding the match is neither a lowercase letter
       // nor a '_'.
       for (unsigned i = 0, n = nameWord.size(); i != n; ++i) {
@@ -405,7 +405,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
 
     // We can match a prefix so long as everything following the match is
     // a number.
-    if (typeWord.startswith_lower(nameWord)) {
+    if (typeWord.startswith_insensitive(nameWord)) {
       for (unsigned i = nameWord.size(), n = typeWord.size(); i != n; ++i) {
         if (!clang::isDigit(typeWord[i])) return false;
       }
@@ -417,7 +417,7 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
   }
 
   // Check for an exact match.
-  return nameWord.equals_lower(typeWord);
+  return nameWord.equals_insensitive(typeWord);
 }
 
 /// Match the beginning of the name to the given type name.
