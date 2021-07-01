@@ -25,4 +25,5 @@ OLD_SYMBOL($ss6detach8priority9operations4TaskV6HandleVy_xs5NeverOGAE8PriorityO_
 OLD_SYMBOL($ss18UnsafeContinuationVMn)
 OLD_SYMBOL($s13AsyncIterators0A8SequencePTl)
 OLD_SYMBOL($s7Elements13AsyncSequencePTl)
+OLD_SYMBOL($s7Elements21AsyncIteratorProtocolPTl)
 
