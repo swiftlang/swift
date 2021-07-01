@@ -2102,7 +2102,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       Invocation.getFrontendOptions().PrintHelpHidden ? 0 :
                                                         llvm::opt::HelpHidden;
     std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
-    Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
+    Options->printHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
                        ExcludedFlagsBitmask, /*ShowAllAliases*/false);
     return finishDiagProcessing(0, /*verifierEnabled*/ false);
