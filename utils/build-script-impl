@@ -142,7 +142,7 @@ KNOWN_SETTINGS=(
 
     ## Build ...
     build-llvm                                    "1"               "set to 1 to build LLVM and Clang"
-    build-sil-debugging-stdlib                    "0"               "set to 1 to build the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    build-sil-debugging-stdlib                    "0"               "set to 1 to build the Swift standard library with -sil-based-debuginfo to enable debugging and profiling on SIL level"
     build-swift-dynamic-sdk-overlay               ""                "set to 1 to build dynamic variants of the Swift SDK overlay"
     build-swift-dynamic-stdlib                    ""                "set to 1 to build dynamic variants of the Swift standard library"
     build-swift-examples                          "1"               "set to 1 to build examples"

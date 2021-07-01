@@ -838,7 +838,8 @@ public:
     DeclCtxt = (DS ? DebugScope->Loc.getAsDeclContext() : nullptr);
   }
 
-  /// Initialize the debug scope for debug info on SIL level (-gsil).
+  /// Initialize the debug scope for debug info on SIL level
+  /// (-sil-based-debuginfo).
   void setSILDebugScope(const SILDebugScope *DS) {
     DebugScope = DS;
   }

@@ -832,7 +832,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
 
   addLastChanceOptPassPipeline(P);
 
-  // Has only an effect if the -gsil option is specified.
+  // Has only an effect if the -sil-based-debuginfo option is specified.
   addSILDebugInfoGeneratorPipeline(P);
 
   // Call the CFG viewer.
@@ -883,7 +883,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Create pre-specializations.
   P.addOnonePrespecializations();
 
-  // Has only an effect if the -gsil option is specified.
+  // Has only an effect if the -sil-based-debuginfo option is specified.
   P.addSILDebugInfoGenerator();
 
   return P;
