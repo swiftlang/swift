@@ -192,19 +192,18 @@ static void sanityCheckStdlib(IRGenModule &IGM) {
 
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
-                         SourceFile *SF,
-                         StringRef ModuleName, StringRef OutputFilename,
+                         SourceFile *SF, StringRef ModuleName,
+                         StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
                          StringRef PrivateDiscriminator)
-    : LLVMContext(new llvm::LLVMContext()),
-      IRGen(irgen), Context(irgen.SIL.getASTContext()),
+    : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
+      Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
       // as long as the IGM is registered with the IRGenerator.
-      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext,
-                                            irgen.Opts,
+      ClangCodeGen(createClangCodeGenerator(Context, *LLVMContext, irgen.Opts,
                                             ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()),
-      DataLayout(irgen.getClangDataLayout()),
+      DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
@@ -1750,12 +1749,12 @@ llvm::Triple IRGenerator::getEffectiveClangTriple() {
   return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }
 
-const llvm::DataLayout &IRGenerator::getClangDataLayout() {
+const llvm::StringRef IRGenerator::getClangDataLayoutString() {
   return static_cast<ClangImporter *>(
              SIL.getASTContext().getClangModuleLoader())
       ->getTargetInfo()
-      .getDataLayout();
-  }
+      .getDataLayoutString();
+}
 
 TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
   return TypeExpansionContext::maximal(getSwiftModule(),
