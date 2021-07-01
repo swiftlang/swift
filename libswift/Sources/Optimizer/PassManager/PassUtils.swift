@@ -35,6 +35,11 @@ struct FunctionPassContext {
     let bridgedAA = PassContext_getAliasAnalysis(passContext, function.bridged)
     return AliasAnalysis(bridged: bridgedAA)
   }
+  
+  var calleeAnalysis: CalleeAnalysis {
+    let bridgeCA = PassContext_getCalleeAnalysis(passContext)
+    return CalleeAnalysis(bridged: bridgeCA)
+  }
 }
 
 struct FunctionPass {

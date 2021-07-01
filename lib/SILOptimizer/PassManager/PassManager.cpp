@@ -1172,3 +1172,7 @@ BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context,
   return {pm->getAnalysis<AliasAnalysis>(castToFunction(function))};
 }
 
+BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) {
+  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
+  return {pm->getAnalysis<BasicCalleeAnalysis>()};
+}

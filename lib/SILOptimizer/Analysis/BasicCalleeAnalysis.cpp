@@ -16,6 +16,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILBridgingUtils.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Compiler.h"
 
@@ -317,4 +319,30 @@ void BasicCalleeAnalysis::print(llvm::raw_ostream &os) const {
       }
     }
   }
+}
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
+                                            BridgedValue callee) {
+  BasicCalleeAnalysis *bca = static_cast<BasicCalleeAnalysis *>(calleeAnalysis.bca);
+  CalleeList cl = bca->getCalleeListOfValue(castToSILValue(callee));
+  return {cl.getOpaquePtr(), cl.getOpaqueKind(), cl.isIncomplete()};
+}
+
+SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees) {
+  CalleeList cl = CalleeList::fromOpaque(callees.opaquePtr, callees.kind,
+                                         callees.incomplete);
+  return cl.end() - cl.begin();
+}
+
+BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
+                                         SwiftInt index) {
+  CalleeList cl = CalleeList::fromOpaque(callees.opaquePtr, callees.kind,
+                                         callees.incomplete);
+  auto iter = cl.begin() + index;
+  assert(index >= 0 && iter < cl.end());
+  return {*iter};
 }

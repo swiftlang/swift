@@ -33,6 +33,16 @@ typedef struct {
   const void * _Nonnull aliasAnalysis;
 } BridgedAliasAnalysis;
 
+typedef struct {
+  void * _Nullable bca;
+} BridgedCalleeAnalysis;
+
+typedef struct {
+  void * _Nonnull opaquePtr;
+  unsigned char kind;
+  unsigned char incomplete;
+} BridgedCalleeList;
+
 typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
 typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
 
@@ -48,6 +58,14 @@ BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context,
 BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
                                                    BridgedInstruction inst,
                                                    BridgedValue addr);
+
+BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context);
+
+BridgedCalleeList CalleeAnalysis_getCallees(BridgedCalleeAnalysis calleeAnalysis,
+                                            BridgedValue callee);
+SwiftInt BridgedFunctionArray_size(BridgedCalleeList callees);
+BridgedFunction BridgedFunctionArray_get(BridgedCalleeList callees,
+                                         SwiftInt index);
 
 #ifdef __cplusplus
 } // extern "C"
