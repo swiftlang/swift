@@ -29,14 +29,25 @@ typedef struct {
   BridgedPassContext passContext;
 } BridgedInstructionPassCtxt;
 
-typedef void (*BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
-typedef void (*BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
+typedef struct {
+  const void * _Nonnull aliasAnalysis;
+} BridgedAliasAnalysis;
+
+typedef void (* _Nonnull BridgedFunctionPassRunFn)(BridgedFunctionPassCtxt);
+typedef void (* _Nonnull BridgedInstructionPassRunFn)(BridgedInstructionPassCtxt);
 
 void SILPassManager_registerFunctionPass(BridgedStringRef name,
                                          BridgedFunctionPassRunFn runFn);
 
 void SILCombine_registerInstructionPass(BridgedStringRef name,
                                         BridgedInstructionPassRunFn runFn);
+
+BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context,
+                                                  BridgedFunction function);
+
+BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
+                                                   BridgedInstruction inst,
+                                                   BridgedValue addr);
 
 #ifdef __cplusplus
 } // extern "C"

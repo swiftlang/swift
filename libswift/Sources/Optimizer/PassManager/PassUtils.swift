@@ -30,6 +30,11 @@ struct FunctionPassContext {
   private func notifyChanges(_ kind: ChangeNotificationKind) {
     PassContext_notifyChanges(passContext, kind)
   }
+
+  var aliasAnalysis: AliasAnalysis {
+    let bridgedAA = PassContext_getAliasAnalysis(passContext, function.bridged)
+    return AliasAnalysis(bridged: bridgedAA)
+  }
 }
 
 struct FunctionPass {

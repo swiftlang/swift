@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/SILOptimizer/OptimizerBridging.h"
 
 using namespace swift;
 
@@ -807,4 +809,20 @@ public:
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
   return new AliasAnalysisContainer();
+}
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+inline AliasAnalysis *castToAliasAnalysis(BridgedAliasAnalysis aa) {
+  return  const_cast<AliasAnalysis *>(
+    static_cast<const AliasAnalysis *>(aa.aliasAnalysis));
+}
+
+BridgedMemoryBehavior AliasAnalysis_getMemBehavior(BridgedAliasAnalysis aa,
+                                                   BridgedInstruction inst,
+                                                   BridgedValue addr) {
+  return (BridgedMemoryBehavior)castToAliasAnalysis(aa)->
+    computeMemoryBehavior(castToInst(inst), castToSILValue(addr));
 }
