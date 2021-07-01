@@ -273,8 +273,8 @@ ERROR(cannot_infer_closure_parameter_type,none,
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,
-      "unable to infer%select{ complex|}0 closure return type; "
-      "add explicit type to disambiguate", (bool))
+      "cannot infer return type for closure with multiple statements; "
+      "add explicit type to disambiguate", ())
 FIXIT(insert_closure_return_type_placeholder,
       "%select{| () }0-> <#Result#> %select{|in }0",
       (bool))
