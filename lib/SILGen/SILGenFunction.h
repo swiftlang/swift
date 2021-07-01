@@ -620,7 +620,7 @@ public:
 
   /// Inject distributed actor and transport interaction code into the destructor.
   void injectDistributedActorDestructorLifecycleCall(
-      DestructorDecl *dd, SILValue selfValue);
+      DestructorDecl *dd, SILValue selfValue, SILBasicBlock *continueBB);
 
   /// Generates code for an artificial top-level function that starts an
   /// application based on a main type and optionally a main type.

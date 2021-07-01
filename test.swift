@@ -20,6 +20,12 @@ class ACTOR {
     }
 
     deinit { 
-        self.transport.RESIGN(address: self.address);
+        if ISREMOTE() {
+            self.transport.RESIGN(address: self.address);
+        }
     }
+}
+
+func ISREMOTE() -> Bool { 
+    false
 }
