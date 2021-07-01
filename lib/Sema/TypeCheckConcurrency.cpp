@@ -2973,6 +2973,70 @@ static ActorIsolation getActorIsolationFromWrappedProperty(VarDecl *var) {
   return ActorIsolation::forUnspecified();
 }
 
+/// Check rules related to global actor attributes on a class declaration.
+///
+/// \returns true if an error occurred.
+static bool checkClassGlobalActorIsolation(
+    ClassDecl *classDecl, ActorIsolation isolation) {
+  assert(isolation.isGlobalActor());
+
+  // A class can only be annotated with a global actor if it has no
+  // superclass, the superclass is annotated with the same global actor, or
+  // the superclass is NSObject. A subclass of a global-actor-annotated class
+  // must be isolated to the same global actor.
+  auto superclassDecl = classDecl->getSuperclassDecl();
+  if (!superclassDecl)
+    return false;
+
+  if (superclassDecl->isNSObject())
+    return false;
+
+  // Ignore actors outright. They'll be diagnosed later.
+  if (classDecl->isActor() || superclassDecl->isActor())
+    return false;
+
+  // Check the superclass's isolation.
+  auto superIsolation = getActorIsolation(superclassDecl);
+  switch (superIsolation) {
+  case ActorIsolation::Unspecified:
+  case ActorIsolation::Independent:
+    // Allow ObjC superclasses with unspecified global actors, because we do
+    // not expect for Objective-C classes to have been universally annotated.
+    // FIXME: We might choose to tighten this up in Swift 6.
+    if (superclassDecl->getClangNode())
+      return false;
+
+    // Break out to diagnose the error below.
+    break;
+
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::DistributedActorInstance:
+    // This is an error that will be diagnosed later. Ignore it here.
+    return false;
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe: {
+    // If the the global actors match, we're fine.
+    Type superclassGlobalActor = superIsolation.getGlobalActor();
+    auto module = classDecl->getParentModule();
+    SubstitutionMap subsMap = classDecl->getDeclaredInterfaceType()
+      ->getSuperclassForDecl(superclassDecl)
+      ->getContextSubstitutionMap(module, superclassDecl);
+    Type superclassGlobalActorInSub = superclassGlobalActor.subst(subsMap);
+    if (isolation.getGlobalActor()->isEqual(superclassGlobalActorInSub))
+      return false;
+
+    break;
+  }
+  }
+
+  // Complain about the mismatch.
+  classDecl->diagnose(
+      diag::actor_isolation_superclass_mismatch, isolation,
+      classDecl->getName(), superIsolation, superclassDecl->getName());
+  return true;
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   // If this declaration has actor-isolated "self", it's isolated to that
@@ -2997,6 +3061,12 @@ ActorIsolation ActorIsolationRequest::evaluate(
           ConcreteDeclRef(value, subs),
           value->getDeclContext()->getParentModule(), value->getLoc(),
           ConcurrentReferenceKind::Nonisolated);
+    }
+
+    // Classes with global actors have additional rules regarding inheritance.
+    if (isolationFromAttr->isGlobalActor()) {
+      if (auto classDecl = dyn_cast<ClassDecl>(value))
+        checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
     }
 
     return *isolationFromAttr;
