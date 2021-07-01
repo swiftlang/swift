@@ -85,7 +85,7 @@ CalleeCache::getOrCreateCalleesForMethod(SILDeclRef Decl) {
   if (Found != TheCache.end())
     return Found->second;
 
-  auto *TheCallees = new (Allocator.Allocate()) Callees;
+  auto *TheCallees = new (Allocator.Allocate()) CalleeList::Callees;
 
   bool canCallUnknown = !calleesAreStaticallyKnowable(M, Decl);
   CalleesAndCanCallUnknown Entry(TheCallees, canCallUnknown);
@@ -225,7 +225,7 @@ CalleeList CalleeCache::getCalleeList(SILDeclRef Decl) const {
     return CalleeList();
 
   auto &Pair = Found->second;
-  return CalleeList(*Pair.getPointer(), Pair.getInt());
+  return CalleeList(Pair.getPointer(), Pair.getInt());
 }
 
 // Return a callee list for the given witness method.
