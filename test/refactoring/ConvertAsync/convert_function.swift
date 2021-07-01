@@ -129,8 +129,8 @@ func asyncResNewErr(arg: String, _ completion: (Result<String, Error>) -> Void) 
 // ASYNC-ERR-NEXT: }
 // ASYNC-ERR-NEXT: }
 
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-UNHANDLED %s
-func asyncUnhandledCompletion(_ completion: (String) -> Void) {
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-NON-ASYNC-IN-ASYNC %s
+func callNonAsyncInAsync(_ completion: (String) -> Void) {
   simple { str in
     let success = run {
       completion(str)
@@ -141,19 +141,21 @@ func asyncUnhandledCompletion(_ completion: (String) -> Void) {
     }
   }
 }
-// ASYNC-UNHANDLED: func asyncUnhandledCompletion() async -> String {
-// ASYNC-UNHANDLED-NEXT: let str = await simple()
-// ASYNC-UNHANDLED-NEXT: let success = run {
-// ASYNC-UNHANDLED-NEXT:   <#completion#>(str)
-// ASYNC-UNHANDLED-NEXT:   {{^}} return true{{$}}
-// ASYNC-UNHANDLED-NEXT: }
-// ASYNC-UNHANDLED-NEXT: if !success {
-// ASYNC-UNHANDLED-NEXT: {{^}} return "bad"{{$}}
-// ASYNC-UNHANDLED-NEXT: }
-// ASYNC-UNHANDLED-NEXT: }
+// CALL-NON-ASYNC-IN-ASYNC:      func callNonAsyncInAsync() async -> String {
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:   let str = await simple()
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:   return await withCheckedContinuation { continuation in
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     let success = run {
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:       continuation.resume(returning: str)
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:       {{^}} return true{{$}}
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     if !success {
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:       continuation.resume(returning: "bad")
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-NEXT:   }
+// CALL-NON-ASYNC-IN-ASYNC-NEXT: }
 
-// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-UNHANDLED-COMMENT %s
-func asyncUnhandledCommentedCompletion(_ completion: (String) -> Void) {
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CALL-NON-ASYNC-IN-ASYNC-COMMENT %s
+func callNonAsyncInAsyncComment(_ completion: (String) -> Void) {
   // a
   simple { str in // b
     // c
@@ -174,28 +176,30 @@ func asyncUnhandledCommentedCompletion(_ completion: (String) -> Void) {
   }
   // k
 }
-// ASYNC-UNHANDLED-COMMENT:      func asyncUnhandledCommentedCompletion() async -> String {
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // a
-// ASYNC-UNHANDLED-COMMENT-NEXT:   let str = await simple()
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // b
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // c
-// ASYNC-UNHANDLED-COMMENT-NEXT:   let success = run {
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // d
-// ASYNC-UNHANDLED-COMMENT-NEXT:     <#completion#>(str)
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // e
-// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return true{{$}}
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // f
-// ASYNC-UNHANDLED-COMMENT-NEXT:   }
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // g
-// ASYNC-UNHANDLED-COMMENT-NEXT:   if !success {
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // h
-// ASYNC-UNHANDLED-COMMENT-NEXT:     {{^}} return "bad"{{$}}
-// ASYNC-UNHANDLED-COMMENT-NEXT:     // i
-// ASYNC-UNHANDLED-COMMENT-NEXT:   }
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // j
-// ASYNC-UNHANDLED-COMMENT-NEXT:   {{ }}
-// ASYNC-UNHANDLED-COMMENT-NEXT:   // k
-// ASYNC-UNHANDLED-COMMENT-NEXT: }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT:      func callNonAsyncInAsyncComment() async -> String {
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   // a
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   let str = await simple()
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   // b
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   // c
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   return await withCheckedContinuation { continuation in
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     let success = run {
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // d
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       continuation.resume(returning: str)
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // e
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       {{^}} return true{{$}}
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // f
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // g
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     if !success {
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // h
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       continuation.resume(returning: "bad")
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:       // i
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // j
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     {{ }}
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:     // k
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT:   }
+// CALL-NON-ASYNC-IN-ASYNC-COMMENT-NEXT: }
 
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix VOID-AND-ERROR-HANDLER %s
 func voidAndErrorCompletion(completion: (Void?, Error?) -> Void) {
@@ -289,7 +293,9 @@ func testReturnHandling3(_ completion: (String?, Error?) -> Void) {
   return (completion("", nil))
 }
 // RETURN-HANDLING3:      func testReturnHandling3() async throws -> String {
-// RETURN-HANDLING3-NEXT:   {{^}} return (<#completion#>("", nil)){{$}}
+// RETURN-HANDLING3-NEXT:   return try await withCheckedThrowingContinuation { continuation in  
+// RETURN-HANDLING3-NEXT:     (continuation.resume(returning: ""))
+// RETURN-HANDLING3-NEXT:   }
 // RETURN-HANDLING3-NEXT: }
 
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=RDAR78693050 %s
