@@ -51,8 +51,9 @@ public:
   /// Describes a position in a source file by explicitly storing the file name,
   /// line and column.
   ///
-  /// This is used for parsed locations from a SIL file, for "-gsil" (see
-  /// SILDebugInfoGenerator) and for the "compiler-generated" singleton location.
+  /// This is used for parsed locations from a SIL file, for
+  /// "-sil-based-debuginfo" (see SILDebugInfoGenerator) and for the
+  /// "compiler-generated" singleton location.
   /// In future we might also use it for de-serialized locations from a
   /// swiftmodule file.
   struct FilenameAndLocation : public SILAllocated<FilenameAndLocation> {
