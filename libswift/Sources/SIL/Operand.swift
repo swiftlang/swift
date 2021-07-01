@@ -25,7 +25,7 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
     switch v {
       case let inst as SingleValueInstruction:
         return inst
-      case let arg as BlockArgument:
+      case let arg as Argument:
         return arg
       case let mvr as MultipleValueInstructionResult:
         return mvr
@@ -34,6 +34,10 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
       default:
         fatalError("unknown Value type")
     }
+  }
+
+  public static func ==(lhs: Operand, rhs: Operand) -> Bool {
+    return lhs.bridged.op == rhs.bridged.op
   }
 
   public var instruction: Instruction {
@@ -48,14 +52,14 @@ public struct Operand : CustomStringConvertible, CustomReflectable {
 }
 
 public struct OperandArray : RandomAccessCollection, CustomReflectable {
-  private let opArray: BridgedOperandArray
+  private let opArray: BridgedArrayRef
   
-  init(opArray: BridgedOperandArray) {
+  init(opArray: BridgedArrayRef) {
     self.opArray = opArray
   }
   
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { return Int(opArray.numOperands) }
+  public var endIndex: Int { return Int(opArray.numElements) }
   
   public subscript(_ index: Int) -> Operand {
     precondition(index >= 0 && index < endIndex)
