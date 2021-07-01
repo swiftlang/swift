@@ -798,12 +798,12 @@ class SomeClassWithInits {
   func hasDetached() {
     Task.detached {
       // okay
-      await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
-      self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      await self.isolated()
+      self.isolated()
       // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
       // expected-note@-2{{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
 
-      print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      print(await self.mutableState)
     }
   }
 }
