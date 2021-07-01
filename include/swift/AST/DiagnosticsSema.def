@@ -4617,6 +4617,9 @@ ERROR(actor_isolation_multiple_attr,none,
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %1 %2 has different actor isolation from %3 overridden declaration",
       (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
+ERROR(actor_isolation_superclass_mismatch,none,
+      "%0 class %1 has different actor isolation from %2 superclass %3",
+      (ActorIsolation, DeclName, ActorIsolation, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Types

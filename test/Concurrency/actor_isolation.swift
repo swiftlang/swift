@@ -940,3 +940,18 @@ actor Counter {
     return counter
   }
 }
+
+/// Superclass checks for global actor-qualified class types.
+class C2 { }
+
+@SomeGlobalActor
+class C3: C2 { } // expected-error{{global actor 'SomeGlobalActor'-isolated class 'C3' has different actor isolation from nonisolated superclass 'C2'}}
+
+@GenericGlobalActor<U>
+class GenericSuper<U> { }
+
+@GenericGlobalActor<[T]>
+class GenericSub1<T>: GenericSuper<[T]> { }
+
+@GenericGlobalActor<T>
+class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated class 'GenericSub2' has different actor isolation from global actor 'GenericGlobalActor<U>'-isolated superclass 'GenericSuper'}}
