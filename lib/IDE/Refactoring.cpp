@@ -6461,7 +6461,8 @@ private:
       // for the completion handler call, e.g 'return completion(args...)'. In
       // that case, be sure not to add another return.
       auto *parent = getWalker().Parent.getAsStmt();
-      AddedReturnOrThrow = !(parent && isa<ReturnStmt>(parent));
+      AddedReturnOrThrow = !(parent && isa<ReturnStmt>(parent) &&
+                             !cast<ReturnStmt>(parent)->isImplicit());
       if (AddedReturnOrThrow)
         OS << tok::kw_return;
     } else {
