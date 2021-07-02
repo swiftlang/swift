@@ -2715,7 +2715,6 @@ public:
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       (void)FD->getTypecheckedBody();
-      TypeChecker::computeCaptures(FD);
     } else if (shouldSkipBodyTypechecking(FD)) {
       FD->setBodySkipped(FD->getBodySourceRange());
     } else {
