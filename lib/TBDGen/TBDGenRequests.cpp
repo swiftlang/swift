@@ -48,10 +48,10 @@ ModuleDecl *TBDGenDescriptor::getParentModule() const {
   return Input.get<FileUnit *>()->getParentModule();
 }
 
-const llvm::DataLayout &TBDGenDescriptor::getDataLayout() const {
+const StringRef TBDGenDescriptor::getDataLayoutString() const {
   auto &ctx = getParentModule()->getASTContext();
   auto *clang = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  return clang->getTargetInfo().getDataLayout();
+  return llvm::StringRef(clang->getTargetInfo().getDataLayoutString());
 }
 
 const llvm::Triple &TBDGenDescriptor::getTarget() const {
