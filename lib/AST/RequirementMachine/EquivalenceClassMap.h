@@ -86,6 +86,11 @@ public:
     return ConcreteType.hasValue();
   }
 
+  Type getConcreteType(
+      TypeArrayView<GenericTypeParamType> genericParams,
+      const ProtocolGraph &protos,
+      RewriteContext &ctx) const;
+
   LayoutConstraint getLayoutConstraint() const {
     return Layout;
   }

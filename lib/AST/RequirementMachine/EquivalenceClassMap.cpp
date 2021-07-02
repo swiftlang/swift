@@ -102,6 +102,45 @@ static unsigned getGenericParamIndex(Type type) {
   return paramTy->getIndex();
 }
 
+/// Reverses the transformation performed by
+/// RewriteSystemBuilder::getConcreteSubstitutionSchema().
+static Type getTypeFromSubstitutionSchema(Type schema,
+                                          ArrayRef<Term> substitutions,
+                              TypeArrayView<GenericTypeParamType> genericParams,
+                                          const ProtocolGraph &protos,
+                                          RewriteContext &ctx) {
+  assert(!schema->isTypeParameter() && "Must have a concrete type here");
+
+  if (!schema->hasTypeParameter())
+    return schema;
+
+  return schema.transformRec([&](Type t) -> Optional<Type> {
+    if (t->is<GenericTypeParamType>()) {
+      auto index = getGenericParamIndex(t);
+
+      return ctx.getTypeForTerm(substitutions[index],
+                                genericParams, protos);
+    }
+
+    assert(!t->isTypeParameter());
+    return None;
+  });
+}
+
+/// Get the concrete type of this equivalence class.
+///
+/// Asserts if this equivalence class is not concrete.
+Type EquivalenceClass::getConcreteType(
+    TypeArrayView<GenericTypeParamType> genericParams,
+    const ProtocolGraph &protos,
+    RewriteContext &ctx) const {
+  return getTypeFromSubstitutionSchema(ConcreteType->getConcreteType(),
+                                       ConcreteType->getSubstitutions(),
+                                       genericParams,
+                                       protos,
+                                       ctx);
+}
+
 /// Given a concrete type that is a structural sub-component of a concrete
 /// type produced by RewriteSystemBuilder::getConcreteSubstitutionSchema(),
 /// collect the subset of referenced substitutions and renumber the generic
