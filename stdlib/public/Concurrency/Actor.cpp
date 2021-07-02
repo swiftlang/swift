@@ -26,12 +26,12 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "../runtime/ThreadLocalStorage.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ThreadLocal.h"
+#include "swift/Runtime/ThreadLocalStorage.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
 #include "llvm/Config/config.h"
@@ -120,8 +120,9 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<ExecutorTrackingInfo>,
-                                            ActiveInfoInThread);
+  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
+      Pointer<ExecutorTrackingInfo>, ActiveInfoInThread,
+      SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
 
   /// The active executor.
   ExecutorRef ActiveExecutor = ExecutorRef::generic();
@@ -195,21 +196,11 @@ public:
   }
 };
 
-#ifdef SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
-class ActiveTask {
-public:
-  static void set(AsyncTask *task) {
-    SWIFT_THREAD_SETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY, task);
-  }
-  static AsyncTask *get() {
-    return (AsyncTask *)SWIFT_THREAD_GETSPECIFIC(SWIFT_CONCURRENCY_TASK_KEY);
-  }
-};
-#else
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<AsyncTask>, Value);
+  static SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(Pointer<AsyncTask>, Value,
+                                            SWIFT_CONCURRENCY_TASK_KEY);
 
 public:
   static void set(AsyncTask *task) { Value.set(task); }
@@ -219,11 +210,13 @@ public:
 /// Define the thread-locals.
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
   Pointer<AsyncTask>,
-  ActiveTask::Value);
-#endif
+  ActiveTask::Value,
+  SWIFT_CONCURRENCY_TASK_KEY);
+
 SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
   Pointer<ExecutorTrackingInfo>,
-  ExecutorTrackingInfo::ActiveInfoInThread);
+  ExecutorTrackingInfo::ActiveInfoInThread,
+  SWIFT_CONCURRENCY_EXECUTOR_TRACKING_INFO_KEY);
 
 } // end anonymous namespace
 
