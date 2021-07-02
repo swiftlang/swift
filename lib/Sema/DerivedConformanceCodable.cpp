@@ -488,6 +488,15 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
                           ? addImplicitCaseCodingKeys(
                               enumDecl, elementDecl, codingKeysEnum)
                           : caseCodingKeysDecls.front();
+
+  if (!result) {
+    // There is no coding key defined for this element,
+    // which is okay, because not all elements have to
+    // be considered for serialization. Attempts to
+    // en-/decode them will be handled at runtime.
+    return true;
+  }
+
   auto *codingKeysTypeDecl = dyn_cast<TypeDecl>(result);
   if (!codingKeysTypeDecl) {
     result->diagnose(diag::codable_codingkeys_type_is_not_an_enum_here,
