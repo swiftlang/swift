@@ -19,6 +19,7 @@
 #include "swift/SIL/SILBridgingUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
@@ -1165,3 +1166,13 @@ void PassContext_eraseInstruction(BridgedPassContext passContext,
   castToPassInvocation(passContext)->eraseInstruction(castToInst(inst));
 }
 
+BridgedAliasAnalysis PassContext_getAliasAnalysis(BridgedPassContext context,
+                                                  BridgedFunction function) {
+  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
+  return {pm->getAnalysis<AliasAnalysis>(castToFunction(function))};
+}
+
+BridgedCalleeAnalysis PassContext_getCalleeAnalysis(BridgedPassContext context) {
+  SILPassManager *pm = castToPassInvocation(context)->getPassManager();
+  return {pm->getAnalysis<BasicCalleeAnalysis>()};
+}
