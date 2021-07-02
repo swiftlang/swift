@@ -95,7 +95,7 @@ class CustomClass {
 }
 
 @available(SwiftStdlib 5.5, *)
-func test_async_retains() async {
+func test_unstructured_retains() async {
   let instance = CustomClass()
   CustomClass.$current.withValue(instance) {
     print("BEFORE send: \(String(reflecting: CustomClass.current))")
@@ -120,11 +120,45 @@ func test_async_retains() async {
 }
 
 @available(SwiftStdlib 5.5, *)
+func test_unstructured_noValues() async {
+  await Task {
+    // no values to copy
+  }.value
+}
+
+@available(SwiftStdlib 5.5, *)
+func downloadImage(from url: String) async throws -> String {
+  await Task.sleep(10_000)
+  return ""
+}
+
+@available(SwiftStdlib 5.5, *)
+func test_unstructured_noValues_childTasks() async {
+  @Sendable func work() async throws {
+    let handle = Task {
+      try await downloadImage(from: "")
+    }
+  }
+
+  // these child tasks have a parent pointer in their task local storage.
+  // we must not copy it when performing the copyTo for a new unstructured task.
+  async let one = work()
+  async let two = work()
+  async let three = work()
+
+  try! await one
+  try! await two
+  try! await three
+
+}
+
+@available(SwiftStdlib 5.5, *)
 @main struct Main {
   static func main() async {
     await copyTo_async()
-    await copyTo_async()
     await copyTo_async_noWait()
-    await test_async_retains()
+    await test_unstructured_retains()
+    await test_unstructured_noValues()
+    await test_unstructured_noValues_childTasks()
   }
 }
