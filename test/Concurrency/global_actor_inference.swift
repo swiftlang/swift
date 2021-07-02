@@ -195,9 +195,10 @@ struct Container<T> {
 }
 
 struct OtherContainer<U> {
-  // Okay to change the global actor in a subclass.
+  // NOT Okay to change the global actor in a subclass.
   @GenericGlobalActor<[U]> class Subclass1 : Container<[U]>.Superclass { }
   @GenericGlobalActor<U> class Subclass2 : Container<[U]>.Superclass { }
+  // expected-error@-1{{global actor 'GenericGlobalActor<U>'-isolated class 'Subclass2' has different actor isolation from global actor 'GenericGlobalActor<T>'-isolated superclass 'Superclass'}}
 
   // Ensure that substitutions work properly when inheriting.
   class Subclass3<V> : Container<(U, V)>.Superclass2 {
@@ -218,7 +219,7 @@ class SuperclassWithGlobalActors {
   func j() { }
 }
 
-@GenericGlobalActor<String>
+@GenericGlobalActor<String> // expected-error@+1{{global actor 'GenericGlobalActor<String>'-isolated class 'SubclassWithGlobalActors' has different actor isolation from nonisolated superclass 'SuperclassWithGlobalActors'}}
 class SubclassWithGlobalActors : SuperclassWithGlobalActors {
   override func f() { } // okay: inferred to @GenericGlobalActor<Int>
 
