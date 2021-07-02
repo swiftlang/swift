@@ -5831,11 +5831,24 @@ void VarDecl::setNamingPattern(NamedPattern *Pat) {
 }
 
 TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
-  if (auto *param = dyn_cast<ParamDecl>(this))
-    return param->getTypeRepr();
+  if (auto *Param = dyn_cast<ParamDecl>(this))
+    return Param->getTypeRepr();
 
-  if (auto *parentPattern = dyn_cast_or_null<TypedPattern>(getParentPattern()))
-    return parentPattern->getTypeRepr();
+  auto *ParentPattern = getParentPattern();
+
+  if (auto *TyPattern = dyn_cast_or_null<TypedPattern>(ParentPattern))
+    return TyPattern->getTypeRepr();
+
+  // Handle typed if/guard/while-let as a special case (e.g. `if let x: Int
+  // = Optional.some(4)`), since the `TypedPattern` is not the top-level
+  // pattern here - instead it is an implicit `OptionalSomePattern`
+  if (auto *SomePattern =
+          dyn_cast_or_null<OptionalSomePattern>(ParentPattern)) {
+    if (auto *TyPattern =
+            dyn_cast<TypedPattern>(SomePattern->getSubPattern())) {
+      return TyPattern->getTypeRepr();
+    }
+  }
 
   return nullptr;
 }
