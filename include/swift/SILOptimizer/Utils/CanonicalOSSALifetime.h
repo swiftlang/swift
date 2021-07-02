@@ -93,6 +93,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
+#include "swift/Basic/DAGNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -220,50 +221,6 @@ public:
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
 };
 
-// Worklist of pointer-like things that have an invalid default value. Avoid
-// revisiting nodes--suitable for DAGs, but pops finished nodes without
-// preserving them in the vector.
-//
-// The primary API has two methods: intialize() and pop(). Others are provided
-// for flexibility.
-//
-// TODO: make this a better utility.
-template <typename T, unsigned SmallSize> struct PtrWorklist {
-  SmallPtrSet<T, SmallSize> ptrVisited;
-  SmallVector<T, SmallSize> ptrVector;
-
-  PtrWorklist() = default;
-
-  PtrWorklist(const PtrWorklist &) = delete;
-
-  void initialize(T t) {
-    clear();
-    insert(t);
-  }
-
-  template <typename R> void initializeRange(R &&range) {
-    clear();
-    ptrVisited.insert(range.begin(), range.end());
-    ptrVector.append(range.begin(), range.end());
-  }
-
-  T pop() { return empty() ? T() : ptrVector.pop_back_val(); }
-
-  bool empty() const { return ptrVector.empty(); }
-
-  unsigned size() const { return ptrVector.size(); }
-
-  void clear() {
-    ptrVector.clear();
-    ptrVisited.clear();
-  }
-
-  void insert(T t) {
-    if (ptrVisited.insert(t).second)
-      ptrVector.push_back(t);
-  }
-};
-
 /// Canonicalize OSSA lifetimes.
 ///
 /// Allows the allocation of analysis state to be reused across calls to
@@ -315,11 +272,11 @@ private:
   /// outisde the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
-  /// Reuse a general visited set for def-use traversal.
-  PtrWorklist<SILValue, 8> defUseWorklist;
+  /// Visited set for general def-use traversal that prevents revisiting values.
+  DAGNodeWorklist<SILValue, 8> defUseWorklist;
 
-  /// Reuse a general worklist for CFG traversal.
-  PtrWorklist<SILBasicBlock *, 8> blockWorklist;
+  /// Visited set general CFG traversal that prevents revisiting blocks.
+  DAGNodeWorklist<SILBasicBlock *, 8> blockWorklist;
 
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
