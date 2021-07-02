@@ -6570,9 +6570,12 @@ Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
   }
 
   auto &ctx = getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, DefaultArgumentExprRequest{const_cast<ParamDecl *>(this)},
-      new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx)));
+  if (Expr *E = evaluateOrDefault(
+          ctx.evaluator,
+          DefaultArgumentExprRequest{const_cast<ParamDecl *>(this)}, nullptr)) {
+    return E;
+  }
+  return new (ctx) ErrorExpr(getSourceRange(), ErrorType::get(ctx));
 }
 
 void ParamDecl::setDefaultExpr(Expr *E, bool isTypeChecked) {
