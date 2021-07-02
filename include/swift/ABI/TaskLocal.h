@@ -174,7 +174,7 @@ public:
     /// returns, as such, any child tasks potentially accessing the value stack
     /// are guaranteed to be completed by the time we pop values off the stack
     /// (after the body has completed).
-    TaskLocal::Item *head;
+    TaskLocal::Item *head = nullptr;
 
   public:
 
