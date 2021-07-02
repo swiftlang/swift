@@ -467,6 +467,8 @@ public:
   /// For instruction results, this returns getDefiningInstruction(). For
   /// arguments, this returns SILBasicBlock::begin() for the argument's parent
   /// block. Returns nullptr for SILUndef.
+  ///
+  /// FIXME: remove this redundant API from SILValue.
   SILInstruction *getDefiningInsertionPoint();
 
   // Const version of \see getDefiningInsertionPoint.
@@ -603,8 +605,6 @@ public:
 
   /// If this SILValue is a result of an instruction, return its
   /// defining instruction. Returns nullptr otherwise.
-  ///
-  /// FIXME: remove this redundant API from SILValue.
   SILInstruction *getDefiningInstruction() {
     return Value->getDefiningInstruction();
   }
