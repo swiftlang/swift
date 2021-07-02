@@ -248,11 +248,11 @@ public:
   InstructionDeleter(InstModCallbacks chainedCallbacks = InstModCallbacks())
       : deadInstructions(), iteratorRegistry(chainedCallbacks) {}
 
-  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
-
   UpdatingInstructionIteratorRegistry &getIteratorRegistry() {
     return iteratorRegistry;
   }
+
+  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
 
   llvm::iterator_range<UpdatingInstructionIterator>
   updatingRange(SILBasicBlock *bb) {
@@ -262,6 +262,12 @@ public:
   llvm::iterator_range<UpdatingReverseInstructionIterator>
   updatingReverseRange(SILBasicBlock *bb) {
     return iteratorRegistry.makeReverseIteratorRange(bb);
+  }
+
+  bool hadCallbackInvocation() const {
+    return const_cast<InstructionDeleter *>(this)
+        ->getCallbacks()
+        .hadCallbackInvocation();
   }
 
   /// If the instruction \p inst is dead, record it so that it can be cleaned
