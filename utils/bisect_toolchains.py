@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # utils/bisect_toolchains.py - Bisect swift.org toolchains with tags
 #
@@ -21,7 +21,7 @@ SWIFT_BASE_URL = 'https://swift.org/builds'
 GITHUB_BASE_URL = 'https://api.github.com'
 
 
-def download_toolchain(platform, tag, branch, workspace):
+def download_toolchain(platform, tag, branch, workspace, script):
    swift_path = None
    if platform == 'osx':
       file_type = 'pkg'
@@ -33,42 +33,48 @@ def download_toolchain(platform, tag, branch, workspace):
    if branch != 'development':
       branch = 'swift-{branch}-branch'.format(branch=branch)
 
-   download_url = "{base_url}/{branch}/{toolchain_type}/{tag}/{tag}-{platform}.{file_type}".format(
-      base_url=SWIFT_BASE_URL,
-      branch=branch,
-      toolchain_type=toolchain_type,
-      tag=tag,
-      platform=platform,
-      file_type=file_type)
+   toolchain_dir = "{workspace}/{tag}-{platform}".format(
+         workspace=workspace, tag=tag, platform=platform)
 
-   print("Downloading: {url}".format(url=download_url))
-   r = requests.get(download_url, allow_redirects=True)
-   download_path="{workspace}/{tag}-{platform}.{file_type}".format(
-      workspace=workspace,
-      tag=tag,
-      platform=platform,
-      file_type=file_type)
+   if not os.path.exists(toolchain_dir):
+      download_url = "{base_url}/{branch}/{toolchain_type}/{tag}/{tag}-{platform}.{file_type}".format(
+         base_url=SWIFT_BASE_URL,
+         branch=branch,
+         toolchain_type=toolchain_type,
+         tag=tag,
+         platform=platform,
+         file_type=file_type)
 
-   with open(download_path, 'wb') as f:
-      f.write(r.content)
+      print("Downloading: {url}".format(url=download_url))
+      r = requests.get(download_url, allow_redirects=True)
+      download_path="{workspace}/{tag}-{platform}.{file_type}".format(
+         workspace=workspace,
+         tag=tag,
+         platform=platform,
+         file_type=file_type)
+
+      with open(download_path, 'wb') as f:
+         f.write(r.content)
 
    if platform == 'osx':
-      print("Installing: {download_path}".format(download_path=download_path))
-      toolchain_dir = "{workspace}/{tag}-{platform}".format(
-         download_path=download_path, workspace=workspace, tag=tag, platform=platform)
-      subprocess.call("pkgutil --expand {download_path} {toolchain_dir}".format(
-         download_path=download_path,
-         toolchain_dir=toolchain_dir), shell=True)
-      payload_path = "{toolchain_dir}/{tag}-osx-package.pkg/Payload".format(
-         toolchain_dir=toolchain_dir,
-         tag=tag)
-      subprocess.call("tar xf {payload_path} -C {toolchain_dir}".format(
-         payload_path=payload_path,
-         toolchain_dir=toolchain_dir), shell=True)
+      if not os.path.exists(toolchain_dir):
+         print("Installing: {download_path}".format(download_path=download_path))
+         subprocess.call("pkgutil --expand {download_path} {toolchain_dir}".format(
+            download_path=download_path,
+            toolchain_dir=toolchain_dir), shell=True)
+         payload_path = "{toolchain_dir}/{tag}-osx-package.pkg/Payload".format(
+            toolchain_dir=toolchain_dir,
+            tag=tag)
+         subprocess.call("tar xf {payload_path} -C {toolchain_dir}".format(
+            payload_path=payload_path,
+            toolchain_dir=toolchain_dir), shell=True)
       swift_path = "{toolchain_dir}/usr/bin/swift".format(
          toolchain_dir=toolchain_dir)
       subprocess.call("{swift_path} --version".format(
          swift_path=swift_path), shell=True)
+      os.environ["SWIFT_EXEC"] = swift_path
+      return_code = subprocess.call("sh {script}".format(script=script), shell=True)
+      print("[INFO] Exit code: {} Tag: {} Script: {}".format(return_code, tag, script))
    return swift_path
 
 def get_tags(branch):
@@ -108,6 +114,10 @@ def main():
       help="Directory to toolchains download",
       required=True)
    parser.add_argument(
+      "--script",
+      help="Script to run with swift bisection",
+      required=True)
+   parser.add_argument(
       "--good-tag",
       help="Good tag (Oldest tag)",
       required=True)
@@ -127,6 +137,7 @@ def main():
    bad_tag = args.bad_tag
    workspace = args.workspace
    branch = args.branch
+   script = args.script
 
    # Setup workspace directory
    if not os.path.exists(workspace):
@@ -141,7 +152,7 @@ def main():
    
    index = start_index
    while(index <= stop_index):
-      download_toolchain(platform, tags[index], branch, workspace)
+      download_toolchain(platform, tags[index], branch, workspace, script)
       index = index + 1
 
 if __name__ == "__main__":
