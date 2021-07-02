@@ -164,11 +164,9 @@ void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
 TaskLocal::Item*
 TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
   size_t amountToAllocate = Item::itemSize(/*valueType*/nullptr);
-  // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
   void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
   Item *item = new(allocation) Item();
 
-  // FIXME: parent pointer must to be the parent STORAGE not just the next item.
   auto parentHead = parent->_private().Local.head;
   if (parentHead) {
     if (parentHead->isEmpty()) {
@@ -223,8 +221,14 @@ TaskLocal::Item::createLink(AsyncTask *task,
 void TaskLocal::Item::copyTo(AsyncTask *target) {
   assert(target && "TaskLocal item attempt to copy to null target task!");
 
-  auto item = Item::createLink(target, this->key, this->valueType);
-  valueType->vw_initializeWithCopy(item->getStoragePtr(), this->getStoragePtr());
+  // 'parent' pointers are signified by null valueType.
+  // We must not copy parent pointers, but rather perform a deep copy of all values,
+  // as such, we skip parent pointers here entirely.
+  if (isParentPointer())
+    return;
+
+  auto item = Item::createLink(target, key, valueType);
+  valueType->vw_initializeWithCopy(item->getStoragePtr(), getStoragePtr());
 
   /// A `copyTo` may ONLY be invoked BEFORE the task is actually scheduled,
   /// so right now we can safely copy the value into the task without additional
