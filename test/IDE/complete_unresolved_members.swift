@@ -450,7 +450,10 @@ func testSubType() {
 func testMemberTypealias() {
   var _: MyProtocol = .#^SUBTYPE_2^#
 }
-// SUBTYPE_2-NOT: Begin completions
+// SUBTYPE_2: Begin completions, 2 items
+// SUBTYPE_2-DAG: Decl[TypeAlias]/CurrNominal/TypeRelation[Convertible]: Concrete1[#BaseClass#];
+// SUBTYPE_2-DAG: Decl[TypeAlias]/CurrNominal/TypeRelation[Convertible]: Concrete2[#AnotherTy#];
+// SUBTYPE_2: End completions
 
 enum Generic<T> {
   case contains(content: T)
