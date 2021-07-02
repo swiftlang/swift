@@ -4274,8 +4274,7 @@ bool ConstraintSystem::repairFailures(
     // it's going to be diagnosed by specialized fix which deals
     // with generic argument mismatches.
     if (matchKind == ConstraintKind::BindToPointerType) {
-      auto *member = rhs->getAs<DependentMemberType>();
-      if (!(member && member->getBase()->hasPlaceholder()))
+      if (!rhs->isPlaceholder())
         break;
     }
 
