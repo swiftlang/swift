@@ -329,3 +329,14 @@ func withDefaultArg(x: String = "") {
 // DEFAULT-ARG:      convert_function.swift [[# @LINE-3]]:1 -> [[# @LINE-2]]:2
 // DEFAULT-ARG-NOT:  @discardableResult
 // DEFAULT-ARG-NEXT: {{^}}func withDefaultArg(x: String = "") async
+
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=IMPLICIT-RETURN %s
+func withImplicitReturn(completionHandler: (String) -> Void) {
+  simple {
+    completionHandler($0)
+  }
+}
+// IMPLICIT-RETURN: func withImplicitReturn() async -> String {
+// IMPLICIT-RETURN-NEXT:   let val0 = await simple()
+// IMPLICIT-RETURN-NEXT:   return val0
+// IMPLICIT-RETURN-NEXT: }
