@@ -1565,8 +1565,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Ty = cast<IntegerLiteralInst>(&SI)->getType();
       break;
     case SILInstructionKind::FloatLiteralInst:
-      cast<FloatLiteralInst>(&SI)->getValue().toString(Str, 16,
-                                                       /*signed*/ true);
+      cast<FloatLiteralInst>(&SI)->getBits().toString(Str, 16,
+                                                      /*signed*/ true);
       Ty = cast<FloatLiteralInst>(&SI)->getType();
       break;
     }
