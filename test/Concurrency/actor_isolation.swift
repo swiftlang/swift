@@ -787,12 +787,12 @@ class SomeClassWithInits {
   func hasDetached() {
     Task.detached {
       // okay
-      await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
-      self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      await self.isolated()
+      self.isolated()
       // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
       // expected-note@-2{{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
 
-      print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      print(await self.mutableState)
     }
   }
 }
@@ -940,3 +940,18 @@ actor Counter {
     return counter
   }
 }
+
+/// Superclass checks for global actor-qualified class types.
+class C2 { }
+
+@SomeGlobalActor
+class C3: C2 { } // expected-error{{global actor 'SomeGlobalActor'-isolated class 'C3' has different actor isolation from nonisolated superclass 'C2'}}
+
+@GenericGlobalActor<U>
+class GenericSuper<U> { }
+
+@GenericGlobalActor<[T]>
+class GenericSub1<T>: GenericSuper<[T]> { }
+
+@GenericGlobalActor<T>
+class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated class 'GenericSub2' has different actor isolation from global actor 'GenericGlobalActor<U>'-isolated superclass 'GenericSuper'}}

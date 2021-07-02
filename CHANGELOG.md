@@ -6,7 +6,7 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.5
 ---------
 
-* [SE-0313][]:
+* [SE-0316][]:
 
 	A type can be defined as a global actor. Global actors extend the notion
 	of actor isolation outside of a single actor type, so that global state
