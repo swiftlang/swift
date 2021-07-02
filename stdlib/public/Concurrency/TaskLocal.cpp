@@ -224,7 +224,7 @@ void TaskLocal::Item::copyTo(AsyncTask *target) {
   // 'parent' pointers are signified by null valueType.
   // We must not copy parent pointers, but rather perform a deep copy of all values,
   // as such, we skip parent pointers here entirely.
-  if (!valueType)
+  if (isParentPointer())
     return;
 
   auto item = Item::createLink(target, key, valueType);

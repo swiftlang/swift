@@ -139,6 +139,9 @@ func test_unstructured_noValues_childTasks() async {
       try await downloadImage(from: "")
     }
   }
+
+  // these child tasks have a parent pointer in their task local storage.
+  // we must not copy it when performing the copyTo for a new unstructured task.
   async let one = work()
   async let two = work()
   async let three = work()
