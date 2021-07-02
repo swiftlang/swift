@@ -3186,8 +3186,14 @@ for host in "${ALL_HOSTS[@]}"; do
 
         # Strip executables, shared libraries and static libraries in
         # `host_install_destdir`.
+        # We exclude on purpose libclang_rt.tvossim.a since
+        # 1) strip will fail parsing that in Xcode 13.0b1 (rdar://80098850)
+        # 2) that library is copied from the Xcode installation,
+        # and it is already stripped
         find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
-          '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
+          '(' -perm -0111 -or -name "*.a" ')' \|
+          -not -name 'libclang_rt.tvossim.a' \|
+          -type f -print | \
           xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
         # Codesign dylibs after strip tool
