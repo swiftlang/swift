@@ -3191,8 +3191,8 @@ for host in "${ALL_HOSTS[@]}"; do
         # 2) that library is copied from the Xcode installation,
         # and it is already stripped
         find "${CURRENT_INSTALL_DIR}${CURRENT_PREFIX}/" \
-          '(' -perm -0111 -or -name "*.a" ')' \|
-          -not -name 'libclang_rt.tvossim.a' \|
+          '(' -perm -0111 -or -name "*.a" ')' \
+          -not -name 'libclang_rt.tvossim.a' \
           -type f -print | \
           xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
