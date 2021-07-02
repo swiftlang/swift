@@ -585,7 +585,7 @@ DECL_ATTR(actorIndependent, ActorIndependent,
   103)
 
 SIMPLE_DECL_ATTR(globalActor, GlobalActor,
-  OnClass | OnStruct | OnEnum | ConcurrencyOnly |
+  OnClass | OnStruct | OnEnum |
   ABIStableToAdd | ABIBreakingToRemove |
   APIStableToAdd | APIBreakingToRemove,
   104)
