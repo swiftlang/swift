@@ -938,6 +938,156 @@ MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
   return MutableTerm(atoms);
 }
 
+/// Compute the interface type for a range of atoms, with an optional
+/// root type.
+///
+/// If the root type is specified, we wrap it in a series of
+/// DependentMemberTypes. Otherwise, the root is computed from
+/// the first atom of the range.
+template<typename Iter>
+Type getTypeForAtomRange(Iter begin, Iter end, Type root,
+                         TypeArrayView<GenericTypeParamType> genericParams,
+                         const ProtocolGraph &protos,
+                         ASTContext &ctx) {
+  Type result = root;
+
+  auto handleRoot = [&](GenericTypeParamType *genericParam) {
+    assert(genericParam->isCanonical());
+
+    if (!genericParams.empty()) {
+      // Return a sugared GenericTypeParamType if we're given an array of
+      // sugared types to substitute.
+      unsigned index = GenericParamKey(genericParam).findIndexIn(genericParams);
+      result = genericParams[index];
+      return;
+    }
+
+    // Otherwise, we're going to return a canonical type.
+    result = genericParam;
+  };
+
+  for (; begin != end; ++begin) {
+    auto atom = *begin;
+
+    if (!result) {
+      // A valid term always begins with a generic parameter, protocol or
+      // associated type atom.
+      switch (atom.getKind()) {
+      case Atom::Kind::GenericParam:
+        handleRoot(atom.getGenericParam());
+        continue;
+
+      case Atom::Kind::Protocol:
+        handleRoot(GenericTypeParamType::get(0, 0, ctx));
+        continue;
+
+      case Atom::Kind::AssociatedType:
+        handleRoot(GenericTypeParamType::get(0, 0, ctx));
+
+        // An associated type term at the root means we have a dependent
+        // member type rooted at Self; handle the associated type below.
+        break;
+
+      case Atom::Kind::Name:
+      case Atom::Kind::Layout:
+      case Atom::Kind::Superclass:
+      case Atom::Kind::ConcreteType:
+        llvm_unreachable("Term has invalid root atom");
+      }
+    }
+
+    // An unresolved type can appear if we have invalid requirements.
+    if (atom.getKind() == Atom::Kind::Name) {
+      result = DependentMemberType::get(result, atom.getName());
+      continue;
+    }
+
+    // We should have a resolved type at this point.
+    assert(atom.getKind() == Atom::Kind::AssociatedType);
+    auto *proto = atom.getProtocols()[0];
+    auto name = atom.getName();
+
+    AssociatedTypeDecl *assocType = nullptr;
+
+    // Special case: handle unknown protocols, since they can appear in the
+    // invalid types that getCanonicalTypeInContext() must handle via
+    // concrete substitution; see the definition of getCanonicalTypeInContext()
+    // below for details.
+    if (!protos.isKnownProtocol(proto)) {
+      assert(root &&
+             "We only allow unknown protocols in getRelativeTypeForTerm()");
+      assert(atom.getProtocols().size() == 1 &&
+             "Unknown associated type atom must have a single protocol");
+      assocType = proto->getAssociatedType(name)->getAssociatedTypeAnchor();
+    } else {
+      // FIXME: Cache this
+      //
+      // An associated type atom [P1&P1&...&Pn:A] has one or more protocols
+      // P0...Pn and an identifier 'A'.
+      //
+      // We map it back to a AssociatedTypeDecl as follows:
+      //
+      // - For each protocol Pn, look for associated types A in Pn itself,
+      //   and all protocols that Pn refines.
+      //
+      // - For each candidate associated type An in protocol Qn where
+      //   Pn refines Qn, get the associated type anchor An' defined in
+      //   protocol Qn', where Qn refines Qn'.
+      //
+      // - Out of all the candidiate pairs (Qn', An'), pick the one where
+      //   the protocol Qn' is the lowest element according to the linear
+      //   order defined by TypeDecl::compare().
+      //
+      // The associated type An' is then the canonical associated type
+      // representative of the associated type atom [P0&...&Pn:A].
+      //
+      for (auto *proto : atom.getProtocols()) {
+        const auto &info = protos.getProtocolInfo(proto);
+        for (auto *otherAssocType : info.AssociatedTypes) {
+          otherAssocType = otherAssocType->getAssociatedTypeAnchor();
+
+          if (otherAssocType->getName() == name &&
+              (assocType == nullptr ||
+               TypeDecl::compare(otherAssocType->getProtocol(),
+                                 assocType->getProtocol()) < 0)) {
+            assocType = otherAssocType;
+          }
+        }
+      }
+    }
+
+    assert(assocType && "Need to look harder");
+    result = DependentMemberType::get(result, assocType);
+  }
+
+  return result;
+}
+
+Type RewriteContext::getTypeForTerm(Term term,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const ProtocolGraph &protos) const {
+  return getTypeForAtomRange(term.begin(), term.end(), Type(),
+                             genericParams, protos, Context);
+}
+
+Type RewriteContext::getTypeForTerm(const MutableTerm &term,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const ProtocolGraph &protos) const {
+  return getTypeForAtomRange(term.begin(), term.end(), Type(),
+                             genericParams, protos, Context);
+}
+
+Type RewriteContext::getRelativeTypeForTerm(
+    const MutableTerm &term, const MutableTerm &prefix,
+    const ProtocolGraph &protos) const {
+  assert(std::equal(prefix.begin(), prefix.end(), term.begin()));
+
+  auto genericParam = CanGenericTypeParamType::get(0, 0, Context);
+  return getTypeForAtomRange(
+      term.begin() + prefix.size(), term.end(), genericParam,
+      { }, protos, Context);
+}
+
 void Rule::dump(llvm::raw_ostream &out) const {
   out << LHS << " => " << RHS;
   if (deleted)
