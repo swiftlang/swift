@@ -3685,11 +3685,12 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     if (classDecl) {
       if (Type superclass = classDecl->getSuperclass()) {
         auto classModule = classDecl->getParentModule();
-        if (TypeChecker::conformsToKnownProtocol(
-                classDecl->mapTypeIntoContext(superclass),
-                KnownProtocolKind::Sendable,
-                classModule))
-          return nullptr;
+        if (auto proto = nominal->getASTContext().getProtocol(KnownProtocolKind::Sendable)) {
+          if (TypeChecker::conformsToProtocol(
+                  classDecl->mapTypeIntoContext(superclass),
+                  proto, classDecl))
+            return nullptr;
+        }
       }
     }
 
