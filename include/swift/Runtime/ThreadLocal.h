@@ -18,9 +18,15 @@
 #ifndef SWIFT_RUNTIME_THREADLOCAL_H
 #define SWIFT_RUNTIME_THREADLOCAL_H
 
+#include <type_traits>
+#include "ThreadLocalStorage.h"
+
 /// SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL - Does the current configuration
 /// allow the use of SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL?
-#if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
+#if defined(__APPLE__)
+// The pthread TLS APIs work better than C++ TLS on Apple platforms.
+#define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 0
+#elif defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 // We define SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL to nothing in this
 // configuration and just use a global variable, so this is okay.
 #define SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL 1
@@ -57,6 +63,17 @@
 #endif
 
 namespace swift {
+// Validate a type stored in thread-local storage, using static asserts. Such
+// types must fit in a pointer and be trivially copyable/destructible.
+#define VALIDATE_THREAD_LOCAL_TYPE(T)                                          \
+  static_assert(sizeof(T) <= sizeof(void *),                                   \
+                "cannot store more than a pointer");                           \
+  static_assert(std::is_trivially_copyable<T>::value,                          \
+                "ThreadLocal values must be trivially copyable");              \
+  static_assert(std::is_trivially_destructible<T>::value,                      \
+                "ThreadLocal cleanup is not supported, stored types must be "  \
+                "trivially destructible");
+
 // A wrapper class for thread-local storage.
 //
 // - On platforms that report SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
@@ -72,50 +89,70 @@ namespace swift {
 // - On platforms that don't report SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL,
 //   we have to simulate thread-local storage.  Fortunately, all of
 //   these platforms (at least for now) support pthread_getspecific.
+#if SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
 template <class T>
 class ThreadLocal {
-  static_assert(sizeof(T) <= sizeof(void*), "cannot store more than a pointer");
+  VALIDATE_THREAD_LOCAL_TYPE(T)
 
-#if SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
   T value;
+
+public:
+  constexpr ThreadLocal() {}
+
+  T get() { return value; }
+
+  void set(T newValue) { value = newValue; }
+};
 #else
+// A wrapper around a pthread_key_t that is lazily initialized using
+// dispatch_once.
+class ThreadLocalKey {
   // We rely on the zero-initialization of objects with static storage
   // duration.
   dispatch_once_t once;
   pthread_key_t key;
 
+public:
   pthread_key_t getKey() {
-    dispatch_once_f(&once, this, [](void *ctx) {
-      pthread_key_create(&reinterpret_cast<ThreadLocal*>(ctx)->key, nullptr);
+    dispatch_once_f(&once, &key, [](void *ctx) {
+      pthread_key_create(reinterpret_cast<pthread_key_t *>(ctx), nullptr);
     });
     return key;
   }
-#endif
+};
+
+// A type representing a constant pthread_key_t, for use on platforms that
+// provide reserved keys.
+template <pthread_key_t constantKey>
+class ConstantThreadLocalKey {
+public:
+  pthread_key_t getKey() { return constantKey; }
+};
+
+template <class T, class Key>
+class ThreadLocal {
+  VALIDATE_THREAD_LOCAL_TYPE(T)
+
+  Key key;
 
 public:
   constexpr ThreadLocal() {}
 
   T get() {
-#if SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
-    return value;
-#else
-    void *storedValue = pthread_getspecific(getKey());
+    void *storedValue = SWIFT_THREAD_GETSPECIFIC(key.getKey());
     T value;
     memcpy(&value, &storedValue, sizeof(T));
     return value;
-#endif
   }
 
   void set(T newValue) {
-#if SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
-    value = newValue;
-#else
     void *storedValue;
     memcpy(&storedValue, &newValue, sizeof(T));
-    pthread_setspecific(getKey(), storedValue);
-#endif
+    SWIFT_THREAD_SETSPECIFIC(key.getKey(), storedValue);
   }
 };
+#endif
+
 } // end namespace swift
 
 /// SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(TYPE, NAME) - Declare a variable
@@ -124,13 +161,16 @@ public:
 ///
 /// Because of the fallback path, the default-initialization of the
 /// type must be equivalent to a bitwise zero-initialization, and the
-/// type must be small and trivially copyable.
+/// type must be small and trivially copyable and destructible.
 #if SWIFT_RUNTIME_SUPPORTS_THREAD_LOCAL
-#define SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(TYPE, NAME) \
+#define SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(TYPE, NAME, KEY) \
   SWIFT_RUNTIME_ATTRIBUTE_THREAD_LOCAL swift::ThreadLocal<TYPE> NAME
+#elif SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+#define SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(TYPE, NAME, KEY) \
+  swift::ThreadLocal<TYPE, ConstantThreadLocalKey<KEY>> NAME
 #else
-#define SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(TYPE, NAME) \
-  swift::ThreadLocal<TYPE> NAME
+#define SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(TYPE, NAME, KEY) \
+  swift::ThreadLocal<TYPE, ThreadLocalKey> NAME
 #endif
 
 #endif
