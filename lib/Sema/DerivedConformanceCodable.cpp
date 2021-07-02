@@ -1146,8 +1146,9 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
     }
 
     // generate: case .<Case>:
+    auto enumType = funcDC->mapTypeIntoContext(enumDecl->getDeclaredInterfaceType());
     auto pat = new (C) EnumElementPattern(
-        TypeExpr::createImplicit(enumDecl->getDeclaredType(), C), SourceLoc(),
+        TypeExpr::createImplicit(enumType, C), SourceLoc(),
         DeclNameLoc(), DeclNameRef(), elt, subpattern);
     pat->setImplicit();
 
