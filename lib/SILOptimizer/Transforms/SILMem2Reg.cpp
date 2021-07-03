@@ -1103,6 +1103,12 @@ bool MemoryToRegisters::promoteSingleAllocation(
   LLVM_DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
   ++NumAllocStackFound;
 
+  // In OSSA, don't do Mem2Reg on non-trivial alloc_stack with dynamic_lifetime.
+  if (alloc->hasDynamicLifetime() && f.hasOwnership() &&
+      !alloc->getType().isTrivial(f)) {
+    return false;
+  }
+
   // Don't handle captured AllocStacks.
   bool inSingleBlock = false;
   if (isCaptured(alloc, inSingleBlock)) {
