@@ -50,6 +50,8 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/raw_ostream.h"
@@ -511,6 +513,157 @@ void EquivalenceClassMap::addProperty(
                           inducedRules, DebugConcreteUnification);
 }
 
+void EquivalenceClassMap::concretizeNestedTypesFromConcreteParents(
+    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
+  for (const auto &equivClass : Map) {
+    if (equivClass->isConcreteType() &&
+        !equivClass->getConformsTo().empty()) {
+      if (DebugConcretizeNestedTypes) {
+        llvm::dbgs() << "^ Concretizing nested types of ";
+        equivClass->dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      }
+
+      concretizeNestedTypesFromConcreteParent(
+          equivClass->getKey(),
+          equivClass->ConcreteType->getConcreteType(),
+          equivClass->ConcreteType->getSubstitutions(),
+          equivClass->getConformsTo(),
+          inducedRules);
+    }
+  }
+}
+
+/// If we have an equivalence class T => { conforms_to: [ P ], concrete: Foo },
+/// then for each associated type A of P, we generate a new rule:
+///
+///   T.[P:A].[concrete: Foo.A] => T.[P:A]  (if Foo.A is concrete)
+///   T.[P:A] => T.(Foo.A)                  (if Foo.A is abstract)
+///
+void EquivalenceClassMap::concretizeNestedTypesFromConcreteParent(
+    const MutableTerm &key,
+    CanType concreteType, ArrayRef<Term> substitutions,
+    ArrayRef<const ProtocolDecl *> conformsTo,
+    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const {
+  for (auto *proto : conformsTo) {
+    // FIXME: Either remove the ModuleDecl entirely from conformance lookup,
+    // or pass the correct one down in here.
+    auto *module = proto->getParentModule();
+
+    auto conformance = module->lookupConformance(concreteType,
+                                                 const_cast<ProtocolDecl *>(proto));
+    if (conformance.isInvalid()) {
+      // FIXME: Diagnose conflict
+      if (DebugConcretizeNestedTypes) {
+        llvm::dbgs() << "^^ " << concreteType << " does not conform to "
+                     << proto->getName() << "\n";
+      }
+
+      continue;
+    }
+
+    // FIXME: Maybe this can happen if the concrete type is an
+    // opaque result type?
+    assert(!conformance.isAbstract());
+
+    auto assocTypes = Protos.getProtocolInfo(proto).AssociatedTypes;
+    if (assocTypes.empty())
+      continue;
+
+    auto *concrete = conformance.getConcrete();
+
+    // We might have duplicates in the list due to diamond inheritance.
+    // FIXME: Filter those out further upstream?
+    // FIXME: This should actually be outside of the loop over the conforming protos...
+    llvm::SmallDenseSet<AssociatedTypeDecl *, 4> visited;
+    for (auto *assocType : assocTypes) {
+      if (!visited.insert(assocType).second)
+        continue;
+
+      // Get the actual protocol in case we inherited this associated type.
+      auto *actualProto = assocType->getProtocol();
+      if (actualProto != proto)
+        continue;
+
+      if (DebugConcretizeNestedTypes) {
+        llvm::dbgs() << "^^ " << "Looking up type witness for "
+                     << proto->getName() << ":" << assocType->getName()
+                     << " on " << concreteType << "\n";
+      }
+
+      auto typeWitness = concrete->getTypeWitness(assocType)
+                                 ->getCanonicalType();
+
+      if (DebugConcretizeNestedTypes) {
+        llvm::dbgs() << "^^ " << "Type witness for " << assocType->getName()
+                     << " of " << concreteType << " is " << typeWitness << "\n";
+      }
+
+      auto nestedType = Atom::forAssociatedType(proto, assocType->getName(),
+                                                Context);
+
+      MutableTerm subjectType = key;
+      subjectType.add(nestedType);
+
+      MutableTerm constraintType;
+
+      if (concreteType == typeWitness) {
+        if (DebugConcretizeNestedTypes) {
+          llvm::dbgs() << "^^ Type witness is the same as the concrete type\n";
+        }
+
+        // Add a rule T.[P:A] => T.
+        constraintType = key;
+
+      } else if (typeWitness->isTypeParameter()) {
+        // The type witness is a type parameter of the form τ_0_n.X.Y...Z,
+        // where 'n' is an index into the substitution array.
+        //
+        // Collect zero or more member type names in reverse order.
+        SmallVector<Atom, 3> atoms;
+        while (auto memberType = dyn_cast<DependentMemberType>(typeWitness)) {
+          atoms.push_back(Atom::forName(memberType->getName(), Context));
+          typeWitness = memberType.getBase();
+        }
+
+        // Get the substitution S corresponding to τ_0_n.
+        unsigned index = getGenericParamIndex(typeWitness);
+        constraintType = MutableTerm(substitutions[index]);
+
+        // Add the member type names.
+        std::reverse(atoms.begin(), atoms.end());
+        for (auto atom : atoms)
+          constraintType.add(atom);
+
+        // Add a rule T => S.X.Y...Z.
+
+      } else {
+        // The type witness is a concrete type.
+        constraintType = subjectType;
+
+        // FIXME: Handle dependent member types here
+        SmallVector<Term, 3> result;
+        auto typeWitnessSchema =
+            remapConcreteSubstitutionSchema(typeWitness, substitutions,
+                                            Context.getASTContext(),
+                                            result);
+        constraintType.add(
+            Atom::forConcreteType(
+                typeWitnessSchema, result, Context));
+
+        // Add a rule T.[P:A].[concrete: Foo.A] => T.[P:A].
+
+      }
+
+      inducedRules.emplace_back(subjectType, constraintType);
+      if (DebugConcretizeNestedTypes) {
+        llvm::dbgs() << "^^ Induced rule " << constraintType
+                     << " => " << subjectType << "\n";
+      }
+    }
+  }
+}
+
 void EquivalenceClassMap::dump(llvm::raw_ostream &out) const {
   out << "Equivalence class map: {\n";
   for (const auto &equivClass : Map) {
@@ -580,6 +733,10 @@ RewriteSystem::buildEquivalenceClassMap(EquivalenceClassMap &map,
   for (auto pair : properties) {
     map.addProperty(pair.first, pair.second, inducedRules);
   }
+
+  // We also need to merge concrete type rules with conformance rules, by
+  // concretizing the associated type witnesses of the concrete type.
+  map.concretizeNestedTypesFromConcreteParents(inducedRules);
 
   // Some of the induced rules might be trivial; only count the induced rules
   // where the left hand side is not already equivalent to the right hand side.

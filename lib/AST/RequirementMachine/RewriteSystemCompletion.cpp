@@ -334,7 +334,7 @@ void RewriteSystem::processMergedAssociatedTypes() {
           // merged type [P1&P2:T] must conform to Q as well. Add a new rule
           // of the form:
           //
-          //   [P1&P2].[Q] => [P1&P2]
+          //   [P1&P2:T].[Q] => [P1&P2:T]
           //
           MutableTerm newLHS;
           newLHS.add(mergedAtom);

@@ -133,7 +133,7 @@ Identifier Atom::getName() const {
   return Ptr->Name;
 }
 
-/// Get the single protocol declaration associate with a protocol atom.
+/// Get the single protocol declaration associated with a protocol atom.
 const ProtocolDecl *Atom::getProtocol() const {
   assert(getKind() == Kind::Protocol);
   return Ptr->Proto;
