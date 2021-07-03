@@ -1048,7 +1048,13 @@ static bool printSwiftVersion(const CompilerInvocation &Invocation) {
 
 static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
                                    llvm::raw_ostream &OS) {
-  if (table.getOption(id).hasFlag(options::FrontendOption)) {
+  if (table.getOption(id).hasFlag(options::FrontendOption) ||
+      table.getOption(id).hasFlag(options::AutolinkExtractOption) ||
+      table.getOption(id).hasFlag(options::ModuleWrapOption) ||
+      table.getOption(id).hasFlag(options::SwiftIndentOption) ||
+      table.getOption(id).hasFlag(options::SwiftAPIExtractOption) ||
+      table.getOption(id).hasFlag(options::SwiftSymbolGraphExtractOption) ||
+      table.getOption(id).hasFlag(options::SwiftAPIDigesterOption)) {
     auto name = StringRef(table.getOptionName(id));
     if (!name.empty()) {
       OS << "    \"" << name << "\",\n";
