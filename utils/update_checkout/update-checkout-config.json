@@ -204,7 +204,7 @@
                 "swift-integration-tests": "main",
                 "swift-xcode-playground-support": "main",
                 "ninja": "release",
-                "icu": "release-65-1",
+                "icu": "release-68-1",
                 "yams": "3.0.1",
                 "cmake": "v3.19.6",
                 "indexstore-db": "main",
