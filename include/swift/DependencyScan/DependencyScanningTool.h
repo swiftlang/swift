@@ -51,7 +51,7 @@ public:
   /// module names (batch inputs) and output them to the
   /// BatchScanInput-specified output locations.
   ///
-  /// \returns a \c std::error_code if errors occured during scan.
+  /// \returns a \c std::error_code if errors occurred during scan.
   std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
   getDependencies(ArrayRef<const char *> Command,
                   const std::vector<BatchScanInput> &BatchInput,
