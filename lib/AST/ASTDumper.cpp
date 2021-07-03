@@ -482,13 +482,29 @@ namespace {
       }
     }
 
+    void printLabel(StringRef label, TerminalColor Color = DeclModifierColor) {
+      OS << " ";
+      PrintWithColorRAII(OS, Color) << label;
+      if (!label.empty())
+        PrintWithColorRAII(OS, Color) << "=";
+    }
+
     // Print a field with a value.
     template<typename T>
-    raw_ostream &printField(StringRef name, const T &value) {
-      OS << " ";
-      PrintWithColorRAII(OS, TypeFieldColor) << name;
-      OS << "=" << value;
-      return OS;
+    void print(const T &value, StringRef label = "") {
+      printLabel(label);
+      OS << value;
+    }
+
+    // Print a single flag.
+    void printFlag(StringRef label) {
+      PrintWithColorRAII(OS, DeclModifierColor) << " " << label;
+    }
+
+    // Print a single flag if it is set.
+    void printFlag(bool isSet, StringRef label) {
+      if (isSet)
+        printFlag(label);
     }
 
     void printCommon(const char *name, StringRef label, TerminalColor Color) {
@@ -539,15 +555,14 @@ namespace {
     void visitImportDecl(ImportDecl *ID, StringRef Label) {
       printCommon(ID, "import_decl", Label);
 
-      if (ID->isExported())
-        OS << " exported";
+      printFlag(ID->isExported(), "exported");
 
       if (ID->getImportKind() != ImportKind::Module)
-        OS << " kind=" << getImportKindString(ID->getImportKind());
+        print(getImportKindString(ID->getImportKind()), "kind");
 
-      OS << " '";
-      ID->getImportPath().print(OS);
-      OS << "'";
+      SmallString<64> scratch;
+      ID->getImportPath().getString(scratch);
+      print(QuotedString(scratch));
 
       printCommonPost();
     }
@@ -562,13 +577,19 @@ namespace {
       printCommonPost(ED);
     }
 
-    void printDeclName(const ValueDecl *D) {
+    void printDeclName(DeclName name, StringRef label = "") {
+      printLabel(label, IdentifierColor);
+      PrintWithColorRAII(OS, IdentifierColor)
+        << '\"' << name << '\"';
+    }
+
+    void printDeclName(const ValueDecl *D, StringRef label = "") {
       if (D->getName()) {
-        PrintWithColorRAII(OS, IdentifierColor)
-          << '\"' << D->getName() << '\"';
+        printDeclName(D->getName(), label);
       } else {
+        printLabel(label);
         PrintWithColorRAII(OS, IdentifierColor)
-          << "'anonname=" << (const void*)D << '\'';
+          << "'anonymous @ " << (const void*)D << '\'';
       }
     }
 
@@ -587,8 +608,7 @@ namespace {
 
     void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD, StringRef Label) {
       printCommon(OTD, "opaque_type", Label);
-      OS << " naming_decl=";
-      printDeclName(OTD->getNamingDecl());
+      printDeclName(OTD->getNamingDecl(), "naming_decl");
       PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
         << Type(OTD->getUnderlyingInterfaceType()).getString();
       OS << " in "
@@ -701,12 +721,10 @@ namespace {
 
       auto VarD = dyn_cast<VarDecl>(VD);
       const auto &attrs = VD->getAttrs();
-      if (attrs.hasAttribute<FinalAttr>() && !(VarD && VarD->isLet()))
-        OS << " final";
-      if (attrs.hasAttribute<ObjCAttr>())
-        OS << " @objc";
-      if (attrs.hasAttribute<DynamicAttr>())
-        OS << " dynamic";
+      printFlag(attrs.hasAttribute<FinalAttr>() && !(VarD && VarD->isLet()),
+                "final");
+      printFlag(attrs.hasAttribute<ObjCAttr>(), "@objc");
+      printFlag(attrs.hasAttribute<DynamicAttr>(), " dynamic");
       if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
         OS << " @_dynamicReplacement(for: \"";
         OS << attr->getReplacedFunctionName();
@@ -720,9 +738,9 @@ namespace {
 
       if (NTD->hasInterfaceType()) {
         if (NTD->isResilient())
-          OS << " resilient";
+          printFlag("resilient");
         else
-          OS << " non-resilient";
+          printFlag("non-resilient");
       }
     }
 
@@ -946,18 +964,13 @@ namespace {
         }
       }
 
-      if (P->isVariadic())
-        OS << " variadic";
-
-      if (P->isAutoClosure())
-        OS << " autoclosure";
-
-      if (P->getAttrs().hasAttribute<NonEphemeralAttr>())
-        OS << " nonEphemeral";
+      printFlag(P->isVariadic(), "variadic");
+      printFlag(P->isAutoClosure(), "autoclosure");
+      printFlag(P->getAttrs().hasAttribute<NonEphemeralAttr>(), "nonEphemeral");
 
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
-        printField("default_arg",
-                   getDefaultArgumentKindString(P->getDefaultArgumentKind()));
+        print(getDefaultArgumentKindString(P->getDefaultArgumentKind()),
+              "default_arg");
       }
 
       if (P->hasDefaultExpr() &&
@@ -968,8 +981,8 @@ namespace {
       }
 
       if (auto init = P->getStructuralDefaultExpr()) {
-        OS << " expression=\n";
-        printRec(init);
+        OS << '\n';
+        printRec(init, "expression");
       }
 
       printCommonPost();
@@ -1032,8 +1045,7 @@ namespace {
 
     void printCommonFD(FuncDecl *FD, const char *type, StringRef Label) {
       printCommonAFD(FD, type, Label);
-      if (FD->isStatic())
-        OS << " type";
+      printFlag(FD->isStatic(), "type");
     }
 
     void visitFuncDecl(FuncDecl *FD, StringRef Label) {
@@ -1121,8 +1133,8 @@ namespace {
 
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, StringRef Label) {
       printCommon(PDD, "pound_diagnostic_decl", Label);
-      auto kind = PDD->isError() ? "error" : "warning";
-      OS << " kind=" << kind << "\n";
+      print(PDD->isError() ? "error" : "warning", "kind");
+      OS << "\n";
       Indent += 2;
       printRec(PDD->getMessage());
       Indent -= 2;
@@ -1131,14 +1143,10 @@ namespace {
 
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD, StringRef Label) {
       printCommon(PGD, "precedence_group_decl", Label);
-      OS << PGD->getName() << "\n";
 
-      OS.indent(Indent+2);
-      OS << "associativity "
-         << getAssociativityString(PGD->getAssociativity()) << "\n";
-
-      OS.indent(Indent+2);
-      OS << "assignment " << (PGD->isAssignment() ? "true" : "false");
+      printDeclName(PGD->getName());
+      print(getAssociativityString(PGD->getAssociativity()), "associativity");
+      printFlag(PGD->isAssignment(), "assignment");
 
       auto printRelations =
           [&](StringRef label, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
@@ -1167,7 +1175,7 @@ namespace {
 
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD, StringRef Label) {
       printCommon(IOD, "infix_operator_decl", Label);
-      OS << " " << IOD->getName();
+      printDeclName(IOD->getName());
       if (!IOD->getIdentifiers().empty()) {
         OS << "\n";
         printOperatorIdentifiers(IOD);
@@ -1177,7 +1185,7 @@ namespace {
 
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD, StringRef Label) {
       printCommon(POD, "prefix_operator_decl", Label);
-      OS << " " << POD->getName();
+      printDeclName(POD->getName());
       if (!POD->getIdentifiers().empty()) {
         OS << "\n";
         printOperatorIdentifiers(POD);
@@ -1187,7 +1195,7 @@ namespace {
 
     void visitPostfixOperatorDecl(PostfixOperatorDecl *POD, StringRef Label) {
       printCommon(POD, "postfix_operator_decl", Label);
-      OS << " " << POD->getName();
+      printDeclName(POD->getName());
       if (!POD->getIdentifiers().empty()) {
         OS << "\n";
         printOperatorIdentifiers(POD);
@@ -1198,8 +1206,7 @@ namespace {
     void visitModuleDecl(ModuleDecl *MD, StringRef Label) {
       printCommon(MD, "module", Label);
 
-      if (MD->isNonSwiftModule())
-        OS << " non_swift";
+      printFlag(MD->isNonSwiftModule(), "non_swift");
       
       printCommonPost();
     }
@@ -1442,6 +1449,17 @@ public:
     }
   }
 
+  // Print a single flag.
+  void printFlag(StringRef label) {
+    PrintWithColorRAII(OS, ExprModifierColor) << " " << label;
+  }
+
+  // Print a single flag if it is set.
+  void printFlag(bool isSet, StringRef label) {
+    if (isSet)
+      printFlag(label);
+  }
+
   void printCommon(const char *name, StringRef label, TerminalColor Color) {
     OS.indent(Indent);
     PrintWithColorRAII(OS, ParenthesisColor) << '(';
@@ -1456,8 +1474,7 @@ public:
   raw_ostream &printCommon(Stmt *S, const char *Name, StringRef Label) {
     printCommon(Name, Label, StmtColor);
 
-    if (S->isImplicit())
-      OS << " implicit";
+    printFlag(S->isImplicit(), "implicit");
 
     if (Ctx) {
       auto R = S->getSourceRange();
@@ -1468,8 +1485,7 @@ public:
       }
     }
 
-    if (S->TrailingSemiLoc.isValid())
-      OS << " trailing_semi";
+    printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
 
     return OS;
   }
@@ -1634,8 +1650,7 @@ public:
   }
   void visitCaseStmt(CaseStmt *S, StringRef Label) {
     printCommon(S, "case_stmt", Label);
-    if (S->hasUnknownAttr())
-      OS << " @unknown";
+    printFlag(S->hasUnknownAttr(), "@unknown");
 
     Indent += 2;
     if (S->hasCaseBodyVariables()) {
@@ -1656,8 +1671,7 @@ public:
     for (const auto &LabelItem : S->getCaseLabelItems()) {
       OS << '\n';
       printCommon("case_label_item", "", StmtColor);
-      if (LabelItem.isDefault())
-        OS << " default";
+      printFlag(LabelItem.isDefault(), "default");
       if (auto *CasePattern = LabelItem.getPattern()) {
         OS << '\n';
         printRec(CasePattern, "pattern");
@@ -1789,6 +1803,17 @@ public:
     declRef.dump(PrintWithColorRAII(OS, DeclColor).getOS());
   }
 
+  // Print a single flag.
+  void printFlag(StringRef label) {
+    PrintWithColorRAII(OS, ExprModifierColor) << " " << label;
+  }
+
+  // Print a single flag if it is set.
+  void printFlag(bool isSet, StringRef label) {
+    if (isSet)
+      printFlag(label);
+  }
+
   void printCommon(const char *name, StringRef label, TerminalColor Color) {
     OS.indent(Indent);
     PrintWithColorRAII(OS, ParenthesisColor) << '(';
@@ -1828,8 +1853,7 @@ public:
       }
     }
 
-    if (E->TrailingSemiLoc.isValid())
-      OS << " trailing_semi";
+    printFlag(E->TrailingSemiLoc.isValid(), "trailing_semi");
 
     return OS;
   }
@@ -2059,8 +2083,7 @@ public:
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
-    if (E->isSuper())
-      OS << " super";
+    printFlag(E->isSuper(), "super");
 
     OS << '\n';
     printRec(E->getBase());
@@ -2158,8 +2181,7 @@ public:
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
       PrintWithColorRAII(OS, AccessLevelColor)
         << " " << getAccessSemanticsString(E->getAccessSemantics());
-    if (E->isSuper())
-      OS << " super";
+    printFlag(E->isSuper(), "super");
     if (E->hasDecl()) {
       PrintWithColorRAII(OS, DeclColor) << " decl=";
       printDeclRef(E->getDecl());
@@ -2681,10 +2703,8 @@ public:
   }
   void visitArrowExpr(ArrowExpr *E, StringRef Label) {
     printCommon(E, "arrow_expr", Label);
-    if (E->getAsyncLoc().isValid())
-      OS << " async";
-    if (E->getThrowsLoc().isValid())
-      OS << " throws";
+    printFlag(E->getAsyncLoc().isValid(), "async");
+    printFlag(E->getThrowsLoc().isValid(), "throws");
     OS << '\n';
     printRec(E->getArgsExpr());
     OS << '\n';
@@ -2826,8 +2846,7 @@ public:
 
   void visitKeyPathExpr(KeyPathExpr *E, StringRef Label) {
     printCommon(E, "keypath_expr", Label);
-    if (E->isObjC())
-      OS << " objc";
+    printFlag(E->isObjC(), "objc");
 
     OS << '\n';
     Indent += 2;
@@ -2996,6 +3015,17 @@ public:
   void printRec(Decl *D, StringRef Label = "");
   void printRec(Expr *E, StringRef Label = "");
   void printRec(TypeRepr *T, StringRef Label = "");
+
+  // Print a single flag.
+  void printFlag(StringRef label) {
+    PrintWithColorRAII(OS, TypeFieldColor) << " " << label;
+  }
+
+  // Print a single flag if it is set.
+  void printFlag(bool isSet, StringRef label) {
+    if (isSet)
+      printFlag(label);
+  }
 
   void printCommon(const char *name, StringRef label, TerminalColor Color) {
     OS.indent(Indent);
@@ -3199,9 +3229,7 @@ public:
     for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
       OS << '\n';
       printCommon("sil_box_field", "");
-      if (Fields[i].isMutable()) {
-        OS << " mutable";
-      }
+      printFlag(Fields[i].isMutable(), "mutable");
       OS << '\n';
       printRec(Fields[i].getFieldType());
       printCommonPost();
@@ -3510,26 +3538,24 @@ namespace {
     }
 
     // Print a single flag.
-    raw_ostream &printFlag(StringRef name) {
-      PrintWithColorRAII(OS, TypeFieldColor) << " " << name;
-      return OS;
+    void printFlag(StringRef label) {
+      PrintWithColorRAII(OS, TypeFieldColor) << " " << label;
     }
 
     // Print a single flag if it is set.
-    raw_ostream &printFlag(bool isSet, StringRef name) {
+    void printFlag(bool isSet, StringRef label) {
       if (isSet)
-        printFlag(name);
-
-      return OS;
+        printFlag(label);
     }
 
     // Print a field with a value.
     template<typename T>
-    raw_ostream &printField(StringRef name, const T &value) {
+    void print(const T &value, StringRef label) {
       OS << " ";
-      PrintWithColorRAII(OS, TypeFieldColor) << name;
-      OS << "=" << value;
-      return OS;
+      PrintWithColorRAII(OS, TypeFieldColor) << label;
+      if (!label.empty())
+        OS << "=";
+      OS << value;
     }
 
     void dumpParameterFlags(ParameterTypeFlags paramFlags) {
@@ -3593,7 +3619,7 @@ namespace {
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
       printCommon("builtin_integer_type", label);
       if (T->isFixedWidth())
-        printField("bit_width", T->getFixedWidth());
+        print(T->getFixedWidth(), "bit_width");
       else
         printFlag("word_sized");
       printCommonPost();
@@ -3601,7 +3627,7 @@ namespace {
 
     void visitBuiltinFloatType(BuiltinFloatType *T, StringRef label) {
       printCommon("builtin_float_type", label);
-      printField("bit_width", T->getBitWidth());
+      print(T->getBitWidth(), "bit_width");
       printCommonPost();
     }
 
@@ -3618,14 +3644,14 @@ namespace {
 
     void visitBuiltinVectorType(BuiltinVectorType *T, StringRef label) {
       printCommon("builtin_vector_type", label);
-      printField("num_elements", T->getNumElements());
+      print(T->getNumElements(), "num_elements");
       printRec(T->getElementType());
       printCommonPost();
     }
 
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon("type_alias_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       PrintWithColorRAII(OS, TypeColor) << " underlying=";
       if (auto underlying = T->getSinglyDesugaredType()) {
         PrintWithColorRAII(OS, TypeColor)
@@ -3650,13 +3676,13 @@ namespace {
 
     void visitTupleType(TupleType *T, StringRef label) {
       printCommon("tuple_type", label);
-      printField("num_elements", T->getNumElements());
+      print(T->getNumElements(), "num_elements");
       Indent += 2;
       for (const auto &elt : T->getElements()) {
         OS << "\n";
         printCommon("", "tuple_type_elt", TypeFieldColor);
         if (elt.hasName())
-          printField("name", elt.getName().str());
+          print(elt.getName().str(), "name");
         dumpParameterFlags(elt.getParameterFlags());
         printRec(elt.getType());
         printCommonPost();
@@ -3675,7 +3701,7 @@ namespace {
 
     void visitEnumType(EnumType *T, StringRef label) {
       printCommon("enum_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       printCommonPost();
@@ -3683,7 +3709,7 @@ namespace {
 
     void visitStructType(StructType *T, StringRef label) {
       printCommon("struct_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       printCommonPost();
@@ -3691,7 +3717,7 @@ namespace {
 
     void visitClassType(ClassType *T, StringRef label) {
       printCommon("class_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       printCommonPost();
@@ -3699,7 +3725,7 @@ namespace {
 
     void visitProtocolType(ProtocolType *T, StringRef label) {
       printCommon("protocol_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       printCommonPost();
@@ -3724,7 +3750,7 @@ namespace {
 
     void visitModuleType(ModuleType *T, StringRef label) {
       printCommon("module_type", label);
-      printField("module", T->getModule()->getName());
+      print(T->getModule()->getName(), "module");
       printCommonPost();
     }
 
@@ -3738,14 +3764,14 @@ namespace {
                               const char *className,
                               StringRef label) {
       printCommon(className, label);
-      printField("address", static_cast<void *>(T));
+      print(static_cast<void *>(T), "address");
       printFlag(T->requiresClass(), "class");
       if (auto layout = T->getLayoutConstraint()) {
         OS << " layout=";
         layout->print(OS);
       }
       for (auto proto : T->getConformsTo())
-        printField("conforms_to", proto->printRef());
+        print(proto->printRef(), "conforms_to");
       if (auto superclass = T->getSuperclass())
         printRec(superclass, "superclass");
     }
@@ -3768,30 +3794,30 @@ namespace {
 
     void visitPrimaryArchetypeType(PrimaryArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "primary_archetype_type", label);
-      printField("name", T->getFullName());
+      print(T->getFullName(), "name");
       OS << "\n";
       printArchetypeNestedTypes(T);
       printCommonPost();
     }
     void visitNestedArchetypeType(NestedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "nested_archetype_type", label);
-      printField("name", T->getFullName());
-      printField("parent", T->getParent());
-      printField("assoc_type", T->getAssocType()->printRef());
+      print(T->getFullName(), "name");
+      print(T->getParent(), "parent");
+      print(T->getAssocType()->printRef(), "assoc_type");
       printArchetypeNestedTypes(T);
       printCommonPost();
     }
     void visitOpenedArchetypeType(OpenedArchetypeType *T, StringRef label) {
       printArchetypeCommon(T, "opened_archetype_type", label);
       printRec(T->getOpenedExistentialType(), "opened_existential");
-      printField("opened_existential_id", T->getOpenedExistentialID());
+      print(T->getOpenedExistentialID(), "opened_existential_id");
       printArchetypeNestedTypes(T);
       printCommonPost();
     }
     void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T,
                                       StringRef label) {
       printArchetypeCommon(T, "opaque_type", label);
-      printField("decl", T->getDecl()->getNamingDecl()->printRef());
+      print(T->getDecl()->getNamingDecl()->printRef(), "decl");
       if (!T->getSubstitutions().empty()) {
         OS << '\n';
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;
@@ -3805,19 +3831,19 @@ namespace {
 
     void visitGenericTypeParamType(GenericTypeParamType *T, StringRef label) {
       printCommon("generic_type_param_type", label);
-      printField("depth", T->getDepth());
-      printField("index", T->getIndex());
+      print(T->getDepth(), "depth");
+      print(T->getIndex(), "index");
       if (auto decl = T->getDecl())
-        printField("decl", decl->printRef());
+        print(decl->printRef(), "decl");
       printCommonPost();
     }
 
     void visitDependentMemberType(DependentMemberType *T, StringRef label) {
       printCommon("dependent_member_type", label);
       if (auto assocType = T->getAssocType()) {
-        printField("assoc_type", assocType->printRef());
+        print(assocType->printRef(), "assoc_type");
       } else {
-        printField("name", T->getName());
+        print(T->getName(), "name");
       }
       printRec(T->getBase(), "base");
       printCommonPost();
@@ -3826,15 +3852,15 @@ namespace {
     void printAnyFunctionParams(ArrayRef<AnyFunctionType::Param> params,
                                 StringRef label) {
       printCommon("function_params", label);
-      printField("num_params", params.size());
+      print(params.size(), "num_params");
       Indent += 2;
       for (const auto &param : params) {
         OS << "\n";
         printCommon("", "param", TypeFieldColor);
         if (param.hasLabel())
-          printField("api_name", param.getLabel().str());
+          print(param.getLabel().str(), "api_name");
         if (param.hasInternalLabel())
-          printField("internal_name", param.getInternalLabel().str());
+          print(param.getInternalLabel().str(), "internal_name");
         dumpParameterFlags(param.getParameterFlags());
         printRec(param.getPlainType());
         printCommonPost();
@@ -3850,8 +3876,8 @@ namespace {
         T->getExtInfo().getSILRepresentation();
 
       if (representation != SILFunctionType::Representation::Thick)
-        printField("representation",
-                   getSILFunctionTypeRepresentationString(representation));
+        print(getSILFunctionTypeRepresentationString(representation),
+                   "representation");
 
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->isSendable(), "Sendable");
@@ -3867,11 +3893,11 @@ namespace {
         auto &ctx = T->getASTContext().getClangModuleLoader()
           ->getClangASTContext();
         T->getClangTypeInfo().dump(os, ctx);
-        printField("clang_type", os.str());
+        print(os.str(), "clang_type");
       }
 
       if (Type globalActor = T->getGlobalActor()) {
-        printField("global_actor", globalActor.getString());
+        print(globalActor.getString(), "global_actor");
       }
 
       printAnyFunctionParams(T->getParams(), "input");
@@ -3900,7 +3926,7 @@ namespace {
 
     void visitSILFunctionType(SILFunctionType *T, StringRef label) {
       printCommon("sil_function_type", label);
-      printField("type", T->getString());
+      print(T->getString(), "type");
 
       for (auto param : T->getParameters()) {
         printRec(param.getInterfaceType(), "input");
@@ -3927,7 +3953,7 @@ namespace {
         auto &ctx =
             T->getASTContext().getClangModuleLoader()->getClangASTContext();
         T->getClangTypeInfo().dump(os, ctx);
-        printField("clang_type", os.str());
+        print(os.str(), "clang_type");
       }
       printCommonPost();
     }
@@ -3941,7 +3967,7 @@ namespace {
     void visitSILBoxType(SILBoxType *T, StringRef label) {
       printCommon("sil_box_type", label);
       // FIXME: Print the structure of the type.
-      printField("type", T->getString());
+      print(T->getString(), "type");
       printCommonPost();
     }
 
@@ -3967,8 +3993,7 @@ namespace {
     void visitProtocolCompositionType(ProtocolCompositionType *T,
                                       StringRef label) {
       printCommon("protocol_composition_type", label);
-      if (T->hasExplicitAnyObject())
-        OS << " any_object";
+      printFlag(T->hasExplicitAnyObject(), "any_object");
       for (auto proto : T->getMembers()) {
         printRec(proto);
       }
@@ -3989,7 +4014,7 @@ namespace {
 
     void visitUnboundGenericType(UnboundGenericType *T, StringRef label) {
       printCommon("unbound_generic_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       printCommonPost();
@@ -3997,7 +4022,7 @@ namespace {
 
     void visitBoundGenericClassType(BoundGenericClassType *T, StringRef label) {
       printCommon("bound_generic_class_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
@@ -4008,7 +4033,7 @@ namespace {
     void visitBoundGenericStructType(BoundGenericStructType *T,
                                      StringRef label) {
       printCommon("bound_generic_struct_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
@@ -4018,7 +4043,7 @@ namespace {
 
     void visitBoundGenericEnumType(BoundGenericEnumType *T, StringRef label) {
       printCommon("bound_generic_enum_type", label);
-      printField("decl", T->getDecl()->printRef());
+      print(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
       for (auto arg : T->getGenericArgs())
@@ -4028,7 +4053,7 @@ namespace {
 
     void visitTypeVariableType(TypeVariableType *T, StringRef label) {
       printCommon("type_variable_type", label);
-      printField("id", T->getID());
+      print(T->getID(), "id");
       printCommonPost();
     }
 
