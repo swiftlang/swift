@@ -296,7 +296,7 @@ public:
 
   ~SyntaxData() {
     assert(RefCount == 0 &&
-           "Destruction occured when there are still references to this.");
+           "Destruction occurred when there are still references to this.");
     if (auto Parent = getParent()) {
       Parent->Release();
     }
