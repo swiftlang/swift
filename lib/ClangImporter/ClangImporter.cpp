@@ -4023,7 +4023,8 @@ ClangImporter::Implementation::loadNamedMembers(
   auto table = findLookupTable(*CMO);
   assert(table && "clang module without lookup table");
 
-  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
+  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD) ||
+         isa<clang::EnumDecl>(CD));
 
   // Force the members of the entire inheritance hierarchy to be loaded and
   // deserialized before loading the named member of a class. This warms up
@@ -4189,10 +4190,11 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
 }
 
 void ClangImporter::dumpSwiftLookupTables() {
-  Impl.dumpSwiftLookupTables();
+  Impl.dumpSwiftLookupTables(llvm::dbgs());
 }
 
-void ClangImporter::Implementation::dumpSwiftLookupTables() {
+void ClangImporter::Implementation::
+dumpSwiftLookupTables(llvm::raw_ostream &os) const {
   // Sort the module names so we can print in a deterministic order.
   SmallVector<StringRef, 4> moduleNames;
   for (const auto &lookupTable : LookupTables) {
@@ -4202,13 +4204,16 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
 
   // Print out the lookup tables for the various modules.
   for (auto moduleName : moduleNames) {
-    llvm::errs() << "<<" << moduleName << " lookup table>>\n";
-    LookupTables[moduleName]->deserializeAll();
-    LookupTables[moduleName]->dump(llvm::errs());
+    os << "<<" << moduleName << " lookup table>>\n";
+    auto iter = LookupTables.find(moduleName);
+    if (iter != LookupTables.end()) {
+      iter->getSecond()->deserializeAll();
+      iter->getSecond()->dump(os);
+    }
   }
 
-  llvm::errs() << "<<Bridging header lookup table>>\n";
-  BridgingHeaderLookupTable->dump(llvm::errs());
+  os << "<<Bridging header lookup table>>\n";
+  BridgingHeaderLookupTable->dump(os);
 }
 
 DeclName ClangImporter::
@@ -4305,4 +4310,254 @@ ClangImporter::instantiateCXXClassTemplate(
 
   return dyn_cast_or_null<StructDecl>(
       Impl.importDecl(ctsd, Impl.CurrentVersion));
+}
+
+static bool moduleNameStartsWith(StringRef actual, StringRef expected) {
+  return actual.startswith(expected)
+         && (actual.size() == expected.size()
+             || actual[expected.size()] == '.');
+}
+
+bool ClangImporter::Implementation::
+shouldEmitImportRemark(const ImportRemark &remark) {
+  if (remark.version != CurrentVersion)
+    return false;
+
+  bool success = remark.getSwiftDecl() != nullptr || !remark.getShouldEmit();
+  auto &opts = SwiftContext.ClangImporterOpts;
+
+  // FIXME: String comparison is a pretty silly way to check for membership in a
+  // module.
+  auto declModule = remark.clangDecl->getOwningModule()->getFullModuleName();
+
+  for (const auto &pair : opts.EmitImportDecisionRemarks) {
+    bool emitForAll = std::get<1>(pair);
+    if (success && !emitForAll)
+      continue;
+
+    const std::string &module = std::get<0>(pair);
+    if (moduleNameStartsWith(declModule, module))
+      return true;
+  }
+
+  return false;
+}
+
+void ClangImporter::Implementation::emitImportRemarks() {
+  // Move list to a local variable so that, if emitting these remarks somehow
+  // causes additional imports, they don't affect us.
+  std::vector<ImportRemark> remarks;
+  std::swap(remarks, ImportRemarks);
+
+  // Emit.
+  for (auto &remark : remarks)
+    remark.diagnose(*this);
+}
+
+void ClangImporter::emitImportRemarks() {
+  auto &opts = Impl.SwiftContext.ClangImporterOpts;
+  if (opts.ForceImportDecisions) {
+    for (auto pair : opts.EmitImportDecisionRemarks) {
+      ImportPath::Module::Builder modulePath(Impl.SwiftContext,
+                                             std::get<0>(pair), '.');
+      auto module = loadModule(SourceLoc(), modulePath.get());
+
+      // FIXME: I'm not convinced this actually touches everything. Is there a
+      // better way to do this?
+      class CuriousDeclConsumer : public VisibleDeclConsumer {
+        virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                               DynamicLookupInfo dynamicLookupInfo = {}) override {
+
+          if (auto *IDC = dyn_cast<IterableDeclContext>(VD))
+            (void)IDC->getMembers();
+        }
+      };
+      CuriousDeclConsumer consumer;
+      module->lookupVisibleDecls({}, consumer, NLKind::QualifiedLookup);
+    }
+  }
+
+  Impl.emitImportRemarks();
+}
+
+void swift::ImportDecision::dump() const {
+  llvm::errs() << "ImportDecision kind: ";
+  switch (kind) {
+  case ImportDecision::Kind::Normal:
+    llvm::errs() << "Normal";
+    break;
+  case ImportDecision::Kind::Inherited:
+    llvm::errs() << "Inherited";
+    break;
+  case ImportDecision::Kind::Mirrored:
+    llvm::errs() << "Mirrored";
+    break;
+  }
+  llvm::errs() << "\n";
+
+  llvm::errs() << "clangDecl: " << getClangDecl() << "\n";
+  if (getClangDecl()) getClangDecl()->dump(llvm::errs());
+
+  llvm::errs() << "remark: --";
+  remark.dump(llvm::errs());
+}
+
+void swift::ImportRemark::dump(llvm::raw_ostream &os) const {
+  switch (getOutcome()) {
+  case ImportRemark::Outcome::Imported:
+    os << "Imported";
+    break;
+  case ImportRemark::Outcome::NotImported:
+    os << "NotImported";
+    break;
+  }
+
+  if (!getShouldEmit())
+    os << " (should not emit)";
+
+  os << "\nversion: ";
+  version.dump(os);
+
+  os << "\nclangDecl: " << clangDecl << "\n";
+  clangDecl->dump(os);
+
+  os << "\nswiftDecl: " << getSwiftDecl() << "\n";
+  getSwiftDecl()->dump(os);
+
+  os << "\nalternateSwiftDecls: " << alternateSwiftDecls.size() << "\n";
+  for (auto altDecl : alternateSwiftDecls) {
+    os << "- " << altDecl << "\n";
+    altDecl->dump(os);
+  }
+
+  os << "\nnotes: " << notes.size();
+  for (auto &note : notes) {
+    os << "\n- conditions: {";
+    if (note.conditions.contains(Outcome::Imported))
+      os << "Imported ";
+    if (note.conditions.contains(Outcome::NotImported))
+      os << "NotImported";
+
+    os << "}\n  diagnostic: "
+       << DiagnosticEngine::diagnosticIDStringFor(note.diagnostic.getID());
+
+    os << "\n  location: ";
+    if (note.location)
+      note.location->print(os, clangDecl->getASTContext().getSourceManager());
+    else
+      os << "(none)";
+  }
+  os << "\n";
+}
+
+StringRef swift::importer::getClangDescriptiveKind(const clang::Decl *D) {
+  switch (D->getKind()) {
+  case clang::Decl::Kind::Record:
+    return "C struct";
+  case clang::Decl::Kind::Typedef:
+    return "C typedef";
+  case clang::Decl::Kind::ObjCInterface:
+    return "Objective-C class interface";
+  case clang::Decl::Kind::ObjCMethod:
+    return "Objective-C method";
+  case clang::Decl::Kind::ObjCIvar:
+    return "Objective-C instance variable";
+  case clang::Decl::Kind::ObjCProperty:
+    return "Objective-C property";
+  case clang::Decl::Kind::ObjCProtocol:
+    return "Objective-C protocol";
+  case clang::Decl::Kind::ObjCCategory:
+    return "Objective-C category";
+  case clang::Decl::Kind::Function:
+    return "C function";
+  case clang::Decl::Kind::Field:
+  case clang::Decl::Kind::IndirectField:
+    return "C field";
+  case clang::Decl::Kind::Enum:
+    return "C enum";
+  case clang::Decl::Kind::EnumConstant:
+    return "C enum constant";
+  case clang::Decl::Kind::Var:
+    return "C variable";
+  default:
+    return D->getDeclKindName();
+  }
+}
+
+void ImportRemark::diagnose(ClangImporter::Implementation &impl) {
+  if (version == importer::ImportNameVersion::raw()) return;
+
+  auto getSourceLoc = [&](clang::SourceLocation clangLoc) -> SourceLoc {
+    return impl.getBufferImporterForDiagnostics()
+        .resolveSourceLocation(impl.getClangASTContext().getSourceManager(),
+                               clangLoc);
+  };
+  
+  SourceLoc remarkLoc = getSourceLoc(clangDecl->getLocation());
+  if (!remarkLoc.isValid()) return;
+
+  auto &diags = impl.SwiftContext.Diags;
+  StringRef clangDeclKind = getClangDescriptiveKind(clangDecl);
+  const clang::NamedDecl *namedClangDecl =
+      dyn_cast<clang::NamedDecl>(clangDecl);
+
+  auto diagnoseImport =
+      [&](Decl *swiftDecl, bool isAlternate) -> InFlightDiagnostic {
+    if (auto *ED = dyn_cast<ExtensionDecl>(swiftDecl))
+      return diags
+          .diagnose(remarkLoc, diag::imported_clang_decl_as_extension,
+                    clangDeclKind, namedClangDecl, isAlternate,
+                    swiftDecl->getAttrs().isUnavailable(impl.SwiftContext),
+                    ED->getExtendedType());
+    else if (auto *AD = dyn_cast<AccessorDecl>(swiftDecl))
+      return diags
+          .diagnose(remarkLoc, diag::imported_clang_decl_as_accessor,
+                    clangDeclKind, namedClangDecl, isAlternate,
+                    swiftDecl->getAttrs().isUnavailable(impl.SwiftContext),
+                    AD->getDescriptiveKind(),
+                    AD->getStorage()->getDescriptiveKind(), AD->getStorage());
+
+    // Any other decl. If it's not a ValueDecl, we'll pass nullptr and end up
+    // not showing an identifier.
+    return diags
+        .diagnose(remarkLoc, diag::imported_clang_decl_as,
+                  clangDeclKind, namedClangDecl, isAlternate,
+                  swiftDecl->getAttrs().isUnavailable(impl.SwiftContext),
+                  swiftDecl->getDescriptiveKind(),
+                  dyn_cast<ValueDecl>(swiftDecl));
+  };
+
+  if (getShouldEmit()) {
+    Optional<InFlightDiagnostic> remarkDiag;
+
+    if (getOutcome() == Outcome::Imported) {
+      remarkDiag.emplace(diagnoseImport(getSwiftDecl(), false));
+    } else {
+      remarkDiag.emplace(
+          diags.diagnose(remarkLoc, diag::did_not_import_clang_decl,
+                         clangDeclKind, namedClangDecl));
+    }
+
+    diags.diagnoseWithNotes(std::move(*remarkDiag), [&] {
+      // Typically, a note is added after observing a failure, so the earlier
+      // notes have more specifics while the later ones have more context. This
+      // is most understandable if they're read in the opposite order, so we
+      // emit them in reverse.
+      for (auto &note : llvm::reverse(notes)) {
+        if (!note.conditions.contains(getOutcome()))
+          continue;
+        
+        SourceLoc noteLoc = remarkLoc;
+        if (note.location)
+          noteLoc = getSourceLoc(*note.location);
+        diags.diagnose(noteLoc, note.diagnostic);
+      }
+    });
+  }
+
+  // Emit even when getShouldEmit() is false, because alreadyDecided() is
+  // sometimes used when we need to add alternative declarations to a main
+  // declaration that we've already imported.
+  for (auto *altDecl : alternateSwiftDecls)
+    diagnoseImport(altDecl, true);
 }

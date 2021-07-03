@@ -996,6 +996,8 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     verifyGenericSignaturesIfNeeded(Invocation.getFrontendOptions(), ctx);
   }
 
+  ctx.getClangModuleLoader()->emitImportRemarks();
+
   // Emit any additional outputs that we only need for a successful compilation.
   // We don't want to unnecessarily delay getting any errors back to the user.
   if (!ctx.hadError()) {

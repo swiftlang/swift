@@ -443,6 +443,9 @@ public:
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
+  /// Emit remarks about decisions made while importing.
+  void emitImportRemarks() override;
+
   /// Dump Swift lookup tables.
   void dumpSwiftLookupTables();
 

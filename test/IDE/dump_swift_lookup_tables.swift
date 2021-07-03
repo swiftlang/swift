@@ -53,12 +53,12 @@ import ImportAsMember
 // CHECK-NEXT:    makeSomeStruct:
 // CHECK-NEXT:      TU: SNMakeSomeStruct, SNMakeSomeStructForX
 // CHECK-NEXT:    x:
-// CHECK-NEXT:      SNSomeStruct: X
-// CHECK-NEXT:      SNPoint: x
+// CHECK-NEXT:      SNSomeStruct: SNSomeStruct::X
+// CHECK-NEXT:      SNPoint: (anonymous struct)::x
 // CHECK-NEXT:    y:
-// CHECK-NEXT:      SNPoint: y
+// CHECK-NEXT:      SNPoint: (anonymous struct)::y
 // CHECK-NEXT:    z:
-// CHECK-NEXT:      SNPoint: z
+// CHECK-NEXT:      SNPoint: (anonymous struct)::z
 
 
 // CHECK-NEXT: Globals-as-members mapping:

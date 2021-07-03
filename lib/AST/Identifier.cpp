@@ -302,6 +302,11 @@ StringRef ObjCSelector::getString(llvm::SmallVectorImpl<char> &scratch) const {
   return os.str();
 }
 
+bool ObjCSelector::isString(StringRef str) const {
+  SmallString<64> scratch;
+  return getString(scratch) == str;
+}
+
 void ObjCSelector::dump() const {
   llvm::errs() << *this << "\n";
 }

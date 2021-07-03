@@ -2203,15 +2203,21 @@ ImportedType ClangImporter::Implementation::importEffectfulPropertyType(
                                         const clang::ObjCMethodDecl *decl,
                                         DeclContext *dc,
                                         importer::ImportedName name,
-                                        bool isFromSystemModule) {
+                                        bool isFromSystemModule,
+                                        ImportDecision &decision) {
   // here we expect a method that is being imported as an effectful property.
   // thus, we currently require async info.
-  if (!name.getAsyncInfo())
+  if (!name.getAsyncInfo()) {
+    decision.note(None, diag::note_cannot_import_sync_method_as_async_getter);
     return ImportedType();
+  }
 
   // a variadic method doesn't make sense here
-  if (decl->isVariadic())
+  if (decl->isVariadic()) {
+    decision.note(None, diag::note_cannot_import_async_getter_with_params,
+                  /*isVarargs=*/true);
     return ImportedType();
+  }
 
   // Our strategy here is to determine what the return type of the method would
   // be, had we imported it as a method.
@@ -2232,12 +2238,17 @@ ImportedType ClangImporter::Implementation::importEffectfulPropertyType(
 
   // getter mustn't have any parameters!
   if (bodyParams->size() != 0) {
+    decision.note(None, diag::note_cannot_import_async_getter_with_params,
+                  /*isVarargs=*/false);
     return ImportedType();
   }
 
   // We expect that the method, after import, will have only an async convention
-  if (!asyncConvention || errorConvention)
+  if (!asyncConvention || errorConvention) {
+    decision.note(None, diag::note_cannot_import_async_getter_wrong_effects,
+                  asyncConvention.hasValue(), errorConvention.hasValue());
     return ImportedType();
+  }
 
   return methodReturnType;
 }

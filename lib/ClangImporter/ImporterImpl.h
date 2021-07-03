@@ -25,11 +25,13 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
@@ -276,6 +278,8 @@ private:
 };
 }
 
+class ImportDecision;
+
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
 
@@ -317,12 +321,95 @@ public:
   explicit operator bool() const { return type.getPointer() != nullptr; }
 };
 
+/// Information about a decision that was made to import, or not import, a
+/// clang declaration into Swift.
+struct ImportRemark {
+  /// Represents the overall result of the import operation.
+  enum Outcome : uint8_t { Imported, NotImported };
+
+  /// A note that will be emitted alongside a given import remark under certain
+  /// conditions.
+  struct Note {
+    using Conditions = OptionSet<Outcome>;
+
+    /// The conditions under which this note should be emitted. Typically either
+    /// \c Outcome::Imported, \c Outcome::NotImported, or both.
+    Conditions conditions;
+
+    /// The diagnostic to emit.
+    Diagnostic diagnostic;
+
+    /// If present, the \c clang::SourceLocation which (after converting to a
+    /// \c SourceLoc) the diagnostic will be emitted at. If absent, the remark's
+    /// \c SourceLoc will be used instead.
+    Optional<clang::SourceLocation> location;
+  };
+
+  /// The Clang declaration being imported.
+  const clang::Decl *clangDecl;
+
+  /// The Swift version it's being imported for.
+  importer::ImportNameVersion version;
+
+private:
+  // Bool is stored negated so that this is all-zeros by default
+  llvm::PointerIntPair<Decl *, 1, bool> swiftDeclAndShouldNotEmit;
+
+public:
+  /// Alternate declarations which \c clangDecl was also imported for.
+  TinyPtrVector<Decl *> alternateSwiftDecls;
+
+  /// The diagnostics to emit along with the remark.
+  SmallVector<Note, 4> notes;
+
+  /// The main Swift declaration that \c clangDecl was imported as. Controls
+  /// the \c Outcome of the import.
+  Decl *getSwiftDecl() const {
+    return swiftDeclAndShouldNotEmit.getPointer();
+  }
+  void setSwiftDecl(Decl *newDecl) {
+    swiftDeclAndShouldNotEmit.setPointer(newDecl);
+  }
+
+  /// If \c true, we will emit the main success/failure remark and any
+  /// notes appropriate for the outcome, in addition to remarks for alternate
+  /// declarations. If \c false, we will only emit remarks for alternate
+  /// declarations.
+  bool getShouldEmit() const {
+    return !swiftDeclAndShouldNotEmit.getInt();
+  }
+  void setShouldEmit(bool newValue) {
+    swiftDeclAndShouldNotEmit.setInt(!newValue);
+  }
+
+  /// The result of this attempt to import.
+  Outcome getOutcome() const {
+    return getSwiftDecl() ? Outcome::Imported : Outcome::NotImported;
+  }
+
+  /// Construct an ImportRemark for a failed import with no notes. Only
+  /// ImportDecision should call this constructor.
+  ImportRemark(const clang::Decl *clangDecl,
+               importer::ImportNameVersion version)
+    : clangDecl(clangDecl), version(version) { }
+
+  /// Generate and emit the diagnostics. Only ClangImporter::Implementation
+  /// should call this method.
+  void diagnose(ClangImporter::Implementation &impl);
+
+  SWIFT_DEBUG_DUMP {
+    dump(llvm::errs());
+  }
+  SWIFT_DEBUG_DUMPER(dump(llvm::raw_ostream &os));
+};
+
 /// Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader,
     public LazyConformanceLoader
 {
   friend class ClangImporter;
+  friend class ImportDecision;
   using Version = importer::ImportNameVersion;
 
 public:
@@ -414,9 +501,26 @@ private:
   /// used when parsing the attribute text.
   llvm::SmallDenseMap<ModuleDecl *, SourceFile *> ClangSwiftAttrSourceFiles;
 
+  /// Remarks to emit about import decisions.
+  std::vector<ImportRemark> ImportRemarks;
+
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
+
+  void cacheImportedDecl(Decl *swiftDecl, const clang::Decl *clangDecl,
+                         Version version) {
+    assert(clangDecl && "can't cache swift decl for null clang decl!");
+    assert(swiftDecl && "can't cache null swift decl!");
+
+    // Identically-named categories canonicalize to the first category with that
+    // name; this is not super-helpful in practice. All other decls should be
+    // canonicalized before caching.
+    if (!isa<clang::ObjCCategoryDecl>(clangDecl))
+      clangDecl = clangDecl->getCanonicalDecl();
+
+    ImportedDecls[{clangDecl, version}] = swiftDecl;
+  }
 
   /// The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
@@ -465,6 +569,15 @@ public:
 
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
+
+  bool shouldEmitImportRemark(const ImportRemark &remark);
+
+  void addImportRemark(const ImportRemark &remark) {
+    if (shouldEmitImportRemark(remark))
+      ImportRemarks.push_back(remark);
+  }
+
+  void emitImportRemarks();
 
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
@@ -855,7 +968,8 @@ public:
                          bool UseCanonicalDecl = true);
 
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
-                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
+                       bool &TypedefIsSuperfluous, bool &HadForwardDeclaration,
+                       ImportDecision &decision);
 
   Decl *importDeclAndCacheImpl(const clang::NamedDecl *ClangDecl,
                                Version version,
@@ -1228,9 +1342,10 @@ public:
   /// Determines what the type of an effectful, computed read-only property
   /// would be, if the given method were imported as such a property.
   ImportedType importEffectfulPropertyType(const clang::ObjCMethodDecl *decl,
-                                            DeclContext *dc,
-                                            importer::ImportedName name,
-                                            bool isFromSystemModule);
+                                           DeclContext *dc,
+                                           importer::ImportedName name,
+                                           bool isFromSystemModule,
+                                           ImportDecision &decision);
 
   /// Attempt to infer a default argument for a parameter with the
   /// given Clang \c type, \c baseName, and optionality.
@@ -1369,6 +1484,9 @@ private:
   void insertMembersAndAlternates(const clang::NamedDecl *nd,
                                   SmallVectorImpl<Decl *> &members);
   void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+
+  void loadAllMembersOfLazilyLoadedEnum(Decl *D,
+                                        const clang::EnumDecl *enumDecl);
 
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds
   /// it and its alternates to \p ext.
@@ -1514,7 +1632,11 @@ public:
   }
 
   /// Dump the Swift-specific name lookup tables we generate.
-  void dumpSwiftLookupTables();
+  void dumpSwiftLookupTables(llvm::raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMPER(dumpSwiftLookupTables()) {
+    dumpSwiftLookupTables(llvm::dbgs());
+  }
 
   void setSinglePCHImport(Optional<std::string> PCHFilename) {
     if (PCHFilename.hasValue()) {
@@ -1535,11 +1657,205 @@ public:
   }
 };
 
+/// An RAII class representing a pending decision about whether, why, and how to
+/// import a Clang declaration into Swift.
+///
+/// \c ImportDecision can be thought of as a builder for \c ImportRemark.
+/// Each remark starts its life indicating that it has failed to import the
+/// clang declaration in question, but with no details about why.
+/// \c ImportDecision can be used to:
+///
+/// \li Indicate that the decision about whether to import or not had already
+///     been made in the past: \c alreadyDecided()
+///
+/// \li Change the failure to success and indicate the resulting Swift
+///     declaration(s): \c import(), \c importAndCache(), \c importAlternate(),
+///     \c importAlternateAndCache()
+///
+/// \li Add notes explaining the import decision: \c noteIf(), \c note()
+///
+/// When \c ImportDecision is deallocated, the remark is given to
+/// \c ClangImporter::Implementation to either emit or drop based on its own
+/// criteria.
+class ImportDecision {
+  // Design note: Why are we using an RAII class for this?
+  //
+  // ClangImporter often uses early returns. It does not always communicate the
+  // meaning of an early return clearly; for instance, it may early-return from
+  // a `void` function, or it may use the same empty return value to mean "error
+  // occurred" and "no work to do". Adding import remarks to the existing code
+  // requires that we work within this framework, and within it, the most
+  // reliable indicator of a failure is simply "we started trying to import
+  // something, but we didn't end up doing it".
+  //
+  // In an ideal world, we might have something more like the `Swift.Result`
+  // enum where callees clearly communicate information directly to their
+  // callers by return value. But that is a larger and riskier refactoring than
+  // we're prepared to take on up front. And adding ImportDecisions is an
+  // incremental step in that direction, building up clear rationales directly
+  // in the code that we could communicate through ClangImporter in other ways
+  // in the future.
+  //
+  // An incrementally better world would be one in which `ImportDecision` and
+  // `SwiftDeclConverter` were basically synonymous. That will take more
+  // refactoring, though.
+
+public:
+  /// What sort of import are we deciding? We usually only emit remarks about
+  /// normal imports; mirrored and inherited imports are implementation details.
+  enum class Kind : uint8_t {
+    /// A normal import of the primary declaration.
+    Normal,
+    /// A mirrored import of a protocol requirement into a conforming type.
+    Mirrored,
+    /// An inherited import of a superclass member into a subclass.
+    Inherited
+  };
+
+private:
+  ClangImporter::Implementation &impl;
+  Kind kind;
+
+  /// The remark we will emit (or not), along with its notes.
+  ImportRemark remark;
+
+public:
+  ImportDecision(ClangImporter::Implementation &impl,
+                 const clang::Decl *clangDecl,
+                 importer::ImportNameVersion version,
+                 Kind kind = Kind::Normal)
+    : impl(impl), kind(kind), remark(clangDecl, version)
+  { }
+
+  // Uncopyable. Each decision is unique.
+  ImportDecision(const ImportDecision &other) = delete;
+  ImportDecision &operator=(const ImportDecision &other) = delete;
+
+  // Unmovable. (These could be implemented by setting the moved-from instance
+  // to AlreadyDecided.)
+  ImportDecision(const ImportDecision &&other) = delete;
+  ImportDecision &operator=(const ImportDecision &&other) = delete;
+
+  ~ImportDecision() {
+    if (kind == Kind::Normal)
+      impl.addImportRemark(remark);
+  }
+
+public:
+  /// Gets the clang declaration we're thinking about importing. Use this only
+  /// for assertions or when the original declaration is inaccessible.
+  const clang::Decl *getClangDecl() const { return remark.clangDecl; }
+
+  /// Change the remark to indicate that the Clang decl was imported into Swift
+  /// as \p decl.
+  void import(Decl *decl) {
+    assert(decl);
+    assert(!remark.getSwiftDecl() || remark.getSwiftDecl() == decl);
+    remark.setSwiftDecl(decl);
+  }
+
+  /// Change the remark to indicate that the Clang decl was imported into Swift
+  /// as \p decl, and register this fact in the
+  /// \c ClangImporter::Implementation::ImportedDecls map.
+  void importAndCache(Decl *decl) {
+    import(decl);
+    if (kind == Kind::Normal)
+      impl.cacheImportedDecl(decl, remark.clangDecl, remark.version);
+  }
+
+  /// Change the remark to indicate that the Clang decl was imported into Swift
+  /// as \p altDecl in addition to \p mainDecl.
+  ///
+  /// Additional remarks will be emitted for the alternate declarations; they
+  /// will say "also imported as" instead of just "imported as".
+  void importAlternate(Decl *mainDecl, ValueDecl *altDecl) {
+    assert(mainDecl && altDecl);
+    // FIXME: assert(mainDecl == remark.swiftDecl);
+    remark.alternateSwiftDecls.push_back(altDecl);
+  }
+
+  /// Change the remark to indicate that the Clang decl was imported into Swift
+  /// as \p altDecl in addition to \p mainDecl, and register this declaration
+  /// in the \c ClangImporter::Implementation::AlternateDecls map.
+  ///
+  /// Additional remarks will be emitted for the alternate declarations; they
+  /// will say "also imported as" instead of just "imported as".
+  void importAndCacheAlternate(Decl *mainDecl, ValueDecl *altDecl) {
+    importAlternate(mainDecl, altDecl);
+    impl.addAlternateDecl(mainDecl, altDecl);
+  }
+
+  /// Add a diagnostic that will be emitted if \p conditions hold. If \c loc is
+  /// provided, it will be emitted at the indicated source location; otherwise,
+  /// it will be emitted at the same source location as the remark.
+  void noteIf(ImportRemark::Note::Conditions conditions,
+              Optional<clang::SourceLocation> loc,
+              Diagnostic diag) {
+    remark.notes.push_back({ conditions, diag, loc });
+  }
+
+  /// Add a diagnostic that will be emitted if \p conditions hold. If \c loc is
+  /// provided, it will be emitted at the indicated source location; otherwise,
+  /// it will be emitted at the same source location as the remark.
+  template <class ...DiagArgs>
+  void noteIf(ImportRemark::Note::Conditions conditions,
+              Optional<clang::SourceLocation> loc,
+              Diag<DiagArgs...> diagID,
+              typename detail::PassArgument<DiagArgs>::type... args) {
+    noteIf(conditions, loc, Diagnostic(diagID, std::move(args)...));
+  }
+
+  /// Add a diagnostic that will be emitted if the declaration is not imported
+  /// (the most commonly needed condition). If \c loc is provided, it will be
+  /// emitted at the indicated source location; otherwise, it will be emitted at
+  /// the same source location as the remark.
+  template <class ...DiagArgs>
+  void note(Optional<clang::SourceLocation> loc,
+            Diag<DiagArgs...> diagID,
+            typename detail::PassArgument<DiagArgs>::type... args) {
+    noteIf(ImportRemark::Outcome::NotImported, loc, diagID, std::move(args)...);
+  }
+
+  /// Indicate that the decision to either import or not import this declaration
+  /// has been made previously. No remark will be emitted indicating whether the
+  /// declaration was imported, and none of the notes will be emitted either.
+  /// However, remarks for any alternate imports \em will still be emitted.
+  ///
+  /// Some situations where you might use this method:
+  ///
+  /// 1) While trying to import a declaration, you use \c importDeclCached() or
+  ///    look in one of \c Impl's maps and discover that this declaration has
+  ///    already been imported (or, perhaps, not imported). You want to just
+  ///    return that value instead of creating a new declaration.
+  ///
+  /// 2) While importing an alternate name for a particular version, you
+  ///    discover that it is synonymous with the active version's name. You
+  ///    don't want or need to do any more work.
+  ///
+  /// 3) You want to generate alternates for a main declaration, but the main
+  ///    declaration has already been imported and its \c ImportDecision is now
+  ///    gone, so you can't add the alternates to its original
+  ///    \c ImportDecision. Instead, you can create a new \c ImportDecision for
+  ///    the clang decl and immediately mark it as "already decided".
+  ///
+  /// The common theme is that you have discovered that some previous
+  /// \c ImportDecision should already indicate whether or not the clang
+  /// declaration was imported, and you are not changing that decision.
+  void alreadyDecided() {
+    remark.setShouldEmit(false);
+  }
+
+  SWIFT_DEBUG_DUMP;
+};
+
 namespace importer {
 
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
+
+/// Returns a string describing the declaration in the user's terms.
+StringRef getClangDescriptiveKind(const clang::Decl *decl);
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);

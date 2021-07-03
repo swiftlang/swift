@@ -32,6 +32,8 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/VersionTuple.h"
 
+namespace clang { class NamedDecl; }
+
 namespace swift {
   class Decl;
   class DeclAttribute;
@@ -115,7 +117,8 @@ namespace swift {
     VersionTuple,
     LayoutConstraint,
     ActorIsolation,
-    Diagnostic
+    Diagnostic,
+    ClangDecl,
   };
 
   namespace diag {
@@ -148,6 +151,7 @@ namespace swift {
       LayoutConstraint LayoutConstraintVal;
       ActorIsolation ActorIsolationVal;
       DiagnosticInfo *DiagnosticVal;
+      const clang::NamedDecl *ClangDecl;
     };
     
   public:
@@ -250,6 +254,10 @@ namespace swift {
         DiagnosticVal(D) {
     }
 
+    DiagnosticArgument(const clang::NamedDecl *ND)
+      : Kind(DiagnosticArgumentKind::ClangDecl), ClangDecl(ND) {
+    }
+
     /// Initializes a diagnostic argument using the underlying type of the
     /// given enum.
     template<
@@ -260,6 +268,8 @@ namespace swift {
           static_cast<typename std::underlying_type<EnumType>::type>(value)) {}
 
     DiagnosticArgumentKind getKind() const { return Kind; }
+
+    unsigned getSelection() const;
 
     StringRef getAsString() const {
       assert(Kind == DiagnosticArgumentKind::String);
@@ -354,6 +364,11 @@ namespace swift {
     DiagnosticInfo *getAsDiagnostic() const {
       assert(Kind == DiagnosticArgumentKind::Diagnostic);
       return DiagnosticVal;
+    }
+
+    const clang::NamedDecl *getAsClangDecl() const {
+      assert(Kind == DiagnosticArgumentKind::ClangDecl);
+      return ClangDecl;
     }
   };
 
@@ -1299,6 +1314,10 @@ namespace swift {
     parentDiag.flush();
     builder();
   }
+
+  /// Prints the qualified name of a Clang declaration in a form suitable for
+  /// diagnostics or debug logging.
+  void printClangDeclName(const clang::NamedDecl *D, llvm::raw_ostream &os);
 
 } // end namespace swift
 
