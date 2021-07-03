@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements diagnostics for constraint system.
+// This file implements diagnostics for the constraint system.
 //
 //===----------------------------------------------------------------------===//
 
@@ -2790,7 +2790,7 @@ bool ContextualFailure::diagnoseConversionToBool() const {
     // Check if we need the inner parentheses.
     // Technically we only need them if there's something in 'expr' with
     // lower precedence than '!=', but the code actually comes out nicer
-    // in most cases with parens on anything non-trivial.
+    // in most cases with parens on anything that is non-trivial.
     if (anchor->canAppendPostfixExpression()) {
       prefix = prefix.drop_back();
       suffix = suffix.drop_front();
@@ -4535,7 +4535,7 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   // corresponding to the missing argument doesn't support a trailing closure,
   // don't provide a Fix-It.
   // FIXME: It's possible to parenthesize and relabel the argument list to
-  // accomodate this, but it's tricky.
+  // accommodate this, but it's tricky.
   bool shouldEmitFixIt =
     !(insertingTrailingClosure && !paramAcceptsTrailingClosure);
 
