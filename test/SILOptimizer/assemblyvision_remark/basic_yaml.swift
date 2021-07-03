@@ -28,7 +28,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
-// CHECK-NEXT:                    Line: [[# @LINE + 27 ]], Column: 12 }
+// CHECK-NEXT:                    Line: [[# @LINE + 42 ]], Column: 12 }
 // CHECK-NEXT: Function:        'getGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'begin exclusive access to value of type '''
@@ -37,6 +37,21 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:   - InferredValue:   'of ''global'''
 // CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                        Line: [[# @LINE - 14 ]], Column: 12 }
+// CHECK-NEXT: ...
+//
+// CHECK: --- !Missed
+// CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
+// CHECK-NEXT: Name:            sil.memory
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                    Line: [[# @LINE + 27 ]], Column: 12 }
+// CHECK-NEXT: Function:        'getGlobal()'
+// CHECK-NEXT: Args:
+// CHECK-NEXT:   - String:          'end exclusive access to value of type '''
+// CHECK-NEXT:   - ValueType:       Klass
+// CHECK-NEXT:   - String:          ''''
+// CHECK-NEXT:   - InferredValue:   'of ''global'''
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                        Line: [[# @LINE - 29 ]], Column: 12 }
 // CHECK-NEXT: ...
 //
 // CHECK: --- !Missed
@@ -51,14 +66,17 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT:   - InferredValue:   'of ''global'''
 // CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift',
-// CHECK-NEXT:                        Line: [[# @LINE - 29 ]], Column: 12 }
+// CHECK-NEXT:                        Line: [[# @LINE - 44 ]], Column: 12 }
 // CHECK-NEXT: ...
 @inline(never)
 public func getGlobal() -> Klass {
     return global // expected-remark @:5 {{retain of type 'Klass'}}
-                  // expected-note @-34:12 {{of 'global'}}
+                  // expected-note @-49:12 {{of 'global'}}
                   // expected-remark @-2 {{begin exclusive access to value of type 'Klass'}}
-                  // expected-note @-36:12 {{of 'global'}}
+                  // expected-note @-51:12 {{of 'global'}}
+                  // NOTE: We really want the end access at :18, not :12. TODO Fix this!
+                  // expected-remark @-5 {{end exclusive access to value of type 'Klass'}}
+                  // expected-note @-54:12 {{of 'global'}}
 }
 
 // CHECK: --- !Missed

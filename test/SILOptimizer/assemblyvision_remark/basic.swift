@@ -15,6 +15,8 @@ public func getGlobal() -> Klass {
                   // expected-note @-5:12 {{of 'global'}}
                   // expected-remark @-2:12 {{begin exclusive access to value of type 'Klass'}}
                   // expected-note @-7:12 {{of 'global'}}
+                  // expected-remark @-4:12 {{end exclusive access to value of type 'Klass'}}
+                  // expected-note @-9:12 {{of 'global'}}
 }
 
 // Make sure that the retain msg is at the beginning of the print and the
