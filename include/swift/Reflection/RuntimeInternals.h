@@ -68,7 +68,12 @@ struct HeapObject {
 
 template <typename Runtime>
 struct Job {
-  typename Runtime::StoredPointer Opaque[4];
+  HeapObject<Runtime> HeapObject;
+  typename Runtime::StoredPointer SchedulerPrivate[2];
+  uint32_t Flags;
+  uint32_t Id;
+  typename Runtime::StoredPointer Reserved[2];
+  typename Runtime::StoredPointer RunJob;
 };
 
 template <typename Runtime>
@@ -86,12 +91,19 @@ struct StackAllocator {
 };
 
 template <typename Runtime>
-struct AsyncTask {
-  HeapObject<Runtime> HeapObject;
-  Job<Runtime> Job;
-  typename Runtime::StoredPointer ResumeContext;
+struct AsyncTaskPrivateStorage {
   typename Runtime::StoredSize Status;
-  typename Runtime::StoredPointer AllocatorPrivate[4];
+  StackAllocator<Runtime> Allocator;
+  typename Runtime::StoredPointer Local;
+};
+
+template <typename Runtime>
+struct AsyncTask: Job<Runtime> {
+  // On 64-bit, there's a Reserved64 after ResumeContext.  
+  typename Runtime::StoredPointer ResumeContextAndReserved[
+    sizeof(typename Runtime::StoredPointer) == 8 ? 2 : 1];
+
+  AsyncTaskPrivateStorage<Runtime> PrivateStorage;
 };
 
 } // end namespace reflection

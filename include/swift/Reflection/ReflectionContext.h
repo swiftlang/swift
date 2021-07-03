@@ -1361,9 +1361,7 @@ public:
     if (!AsyncTaskObj)
       return std::string("failure reading async task");
 
-    auto *Allocator = reinterpret_cast<const StackAllocator *>(
-        &AsyncTaskObj->AllocatorPrivate);
-    StoredPointer SlabPtr = Allocator->FirstSlab;
+    StoredPointer SlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     while (SlabPtr) {
       auto SlabBytes = getReader().readBytes(
           RemoteAddress(SlabPtr), sizeof(typename StackAllocator::Slab));
