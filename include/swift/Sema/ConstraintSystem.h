@@ -2521,8 +2521,8 @@ private:
 
   private:
     /// The list of constraints that have been retired along the
-    /// current path, this list is used in LIFO (Last In First Out) 
-    /// fashion when constraints are added back to the circulation.
+    /// current path, this list is used in LIFO fashion when
+    /// constraints are added back to the circulation.
     ConstraintList retiredConstraints;
 
     /// The set of constraints which were active at the time of this state
@@ -2821,7 +2821,7 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(const Solution &solution);
 
-  /// If there is more than one viable solution, we attempt 
+  /// If there is more than one viable solution, attempt 
   /// to pick the best solution and remove all of the rest.
   ///
   /// \param solutions The set of solutions to filter.
