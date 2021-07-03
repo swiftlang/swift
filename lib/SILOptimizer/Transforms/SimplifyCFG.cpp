@@ -663,7 +663,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
 
   // Split all critical edges such that we can move code onto edges. This is
   // also required for SSA construction in dominatorBasedSimplifications' jump
-  // threading. It only splits new critical edges and it creates by jump threading.
+  // threading. It only splits new critical edges it creates by jump threading.
   bool Changed = false;
   if (!Fn.hasOwnership() && EnableJumpThread) {
     Changed = splitAllCriticalEdges(Fn, DT, nullptr);
@@ -2053,7 +2053,7 @@ static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someB
     return true;
 
   // Otherwise, lets begin a traversal along the successors of noneSuccessorBB,
-  // searching for someSuccessorBB, being careful such that we only allow for blocks to be
+  // searching for someSuccessorBB, being careful to only allow for blocks to be
   // visited once. This enables us to guarantee that there no loops or
   // any sub-diamonds in the part of the CFG we are traversing. This /does/
   // allow for side-entrances to the region from blocks not reachable from
@@ -4055,7 +4055,7 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
 
   // This is going to be the last basic block this program is going to execute
   // and this block is inert from the ARC's prospective,so there's no point to do any
-  // releases beyond/at this point.
+  // releases at this point.
   bool Changed = false;
   llvm::SmallPtrSet<SILInstruction *, 4> InstsToRemove;
   for (auto &I : *BB) {
