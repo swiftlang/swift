@@ -31,7 +31,7 @@ public:
   /// Construct a dependency scanning tool.
   DependencyScanningTool();
 
-  /// Collect the full module depenedency graph for the input, ignoring any
+  /// Collect the full module dependency graph for the input, ignoring any
   /// placeholder modules.
   ///
   /// \returns a \c StringError with the diagnostic output if errors
@@ -47,7 +47,7 @@ public:
   llvm::ErrorOr<swiftscan_import_set_t>
   getImports(ArrayRef<const char *> Command);
 
-  /// Collect the full module depenedency graph for the input collection of
+  /// Collect the full module dependency graph for the input collection of
   /// module names (batch inputs) and output them to the
   /// BatchScanInput-specified output locations.
   ///
