@@ -6,7 +6,7 @@
 func foo(_ n: Int) -> Int {
   // CHECK:   (body=brace_stmt
   // CHECK:     (return_stmt
-  // CHECK:       (integer_literal_expr type='<null>' value=42 {{.*}})))
+  // CHECK:       (integer_literal_expr type='<null>'{{.*}} value=42 {{.*}})))
   // CHECK-AST: (body=brace_stmt
   // CHECK-AST:   (return_stmt
   // CHECK-AST:     (integer_literal_expr type='{{[^']+}}' {{.*}} value=42 {{.*}})
@@ -18,9 +18,9 @@ func foo(_ n: Int) -> Int {
 // CHECK-AST-LABEL: (func_decl{{.*}}"bar()"
 func bar() {
   // CHECK: (body=brace_stmt
-  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
-  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
-  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
+  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}'{{.*}} name=foo
+  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}'{{.*}} name=foo
+  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}'{{.*}} name=foo
   // CHECK-AST: (body=brace_stmt
   // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
   // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
@@ -95,11 +95,11 @@ enum MyEnum {
 // CHECK-LABEL: (top_level_code_decl range=[{{.+}}]
 // CHECK-NEXT:    (brace_stmt implicit range=[{{.+}}]
 // CHECK-NEXT:      (sequence_expr type='<null>'
-// CHECK-NEXT:        (discard_assignment_expr type='<null>')
+// CHECK-NEXT:        (discard_assignment_expr type='<null>'{{.*}})
 // CHECK-NEXT:        (assign_expr type='<null>'
 // CHECK-NEXT:          (<<null>>)
 // CHECK-NEXT:          (<<null>>))
-// CHECK-NEXT:        (closure_expr type='<null>' discriminator={{[0-9]+}}
+// CHECK-NEXT:        (closure_expr type='<null>'{{.*}} discriminator={{[0-9]+}}
 // CHECK-NEXT:          (parameter_list range=[{{.+}}]
 // CHECK-NEXT:            (parameter "v"))
 // CHECK-NEXT:          (brace_stmt range=[{{.+}}])))))
@@ -116,8 +116,8 @@ struct SelfParam {
   // CHECK-NEXT:        (component id='SelfParam' bind=none)))
   static func createOptional() -> SelfParam? {
 
-    // CHECK-LABEL: (single_expression_body=call_expr type='<null>' arg_labels=
-    // CHECK-NEXT:    (unresolved_decl_ref_expr type='<null>' name=SelfParam function_ref=unapplied)
+    // CHECK-LABEL: (single_expression_body=call_expr type='<null>'{{.*}} arg_labels=
+    // CHECK-NEXT:    (unresolved_decl_ref_expr type='<null>'{{.*}} name=SelfParam function_ref=unapplied)
     // CHECK-NEXT:    (tuple_expr type='()'{{.*}}))
     SelfParam()
   }

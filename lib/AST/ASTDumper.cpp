@@ -314,15 +314,16 @@ static void dumpSubstitutionMapRec(
 namespace {
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef> {
   public:
+    ASTContext *Ctx;
     raw_ostream &OS;
     unsigned Indent;
 
-    explicit PrintPattern(raw_ostream &os, unsigned indent = 0)
-      : OS(os), Indent(indent) { }
+    explicit PrintPattern(ASTContext *Ctx, raw_ostream &os, unsigned indent = 0)
+      : Ctx(Ctx), OS(os), Indent(indent) { }
 
     void printRec(Decl *D, StringRef Label = "");
     void printRec(Expr *E, StringRef Label = "");
-    void printRec(Stmt *S, const ASTContext &Ctx, StringRef Label = "");
+    void printRec(Stmt *S, StringRef Label = "");
     void printRec(TypeRepr *T, StringRef Label = "");
     void printRec(const Pattern *P, StringRef Label = "");
 
@@ -451,16 +452,17 @@ namespace {
   /// PrintDecl - Visitor implementation of Decl::print.
   class PrintDecl : public DeclVisitor<PrintDecl, void, StringRef> {
   public:
+    ASTContext *Ctx;
     raw_ostream &OS;
     unsigned Indent;
 
-    explicit PrintDecl(raw_ostream &os, unsigned indent = 0)
-      : OS(os), Indent(indent) { }
+    explicit PrintDecl(ASTContext *Ctx, raw_ostream &os, unsigned indent = 0)
+      : Ctx(Ctx), OS(os), Indent(indent) { }
 
   private:
     void printRec(Decl *D, StringRef Label = "");
     void printRec(Expr *E, StringRef Label = "");
-    void printRec(Stmt *S, const ASTContext &Ctx, StringRef Label = "");
+    void printRec(Stmt *S, StringRef Label = "");
     void printRec(Pattern *P, StringRef Label = "");
     void printRec(TypeRepr *T, StringRef Label = "");
 
@@ -529,10 +531,10 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
 
       auto R = D->getSourceRange();
-      if (R.isValid()) {
+      if (Ctx && R.isValid()) {
         PrintWithColorRAII(OS, RangeColor) << " range=";
         R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                D->getASTContext().SourceMgr, /*PrintText=*/false);
+                Ctx->SourceMgr, /*PrintText=*/false);
       }
 
       if (D->TrailingSemiLoc.isValid())
@@ -988,18 +990,18 @@ namespace {
       printCommonPost();
     }
 
-    void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
+    void printParameterList(const ParameterList *params) {
       printCommon("parameter_list", "", ParameterColor);
 
-      if (!ctx && params->size() != 0 && params->get(0))
-        ctx = &params->get(0)->getASTContext();
+      if (!Ctx && params->size() != 0 && params->get(0))
+        Ctx = &params->get(0)->getASTContext();
 
-      if (ctx) {
+      if (Ctx) {
         auto R = params->getSourceRange();
         if (R.isValid()) {
           PrintWithColorRAII(OS, RangeColor) << " range=";
           R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                  ctx->SourceMgr, /*PrintText=*/false);
+                  Ctx->SourceMgr, /*PrintText=*/false);
         }
       }
 
@@ -1021,7 +1023,7 @@ namespace {
       }
 
       OS << '\n';
-      printParameterList(D->getParameters(), &D->getASTContext());
+      printParameterList(D->getParameters());
       Indent -= 2;
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
@@ -1039,7 +1041,7 @@ namespace {
         printRec(D->getSingleExpressionBody(), "single_expression_body");
       } else if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         OS << '\n';
-        printRec(Body, D->getASTContext(), "body");
+        printRec(Body, "body");
       }
     }
 
@@ -1087,20 +1089,20 @@ namespace {
       printCommon(TLCD, "top_level_code_decl", Label);
       if (TLCD->getBody()) {
         OS << "\n";
-        printRec(TLCD->getBody(), static_cast<Decl *>(TLCD)->getASTContext());
+        printRec(TLCD->getBody());
       }
       printCommonPost();
     }
     
-    void printASTNodes(const ArrayRef<ASTNode> &Elements, const ASTContext &Ctx,
-                       const char *Name, StringRef Label) {
+    void printASTNodes(const ArrayRef<ASTNode> &Elements, const char *Name,
+                       StringRef Label) {
       printCommon(Name, Label, ASTNodeColor);
       for (auto Elt : Elements) {
         OS << '\n';
         if (auto *SubExpr = Elt.dyn_cast<Expr*>())
           printRec(SubExpr);
         else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-          printRec(SubStmt, Ctx);
+          printRec(SubStmt);
         else
           printRec(Elt.get<Decl*>());
       }
@@ -1123,7 +1125,7 @@ namespace {
 
         OS << '\n';
         Indent += 2;
-        printASTNodes(Clause.Elements, ICD->getASTContext(), "", "elements");
+        printASTNodes(Clause.Elements, "", "elements");
         Indent -= 2;
       }
 
@@ -1225,7 +1227,7 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(OS, Indent).printParameterList(this);
+  PrintDecl(nullptr, OS, Indent).printParameterList(this);
   llvm::errs() << '\n';
 }
 
@@ -1247,7 +1249,7 @@ void Decl::dump(const char *filename) const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(OS, Indent).visit(const_cast<Decl *>(this), "");
+  PrintDecl(&getASTContext(), OS, Indent).visit(const_cast<Decl *>(this), "");
   OS << '\n';
 }
 
@@ -1367,7 +1369,7 @@ void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
   if (parseIfNeeded)
     (void)getTopLevelDecls();
 
-  PrintDecl(OS).visitSourceFile(*this, "");
+  PrintDecl(&getASTContext(), OS).visitSourceFile(*this, "");
   llvm::errs() << '\n';
 }
 
@@ -1375,8 +1377,15 @@ void Pattern::dump() const {
   dump(llvm::errs());
 }
 
+static ASTContext *getASTContextFromType(Type ty) {
+  if (ty)
+    return &ty->getASTContext();
+  return nullptr;
+}
+
 void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintPattern(OS, Indent).visit(const_cast<Pattern*>(this), "");
+  PrintPattern(getASTContextFromType(getType()), OS, Indent)
+    .visit(const_cast<Pattern*>(this), "");
   OS << '\n';
 }
 
@@ -1388,13 +1397,12 @@ namespace {
 /// PrintStmt - Visitor implementation of Stmt::dump.
 class PrintStmt : public StmtVisitor<PrintStmt, void, StringRef> {
 public:
+  ASTContext *Ctx;
   raw_ostream &OS;
-  const ASTContext *Ctx;
   unsigned Indent;
 
-  PrintStmt(raw_ostream &os, const ASTContext *ctx, unsigned indent)
-    : OS(os), Ctx(ctx), Indent(indent) {
-  }
+  PrintStmt(ASTContext *ctx, raw_ostream &os, unsigned indent)
+    : Ctx(ctx), OS(os), Indent(indent) { }
 
   void visit(Stmt *S, StringRef Label) {
     if (S)
@@ -1732,7 +1740,8 @@ void Stmt::dump() const {
 }
 
 void Stmt::dump(raw_ostream &OS, const ASTContext *Ctx, unsigned Indent) const {
-  PrintStmt(OS, Ctx, Indent).visit(const_cast<Stmt*>(this), "");
+  PrintStmt(const_cast<ASTContext *>(Ctx), OS, Indent)
+      .visit(const_cast<Stmt*>(this), "");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1743,6 +1752,7 @@ namespace {
 /// PrintExpr - Visitor implementation of Expr::dump.
 class PrintExpr : public ExprVisitor<PrintExpr, void, StringRef> {
 public:
+  ASTContext *Ctx;
   raw_ostream &OS;
   llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
   llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
@@ -1750,17 +1760,17 @@ public:
       GetTypeOfKeyPathComponent;
   unsigned Indent;
 
-  PrintExpr(raw_ostream &os, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
+  PrintExpr(ASTContext *ctx, raw_ostream &os, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
             llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
             llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                 getTypeOfKeyPathComponent,
             unsigned indent)
-      : OS(os), GetTypeOfExpr(getTypeOfExpr),
+      : Ctx(ctx), OS(os), GetTypeOfExpr(getTypeOfExpr),
         GetTypeOfTypeRepr(getTypeOfTypeRepr),
         GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent), Indent(indent) {}
 
-  PrintExpr(raw_ostream &os, unsigned indent)
-    : PrintExpr(os, [](Expr *E) -> Type { return E->getType(); }, nullptr,
+  PrintExpr(ASTContext *ctx, raw_ostream &os, unsigned indent)
+    : PrintExpr(ctx, os, [](Expr *E) -> Type { return E->getType(); }, nullptr,
                 [](KeyPathExpr *E, unsigned index) -> Type {
                   return E->getComponents()[index].getComponentType();
                 }, indent) { }
@@ -1779,7 +1789,7 @@ public:
   /// FIXME: This should use ExprWalker to print children.
 
   void printRec(Decl *D, StringRef Label = "");
-  void printRec(Stmt *S, const ASTContext &Ctx, StringRef Label = "");
+  void printRec(Stmt *S, StringRef Label = "");
   void printRec(const Pattern *P, StringRef Label = "");
   void printRec(TypeRepr *T, StringRef Label = "");
 
@@ -1837,19 +1847,22 @@ public:
     PrintWithColorRAII(OS, TypeColor) << GetTypeOfExpr(E).getString(PO) << '\'';
 
     // If we have a source range and an ASTContext, print the source range.
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
+    if (!Ctx)
+      if (auto Ty = GetTypeOfExpr(E))
+        Ctx = &Ty->getASTContext();
+
+    if (Ctx) {
       auto L = E->getLoc();
       if (L.isValid()) {
         PrintWithColorRAII(OS, LocationColor) << " location=";
-        L.print(PrintWithColorRAII(OS, LocationColor).getOS(), Ctx.SourceMgr);
+        L.print(PrintWithColorRAII(OS, LocationColor).getOS(), Ctx->SourceMgr);
       }
 
       auto R = E->getSourceRange();
       if (R.isValid()) {
         PrintWithColorRAII(OS, RangeColor) << " range=";
         R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                Ctx.SourceMgr, /*PrintText=*/false);
+                Ctx->SourceMgr, /*PrintText=*/false);
       }
     }
 
@@ -1956,13 +1969,12 @@ public:
     printCommon(E, "interpolated_string_literal_expr", Label);
     
     // Print the trailing quote location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
+    if (Ctx) {
       auto TQL = E->getTrailingQuoteLoc();
       if (TQL.isValid()) {
         PrintWithColorRAII(OS, LocationColor) << " trailing_quote_loc=";
         TQL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
-                  Ctx.SourceMgr);
+                  Ctx->SourceMgr);
       }
     }
     PrintWithColorRAII(OS, LiteralValueColor)
@@ -2558,11 +2570,11 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
+      PrintDecl(Ctx, OS, Indent+2).printParameterList(E->getParameters());
     }
 
     OS << '\n';
-    printRec(E->getBody(), E->getASTContext());
+    printRec(E->getBody());
     printCommonPost();
   }
   void visitAutoClosureExpr(AutoClosureExpr *E, StringRef Label) {
@@ -2570,7 +2582,7 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
+      PrintDecl(Ctx, OS, Indent+2).printParameterList(E->getParameters());
     }
 
     OS << '\n';
@@ -2803,13 +2815,12 @@ public:
     printCommon(E, "editor_placeholder_expr", Label);
 
     // Print the trailing angle bracket location
-    if (auto Ty = GetTypeOfExpr(E)) {
-      auto &Ctx = Ty->getASTContext();
+    if (Ctx) {
       auto TABL = E->getTrailingAngleBracketLoc();
       if (TABL.isValid()) {
         PrintWithColorRAII(OS, LocationColor) << " trailing_angle_bracket_loc=";
         TABL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
-                   Ctx.SourceMgr);
+                   Ctx->SourceMgr);
       }
     }
 
@@ -2957,6 +2968,9 @@ public:
   }
 
   void visitTapExpr(TapExpr *E, StringRef Label) {
+    if (!Ctx)
+      Ctx = &E->getVar()->getDeclContext()->getASTContext();
+
     printCommon(E, "tap_expr", Label);
     PrintWithColorRAII(OS, DeclColor) << " var=";
     printDeclRef(E->getVar());
@@ -2965,7 +2979,7 @@ public:
     printRec(E->getSubExpr());
     OS << '\n';
 
-    printRec(E->getBody(), E->getVar()->getDeclContext()->getASTContext());
+    printRec(E->getBody());
     printCommonPost();
   }
 };
@@ -2982,13 +2996,14 @@ void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  PrintExpr(OS, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent,
-            Indent)
+  PrintExpr(getASTContextFromType(getTypeOfExpr(const_cast<Expr *>(this))), OS,
+            getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent, Indent)
       .visit(const_cast<Expr *>(this), "");
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintExpr(OS, Indent).visit(const_cast<Expr *>(this), "");
+  PrintExpr(getASTContextFromType(getType()), OS, Indent)
+      .visit(const_cast<Expr *>(this), "");
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
@@ -3006,11 +3021,12 @@ void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 namespace {
 class PrintTypeRepr : public TypeReprVisitor<PrintTypeRepr, void, StringRef> {
 public:
+  ASTContext *Ctx;
   raw_ostream &OS;
   unsigned Indent;
 
-  PrintTypeRepr(raw_ostream &os, unsigned indent)
-    : OS(os), Indent(indent) { }
+  PrintTypeRepr(ASTContext *ctx, raw_ostream &os, unsigned indent)
+    : Ctx(ctx), OS(os), Indent(indent) { }
 
   void printRec(Decl *D, StringRef Label = "");
   void printRec(Expr *E, StringRef Label = "");
@@ -3208,11 +3224,13 @@ public:
   void visitFixedTypeRepr(FixedTypeRepr *T, StringRef Label) {
     printCommon("type_fixed", Label);
     auto Ty = T->getType();
-    if (Ty) {
-      auto &srcMgr =  Ty->getASTContext().SourceMgr;
+    if (!Ctx && Ty)
+      Ctx = &Ty->getASTContext();
+
+    if (Ctx) {
       if (T->getLoc().isValid()) {
         OS << " location=@";
-        T->getLoc().print(OS, srcMgr);
+        T->getLoc().print(OS, Ctx->SourceMgr);
       } else {
         OS << " location=<<invalid>>";
       }
@@ -3248,7 +3266,8 @@ public:
 } // end anonymous namespace
 
 void TypeRepr::dump() const {
-  PrintTypeRepr(llvm::errs(), 0).visit(const_cast<TypeRepr*>(this), "");
+  PrintTypeRepr(nullptr, llvm::errs(), 0)
+      .visit(const_cast<TypeRepr*>(this), "");
   llvm::errs() << '\n';
 }
 
@@ -3514,6 +3533,7 @@ void SubstitutionMap::dump() const {
 
 namespace {
   class PrintType : public TypeVisitor<PrintType, void, StringRef> {
+    ASTContext *Ctx;
     raw_ostream &OS;
     unsigned Indent;
 
@@ -3571,7 +3591,8 @@ namespace {
     }
 
   public:
-    PrintType(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) { }
+    PrintType(ASTContext *ctx, raw_ostream &os, unsigned indent)
+      : Ctx(ctx), OS(os), Indent(indent) { }
 
     void visit(Type T, StringRef Label) {
       if (!T.isNull())
@@ -3890,9 +3911,8 @@ namespace {
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        auto &ctx = T->getASTContext().getClangModuleLoader()
-          ->getClangASTContext();
-        T->getClangTypeInfo().dump(os, ctx);
+        auto &clangCtx = Ctx->getClangModuleLoader()->getClangASTContext();
+        T->getClangTypeInfo().dump(os, clangCtx);
         print(os.str(), "clang_type");
       }
 
@@ -3950,9 +3970,8 @@ namespace {
       if (!T->getClangTypeInfo().empty()) {
         std::string s;
         llvm::raw_string_ostream os(s);
-        auto &ctx =
-            T->getASTContext().getClangModuleLoader()->getClangASTContext();
-        T->getClangTypeInfo().dump(os, ctx);
+        auto &clangCtx = Ctx->getClangModuleLoader()->getClangASTContext();
+        T->getClangTypeInfo().dump(os, clangCtx);
         print(os.str(), "clang_type");
       }
       printCommonPost();
@@ -4070,7 +4089,7 @@ void Type::dump(raw_ostream &os, unsigned indent) const {
     return; // not needed for the parser library.
   #endif
 
-  PrintType(os, indent).visit(*this, "");
+  PrintType(getASTContextFromType(*this), os, indent).visit(*this, "");
   os << "\n";
 }
 
@@ -4155,75 +4174,75 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
 }
 
 void PrintPattern::printRec(Decl *D, StringRef Label) {
-  PrintDecl(OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
 }
 void PrintPattern::printRec(Expr *E, StringRef Label) {
-  PrintExpr(OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
 }
-void PrintPattern::printRec(Stmt *S, const ASTContext &Ctx, StringRef Label) {
-  PrintStmt(OS, &Ctx, Indent + 2).visit(S, Label);
+void PrintPattern::printRec(Stmt *S, StringRef Label) {
+  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
 }
 void PrintPattern::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
 }
 void PrintPattern::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
+  PrintPattern(Ctx, OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
 }
 
 void PrintDecl::printRec(Decl *D, StringRef Label) {
-  PrintDecl(OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
 }
 void PrintDecl::printRec(Expr *E, StringRef Label) {
-  PrintExpr(OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
 }
-void PrintDecl::printRec(Stmt *S, const ASTContext &Ctx, StringRef Label) {
-  PrintStmt(OS, &Ctx, Indent + 2).visit(S, Label);
+void PrintDecl::printRec(Stmt *S, StringRef Label) {
+  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
 }
 void PrintDecl::printRec(Pattern *P, StringRef Label) {
-  PrintPattern(OS, Indent+2).visit(P, Label);
+  PrintPattern(Ctx, OS, Indent+2).visit(P, Label);
 }
 void PrintDecl::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
 }
 
 void PrintStmt::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(OS, Ctx, Indent + 2).visit(S, Label);
+  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
 }
 void PrintStmt::printRec(Decl *D, StringRef Label) {
-  PrintDecl(OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
 }
 void PrintStmt::printRec(Expr *E, StringRef Label) {
-  PrintExpr(OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
 }
 void PrintStmt::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
+  PrintPattern(Ctx, OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
 }
 
 void PrintExpr::printRec(Expr *E, StringRef Label) {
-  PrintExpr(OS, GetTypeOfExpr, GetTypeOfTypeRepr, GetTypeOfKeyPathComponent,
-            Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, GetTypeOfExpr, GetTypeOfTypeRepr,
+            GetTypeOfKeyPathComponent, Indent + 2).visit(E, Label);
 }
 void PrintExpr::printRec(Decl *D, StringRef Label) {
-  PrintDecl(OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
 }
-void PrintExpr::printRec(Stmt *S, const ASTContext &Ctx, StringRef Label) {
-  PrintStmt(OS, &Ctx, Indent + 2).visit(S, Label);
+void PrintExpr::printRec(Stmt *S, StringRef Label) {
+  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
 }
 void PrintExpr::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
+  PrintPattern(Ctx, OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
 }
 void PrintExpr::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
 }
 
 void PrintTypeRepr::printRec(Decl *D, StringRef Label) {
-  PrintDecl(OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
 }
 void PrintTypeRepr::printRec(Expr *E, StringRef Label) {
-  PrintExpr(OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
 }
 void PrintTypeRepr::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
 }
 
 void PrintType::printRec(Type type, StringRef label) {
