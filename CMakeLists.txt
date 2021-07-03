@@ -512,8 +512,6 @@ message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VER
 message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
 if (CMAKE_Swift_COMPILER)
   message(STATUS "Swift Compiler (${CMAKE_Swift_COMPILER}) Version: ${CMAKE_Swift_COMPILER_VERSION}")
-elseif (SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
-  message(FATAL_ERROR "Swift Compiler not found and SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER is set")
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
