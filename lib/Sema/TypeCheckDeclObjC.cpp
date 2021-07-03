@@ -1271,10 +1271,11 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       reason.describe(CD);
     }
 
-    // Only allow ObjC-rooted classes to be @objc.
+    // Only allow actors and ObjC-rooted classes to be @objc.
     // (Leave a hole for test cases.)
     if (ancestry.contains(AncestryFlags::ObjC) &&
-        !ancestry.contains(AncestryFlags::ClangImported)) {
+        !ancestry.contains(AncestryFlags::ClangImported) &&
+        !CD->isActor()) {
       if (ctx.LangOpts.EnableObjCAttrRequiresFoundation) {
         swift::diagnoseAndRemoveAttr(CD, attr,
                                      diag::invalid_objc_swift_rooted_class)
