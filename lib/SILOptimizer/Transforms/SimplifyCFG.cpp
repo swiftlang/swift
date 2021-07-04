@@ -107,7 +107,6 @@ class SimplifyCFG {
   bool ShouldVerify;
   bool EnableJumpThread;
 
-  
 public:
   SimplifyCFG(SILFunction &Fn, SILTransform &T, bool Verify,
               bool EnableJumpThread)
@@ -580,6 +579,7 @@ static bool tryDominatorBasedSimplifications(
   }
   return Changed;
 }
+
 /// Propagate values of branched upon values along the outgoing edges down the
 /// dominator tree.
 bool SimplifyCFG::dominatorBasedSimplifications(SILFunction &Fn,
