@@ -112,6 +112,28 @@ namespace {
     }
 
   };
+
+/// Contains helpers for looking up types in expressions. Used by PrintExpr,
+/// but threaded through the other printers too.
+struct ExprTypeDelegate {
+  llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
+  llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
+  llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+      GetTypeOfKeyPathComponent;
+
+  ExprTypeDelegate(llvm::function_ref<Type(Expr *)> getTypeOfExpr,
+                   llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
+                   llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
+                       getTypeOfKeyPathComponent)
+    : GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
+      GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
+
+  ExprTypeDelegate()
+    : ExprTypeDelegate([](Expr *E) -> Type { return E->getType(); }, nullptr,
+                       [](KeyPathExpr *E, unsigned index) -> Type {
+                         return E->getComponents()[index].getComponentType();
+                       }) { }
+};
 } // end anonymous namespace
 
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
@@ -316,10 +338,12 @@ namespace {
   public:
     ASTContext *Ctx;
     raw_ostream &OS;
+    ExprTypeDelegate &Delegate;
     unsigned Indent;
 
-    explicit PrintPattern(ASTContext *Ctx, raw_ostream &os, unsigned indent = 0)
-      : Ctx(Ctx), OS(os), Indent(indent) { }
+    explicit PrintPattern(ASTContext *Ctx, raw_ostream &os,
+                          ExprTypeDelegate &delegate, unsigned indent = 0)
+      : Ctx(Ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
     void printRec(Decl *D, StringRef Label = "");
     void printRec(Expr *E, StringRef Label = "");
@@ -454,10 +478,12 @@ namespace {
   public:
     ASTContext *Ctx;
     raw_ostream &OS;
+    ExprTypeDelegate &Delegate;
     unsigned Indent;
 
-    explicit PrintDecl(ASTContext *Ctx, raw_ostream &os, unsigned indent = 0)
-      : Ctx(Ctx), OS(os), Indent(indent) { }
+    explicit PrintDecl(ASTContext *Ctx, raw_ostream &os,
+                       ExprTypeDelegate &delegate, unsigned indent = 0)
+      : Ctx(Ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
   private:
     void printRec(Decl *D, StringRef Label = "");
@@ -1227,7 +1253,8 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(nullptr, OS, Indent).printParameterList(this);
+  ExprTypeDelegate delegate;
+  PrintDecl(nullptr, OS, delegate, Indent).printParameterList(this);
   llvm::errs() << '\n';
 }
 
@@ -1249,7 +1276,9 @@ void Decl::dump(const char *filename) const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintDecl(&getASTContext(), OS, Indent).visit(const_cast<Decl *>(this), "");
+  ExprTypeDelegate delegate;
+  PrintDecl(&getASTContext(), OS, delegate, Indent)
+      .visit(const_cast<Decl *>(this), "");
   OS << '\n';
 }
 
@@ -1369,7 +1398,8 @@ void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
   if (parseIfNeeded)
     (void)getTopLevelDecls();
 
-  PrintDecl(&getASTContext(), OS).visitSourceFile(*this, "");
+  ExprTypeDelegate delegate;
+  PrintDecl(&getASTContext(), OS, delegate).visitSourceFile(*this, "");
   llvm::errs() << '\n';
 }
 
@@ -1384,7 +1414,8 @@ static ASTContext *getASTContextFromType(Type ty) {
 }
 
 void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintPattern(getASTContextFromType(getType()), OS, Indent)
+  ExprTypeDelegate delegate;
+  PrintPattern(getASTContextFromType(getType()), OS, delegate, Indent)
     .visit(const_cast<Pattern*>(this), "");
   OS << '\n';
 }
@@ -1399,10 +1430,12 @@ class PrintStmt : public StmtVisitor<PrintStmt, void, StringRef> {
 public:
   ASTContext *Ctx;
   raw_ostream &OS;
+  ExprTypeDelegate &Delegate;
   unsigned Indent;
 
-  PrintStmt(ASTContext *ctx, raw_ostream &os, unsigned indent)
-    : Ctx(ctx), OS(os), Indent(indent) { }
+  explicit PrintStmt(ASTContext *ctx, raw_ostream &os,
+                     ExprTypeDelegate &delegate, unsigned indent)
+    : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
   void visit(Stmt *S, StringRef Label) {
     if (S)
@@ -1740,7 +1773,8 @@ void Stmt::dump() const {
 }
 
 void Stmt::dump(raw_ostream &OS, const ASTContext *Ctx, unsigned Indent) const {
-  PrintStmt(const_cast<ASTContext *>(Ctx), OS, Indent)
+  ExprTypeDelegate delegate;
+  PrintStmt(const_cast<ASTContext *>(Ctx), OS, delegate, Indent)
       .visit(const_cast<Stmt*>(this), "");
 }
 
@@ -1754,26 +1788,25 @@ class PrintExpr : public ExprVisitor<PrintExpr, void, StringRef> {
 public:
   ASTContext *Ctx;
   raw_ostream &OS;
-  llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
-  llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
-  llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-      GetTypeOfKeyPathComponent;
+  ExprTypeDelegate &Delegate;
   unsigned Indent;
 
-  PrintExpr(ASTContext *ctx, raw_ostream &os, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
-            llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
-            llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-                getTypeOfKeyPathComponent,
-            unsigned indent)
-      : Ctx(ctx), OS(os), GetTypeOfExpr(getTypeOfExpr),
-        GetTypeOfTypeRepr(getTypeOfTypeRepr),
-        GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent), Indent(indent) {}
+  Type getTypeOfExpr(Expr *E) {
+    return Delegate.GetTypeOfExpr(E);
+  }
+  bool canGetTypeOfTypeRepr() {
+    return (bool)Delegate.GetTypeOfTypeRepr;
+  }
+  Type getTypeOfTypeRepr(TypeRepr *T) {
+    return Delegate.GetTypeOfTypeRepr(T);
+  }
+  Type getTypeOfKeyPathComponent(KeyPathExpr *E, unsigned index) {
+    return Delegate.GetTypeOfKeyPathComponent(E, index);
+  }
 
-  PrintExpr(ASTContext *ctx, raw_ostream &os, unsigned indent)
-    : PrintExpr(ctx, os, [](Expr *E) -> Type { return E->getType(); }, nullptr,
-                [](KeyPathExpr *E, unsigned index) -> Type {
-                  return E->getComponents()[index].getComponentType();
-                }, indent) { }
+  PrintExpr(ASTContext *ctx, raw_ostream &os, ExprTypeDelegate &delegate,
+            unsigned indent)
+      : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) {}
 
   void visit(Expr *E, StringRef Label) {
     if (E)
@@ -1844,11 +1877,11 @@ public:
     if (E->isImplicit())
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
     PrintWithColorRAII(OS, TypeColor) << " type='";
-    PrintWithColorRAII(OS, TypeColor) << GetTypeOfExpr(E).getString(PO) << '\'';
+    PrintWithColorRAII(OS, TypeColor) << getTypeOfExpr(E).getString(PO) << '\'';
 
     // If we have a source range and an ASTContext, print the source range.
     if (!Ctx)
-      if (auto Ty = GetTypeOfExpr(E))
+      if (auto Ty = getTypeOfExpr(E))
         Ctx = &Ty->getASTContext();
 
     if (Ctx) {
@@ -1910,7 +1943,7 @@ public:
     if (E->isNegative())
       PrintWithColorRAII(OS, LiteralValueColor) << " negative";
     PrintWithColorRAII(OS, LiteralValueColor) << " value=";
-    Type T = GetTypeOfExpr(E);
+    Type T = getTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
       PrintWithColorRAII(OS, LiteralValueColor) << E->getDigitsText();
     else
@@ -2547,7 +2580,7 @@ public:
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
-    if (auto Ty = GetTypeOfExpr(E)) {
+    if (auto Ty = getTypeOfExpr(E)) {
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
         if (!fType->getExtInfo().isNoEscape())
           PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
@@ -2570,7 +2603,8 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(Ctx, OS, Indent+2).printParameterList(E->getParameters());
+      PrintDecl(Ctx, OS, Delegate, Indent+2)
+          .printParameterList(E->getParameters());
     }
 
     OS << '\n';
@@ -2582,7 +2616,8 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(Ctx, OS, Indent+2).printParameterList(E->getParameters());
+      PrintDecl(Ctx, OS, Delegate, Indent+2)
+          .printParameterList(E->getParameters());
     }
 
     OS << '\n';
@@ -2689,8 +2724,8 @@ public:
       OS << ' ' << getCheckedCastKindName(checkedCast->getCastKind());
 
     OS << " writtenType='";
-    if (GetTypeOfTypeRepr)
-      GetTypeOfTypeRepr(E->getCastTypeRepr()).print(OS);
+    if (canGetTypeOfTypeRepr())
+      getTypeOfTypeRepr(E->getCastTypeRepr()).print(OS);
     else
       E->getCastType().print(OS);
     OS << "'";
@@ -2926,7 +2961,7 @@ public:
         break;
       }
       PrintWithColorRAII(OS, TypeColor)
-        << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";
+        << " type='" << getTypeOfKeyPathComponent(E, i) << "'";
       if (auto indexExpr = component.getIndexExpr()) {
         OS << '\n';
         printRec(indexExpr);
@@ -2996,13 +3031,16 @@ void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  PrintExpr(getASTContextFromType(getTypeOfExpr(const_cast<Expr *>(this))), OS,
-            getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent, Indent)
+  ExprTypeDelegate delegate(getTypeOfExpr, getTypeOfTypeRepr,
+                            getTypeOfKeyPathComponent);
+  PrintExpr(getASTContextFromType(getTypeOfExpr(const_cast<Expr *>(this))),
+            OS, delegate, Indent)
       .visit(const_cast<Expr *>(this), "");
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
-  PrintExpr(getASTContextFromType(getType()), OS, Indent)
+  ExprTypeDelegate delegate;
+  PrintExpr(getASTContextFromType(getType()), OS, delegate, Indent)
       .visit(const_cast<Expr *>(this), "");
 }
 
@@ -3023,10 +3061,12 @@ class PrintTypeRepr : public TypeReprVisitor<PrintTypeRepr, void, StringRef> {
 public:
   ASTContext *Ctx;
   raw_ostream &OS;
+  ExprTypeDelegate &Delegate;
   unsigned Indent;
 
-  PrintTypeRepr(ASTContext *ctx, raw_ostream &os, unsigned indent)
-    : Ctx(ctx), OS(os), Indent(indent) { }
+  explicit PrintTypeRepr(ASTContext *ctx, raw_ostream &os,
+                         ExprTypeDelegate &delegate, unsigned indent)
+    : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
   void printRec(Decl *D, StringRef Label = "");
   void printRec(Expr *E, StringRef Label = "");
@@ -3266,7 +3306,8 @@ public:
 } // end anonymous namespace
 
 void TypeRepr::dump() const {
-  PrintTypeRepr(nullptr, llvm::errs(), 0)
+  ExprTypeDelegate delegate;
+  PrintTypeRepr(nullptr, llvm::errs(), delegate, 0)
       .visit(const_cast<TypeRepr*>(this), "");
   llvm::errs() << '\n';
 }
@@ -3535,6 +3576,7 @@ namespace {
   class PrintType : public TypeVisitor<PrintType, void, StringRef> {
     ASTContext *Ctx;
     raw_ostream &OS;
+    ExprTypeDelegate &Delegate;
     unsigned Indent;
 
     void printCommon(const char *name, StringRef label, TerminalColor Color) {
@@ -3591,8 +3633,9 @@ namespace {
     }
 
   public:
-    PrintType(ASTContext *ctx, raw_ostream &os, unsigned indent)
-      : Ctx(ctx), OS(os), Indent(indent) { }
+    explicit PrintType(ASTContext *ctx, raw_ostream &os,
+                       ExprTypeDelegate &delegate, unsigned indent)
+      : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
     void visit(Type T, StringRef Label) {
       if (!T.isNull())
@@ -4089,7 +4132,9 @@ void Type::dump(raw_ostream &os, unsigned indent) const {
     return; // not needed for the parser library.
   #endif
 
-  PrintType(getASTContextFromType(*this), os, indent).visit(*this, "");
+  ExprTypeDelegate delegate;
+  PrintType(getASTContextFromType(*this), os, delegate, indent)
+      .visit(*this, "");
   os << "\n";
 }
 
@@ -4174,75 +4219,74 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
 }
 
 void PrintPattern::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
 }
 void PrintPattern::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
 }
 void PrintPattern::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
+  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
 }
 void PrintPattern::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
 }
 void PrintPattern::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
+  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(const_cast<Pattern *>(P), Label);
 }
 
 void PrintDecl::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
 }
 void PrintDecl::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
 }
 void PrintDecl::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
+  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
 }
 void PrintDecl::printRec(Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Indent+2).visit(P, Label);
+  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(P, Label);
 }
 void PrintDecl::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
 }
 
 void PrintStmt::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
+  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
 }
 void PrintStmt::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
 }
 void PrintStmt::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
 }
 void PrintStmt::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
+  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(const_cast<Pattern *>(P), Label);
 }
 
 void PrintExpr::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, GetTypeOfExpr, GetTypeOfTypeRepr,
-            GetTypeOfKeyPathComponent, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
 }
 void PrintExpr::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
 }
 void PrintExpr::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Indent + 2).visit(S, Label);
+  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
 }
 void PrintExpr::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Indent+2).visit(const_cast<Pattern *>(P), Label);
+  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(const_cast<Pattern *>(P), Label);
 }
 void PrintExpr::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
 }
 
 void PrintTypeRepr::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Indent + 2).visit(D, Label);
+  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
 }
 void PrintTypeRepr::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Indent + 2).visit(E, Label);
+  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
 }
 void PrintTypeRepr::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Indent+2).visit(T, Label);
+  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
 }
 
 void PrintType::printRec(Type type, StringRef label) {
