@@ -196,6 +196,7 @@ public:
   }
 
   ASTNodeDumper child(const char *Name, StringRef Label, TerminalColor Color) {
+    *OS << '\n';
     return ASTNodeDumper(Ctx, *OS, *Delegate, IndentChildren,
                          Name, Label, Color);
   }
@@ -224,7 +225,6 @@ public:
   void printRec(ArrayRef<T> elems, StringRef Label) {
     auto childDump = child("array", Label, ExprModifierColor);
     for (auto elt : elems) {
-      childDump << "\n";
       childDump.printRec(elt, "");
     }
   }
@@ -577,7 +577,6 @@ namespace {
 
     void visitParenPattern(ParenPattern *P, StringRef Label) {
       auto dump = printCommon(P, "pattern_paren", Label);
-      dump << '\n';
       dump.printRec(P->getSubPattern());
     }
 
@@ -592,10 +591,8 @@ namespace {
                  },
                  [&] { dump << ","; });
 
-      for (auto &elt : P->getElements()) {
-        dump << '\n';
+      for (auto &elt : P->getElements())
         dump.printRec(elt.getPattern());
-      }
     }
     void visitNamedPattern(NamedPattern *P, StringRef Label) {
       auto dump = printCommon(P, "pattern_named", Label);
@@ -606,10 +603,8 @@ namespace {
     }
     void visitTypedPattern(TypedPattern *P, StringRef Label) {
       auto dump = printCommon(P, "pattern_typed", Label);
-      dump << '\n';
       dump.printRec(P->getSubPattern());
       if (auto *repr = P->getTypeRepr()) {
-        dump << '\n';
         dump.printRec(repr);
       }
     }
@@ -619,7 +614,6 @@ namespace {
       dump << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
       P->getCastType().print(dump.getOS());
       if (auto sub = P->getSubPattern()) {
-        dump << '\n';
         dump.printRec(sub);
       }
     }
@@ -633,7 +627,6 @@ namespace {
     }
     void visitBindingPattern(BindingPattern *P, StringRef Label) {
       auto dump = printCommon(P, P->isLet() ? "pattern_let" : "pattern_var", Label);
-      dump << '\n';
       dump.printRec(P->getSubPattern());
     }
     void visitEnumElementPattern(EnumElementPattern *P, StringRef Label) {
@@ -642,13 +635,11 @@ namespace {
       P->getParentType().print(dump.colored(TypeColor).getOS());
       dump.colored(IdentifierColor) << '.' << P->getName();
       if (P->hasSubPattern()) {
-        dump << '\n';
         dump.printRec(P->getSubPattern());
       }
     }
     void visitOptionalSomePattern(OptionalSomePattern *P, StringRef Label) {
       auto dump = printCommon(P, "pattern_optional_some", Label);
-      dump << '\n';
       dump.printRec(P->getSubPattern());
     }
     void visitBoolPattern(BoolPattern *P, StringRef Label) {
@@ -908,10 +899,8 @@ namespace {
         break;
       }
 
-      for (Decl *D : IDC->getMembers()) {
-        dump << '\n';
+      for (Decl *D : IDC->getMembers())
         dump.printRec(D);
-      }
     }
 
     void visitSourceFile(const SourceFile &SF, StringRef Label) {
@@ -923,7 +912,6 @@ namespace {
           if (D->isImplicit())
             continue;
 
-          dump << '\n';
           dump.printRec(D);
         }
       }
@@ -956,10 +944,8 @@ namespace {
     }
 
     void printAccessors(ASTNodeDumper &dump, AbstractStorageDecl *D) {
-      for (auto accessor : D->getAllAccessors()) {
-        dump << "\n";
+      for (auto accessor : D->getAllAccessors())
         dump.printRec(accessor);
-      }
     }
 
     void visitParamDecl(ParamDecl *PD, StringRef Label) {
@@ -1002,18 +988,14 @@ namespace {
           dump.colored(CapturesColor).getOS());
       }
 
-      if (auto init = PD->getStructuralDefaultExpr()) {
-        dump << '\n';
+      if (auto init = PD->getStructuralDefaultExpr())
         dump.printRec(init, "expression");
-      }
     }
 
     void visitEnumCaseDecl(EnumCaseDecl *ECD, StringRef Label) {
       auto dump = printCommon(ECD, "enum_case_decl", Label);
-      for (EnumElementDecl *D : ECD->getElements()) {
-        dump << '\n';
+      for (EnumElementDecl *D : ECD->getElements())
         dump.printRec(D);
-      }
     }
 
     void visitEnumDecl(EnumDecl *ED, StringRef Label) {
@@ -1023,10 +1005,8 @@ namespace {
 
     void visitEnumElementDecl(EnumElementDecl *EED, StringRef Label) {
       auto dump = printCommon(EED, "enum_element_decl", Label);
-      if (auto *paramList = EED->getParameterList()) {
-        dump << "\n";
+      if (auto *paramList = EED->getParameterList())
         dump.printRec(paramList);
-      }
     }
 
     void visitStructDecl(StructDecl *SD, StringRef Label) {
@@ -1045,21 +1025,13 @@ namespace {
       auto dump = printCommon(PBD, "pattern_binding_decl", Label);
 
       for (auto idx : range(PBD->getNumPatternEntries())) {
-        dump << '\n';
         auto childDump = dump.child("pattern_entry", "", PatternColor);
 
-        childDump << '\n';
         childDump.printRec(PBD->getPattern(idx), "pattern");
-
-        if (PBD->getOriginalInit(idx)) {
-          childDump << '\n';
+        if (PBD->getOriginalInit(idx))
           childDump.printRec(PBD->getOriginalInit(idx), "original_init");
-        }
-
-        if (PBD->getInit(idx)) {
-          childDump << '\n';
+        if (PBD->getInit(idx))
           childDump.printRec(PBD->getInit(idx), "processed_init");
-        }
       }
     }
 
@@ -1089,29 +1061,24 @@ namespace {
 
       dump.printNodeRange(params->getSourceRange());
 
-      for (auto P : *params) {
-        dump << '\n';
+      for (auto P : *params)
         dump.printRec(P);
-      }
     }
 
     void printAbstractFunctionDecl(ASTNodeDumper &dump,
                                    AbstractFunctionDecl *D) {
       if (auto fac = D->getForeignAsyncConvention()) {
-        dump << '\n';
         auto childDump = dump.child("foreign_async", "", DeclModifierColor);
         childDump.print(fac->completionHandlerParamIndex(),
                         "completion_handler_param_index");
         if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
           childDump.print(*errorParamIndex, "error_param_index");
 
-        if (auto type = fac->completionHandlerType()) {
+        if (auto type = fac->completionHandlerType())
           childDump.print(type, "completion_handler_type");
-        }
       }
 
       if (auto fec = D->getForeignErrorConvention()) {
-        dump << '\n';
         auto childDump = dump.child("foreign_error", "", DeclModifierColor);
         childDump.print(getForeignErrorConventionKindString(fec->getKind()),
                         "kind");
@@ -1130,31 +1097,22 @@ namespace {
           childDump.print(fec->getResultType(), "result_type");
       }
 
-      if (auto *P = D->getImplicitSelfDecl()) {
-        dump << '\n';
+      if (auto *P = D->getImplicitSelfDecl())
         dump.printRec(P, "self");
-      }
 
-      dump << '\n';
       dump.printRec(D->getParameters());
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (FD->getResultTypeRepr()) {
-          dump << '\n';
           dump.printRec(FD->getResultTypeRepr(), "result");
-          if (auto opaque = FD->getOpaqueResultTypeDecl()) {
-            dump << '\n';
+          if (auto opaque = FD->getOpaqueResultTypeDecl())
             dump.printRec(opaque, "opaque_result_decl");
-          }
         }
       }
-      if (D->hasSingleExpressionBody()) {
-        dump << '\n';
+      if (D->hasSingleExpressionBody())
         dump.printRec(D->getSingleExpressionBody(), "single_expression_body");
-      } else if (auto Body = D->getBody(/*canSynthesize=*/false)) {
-        dump << '\n';
+      else if (auto Body = D->getBody(/*canSynthesize=*/false))
         dump.printRec(Body, "body");
-      }
     }
 
     LLVM_NODISCARD ASTNodeDumper
@@ -1194,49 +1152,26 @@ namespace {
 
     void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD, StringRef Label) {
       auto dump = printCommon(TLCD, "top_level_code_decl", Label);
-      if (TLCD->getBody()) {
-        dump << "\n";
+      if (TLCD->getBody())
         dump.printRec(TLCD->getBody());
-      }
     }
     
-    void printASTNodes(ASTNodeDumper &parentDump,
-                       const ArrayRef<ASTNode> &Elements, const char *Name,
-                       StringRef Label) {
-      auto dump = parentDump.child(Name, Label, ASTNodeColor);
-      for (auto Elt : Elements) {
-        dump << '\n';
-        if (auto *SubExpr = Elt.dyn_cast<Expr*>())
-          dump.printRec(SubExpr);
-        else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-          dump.printRec(SubStmt);
-        else
-          dump.printRec(Elt.get<Decl*>());
-      }
-    }
-
     void visitIfConfigDecl(IfConfigDecl *ICD, StringRef Label) {
       auto dump = printCommon(ICD, "if_config_decl", Label);
       for (auto &Clause : ICD->getClauses()) {
-        dump << '\n';
         auto childDump = dump.child((Clause.Cond ? "#if:" : "#else:"), "",
                                     StmtColor);
-        if (Clause.isActive)
-          childDump.colored(DeclModifierColor) << " active";
-        if (Clause.Cond) {
-          childDump << "\n";
-          childDump.printRec(Clause.Cond);
-        }
+        childDump.printFlag(Clause.isActive, "active", DeclModifierColor);
 
-        dump << '\n';
-        printASTNodes(childDump, Clause.Elements, "", "elements");
+        if (Clause.Cond)
+          childDump.printRec(Clause.Cond);
+        childDump.printRec(Clause.Elements, "elements");
       }
     }
 
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, StringRef Label) {
       auto dump = printCommon(PDD, "pound_diagnostic_decl", Label);
       dump.print(PDD->isError() ? "error" : "warning", "kind");
-      dump << "\n";
       dump.printRec(PDD->getMessage());
     }
 
@@ -1251,7 +1186,7 @@ namespace {
       auto printRelations =
           [&](StringRef label, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
         if (rels.empty()) return;
-        dump << '\n';
+
         auto childDump = dump.child("groups", label, DeclModifierColor);
         childDump << rels[0].Name;
         for (auto &rel : rels.slice(1))
@@ -1264,7 +1199,6 @@ namespace {
     void printOperatorIdentifiers(ASTNodeDumper &dump, OperatorDecl *OD) {
       auto identifiers = OD->getIdentifiers();
       for (auto index : indices(identifiers)) {
-        dump << "\n";
         auto childDump = dump.child("identifier", llvm::utostr(index),
                                     DeclModifierColor);
         childDump.print(identifiers[index].Item);
@@ -1512,33 +1446,25 @@ public:
   void visitBraceStmt(BraceStmt *S, StringRef Label) {
     auto dump = printCommon(S, "brace_stmt", Label);
 
-    for (auto Elt : S->getElements()) {
-      dump << '\n';
+    for (auto Elt : S->getElements())
       dump.printRec(Elt);
-    }
   }
 
   void visitReturnStmt(ReturnStmt *S, StringRef Label) {
     auto dump = printCommon(S, "return_stmt", Label);
-    if (S->hasResult()) {
-      dump << '\n';
+    if (S->hasResult())
       dump.printRec(S->getResult());
-    }
   }
 
   void visitYieldStmt(YieldStmt *S, StringRef Label) {
     auto dump = printCommon(S, "yield_stmt", Label);
-    for (auto yield : S->getYields()) {
-      dump << '\n';
+    for (auto yield : S->getYields())
       dump.printRec(yield);
-    }
   }
 
   void visitDeferStmt(DeferStmt *S, StringRef Label) {
     auto dump = printCommon(S, "defer_stmt", Label);
-    dump << '\n';
     dump.printRec(S->getTempDecl());
-    dump << '\n';
     dump.printRec(S->getCallExpr());
   }
 
@@ -1546,79 +1472,52 @@ public:
     auto dump = printCommon(S, "if_stmt", Label);
 
     dump.printRec(S->getCond(), "conditions");
-
-    dump << '\n';
     dump.printRec(S->getThenStmt(), "then_body");
-
-    if (S->getElseStmt()) {
-      dump << '\n';
+    if (S->getElseStmt())
       dump.printRec(S->getElseStmt(), "else_body");
-    }
   }
 
   void visitGuardStmt(GuardStmt *S, StringRef Label) {
     auto dump = printCommon(S, "guard_stmt", Label);
     dump.printRec(S->getCond(), "conditions");
-    dump << '\n';
     dump.printRec(S->getBody(), "else_body");
   }
 
   void visitDoStmt(DoStmt *S, StringRef Label) {
     auto dump = printCommon(S, "do_stmt", Label);
-    dump << '\n';
     dump.printRec(S->getBody(), "body");
   }
 
   void visitWhileStmt(WhileStmt *S, StringRef Label) {
     auto dump = printCommon(S, "while_stmt", Label);
     dump.printRec(S->getCond(), "conditions");
-    dump << '\n';
     dump.printRec(S->getBody(), "body");
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *S, StringRef Label) {
     auto dump = printCommon(S, "repeat_while_stmt", Label);
-    dump << '\n';
     dump.printRec(S->getBody(), "body");
-    dump << '\n';
     dump.printRec(S->getCond(), "condition");
   }
 
   void visitForEachStmt(ForEachStmt *S, StringRef Label) {
     auto dump = printCommon(S, "for_each_stmt", Label);
 
-    dump << '\n';
     dump.printRec(S->getPattern(), "pattern");
-
-    if (S->getWhere()) {
-      dump << '\n';
+    if (S->getWhere())
       dump.printRec(S->getWhere(), "where_clause");
-    }
-
-    dump << '\n';
     dump.printRec(S->getSequence(), "sequence");
 
-    if (S->getIteratorVar()) {
-      dump << '\n';
+    if (S->getIteratorVar())
       dump.printRec(S->getIteratorVar(), "iterator_var");
-    }
-
-    if (S->getIteratorVarRef()) {
-      dump << '\n';
+    if (S->getIteratorVarRef())
       dump.printRec(S->getIteratorVarRef(), "iterator_var_ref");
-    }
 
-    if (S->getConvertElementExpr()) {
-      dump << '\n';
+    if (S->getConvertElementExpr())
       dump.printRec(S->getConvertElementExpr(), "convert_element_expr");
-    }
-
-    if (S->getElementExpr()) {
-      dump << '\n';
+    if (S->getElementExpr())
       dump.printRec(S->getElementExpr(), "element_expr");
-    }
 
-    dump << '\n';
     dump.printRec(S->getBody(), "body");
   }
 
@@ -1637,36 +1536,28 @@ public:
   void visitSwitchStmt(SwitchStmt *S, StringRef Label) {
     auto dump = printCommon(S, "switch_stmt", Label);
 
-    dump << '\n';
     dump.printRec(S->getSubjectExpr(), "subject");
-
     dump.printRec(S->getRawCases(), "cases");
   }
 
   void visitCaseStmt(CaseStmt *S, StringRef Label) {
     auto dump = printCommon(S, "case_stmt", Label);
+
     dump.printFlag(S->hasUnknownAttr(), "@unknown");
 
     if (S->hasCaseBodyVariables())
       dump.printRec(S->getCaseBodyVariables(), "case_body_variables");
 
     for (const auto &LabelItem : S->getCaseLabelItems()) {
-      dump << '\n';
       auto childDump = dump.child("case_label_item", "", StmtColor);
       childDump.printFlag(LabelItem.isDefault(), "default");
 
-      if (auto *CasePattern = LabelItem.getPattern()) {
-        childDump << '\n';
+      if (auto *CasePattern = LabelItem.getPattern())
         childDump.printRec(CasePattern, "pattern");
-      }
-
-      if (auto *Guard = LabelItem.getGuardExpr()) {
-        childDump << '\n';
+      if (auto *Guard = LabelItem.getGuardExpr())
         childDump.printRec(const_cast<Expr *>(Guard), "where_clause");
-      }
     }
 
-    dump << '\n';
     dump.printRec(S->getBody(), "body");
   }
 
@@ -1676,7 +1567,6 @@ public:
 
   void visitThrowStmt(ThrowStmt *S, StringRef Label) {
     auto dump = printCommon(S, "throw_stmt", Label);
-    dump << '\n';
     dump.printRec(S->getSubExpr());
   }
 
@@ -1684,16 +1574,13 @@ public:
     auto dump = printCommon(S, "pound_assert", Label);
     dump.print(QuotedString(S->getMessage()), "message");
 
-    dump << "\n";
     dump.printRec(S->getCondition());
   }
 
   void visitDoCatchStmt(DoCatchStmt *S, StringRef Label) {
     auto dump = printCommon(S, "do_catch_stmt", Label);
 
-    dump << '\n';
     dump.printRec(S->getBody(), "do_body");
-
     dump.printRec(S->getCatches(), "catch_clauses");
   }
 };
@@ -1707,9 +1594,7 @@ void ASTNodeDumper::printRec(StmtConditionElement C, StringRef Label) {
 
   case StmtConditionElement::CK_PatternBinding: {
     auto dump = child("pattern", Label, PatternColor);
-    dump << "\n";
     dump.printRec(C.getPattern());
-    dump << "\n";
     dump.printRec(C.getInitializer());
     break;
   }
@@ -1814,12 +1699,8 @@ public:
   }
 
   void printSemanticExpr(ASTNodeDumper &dump, Expr *semanticExpr) {
-    if (semanticExpr == nullptr) {
-      return;
-    }
-    
-    dump << '\n';
-    dump.printRec(semanticExpr, "semantic_expr");
+    if (semanticExpr)
+      dump.printRec(semanticExpr, "semantic_expr");
   }
 
   void visitErrorExpr(ErrorExpr *E, StringRef Label) {
@@ -1828,10 +1709,8 @@ public:
 
   void visitCodeCompletionExpr(CodeCompletionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "code_completion_expr", Label);
-    if (E->getBase()) {
-      dump << '\n';
+    if (E->getBase())
       dump.printRec(E->getBase());
-    }
   }
 
   void visitNilLiteralExpr(NilLiteralExpr *E, StringRef Label) {
@@ -1903,7 +1782,6 @@ public:
     dump.printDeclRef(E->getBuilderInit(), "builder_init", LiteralValueColor);
     dump.printDeclRef(E->getInitializer(), "result_init", LiteralValueColor);
 
-    dump << "\n";
     dump.printRec(E->getAppendingExpr());
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, StringRef Label) {
@@ -1927,7 +1805,6 @@ public:
     dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
     printArgumentLabels(dump, E->getArgumentLabels());
 
-    dump << "\n";
     dump.printRec(E->getArg());
   }
 
@@ -1972,7 +1849,6 @@ public:
                ExprModifierColor);
 
     for (auto D : E->getDecls()) {
-      dump << "\n";
       auto childDump = dump.child("candidate", "", DeclModifierColor);
       childDump.printDeclRef(D, "decl");
     }
@@ -1989,11 +1865,9 @@ public:
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E, StringRef Label) {
     auto dump = printCommon(E, "unresolved_specialize_expr", Label);
 
-    dump << '\n';
     dump.printRec(E->getSubExpr());
 
     for (TypeLoc T : E->getUnresolvedParams()) {
-      dump << '\n';
       dump.printRec(T.getTypeRepr());
     }
   }
@@ -2009,7 +1883,6 @@ public:
 
     dump.printFlag(E->isSuper(), "super");
 
-    dump << '\n';
     dump.printRec(E->getBase());
   }
 
@@ -2017,8 +1890,6 @@ public:
     auto dump = printCommon(E, "dynamic_member_ref_expr", Label);
 
     dump.printDeclRef(E->getMember(), "decl");
-
-    dump << '\n';
     dump.printRec(E->getBase());
   }
 
@@ -2032,31 +1903,23 @@ public:
 
   void visitDotSelfExpr(DotSelfExpr *E, StringRef Label) {
     auto dump = printCommon(E, "dot_self_expr", Label);
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
   void visitParenExpr(ParenExpr *E, StringRef Label) {
     auto dump = printCommon(E, "paren_expr", Label);
 
     dump.printFlag(E->hasTrailingClosure(), "trailing-closure");
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitAwaitExpr(AwaitExpr *E, StringRef Label) {
     auto dump = printCommon(E, "await_expr", Label);
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitUnresolvedMemberChainResultExpr(UnresolvedMemberChainResultExpr *E,
                                             StringRef Label){
     auto dump = printCommon(E, "unresolved_member_chain_expr", Label);
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2075,7 +1938,6 @@ public:
     }
 
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-      dump << '\n';
       if (E->getElement(i))
         dump.printRec(E->getElement(i));
       else
@@ -2088,10 +1950,8 @@ public:
 
     dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
 
-    for (auto elt : E->getElements()) {
-      dump << '\n';
+    for (auto elt : E->getElements())
       dump.printRec(elt);
-    }
   }
 
   void visitDictionaryExpr(DictionaryExpr *E, StringRef Label) {
@@ -2099,10 +1959,8 @@ public:
 
     dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
 
-    for (auto elt : E->getElements()) {
-      dump << '\n';
+    for (auto elt : E->getElements())
       dump.printRec(elt);
-    }
   }
 
   void visitSubscriptExpr(SubscriptExpr *E, StringRef Label) {
@@ -2116,20 +1974,14 @@ public:
       dump.printDeclRef(E->getDecl(), "decl");
     printArgumentLabels(dump, E->getArgumentLabels());
 
-    dump << '\n';
     dump.printRec(E->getBase(), "base");
-
-    dump << '\n';
     dump.printRec(E->getIndex(), "index");
   }
 
   void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, StringRef Label) {
     auto dump = printCommon(E, "keypath_application_expr", Label);
 
-    dump << '\n';
     dump.printRec(E->getBase(), "base");
-
-    dump << '\n';
     dump.printRec(E->getKeyPath(), "key_path");
   }
 
@@ -2139,10 +1991,7 @@ public:
     dump.printDeclRef(E->getMember(), "decl");
     printArgumentLabels(dump, E->getArgumentLabels());
 
-    dump << '\n';
     dump.printRec(E->getBase(), "base");
-
-    dump << '\n';
     dump.printRec(E->getIndex(), "index");
   }
 
@@ -2153,10 +2002,8 @@ public:
     dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
                ExprModifierColor);
 
-    if (E->getBase()) {
-      dump << '\n';
+    if (E->getBase())
       dump.printRec(E->getBase(), "base");
-    }
   }
 
   void visitTupleElementExpr(TupleElementExpr *E, StringRef Label) {
@@ -2164,7 +2011,6 @@ public:
 
     dump.print(E->getFieldNumber(), "index", IdentifierColor);
 
-    dump << '\n';
     dump.printRec(E->getBase(), "base");
   }
 
@@ -2172,37 +2018,29 @@ public:
     auto dump = printCommon(E, "destructure_tuple_expr", Label);
 
     dump.printRec(E->getDestructuredElements(), "destructured");
-
-    dump << "\n";
     dump.printRec(E->getSubExpr());
-
-    dump << "\n";
     dump.printRec(E->getResultExpr());
   }
 
   void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "unresolvedtype_conversion_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitFunctionConversionExpr(FunctionConversionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "function_conversion_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitCovariantFunctionConversionExpr(CovariantFunctionConversionExpr *E,
                                             StringRef Label) {
     auto dump = printCommon(E, "covariant_function_conversion_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *E,
                                           StringRef Label) {
     auto dump = printCommon(E, "covariant_return_conversion_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2210,13 +2048,11 @@ public:
       ImplicitlyUnwrappedFunctionConversionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "implicitly_unwrapped_function_conversion_expr",
                             Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, StringRef Label) {
     auto dump = printCommon(E, "underlying_to_opaque_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2224,16 +2060,12 @@ public:
     auto dump = printCommon(E, "erasure_expr", Label);
 
     dump.printRec(E->getConformances(), "conformances");
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitAnyHashableErasureExpr(AnyHashableErasureExpr *E, StringRef Label) {
     auto dump = printCommon(E, "any_hashable_erasure_expr", Label);
-    dump << '\n';
     dump.printRec(E->getConformance());
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2242,32 +2074,26 @@ public:
     auto dump = printCommon(E, "conditional_bridge_from_objc_expr", Label);
 
     dump.printDeclRef(E->getConversion(), "conversion");
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, StringRef Label) {
     auto dump = printCommon(E, "bridge_from_objc_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitBridgeToObjCExpr(BridgeToObjCExpr *E, StringRef Label) {
     auto dump = printCommon(E, "bridge_to_objc_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitLoadExpr(LoadExpr *E, StringRef Label) {
     auto dump = printCommon(E, "load_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "metatype_conversion_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2275,178 +2101,144 @@ public:
                                            StringRef Label) {
     auto dump = printCommon(E, "collection_upcast_expr", Label);
 
-    dump << '\n';
     dump.printRec(E->getSubExpr());
-
-    if (auto keyConversion = E->getKeyConversion()) {
-      dump << '\n';
+    if (auto keyConversion = E->getKeyConversion())
       dump.printRec(keyConversion.Conversion, "key_conversion");
-    }
-
-    if (auto valueConversion = E->getValueConversion()) {
-      dump << '\n';
+    if (auto valueConversion = E->getValueConversion())
       dump.printRec(valueConversion.Conversion, "value_conversion");
-    }
   }
 
   void visitDerivedToBaseExpr(DerivedToBaseExpr *E, StringRef Label) {
     auto dump = printCommon(E, "derived_to_base_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, StringRef Label) {
     auto dump = printCommon(E, "archetype_to_super_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, StringRef Label) {
     auto dump = printCommon(E, "inject_into_optional", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E,
                                       StringRef Label) {
     auto dump = printCommon(E, "class_metatype_to_object", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *E,
                                             StringRef Label) {
     auto dump = printCommon(E, "existential_metatype_to_object", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E,
                                          StringRef Label) {
     auto dump = printCommon(E, "protocol_metatype_to_object", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitInOutToPointerExpr(InOutToPointerExpr *E, StringRef Label) {
     auto dump = printCommon(E, "inout_to_pointer", Label);
     dump.printFlag(E->isNonAccessing(), "nonaccessing");
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitArrayToPointerExpr(ArrayToPointerExpr *E, StringRef Label) {
     auto dump = printCommon(E, "array_to_pointer", Label);
     dump.printFlag(E->isNonAccessing(), "nonaccessing");
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitStringToPointerExpr(StringToPointerExpr *E, StringRef Label) {
     auto dump = printCommon(E, "string_to_pointer", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitPointerToPointerExpr(PointerToPointerExpr *E, StringRef Label) {
     auto dump = printCommon(E, "pointer_to_pointer", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "foreign_object_conversion", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E, StringRef Label) {
     auto dump = printCommon(E, "unevaluated_instance", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "differentiable_function", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitLinearFunctionExpr(LinearFunctionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "linear_function", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitDifferentiableFunctionExtractOriginalExpr(
       DifferentiableFunctionExtractOriginalExpr *E, StringRef Label) {
     auto dump = printCommon(E, "differentiable_function_extract_original", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitLinearFunctionExtractOriginalExpr(
       LinearFunctionExtractOriginalExpr *E, StringRef Label) {
     auto dump = printCommon(E, "linear_function_extract_original", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitLinearToDifferentiableFunctionExpr(
       LinearToDifferentiableFunctionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "linear_to_differentiable_function", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitInOutExpr(InOutExpr *E, StringRef Label) {
     auto dump = printCommon(E, "inout_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitVarargExpansionExpr(VarargExpansionExpr *E, StringRef Label) {
     auto dump = printCommon(E, "vararg_expansion_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitForceTryExpr(ForceTryExpr *E, StringRef Label) {
     auto dump = printCommon(E, "force_try_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitOptionalTryExpr(OptionalTryExpr *E, StringRef Label) {
     auto dump = printCommon(E, "optional_try_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitTryExpr(TryExpr *E, StringRef Label) {
     auto dump = printCommon(E, "try_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitSequenceExpr(SequenceExpr *E, StringRef Label) {
     auto dump = printCommon(E, "sequence_expr", Label);
-    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-      dump << '\n';
+    for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       dump.printRec(E->getElement(i));
-    }
   }
 
   void visitCaptureListExpr(CaptureListExpr *E, StringRef Label) {
     auto dump = printCommon(E, "capture_list", Label);
     {
       auto childDump = dump.child("captures", "", CapturesColor);
-      for (auto capture : E->getCaptureList()) {
-        childDump << '\n';
+      for (auto capture : E->getCaptureList())
         childDump.printRec(capture.PBD);
-      }
     }
-    dump << '\n';
     dump.printRec(E->getClosureBody(), "body");
   }
 
@@ -2499,30 +2291,21 @@ public:
     dump.printFlag(E->inheritsActorContext(), "inherits_actor_context",
                    ClosureModifierColor);
 
-    if (E->getParameters()) {
-      dump << '\n';
+    if (E->getParameters())
       dump.printRec(E->getParameters());
-    }
-
-    dump << '\n';
     dump.printRec(E->getBody(), "body");
   }
 
   void visitAutoClosureExpr(AutoClosureExpr *E, StringRef Label) {
     auto dump = printClosure(E, "autoclosure_expr", Label);
 
-    if (E->getParameters()) {
-      dump << '\n';
+    if (E->getParameters())
       dump.printRec(E->getParameters());
-    }
-
-    dump << '\n';
     dump.printRec(E->getSingleExpressionBody(), "single_expr_body");
   }
 
   void visitDynamicTypeExpr(DynamicTypeExpr *E, StringRef Label) {
     auto dump = printCommon(E, "metatype_expr", Label);
-    dump << '\n';
     dump.printRec(E->getBase(), "base");
   }
 
@@ -2536,19 +2319,14 @@ public:
     auto dump = printCommon(E, "property_wrapper_value_placeholder_expr",
                             Label);
 
-    dump << '\n';
     dump.printRec(E->getOpaqueValuePlaceholder(), "opaque_value_placeholder");
-
-    if (auto *value = E->getOriginalWrappedValue()) {
-      dump << '\n';
+    if (auto *value = E->getOriginalWrappedValue())
       dump.printRec(value, "original_wrapped_value");
-    }
   }
 
   void visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E,
                                        StringRef Label) {
     auto dump = printCommon(E, "applied_property_wrapper_expr", Label);
-    dump << '\n';
     dump.printRec(E->getValue());
   }
 
@@ -2579,10 +2357,7 @@ public:
     if (auto call = dyn_cast<CallExpr>(E))
       printArgumentLabels(dump, call->getArgumentLabels());
 
-    dump << '\n';
     dump.printRec(E->getFn(), "fn");
-
-    dump << '\n';
     dump.printRec(E->getArg(), "arg");
   }
 
@@ -2604,11 +2379,10 @@ public:
   void visitConstructorRefCallExpr(ConstructorRefCallExpr *E, StringRef Label) {
     printApplyExpr(E, "constructor_ref_call_expr", Label);
   }
+
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, StringRef Label) {
     auto dump = printCommon(E, "dot_syntax_base_ignored", Label);
-    dump << '\n';
     dump.printRec(E->getLHS());
-    dump << '\n';
     dump.printRec(E->getRHS());
   }
 
@@ -2626,7 +2400,6 @@ public:
       E->getCastType().print(dump.getOS());
     dump << "'";
 
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2652,34 +2425,25 @@ public:
     dump.printFlag(E->getAsyncLoc().isValid(), "async");
     dump.printFlag(E->getThrowsLoc().isValid(), "throws");
 
-    dump << '\n';
     dump.printRec(E->getArgsExpr(), "args");
-
-    dump << '\n';
     dump.printRec(E->getResultExpr(), "result");
   }
 
   void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E, StringRef Label) {
     auto dump = printCommon(E, "rebind_self_in_constructor_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitIfExpr(IfExpr *E, StringRef Label) {
     auto dump = printCommon(E, "if_expr", Label);
-    dump << '\n';
     dump.printRec(E->getCondExpr(), "condition");
-    dump << '\n';
     dump.printRec(E->getThenExpr(), "then_expr");
-    dump << '\n';
     dump.printRec(E->getElseExpr(), "else_expr");
   }
 
   void visitAssignExpr(AssignExpr *E, StringRef Label) {
     auto dump = printCommon(E, "assign_expr", Label);
-    dump << '\n';
     dump.printRec(E->getDest(), "dest");
-    dump << '\n';
     dump.printRec(E->getSrc(), "src");
   }
 
@@ -2687,13 +2451,11 @@ public:
     auto dump = printCommon(E, "enum_is_case_expr", Label);
     dump.printNodeName(E->getEnumElement());
 
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E, StringRef Label) {
     auto dump = printCommon(E, "unresolved_pattern_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubPattern());
   }
 
@@ -2701,13 +2463,11 @@ public:
     auto dump = printCommon(E, "bind_optional_expr", Label);
     dump.print(E->getDepth(), "depth");
 
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitOptionalEvaluationExpr(OptionalEvaluationExpr *E, StringRef Label) {
     auto dump = printCommon(E, "optional_evaluation_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2716,20 +2476,14 @@ public:
     dump.printFlag(E->isForceOfImplicitlyUnwrappedOptional(),
                    "implicit_iuo_unwrap", ExprModifierColor);
 
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
   void visitOpenExistentialExpr(OpenExistentialExpr *E, StringRef Label) {
     auto dump = printCommon(E, "open_existential_expr", Label);
 
-    dump << '\n';
     dump.printRec(E->getOpaqueValue(), "opaque_value");
-
-    dump << '\n';
     dump.printRec(E->getExistentialValue(), "existential_value");
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2737,13 +2491,8 @@ public:
                                          StringRef Label) {
     auto dump = printCommon(E, "make_temporarily_escapable_expr", Label);
 
-    dump << '\n';
     dump.printRec(E->getOpaqueValue(), "opaque_value");
-
-    dump << '\n';
     dump.printRec(E->getNonescapingClosureValue(), "nonescaping_closure_value");
-
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2755,21 +2504,16 @@ public:
 
     auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
-    if (TyR) {
-      dump << '\n';
+    if (TyR)
       dump.printRec(TyR, "placeholder_type_repr");
-    }
-    if (ExpTyR && ExpTyR != TyR) {
-      dump << '\n';
+    if (ExpTyR && ExpTyR != TyR)
       dump.printRec(ExpTyR, "type_for_expansion");
-    }
 
     printSemanticExpr(dump, E->getSemanticExpr());
   }
 
   void visitLazyInitializerExpr(LazyInitializerExpr *E, StringRef Label) {
     auto dump = printCommon(E, "lazy_initializer_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2778,7 +2522,6 @@ public:
     dump.print(getObjCSelectorExprKindString(E->getSelectorKind()), "kind");
     dump.printDeclRef(E->getMethod(), "decl");
 
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2787,12 +2530,10 @@ public:
     dump.printFlag(E->isObjC(), "objc");
 
     {
-      dump << '\n';
       auto childDump = dump.child("", "components", ExprColor);
       for (unsigned i : indices(E->getComponents())) {
         Optional<ASTNodeDumper> grandchildDump;
         auto &component = E->getComponents()[i];
-        childDump << '\n';
         switch (component.getKind()) {
         case KeyPathExpr::Component::Kind::Invalid:
           grandchildDump = childDump.child("", "invalid", ASTNodeColor);
@@ -2856,26 +2597,19 @@ public:
         grandchildDump->print(getTypeOfKeyPathComponent(E, i), "type",
                               TypeColor);
         if (auto indexExpr = component.getIndexExpr()) {
-          *grandchildDump << '\n';
           grandchildDump->printRec(indexExpr);
         }
       }
     }
 
-    if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
-      dump << '\n';
+    if (auto stringLiteral = E->getObjCStringLiteralExpr())
       dump.printRec(stringLiteral, "objc_string_literal");
-    }
 
     if (!E->isObjC()) {
-      if (auto root = E->getParsedRoot()) {
-        dump << "\n";
+      if (auto root = E->getParsedRoot())
         dump.printRec(root, "parsed_root");
-      }
-      if (auto path = E->getParsedPath()) {
-        dump << "\n";
+      if (auto path = E->getParsedPath())
         dump.printRec(path, "parsed_path");
-      }
     }
   }
 
@@ -2885,7 +2619,6 @@ public:
 
   void visitOneWayExpr(OneWayExpr *E, StringRef Label) {
     auto dump = printCommon(E, "one_way_expr", Label);
-    dump << '\n';
     dump.printRec(E->getSubExpr());
   }
 
@@ -2896,10 +2629,7 @@ public:
     auto dump = printCommon(E, "tap_expr", Label);
     dump.printDeclRef(E->getVar(), "var");
 
-    dump << '\n';
     dump.printRec(E->getSubExpr(), "initializer");
-
-    dump << '\n';
     dump.printRec(E->getBody(), "body");
   }
 };
@@ -2968,16 +2698,13 @@ public:
     dump.printLabel("attrs");
     T->printAttrs(dump.getOS());
 
-    dump << '\n';
     dump.printRec(T->getTypeRepr());
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_ident", Label);
     for (auto comp : T->getComponentRange()) {
-      dump << '\n';
       auto childDump = dump.child("component", "", TypeReprColor);
-
       childDump.printNodeName(comp->getNameRef());
 
       if (comp->isBound())
@@ -2985,12 +2712,9 @@ public:
       else
         childDump.print("none", "bind", DeclColor);
 
-      if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp)) {
-        for (auto genArg : GenIdT->getGenericArgs()) {
-          childDump << '\n';
+      if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp))
+        for (auto genArg : GenIdT->getGenericArgs())
           childDump.printRec(genArg);
-        }
-      }
     }
   }
 
@@ -2999,24 +2723,18 @@ public:
     dump.printFlag(T->isAsync(), "async");
     dump.printFlag(T->isThrowing(), "throws");
 
-    dump << '\n';
     dump.printRec(T->getArgsTypeRepr(), "arg_type");
-
-    dump << '\n';
     dump.printRec(T->getResultTypeRepr(), "result_type");
   }
 
   void visitArrayTypeRepr(ArrayTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_array", Label);
-    dump << '\n';
     dump.printRec(T->getBase(), "element");
   }
 
   void visitDictionaryTypeRepr(DictionaryTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_dictionary", Label);
-    dump << '\n';
     dump.printRec(T->getKey(), "key_type");
-    dump << '\n';
     dump.printRec(T->getValue(), "value_type");
   }
 
@@ -3024,7 +2742,6 @@ public:
     auto dump = printCommon("type_tuple", Label);
 
     for (auto elem : T->getElements()) {
-      dump << '\n';
       if (elem.Name.empty())
         dump.printRec(elem.Type);
       else
@@ -3034,64 +2751,53 @@ public:
 
   void visitCompositionTypeRepr(CompositionTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_composite", Label);
-    for (auto elem : T->getTypes()) {
-      dump << '\n';
+    for (auto elem : T->getTypes())
       dump.printRec(elem);
-    }
   }
 
   void visitMetatypeTypeRepr(MetatypeTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_metatype", Label);
-    dump << '\n';
     dump.printRec(T->getBase(), "instance_type");
   }
 
   void visitProtocolTypeRepr(ProtocolTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_protocol", Label);
-    dump << '\n';
     dump.printRec(T->getBase());
   }
 
   void visitInOutTypeRepr(InOutTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_inout", Label);
-    dump << '\n';
     dump.printRec(T->getBase());
   }
   
   void visitSharedTypeRepr(SharedTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_shared", Label);
-    dump << '\n';
     dump.printRec(T->getBase());
   }
 
   void visitOwnedTypeRepr(OwnedTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_owned", Label);
-    dump << '\n';
     dump.printRec(T->getBase());
   }
 
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T, StringRef Label) {
     auto dump = printCommon("isolated", Label);
-    dump << '\n';
     dump.printRec(T->getBase());
   }
 
   void visitOptionalTypeRepr(OptionalTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_optional", Label);
-    dump << '\n';
     dump.printRec(T->getBase());
   }
 
   void visitImplicitlyUnwrappedOptionalTypeRepr(
       ImplicitlyUnwrappedOptionalTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_implicitly_unwrapped_optional", Label);
-    dump << '\n';
     dump.printRec(T->getBase());
   }
 
   void visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T, StringRef Label) {
     auto dump = printCommon("type_opaque_return", Label);
-    dump << '\n';
     dump.printRec(T->getConstraint());
   }
 
@@ -3113,7 +2819,6 @@ public:
 
     auto dump = printCommon("type_fixed", Label);
     dump.printNodeLocation(T->getLoc());
-    dump << '\n';
     dump.printRec(Ty, "fixed_type");
   }
 
@@ -3122,19 +2827,14 @@ public:
 
     ArrayRef<SILBoxTypeReprField> Fields = T->getFields();
     for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
-      dump << '\n';
       auto childDump = dump.child("sil_box_field", "", TypeReprColor);
-
       childDump.printFlag(Fields[i].isMutable(), "mutable");
 
-      childDump << '\n';
       childDump.printRec(Fields[i].getFieldType());
     }
 
-    for (auto genArg : T->getGenericArguments()) {
-      dump << '\n';
+    for (auto genArg : T->getGenericArguments())
       dump.printRec(genArg);
-    }
   }
 };
 
@@ -4063,29 +3763,37 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
 }
 
 void ASTNodeDumper::printRec(Decl *D, StringRef Label) {
+  *OS << '\n';
   PrintDecl(Ctx, *OS, *Delegate, IndentChildren).visit(D, Label);
 }
 void ASTNodeDumper::printRec(Expr *E, StringRef Label) {
+  *OS << '\n';
   PrintExpr(Ctx, *OS, *Delegate, IndentChildren).visit(E, Label);
 }
 void ASTNodeDumper::printRec(Stmt *S, StringRef Label) {
+  *OS << '\n';
   PrintStmt(Ctx, *OS, *Delegate, IndentChildren).visit(S, Label);
 }
 void ASTNodeDumper::printRec(TypeRepr *T, StringRef Label) {
+  *OS << '\n';
   PrintTypeRepr(Ctx, *OS, *Delegate, IndentChildren).visit(T, Label);
 }
 void ASTNodeDumper::printRec(const Pattern *P, StringRef Label) {
+  *OS << '\n';
   PrintPattern(Ctx, *OS, *Delegate, IndentChildren)
       .visit(const_cast<Pattern *>(P), Label);
 }
 void ASTNodeDumper::printRec(Type Ty, StringRef Label) {
+  *OS << '\n';
   PrintType(Ctx, *OS, *Delegate, IndentChildren)
       .visit(Ty, Label);
 }
 void ASTNodeDumper::printRec(ParameterList *PL, StringRef Label) {
+  *OS << '\n';
   PrintDecl(Ctx, *OS, *Delegate, IndentChildren).printParameterList(PL, Label);
 }
 void ASTNodeDumper::printRec(ProtocolConformanceRef conf, StringRef Label) {
+  *OS << '\n';
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
   dumpProtocolConformanceRefRec(conf, *OS, IndentChildren, Label, visited);
 }
