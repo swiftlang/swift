@@ -54,3 +54,6 @@ struct ExampleResultBuilder {
   static func buildFinalResult(_ component: Component) -> Result { ... }
 }
 ```
+
+To understand Result Builder Methods in more detail check out [Attributes](https://docs.swift.org/swift-book/ReferenceManual/Attributes.html) section in _The Swift Programming Language_.
+
