@@ -55,5 +55,5 @@ struct ExampleResultBuilder {
 }
 ```
 
-To understand Result Builder Methods in more detail check out [Attributes](https://docs.swift.org/swift-book/ReferenceManual/Attributes.html) section in _The Swift Programming Language_.
+To understand Result Builder Methods in more detail check out [Result Builder Methods](https://docs.swift.org/swift-book/LanguageGuide/Properties.html#ID617) section in _The Swift Programming Language_.
 
