@@ -71,6 +71,7 @@ extension RandomNumberGenerator {
   // unsigned integer will be used, recursing infinitely and probably blowing
   // the stack.
   @available(*, unavailable)
+  @_alwaysEmitIntoClient
   public mutating func next() -> UInt64 { fatalError() }
   
   /// Returns a value from a uniform, independent distribution of binary data.
@@ -103,6 +104,9 @@ extension RandomNumberGenerator {
     upperBound: T
   ) -> T {
     _precondition(upperBound != 0, "upperBound cannot be zero.")
+    // We use Lemire's "nearly divisionless" method for generating random
+    // integers in an interval. For a detailed explanation, see:
+    // https://arxiv.org/abs/1805.10941
     var random: T = next()
     var m = random.multipliedFullWidth(by: upperBound)
     if m.low < upperBound {
