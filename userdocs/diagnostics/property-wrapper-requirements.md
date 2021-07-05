@@ -5,4 +5,4 @@ First, all property wrapper types must have a property named `wrappedValue`. Thi
 
 Second, none of a property wrapper's initializers may be failable. Additionally, if a property wrapper initializer has a `wrappedValue` parameter, the type of that parameter must either be the same as the type of the `wrappedValue` property or an `@autoclosure` of that type.
 
-To understand property wrappers in more detail check out [Propeties](https://docs.swift.org/swift-book/LanguageGuide/Properties.html) section in _The Swift Programming Language_.
+To understand property wrappers in more detail check out [Property Wrappers](https://docs.swift.org/swift-book/LanguageGuide/Properties.html#ID617) section in _The Swift Programming Language_.
