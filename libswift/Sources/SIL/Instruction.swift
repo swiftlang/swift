@@ -389,6 +389,8 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
 
 final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var numArguments: Int { ApplyInst_numArguments(bridged) }
+  
+  public var singleDirectResult: Value? { self }
 }
 
 //===----------------------------------------------------------------------===//
@@ -430,6 +432,8 @@ final public class DestructureTupleInst : MultipleValueInstruction {
 
 final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
   public var numArguments: Int { BeginApplyInst_numArguments(bridged) }
+  
+  public var singleDirectResult: Value? { nil }
 }
 
 //===----------------------------------------------------------------------===//
@@ -459,6 +463,11 @@ final public class UnwindInst : TermInst {
 
 final public class TryApplyInst : TermInst, FullApplySite {
   public var numArguments: Int { TryApplyInst_numArguments(bridged) }
+  
+  public var normalBlock: BasicBlock { successors[0] }
+  public var errorBlock: BasicBlock { successors[1] }
+  
+  public var singleDirectResult: Value? { normalBlock.arguments[0] }
 }
 
 final public class BranchInst : TermInst {

@@ -31,4 +31,5 @@ extension ApplySite {
 }
 
 public protocol FullApplySite : ApplySite {
+  var singleDirectResult: Value? { get }
 }
