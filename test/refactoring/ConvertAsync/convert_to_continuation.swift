@@ -26,6 +26,20 @@ func testCreateContinuation(completionHandler: (Int) -> Void) {
 // CREATE-CONTINUATION-NEXT:   }
 // CREATE-CONTINUATION-NEXT: }
 
+// RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS %s
+func testCreateContinuationWithCompletionHandlerCallInParens(completionHandler: (Int) -> Void) {
+  withoutAsyncAlternativeBecauseOfMismatchedCompletionHandlerName {
+    (completionHandler($0))
+  }
+}
+// CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS:      func testCreateContinuationWithCompletionHandlerCallInParens() async -> Int {
+// CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS-NEXT:   return await withCheckedContinuation { continuation in 
+// CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS-NEXT:     withoutAsyncAlternativeBecauseOfMismatchedCompletionHandlerName {
+// CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS-NEXT:       continuation.resume(returning: $0)
+// CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS-NEXT:     }
+// CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS-NEXT:   }
+// CREATE-CONTINUATION-HANDLER-CALL-IN-PARENS-NEXT: }
+
 // RUN: %refactor-check-compiles -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=CREATE-CONTINUATION-BECAUSE-RETURN-VALUE %s
 func testCreateContinuationBecauseOfReturnValue(completionHandler: (Int) -> Void) {
   _ = withoutAsyncAlternativeBecauseOfReturnValue {

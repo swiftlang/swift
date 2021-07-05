@@ -4267,10 +4267,12 @@ struct AsyncHandlerDesc {
     if (!isValid())
       return nullptr;
 
-    if (Node.isExpr(swift::ExprKind::Call)) {
-      CallExpr *CE = cast<CallExpr>(Node.dyn_cast<Expr *>());
-      if (CE->getFn()->getReferencedDecl().getDecl() == getHandler())
-        return CE;
+    if (auto E = Node.dyn_cast<Expr *>()) {
+      if (auto *CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr())) {
+        if (CE->getFn()->getReferencedDecl().getDecl() == getHandler()) {
+          return CE;
+        }
+      }
     }
     return nullptr;
   }
@@ -6359,10 +6361,10 @@ private:
       }
     } else if (CallExpr *CE = TopHandler.getAsHandlerCall(E)) {
       if (Scopes.back().isWrappedInContination()) {
-        return addCustom(CE->getSourceRange(),
+        return addCustom(E->getSourceRange(),
                          [&]() { addHandlerCallToContinuation(CE); });
       } else if (NestedExprCount == 0) {
-        return addCustom(CE->getSourceRange(), [&]() { addHandlerCall(CE); });
+        return addCustom(E->getSourceRange(), [&]() { addHandlerCall(CE); });
       }
     } else if (auto *CE = dyn_cast<CallExpr>(E)) {
       // Try and hoist a call's completion handler. Don't do so if
