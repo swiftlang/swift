@@ -38,8 +38,8 @@ enum TrailingSemi {
   case A,B;
 
   // CHECK-LABEL: (subscript_decl{{.*}}trailing_semi
-  // CHECK-NOT:   (func_decl{{.*}}trailing_semi 'anonymous @ {{.*}}' get_for=subscript(_:)
-  // CHECK:       (accessor_decl{{.*}}'anonymous @ {{.*}}' get_for=subscript(_:)
+  // CHECK-NOT:   (func_decl{{.*}}trailing_semi get_for="subscript(_:)"
+  // CHECK:       (accessor_decl{{.*}} get_for="subscript(_:)"
   subscript(x: Int) -> Int {
     // CHECK-LABEL: (pattern_binding_decl{{.*}}trailing_semi
     // CHECK-NOT:   (var_decl{{.*}}trailing_semi "y"

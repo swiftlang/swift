@@ -13,13 +13,13 @@ protocol DefaultInit {
 struct UseWrapper<T: DefaultInit> {
   // CHECK: var_decl{{.*}}"wrapped"
 
-  // CHECK: accessor_decl{{.*}}get_for=wrapped
+  // CHECK: accessor_decl{{.*}}get_for="wrapped"
   // CHECK: member_ref_expr{{.*}}UseWrapper._wrapped
 
-  // CHECK: accessor_decl{{.*}}set_for=wrapped
+  // CHECK: accessor_decl{{.*}}set_for="wrapped"
   // CHECK: member_ref_expr{{.*}}UseWrapper._wrapped
 
-  // CHECK: accessor_decl{{.*}}_modify_for=wrapped
+  // CHECK: accessor_decl{{.*}}_modify_for="wrapped"
   // CHECK: yield_stmt
   // CHECK: member_ref_expr{{.*}}Wrapper.wrappedValue
   @Wrapper
@@ -37,7 +37,7 @@ struct UseWrapper<T: DefaultInit> {
 struct UseWillSetDidSet {
   // CHECK: var_decl{{.*}}"z"
 
-  // CHECK: accessor_decl{{.*}}set_for=z
+  // CHECK: accessor_decl{{.*}}set_for="z"
   // CHECK: member_ref_expr{{.*}}UseWillSetDidSet._z
   @Wrapper
   var z: Int {
@@ -82,10 +82,10 @@ struct Observable<Value> {
 class MyObservedType {
   @Observable var observedProperty = 17
 
-  // CHECK: accessor_decl{{.*}}get_for=observedProperty
+  // CHECK: accessor_decl{{.*}}get_for="observedProperty"
   // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
 
-  // CHECK: accessor_decl{{.*}}set_for=observedProperty
+  // CHECK: accessor_decl{{.*}}set_for="observedProperty"
   // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
 }
 

@@ -284,39 +284,58 @@ public:
     else
       PrintWithColorRAII(*OS, TypeReprColor) << "<<NULL>>";
     PrintWithColorRAII(*OS, TypeReprColor) << "'";
+
+private:
+  template <typename Name>
+  void printNodeNameImpl(Name name, StringRef label) {
+    printLabel(label, IdentifierColor);
+    PrintWithColorRAII(*OS, IdentifierColor) << '"' << name << '"';
   }
 
+public:
   /// Print the name of the node we are currently dumping. Do not use
   /// this to just print DeclNameRefs in general; only use it for a declaration
   /// name that the node "is".
   void printNodeName(StringRef name) {
-    PrintWithColorRAII(*OS, IdentifierColor) << ' ' << '"' << name << '"';
+    printNodeNameImpl(name, "");
   }
 
   /// Print the name of the node we are currently dumping. Do not use
   /// this to just print DeclNameRefs in general; only use it for a declaration
   /// name that the node "is".
   void printNodeName(DeclNameRef name) {
-    PrintWithColorRAII(*OS, IdentifierColor) << ' ' << '"' << name << '"';
+    printNodeNameImpl(name, "");
   }
 
   /// Print the name of the node we are currently dumping. Do not use
   /// this to just print DeclNames in general; only use it for a declaration
   /// name that the node "is".
   void printNodeName(DeclName name) {
-    printNodeName(DeclNameRef(name));
+    printNodeNameImpl(name, "");
   }
 
   /// Print the name of the node we are currently dumping. Do not use
   /// this to just print ValueDecls in general; only use it for a declaration
   /// that the node "is".
   void printNodeName(const ValueDecl *D) {
-    if (D->getName()) {
-      printNodeName(D->getName());
-    } else {
-      PrintWithColorRAII(*OS, IdentifierColor)
-        << "'anonymous @ " << (const void*)D << '\'';
+    SmallString<16> label;
+
+    // Accessors don't have a usable name, so we instead prepend a field to the
+    // name of the accessor's storage.
+    if (auto *AD = dyn_cast<AccessorDecl>(D)) {
+      llvm::raw_svector_ostream(label)
+          << getAccessorKindString(AD->getAccessorKind()) << "_for";
+      D = AD->getStorage();
     }
+
+    if (D->getName()) {
+      printNodeNameImpl(D->getName(), label);
+      return;
+    }
+
+    SmallString<32> scratch;
+    llvm::raw_svector_ostream(scratch) << "anonymous @ " << (const void*)D;
+    printNodeNameImpl(scratch, label);
   }
 
   /// Print the source range of the node we are currently displaying. Do not use
@@ -1136,8 +1155,6 @@ namespace {
 
     void visitAccessorDecl(AccessorDecl *AD, StringRef Label) {
       auto dump = printCommonFD(AD, "accessor_decl", Label);
-      dump << " " << getAccessorKindString(AD->getAccessorKind());
-      dump << "_for=" << AD->getStorage()->getName();
       printAbstractFunctionDecl(dump, AD);
     }
 
