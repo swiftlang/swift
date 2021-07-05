@@ -113,26 +113,52 @@ namespace {
 
   };
 
-/// Contains helpers for looking up types in expressions. Used by PrintExpr,
-/// but threaded through the other printers too.
-struct ExprTypeDelegate {
-  llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
-  llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
-  llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-      GetTypeOfKeyPathComponent;
+/// Contains AST dumping state and configuration.
+///
+/// \c ASTDumper lives for the duration of an AST dumping operation and tracks
+/// the indentation, as well as holding other shared state. Instances should be
+/// constructed on the stack and passed only by reference or pointer.
+struct ASTDumper {
+  template<typename Fn>
+  using function_ref = llvm::function_ref<Fn>;
 
-  ExprTypeDelegate(llvm::function_ref<Type(Expr *)> getTypeOfExpr,
-                   llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
-                   llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
-                       getTypeOfKeyPathComponent)
-    : GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
+  ASTContext *Ctx;
+  raw_ostream &OS;
+  signed Indent;
+
+private:
+  signed StartingIndent;
+
+public:
+  function_ref<Type(Expr *)> GetTypeOfExpr;
+  function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
+  function_ref<Type(KeyPathExpr *E, unsigned index)> GetTypeOfKeyPathComponent;
+
+  ASTDumper(ASTContext *ctx, raw_ostream &os, unsigned indent,
+            function_ref<Type(Expr *)> getTypeOfExpr,
+            function_ref<Type(TypeRepr *)> getTypeOfTypeRepr,
+            function_ref<Type(KeyPathExpr *E, unsigned index)>
+                getTypeOfKeyPathComponent)
+    : Ctx(ctx), OS(os), Indent(indent), StartingIndent(indent),
+      GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
       GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) { }
 
-  ExprTypeDelegate()
-    : ExprTypeDelegate([](Expr *E) -> Type { return E->getType(); }, nullptr,
-                       [](KeyPathExpr *E, unsigned index) -> Type {
-                         return E->getComponents()[index].getComponentType();
-                       }) { }
+  ASTDumper(ASTContext *ctx, raw_ostream &os, signed indent = 0)
+    : ASTDumper(ctx, os, indent,
+                [](Expr *E) -> Type { return E->getType(); }, nullptr,
+                [](KeyPathExpr *E, unsigned index) -> Type {
+                  return E->getComponents()[index].getComponentType();
+                }) { }
+
+  // Type is uncopyable and immovable because it is intentionally shared state
+  // that should only be handled by reference or pointer.
+  ASTDumper(const ASTDumper&) = delete;
+  ASTDumper& operator=(const ASTDumper &) = delete;
+
+  ~ASTDumper() {
+    assert(Indent == StartingIndent
+              && "unbalanced indentation changes during dump");
+  }
 };
 
 /// Helper class for dumping an AST node.
@@ -142,63 +168,74 @@ struct ExprTypeDelegate {
 /// handles printing the opening and closing parentheses, correctly formatting
 /// and coloring things, etc.
 class ASTNodeDumper {
-  ASTContext *Ctx;
-  raw_ostream *OS;
-  ExprTypeDelegate *Delegate;
+  ASTDumper *Dumper;
 
-public:
-  unsigned IndentChildren;
-
-  ASTNodeDumper(ASTContext *ctx, raw_ostream &os, ExprTypeDelegate &delegate,
-                unsigned indent,
-                const char *Name, StringRef Label, TerminalColor Color)
-    : Ctx(ctx), OS(&os), Delegate(&delegate), IndentChildren(indent + 2)
-  {
-    OS->indent(indent /* note this is parent indentation */);
-    PrintWithColorRAII(*OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(*OS, LabelColor) << Label;
-    if (!Label.empty())
-      PrintWithColorRAII(*OS, LabelColor) << "=";
-    PrintWithColorRAII(*OS, Color) << Name;
+  raw_ostream &os() {
+    assert(Dumper && "printing from inactive ASTNodeDumper");
+    return Dumper->OS;
   }
 
-  template<typename Creator>
-  ASTNodeDumper(Creator *creator, const char *Name, StringRef Label,
+  ASTContext *ctx() {
+    assert(Dumper && "getting context from inactive ASTNodeDumper");
+    return Dumper->Ctx;
+  }
+
+public:
+  signed IndentChildren;
+
+  ASTNodeDumper(ASTDumper &dumper, const char *Name, StringRef Label,
                 TerminalColor Color)
-    : ASTNodeDumper(creator->Ctx, creator->OS, creator->Delegate,
-                    creator->Indent, Name, Label, Color) { }
+    : Dumper(&dumper), IndentChildren(dumper.Indent + 2)
+  {
+    os().indent(dumper.Indent /* note this is parent indentation */);
+    PrintWithColorRAII(os(), ParenthesisColor) << '(';
+    PrintWithColorRAII(os(), LabelColor) << Label;
+    if (!Label.empty())
+      PrintWithColorRAII(os(), LabelColor) << "=";
+    PrintWithColorRAII(os(), Color) << Name;
+
+    dumper.Indent = IndentChildren;
+  }
 
   // Type is uncopyable because its destructor has side effects.
   ASTNodeDumper(const ASTNodeDumper&) = delete;
   ASTNodeDumper& operator=(const ASTNodeDumper &) = delete;
 
+  // Type is moveable.
   ASTNodeDumper(ASTNodeDumper &&Other)
-    : Ctx(Other.Ctx), OS(Other.OS), Delegate(Other.Delegate),
-      IndentChildren(Other.IndentChildren)
+    : Dumper(Other.Dumper), IndentChildren(Other.IndentChildren)
   {
-    Other.OS = nullptr;
+    Other.Dumper = nullptr;
   }
 
   ASTNodeDumper& operator=(ASTNodeDumper&& Other) {
-    Ctx = Other.Ctx;
-    OS = Other.OS;
-    Delegate = Other.Delegate;
+    Dumper = Other.Dumper;
     IndentChildren = Other.IndentChildren;
 
-    Other.OS = nullptr;
+    Other.Dumper = nullptr;
 
     return *this;
   }
 
   ~ASTNodeDumper() {
-    if (OS)
-      PrintWithColorRAII(*OS, ParenthesisColor) << ')';
+    if (!Dumper) return;
+
+    PrintWithColorRAII(os(), ParenthesisColor) << ')';
+
+    // This should be an assertion, but we don't want to crash in the middle of
+    // an AST dump just because it's not formatted correctly.
+    if (Dumper->Indent != IndentChildren)
+      PrintWithColorRAII(os(), { llvm::raw_ostream::RED, true })
+          << " <<INTERNAL WARNING: node destruction unbalanced>> ";
+
+    Dumper->Indent -= 2;
+
+    Dumper = nullptr;
   }
 
   ASTNodeDumper child(const char *Name, StringRef Label, TerminalColor Color) {
-    *OS << '\n';
-    return ASTNodeDumper(Ctx, *OS, *Delegate, IndentChildren,
-                         Name, Label, Color);
+    os() << '\n';
+    return ASTNodeDumper(*Dumper, Name, Label, Color);
   }
 
   void printRec(Decl *D, StringRef Label = "");
@@ -230,10 +267,10 @@ public:
   }
 
   void printLabel(StringRef label, TerminalColor Color = DeclModifierColor) {
-    *OS << " ";
-    PrintWithColorRAII(*OS, Color) << label;
+    os() << " ";
+    PrintWithColorRAII(os(), Color) << label;
     if (!label.empty())
-      PrintWithColorRAII(*OS, Color) << "=";
+      PrintWithColorRAII(os(), Color) << "=";
   }
 
   /// Print a field with a value and an optional label.
@@ -241,23 +278,24 @@ public:
   void print(const T &value, StringRef label = "",
              TerminalColor Color = DeclModifierColor) {
     printLabel(label, Color);
-    PrintWithColorRAII(*OS, Color) << value;
+    PrintWithColorRAII(os(), Color) << value;
   }
 
   void print(SourceLoc value, StringRef label = "",
              TerminalColor Color = DeclModifierColor) {
-    if (!Ctx) return;
+    if (!ctx()) return;
 
     printLabel(label, Color);
     if (value.isValid())
-      value.print(PrintWithColorRAII(*OS, Color).getOS(), Ctx->SourceMgr);
+      value.print(PrintWithColorRAII(os(), Color).getOS(),
+                  ctx()->SourceMgr);
     else
-      PrintWithColorRAII(*OS, Color) << "<<invalid>>";
+      PrintWithColorRAII(os(), Color) << "<<invalid>>";
   }
 
   /// Print a single flag.
   void printFlag(StringRef label, TerminalColor Color = DeclModifierColor) {
-    PrintWithColorRAII(*OS, Color) << " " << label;
+    PrintWithColorRAII(os(), Color) << " " << label;
   }
 
   /// Print a single flag if it is set.
@@ -271,25 +309,26 @@ public:
   void printDeclRef(ConcreteDeclRef declRef, StringRef label,
                     TerminalColor Color = DeclColor) {
     printLabel(label, Color);
-    declRef.dump(PrintWithColorRAII(*OS, Color).getOS());
+    declRef.dump(PrintWithColorRAII(os(), Color).getOS());
   }
 
   /// Pretty-print a TypeRepr.
   void printTypeRepr(TypeRepr *T, StringRef label) {
     printLabel(label, TypeReprColor);
 
-    PrintWithColorRAII(*OS, TypeReprColor) << "'";
+    PrintWithColorRAII(os(), TypeReprColor) << "'";
     if (T)
-      T->print(PrintWithColorRAII(*OS, TypeReprColor).getOS());
+      T->print(PrintWithColorRAII(os(), TypeReprColor).getOS());
     else
-      PrintWithColorRAII(*OS, TypeReprColor) << "<<NULL>>";
-    PrintWithColorRAII(*OS, TypeReprColor) << "'";
+      PrintWithColorRAII(os(), TypeReprColor) << "<<NULL>>";
+    PrintWithColorRAII(os(), TypeReprColor) << "'";
+  }
 
 private:
   template <typename Name>
   void printNodeNameImpl(Name name, StringRef label) {
     printLabel(label, IdentifierColor);
-    PrintWithColorRAII(*OS, IdentifierColor) << '"' << name << '"';
+    PrintWithColorRAII(os(), IdentifierColor) << '"' << name << '"';
   }
 
 public:
@@ -342,10 +381,10 @@ public:
   /// this to just print SourceRanges in general; only use it for the range
   /// of the current node.
   void printNodeRange(SourceRange R) {
-    if (Ctx && R.isValid()) {
+    if (ctx() && R.isValid()) {
       printLabel("range", RangeColor);
-      R.print(PrintWithColorRAII(*OS, RangeColor).getOS(),
-              Ctx->SourceMgr, /*PrintText=*/false);
+      R.print(PrintWithColorRAII(os(), RangeColor).getOS(), ctx()->SourceMgr,
+              /*PrintText=*/false);
     }
   }
 
@@ -362,16 +401,16 @@ public:
 
   template <typename T>
   friend ASTNodeDumper &operator << (ASTNodeDumper &dumper, const T &value) {
-    *dumper.OS << value;
+    dumper.os() << value;
     return dumper;
   }
 
   raw_ostream &getOS() {
-    return *OS;
+    return os();
   }
 
   PrintWithColorRAII colored(TerminalColor color) {
-    return PrintWithColorRAII(*OS, color);
+    return PrintWithColorRAII(os(), color);
   }
 };
 } // end anonymous namespace
@@ -576,18 +615,13 @@ static void dumpSubstitutionMapRec(
 namespace {
   class PrintPattern : public PatternVisitor<PrintPattern, void, StringRef> {
   public:
-    ASTContext *Ctx;
-    raw_ostream &OS;
-    ExprTypeDelegate &Delegate;
-    unsigned Indent;
+    ASTDumper &Dumper;
 
-    explicit PrintPattern(ASTContext *Ctx, raw_ostream &os,
-                          ExprTypeDelegate &delegate, unsigned indent = 0)
-      : Ctx(Ctx), OS(os), Delegate(delegate), Indent(indent) { }
+    explicit PrintPattern(ASTDumper &dumper) : Dumper(dumper) { }
 
     LLVM_NODISCARD ASTNodeDumper printCommon(Pattern *P, const char *Name,
                                              StringRef Label) {
-      ASTNodeDumper dump(this, Name, Label, PatternColor);
+      ASTNodeDumper dump(Dumper, Name, Label, PatternColor);
 
       if (P->isImplicit())
         dump.colored(ExprModifierColor) << " implicit";
@@ -678,14 +712,9 @@ namespace {
   /// PrintDecl - Visitor implementation of Decl::print.
   class PrintDecl : public DeclVisitor<PrintDecl, void, StringRef> {
   public:
-    ASTContext *Ctx;
-    raw_ostream &OS;
-    ExprTypeDelegate &Delegate;
-    unsigned Indent;
+    ASTDumper &Dumper;
 
-    explicit PrintDecl(ASTContext *Ctx, raw_ostream &os,
-                       ExprTypeDelegate &delegate, unsigned indent = 0)
-      : Ctx(Ctx), OS(os), Delegate(delegate), Indent(indent) { }
+    explicit PrintDecl(ASTDumper &dumper) : Dumper(dumper) { }
 
   private:
     void printWhereRequirements(ASTNodeDumper &dump,
@@ -709,7 +738,7 @@ namespace {
     LLVM_NODISCARD ASTNodeDumper printCommon(Decl *D, const char *Name,
                                              StringRef Label,
                                              TerminalColor Color = DeclColor) {
-      ASTNodeDumper dump(this, Name, Label, Color);
+      ASTNodeDumper dump(Dumper, Name, Label, Color);
 
       if (D->isImplicit())
         dump.colored(DeclModifierColor) << " implicit";
@@ -930,7 +959,7 @@ namespace {
     }
 
     void visitSourceFile(const SourceFile &SF, StringRef Label) {
-      ASTNodeDumper dump(this, "source_file", Label, ASTNodeColor);
+      ASTNodeDumper dump(Dumper, "source_file", Label, ASTNodeColor);
       dump.colored(LocationColor) << " \"" << SF.getFilename() << '"';
 
       if (auto decls = SF.getCachedTopLevelDecls()) {
@@ -1080,10 +1109,10 @@ namespace {
     }
 
     void printParameterList(const ParameterList *params, StringRef Label) {
-      if (!Ctx && params->size() != 0 && params->get(0))
-        Ctx = &params->get(0)->getASTContext();
+      if (!Dumper.Ctx && params->size() != 0 && params->get(0))
+        Dumper.Ctx = &params->get(0)->getASTContext();
 
-      ASTNodeDumper dump(this, "parameter_list", Label, ParameterColor);
+      ASTNodeDumper dump(Dumper, "parameter_list", Label, ParameterColor);
 
       dump.printNodeRange(params->getSourceRange());
 
@@ -1264,8 +1293,8 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  ExprTypeDelegate delegate;
-  PrintDecl(nullptr, OS, delegate, Indent).printParameterList(this, "");
+  ASTDumper dumper(nullptr, OS, Indent);
+  PrintDecl(dumper).printParameterList(this, "");
   llvm::errs() << '\n';
 }
 
@@ -1287,9 +1316,8 @@ void Decl::dump(const char *filename) const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
-  ExprTypeDelegate delegate;
-  PrintDecl(&getASTContext(), OS, delegate, Indent)
-      .visit(const_cast<Decl *>(this), "");
+  ASTDumper dumper(&getASTContext(), OS, Indent);
+  PrintDecl(dumper).visit(const_cast<Decl *>(this), "");
   OS << '\n';
 }
 
@@ -1409,8 +1437,8 @@ void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
   if (parseIfNeeded)
     (void)getTopLevelDecls();
 
-  ExprTypeDelegate delegate;
-  PrintDecl(&getASTContext(), OS, delegate).visitSourceFile(*this, "");
+  ASTDumper dumper(&getASTContext(), OS);
+  PrintDecl(dumper).visitSourceFile(*this, "");
   llvm::errs() << '\n';
 }
 
@@ -1425,9 +1453,8 @@ static ASTContext *getASTContextFromType(Type ty) {
 }
 
 void Pattern::dump(raw_ostream &OS, unsigned Indent) const {
-  ExprTypeDelegate delegate;
-  PrintPattern(getASTContextFromType(getType()), OS, delegate, Indent)
-    .visit(const_cast<Pattern*>(this), "");
+  ASTDumper dumper(getASTContextFromType(getType()), OS, Indent);
+  PrintPattern(dumper).visit(const_cast<Pattern*>(this), "");
   OS << '\n';
 }
 
@@ -1439,26 +1466,21 @@ namespace {
 /// PrintStmt - Visitor implementation of Stmt::dump.
 class PrintStmt : public StmtVisitor<PrintStmt, void, StringRef> {
 public:
-  ASTContext *Ctx;
-  raw_ostream &OS;
-  ExprTypeDelegate &Delegate;
-  unsigned Indent;
+  ASTDumper &Dumper;
 
-  explicit PrintStmt(ASTContext *ctx, raw_ostream &os,
-                     ExprTypeDelegate &delegate, unsigned indent)
-    : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) { }
+  explicit PrintStmt(ASTDumper &dumper) : Dumper(dumper) { }
 
   void visit(Stmt *S, StringRef Label) {
     if (S)
       StmtVisitor<PrintStmt, void, StringRef>::visit(S, Label);
     else {
-      (void)ASTNodeDumper(this, "<<null>>", Label, StmtColor);
+      (void)ASTNodeDumper(Dumper, "<<null>>", Label, StmtColor);
     }
   }
 
   LLVM_NODISCARD ASTNodeDumper
   printCommon(Stmt *S, const char *Name, StringRef Label) {
-    ASTNodeDumper dump(this, Name, Label, StmtColor);
+    ASTNodeDumper dump(Dumper, Name, Label, StmtColor);
 
     dump.printFlag(S->isImplicit(), "implicit");
     dump.printNodeRange(S->getSourceRange());
@@ -1654,9 +1676,8 @@ void Stmt::dump() const {
 }
 
 void Stmt::dump(raw_ostream &OS, const ASTContext *Ctx, unsigned Indent) const {
-  ExprTypeDelegate delegate;
-  PrintStmt(const_cast<ASTContext *>(Ctx), OS, delegate, Indent)
-      .visit(const_cast<Stmt*>(this), "");
+  ASTDumper dumper(const_cast<ASTContext *>(Ctx), OS, Indent);
+  PrintStmt(dumper).visit(const_cast<Stmt*>(this), "");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1667,33 +1688,28 @@ namespace {
 /// PrintExpr - Visitor implementation of Expr::dump.
 class PrintExpr : public ExprVisitor<PrintExpr, void, StringRef> {
 public:
-  ASTContext *Ctx;
-  raw_ostream &OS;
-  ExprTypeDelegate &Delegate;
-  unsigned Indent;
+  ASTDumper &Dumper;
 
   Type getTypeOfExpr(Expr *E) {
-    return Delegate.GetTypeOfExpr(E);
+    return Dumper.GetTypeOfExpr(E);
   }
   bool canGetTypeOfTypeRepr() {
-    return (bool)Delegate.GetTypeOfTypeRepr;
+    return (bool)Dumper.GetTypeOfTypeRepr;
   }
   Type getTypeOfTypeRepr(TypeRepr *T) {
-    return Delegate.GetTypeOfTypeRepr(T);
+    return Dumper.GetTypeOfTypeRepr(T);
   }
   Type getTypeOfKeyPathComponent(KeyPathExpr *E, unsigned index) {
-    return Delegate.GetTypeOfKeyPathComponent(E, index);
+    return Dumper.GetTypeOfKeyPathComponent(E, index);
   }
 
-  PrintExpr(ASTContext *ctx, raw_ostream &os, ExprTypeDelegate &delegate,
-            unsigned indent)
-      : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) {}
+  PrintExpr(ASTDumper &dumper) : Dumper(dumper) { }
 
   void visit(Expr *E, StringRef Label) {
     if (E)
       ExprVisitor<PrintExpr, void, StringRef>::visit(E, Label);
     else {
-      (void)ASTNodeDumper(this, "<<null>>", Label, ExprColor);
+      (void)ASTNodeDumper(Dumper, "<<null>>", Label, ExprColor);
     }
   }
 
@@ -1701,11 +1717,11 @@ public:
 
   LLVM_NODISCARD ASTNodeDumper
   printCommon(Expr *E, const char *C, StringRef Label) {
-    if (!Ctx)
+    if (!Dumper.Ctx)
       if (auto Ty = getTypeOfExpr(E))
-        Ctx = &Ty->getASTContext();
+        Dumper.Ctx = &Ty->getASTContext();
 
-    ASTNodeDumper dump(this, C, Label, ExprColor);
+    ASTNodeDumper dump(Dumper, C, Label, ExprColor);
 
     dump.printFlag(E->isImplicit(), "implicit", ExprModifierColor);
 
@@ -2647,8 +2663,8 @@ public:
   }
 
   void visitTapExpr(TapExpr *E, StringRef Label) {
-    if (!Ctx)
-      Ctx = &E->getVar()->getDeclContext()->getASTContext();
+    if (!Dumper.Ctx)
+      Dumper.Ctx = &E->getVar()->getDeclContext()->getASTContext();
 
     auto dump = printCommon(E, "tap_expr", Label);
     dump.printDeclRef(E->getVar(), "var");
@@ -2670,17 +2686,15 @@ void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
                 llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
-  ExprTypeDelegate delegate(getTypeOfExpr, getTypeOfTypeRepr,
-                            getTypeOfKeyPathComponent);
-  PrintExpr(getASTContextFromType(getTypeOfExpr(const_cast<Expr *>(this))),
-            OS, delegate, Indent)
-      .visit(const_cast<Expr *>(this), "");
+  ASTDumper dumper(
+      getASTContextFromType(getTypeOfExpr(const_cast<Expr *>(this))), OS,
+      Indent, getTypeOfExpr, getTypeOfTypeRepr, getTypeOfKeyPathComponent);
+  PrintExpr(dumper).visit(const_cast<Expr *>(this), "");
 }
 
 void Expr::dump(raw_ostream &OS, unsigned Indent) const {
-  ExprTypeDelegate delegate;
-  PrintExpr(getASTContextFromType(getType()), OS, delegate, Indent)
-      .visit(const_cast<Expr *>(this), "");
+  ASTDumper dumper(getASTContextFromType(getType()), OS, Indent);
+  PrintExpr(dumper).visit(const_cast<Expr *>(this), "");
 }
 
 void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
@@ -2698,18 +2712,13 @@ void Expr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 namespace {
 class PrintTypeRepr : public TypeReprVisitor<PrintTypeRepr, void, StringRef> {
 public:
-  ASTContext *Ctx;
-  raw_ostream &OS;
-  ExprTypeDelegate &Delegate;
-  unsigned Indent;
+  ASTDumper &Dumper;
 
-  explicit PrintTypeRepr(ASTContext *ctx, raw_ostream &os,
-                         ExprTypeDelegate &delegate, unsigned indent)
-    : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) { }
+  explicit PrintTypeRepr(ASTDumper &dumper) : Dumper(dumper) { }
 
   LLVM_NODISCARD ASTNodeDumper
   printCommon(const char *Name, StringRef Label) {
-    return ASTNodeDumper(this, Name, Label, TypeReprColor);
+    return ASTNodeDumper(Dumper, Name, Label, TypeReprColor);
   }
 
   void visitErrorTypeRepr(ErrorTypeRepr *T, StringRef Label) {
@@ -2838,8 +2847,8 @@ public:
 
   void visitFixedTypeRepr(FixedTypeRepr *T, StringRef Label) {
     auto Ty = T->getType();
-    if (!Ctx && Ty)
-      Ctx = &Ty->getASTContext();
+    if (!Dumper.Ctx && Ty)
+      Dumper.Ctx = &Ty->getASTContext();
 
     auto dump = printCommon("type_fixed", Label);
     dump.printNodeLocation(T->getLoc());
@@ -2865,9 +2874,8 @@ public:
 } // end anonymous namespace
 
 void TypeRepr::dump() const {
-  ExprTypeDelegate delegate;
-  PrintTypeRepr(nullptr, llvm::errs(), delegate, 0)
-      .visit(const_cast<TypeRepr*>(this), "");
+  ASTDumper dumper(nullptr, llvm::errs());
+  PrintTypeRepr(dumper).visit(const_cast<TypeRepr*>(this), "");
   llvm::errs() << '\n';
 }
 
@@ -3143,14 +3151,9 @@ void SubstitutionMap::dump() const {
 namespace {
   class PrintType : public TypeVisitor<PrintType, void, StringRef> {
   public:
-    ASTContext *Ctx;
-    raw_ostream &OS;
-    ExprTypeDelegate &Delegate;
-    unsigned Indent;
+    ASTDumper &Dumper;
 
-    explicit PrintType(ASTContext *ctx, raw_ostream &os,
-                       ExprTypeDelegate &delegate, unsigned indent)
-      : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) { }
+    explicit PrintType(ASTDumper &dumper) : Dumper(dumper) { }
 
     void visit(Type T, StringRef Label) {
       if (!T.isNull())
@@ -3163,7 +3166,7 @@ namespace {
   private:
     LLVM_NODISCARD ASTNodeDumper
     printCommon(const char *name, StringRef label) {
-      return ASTNodeDumper(this, name, label, TypeColor);
+      return ASTNodeDumper(Dumper, name, label, TypeColor);
     }
 
     void dumpParameterFlags(ASTNodeDumper &dump,
@@ -3446,7 +3449,7 @@ namespace {
 
       std::string s;
       llvm::raw_string_ostream os(s);
-      auto &clangCtx = Ctx->getClangModuleLoader()->getClangASTContext();
+      auto &clangCtx = Dumper.Ctx->getClangModuleLoader()->getClangASTContext();
       clangTy.dump(os, clangCtx);
 
       auto childDump = dump.child("clang_type", label, TypeFieldColor);
@@ -3611,9 +3614,8 @@ void Type::dump(raw_ostream &os, unsigned indent) const {
     return; // not needed for the parser library.
   #endif
 
-  ExprTypeDelegate delegate;
-  PrintType(getASTContextFromType(*this), os, delegate, indent)
-      .visit(*this, "");
+  ASTDumper dumper(getASTContextFromType(*this), os, indent);
+  PrintType(dumper).visit(*this, "");
   os << "\n";
 }
 
@@ -3698,37 +3700,35 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
 }
 
 void ASTNodeDumper::printRec(Decl *D, StringRef Label) {
-  *OS << '\n';
-  PrintDecl(Ctx, *OS, *Delegate, IndentChildren).visit(D, Label);
+  os() << '\n';
+  PrintDecl(*Dumper).visit(D, Label);
 }
 void ASTNodeDumper::printRec(Expr *E, StringRef Label) {
-  *OS << '\n';
-  PrintExpr(Ctx, *OS, *Delegate, IndentChildren).visit(E, Label);
+  os() << '\n';
+  PrintExpr(*Dumper).visit(E, Label);
 }
 void ASTNodeDumper::printRec(Stmt *S, StringRef Label) {
-  *OS << '\n';
-  PrintStmt(Ctx, *OS, *Delegate, IndentChildren).visit(S, Label);
+  os() << '\n';
+  PrintStmt(*Dumper).visit(S, Label);
 }
 void ASTNodeDumper::printRec(TypeRepr *T, StringRef Label) {
-  *OS << '\n';
-  PrintTypeRepr(Ctx, *OS, *Delegate, IndentChildren).visit(T, Label);
+  os() << '\n';
+  PrintTypeRepr(*Dumper).visit(T, Label);
 }
 void ASTNodeDumper::printRec(const Pattern *P, StringRef Label) {
-  *OS << '\n';
-  PrintPattern(Ctx, *OS, *Delegate, IndentChildren)
-      .visit(const_cast<Pattern *>(P), Label);
+  os() << '\n';
+  PrintPattern(*Dumper).visit(const_cast<Pattern *>(P), Label);
 }
 void ASTNodeDumper::printRec(Type Ty, StringRef Label) {
-  *OS << '\n';
-  PrintType(Ctx, *OS, *Delegate, IndentChildren)
-      .visit(Ty, Label);
+  os() << '\n';
+  PrintType(*Dumper).visit(Ty, Label);
 }
 void ASTNodeDumper::printRec(ParameterList *PL, StringRef Label) {
-  *OS << '\n';
-  PrintDecl(Ctx, *OS, *Delegate, IndentChildren).printParameterList(PL, Label);
+  os() << '\n';
+  PrintDecl(*Dumper).printParameterList(PL, Label);
 }
 void ASTNodeDumper::printRec(ProtocolConformanceRef conf, StringRef Label) {
-  *OS << '\n';
+  os() << '\n';
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  dumpProtocolConformanceRefRec(conf, *OS, IndentChildren, Label, visited);
+  dumpProtocolConformanceRefRec(conf, os(), Dumper->Indent, Label, visited);
 }
