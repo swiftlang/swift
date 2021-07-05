@@ -10,12 +10,12 @@ import Foundation
 class MyClass {
   // CHECK: @objc func doBigJob() async -> Int
   // CHECK-DUMP: func_decl{{.*}}doBigJob{{.*}}
-  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=0 completion_handler_type=@convention(block) (Int) -> ()
+  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=0 completion_handler_type='@convention(block) (Int) -> ()'
   @objc func doBigJob() async -> Int { return 0 }
 
   // CHECK: @objc func doBigJobOrFail(_: Int) async throws -> (AnyObject, Int)
   // CHECK-DUMP: func_decl{{.*}}doBigJobOrFail{{.*}}
-  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=1 error_param_index=2 completion_handler_type=@convention(block) (Optional<AnyObject>, Int, Optional<Error>) -> ()
+  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=1 error_param_index=2 completion_handler_type='@convention(block) (Optional<AnyObject>, Int, Optional<Error>) -> ()'
   @objc func doBigJobOrFail(_: Int) async throws -> (AnyObject, Int) { return (self, 0) }
 
   @objc func takeAnAsync(_ fn: () async -> Int) { } // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
@@ -31,12 +31,12 @@ class MyClass {
 actor MyActor {
   // CHECK: @objc func doBigJob() async -> Int
   // CHECK-DUMP: func_decl{{.*}}doBigJob{{.*}}
-  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=0 completion_handler_type=@convention(block) (Int) -> ()
+  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=0 completion_handler_type='@convention(block) (Int) -> ()'
   @objc func doBigJob() async -> Int { return 0 }
 
   // CHECK: @objc func doBigJobOrFail(_: Int) async throws -> (AnyObject, Int)
   // CHECK-DUMP: func_decl{{.*}}doBigJobOrFail{{.*}}
-  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=1 error_param_index=2 completion_handler_type=@convention(block) (Optional<AnyObject>, Int, Optional<Error>) -> ()
+  // CHECK-DUMP-NEXT: (foreign_async completion_handler_param_index=1 error_param_index=2 completion_handler_type='@convention(block) (Optional<AnyObject>, Int, Optional<Error>) -> ()'
   @objc func doBigJobOrFail(_: Int) async throws -> (AnyObject, Int) { return (self, 0) }
   // expected-warning@-1{{cannot call function returning non-sendable type '(AnyObject, Int)' across actors}}
 

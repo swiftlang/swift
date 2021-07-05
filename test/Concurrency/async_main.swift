@@ -26,7 +26,7 @@ func asyncFunc() async {
 // CHECK-AST:       (single_expression_body=await_expr type='()'
 // CHECK-AST-NEXT:    (call_expr type='()'
 // CHECK-AST-NEXT:       (fn=declref_expr type='() async -> ()'
-// CHECK-AST-SAME:        decl=async_main.(file).asyncFunc()@
+// CHECK-AST-SAME:        decl='async_main.(file).asyncFunc()@
 
 // CHECK-AST-LABEL: (func_decl implicit "$main()" interface
 // CHECK-AST:       (body=brace_stmt
@@ -34,7 +34,7 @@ func asyncFunc() async {
 // CHECK-AST-NEXT:      (call_expr implicit type='()'
 // CHECK-AST-NEXT:        (fn=declref_expr implicit
 // CHECK-AST-SAME:             type='(@escaping () async throws -> ()) -> ()'
-// CHECK-AST-SAME:             decl=_Concurrency.(file)._runAsyncMain
+// CHECK-AST-SAME:             decl='_Concurrency.(file)._runAsyncMain
 // CHECK-AST-SAME:             function_ref=single
 // CHECK-AST-NEXT:        (arg=paren_expr implicit type='(() async throws -> ())'
 // CHECK-AST-NEXT:          (function_conversion_expr implicit type='() async throws -> ()'

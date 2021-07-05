@@ -276,8 +276,24 @@ public:
       PrintWithColorRAII(os(), Color) << "=";
   }
 
+  // To explain the terrifying template goop: The first overload handles
+  // non-integers and adds quotes around the value; the second handles integers
+  // and doesn't.
+
+  /// Print a field with a quoted value and an optional label.
+  template <
+      typename T,
+      typename std::enable_if<!std::is_integral<T>::value>::type * = nullptr>
+  void print(const T &value, StringRef label = "",
+             TerminalColor Color = DeclModifierColor) {
+    printLabel(label, Color);
+    PrintWithColorRAII(os(), Color) << "'" << value << "'";
+  }
+
   /// Print a field with a value and an optional label.
-  template<typename T>
+  template <
+      typename T,
+      typename std::enable_if<std::is_integral<T>::value>::type * = nullptr>
   void print(const T &value, StringRef label = "",
              TerminalColor Color = DeclModifierColor) {
     printLabel(label, Color);
@@ -289,17 +305,22 @@ public:
     if (!ctx()) return;
 
     printLabel(label, Color);
+    PrintWithColorRAII colorized(os(), Color);
+    os() << "'";
     if (value.isValid())
-      value.print(PrintWithColorRAII(os(), Color).getOS(),
-                  ctx()->SourceMgr);
+      value.print(os(), ctx()->SourceMgr);
     else
-      PrintWithColorRAII(os(), Color) << "<<invalid>>";
+      os() << "<<invalid>>";
+    os() << "'";
   }
 
   void print(LayoutConstraint layout, StringRef label = "",
              TerminalColor Color = DeclModifierColor) {
     printLabel(label, Color);
-    layout->print(PrintWithColorRAII(os(), Color).getOS());
+    PrintWithColorRAII colorized(os(), Color);
+    os() << "'";
+    layout->print(os());
+    os() << "'";
   }
 
   /// Print a single flag.
@@ -314,23 +335,46 @@ public:
       printFlag(label, Color);
   }
 
+  /// Print a single flag with a string value. Use this instead of print() when
+  /// you know the value will be a short, fixed string and you don't want it
+  /// quoted.
+  void printFlag(StringRef value, StringRef label,
+                 TerminalColor Color = DeclModifierColor) {
+    printLabel(label, Color);
+    PrintWithColorRAII(os(), Color) << value;
+  }
+
+  /// Print a single flag with a string value. Use this instead of print() when
+  /// you know the value will be a short, fixed string and you don't want it
+  /// quoted.
+  void printFlag(const char *value, StringRef label,
+                 TerminalColor Color = DeclModifierColor) {
+    printFlag(StringRef(value), label, Color);
+  }
+
+
   /// Print the name of a declaration being referenced.
   void printDeclRef(ConcreteDeclRef declRef, StringRef label,
                     TerminalColor Color = DeclColor) {
     printLabel(label, Color);
-    declRef.dump(PrintWithColorRAII(os(), Color).getOS());
+
+    PrintWithColorRAII colorized(os(), Color);
+    os() << "'";
+    declRef.dump(os());
+    os() << "'";
   }
 
   /// Pretty-print a TypeRepr.
   void printTypeRepr(TypeRepr *T, StringRef label) {
     printLabel(label, TypeReprColor);
 
-    PrintWithColorRAII(os(), TypeReprColor) << "'";
+    PrintWithColorRAII colorized(os(), TypeReprColor);
+    os() << "'";
     if (T)
-      T->print(PrintWithColorRAII(os(), TypeReprColor).getOS());
+      T->print(os());
     else
-      PrintWithColorRAII(os(), TypeReprColor) << "<<NULL>>";
-    PrintWithColorRAII(os(), TypeReprColor) << "'";
+      os() << "<<null>>";
+    os() << "'";
   }
 
   void printGenericParameters(GenericParamList *Params, StringRef label = "") {
@@ -422,8 +466,10 @@ public:
   void printNodeRange(SourceRange R) {
     if (ctx() && R.isValid()) {
       printLabel("range", RangeColor);
-      R.print(PrintWithColorRAII(os(), RangeColor).getOS(), ctx()->SourceMgr,
-              /*PrintText=*/false);
+      PrintWithColorRAII colorized(os(), RangeColor);
+      os() << "'";
+      R.print(os(), ctx()->SourceMgr, /*PrintText=*/false);
+      os() << "'";
     }
   }
 
@@ -433,6 +479,12 @@ public:
   void printNodeLocation(SourceLoc L) {
     if (!L.isValid()) return;
     print(L, "location", LocationColor);
+  }
+
+  template <typename T>
+  void printNodeLiteralValue(const T &value, StringRef label = "") {
+    printLabel(label, LiteralValueColor);
+    PrintWithColorRAII(os(), LiteralValueColor) << value;
   }
 
 private:
@@ -466,9 +518,14 @@ public:
   }
 
   void printNodeAccess(AccessLevel level) {
-    print(getAccessLevelSpelling(level), "access",
-          AccessLevelColor);
+    printFlag(getAccessLevelSpelling(level), "access", AccessLevelColor);
   }
+
+  void printNodeFunctionRefKind(FunctionRefKind kind) {
+    printFlag(getFunctionRefKindStr(kind), "function_ref", ExprModifierColor);
+  }
+
+  void printNodeAccessSemantics(AccessSemantics semantics);
 
   // These exist for backwards compatibility. The goal is to turn all uses of
   // them into method calls instead. Un-comment the [[deprecated]] attrs below
@@ -667,6 +724,11 @@ static StringRef getAssociativityString(Associativity value) {
   llvm_unreachable("Unhandled Associativity in switch.");
 }
 
+void ASTNodeDumper::printNodeAccessSemantics(AccessSemantics semantics) {
+  if (semantics == AccessSemantics::Ordinary) return;
+  printFlag(getAccessSemanticsString(semantics), AccessLevelColor);
+}
+
 //===----------------------------------------------------------------------===//
 //  Decl printing.
 //===----------------------------------------------------------------------===//
@@ -829,11 +891,11 @@ namespace {
       dump.printFlag(ID->isExported(), "exported");
 
       if (ID->getImportKind() != ImportKind::Module)
-        dump.print(getImportKindString(ID->getImportKind()), "kind");
+        dump.printFlag(getImportKindString(ID->getImportKind()), "kind");
 
       SmallString<64> scratch;
       ID->getImportPath().getString(scratch);
-      dump.print(QuotedString(scratch));
+      dump.printNodeName(scratch);
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, StringRef Label) {
@@ -1028,13 +1090,13 @@ namespace {
 
       if (D->hasInterfaceType()) {
         auto impl = D->getImplInfo();
-        dump.print(getReadImplKindName(impl.getReadImpl()), "readImpl");
+        dump.printFlag(getReadImplKindName(impl.getReadImpl()), "readImpl");
         dump.printFlag(!impl.supportsMutation(), "immutable");
 
         if (impl.supportsMutation()) {
-          dump.print(getWriteImplKindName(impl.getWriteImpl()), "writeImpl");
-          dump.print(getReadWriteImplKindName(impl.getReadWriteImpl()),
-                     "readWriteImpl");
+          dump.printFlag(getWriteImplKindName(impl.getWriteImpl()), "writeImpl");
+          dump.printFlag(getReadWriteImplKindName(impl.getReadWriteImpl()),
+                         "readWriteImpl");
         }
       }
     }
@@ -1074,7 +1136,7 @@ namespace {
 
       if (PD->getDefaultArgumentKind() != DefaultArgumentKind::None)
         dump.print(getDefaultArgumentKindString(PD->getDefaultArgumentKind()),
-                   "default_arg");
+                   "default_arg_kind");
 
       if (PD->hasDefaultExpr())
         dump.printNodeCaptureInfo(PD->getDefaultArgumentCaptureInfo(),
@@ -1170,14 +1232,13 @@ namespace {
 
       if (auto fec = D->getForeignErrorConvention()) {
         auto childDump = dump.child("foreign_error", "", DeclModifierColor);
-        childDump.print(getForeignErrorConventionKindString(fec->getKind()),
-                        "kind");
+        childDump.printFlag(getForeignErrorConventionKindString(fec->getKind()),
+                            "kind");
 
         bool isOwned = (fec->isErrorOwned() == ForeignErrorConvention::IsOwned);
         childDump.printFlag(isOwned ? "owned" : "unowned");
 
-        childDump.print(llvm::utostr(fec->getErrorParameterIndex()),
-                        "param_index");
+        childDump.print(fec->getErrorParameterIndex(), "param_index");
         childDump.print(fec->getErrorParameterType(), "param_type");
 
         bool wantResultType = (
@@ -1267,8 +1328,8 @@ namespace {
       auto dump = printCommon(PGD, "precedence_group_decl", Label);
 
       dump.printNodeName(PGD->getName());
-      dump.print(getAssociativityString(PGD->getAssociativity()),
-                 "associativity");
+      dump.printFlag(getAssociativityString(PGD->getAssociativity()),
+                     "associativity");
       dump.printFlag(PGD->isAssignment(), "assignment");
 
       auto printRelations =
@@ -1652,7 +1713,7 @@ public:
 
   void visitPoundAssertStmt(PoundAssertStmt *S, StringRef Label) {
     auto dump = printCommon(S, "pound_assert", Label);
-    dump.print(QuotedString(S->getMessage()), "message");
+    dump.print(S->getMessage(), "message");
 
     dump.printRec(S->getCondition());
   }
@@ -1788,7 +1849,7 @@ public:
 
   void visitNilLiteralExpr(NilLiteralExpr *E, StringRef Label) {
     auto dump = printCommon(E, "nil_literal_expr", Label);
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer");
   }
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E, StringRef Label) {
@@ -1798,24 +1859,22 @@ public:
 
     Type T = getTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
-      dump.print(E->getDigitsText(), "value", LiteralValueColor);
+      dump.printNodeLiteralValue(E->getDigitsText());
     else
-      dump.print(E->getValue(), "value", LiteralValueColor);
+      dump.printNodeLiteralValue(E->getValue());
 
-    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
-                      LiteralValueColor);
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer");
+    dump.printDeclRef(E->getInitializer(), "initializer");
   }
 
   void visitFloatLiteralExpr(FloatLiteralExpr *E, StringRef Label) {
     auto dump = printCommon(E, "float_literal_expr", Label);
 
     dump.printFlag(E->isNegative(), "negative", LiteralValueColor);
-    dump.print(E->getDigitsText(), "value", LiteralValueColor);
+    dump.printNodeLiteralValue(E->getDigitsText());
 
-    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
-                      LiteralValueColor);
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer");
+    dump.printDeclRef(E->getInitializer(), "initializer");
 
     if (!E->getBuiltinType().isNull())
       dump.print(E->getBuiltinType(), "builtin_type", TypeColor);
@@ -1824,23 +1883,22 @@ public:
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E, StringRef Label) {
     auto dump = printCommon(E, "boolean_literal_expr", Label);
 
-    dump.print(E->getValue() ? "true" : "false", "value", LiteralValueColor);
+    dump.printNodeLiteralValue(E->getValue() ? "true" : "false");
 
-    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
-                      LiteralValueColor);
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer");
+    dump.printDeclRef(E->getInitializer(), "initializer");
   }
 
   void visitStringLiteralExpr(StringLiteralExpr *E, StringRef Label) {
     auto dump = printCommon(E, "string_literal_expr", Label);
 
-    dump.print(getStringLiteralExprEncodingString(E->getEncoding()), "encoding",
-               LiteralValueColor);
-    dump.print(QuotedString(E->getValue()), "value", LiteralValueColor);
+    dump.printNodeLiteralValue(QuotedString(E->getValue()));
 
-    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
-                      LiteralValueColor);
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printFlag(getStringLiteralExprEncodingString(E->getEncoding()),
+                   "encoding", LiteralValueColor);
+
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer");
+    dump.printDeclRef(E->getInitializer(), "initializer");
   }
 
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E, StringRef Label) {
@@ -1852,30 +1910,30 @@ public:
     dump.print(E->getInterpolationCount(), "interpolation_count",
                LiteralValueColor);
 
-    dump.printDeclRef(E->getBuilderInit(), "builder_init", LiteralValueColor);
-    dump.printDeclRef(E->getInitializer(), "result_init", LiteralValueColor);
+    dump.printDeclRef(E->getBuilderInit(), "builder_init");
+    dump.printDeclRef(E->getInitializer(), "result_init");
 
     dump.printRec(E->getAppendingExpr());
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, StringRef Label) {
     auto dump = printCommon(E, "magic_identifier_literal_expr", Label);
 
-    dump.print(MagicIdentifierLiteralExpr::getKindString(E->getKind()), "kind");
+    dump.printFlag(MagicIdentifierLiteralExpr::getKindString(E->getKind()),
+                   "kind");
 
     if (E->isString())
-      dump.print(getStringLiteralExprEncodingString(E->getStringEncoding()),
-                 "encoding", LiteralValueColor);
+      dump.printFlag(getStringLiteralExprEncodingString(E->getStringEncoding()),
+                     "encoding", LiteralValueColor);
 
-    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
-                      LiteralValueColor);
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer");
+    dump.printDeclRef(E->getInitializer(), "initializer");
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E, StringRef Label) {
     auto dump = printCommon(E, "object_literal", Label);
 
-    dump.print(QuotedString(E->getLiteralKindPlainName()), "kind");
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.print(E->getLiteralKindPlainName(), "kind");
+    dump.printDeclRef(E->getInitializer(), "initializer");
     dump.printNodeArgLabels(E->getArgumentLabels());
 
     dump.printRec(E->getArg());
@@ -1888,14 +1946,9 @@ public:
   void visitDeclRefExpr(DeclRefExpr *E, StringRef Label) {
     auto dump = printCommon(E, "declref_expr", Label);
 
-    dump.printDeclRef(E->getDeclRef(), "decl", DeclColor);
-
-    if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      dump.print(getAccessSemanticsString(E->getAccessSemantics()), "",
-                 AccessLevelColor);
-
-    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
-               ExprModifierColor);
+    dump.printDeclRef(E->getDeclRef(), "decl");
+    dump.printNodeAccessSemantics(E->getAccessSemantics());
+    dump.printNodeFunctionRefKind(E->getFunctionRefKind());
   }
 
   void visitSuperRefExpr(SuperRefExpr *E, StringRef Label) {
@@ -1918,8 +1971,7 @@ public:
 
     dump.printNodeName(E->getDecls()[0]->getBaseName());
     dump.print(E->getDecls().size(), "number_of_decls", ExprModifierColor);
-    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
-               ExprModifierColor);
+    dump.printNodeFunctionRefKind(E->getFunctionRefKind());
 
     for (auto D : E->getDecls()) {
       auto childDump = dump.child("candidate", "", DeclModifierColor);
@@ -1931,8 +1983,7 @@ public:
     auto dump = printCommon(E, "unresolved_decl_ref_expr", Label);
 
     dump.printNodeName(E->getName());
-    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
-               ExprModifierColor);
+    dump.printNodeFunctionRefKind(E->getFunctionRefKind());
   }
 
   void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E, StringRef Label) {
@@ -1940,20 +1991,15 @@ public:
 
     dump.printRec(E->getSubExpr());
 
-    for (TypeLoc T : E->getUnresolvedParams()) {
+    for (TypeLoc T : E->getUnresolvedParams())
       dump.printRec(T.getTypeRepr());
-    }
   }
 
   void visitMemberRefExpr(MemberRefExpr *E, StringRef Label) {
     auto dump = printCommon(E, "member_ref_expr", Label);
 
     dump.printDeclRef(E->getMember(), "decl");
-
-    if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      dump.print(getAccessSemanticsString(E->getAccessSemantics()), "",
-                 AccessLevelColor);
-
+    dump.printNodeAccessSemantics(E->getAccessSemantics());
     dump.printFlag(E->isSuper(), "super");
 
     dump.printRec(E->getBase());
@@ -1970,8 +2016,7 @@ public:
     auto dump = printCommon(E, "unresolved_member_expr", Label);
 
     dump.printNodeName(E->getName());
-    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
-               ExprModifierColor);
+    dump.printNodeFunctionRefKind(E->getFunctionRefKind());
   }
 
   void visitDotSelfExpr(DotSelfExpr *E, StringRef Label) {
@@ -2021,7 +2066,7 @@ public:
   void visitArrayExpr(ArrayExpr *E, StringRef Label) {
     auto dump = printCommon(E, "array_expr", Label);
 
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer");
 
     for (auto elt : E->getElements())
       dump.printRec(elt);
@@ -2030,7 +2075,7 @@ public:
   void visitDictionaryExpr(DictionaryExpr *E, StringRef Label) {
     auto dump = printCommon(E, "dictionary_expr", Label);
 
-    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer");
 
     for (auto elt : E->getElements())
       dump.printRec(elt);
@@ -2039,9 +2084,7 @@ public:
   void visitSubscriptExpr(SubscriptExpr *E, StringRef Label) {
     auto dump = printCommon(E, "subscript_expr", Label);
 
-    if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      dump.print(getAccessSemanticsString(E->getAccessSemantics()), "",
-                 AccessLevelColor);
+    dump.printNodeAccessSemantics(E->getAccessSemantics());
     dump.printFlag(E->isSuper(), "super");
     if (E->hasDecl())
       dump.printDeclRef(E->getDecl(), "decl");
@@ -2072,8 +2115,7 @@ public:
     auto dump = printCommon(E, "unresolved_dot_expr", Label);
 
     dump.printNodeName(E->getName());
-    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
-               ExprModifierColor);
+    dump.printNodeFunctionRefKind(E->getFunctionRefKind());
 
     if (E->getBase())
       dump.printRec(E->getBase(), "base");
@@ -2576,7 +2618,7 @@ public:
 
   void visitObjCSelectorExpr(ObjCSelectorExpr *E, StringRef Label) {
     auto dump = printCommon(E, "objc_selector_expr", Label);
-    dump.print(getObjCSelectorExprKindString(E->getSelectorKind()), "kind");
+    dump.printFlag(getObjCSelectorExprKindString(E->getSelectorKind()), "kind");
     dump.printDeclRef(E->getMethod(), "decl");
 
     dump.printRec(E->getSubExpr());
@@ -2758,9 +2800,9 @@ public:
       childDump.printNodeName(comp->getNameRef());
 
       if (comp->isBound())
-        childDump.printDeclRef(comp->getBoundDecl(), "bind", DeclColor);
+        childDump.printDeclRef(comp->getBoundDecl(), "bound_decl");
       else
-        childDump.print("none", "bind", DeclColor);
+        childDump.printFlag("unbound");
 
       if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp))
         for (auto genArg : GenIdT->getGenericArgs())
@@ -3476,8 +3518,8 @@ namespace {
       SILFunctionType::Representation representation =
         T->getExtInfo().getSILRepresentation();
       if (representation != SILFunctionType::Representation::Thick)
-        dump.print(getSILFunctionTypeRepresentationString(representation),
-                   "representation");
+        dump.printFlag(getSILFunctionTypeRepresentationString(representation),
+                       "representation");
 
       dump.printFlag(!T->isNoEscape(), "escaping");
       dump.printFlag(T->isSendable(), "Sendable");
