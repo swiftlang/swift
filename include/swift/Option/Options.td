@@ -549,6 +549,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
+  
+def lto_library : Separate<["-"], "lto_library">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption]>,
+  HelpText<"Perform LTO with <lto_library>">, MetaVarName<"<lto_library>">;
 
 def access_notes_path : Separate<["-"], "access-notes-path">,
   Flags<[FrontendOption, ArgumentIsPath]>,
