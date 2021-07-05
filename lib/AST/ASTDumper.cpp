@@ -172,6 +172,11 @@ class ASTNodeDumper {
 
   raw_ostream &os() {
     assert(Dumper && "printing from inactive ASTNodeDumper");
+
+    // Dumper->Indent is briefly less-than during construction and destruction.
+    assert(Dumper->Indent <= IndentChildren &&
+              "printing from parent ASTNodeDumper");
+    
     return Dumper->OS;
   }
 
