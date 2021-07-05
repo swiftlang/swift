@@ -941,9 +941,9 @@ StringRef Parser::copyAndStripUnderscores(StringRef orig) {
 /// possibly preceded by attributes.  If so, we disambiguate the parse as the
 /// start of a get-set block in a variable definition (not as a trailing
 /// closure).
-static bool isStartOfGetSetAccessor(Parser &P) {
-  assert(P.Tok.is(tok::l_brace) && "not checking a brace?");
-  
+bool Parser::isStartOfGetSetAccessor() {
+  assert(Tok.is(tok::l_brace) && "not checking a brace?");
+
   // The only case this can happen is if the accessor label is immediately after
   // a brace (possibly preceded by attributes).  "get" is implicit, so it can't
   // be checked for.  Conveniently however, get/set properties are not allowed
@@ -952,7 +952,7 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   //
   // If we have a 'didSet' or a 'willSet' label, disambiguate immediately as
   // an accessor block.
-  Token NextToken = P.peekToken();
+  Token NextToken = peekToken();
   if (NextToken.isContextualKeyword("didSet") ||
       NextToken.isContextualKeyword("willSet"))
     return true;
@@ -961,21 +961,23 @@ static bool isStartOfGetSetAccessor(Parser &P) {
   if (NextToken.isNot(tok::at_sign))
     return false;
 
-  Parser::BacktrackingScope Backtrack(P);
+  Parser::BacktrackingScope Backtrack(*this);
 
   // Eat the "{".
-  P.consumeToken(tok::l_brace);
+  consumeToken(tok::l_brace);
 
   // Eat attributes, if present.
-  while (P.consumeIf(tok::at_sign)) {
-    if (!P.consumeIf(tok::identifier)) return false;
+  while (consumeIf(tok::at_sign)) {
+    if (!consumeIf(tok::identifier))
+      return false;
     // Eat paren after attribute name; e.g. @foo(x)
-    if (P.Tok.is(tok::l_paren)) P.skipSingle();
+    if (Tok.is(tok::l_paren))
+      skipSingle();
   }
 
   // Check if we have 'didSet'/'willSet' after attributes.
-  return P.Tok.isContextualKeyword("didSet") ||
-         P.Tok.isContextualKeyword("willSet");
+  return Tok.isContextualKeyword("didSet") ||
+         Tok.isContextualKeyword("willSet");
 }
 
 /// Recover invalid uses of trailing closures in a situation
@@ -987,7 +989,7 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   
   // If this is the start of a get/set accessor, then it isn't a trailing
   // closure.
-  if (isStartOfGetSetAccessor(P))
+  if (P.isStartOfGetSetAccessor())
     return false;
 
   // If this is a normal expression (not an expr-basic) then trailing closures
