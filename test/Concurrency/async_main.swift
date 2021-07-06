@@ -23,13 +23,13 @@ func asyncFunc() async {
 // CHECK-EXEC: Hello World!
 
 // CHECK-AST-LABEL: "main()" interface
-// CHECK-AST:       (await_expr type='()'
+// CHECK-AST:       (single_expression_body=await_expr type='()'
 // CHECK-AST-NEXT:    (call_expr type='()'
 // CHECK-AST-NEXT:       (declref_expr type='() async -> ()'
 // CHECK-AST-SAME:        decl=async_main.(file).asyncFunc()@
 
 // CHECK-AST-LABEL: (func_decl implicit "$main()" interface
-// CHECK-AST:       (brace_stmt
+// CHECK-AST:       (body=brace_stmt
 // CHECK-AST-NEXT:    (return_stmt implicit
 // CHECK-AST-NEXT:      (call_expr implicit type='()'
 // CHECK-AST-NEXT:        (declref_expr implicit
