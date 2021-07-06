@@ -4433,7 +4433,23 @@ public:
 
   /// Build implicit autoclosure expression wrapping a given expression.
   /// Given expression represents computed result of the closure.
+  ///
+  /// The \p ClosureDC must be the deepest possible context that
+  /// contains this autoclosure expression. For example,
+  ///
+  /// func foo() {
+  ///   _ = { $0 || $1 || $2 }
+  /// }
+  ///
+  /// Even though the decl context of $1 (after solution application) is
+  /// `||`'s autoclosure parameter, we cannot know this until solution
+  /// application has finished because autoclosure expressions are expanded in
+  /// depth-first order then \c ContextualizeClosures comes around to clean up.
+  /// All that is required is that the explicit closure be the context since it
+  /// is the innermost context that can introduce potential new capturable
+  /// declarations.
   Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType,
+                             DeclContext *ClosureDC,
                              bool isDefaultWrappedValue = false,
                              bool isAsyncLetWrapper = false);
 
