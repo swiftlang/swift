@@ -24,7 +24,7 @@ bool swift::checkOperandOwnershipInvariants(const Operand *operand) {
   OperandOwnership opOwnership = operand->getOperandOwnership();
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
-    return bool(BorrowingOperand::get(operand));
+    return bool(BorrowingOperand(const_cast<Operand *>(operand)));
   }
   return true;
 }

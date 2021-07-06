@@ -3514,14 +3514,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     return storage->isSettable(storage->getDeclContext());
   };
 
-  // We cannot use the same opened archetype in the getter and setter. Therefore
-  // we create a new one for both the getter and the setter.
-  auto renewOpenedArchetypes = [](SubstitutableType *type) -> Type {
-    if (auto *openedTy = dyn_cast<OpenedArchetypeType>(type))
-      return OpenedArchetypeType::get(openedTy->getOpenedExistentialType());
-    return type;
-  };
-
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
@@ -3545,15 +3537,13 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     auto id = getIdForKeyPathComponentComputedProperty(*this, var,
                                                        strategy);
     auto getter = getOrCreateKeyPathGetter(*this, loc,
-             var, subs.subst(renewOpenedArchetypes,
-                             MakeAbstractConformanceForGenericType()),
+             var, subs,
              needsGenericContext ? genericEnv : nullptr,
              expansion, {}, baseTy, componentTy);
     
     if (isSettableInComponent()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
-             var, subs.subst(renewOpenedArchetypes,
-                             MakeAbstractConformanceForGenericType()),
+             var, subs,
              needsGenericContext ? genericEnv : nullptr,
              expansion, {}, baseTy, componentTy);
       return KeyPathPatternComponent::forComputedSettableProperty(id,
@@ -3598,8 +3588,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     
     auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
     auto getter = getOrCreateKeyPathGetter(*this, loc,
-             decl, subs.subst(renewOpenedArchetypes,
-                              MakeAbstractConformanceForGenericType()),
+             decl, subs,
              needsGenericContext ? genericEnv : nullptr,
              expansion,
              indexTypes,
@@ -3608,8 +3597,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
     if (isSettableInComponent()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
-             decl, subs.subst(renewOpenedArchetypes,
-                              MakeAbstractConformanceForGenericType()),
+             decl, subs,
              needsGenericContext ? genericEnv : nullptr,
              expansion,
              indexTypes,
@@ -3741,6 +3729,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     case KeyPathExpr::Component::Kind::Invalid:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+    case KeyPathExpr::Component::Kind::CodeCompletion:
       llvm_unreachable("not resolved");
       break;
 

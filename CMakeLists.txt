@@ -191,9 +191,10 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     option only affects the tools that run on the host (the compiler), and has
     no effect on the target libraries (the standard library and the runtime).")
 
-option(SWIFT_TOOLS_ENABLE_LIBSWIFT
-  "Enable building libswift and linking libswift into the compiler itself."
-  FALSE)
+# NOTE: We do not currently support building libswift with the Xcode generator.
+cmake_dependent_option(SWIFT_TOOLS_ENABLE_LIBSWIFT
+  "Enable building libswift and linking libswift into the compiler itself." FALSE
+  "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" FALSE)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -374,7 +375,7 @@ option(SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
     "${SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS_default}")
 
 option(SWIFT_STDLIB_SIL_DEBUGGING
-    "Compile the Swift standard library with -gsil to enable debugging and profiling on SIL level"
+    "Compile the Swift standard library with -sil-based-debuginfo to enable debugging and profiling on SIL level"
     FALSE)
 
 option(SWIFT_CHECK_INCREMENTAL_COMPILATION
@@ -480,7 +481,9 @@ endif()
 
 set(SWIFT_BUILD_HOST_DISPATCH FALSE)
 if(SWIFT_ENABLE_DISPATCH AND NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
+  # Only build libdispatch for the host if the host tools are being built and
+  # specifically if these two libraries that depend on it are built.
+  if(SWIFT_INCLUDE_TOOLS AND (SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT))
     set(SWIFT_BUILD_HOST_DISPATCH TRUE)
   endif()
 
@@ -1056,9 +1059,7 @@ if(SWIFT_INCLUDE_TOOLS)
   # which is used in add_swift_host_tool for the lldb workaround.
   #
   # NOTE: We do not currently support libswift with the Xcode generator.
-  if (NOT CMAKE_GENERATOR STREQUAL "Xcode")
-    add_subdirectory(libswift)
-  endif()
+  add_subdirectory(libswift)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.

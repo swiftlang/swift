@@ -600,7 +600,7 @@ FUNCTION(GetFunctionMetadataDifferentiable,
 //                                          const Metadata *globalActor);
 FUNCTION(GetFunctionMetadataGlobalActor,
          swift_getFunctionTypeMetadataGlobalActor,
-         C_CC, AlwaysAvailable,
+         C_CC, ConcurrencyAvailability,
          RETURNS(TypeMetadataPtrTy),
          ARGS(SizeTy,
               SizeTy,
@@ -1737,6 +1737,29 @@ FUNCTION(AutoDiffAllocateSubcontext,
          RETURNS(Int8PtrTy),
          ARGS(RefCountedPtrTy, SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
+
+// SWIFT_RUNTIME_EXPORT
+// unsigned swift_getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
+//                                                    uint32_t numExtraCases,
+//                                                    const Metadata *enumType)
+FUNCTION(GetMultiPayloadEnumTagSinglePayload,
+         swift_getMultiPayloadEnumTagSinglePayload, C_CC,
+         MultiPayloadEnumTagSinglePayloadAvailability,
+         RETURNS(Int32Ty),
+         ARGS(OpaquePtrTy, Int32Ty, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// SWIFT_RUNTIME_EXPORT 
+// void swift_storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
+//                                                   uint32_t index,
+//                                                   uint32_t numExtraCases,
+//                                                   const Metadata *enumType);
+FUNCTION(StoreMultiPayloadEnumTagSinglePayload,
+         swift_storeMultiPayloadEnumTagSinglePayload, C_CC,
+         MultiPayloadEnumTagSinglePayloadAvailability,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, Int32Ty, Int32Ty, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
 
 #undef RETURNS
 #undef ARGS

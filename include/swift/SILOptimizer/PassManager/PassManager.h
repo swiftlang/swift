@@ -59,6 +59,8 @@ public:
   LibswiftPassInvocation(SILPassManager *passManager, SILCombiner *silCombiner) :
     passManager(passManager), silCombiner(silCombiner) {}
 
+  SILPassManager *getPassManager() const { return passManager; }
+
   FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
 
   FixedSizeSlab *freeSlab(FixedSizeSlab *slab);

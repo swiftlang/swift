@@ -2828,7 +2828,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     if (Ctx.isSwiftVersionAtLeast(5)) {
       if (wantDynamicSelf && CD->isConvenienceInit())
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())
-          if (!classDecl->isFinal())
+          if (!classDecl->isSemanticallyFinal())
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {

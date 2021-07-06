@@ -2374,6 +2374,10 @@ public:
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
+  /// Is this declaration semantically 'final', meaning that the type checker
+  /// should treat it as final even if the ABI does not?
+  bool isSemanticallyFinal() const;
+
   /// Is this declaration 'final'?
   bool isFinal() const;
 
@@ -7556,7 +7560,8 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl();
+    auto classDecl = getDeclContext()->getSelfClassDecl();
+    return classDecl && !classDecl->isActor();
   } else {
     return false;
   }

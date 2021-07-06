@@ -175,10 +175,10 @@ actor GenericSuper<T> {
 
 actor GenericSub<T> : GenericSuper<[T]> { // expected-error{{actor types do not support inheritance}}
   override func method() { }  // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
-  // expected-error@-1{{actor-isolated instance method 'method()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
+  // expected-error@-1{{instance method overrides a 'final' instance method}}
 
-  @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
-  nonisolated override func method3() { } // expected-error{{nonisolated instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
+  @GenericGlobalActor<T> override func method2() { } // expected-error{{instance method overrides a 'final' instance method}}
+  nonisolated override func method3() { } // expected-error{{instance method overrides a 'final' instance method}}
 
   @OtherGlobalActor func testMethod() {
     method() // expected-error{{actor-isolated instance method 'method()' can not be referenced from global actor 'OtherGlobalActor'}}
@@ -195,9 +195,10 @@ struct Container<T> {
 }
 
 struct OtherContainer<U> {
-  // Okay to change the global actor in a subclass.
+  // NOT Okay to change the global actor in a subclass.
   @GenericGlobalActor<[U]> class Subclass1 : Container<[U]>.Superclass { }
   @GenericGlobalActor<U> class Subclass2 : Container<[U]>.Superclass { }
+  // expected-error@-1{{global actor 'GenericGlobalActor<U>'-isolated class 'Subclass2' has different actor isolation from global actor 'GenericGlobalActor<T>'-isolated superclass 'Superclass'}}
 
   // Ensure that substitutions work properly when inheriting.
   class Subclass3<V> : Container<(U, V)>.Superclass2 {
@@ -218,7 +219,7 @@ class SuperclassWithGlobalActors {
   func j() { }
 }
 
-@GenericGlobalActor<String>
+@GenericGlobalActor<String> // expected-error@+1{{global actor 'GenericGlobalActor<String>'-isolated class 'SubclassWithGlobalActors' has different actor isolation from nonisolated superclass 'SuperclassWithGlobalActors'}}
 class SubclassWithGlobalActors : SuperclassWithGlobalActors {
   override func f() { } // okay: inferred to @GenericGlobalActor<Int>
 

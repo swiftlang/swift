@@ -1399,6 +1399,9 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
   for (auto var : members) {
+    if (var->isStatic())
+      continue;
+
     bool generateParamName = wantCtorParamNames;
 
     if (var->hasClangNode()) {

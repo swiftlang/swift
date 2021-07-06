@@ -42,28 +42,8 @@ module _SwiftObjectiveCOverlayShims {
   header "ObjectiveCOverlayShims.h"
 }
 
-module _SwiftOSOverlayShims {
-  header "OSOverlayShims.h"
-}
-
-module _SwiftSafariServicesOverlayShims {
-  header "SafariServicesOverlayShims.h"
-}
-
-module _SwiftAppKitOverlayShims {
-  header "AppKitOverlayShims.h"
-}
-
-module _SwiftUIKitOverlayShims {
-  header "UIKitOverlayShims.h"
-}
-
 module _SwiftXCTestOverlayShims {
   header "XCTestOverlayShims.h"
-}
-
-module _SwiftXPCOverlayShims {
-  header "XPCOverlayShims.h"
 }
 
 module _SwiftCoreFoundationOverlayShims {
@@ -72,18 +52,6 @@ module _SwiftCoreFoundationOverlayShims {
 
 module _SwiftFoundationOverlayShims {
   header "FoundationOverlayShims.h"
-}
-
-module _SwiftNetworkOverlayShims {
-  header "NetworkOverlayShims.h"
-}
-
-module _SwiftClockKitOverlayShims {
-    header "ClockKitOverlayShims.h"
-}
-
-module _SwiftCoreMediaOverlayShims {
-  header "CoreMediaOverlayShims.h"
 }
 
 module _SwiftConcurrencyShims {

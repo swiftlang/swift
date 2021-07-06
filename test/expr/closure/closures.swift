@@ -403,7 +403,7 @@ Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
-let samples = {   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+let samples = {   // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
           if (i > 10) { return true }
           else { return false }
         }()
@@ -485,7 +485,7 @@ func lvalueCapture<T>(c: GenericClass<T>) {
 }
 
 // Don't expose @lvalue-ness in diagnostics.
-let closure = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
+let closure = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{16-16= () -> <#Result#> in }}
   var helper = true
   return helper
 }

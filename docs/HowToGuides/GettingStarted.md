@@ -151,35 +151,18 @@ Double-check that running `pwd` prints a path ending with `swift`.
 [Homebrew]: https://brew.sh/
 [Homebrew Bundle]: https://github.com/Homebrew/homebrew-bundle
 
-### Ubuntu Linux
+### Linux
 
-1. For Ubuntu 16.04 LTS and 18.04 LTS, run the following:
-
-   ```sh
-   sudo apt-get install    \
-     clang                 \
-     cmake                 \
-     git                   \
-     icu-devtools          \
-     libcurl4-openssl-dev  \
-     libedit-dev           \
-     libicu-dev            \
-     libncurses5-dev       \
-     libpython3-dev        \
-     libsqlite3-dev        \
-     libxml2-dev           \
-     ninja-build           \
-     pkg-config            \
-     python                \
-     python-six            \
-     rsync                 \
-     swig                  \
-     systemtap-sdt-dev     \
-     tzdata                \
-     uuid-dev
+1. The latest Linux dependencies are listed in the respective Dockerfiles:
+   * [Ubuntu 20.04](https://github.com/apple/swift-docker/blob/main/swift-ci/master/ubuntu/20.04/Dockerfile)
+   * [CentOS 7](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/7/Dockerfile)
+   * [CentOS 8](https://github.com/apple/swift-docker/blob/main/swift-ci/master/centos/8/Dockerfile)
+   * [Amazon Linux 2](https://github.com/apple/swift-docker/blob/main/swift-ci/master/amazon-linux/2/Dockerfile)
+   
+2. To install sccache (optional):
+   ```
    sudo snap install sccache --candidate --classic
    ```
-
    **Note:** LLDB currently requires at least `swig-1.3.40` but will
    successfully build with version 2 shipped with Ubuntu.
 

@@ -20,7 +20,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -224,20 +223,114 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   DCtx.clear();
 }
 
-static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
-  // This doesn't handle Unicode symbols, but maybe that's okay.
-  // Also accept the future mangling prefix.
-  llvm::Regex maybeSymbol("(_T|_?\\$[Ss])[_a-zA-Z0-9$.]+");
+static bool isValidInMangling(char ch) {
+  return (ch == '_' || ch == '$' || ch == '.'
+          || (ch >= 'a' && ch <= 'z')
+          || (ch >= 'A' && ch <= 'Z')
+          || (ch >= '0' && ch <= '9'));
+}
 
+static bool findMaybeMangled(llvm::StringRef input, llvm::StringRef &match) {
+  const char *ptr = input.data();
+  size_t len = input.size();
+  const char *end = ptr + len;
+  enum {
+    Start,
+    SeenUnderscore,
+    SeenDollar,
+    FoundPrefix
+  } state = Start;
+  const char *matchStart = nullptr;
+
+  // Find _T, $S, $s, _$S, _$s followed by a valid mangled string
+  while (ptr < end) {
+    switch (state) {
+    case Start:
+      while (ptr < end) {
+        char ch = *ptr++;
+
+        if (ch == '_') {
+          state = SeenUnderscore;
+          matchStart = ptr - 1;
+          break;
+        } else if (ch == '$') {
+          state = SeenDollar;
+          matchStart = ptr - 1;
+          break;
+        }
+      }
+      break;
+
+    case SeenUnderscore:
+      while (ptr < end) {
+        char ch = *ptr++;
+
+        if (ch == 'T') {
+          state = FoundPrefix;
+          break;
+        } else if (ch == '$') {
+          state = SeenDollar;
+          break;
+        } else if (ch == '_') {
+          matchStart = ptr - 1;
+        } else {
+          state = Start;
+          break;
+        }
+      }
+      break;
+
+    case SeenDollar:
+      while (ptr < end) {
+        char ch = *ptr++;
+
+        if (ch == 'S' || ch == 's') {
+          state = FoundPrefix;
+          break;
+        } else if (ch == '_') {
+          state = SeenUnderscore;
+          matchStart = ptr - 1;
+          break;
+        } else if (ch == '$') {
+          matchStart = ptr - 1;
+        } else {
+          state = Start;
+          break;
+        }
+      }
+      break;
+
+    case FoundPrefix:
+      {
+        const char *mangled = ptr;
+
+        while (ptr < end && isValidInMangling(*ptr))
+          ++ptr;
+
+        if (ptr == mangled) {
+          state = Start;
+          break;
+        }
+
+        match = llvm::StringRef(matchStart, ptr - matchStart);
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+static int demangleSTDIN(const swift::Demangle::DemangleOptions &options) {
   swift::Demangle::Context DCtx;
   for (std::string mangled; std::getline(std::cin, mangled);) {
     llvm::StringRef inputContents(mangled);
+    llvm::StringRef match;
 
-    llvm::SmallVector<llvm::StringRef, 1> matches;
-    while (maybeSymbol.match(inputContents, &matches)) {
-      llvm::outs() << substrBefore(inputContents, matches.front());
-      demangle(llvm::outs(), matches.front(), DCtx, options);
-      inputContents = substrAfter(inputContents, matches.front());
+    while (findMaybeMangled(inputContents, match)) {
+      llvm::outs() << substrBefore(inputContents, match);
+      demangle(llvm::outs(), match, DCtx, options);
+      inputContents = substrAfter(inputContents, match);
     }
 
     llvm::outs() << inputContents << '\n';

@@ -935,7 +935,9 @@ function(add_swift_fuzzer_host_tool executable)
 
   # Then make sure that we pass the -fsanitize=fuzzer flag both on the cflags
   # and cxx flags line.
-  target_compile_options(${executable} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:"-fsanitize=fuzzer">)
+  target_compile_options(${executable} PRIVATE
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-fsanitize=fuzzer>
+    $<$<COMPILE_LANGUAGE:Swift>:-sanitize=fuzzer>)
   target_link_libraries(${executable} PRIVATE "-fsanitize=fuzzer")
 endfunction()
 

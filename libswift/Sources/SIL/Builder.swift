@@ -46,7 +46,7 @@ public struct Builder {
       return name.withBridgedStringRef { nameStr in
         let bi = SILBuilder_createBuiltinBinaryFunction(
           bridgedInsPoint, location.bridgedLocation, nameStr,
-          operandType.silType, resultType.silType, valuesRef)
+          operandType.bridged, resultType.bridged, valuesRef)
         return bi.getAs(BuiltinInst.self)
       }
     }

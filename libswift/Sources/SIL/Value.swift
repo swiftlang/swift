@@ -28,15 +28,23 @@ extension Value {
   }
 
   public var type: Type {
-    return Type(silType: SILValue_getType(bridged))
+    return Type(bridged: SILValue_getType(bridged))
   }
 
-  var bridged: BridgedValue {
+  public var hashable: HashableValue { ObjectIdentifier(self) }
+
+  public var bridged: BridgedValue {
     BridgedValue(obj: SwiftObject(self as AnyObject))
   }
   var bridgedNode: BridgedNode {
     BridgedNode(obj: SwiftObject(self as AnyObject))
   }
+}
+
+public typealias HashableValue = ObjectIdentifier
+
+public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
+  return lhs === rhs
 }
 
 extension BridgedValue {

@@ -361,6 +361,7 @@ func checkResult(_ plaintext: [UInt8]) {
 }
 
 @inline(never)
+@_assemblyVision
 public func run_ChaCha(_ N: Int) {
   let key = Array(repeating: UInt8(1), count: 32)
   let nonce = Array(repeating: UInt8(2), count: 12)

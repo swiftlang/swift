@@ -26,13 +26,6 @@
 
 #include <stdlib.h>
 
-/// Major version changes when there are ABI or source incompatible changes.
-#define SWIFT_REFLECTION_VERSION_MAJOR 3
-
-/// Minor version changes when new APIs are added in ABI- and source-compatible
-/// way.
-#define SWIFT_REFLECTION_VERSION_MINOR 0
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,6 +35,14 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 __attribute__((__weak_import__))
 #endif
 extern unsigned long long swift_reflection_classIsSwiftMask;
+
+/// An arbitrary version number for this library. Incremented to indicate the
+/// presence of a bug fix or feature that can't be detected from the outside
+/// otherwise. The currently used version numbers are:
+///
+/// 0 - Indicates that swift_reflection_iterateAsyncTaskAllocations has been
+///     fixed to use the right AsyncTask layout.
+SWIFT_REMOTE_MIRROR_LINKAGE extern uint32_t swift_reflection_libraryVersion;
 
 /// Get the metadata version supported by the Remote Mirror library.
 SWIFT_REMOTE_MIRROR_LINKAGE

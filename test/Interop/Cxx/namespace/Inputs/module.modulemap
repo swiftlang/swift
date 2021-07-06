@@ -1,5 +1,6 @@
 module Classes {
   header "classes.h"
+  requires cplusplus
 }
 
 module ClassesSecondHeader {
@@ -7,22 +8,27 @@ module ClassesSecondHeader {
   // these headers should be added to the correct module: SR-14214.
   header "classes.h"
   header "classes-second-header.h"
+  requires cplusplus
 }
 
 module FreeFunctions {
   header "free-functions.h"
+  requires cplusplus
 }
 
 module FreeFunctionsSecondHeader {
   header "free-functions.h"
   header "free-functions-second-header.h"
+  requires cplusplus
 }
 
 module Templates {
   header "templates.h"
+  requires cplusplus
 }
 
 module TemplatesSecondHeader {
   header "templates.h"
   header "templates-second-header.h"
+  requires cplusplus
 }

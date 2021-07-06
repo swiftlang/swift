@@ -59,7 +59,6 @@
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(Actor)
-PROTOCOL(DistributedActor)
 PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
 PROTOCOL(RawRepresentable)
@@ -94,6 +93,10 @@ PROTOCOL(StringInterpolationProtocol)
 
 PROTOCOL(AdditiveArithmetic)
 PROTOCOL(Differentiable)
+
+// Distributed Actors
+PROTOCOL(DistributedActor)
+PROTOCOL(ActorTransport)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)

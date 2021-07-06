@@ -252,7 +252,7 @@ struct CC {}
 func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
+  callCC { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{none}}
     _ = $0
     return 1
   }
@@ -313,7 +313,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> <#Result#> }}
+let things = Thing().map { thing in  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{34-34=-> <#Result#> }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -322,7 +322,7 @@ let things = Thing().map { thing in  // expected-error {{unable to infer complex
 
 // <rdar://problem/21675896> QoI: [Closure return type inference] Swift cannot find members for the result of inlined lambdas with branches
 func r21675896(file : String) {
-  let x: String = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{20-20= () -> <#Result#> in }}
+  let x: String = { // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{20-20= () -> <#Result#> in }}
     if true {
       return "foo"
     }
@@ -360,7 +360,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> <#Result#> }}
+[0].map {  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{5-5=-> <#Result#> }}
   _ in
   let r =  (1,2).0
   return r
@@ -408,7 +408,7 @@ func r20789423() {
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
   // expected-error@-1:11 {{cannot call value of non-function type '()'}}
   
-  let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> <#Result#> }}
+  let _f = { (v: Int) in  // expected-error {{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{23-23=-> <#Result#> }}
     print("a")
     return "hi"
   }

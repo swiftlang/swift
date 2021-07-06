@@ -161,7 +161,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{unable to infer complex closure return type; add explicit type to disambiguate}} {{21-21=-> <#Result#> }} {{educational-notes=complex-closure-inference}}
+  myMap(0..<10, { x in // expected-error{{cannot infer return type for closure with multiple statements; add explicit type to disambiguate}} {{21-21=-> <#Result#> }} {{educational-notes=complex-closure-inference}}
     ()
     return x
   })

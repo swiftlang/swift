@@ -727,4 +727,42 @@ struct TuplifiedStructWithInvalidClosure {
       42
     }
   }
+
+  @TupleBuilder var nestedErrorsDiagnosedByParser: some Any {
+    tuplify(true) { _ in
+      tuplify { _ in
+        self. // expected-error {{expected member name following '.'}}
+      }
+      42
+    }
+  }
+}
+
+// rdar://65667992 - invalid case in enum causes fallback diagnostic
+func test_rdar65667992() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ t: T) -> T { t }
+    static func buildEither<T>(first: T) -> T { first }
+    static func buildEither<T>(second: T) -> T { second }
+  }
+
+  struct S {}
+
+  enum E {
+    case set(v: Int, choices: [Int])
+    case notSet(choices: [Int])
+  }
+
+  struct MyView {
+    var entry: E
+
+    @Builder var body: S {
+      switch entry { // expected-error {{type 'E' has no member 'unset'}}
+      case .set(_, _): S()
+      case .unset(_): S()
+      default: S()
+      }
+    }
+  }
 }

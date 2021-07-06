@@ -744,6 +744,10 @@ public:
   /// Get the runtime availability of support for differentiation.
   AvailabilityContext getDifferentiationAvailability();
 
+  /// Get the runtime availability of getters and setters of multi payload enum
+  /// tag single payloads.
+  AvailabilityContext getMultiPayloadEnumTagSinglePayload();
+
   /// Get the runtime availability of features introduced in the Swift 5.2
   /// compiler for the target platform.
   AvailabilityContext getSwift52Availability();
@@ -759,6 +763,10 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.5
   /// compiler for the target platform.
   AvailabilityContext getSwift55Availability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.6
+  /// compiler for the target platform.
+  AvailabilityContext getSwift56Availability();
 
   /// Get the runtime availability of features that have been introduced in the
   /// Swift compiler for future versions of the target platform.

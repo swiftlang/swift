@@ -150,6 +150,13 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
       BaseTy->hasUnresolvedType() || BaseTy->hasError())
     return true;
 
+  if (isa<TypeAliasDecl>(VD) && BaseTy->is<ProtocolType>()) {
+    // The protocol doesn't satisfy its own generic signature (static members
+    // of the protocol are not visible on the protocol itself) but we can still
+    // access typealias declarations on it.
+    return true;
+  }
+
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
     return true;

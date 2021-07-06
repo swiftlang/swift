@@ -604,7 +604,8 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitEndAccessInst(
     // Use the actual source loc of the begin_access if it works. Otherwise,
     // scan backwards.
     auto remark =
-        RemarkMissed("memory", *eai, SourceLocInferenceBehavior::BackwardScan,
+        RemarkMissed("memory", *eai,
+                     SourceLocInferenceBehavior::BackwardThenForwardAlwaysInfer,
                      SourceLocPresentationKind::EndRange)
         << "end exclusive access to value of type '"
         << NV("ValueType", eai->getOperand()->getType()) << "'";
@@ -649,7 +650,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
 
     auto remark =
         RemarkMissed("memory", *sri,
-                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer,
+                     SourceLocInferenceBehavior::BackwardThenForwardAlwaysInfer,
                      SourceLocPresentationKind::EndRange)
         << "release of type '" << NV("ValueType", sri->getOperand()->getType())
         << "'";
@@ -693,7 +694,7 @@ void AssemblyVisionRemarkGeneratorInstructionVisitor::visitReleaseValueInst(
     // Releases end a lifetime scope so we infer scan backward.
     auto remark =
         RemarkMissed("memory", *rvi,
-                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer)
+                     SourceLocInferenceBehavior::BackwardThenForwardAlwaysInfer)
         << "release of type '" << NV("ValueType", rvi->getOperand()->getType())
         << "'";
     for (auto arg : inferredArgs) {
