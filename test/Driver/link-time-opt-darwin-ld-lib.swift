@@ -28,12 +28,12 @@
 
 // Check that driver does not see libLTO.dylib as an input
 
-// RUN: %swiftc_driver -driver-print-jobs %S/../Inputs/empty.swift -lto=llvm-full -lto_library /foo/libLTO.dylib -target x86_64-apple-macosx10.9     | %FileCheck %s --check-prefix=CHECK-SIMPLE-LTO-LIB --check-prefix=CHECK-SIMPLE-LTO-LIB-macosx
+// RUN: %swiftc_driver -driver-print-jobs %S/../Inputs/empty.swift -lto=llvm-full -lto-library /foo/libLTO.dylib -target x86_64-apple-macosx10.9     | %FileCheck %s --check-prefix=CHECK-SIMPLE-LTO-LIB --check-prefix=CHECK-SIMPLE-LTO-LIB-macosx
 
 // CHECK-SIMPLE-LTO-LIB: swift
 // CHECK-SIMPLE-LTO-LIB-DAG: -emit-bc
 // CHECK-SIMPLE-LTO-LIB-DAG: -lto=llvm-full
-// CHECK-SIMPLE-LTO-LIB-NOT: -lto_library /foo/libLTO.dylib
+// CHECK-SIMPLE-LTO-LIB-NOT: -lto-library /foo/libLTO.dylib
 // CHECK-SIMPLE-LTO-LIB-DAG: -o [[OBJECTFILE:.*\.bc]]
 
 // CHECK-SIMPLE-LTO-LIB-macosx: ld
