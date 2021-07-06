@@ -551,8 +551,7 @@ def lto : Joined<["-"], "lto=">,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
   
 def lto_library : Separate<["-"], "lto-library">,
-  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption]>,
+  Flags<[FrontendOption, ArgumentIsPath, NoInteractiveOption]>,
   HelpText<"Perform LTO with <lto-library>">, MetaVarName<"<lto-library>">;
 
 def access_notes_path : Separate<["-"], "access-notes-path">,
