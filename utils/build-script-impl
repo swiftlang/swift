@@ -1444,6 +1444,25 @@ function cmake_config_opt() {
     fi
 }
 
+function copy_lib_stripping_architecture() {
+    local source="$1"
+    local dest="$2"
+    local arch="$3"
+
+    # An alternative approach would be to use || to first
+    # attempt the removal of the slice and fall back to the
+    # copy when failing.
+    # However, this would leave unneeded error messages in the logs
+    # that may hinder investigation; in addition, in this scenario
+    # the `call` function seems to not propagate correctly failure
+    # exit codes.
+    if lipo -archs "${source}" | grep -q "${arch}"; then
+        call lipo -remove "${arch}" "${source}" -output "${dest}"
+    else
+        call cp "${source}" "${dest}"
+    fi
+}
+
 function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
     local clang_dest_dir="$1"
 
@@ -1468,7 +1487,12 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 DEST_LIB_PATH="${DEST_BUILTINS_DIR}/${LIB_NAME}"
                 if [[ ! -f "${DEST_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_LIB_PATH}" ]]; then
-                        call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
+                        if [[ "$OS" == "tvos" ]]; then
+                            # This is to avoid strip failures when generating a toolchain
+                            copy_lib_stripping_architecture "${HOST_LIB_PATH}" "${DEST_LIB_PATH}" i386
+                        else
+                           call cp "${HOST_LIB_PATH}" "${DEST_LIB_PATH}"
+                        fi
                     elif [[ "${VERBOSE_BUILD}" ]]; then
                         echo "no file exists at ${HOST_LIB_PATH}"
                     fi
@@ -1480,7 +1504,12 @@ function copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain() {
                 DEST_SIM_LIB_PATH="${DEST_BUILTINS_DIR}/${SIM_LIB_NAME}"
                 if [[ ! -f "${DEST_SIM_LIB_PATH}" ]]; then
                     if [[ -f "${HOST_SIM_LIB_PATH}" ]]; then
-                        call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                        if [[ "$OS" == "tvos" ]]; then
+                            # This is to avoid strip failures when generating a toolchain
+                            copy_lib_stripping_architecture "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}" i386
+                        else
+                            call cp "${HOST_SIM_LIB_PATH}" "${DEST_SIM_LIB_PATH}"
+                        fi
                     elif [[ -f "${HOST_LIB_PATH}" ]]; then
                         # The simulator .a might not exist if the host
                         # Xcode is old. In that case, copy over the
