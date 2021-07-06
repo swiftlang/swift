@@ -2926,10 +2926,8 @@ public:
   }
 
   void visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T, StringRef Label) {
-    printCommon("type_named_opaque_return", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_named_opaque_return", Label);
+    dump.printRec(T->getBase());
   }
 
   void visitPlaceholderTypeRepr(PlaceholderTypeRepr *T, StringRef Label) {
