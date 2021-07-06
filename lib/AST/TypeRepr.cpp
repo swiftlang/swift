@@ -129,18 +129,25 @@ void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
 }
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
+  getAttrs().print(OS);
+}
+
+void TypeAttributes::print(llvm::raw_ostream &OS) const {
   StreamPrinter Printer(OS);
-  printAttrs(Printer, PrintOptions());
+  print(Printer, PrintOptions());
 }
 
 void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
                                     const PrintOptions &Options) const {
-  const TypeAttributes &Attrs = getAttrs();
+  getAttrs().print(Printer, Options);
+}
 
+void TypeAttributes::print(ASTPrinter &Printer,
+                           const PrintOptions &Options) const {
   auto hasAttr = [&](TypeAttrKind K) -> bool {
     if (Options.excludeAttrKind(K))
       return false;
-    return Attrs.has(K);
+    return has(K);
   };
 
   if (hasAttr(TAK_autoclosure))
@@ -153,7 +160,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_differentiable)) {
     Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@differentiable");
-    switch (Attrs.differentiabilityKind) {
+    switch (differentiabilityKind) {
     case DifferentiabilityKind::Normal:
       break;
     case DifferentiabilityKind::Forward:
@@ -177,11 +184,11 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_thick))
     Printer.printSimpleAttr("@thick") << " ";
 
-  if (hasAttr(TAK_convention) && Attrs.hasConvention()) {
+  if (hasAttr(TAK_convention) && hasConvention()) {
     Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@convention");
     SmallString<32> convention;
-    Attrs.getConventionArguments(convention);
+    getConventionArguments(convention);
     Printer << "(" << convention << ")";
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";

@@ -17,7 +17,7 @@ protocol P0 {
 // CHECK: protocol{{.*}}"P1"
 protocol P1: P0 {
   // CHECK: associated_type_decl
-  // CHECK-SAME: overridden=P0
+  // CHECK-SAME: overridden_protos=('P0')
   associatedtype A
 
   // CHECK: func_decl{{.*}}foo(){{.*}}Self : P1{{.*}}override={{.*}}P0.foo
@@ -25,7 +25,7 @@ protocol P1: P0 {
 
   // CHECK: var_decl
   // CHECK-SAME: "prop"
-  // CHECK-SAME: override=override.(file).P0.prop
+  // CHECK-SAME: override=('override.(file).P0.prop@{{[^']+}}')
   var prop: A { get }
 }
 
@@ -42,30 +42,31 @@ protocol P2 {
 protocol P3: P1, P2 {
   // CHECK: associated_type_decl
   // CHECK-SAME: "A"
-  // CHECK-SAME: override=override.(file).P1.A
-  // CHECK-SAME: override.(file).P2.A
+  // CHECK-SAME: override=(
+  // CHECK-SAME: 'override.(file).P1.A@
+  // CHECK-SAME: 'override.(file).P2.A@
   associatedtype A
 
-  // CHECK: func_decl{{.*}}foo(){{.*}}Self : P3{{.*}}override={{.*}}P2.foo{{.*,.*}}P1.foo
+  // CHECK: func_decl{{.*}}foo(){{.*}}Self : P3{{.*}}override=('{{.*}}P2.foo{{.*' '.*}}P1.foo
   func foo()
 
   // CHECK: var_decl
   // CHECK-SAME: "prop"
-  // CHECK-SAME: override=override.(file).P2.prop
-  // CHECK-SAME: override.(file).P1.prop
+  // CHECK-SAME: override=(
+  // CHECK-SAME: 'override.(file).P2.prop@
+  // CHECK-SAME: 'override.(file).P1.prop@
   var prop: A { get }
 }
 
 // CHECK: protocol{{.*}}"P4"
 protocol P4: P0 {
   // CHECK: func_decl{{.*}}foo(){{.*}}Self : P4
-  // CHECK-NOT: override=
-  // CHECK-SAME: )
+  // CHECK-SAME: override=()
   func foo() -> Int
 
   // CHECK: var_decl
   // CHECK-SAME: "prop"
-  // CHECK-NOT: override=
+  // CHECK-SAME: override=()
   // CHECK-SAME: immutable
   var prop: Int { get }
 }
@@ -73,13 +74,12 @@ protocol P4: P0 {
 // CHECK: protocol{{.*}}"P5"
 protocol P5: P0 where Self.A == Int {
   // CHECK: func_decl{{.*}}foo(){{.*}}Self : P5
-  // CHECK-NOT: override=
-  // CHECK-SAME: )
+  // CHECK-SAME: override=()
   func foo() -> Int
 
   // CHECK: var_decl
   // CHECK-SAME: "prop"
-  // CHECK-SAME: override=override.(file).P0.prop
+  // CHECK-SAME: override=('override.(file).P0.prop@
   var prop: Int { get }
 }
 
@@ -91,7 +91,7 @@ protocol P6: P0 {
 
   // CHECK: var_decl
   // CHECK-SAME: "prop"
-  // CHECK-SAME: override=override.(file).P0.prop
+  // CHECK-SAME: override=('override.(file).P0.prop@
   override var prop: A { get }
 }
 
@@ -109,20 +109,18 @@ protocol P7: P0 {
 protocol P8: P0 {
   // CHECK: associated_type_decl
   // CHECK-SAME: "A"
-  // CHECK-NOT: override
-  // CHECK-SAME: )
+  // CHECK-SAME: override=()
   @_nonoverride
   associatedtype A
 
   // CHECK: func_decl{{.*}}foo(){{.*}}Self : P8
-  // CHECK-NOT: override=
-  // CHECK-SAME: )
+  // CHECK-SAME: override=()
   @_nonoverride
   func foo()
 
   // CHECK: var_decl
   // CHECK-SAME: "prop"
-  // CHECK-NOT: override=
+  // CHECK-SAME: override=()
   // CHECK-SAME: immutable
   @_nonoverride
   var prop: A { get }
@@ -140,13 +138,11 @@ protocol SubtypingP0 {
 // CHECK: protocol{{.*}}"SubtypingP1"
 protocol SubtypingP1: SubtypingP0 {
   // CHECK: constructor_decl{{.*}}Self : SubtypingP1
-  // CHECK-NOT: override=
-  // CHECK-SAME: designated
+  // CHECK-SAME: override=()
   init()
 
   // CHECK: func_decl{{.*}}foo(){{.*}}Self : SubtypingP1
-  // CHECK-NOT: override=
-  // CHECK-SAME: )
+  // CHECK-SAME: override=()
   func foo() -> Derived
 }
 

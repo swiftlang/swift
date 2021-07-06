@@ -5209,7 +5209,7 @@ public:
   }
 
   void visitOpenedArchetypeType(OpenedArchetypeType *T) {
-    if (Options.PrintForSIL)
+    if (Options.PrintForSIL || Options.PrintOpenedTypeAttr)
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
     visit(T->getOpenedExistentialType());
   }
@@ -5455,34 +5455,6 @@ void GenericSignature::print(ASTPrinter &Printer,
 void GenericSignature::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
-}
-
-void Requirement::dump() const {
-  dump(llvm::errs());
-  llvm::errs() << '\n';
-}
-void Requirement::dump(raw_ostream &out) const {
-  switch (getKind()) {
-  case RequirementKind::Conformance:
-    out << "conforms_to: ";
-    break;
-  case RequirementKind::Layout:
-    out << "layout: ";
-    break;
-  case RequirementKind::Superclass:
-    out << "superclass: ";
-    break;
-  case RequirementKind::SameType:
-    out << "same_type: ";
-    break;
-  }
-
-  if (getFirstType())
-    out << getFirstType() << " ";
-  if (getKind() != RequirementKind::Layout && getSecondType())
-    out << getSecondType();
-  else if (getLayoutConstraint())
-    out << getLayoutConstraint();
 }
 
 void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {

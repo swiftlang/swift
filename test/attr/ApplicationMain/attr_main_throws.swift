@@ -7,7 +7,7 @@ struct MyBase {
   }
 }
 
-// CHECK-AST: (func_decl implicit "$main()" interface type='(MyBase.Type) -> () throws -> ()' access=internal type
+// CHECK-AST: (func_decl implicit "$main()" interface type='(MyBase.Type) -> () throws -> ()' access=internal override=() type
 // CHECK-AST-NEXT:  (self=parameter implicit "self" type='<null type>')
 // CHECK-AST-NEXT:  (parameter_list)
 // CHECK-AST-NEXT:  (body=brace_stmt implicit

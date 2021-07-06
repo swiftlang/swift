@@ -2438,6 +2438,9 @@ public:
   llvm::iterator_range<iterator> getCustomAttrs() const {
     return llvm::make_range(iterator(CustomAttrs), iterator());
   }
+
+  void print(llvm::raw_ostream &OS) const;
+  void print(ASTPrinter &Printer, const PrintOptions &Options) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
