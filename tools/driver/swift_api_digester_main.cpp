@@ -196,13 +196,15 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   bool detectFuncToProperty(SDKNode *R, SDKNode *A) {
     if (R->getKind() == SDKNodeKind::DeclFunction) {
       if (A->getKind() == SDKNodeKind::DeclVar) {
-        if (A->getName().compare_lower(R->getName()) == 0) {
+        if (A->getName().compare_insensitive(R->getName()) == 0) {
           R->annotate(NodeAnnotation::GetterToProperty);
         } else if (R->getName().startswith("get") &&
-                   R->getName().substr(3).compare_lower(A->getName()) == 0) {
+                   R->getName().substr(3).compare_insensitive(A->getName()) ==
+                       0) {
           R->annotate(NodeAnnotation::GetterToProperty);
         } else if (R->getName().startswith("set") &&
-                   R->getName().substr(3).compare_lower(A->getName()) == 0) {
+                   R->getName().substr(3).compare_insensitive(A->getName()) ==
+                       0) {
           R->annotate(NodeAnnotation::SetterToProperty);
         } else {
           return false;
