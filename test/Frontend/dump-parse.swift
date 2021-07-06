@@ -6,7 +6,7 @@
 func foo(_ n: Int) -> Int {
   // CHECK:   (body=brace_stmt
   // CHECK:     (return_stmt
-  // CHECK:       (integer_literal_expr type='<null>'{{.*}} value=42 {{.*}})))
+  // CHECK:       (integer_literal_expr type='<null type>'{{.*}} value=42 {{.*}})))
   // CHECK-AST: (body=brace_stmt
   // CHECK-AST:   (return_stmt
   // CHECK-AST:     (integer_literal_expr type='{{[^']+}}' {{.*}} value=42 {{.*}})
@@ -83,23 +83,23 @@ enum MyEnum {
     // CHECK-LABEL: (enum_case_decl range=[{{.+}}]
     // CHECK-NEXT:    (enum_element_decl range=[{{.+}}]  "foo(x:)"
     // CHECK-NEXT:      (parameter_list range=[{{.+}}]
-    // CHECK-NEXT:         (parameter range=[{{.+}}] "x" type='<null type>' api_name=x)))
+    // CHECK-NEXT:         (parameter range=[{{.+}}] "x" type='<null type>' api_name="x")))
     // CHECK-NEXT:     (enum_element_decl range=[{{.+}}] "bar"))
     // CHECK-NEXT:  (enum_element_decl range=[{{.+}}] "foo(x:)"
     // CHECK-NEXT:    (parameter_list range=[{{.+}}]
-    // CHECK-NEXT:      (parameter range=[{{.+}}] "x" type='<null type>' api_name=x)))
+    // CHECK-NEXT:      (parameter range=[{{.+}}] "x" type='<null type>' api_name="x")))
     // CHECK-NEXT:  (enum_element_decl range=[{{.+}}] "bar"))
     case foo(x: MyStruct), bar
 }
 
 // CHECK-LABEL: (top_level_code_decl range=[{{.+}}]
 // CHECK-NEXT:    (brace_stmt implicit range=[{{.+}}]
-// CHECK-NEXT:      (sequence_expr type='<null>'
-// CHECK-NEXT:        (discard_assignment_expr type='<null>'{{.*}})
-// CHECK-NEXT:        (assign_expr type='<null>'
+// CHECK-NEXT:      (sequence_expr type='<null type>'
+// CHECK-NEXT:        (discard_assignment_expr type='<null type>'{{.*}})
+// CHECK-NEXT:        (assign_expr type='<null type>'
 // CHECK-NEXT:          (dest=<<null>>)
 // CHECK-NEXT:          (src=<<null>>))
-// CHECK-NEXT:        (closure_expr type='<null>'{{.*}} discriminator={{[0-9]+}}
+// CHECK-NEXT:        (closure_expr type='<null type>'{{.*}} discriminator={{[0-9]+}}
 // CHECK-NEXT:          (parameter_list range=[{{.+}}]
 // CHECK-NEXT:            (parameter range=[{{.+}}] "v" type='<null type>'))
 // CHECK-NEXT:          (body=brace_stmt range=[{{.+}}])))))
@@ -116,8 +116,8 @@ struct SelfParam {
   // CHECK-NEXT:        (component "SelfParam" bind=none)))
   static func createOptional() -> SelfParam? {
 
-    // CHECK-LABEL: (single_expression_body=call_expr type='<null>'{{.*}} arg_labels=
-    // CHECK-NEXT:    (fn=unresolved_decl_ref_expr type='<null>'{{.*}} "SelfParam" function_ref=unapplied)
+    // CHECK-LABEL: (single_expression_body=call_expr type='<null type>'{{.*}} arg_labels=
+    // CHECK-NEXT:    (fn=unresolved_decl_ref_expr type='<null type>'{{.*}} "SelfParam" function_ref=unapplied)
     // CHECK-NEXT:    (arg=tuple_expr type='()'{{.*}}))
     SelfParam()
   }
