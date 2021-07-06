@@ -6634,7 +6634,7 @@ private:
            "TopHandler's completion handler");
     assert(Scopes.back().isWrappedInContination());
 
-    ArrayRef<Expr *> Args;
+    std::vector<Expr *> Args;
     StringRef ResumeArgumentLabel;
     switch (TopHandler.getHandlerType()) {
     case HandlerType::PARAMS: {
