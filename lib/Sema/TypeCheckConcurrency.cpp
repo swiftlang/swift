@@ -393,10 +393,10 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
                 diag::distributed_actor_func_defined_outside_of_distributed_actor,
                 func->getName());
           }
-        }
+        } // TODO: need to handle protocol case here too?
 
           return forDistributedActorSelf(isolation.getActor(),
-                                         /*isCrossActor*/ isAccessibleAcrossActors); // TODO: not sure?
+                                         /*isCrossActor*/ isAccessibleAcrossActors);
       }
     }
 

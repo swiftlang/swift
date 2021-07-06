@@ -2810,15 +2810,64 @@ bool ConformanceChecker::checkActorIsolation(
         return false;
     }
 
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(witness)) {
+      // A 'distributed func' may witness a distributed isolated function requirement.
+      if (funcDecl->isDistributed()) {
+        return false;
+      }
+    }
+
+    auto requirementIsolation = getActorIsolation(requirement);
+    // A distributed function may be witnessed by a distributed function.
+    if (requirementIsolation == ActorIsolation::DistributedActorInstance) {
+      fprintf(stderr, "[%s:%d] (%s) OKEY!\n", __FILE__, __LINE__, __FUNCTION__);
+      return false;
+    }
+
+    fprintf(stderr, "[%s:%d] (%s) REQUIREMENT\n", __FILE__, __LINE__, __FUNCTION__);
+    requirement->dump();
+    fprintf(stderr, "[%s:%d] (%s) WITNESS\n", __FILE__, __LINE__, __FUNCTION__);
+    witness->dump();
+
+    fprintf(stderr, "[%s:%d] (%s) OH NO, was:%d, inst:%d, dist:%d\n", __FILE__, __LINE__, __FUNCTION__,
+            requirementIsolation,
+            ActorIsolation::ActorInstance,
+            ActorIsolation::DistributedActorInstance);
+
+    // A distributed function may be witnessed by a distributed function.
+    if (requirementIsolation == ActorIsolation::DistributedActorInstance) {
+      requirement->dump();
+      fprintf(stderr, "[%s:%d] (%s) OKEY!\n", __FILE__, __LINE__, __FUNCTION__);
+      return false;
+    }
+
+    fprintf(stderr, "[%s:%d] (%s) LLVM_FALLTHROUGH!\n", __FILE__, __LINE__, __FUNCTION__);
     // continue checking ActorSelf rules
     LLVM_FALLTHROUGH;
   }
   case ActorIsolationRestriction::ActorSelf: {
+    auto requirementIsolation = getActorIsolation(requirement);
+
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
-    if (getActorIsolation(requirement) == ActorIsolation::ActorInstance)
+    if (requirementIsolation == ActorIsolation::ActorInstance)
       return false;
 
+//    // A distributed function may be witnessed by a distributed function.
+//    if (requirementIsolation == ActorIsolation::DistributedActorInstance) {
+//      fprintf(stderr, "[%s:%d] (%s) OKEY!\n", __FILE__, __LINE__, __FUNCTION__);
+//      return false;
+//    }
+//
+//    fprintf(stderr, "[%s:%d] (%s) REQUIREMENT\n", __FILE__, __LINE__, __FUNCTION__);
+//    requirement->dump();
+//    fprintf(stderr, "[%s:%d] (%s) WITNESS\n", __FILE__, __LINE__, __FUNCTION__);
+//    witness->dump();
+//
+//    fprintf(stderr, "[%s:%d] (%s) OH NO, was:%d, inst:%d, dist:%d\n", __FILE__, __LINE__, __FUNCTION__,
+//            requirementIsolation,
+//            ActorIsolation::ActorInstance,
+//            ActorIsolation::DistributedActorInstance);
     witness->diagnose(diag::actor_isolated_witness,
                       witness->getDescriptiveKind(),
                       witness->getName());
