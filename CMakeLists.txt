@@ -191,9 +191,10 @@ set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     option only affects the tools that run on the host (the compiler), and has
     no effect on the target libraries (the standard library and the runtime).")
 
-option(SWIFT_TOOLS_ENABLE_LIBSWIFT
-  "Enable building libswift and linking libswift into the compiler itself."
-  FALSE)
+# NOTE: We do not currently support building libswift with the Xcode generator.
+cmake_dependent_option(SWIFT_TOOLS_ENABLE_LIBSWIFT
+  "Enable building libswift and linking libswift into the compiler itself." FALSE
+  "NOT CMAKE_GENERATOR STREQUAL \"Xcode\"" FALSE)
 
 # The following only works with the Ninja generator in CMake >= 3.0.
 set(SWIFT_PARALLEL_LINK_JOBS "" CACHE STRING
@@ -511,8 +512,6 @@ message(STATUS "C Compiler (${CMAKE_C_COMPILER}) Version: ${CMAKE_C_COMPILER_VER
 message(STATUS "C++ Compiler (${CMAKE_CXX_COMPILER}) Version: ${CMAKE_CXX_COMPILER_VERSION}")
 if (CMAKE_Swift_COMPILER)
   message(STATUS "Swift Compiler (${CMAKE_Swift_COMPILER}) Version: ${CMAKE_Swift_COMPILER_VERSION}")
-elseif (SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
-  message(FATAL_ERROR "Swift Compiler not found and SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER is set")
 else()
   message(STATUS "Swift Compiler (None).")
 endif()
@@ -1060,9 +1059,7 @@ if(SWIFT_INCLUDE_TOOLS)
   # which is used in add_swift_host_tool for the lldb workaround.
   #
   # NOTE: We do not currently support libswift with the Xcode generator.
-  if (NOT CMAKE_GENERATOR STREQUAL "Xcode")
-    add_subdirectory(libswift)
-  endif()
+  add_subdirectory(libswift)
 
   # Always include this after including stdlib/!
   # Refer to the large comment above the add_subdirectory(stdlib) call.

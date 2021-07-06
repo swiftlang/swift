@@ -922,7 +922,7 @@ One of the first steps is an invocation of the driver's
 In order to create a Swift compiler installation (`--install-swift`), the
 standalone driver must be built as a separate build product using the
 *just-built* Swift compiler and toolchain (the ones built in the same
-`build-script` invocation, preceeding the SwiftDriver build product). The
+`build-script` invocation, preceding the SwiftDriver build product). The
 additional build product is added to the build by specifying the
 `--swift-driver` option of the `build-script`. The driver product is istalled
 into the resulting toolchain installation by specifying the

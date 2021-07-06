@@ -1,5 +1,7 @@
 // Windows doesn't track/use read() and poll()
 // UNSUPPORTED: windows
+// This test is unreliable on busy machines.
+// ALLOW_RETRIES: 5
 // RUN: %empty-directory(%t/manyfuncs)
 // RUN: %empty-directory(%t/stats)
 //

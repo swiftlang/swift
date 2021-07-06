@@ -4092,11 +4092,23 @@ bool ConstraintSystem::repairFailures(
     path.pop_back();
     // If this is a contextual mismatch between l-value types e.g.
     // `@lvalue String vs. @lvalue Int`, let's pretend that it's okay.
-    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-      auto *locator = getConstraintLocator(anchor, path.back());
-      conversionsOrFixes.push_back(
-          IgnoreContextualType::create(*this, lhs, rhs, locator));
-      break;
+    if (!path.empty()) {
+      if (path.back().is<LocatorPathElt::ContextualType>()) {
+        auto *locator = getConstraintLocator(anchor, path.back());
+        conversionsOrFixes.push_back(
+            IgnoreContextualType::create(*this, lhs, rhs, locator));
+        break;
+      }
+
+      // If this is a function type param type mismatch in any position,
+      // the mismatch we want to report is for the whole structural type.
+      auto last = std::find_if(
+          path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+            return elt.is<LocatorPathElt::FunctionArgument>();
+          });
+
+      if (last != path.rend())
+        break;
     }
 
     LLVM_FALLTHROUGH;
@@ -4887,14 +4899,24 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::PatternMatch: {
+    auto *pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
+    bool isMemberMatch =
+        lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern);
+
+    // If member reference couldn't be resolved, let's allow pattern
+    // to have holes.
+    if (rhs->isPlaceholder() && isMemberMatch) {
+      recordAnyTypeVarAsPotentialHole(lhs);
+      return true;
+    }
+
     // If either type is a placeholder, consider this fixed.
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
-    // If the left-hand side is a function type and the pattern is an enum
-    // element pattern, call it a contextual mismatch.
-    auto pattern = elt.castTo<LocatorPathElt::PatternMatch>().getPattern();
-    if (lhs->is<FunctionType>() && isa<EnumElementPattern>(pattern)) {
+    // If member reference didn't match expected pattern,
+    // let's consider that a contextual mismatch.
+    if (isMemberMatch) {
       recordAnyTypeVarAsPotentialHole(lhs);
       recordAnyTypeVarAsPotentialHole(rhs);
 
@@ -8207,6 +8229,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           // `key path` constraint can't be retired until all components
           // are simplified.
           addTypeVariableConstraintsToWorkList(memberTypeVar);
+        } else if (locator->isLastElement<LocatorPathElt::PatternMatch>()) {
+          // Let's handle member patterns specifically because they use
+          // equality instead of argument application constraint, so allowing
+          // them to bind member could mean missing valid hole positions in
+          // the pattern.
+          assignFixedType(memberTypeVar,
+                          PlaceholderType::get(getASTContext(), memberTypeVar));
         } else {
           recordPotentialHole(memberTypeVar);
         }
