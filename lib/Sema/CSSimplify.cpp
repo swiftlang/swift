@@ -4092,11 +4092,23 @@ bool ConstraintSystem::repairFailures(
     path.pop_back();
     // If this is a contextual mismatch between l-value types e.g.
     // `@lvalue String vs. @lvalue Int`, let's pretend that it's okay.
-    if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
-      auto *locator = getConstraintLocator(anchor, path.back());
-      conversionsOrFixes.push_back(
-          IgnoreContextualType::create(*this, lhs, rhs, locator));
-      break;
+    if (!path.empty()) {
+      if (path.back().is<LocatorPathElt::ContextualType>()) {
+        auto *locator = getConstraintLocator(anchor, path.back());
+        conversionsOrFixes.push_back(
+            IgnoreContextualType::create(*this, lhs, rhs, locator));
+        break;
+      }
+
+      // If this is a function type param type mismatch in any position,
+      // the mismatch we want to report is for the whole structural type.
+      auto last = std::find_if(
+          path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+            return elt.is<LocatorPathElt::FunctionArgument>();
+          });
+
+      if (last != path.rend())
+        break;
     }
 
     LLVM_FALLTHROUGH;
