@@ -6111,8 +6111,7 @@ private:
 
         // fatalError(...)
         OS << "fatalError" << tok::l_paren;
-        OS << "\"Expected non-nil success param '" << Name;
-        OS << "' for nil error\"";
+        OS << "\"Expected non-nil result '" << Name << "' for nil error\"";
         OS << tok::r_paren << "\n";
 
         // End guard.
@@ -6903,8 +6902,7 @@ private:
         }
         OS << ' ' << tok::kw_else << ' ' << tok::l_brace << '\n';
         OS << "fatalError" << tok::l_paren;
-        OS << "\"Expected non-nil success argument '" << ArgName;
-        OS << "' for nil error\"";
+        OS << "\"Expected non-nil result '" << ArgName << "' for nil error\"";
         OS << tok::r_paren << '\n';
         OS << tok::r_brace << '\n';
       }

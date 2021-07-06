@@ -120,7 +120,7 @@ func testThrowingContinuationRelayingErrorAndResult(completionHandler: (Int?, Er
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:         continuation.resume(throwing: error)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:       } else {
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:         guard let theValue1 = theValue else {
-// THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:           fatalError("Expected non-nil success argument 'theValue1' for nil error")
+// THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:           fatalError("Expected non-nil result 'theValue1' for nil error")
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:         }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:         continuation.resume(returning: theValue1)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-RESULT-NEXT:       }
@@ -141,7 +141,7 @@ func testThrowingContinuationRelayingErrorAndComplexResult(completionHandler: (I
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:         continuation.resume(throwing: error)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:       } else {
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:         guard let result = theValue.map({ $0 + 1 }) else {
-// THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:           fatalError("Expected non-nil success argument 'result' for nil error")
+// THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:           fatalError("Expected non-nil result 'result' for nil error")
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:         }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:         continuation.resume(returning: result)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-NEXT:       }
@@ -162,10 +162,10 @@ func testThrowingContinuationRelayingErrorAndTwoComplexResults(completionHandler
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:         continuation.resume(throwing: error)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:       } else {
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:         guard let result0 = theValue.map({ $0 + 1 }) else {
-// THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:           fatalError("Expected non-nil success argument 'result0' for nil error")
+// THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:           fatalError("Expected non-nil result 'result0' for nil error")
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:         }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:         guard let result1 = theValue.map({ $0 + 2 }) else {
-// THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:           fatalError("Expected non-nil success argument 'result1' for nil error")
+// THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:           fatalError("Expected non-nil result 'result1' for nil error")
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:         }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:         continuation.resume(returning: (result0, result1))
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-TWO-COMPLEX-RESULTS-NEXT:       }
@@ -186,7 +186,7 @@ func testThrowingContinuationRelayingErrorAndComplexResultWithTrailingClosure(co
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         continuation.resume(throwing: error)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:       } else {
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         guard let result = theValue.map { $0 + 1 }.self else {
-// THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:           fatalError("Expected non-nil success argument 'result' for nil error")
+// THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:           fatalError("Expected non-nil result 'result' for nil error")
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         }
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:         continuation.resume(returning: result)
 // THROWING-CONTINUATION-RELAYING-ERROR-AND-COMPLEX-RESULT-WITH-TRAILING-CLOSURE-NEXT:       }
@@ -461,10 +461,10 @@ func testMultipleReturnValuesAndError(completion: (Int?, String?, Error?) -> Voi
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:         continuation.resume(throwing: error)
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:       } else {
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:         guard let first1 = first else {
-// MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:           fatalError("Expected non-nil success argument 'first1' for nil error")
+// MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:           fatalError("Expected non-nil result 'first1' for nil error")
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:         }
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:         guard let second1 = second else {
-// MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:           fatalError("Expected non-nil success argument 'second1' for nil error")
+// MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:           fatalError("Expected non-nil result 'second1' for nil error")
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:         }
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:         continuation.resume(returning: (first1, second1))
 // MULTIPLE-RETURN-VALUES-AND-ERROR-NEXT:       }
@@ -496,7 +496,7 @@ func testMixedOptionalAnNonOptionaResults(completion: (Int?, String?, Error?) ->
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:   return try await withCheckedThrowingContinuation { continuation in 
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:     withoutAsyncAlternativeThrowing { (theResult, error) in
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:       guard let theResult1 = theResult else {
-// MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:         fatalError("Expected non-nil success argument 'theResult1' for nil error")
+// MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:         fatalError("Expected non-nil result 'theResult1' for nil error")
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:       }
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:       continuation.resume(returning: (theResult1, "hi"))
 // MIXED-OPTIONAL-AND-NON-OPTIONAL-RESULT-NEXT:     }
@@ -514,7 +514,7 @@ func testUseOptionalResultValueAfterCompletionHandlerCall(completion: (Int?, Str
 // USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:   return try await withCheckedThrowingContinuation { continuation in 
 // USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:     withoutAsyncAlternativeThrowing { (theResult, error) in
 // USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:       guard let theResult1 = theResult else {
-// USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:         fatalError("Expected non-nil success argument 'theResult1' for nil error")
+// USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:         fatalError("Expected non-nil result 'theResult1' for nil error")
 // USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:       }
 // USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:       continuation.resume(returning: (theResult1, "hi"))
 // USE-OPTIONAL-RESULT-AFTER-COMPLETION-HANDLER-CALL-NEXT:       print(theResult.map { $0 + 1 } as Any)
