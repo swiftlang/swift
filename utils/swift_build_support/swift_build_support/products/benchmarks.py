@@ -57,7 +57,7 @@ class Benchmarks(product.Product):
             # we need to prefer the libraries we just built
             return {'DYLD_LIBRARY_PATH': os.path.join(
                 _get_toolchain_path(host_target, self, self.args),
-                'usr/lib/swift/macosx')}
+                'usr', 'lib', 'swift', 'macosx')}
 
         return None
 
@@ -98,10 +98,9 @@ class Benchmarks(product.Product):
 
 
 def _get_toolchain_path(host_target, product, args):
-    """ TODO check if we should prefer using product.install_toolchain_path
-    this logic initially was inside run_build_script_helper
-    and was factored out so it can be used in testing as well
-    """
+    # TODO check if we should prefer using product.install_toolchain_path
+    # this logic initially was inside run_build_script_helper
+    # and was factored out so it can be used in testing as well
 
     toolchain_path = swiftpm.SwiftPM.get_install_destdir(args,
                                                          host_target,
