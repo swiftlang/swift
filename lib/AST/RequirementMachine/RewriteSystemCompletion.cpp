@@ -446,7 +446,7 @@ RewriteSystem::computeConfluentCompletion(unsigned maxIterations,
   // moving on to overlaps between rules introduced by completion.
   while (!Worklist.empty()) {
     // Check if we've already done too much work.
-    if (steps >= maxIterations)
+    if (Rules.size() > maxIterations)
       return std::make_pair(CompletionResult::MaxIterations, steps);
 
     auto next = Worklist.front();
