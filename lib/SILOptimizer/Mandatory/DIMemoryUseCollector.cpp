@@ -1065,7 +1065,11 @@ void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  if (TheMemory.isRootSelf()) {
+  if (TheMemory.isRootSelf() ||
+  
+      // Also, just visit all users if ClassPointer is a closure argument,
+      // i.e. collectClassSelfUses is called from addClosureElementUses.
+      isa<SILFunctionArgument>(ClassPointer)) {
     collectClassSelfUses(ClassPointer, TheMemory.getType(), EltNumbering);
     return;
   }
