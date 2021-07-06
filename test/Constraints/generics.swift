@@ -905,3 +905,28 @@ func rdar78781552() {
     // expected-error@-4 {{missing argument for parameter 'filter' in call}}
   }
 }
+
+// rdar://79757320 - failured to produce a diagnostic when unresolved dependent member is used in function result position
+
+protocol R_79757320 {
+  associatedtype In
+  associatedtype Out
+}
+
+func rdar79757320() {
+  struct Value<W> {
+    init(_: W) {}
+
+    func formatted() -> String { "" }
+    func formatted<T : R_79757320>(_: T) -> T.Out where T.In == Value<W> { fatalError() }
+  }
+
+  struct Container {
+    var value: String
+  }
+
+  // FIXME: There has to be a way to propagate holes that makes it easy to suppress failures caused by missing members.
+  _ = Container(value: Value(42).formatted(.S(a: .a, b: .b(0)))) // expected-error {{type 'R_79757320' has no member 'S'}}
+  // expected-error@-1 {{cannot infer contextual base in reference to member 'a'}}
+  // expected-error@-2 {{cannot infer contextual base in reference to member 'b'}}
+}
