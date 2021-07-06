@@ -6094,17 +6094,9 @@ private:
         OS << *ErrName << " " << tok::equal << " " << *ErrName << " ";
         OS << tok::l_brace << "\n";
         for (auto Idx : indices(SuccessParamNames)) {
-          auto &Name = SuccessParamNames[Idx];
           auto ParamTy = SuccessParams[Idx].getParameterType();
           if (!HandlerDesc.shouldUnwrap(ParamTy))
             continue;
-
-          // assert(res == nil, "Expected nil-success param 'res' for non-nil
-          //                     error")
-          OS << "assert" << tok::l_paren << Name << " == " << tok::kw_nil;
-          OS << tok::comma << " \"Expected nil success param '" << Name;
-          OS << "' for non-nil error\"";
-          OS << tok::r_paren << "\n";
         }
 
         // continuation.resume(throwing: err)

@@ -85,7 +85,6 @@ func foo6(_ completion: @escaping (String?, Error?) -> Void) {}
 // FOO6-NEXT:   return try await withCheckedThrowingContinuation { continuation in
 // FOO6-NEXT:     foo6() { result, error in
 // FOO6-NEXT:       if let error = error {
-// FOO6-NEXT:         assert(result == nil, "Expected nil success param 'result' for non-nil error")
 // FOO6-NEXT:         continuation.resume(throwing: error)
 // FOO6-NEXT:         return
 // FOO6-NEXT:       }
@@ -104,7 +103,6 @@ func foo7(_ completion: @escaping (String?, Int, Error?) -> Void) {}
 // FOO7-NEXT:   return try await withCheckedThrowingContinuation { continuation in
 // FOO7-NEXT:     foo7() { result1, result2, error in
 // FOO7-NEXT:       if let error = error {
-// FOO7-NEXT:         assert(result1 == nil, "Expected nil success param 'result1' for non-nil error")
 // FOO7-NEXT:         continuation.resume(throwing: error)
 // FOO7-NEXT:         return
 // FOO7-NEXT:       }
@@ -123,8 +121,6 @@ func foo8(_ completion: @escaping (String?, Int?, Error?) -> Void) {}
 // FOO8-NEXT:   return try await withCheckedThrowingContinuation { continuation in
 // FOO8-NEXT:     foo8() { result1, result2, error in
 // FOO8-NEXT:       if let error = error {
-// FOO8-NEXT:         assert(result1 == nil, "Expected nil success param 'result1' for non-nil error")
-// FOO8-NEXT:         assert(result2 == nil, "Expected nil success param 'result2' for non-nil error")
 // FOO8-NEXT:         continuation.resume(throwing: error)
 // FOO8-NEXT:         return
 // FOO8-NEXT:       }
