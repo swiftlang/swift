@@ -419,8 +419,8 @@ extension Zip2RandomAccessCollection: RandomAccessCollection {
   @inlinable
   public func index(before i: Index) -> Index {
     return _pack(
-      _base1.index(after: i.base1),
-      _base2.index(after: i.base2))
+      _base1.index(before: i.base1),
+      _base2.index(before: i.base2))
   }
   
   @inlinable
