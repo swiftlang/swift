@@ -134,6 +134,220 @@ struct ExprTypeDelegate {
                          return E->getComponents()[index].getComponentType();
                        }) { }
 };
+
+/// Helper class for dumping an AST node.
+///
+/// \c ASTNodeDumper is an RAII type which prints the surrounding structure of
+/// an AST node and provides methods for printing information from it, too. It
+/// handles printing the opening and closing parentheses, correctly formatting
+/// and coloring things, etc.
+class ASTNodeDumper {
+  ASTContext *Ctx;
+  raw_ostream *OS;
+  ExprTypeDelegate *Delegate;
+
+public:
+  unsigned IndentChildren;
+
+  ASTNodeDumper(ASTContext *ctx, raw_ostream &os, ExprTypeDelegate &delegate,
+                unsigned indent,
+                const char *Name, StringRef Label, TerminalColor Color)
+    : Ctx(ctx), OS(&os), Delegate(&delegate), IndentChildren(indent + 2)
+  {
+    OS->indent(indent /* note this is parent indentation */);
+    PrintWithColorRAII(*OS, ParenthesisColor) << '(';
+    PrintWithColorRAII(*OS, LabelColor) << Label;
+    if (!Label.empty())
+      PrintWithColorRAII(*OS, LabelColor) << "=";
+    PrintWithColorRAII(*OS, Color) << Name;
+  }
+
+  template<typename Creator>
+  ASTNodeDumper(Creator *creator, const char *Name, StringRef Label,
+                TerminalColor Color)
+    : ASTNodeDumper(creator->Ctx, creator->OS, creator->Delegate,
+                    creator->Indent, Name, Label, Color) { }
+
+  // Type is uncopyable because its destructor has side effects.
+  ASTNodeDumper(const ASTNodeDumper&) = delete;
+  ASTNodeDumper& operator=(const ASTNodeDumper &) = delete;
+
+  ASTNodeDumper(ASTNodeDumper &&Other)
+    : Ctx(Other.Ctx), OS(Other.OS), Delegate(Other.Delegate),
+      IndentChildren(Other.IndentChildren)
+  {
+    Other.OS = nullptr;
+  }
+
+  ASTNodeDumper& operator=(ASTNodeDumper&& Other) {
+    Ctx = Other.Ctx;
+    OS = Other.OS;
+    Delegate = Other.Delegate;
+    IndentChildren = Other.IndentChildren;
+
+    Other.OS = nullptr;
+
+    return *this;
+  }
+
+  ~ASTNodeDumper() {
+    if (OS)
+      PrintWithColorRAII(*OS, ParenthesisColor) << ')';
+  }
+
+  ASTNodeDumper child(const char *Name, StringRef Label, TerminalColor Color) {
+    return ASTNodeDumper(Ctx, *OS, *Delegate, IndentChildren,
+                         Name, Label, Color);
+  }
+
+  void printRec(Decl *D, StringRef Label = "");
+  void printRec(Expr *E, StringRef Label = "");
+  void printRec(Stmt *S, StringRef Label = "");
+  void printRec(TypeRepr *T, StringRef Label = "");
+  void printRec(const Pattern *P, StringRef Label = "");
+  void printRec(Type Ty, StringRef Label = "");
+
+  void printRec(ParameterList *params, StringRef Label = "");
+  void printRec(StmtConditionElement C, StringRef Label = "");
+  void printRec(ProtocolConformanceRef conf, StringRef Label = "");
+
+  void printRec(const ASTNode N, StringRef Label = "") {
+         if (auto n = N.dyn_cast<Expr *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<Stmt *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<Decl *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<Pattern *>()) printRec(n, Label);
+    else if (auto n = N.dyn_cast<TypeRepr *>()) printRec(n, Label);
+    else llvm_unreachable("unknown ASTNode");
+  }
+
+  template<typename T>
+  void printRec(ArrayRef<T> elems, StringRef Label) {
+    auto childDump = child("array", Label, ExprModifierColor);
+    for (auto elt : elems) {
+      childDump << "\n";
+      childDump.printRec(elt, "");
+    }
+  }
+
+  void printLabel(StringRef label, TerminalColor Color = DeclModifierColor) {
+    *OS << " ";
+    PrintWithColorRAII(*OS, Color) << label;
+    if (!label.empty())
+      PrintWithColorRAII(*OS, Color) << "=";
+  }
+
+  /// Print a field with a value and an optional label.
+  template<typename T>
+  void print(const T &value, StringRef label = "",
+             TerminalColor Color = DeclModifierColor) {
+    printLabel(label, Color);
+    PrintWithColorRAII(*OS, Color) << value;
+  }
+
+  void print(SourceLoc value, StringRef label = "",
+             TerminalColor Color = DeclModifierColor) {
+    if (!Ctx) return;
+
+    printLabel(label, Color);
+    if (value.isValid())
+      value.print(PrintWithColorRAII(*OS, Color).getOS(), Ctx->SourceMgr);
+    else
+      PrintWithColorRAII(*OS, Color) << "<<invalid>>";
+  }
+
+  /// Print a single flag.
+  void printFlag(StringRef label, TerminalColor Color = DeclModifierColor) {
+    PrintWithColorRAII(*OS, Color) << " " << label;
+  }
+
+  /// Print a single flag if it is set.
+  void printFlag(bool isSet, StringRef label,
+                 TerminalColor Color = DeclModifierColor) {
+    if (isSet)
+      printFlag(label, Color);
+  }
+
+  /// Print the name of a declaration being referenced.
+  void printDeclRef(ConcreteDeclRef declRef, StringRef label,
+                    TerminalColor Color = DeclColor) {
+    printLabel(label, Color);
+    declRef.dump(PrintWithColorRAII(*OS, Color).getOS());
+  }
+
+  /// Pretty-print a TypeRepr.
+  void printTypeRepr(TypeRepr *T, StringRef label) {
+    printLabel(label, TypeReprColor);
+
+    PrintWithColorRAII(*OS, TypeReprColor) << "'";
+    if (T)
+      T->print(PrintWithColorRAII(*OS, TypeReprColor).getOS());
+    else
+      PrintWithColorRAII(*OS, TypeReprColor) << "<<NULL>>";
+    PrintWithColorRAII(*OS, TypeReprColor) << "'";
+  }
+
+  /// Print the name of the declaration we are currently dumping. Do not use
+  /// this to just print DeclNameRefs in general; only use it for a declaration
+  /// name that the node "is".
+  void printNodeName(DeclNameRef name) {
+    PrintWithColorRAII(*OS, IdentifierColor) << ' ' << '"' << name << '"';
+  }
+
+  /// Print the name of the declaration we are currently dumping. Do not use
+  /// this to just print DeclNames in general; only use it for a declaration
+  /// name that the node "is".
+  void printNodeName(DeclName name) {
+    printNodeName(DeclNameRef(name));
+  }
+
+  /// Print the name of the declaration we are currently dumping. Do not use
+  /// this to just print ValueDecls in general; only use it for a declaration
+  /// that the node "is".
+  void printNodeName(const ValueDecl *D) {
+    if (D->getName()) {
+      printNodeName(D->getName());
+    } else {
+      PrintWithColorRAII(*OS, IdentifierColor)
+        << "'anonymous @ " << (const void*)D << '\'';
+    }
+  }
+
+  /// Print the source range of the node we are currently displaying. Do not use
+  /// this to just print SourceRanges in general; only use it for the range
+  /// of the current node.
+  void printNodeRange(SourceRange R) {
+    if (Ctx && R.isValid()) {
+      printLabel("range", RangeColor);
+      R.print(PrintWithColorRAII(*OS, RangeColor).getOS(),
+              Ctx->SourceMgr, /*PrintText=*/false);
+    }
+  }
+
+  /// Print the source location of the node we are currently displaying. Do not
+  /// use this to just print SourceLocs in general; only use it for the location
+  /// of the current node.
+  void printNodeLocation(SourceLoc L) {
+    if (!L.isValid()) return;
+    print(L, "location", LocationColor);
+  }
+
+  // These exist for backwards compatibility. The goal is to turn all uses of
+  // them into method calls instead.
+
+  template <typename T>
+  friend ASTNodeDumper &operator << (ASTNodeDumper &dumper, const T &value) {
+    *dumper.OS << value;
+    return dumper;
+  }
+
+  raw_ostream &getOS() {
+    return *OS;
+  }
+
+  PrintWithColorRAII colored(TerminalColor color) {
+    return PrintWithColorRAII(*OS, color);
+  }
+};
 } // end anonymous namespace
 
 static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
@@ -345,130 +559,101 @@ namespace {
                           ExprTypeDelegate &delegate, unsigned indent = 0)
       : Ctx(Ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
-    void printRec(Decl *D, StringRef Label = "");
-    void printRec(Expr *E, StringRef Label = "");
-    void printRec(Stmt *S, StringRef Label = "");
-    void printRec(TypeRepr *T, StringRef Label = "");
-    void printRec(const Pattern *P, StringRef Label = "");
-
-    void printCommon(const char *name, StringRef label, TerminalColor Color) {
-      OS.indent(Indent);
-      PrintWithColorRAII(OS, ParenthesisColor) << '(';
-      PrintWithColorRAII(OS, LabelColor) << label;
-      if (!label.empty()) {  // not null/empty
-        OS << "=";
-      }
-
-      PrintWithColorRAII(OS, Color) << name;
-    }
-
-    raw_ostream &printCommon(Pattern *P, const char *Name, StringRef Label) {
-      printCommon(Name, Label, PatternColor);
+    LLVM_NODISCARD ASTNodeDumper printCommon(Pattern *P, const char *Name,
+                                             StringRef Label) {
+      ASTNodeDumper dump(this, Name, Label, PatternColor);
 
       if (P->isImplicit())
-        PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
+        dump.colored(ExprModifierColor) << " implicit";
 
       if (P->hasType()) {
-        PrintWithColorRAII(OS, TypeColor) << " type='";
-        P->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
-        PrintWithColorRAII(OS, TypeColor) << "'";
+        dump.colored(TypeColor) << " type='";
+        P->getType().print(dump.colored(TypeColor).getOS());
+        dump.colored(TypeColor) << "'";
       }
-      return OS;
-    }
 
-    void printCommonPost() {
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
+      return dump;
     }
 
     void visitParenPattern(ParenPattern *P, StringRef Label) {
-      printCommon(P, "pattern_paren", Label);
-      OS << '\n';
-      printRec(P->getSubPattern());
-      printCommonPost();
+      auto dump = printCommon(P, "pattern_paren", Label);
+      dump << '\n';
+      dump.printRec(P->getSubPattern());
     }
-    void visitTuplePattern(TuplePattern *P, StringRef Label) {
-      printCommon(P, "pattern_tuple", Label);
 
-      OS << " names=";
+    void visitTuplePattern(TuplePattern *P, StringRef Label) {
+      auto dump = printCommon(P, "pattern_tuple", Label);
+
+      dump << " names=";
       interleave(P->getElements(),
                  [&](const TuplePatternElt &elt) {
                    auto name = elt.getLabel();
-                   OS << (name.empty() ? "''" : name.str());
+                   dump << (name.empty() ? "''" : name.str());
                  },
-                 [&] { OS << ","; });
+                 [&] { dump << ","; });
 
       for (auto &elt : P->getElements()) {
-        OS << '\n';
-        printRec(elt.getPattern());
+        dump << '\n';
+        dump.printRec(elt.getPattern());
       }
-      printCommonPost();
     }
     void visitNamedPattern(NamedPattern *P, StringRef Label) {
-      printCommon(P, "pattern_named", Label);
-      PrintWithColorRAII(OS, IdentifierColor) << " '" << P->getNameStr() << "'";
-      printCommonPost();
+      auto dump = printCommon(P, "pattern_named", Label);
+      dump.printNodeName(P->getDecl());
     }
     void visitAnyPattern(AnyPattern *P, StringRef Label) {
-      printCommon(P, "pattern_any", Label);
-      printCommonPost();
+      (void)printCommon(P, "pattern_any", Label);
     }
     void visitTypedPattern(TypedPattern *P, StringRef Label) {
-      printCommon(P, "pattern_typed", Label);
-      OS << '\n';
-      printRec(P->getSubPattern());
+      auto dump = printCommon(P, "pattern_typed", Label);
+      dump << '\n';
+      dump.printRec(P->getSubPattern());
       if (auto *repr = P->getTypeRepr()) {
-        OS << '\n';
-        printRec(repr);
+        dump << '\n';
+        dump.printRec(repr);
       }
-      printCommonPost();
     }
 
     void visitIsPattern(IsPattern *P, StringRef Label) {
-      printCommon(P, "pattern_is", Label);
-      OS << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
-      P->getCastType().print(OS);
+      auto dump = printCommon(P, "pattern_is", Label);
+      dump << ' ' << getCheckedCastKindName(P->getCastKind()) << ' ';
+      P->getCastType().print(dump.getOS());
       if (auto sub = P->getSubPattern()) {
-        OS << '\n';
-        printRec(sub);
+        dump << '\n';
+        dump.printRec(sub);
       }
-      printCommonPost();
     }
     void visitExprPattern(ExprPattern *P, StringRef Label) {
-      printCommon(P, "pattern_expr", Label);
-      OS << '\n';
+      auto dump = printCommon(P, "pattern_expr", Label);
+      dump << '\n';
       if (auto m = P->getMatchExpr())
-        printRec(m);
+        dump.printRec(m);
       else
-        printRec(P->getSubExpr());
-      printCommonPost();
+        dump.printRec(P->getSubExpr());
     }
     void visitBindingPattern(BindingPattern *P, StringRef Label) {
-      printCommon(P, P->isLet() ? "pattern_let" : "pattern_var", Label);
-      OS << '\n';
-      printRec(P->getSubPattern());
-      printCommonPost();
+      auto dump = printCommon(P, P->isLet() ? "pattern_let" : "pattern_var", Label);
+      dump << '\n';
+      dump.printRec(P->getSubPattern());
     }
     void visitEnumElementPattern(EnumElementPattern *P, StringRef Label) {
-      printCommon(P, "pattern_enum_element", Label);
-      OS << ' ';
-      P->getParentType().print(PrintWithColorRAII(OS, TypeColor).getOS());
-      PrintWithColorRAII(OS, IdentifierColor) << '.' << P->getName();
+      auto dump = printCommon(P, "pattern_enum_element", Label);
+      dump << ' ';
+      P->getParentType().print(dump.colored(TypeColor).getOS());
+      dump.colored(IdentifierColor) << '.' << P->getName();
       if (P->hasSubPattern()) {
-        OS << '\n';
-        printRec(P->getSubPattern());
+        dump << '\n';
+        dump.printRec(P->getSubPattern());
       }
-      printCommonPost();
     }
     void visitOptionalSomePattern(OptionalSomePattern *P, StringRef Label) {
-      printCommon(P, "pattern_optional_some", Label);
-      OS << '\n';
-      printRec(P->getSubPattern());
-      printCommonPost();
+      auto dump = printCommon(P, "pattern_optional_some", Label);
+      dump << '\n';
+      dump.printRec(P->getSubPattern());
     }
     void visitBoolPattern(BoolPattern *P, StringRef Label) {
-      printCommon(P, "pattern_bool", Label);
-      OS << (P->getValue() ? " true" : " false");
-      printCommonPost();
+      auto dump = printCommon(P, "pattern_bool", Label);
+      dump << (P->getValue() ? " true" : " false");
     }
 
   };
@@ -486,19 +671,13 @@ namespace {
       : Ctx(Ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
   private:
-    void printRec(Decl *D, StringRef Label = "");
-    void printRec(Expr *E, StringRef Label = "");
-    void printRec(Stmt *S, StringRef Label = "");
-    void printRec(Pattern *P, StringRef Label = "");
-    void printRec(TypeRepr *T, StringRef Label = "");
-
-    void printWhereRequirements(
+    void printWhereRequirements(ASTNodeDumper &dump,
         PointerUnion<const AssociatedTypeDecl *, const GenericContext *> Owner)
         const {
       const auto printWhere = [&](const TrailingWhereClause *Where) {
         if (Where) {
-          OS << " where requirements: ";
-          Where->print(OS, /*printWhereKeyword*/ false);
+          dump << " where requirements: ";
+          Where->print(dump.getOS(), /*printWhereKeyword*/ false);
         }
       };
 
@@ -510,740 +689,614 @@ namespace {
       }
     }
 
-    void printLabel(StringRef label, TerminalColor Color = DeclModifierColor) {
-      OS << " ";
-      PrintWithColorRAII(OS, Color) << label;
-      if (!label.empty())
-        PrintWithColorRAII(OS, Color) << "=";
-    }
-
-    // Print a field with a value.
-    template<typename T>
-    void print(const T &value, StringRef label = "") {
-      printLabel(label);
-      OS << value;
-    }
-
-    // Print a single flag.
-    void printFlag(StringRef label) {
-      PrintWithColorRAII(OS, DeclModifierColor) << " " << label;
-    }
-
-    // Print a single flag if it is set.
-    void printFlag(bool isSet, StringRef label) {
-      if (isSet)
-        printFlag(label);
-    }
-
-    void printCommon(const char *name, StringRef label, TerminalColor Color) {
-      OS.indent(Indent);
-      PrintWithColorRAII(OS, ParenthesisColor) << '(';
-      PrintWithColorRAII(OS, LabelColor) << label;
-      if (!label.empty()) {  // not null/empty
-        OS << "=";
-      }
-
-      PrintWithColorRAII(OS, Color) << name;
-    }
-
-    void printCommon(Decl *D, const char *Name, StringRef Label,
-                     TerminalColor Color = DeclColor) {
-      printCommon(Name, Label, Color);
+    LLVM_NODISCARD ASTNodeDumper printCommon(Decl *D, const char *Name,
+                                             StringRef Label,
+                                             TerminalColor Color = DeclColor) {
+      ASTNodeDumper dump(this, Name, Label, Color);
 
       if (D->isImplicit())
-        PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
+        dump.colored(DeclModifierColor) << " implicit";
 
       if (D->isHoisted())
-        PrintWithColorRAII(OS, DeclModifierColor) << " hoisted";
+        dump.colored(DeclModifierColor) << " hoisted";
 
-      auto R = D->getSourceRange();
-      if (Ctx && R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                Ctx->SourceMgr, /*PrintText=*/false);
-      }
+      dump.printNodeRange(D->getSourceRange());
 
       if (D->TrailingSemiLoc.isValid())
-        PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
+        dump.colored(DeclModifierColor) << " trailing_semi";
+
+      return dump;
     }
 
-    void printCommonPost() {
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
-    }
-
-    void printInherited(ArrayRef<TypeLoc> Inherited) {
+    void printInherited(ASTNodeDumper &dump, ArrayRef<TypeLoc> Inherited) {
       if (Inherited.empty())
         return;
-      OS << " inherits: ";
-      interleave(Inherited, [&](TypeLoc Super) { Super.getType().print(OS); },
-                 [&] { OS << ", "; });
+      dump << " inherits: ";
+      interleave(Inherited,
+                 [&](TypeLoc Super) { Super.getType().print(dump.getOS()); },
+                 [&] { dump << ", "; });
     }
 
   public:
     void visitImportDecl(ImportDecl *ID, StringRef Label) {
-      printCommon(ID, "import_decl", Label);
+      auto dump = printCommon(ID, "import_decl", Label);
 
-      printFlag(ID->isExported(), "exported");
+      dump.printFlag(ID->isExported(), "exported");
 
       if (ID->getImportKind() != ImportKind::Module)
-        print(getImportKindString(ID->getImportKind()), "kind");
+        dump.print(getImportKindString(ID->getImportKind()), "kind");
 
       SmallString<64> scratch;
       ID->getImportPath().getString(scratch);
-      print(QuotedString(scratch));
-
-      printCommonPost();
+      dump.print(QuotedString(scratch));
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, StringRef Label) {
-      printCommon(ED, "extension_decl", Label, ExtensionColor);
-      OS << ' ';
+      auto dump = printCommon(ED, "extension_decl", Label, ExtensionColor);
+      dump << ' ';
       if (ED->hasBeenBound())
-        ED->getExtendedType().print(OS);
+        ED->getExtendedType().print(dump.getOS());
       else
-        ED->getExtendedTypeRepr()->print(OS);
-      printCommonPost(ED);
-    }
-
-    void printDeclName(DeclName name, StringRef label = "") {
-      printLabel(label, IdentifierColor);
-      PrintWithColorRAII(OS, IdentifierColor)
-        << '\"' << name << '\"';
-    }
-
-    void printDeclName(const ValueDecl *D, StringRef label = "") {
-      if (D->getName()) {
-        printDeclName(D->getName(), label);
-      } else {
-        printLabel(label);
-        PrintWithColorRAII(OS, IdentifierColor)
-          << "'anonymous @ " << (const void*)D << '\'';
-      }
+        ED->getExtendedTypeRepr()->print(dump.getOS());
+      printCommonPost(dump, ED);
     }
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD, StringRef Label) {
-      printCommon(TAD, "typealias", Label);
-      PrintWithColorRAII(OS, TypeColor) << " type=";
+      auto dump = printCommon(TAD, "typealias", Label);
+      dump.colored(TypeColor) << " type=";
       if (auto underlying = TAD->getCachedUnderlyingType()) {
-        PrintWithColorRAII(OS, TypeColor)
-          << "'" << underlying.getString() << "'";
+        dump.colored(TypeColor) << "'" << underlying.getString() << "'";
       } else {
-        PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
+        dump.colored(TypeColor) << "<<<unresolved>>>";
       }
-      printWhereRequirements(TAD);
-      printCommonPost();
+      printWhereRequirements(dump, TAD);
     }
 
     void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD, StringRef Label) {
-      printCommon(OTD, "opaque_type", Label);
-      printDeclName(OTD->getNamingDecl(), "naming_decl");
-      PrintWithColorRAII(OS, TypeColor) << " opaque_interface="
+      auto dump = printCommon(OTD, "opaque_type", Label);
+      dump.printNodeName(OTD->getNamingDecl());
+      dump.colored(TypeColor) << " opaque_interface="
         << Type(OTD->getUnderlyingInterfaceType()).getString();
-      OS << " in "
+      dump << " in "
          << OTD->getOpaqueInterfaceGenericSignature()->getAsString();
       if (auto underlyingSubs = OTD->getUnderlyingTypeSubstitutions()) {
-        OS << " underlying:\n";
+        dump << " underlying:\n";
         SmallPtrSet<const ProtocolConformance *, 4> Dumped;
-        dumpSubstitutionMapRec(*underlyingSubs, OS,
+        dumpSubstitutionMapRec(*underlyingSubs, dump.getOS(),
                                SubstitutionMap::DumpStyle::Full,
                                Indent + 2, Dumped);
       }
-      printCommonPost();
     }
 
-    void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
-                                      const char *name, StringRef Label) {
-      printCommon(decl, name, Label);
+    LLVM_NODISCARD ASTNodeDumper
+    printAbstractTypeParamCommon(AbstractTypeParamDecl *decl, const char *name,
+                                 StringRef Label) {
+      auto dump = printCommon(decl, name, Label);
       if (decl->getDeclContext()->getGenericEnvironmentOfContext()) {
         if (auto superclassTy = decl->getSuperclass()) {
-          OS << " superclass='" << superclassTy->getString() << "'";
+          dump << " superclass='" << superclassTy->getString() << "'";
         }
       }
+      return dump;
     }
 
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl, StringRef Label) {
-      printAbstractTypeParamCommon(decl, "generic_type_param", Label);
-      OS << " depth=" << decl->getDepth() << " index=" << decl->getIndex();
-      printCommonPost();
+      auto dump = printAbstractTypeParamCommon(decl, "generic_type_param",
+                                               Label);
+      dump << " depth=" << decl->getDepth() << " index=" << decl->getIndex();
     }
 
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl, StringRef Label) {
-      printAbstractTypeParamCommon(decl, "associated_type_decl", Label);
+      auto dump = printAbstractTypeParamCommon(decl, "associated_type_decl",
+                                               Label);
       if (auto defaultDef = decl->getDefaultDefinitionType()) {
-        OS << " default=";
-        defaultDef.print(OS);
+        dump << " default=";
+        defaultDef.print(dump.getOS());
       }
-      printWhereRequirements(decl);
+      printWhereRequirements(dump, decl);
       if (decl->overriddenDeclsComputed()) {
-        OS << " overridden=";
+        dump << " overridden=";
         interleave(decl->getOverriddenDecls(),
                    [&](AssociatedTypeDecl *overridden) {
-                     OS << overridden->getProtocol()->getName();
+                     dump << overridden->getProtocol()->getName();
                    }, [&]() {
-                     OS << ", ";
+                     dump << ", ";
                    });
       }
-
-      printCommonPost();
     }
 
     void visitProtocolDecl(ProtocolDecl *PD, StringRef Label) {
-      printCommon(PD, "protocol", Label);
+      auto dump = printCommon(PD, "protocol", Label);
 
-      OS << " requirement signature=";
+      dump << " requirement signature=";
       if (PD->isRequirementSignatureComputed()) {
-        OS << GenericSignature::get({PD->getProtocolSelfType()} ,
-                                    PD->getRequirementSignature())
+        dump << GenericSignature::get({PD->getProtocolSelfType()} ,
+                                      PD->getRequirementSignature())
                 ->getAsString();
       } else {
-        OS << "<null>";
+        dump << "<null>";
       }
-      printCommonPost(PD);
+      printCommonPost(dump, PD);
     }
 
-    void printCommon(ValueDecl *VD, const char *Name, StringRef Label,
-                     TerminalColor Color = DeclColor) {
-      printCommon((Decl*)VD, Name, Label, Color);
+    LLVM_NODISCARD ASTNodeDumper
+    printCommon(ValueDecl *VD, const char *Name, StringRef Label,
+                TerminalColor Color = DeclColor) {
+      auto dump = printCommon((Decl*)VD, Name, Label, Color);
 
-      OS << ' ';
-      printDeclName(VD);
+      dump.printNodeName(VD);
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-        printGenericParameters(OS, AFD->getParsedGenericParams());
+        printGenericParameters(dump.getOS(), AFD->getParsedGenericParams());
       if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
-        printGenericParameters(OS, GTD->getParsedGenericParams());
+        printGenericParameters(dump.getOS(), GTD->getParsedGenericParams());
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
-        PrintWithColorRAII(OS, TypeColor) << " type='";
+        dump.colored(TypeColor) << " type='";
         if (var->hasInterfaceType())
-          var->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
+          var->getType().print(dump.colored(TypeColor).getOS());
         else
-          PrintWithColorRAII(OS, TypeColor) << "<null type>";
-        PrintWithColorRAII(OS, TypeColor) << "'";
+          dump.colored(TypeColor) << "<null type>";
+        dump.colored(TypeColor) << "'";
       }
 
       if (VD->hasInterfaceType()) {
-        PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
+        dump.colored(InterfaceTypeColor) << " interface type='";
         VD->getInterfaceType()->print(
-            PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
-        PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
+            dump.colored(InterfaceTypeColor).getOS());
+        dump.colored(InterfaceTypeColor) << "'";
       }
 
       if (VD->hasAccess()) {
-        PrintWithColorRAII(OS, AccessLevelColor) << " access="
+        dump.colored(AccessLevelColor) << " access="
           << getAccessLevelSpelling(VD->getFormalAccess());
       }
 
       if (VD->overriddenDeclsComputed()) {
         auto overridden = VD->getOverriddenDecls();
         if (!overridden.empty()) {
-          PrintWithColorRAII(OS, OverrideColor) << " override=";
+          dump.colored(OverrideColor) << " override=";
           interleave(overridden,
                      [&](ValueDecl *overridden) {
                        overridden->dumpRef(
-                                PrintWithColorRAII(OS, OverrideColor).getOS());
+                                dump.colored(OverrideColor).getOS());
                      }, [&]() {
-                       OS << ", ";
+                       dump << ", ";
                      });
         }
       }
 
       auto VarD = dyn_cast<VarDecl>(VD);
       const auto &attrs = VD->getAttrs();
-      printFlag(attrs.hasAttribute<FinalAttr>() && !(VarD && VarD->isLet()),
+      dump.printFlag(attrs.hasAttribute<FinalAttr>() && !(VarD && VarD->isLet()),
                 "final");
-      printFlag(attrs.hasAttribute<ObjCAttr>(), "@objc");
-      printFlag(attrs.hasAttribute<DynamicAttr>(), " dynamic");
+      dump.printFlag(attrs.hasAttribute<ObjCAttr>(), "@objc");
+      dump.printFlag(attrs.hasAttribute<DynamicAttr>(), " dynamic");
       if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
-        OS << " @_dynamicReplacement(for: \"";
-        OS << attr->getReplacedFunctionName();
-        OS << "\")";
+        dump << " @_dynamicReplacement(for: \"";
+        dump << attr->getReplacedFunctionName();
+        dump << "\")";
       }
+      return dump;
     }
 
-    void printCommon(NominalTypeDecl *NTD, const char *Name, StringRef Label,
-                     TerminalColor Color = DeclColor) {
-      printCommon((ValueDecl *)NTD, Name, Label, Color);
+    LLVM_NODISCARD ASTNodeDumper
+    printCommon(NominalTypeDecl *NTD, const char *Name, StringRef Label,
+                TerminalColor Color = DeclColor) {
+      auto dump = printCommon((ValueDecl *)NTD, Name, Label, Color);
 
       if (NTD->hasInterfaceType()) {
         if (NTD->isResilient())
-          printFlag("resilient");
+          dump.printFlag("resilient");
         else
-          printFlag("non-resilient");
+          dump.printFlag("non-resilient");
       }
+      return dump;
     }
 
-    void printCommonPost(const IterableDeclContext *IDC) {
+    void printCommonPost(ASTNodeDumper &dump, const IterableDeclContext *IDC) {
       switch (IDC->getIterableContextKind()) {
       case IterableDeclContextKind::NominalTypeDecl: {
         const auto NTD = cast<NominalTypeDecl>(IDC);
-        printInherited(NTD->getInherited());
-        printWhereRequirements(NTD);
+        printInherited(dump, NTD->getInherited());
+        printWhereRequirements(dump, NTD);
         break;
       }
       case IterableDeclContextKind::ExtensionDecl:
         const auto ED = cast<ExtensionDecl>(IDC);
-        printInherited(ED->getInherited());
-        printWhereRequirements(ED);
+        printInherited(dump, ED->getInherited());
+        printWhereRequirements(dump, ED);
         break;
       }
 
       for (Decl *D : IDC->getMembers()) {
-        OS << '\n';
-        printRec(D);
+        dump << '\n';
+        dump.printRec(D);
       }
-      printCommonPost();
     }
 
     void visitSourceFile(const SourceFile &SF, StringRef Label) {
-      printCommon("source_file", Label, ASTNodeColor);
-      PrintWithColorRAII(OS, LocationColor) << " \"" << SF.getFilename() << '"';
+      ASTNodeDumper dump(this, "source_file", Label, ASTNodeColor);
+      dump.colored(LocationColor) << " \"" << SF.getFilename() << '"';
 
       if (auto decls = SF.getCachedTopLevelDecls()) {
         for (Decl *D : *decls) {
           if (D->isImplicit())
             continue;
 
-          OS << '\n';
-          printRec(D);
+          dump << '\n';
+          dump.printRec(D);
         }
       }
-      printCommonPost();
     }
 
     void visitVarDecl(VarDecl *VD, StringRef Label) {
-      printCommon(VD, "var_decl", Label);
+      auto dump = printCommon(VD, "var_decl", Label);
       if (VD->isLet())
-        PrintWithColorRAII(OS, DeclModifierColor) << " let";
+        dump.colored(DeclModifierColor) << " let";
       if (VD->getAttrs().hasAttribute<LazyAttr>())
-        PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
-      printStorageImpl(VD);
-      printAccessors(VD);
-      printCommonPost();
+        dump.colored(DeclModifierColor) << " lazy";
+      printStorageImpl(dump, VD);
+      printAccessors(dump, VD);
     }
 
-    void printStorageImpl(AbstractStorageDecl *D) {
-      if (D->isStatic())
-        PrintWithColorRAII(OS, DeclModifierColor) << " type";
+    void printStorageImpl(ASTNodeDumper &dump, AbstractStorageDecl *D) {
+      dump.printFlag(D->isStatic(), "type");
 
       if (D->hasInterfaceType()) {
         auto impl = D->getImplInfo();
-        PrintWithColorRAII(OS, DeclModifierColor)
-          << " readImpl="
-          << getReadImplKindName(impl.getReadImpl());
-        if (!impl.supportsMutation()) {
-          PrintWithColorRAII(OS, DeclModifierColor)
-            << " immutable";
-        } else {
-          PrintWithColorRAII(OS, DeclModifierColor)
-            << " writeImpl="
-            << getWriteImplKindName(impl.getWriteImpl());
-          PrintWithColorRAII(OS, DeclModifierColor)
-            << " readWriteImpl="
-            << getReadWriteImplKindName(impl.getReadWriteImpl());
+        dump.print(getReadImplKindName(impl.getReadImpl()), "readImpl");
+        dump.printFlag(!impl.supportsMutation(), "immutable");
+
+        if (impl.supportsMutation()) {
+          dump.print(getWriteImplKindName(impl.getWriteImpl()), "writeImpl");
+          dump.print(getReadWriteImplKindName(impl.getReadWriteImpl()),
+                     "readWriteImpl");
         }
       }
     }
 
-    void printAccessors(AbstractStorageDecl *D) {
+    void printAccessors(ASTNodeDumper &dump, AbstractStorageDecl *D) {
       for (auto accessor : D->getAllAccessors()) {
-        OS << "\n";
-        printRec(accessor);
+        dump << "\n";
+        dump.printRec(accessor);
       }
     }
 
     void visitParamDecl(ParamDecl *PD, StringRef Label) {
-      printParameter(PD, Label);
-    }
+      auto dump = printCommon(PD, "parameter", Label, ParameterColor);
 
-    void visitEnumCaseDecl(EnumCaseDecl *ECD, StringRef Label) {
-      printCommon(ECD, "enum_case_decl", Label);
-      for (EnumElementDecl *D : ECD->getElements()) {
-        OS << '\n';
-        printRec(D);
-      }
-      printCommonPost();
-    }
+      if (!PD->getArgumentName().empty())
+        dump.colored(IdentifierColor) << " api_name=" << PD->getArgumentName();
 
-    void visitEnumDecl(EnumDecl *ED, StringRef Label) {
-      printCommon(ED, "enum_decl", Label);
-      printCommonPost(ED);
-    }
-
-    void visitEnumElementDecl(EnumElementDecl *EED, StringRef Label) {
-      printCommon(EED, "enum_element_decl", Label);
-      if (auto *paramList = EED->getParameterList()) {
-        Indent += 2;
-        OS << "\n";
-        printParameterList(paramList);
-        Indent -= 2;
-      }
-      printCommonPost();
-    }
-
-    void visitStructDecl(StructDecl *SD, StringRef Label) {
-      printCommon(SD, "struct_decl", Label);
-      printCommonPost(SD);
-    }
-
-    void visitClassDecl(ClassDecl *CD, StringRef Label) {
-      printCommon(CD, "class_decl", Label);
-      if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
-        OS << " @_staticInitializeObjCMetadata";
-      printCommonPost(CD);
-    }
-
-    void visitPatternBindingDecl(PatternBindingDecl *PBD, StringRef Label) {
-      printCommon(PBD, "pattern_binding_decl", Label);
-
-      for (auto idx : range(PBD->getNumPatternEntries())) {
-        OS << '\n';
-        printRec(PBD->getPattern(idx));
-        if (PBD->getOriginalInit(idx)) {
-          OS << '\n';
-          OS.indent(Indent + 2);
-          OS << "Original init:\n";
-          printRec(PBD->getOriginalInit(idx));
-        }
-        if (PBD->getInit(idx)) {
-          OS << '\n';
-          OS.indent(Indent + 2);
-          OS << "Processed init:\n";
-          printRec(PBD->getInit(idx));
-        }
-      }
-      printCommonPost();
-    }
-
-    void visitSubscriptDecl(SubscriptDecl *SD, StringRef Label) {
-      printCommon(SD, "subscript_decl", Label);
-      printStorageImpl(SD);
-      printAccessors(SD);
-      printCommonPost();
-    }
-
-    void printCommonAFD(AbstractFunctionDecl *D, const char *Type,
-                        StringRef Label) {
-      printCommon(D, Type, Label, FuncColor);
-      if (!D->getCaptureInfo().isTrivial()) {
-        OS << " ";
-        D->getCaptureInfo().print(OS);
-      }
-
-      if (auto fac = D->getForeignAsyncConvention()) {
-        OS << " foreign_async=";
-        if (auto type = fac->completionHandlerType())
-          type.print(OS);
-        OS << ",completion_handler_param="
-           << fac->completionHandlerParamIndex();
-        if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
-          OS << ",error_param=" << *errorParamIndex;
-      }
-
-      if (auto fec = D->getForeignErrorConvention()) {
-        OS << " foreign_error=";
-        OS << getForeignErrorConventionKindString(fec->getKind());
-        bool wantResultType = (
-          fec->getKind() == ForeignErrorConvention::ZeroResult ||
-          fec->getKind() == ForeignErrorConvention::NonZeroResult);
-
-        OS << ((fec->isErrorOwned() == ForeignErrorConvention::IsOwned)
-                ? ",owned"
-                : ",unowned");
-        OS << ",param=" << llvm::utostr(fec->getErrorParameterIndex());
-        OS << ",paramtype=" << fec->getErrorParameterType().getString();
-        if (wantResultType)
-          OS << ",resulttype=" << fec->getResultType().getString();
-      }
-    }
-
-    void printParameter(const ParamDecl *P, StringRef Label) {
-      printCommon("parameter", Label, ParameterColor);
-      OS << " ";
-      printDeclName(P);
-      if (!P->getArgumentName().empty())
-        PrintWithColorRAII(OS, IdentifierColor)
-          << " apiName=" << P->getArgumentName();
-
-      if (P->hasInterfaceType()) {
-        PrintWithColorRAII(OS, TypeColor) << " type='";
-        P->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
-        PrintWithColorRAII(OS, TypeColor) << "'";
-
-        PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
-        P->getInterfaceType().print(
-            PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
-        PrintWithColorRAII(OS, InterfaceTypeColor) << "'";
-      }
-
-      if (auto specifier = P->getCachedSpecifier()) {
+      if (auto specifier = PD->getCachedSpecifier()) {
         switch (*specifier) {
         case ParamDecl::Specifier::Default:
           /* nothing */
           break;
         case ParamDecl::Specifier::InOut:
-          OS << " inout";
+          dump.printFlag("inout");
           break;
         case ParamDecl::Specifier::Shared:
-          OS << " shared";
+          dump.printFlag("shared");
           break;
         case ParamDecl::Specifier::Owned:
-          OS << " owned";
+          dump.printFlag("owned");
           break;
         }
       }
 
-      printFlag(P->isVariadic(), "variadic");
-      printFlag(P->isAutoClosure(), "autoclosure");
-      printFlag(P->getAttrs().hasAttribute<NonEphemeralAttr>(), "nonEphemeral");
+      dump.printFlag(PD->isVariadic(), "variadic");
+      dump.printFlag(PD->isAutoClosure(), "autoclosure");
+      dump.printFlag(PD->getAttrs().hasAttribute<NonEphemeralAttr>(),
+                     "nonEphemeral");
 
-      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
-        print(getDefaultArgumentKindString(P->getDefaultArgumentKind()),
-              "default_arg");
+      if (PD->getDefaultArgumentKind() != DefaultArgumentKind::None) {
+        dump.print(getDefaultArgumentKindString(PD->getDefaultArgumentKind()),
+                   "default_arg");
       }
 
-      if (P->hasDefaultExpr() &&
-          !P->getDefaultArgumentCaptureInfo().isTrivial()) {
-        OS << " ";
-        P->getDefaultArgumentCaptureInfo().print(
-          PrintWithColorRAII(OS, CapturesColor).getOS());
+      if (PD->hasDefaultExpr() &&
+          !PD->getDefaultArgumentCaptureInfo().isTrivial()) {
+        dump << " ";
+        PD->getDefaultArgumentCaptureInfo().print(
+          dump.colored(CapturesColor).getOS());
       }
 
-      if (auto init = P->getStructuralDefaultExpr()) {
-        OS << '\n';
-        printRec(init, "expression");
+      if (auto init = PD->getStructuralDefaultExpr()) {
+        dump << '\n';
+        dump.printRec(init, "expression");
       }
-
-      printCommonPost();
     }
 
-    void printParameterList(const ParameterList *params) {
-      printCommon("parameter_list", "", ParameterColor);
+    void visitEnumCaseDecl(EnumCaseDecl *ECD, StringRef Label) {
+      auto dump = printCommon(ECD, "enum_case_decl", Label);
+      for (EnumElementDecl *D : ECD->getElements()) {
+        dump << '\n';
+        dump.printRec(D);
+      }
+    }
 
+    void visitEnumDecl(EnumDecl *ED, StringRef Label) {
+      auto dump = printCommon(ED, "enum_decl", Label);
+      printCommonPost(dump, ED);
+    }
+
+    void visitEnumElementDecl(EnumElementDecl *EED, StringRef Label) {
+      auto dump = printCommon(EED, "enum_element_decl", Label);
+      if (auto *paramList = EED->getParameterList()) {
+        dump << "\n";
+        dump.printRec(paramList);
+      }
+    }
+
+    void visitStructDecl(StructDecl *SD, StringRef Label) {
+      auto dump = printCommon(SD, "struct_decl", Label);
+      printCommonPost(dump, SD);
+    }
+
+    void visitClassDecl(ClassDecl *CD, StringRef Label) {
+      auto dump = printCommon(CD, "class_decl", Label);
+      if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
+        dump << " @_staticInitializeObjCMetadata";
+      printCommonPost(dump, CD);
+    }
+
+    void visitPatternBindingDecl(PatternBindingDecl *PBD, StringRef Label) {
+      auto dump = printCommon(PBD, "pattern_binding_decl", Label);
+
+      for (auto idx : range(PBD->getNumPatternEntries())) {
+        dump << '\n';
+        auto childDump = dump.child("pattern_entry", "", PatternColor);
+
+        childDump << '\n';
+        childDump.printRec(PBD->getPattern(idx), "pattern");
+
+        if (PBD->getOriginalInit(idx)) {
+          childDump << '\n';
+          childDump.printRec(PBD->getOriginalInit(idx), "original_init");
+        }
+
+        if (PBD->getInit(idx)) {
+          childDump << '\n';
+          childDump.printRec(PBD->getInit(idx), "processed_init");
+        }
+      }
+    }
+
+    void visitSubscriptDecl(SubscriptDecl *SD, StringRef Label) {
+      auto dump = printCommon(SD, "subscript_decl", Label);
+      printStorageImpl(dump, SD);
+      printAccessors(dump, SD);
+    }
+
+    LLVM_NODISCARD ASTNodeDumper
+    printCommonAFD(AbstractFunctionDecl *D, const char *Type, StringRef Label) {
+      auto dump = printCommon(D, Type, Label, FuncColor);
+
+      if (!D->getCaptureInfo().isTrivial()) {
+        dump << " ";
+        D->getCaptureInfo().print(dump.getOS());
+      }
+
+      return dump;
+    }
+
+    void printParameterList(const ParameterList *params, StringRef Label) {
       if (!Ctx && params->size() != 0 && params->get(0))
         Ctx = &params->get(0)->getASTContext();
 
-      if (Ctx) {
-        auto R = params->getSourceRange();
-        if (R.isValid()) {
-          PrintWithColorRAII(OS, RangeColor) << " range=";
-          R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                  Ctx->SourceMgr, /*PrintText=*/false);
+      ASTNodeDumper dump(this, "parameter_list", Label, ParameterColor);
+
+      dump.printNodeRange(params->getSourceRange());
+
+      for (auto P : *params) {
+        dump << '\n';
+        dump.printRec(P);
+      }
+    }
+
+    void printAbstractFunctionDecl(ASTNodeDumper &dump,
+                                   AbstractFunctionDecl *D) {
+      if (auto fac = D->getForeignAsyncConvention()) {
+        dump << '\n';
+        auto childDump = dump.child("foreign_async", "", DeclModifierColor);
+        childDump.print(fac->completionHandlerParamIndex(),
+                        "completion_handler_param_index");
+        if (auto errorParamIndex = fac->completionHandlerErrorParamIndex())
+          childDump.print(*errorParamIndex, "error_param_index");
+
+        if (auto type = fac->completionHandlerType()) {
+          childDump.print(type, "completion_handler_type");
         }
       }
 
-      Indent += 2;
-      for (auto P : *params) {
-        OS << '\n';
-        printParameter(P, "");
+      if (auto fec = D->getForeignErrorConvention()) {
+        dump << '\n';
+        auto childDump = dump.child("foreign_error", "", DeclModifierColor);
+        childDump.print(getForeignErrorConventionKindString(fec->getKind()),
+                        "kind");
+
+        bool isOwned = (fec->isErrorOwned() == ForeignErrorConvention::IsOwned);
+        childDump.printFlag(isOwned ? "owned" : "unowned");
+
+        childDump.print(llvm::utostr(fec->getErrorParameterIndex()),
+                        "param_index");
+        childDump.print(fec->getErrorParameterType(), "param_type");
+
+        bool wantResultType = (
+          fec->getKind() == ForeignErrorConvention::ZeroResult ||
+          fec->getKind() == ForeignErrorConvention::NonZeroResult);
+        if (wantResultType)
+          childDump.print(fec->getResultType(), "result_type");
       }
-      Indent -= 2;
 
-      printCommonPost();
-    }
-
-    void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
-      Indent += 2;
       if (auto *P = D->getImplicitSelfDecl()) {
-        OS << '\n';
-        printParameter(P, "self");
+        dump << '\n';
+        dump.printRec(P, "self");
       }
 
-      OS << '\n';
-      printParameterList(D->getParameters());
-      Indent -= 2;
+      dump << '\n';
+      dump.printRec(D->getParameters());
 
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (FD->getResultTypeRepr()) {
-          OS << '\n';
-          printRec(FD->getResultTypeRepr(), "result");
+          dump << '\n';
+          dump.printRec(FD->getResultTypeRepr(), "result");
           if (auto opaque = FD->getOpaqueResultTypeDecl()) {
-            OS << '\n';
-            printRec(opaque, "opaque_result_decl");
+            dump << '\n';
+            dump.printRec(opaque, "opaque_result_decl");
           }
         }
       }
       if (D->hasSingleExpressionBody()) {
-        OS << '\n';
-        printRec(D->getSingleExpressionBody(), "single_expression_body");
+        dump << '\n';
+        dump.printRec(D->getSingleExpressionBody(), "single_expression_body");
       } else if (auto Body = D->getBody(/*canSynthesize=*/false)) {
-        OS << '\n';
-        printRec(Body, "body");
+        dump << '\n';
+        dump.printRec(Body, "body");
       }
     }
 
-    void printCommonFD(FuncDecl *FD, const char *type, StringRef Label) {
-      printCommonAFD(FD, type, Label);
-      printFlag(FD->isStatic(), "type");
+    LLVM_NODISCARD ASTNodeDumper
+    printCommonFD(FuncDecl *FD, const char *type, StringRef Label) {
+      auto dump = printCommonAFD(FD, type, Label);
+      dump.printFlag(FD->isStatic(), "type");
+      return dump;
     }
 
     void visitFuncDecl(FuncDecl *FD, StringRef Label) {
-      printCommonFD(FD, "func_decl", Label);
-      printAbstractFunctionDecl(FD);
-      printCommonPost();
+      auto dump = printCommonFD(FD, "func_decl", Label);
+      printAbstractFunctionDecl(dump, FD);
     }
 
     void visitAccessorDecl(AccessorDecl *AD, StringRef Label) {
-      printCommonFD(AD, "accessor_decl", Label);
-      OS << " " << getAccessorKindString(AD->getAccessorKind());
-      OS << "_for=" << AD->getStorage()->getName();
-      printAbstractFunctionDecl(AD);
-      printCommonPost();
+      auto dump = printCommonFD(AD, "accessor_decl", Label);
+      dump << " " << getAccessorKindString(AD->getAccessorKind());
+      dump << "_for=" << AD->getStorage()->getName();
+      printAbstractFunctionDecl(dump, AD);
     }
 
     void visitConstructorDecl(ConstructorDecl *CD, StringRef Label) {
-      printCommonAFD(CD, "constructor_decl", Label);
-      if (CD->isRequired())
-        PrintWithColorRAII(OS, DeclModifierColor) << " required";
-      PrintWithColorRAII(OS, DeclModifierColor) << " "
-        << getCtorInitializerKindString(CD->getInitKind());
+      auto dump = printCommonAFD(CD, "constructor_decl", Label);
+      dump.printFlag(CD->isRequired(), "required");
+      dump.printFlag(getCtorInitializerKindString(CD->getInitKind()));
       if (CD->isFailable())
-        PrintWithColorRAII(OS, DeclModifierColor) << " failable="
-          << (CD->isImplicitlyUnwrappedOptional()
-              ? "ImplicitlyUnwrappedOptional"
-              : "Optional");
-      printAbstractFunctionDecl(CD);
-      printCommonPost();
+        dump.print((CD->isImplicitlyUnwrappedOptional()
+                    ? "ImplicitlyUnwrappedOptional"
+                    : "Optional"), "failable");
+      printAbstractFunctionDecl(dump, CD);
     }
 
     void visitDestructorDecl(DestructorDecl *DD, StringRef Label) {
-      printCommonAFD(DD, "destructor_decl", Label);
-      printAbstractFunctionDecl(DD);
-      printCommonPost();
+      auto dump = printCommonAFD(DD, "destructor_decl", Label);
+      printAbstractFunctionDecl(dump, DD);
     }
 
     void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD, StringRef Label) {
-      printCommon(TLCD, "top_level_code_decl", Label);
+      auto dump = printCommon(TLCD, "top_level_code_decl", Label);
       if (TLCD->getBody()) {
-        OS << "\n";
-        printRec(TLCD->getBody());
+        dump << "\n";
+        dump.printRec(TLCD->getBody());
       }
-      printCommonPost();
     }
     
-    void printASTNodes(const ArrayRef<ASTNode> &Elements, const char *Name,
+    void printASTNodes(ASTNodeDumper &parentDump,
+                       const ArrayRef<ASTNode> &Elements, const char *Name,
                        StringRef Label) {
-      printCommon(Name, Label, ASTNodeColor);
+      auto dump = parentDump.child(Name, Label, ASTNodeColor);
       for (auto Elt : Elements) {
-        OS << '\n';
+        dump << '\n';
         if (auto *SubExpr = Elt.dyn_cast<Expr*>())
-          printRec(SubExpr);
+          dump.printRec(SubExpr);
         else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-          printRec(SubStmt);
+          dump.printRec(SubStmt);
         else
-          printRec(Elt.get<Decl*>());
+          dump.printRec(Elt.get<Decl*>());
       }
-      printCommonPost();
     }
 
     void visitIfConfigDecl(IfConfigDecl *ICD, StringRef Label) {
-      printCommon(ICD, "if_config_decl", Label);
-      Indent += 2;
+      auto dump = printCommon(ICD, "if_config_decl", Label);
       for (auto &Clause : ICD->getClauses()) {
-        OS << '\n';
-        OS.indent(Indent);
-        PrintWithColorRAII(OS, StmtColor) << (Clause.Cond ? "#if:" : "#else:");
+        dump << '\n';
+        auto childDump = dump.child((Clause.Cond ? "#if:" : "#else:"), "",
+                                    StmtColor);
         if (Clause.isActive)
-          PrintWithColorRAII(OS, DeclModifierColor) << " active";
+          childDump.colored(DeclModifierColor) << " active";
         if (Clause.Cond) {
-          OS << "\n";
-          printRec(Clause.Cond);
+          childDump << "\n";
+          childDump.printRec(Clause.Cond);
         }
 
-        OS << '\n';
-        Indent += 2;
-        printASTNodes(Clause.Elements, "", "elements");
-        Indent -= 2;
+        dump << '\n';
+        printASTNodes(childDump, Clause.Elements, "", "elements");
       }
-
-      Indent -= 2;
-      printCommonPost();
     }
 
     void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD, StringRef Label) {
-      printCommon(PDD, "pound_diagnostic_decl", Label);
-      print(PDD->isError() ? "error" : "warning", "kind");
-      OS << "\n";
-      Indent += 2;
-      printRec(PDD->getMessage());
-      Indent -= 2;
-      printCommonPost();
+      auto dump = printCommon(PDD, "pound_diagnostic_decl", Label);
+      dump.print(PDD->isError() ? "error" : "warning", "kind");
+      dump << "\n";
+      dump.printRec(PDD->getMessage());
     }
 
     void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD, StringRef Label) {
-      printCommon(PGD, "precedence_group_decl", Label);
+      auto dump = printCommon(PGD, "precedence_group_decl", Label);
 
-      printDeclName(PGD->getName());
-      print(getAssociativityString(PGD->getAssociativity()), "associativity");
-      printFlag(PGD->isAssignment(), "assignment");
+      dump.printNodeName(PGD->getName());
+      dump.print(getAssociativityString(PGD->getAssociativity()),
+                 "associativity");
+      dump.printFlag(PGD->isAssignment(), "assignment");
 
       auto printRelations =
           [&](StringRef label, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
         if (rels.empty()) return;
-        OS << '\n';
-        OS.indent(Indent+2);
-        OS << label << ' ' << rels[0].Name;
+        dump << '\n';
+        auto childDump = dump.child("groups", label, DeclModifierColor);
+        childDump << rels[0].Name;
         for (auto &rel : rels.slice(1))
-          OS << ", " << rel.Name;
+          childDump << " " << rel.Name;
       };
-      printRelations("higherThan", PGD->getHigherThan());
-      printRelations("lowerThan", PGD->getLowerThan());
-
-      printCommonPost();
+      printRelations("higher_than", PGD->getHigherThan());
+      printRelations("lower_than", PGD->getLowerThan());
     }
 
-    void printOperatorIdentifiers(OperatorDecl *OD) {
+    void printOperatorIdentifiers(ASTNodeDumper &dump, OperatorDecl *OD) {
       auto identifiers = OD->getIdentifiers();
       for (auto index : indices(identifiers)) {
-        OS.indent(Indent + 2);
-        OS << "identifier #" << index << " " << identifiers[index].Item;
-        if (index != identifiers.size() - 1)
-          OS << "\n";
+        dump << "\n";
+        auto childDump = dump.child("identifier", llvm::utostr(index),
+                                    DeclModifierColor);
+        childDump.print(identifiers[index].Item);
       }
     }
 
     void visitInfixOperatorDecl(InfixOperatorDecl *IOD, StringRef Label) {
-      printCommon(IOD, "infix_operator_decl", Label);
-      printDeclName(IOD->getName());
-      if (!IOD->getIdentifiers().empty()) {
-        OS << "\n";
-        printOperatorIdentifiers(IOD);
-      }
-      printCommonPost();
+      auto dump = printCommon(IOD, "infix_operator_decl", Label);
+      dump.printNodeName(IOD->getName());
+      printOperatorIdentifiers(dump, IOD);
     }
 
     void visitPrefixOperatorDecl(PrefixOperatorDecl *POD, StringRef Label) {
-      printCommon(POD, "prefix_operator_decl", Label);
-      printDeclName(POD->getName());
-      if (!POD->getIdentifiers().empty()) {
-        OS << "\n";
-        printOperatorIdentifiers(POD);
-      }
-      printCommonPost();
+      auto dump = printCommon(POD, "prefix_operator_decl", Label);
+      dump.printNodeName(POD->getName());
+      printOperatorIdentifiers(dump, POD);
     }
 
     void visitPostfixOperatorDecl(PostfixOperatorDecl *POD, StringRef Label) {
-      printCommon(POD, "postfix_operator_decl", Label);
-      printDeclName(POD->getName());
-      if (!POD->getIdentifiers().empty()) {
-        OS << "\n";
-        printOperatorIdentifiers(POD);
-      }
-      printCommonPost();
+      auto dump = printCommon(POD, "postfix_operator_decl", Label);
+      dump.printNodeName(POD->getName());
+      printOperatorIdentifiers(dump, POD);
     }
 
     void visitModuleDecl(ModuleDecl *MD, StringRef Label) {
-      printCommon(MD, "module", Label);
-
-      printFlag(MD->isNonSwiftModule(), "non_swift");
-      
-      printCommonPost();
+      auto dump = printCommon(MD, "module", Label);
+      dump.printFlag(MD->isNonSwiftModule(), "non_swift");
     }
 
     void visitMissingMemberDecl(MissingMemberDecl *MMD, StringRef Label) {
-      printCommon(MMD, "missing_member_decl", Label);
-      PrintWithColorRAII(OS, IdentifierColor)
-          << " \"" << MMD->getName() << '\"';
-      printCommonPost();
+      auto dump = printCommon(MMD, "missing_member_decl", Label);
+      dump.printNodeName(MMD->getName());
     }
   };
 } // end anonymous namespace
@@ -1254,7 +1307,7 @@ void ParameterList::dump() const {
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
   ExprTypeDelegate delegate;
-  PrintDecl(nullptr, OS, delegate, Indent).printParameterList(this);
+  PrintDecl(nullptr, OS, delegate, Indent).printParameterList(this, "");
   llvm::errs() << '\n';
 }
 
@@ -1441,331 +1494,250 @@ public:
     if (S)
       StmtVisitor<PrintStmt, void, StringRef>::visit(S, Label);
     else {
-      printCommon("<<null>>", Label, StmtColor);
-      printCommonPost();
+      (void)ASTNodeDumper(this, "<<null>>", Label, StmtColor);
     }
   }
 
-  void printRec(Stmt *S, StringRef Label = "");
-  void printRec(Decl *D, StringRef Label = "");
-  void printRec(Expr *E, StringRef Label = "");
-  void printRec(const Pattern *P, StringRef Label = "");
+  LLVM_NODISCARD ASTNodeDumper
+  printCommon(Stmt *S, const char *Name, StringRef Label) {
+    ASTNodeDumper dump(this, Name, Label, StmtColor);
 
-  void printRec(StmtConditionElement C, StringRef Label = "") {
-    switch (C.getKind()) {
-    case StmtConditionElement::CK_Boolean:
-      return printRec(C.getBoolean(), Label);
-    case StmtConditionElement::CK_PatternBinding:
-      Indent += 2;
-      printCommon("pattern", Label, PatternColor);
-      OS << "\n";
-      printRec(C.getPattern());
-      OS << "\n";
-      printRec(C.getInitializer());
-      printCommonPost();
-      Indent -= 2;
-      break;
-    case StmtConditionElement::CK_Availability:
-      Indent += 2;
-      printCommon("#available", Label, ASTNodeColor);
-      OS << "\n";
-      for (auto *Query : C.getAvailability()->getQueries()) {
-        OS << '\n';
-        switch (Query->getKind()) {
-        case AvailabilitySpecKind::PlatformVersionConstraint:
-          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        case AvailabilitySpecKind::LanguageVersionConstraint:
-        case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-          cast<PlatformVersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        case AvailabilitySpecKind::OtherPlatform:
-          cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
-          break;
-        }
-      }
-      printCommonPost();
-      Indent -= 2;
-      break;
-    }
-  }
+    dump.printFlag(S->isImplicit(), "implicit");
+    dump.printNodeRange(S->getSourceRange());
+    dump.printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
 
-  // Print a single flag.
-  void printFlag(StringRef label) {
-    PrintWithColorRAII(OS, ExprModifierColor) << " " << label;
-  }
-
-  // Print a single flag if it is set.
-  void printFlag(bool isSet, StringRef label) {
-    if (isSet)
-      printFlag(label);
-  }
-
-  void printCommon(const char *name, StringRef label, TerminalColor Color) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, LabelColor) << label;
-    if (!label.empty()) {  // not null/empty
-      OS << "=";
-    }
-
-    PrintWithColorRAII(OS, Color) << name;
-  }
-
-  raw_ostream &printCommon(Stmt *S, const char *Name, StringRef Label) {
-    printCommon(Name, Label, StmtColor);
-
-    printFlag(S->isImplicit(), "implicit");
-
-    if (Ctx) {
-      auto R = S->getSourceRange();
-      if (R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                Ctx->SourceMgr, /*PrintText=*/false);
-      }
-    }
-
-    printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
-
-    return OS;
-  }
-
-  void printCommonPost() {
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    return dump;
   }
 
   void visitBraceStmt(BraceStmt *S, StringRef Label) {
-    printCommon(S, "brace_stmt", Label);
-    printASTNodes(S->getElements());
-    printCommonPost();
-  }
+    auto dump = printCommon(S, "brace_stmt", Label);
 
-  void printASTNodes(const ArrayRef<ASTNode> &Elements) {
-    for (auto Elt : Elements) {
-      OS << '\n';
-      if (auto *SubExpr = Elt.dyn_cast<Expr*>())
-        printRec(SubExpr);
-      else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-        printRec(SubStmt);
-      else
-        printRec(Elt.get<Decl*>());
+    for (auto Elt : S->getElements()) {
+      dump << '\n';
+      dump.printRec(Elt);
     }
   }
 
   void visitReturnStmt(ReturnStmt *S, StringRef Label) {
-    printCommon(S, "return_stmt", Label);
+    auto dump = printCommon(S, "return_stmt", Label);
     if (S->hasResult()) {
-      OS << '\n';
-      printRec(S->getResult());
+      dump << '\n';
+      dump.printRec(S->getResult());
     }
-    printCommonPost();
   }
 
   void visitYieldStmt(YieldStmt *S, StringRef Label) {
-    printCommon(S, "yield_stmt", Label);
+    auto dump = printCommon(S, "yield_stmt", Label);
     for (auto yield : S->getYields()) {
-      OS << '\n';
-      printRec(yield);
+      dump << '\n';
+      dump.printRec(yield);
     }
-    printCommonPost();
   }
 
   void visitDeferStmt(DeferStmt *S, StringRef Label) {
-    printCommon(S, "defer_stmt", Label) << '\n';
-    printRec(S->getTempDecl());
-    OS << '\n';
-    printRec(S->getCallExpr());
-    printCommonPost();
+    auto dump = printCommon(S, "defer_stmt", Label);
+    dump << '\n';
+    dump.printRec(S->getTempDecl());
+    dump << '\n';
+    dump.printRec(S->getCallExpr());
   }
 
   void visitIfStmt(IfStmt *S, StringRef Label) {
-    printCommon(S, "if_stmt", Label) << '\n';
-    for (auto elt : S->getCond())
-      printRec(elt);
-    OS << '\n';
-    printRec(S->getThenStmt());
+    auto dump = printCommon(S, "if_stmt", Label);
+
+    dump.printRec(S->getCond(), "conditions");
+
+    dump << '\n';
+    dump.printRec(S->getThenStmt(), "then_body");
+
     if (S->getElseStmt()) {
-      OS << '\n';
-      printRec(S->getElseStmt());
+      dump << '\n';
+      dump.printRec(S->getElseStmt(), "else_body");
     }
-    printCommonPost();
   }
 
   void visitGuardStmt(GuardStmt *S, StringRef Label) {
-    printCommon(S, "guard_stmt", Label) << '\n';
-    for (auto elt : S->getCond())
-      printRec(elt);
-    OS << '\n';
-    printRec(S->getBody());
-    printCommonPost();
+    auto dump = printCommon(S, "guard_stmt", Label);
+    dump.printRec(S->getCond(), "conditions");
+    dump << '\n';
+    dump.printRec(S->getBody(), "else_body");
   }
 
   void visitDoStmt(DoStmt *S, StringRef Label) {
-    printCommon(S, "do_stmt", Label) << '\n';
-    printRec(S->getBody());
-    printCommonPost();
+    auto dump = printCommon(S, "do_stmt", Label);
+    dump << '\n';
+    dump.printRec(S->getBody(), "body");
   }
 
   void visitWhileStmt(WhileStmt *S, StringRef Label) {
-    printCommon(S, "while_stmt", Label) << '\n';
-    for (auto elt : S->getCond())
-      printRec(elt);
-    OS << '\n';
-    printRec(S->getBody());
-    printCommonPost();
+    auto dump = printCommon(S, "while_stmt", Label);
+    dump.printRec(S->getCond(), "conditions");
+    dump << '\n';
+    dump.printRec(S->getBody(), "body");
   }
 
   void visitRepeatWhileStmt(RepeatWhileStmt *S, StringRef Label) {
-    printCommon(S, "repeat_while_stmt", Label) << '\n';
-    printRec(S->getBody());
-    OS << '\n';
-    printRec(S->getCond());
-    printCommonPost();
+    auto dump = printCommon(S, "repeat_while_stmt", Label);
+    dump << '\n';
+    dump.printRec(S->getBody(), "body");
+    dump << '\n';
+    dump.printRec(S->getCond(), "condition");
   }
-  void visitForEachStmt(ForEachStmt *S, StringRef Label) {
-    printCommon(S, "for_each_stmt", Label);
 
-    OS << '\n';
-    printRec(S->getPattern(), "pattern");
+  void visitForEachStmt(ForEachStmt *S, StringRef Label) {
+    auto dump = printCommon(S, "for_each_stmt", Label);
+
+    dump << '\n';
+    dump.printRec(S->getPattern(), "pattern");
 
     if (S->getWhere()) {
-      OS << '\n';
-      printRec(S->getWhere(), "where_clause");
+      dump << '\n';
+      dump.printRec(S->getWhere(), "where_clause");
     }
 
-    OS << '\n';
-    printRec(S->getSequence(), "sequence");
+    dump << '\n';
+    dump.printRec(S->getSequence(), "sequence");
 
     if (S->getIteratorVar()) {
-      OS << '\n';
-      printRec(S->getIteratorVar(), "iterator_var");
+      dump << '\n';
+      dump.printRec(S->getIteratorVar(), "iterator_var");
     }
 
     if (S->getIteratorVarRef()) {
-      OS << '\n';
-      printRec(S->getIteratorVarRef(), "iterator_var_ref");
+      dump << '\n';
+      dump.printRec(S->getIteratorVarRef(), "iterator_var_ref");
     }
 
     if (S->getConvertElementExpr()) {
-      OS << '\n';
-      printRec(S->getConvertElementExpr(), "convert_element_expr");
+      dump << '\n';
+      dump.printRec(S->getConvertElementExpr(), "convert_element_expr");
     }
 
     if (S->getElementExpr()) {
-      OS << '\n';
-      printRec(S->getElementExpr(), "element_expr");
+      dump << '\n';
+      dump.printRec(S->getElementExpr(), "element_expr");
     }
 
-    OS << '\n';
-    printRec(S->getBody(), "body");
-
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(S->getBody(), "body");
   }
+
   void visitBreakStmt(BreakStmt *S, StringRef Label) {
-    printCommon(S, "break_stmt", Label);
-    printCommonPost();
+    (void)printCommon(S, "break_stmt", Label);
   }
+
   void visitContinueStmt(ContinueStmt *S, StringRef Label) {
-    printCommon(S, "continue_stmt", Label);
-    printCommonPost();
+    (void)printCommon(S, "continue_stmt", Label);
   }
+
   void visitFallthroughStmt(FallthroughStmt *S, StringRef Label) {
-    printCommon(S, "fallthrough_stmt", Label);
-    printCommonPost();
+    (void)printCommon(S, "fallthrough_stmt", Label);
   }
+
   void visitSwitchStmt(SwitchStmt *S, StringRef Label) {
-    printCommon(S, "switch_stmt", Label);
+    auto dump = printCommon(S, "switch_stmt", Label);
 
-    OS << '\n';
-    printRec(S->getSubjectExpr());
+    dump << '\n';
+    dump.printRec(S->getSubjectExpr(), "subject");
 
-    for (auto N : S->getRawCases()) {
-      OS << '\n';
-      if (N.is<Stmt*>())
-        printRec(N.get<Stmt*>());
-      else
-        printRec(N.get<Decl*>());
-    }
-    printCommonPost();
+    dump.printRec(S->getRawCases(), "cases");
   }
-  void visitCaseStmt(CaseStmt *S, StringRef Label) {
-    printCommon(S, "case_stmt", Label);
-    printFlag(S->hasUnknownAttr(), "@unknown");
 
-    Indent += 2;
-    if (S->hasCaseBodyVariables()) {
-      OS << '\n';
-      printCommon("case_body_variables", "", StmtColor);
-      OS << '\n';
-      for (auto *vd : S->getCaseBodyVariables()) {
-        // TODO: Printing a var decl does an Indent ... dump(vd) ... '\n'. We
-        // should see if we can factor this dumping so that the caller of
-        // printRec(VarDecl) has more control over the printing.
-        printRec(vd);
-      }
-      // FIXME: Is this correct?
-      OS.indent(Indent);
-      printCommonPost();
-    }
+  void visitCaseStmt(CaseStmt *S, StringRef Label) {
+    auto dump = printCommon(S, "case_stmt", Label);
+    dump.printFlag(S->hasUnknownAttr(), "@unknown");
+
+    if (S->hasCaseBodyVariables())
+      dump.printRec(S->getCaseBodyVariables(), "case_body_variables");
 
     for (const auto &LabelItem : S->getCaseLabelItems()) {
-      OS << '\n';
-      printCommon("case_label_item", "", StmtColor);
-      printFlag(LabelItem.isDefault(), "default");
+      dump << '\n';
+      auto childDump = dump.child("case_label_item", "", StmtColor);
+      childDump.printFlag(LabelItem.isDefault(), "default");
+
       if (auto *CasePattern = LabelItem.getPattern()) {
-        OS << '\n';
-        printRec(CasePattern, "pattern");
+        childDump << '\n';
+        childDump.printRec(CasePattern, "pattern");
       }
+
       if (auto *Guard = LabelItem.getGuardExpr()) {
-        OS << '\n';
-        printRec(const_cast<Expr *>(Guard), "where_clause");
+        childDump << '\n';
+        childDump.printRec(const_cast<Expr *>(Guard), "where_clause");
       }
-      printCommonPost();
     }
-    Indent -= 2;
 
-    OS << '\n';
-    printRec(S->getBody(), "body");
-
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(S->getBody(), "body");
   }
 
   void visitFailStmt(FailStmt *S, StringRef Label) {
-    printCommon(S, "fail_stmt", Label);
-    printCommonPost();
+    (void)printCommon(S, "fail_stmt", Label);
   }
 
   void visitThrowStmt(ThrowStmt *S, StringRef Label) {
-    printCommon(S, "throw_stmt", Label);
-    OS << '\n';
-    printRec(S->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(S, "throw_stmt", Label);
+    dump << '\n';
+    dump.printRec(S->getSubExpr());
   }
 
   void visitPoundAssertStmt(PoundAssertStmt *S, StringRef Label) {
-    printCommon(S, "pound_assert", Label);
-    OS << " message=" << QuotedString(S->getMessage()) << "\n";
-    printRec(S->getCondition());
-    printCommonPost();
+    auto dump = printCommon(S, "pound_assert", Label);
+    dump.print(QuotedString(S->getMessage()), "message");
+
+    dump << "\n";
+    dump.printRec(S->getCondition());
   }
 
   void visitDoCatchStmt(DoCatchStmt *S, StringRef Label) {
-    printCommon(S, "do_catch_stmt", Label);
+    auto dump = printCommon(S, "do_catch_stmt", Label);
 
-    OS << '\n';
-    printRec(S->getBody(), "do_body");
+    dump << '\n';
+    dump.printRec(S->getBody(), "do_body");
 
-    for (auto clause : S->getCatches()) {
-      OS << '\n';
-      printRec(clause);
-    }
-
-    printCommonPost();
+    dump.printRec(S->getCatches(), "catch_clauses");
   }
 };
 
 } // end anonymous namespace
+
+void ASTNodeDumper::printRec(StmtConditionElement C, StringRef Label) {
+  switch (C.getKind()) {
+  case StmtConditionElement::CK_Boolean:
+    return printRec(C.getBoolean(), Label);
+
+  case StmtConditionElement::CK_PatternBinding: {
+    auto dump = child("pattern", Label, PatternColor);
+    dump << "\n";
+    dump.printRec(C.getPattern());
+    dump << "\n";
+    dump.printRec(C.getInitializer());
+    break;
+  }
+
+  case StmtConditionElement::CK_Availability: {
+    auto dump = child("#available", Label, ASTNodeColor);
+    for (auto *Query : C.getAvailability()->getQueries()) {
+      dump << '\n';
+      switch (Query->getKind()) {
+      case AvailabilitySpecKind::PlatformVersionConstraint:
+        cast<PlatformVersionConstraintAvailabilitySpec>(Query)
+            ->print(dump.getOS(), dump.IndentChildren);
+        break;
+      case AvailabilitySpecKind::LanguageVersionConstraint:
+      case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
+        cast<PlatformVersionConstraintAvailabilitySpec>(Query)
+            ->print(dump.getOS(), dump.IndentChildren);
+        break;
+      case AvailabilitySpecKind::OtherPlatform:
+        cast<OtherPlatformAvailabilitySpec>(Query)
+            ->print(dump.getOS(), dump.IndentChildren);
+        break;
+      }
+    }
+    break;
+  }
+  }
+}
 
 void Stmt::dump() const {
   dump(llvm::errs());
@@ -1812,882 +1784,806 @@ public:
     if (E)
       ExprVisitor<PrintExpr, void, StringRef>::visit(E, Label);
     else {
-      printCommon("<<null>>", Label, ExprColor);
-      printCommonPost();
+      (void)ASTNodeDumper(this, "<<null>>", Label, ExprColor);
     }
   }
-
-  void printRec(Expr *E, StringRef Label = "");
 
   /// FIXME: This should use ExprWalker to print children.
 
-  void printRec(Decl *D, StringRef Label = "");
-  void printRec(Stmt *S, StringRef Label = "");
-  void printRec(const Pattern *P, StringRef Label = "");
-  void printRec(TypeRepr *T, StringRef Label = "");
-
-  template<typename T, typename... Args>
-  void printRec(ArrayRef<T> elems, StringRef Label, Args... args) {
-    Indent += 2;
-    printCommon("array", Label, ExprModifierColor);
-    for (auto elt : elems) {
-      OS << "\n";
-      printRec(elt, ::std::forward<Args>(args)..., "");
-    }
-    printCommonPost();
-    Indent -= 2;
-  }
-
-  void printRec(ProtocolConformanceRef conf) {
-    conf.dump(OS, Indent + 2);
-  }
-
-  void printDeclRef(ConcreteDeclRef declRef) {
-    declRef.dump(PrintWithColorRAII(OS, DeclColor).getOS());
-  }
-
-  // Print a single flag.
-  void printFlag(StringRef label) {
-    PrintWithColorRAII(OS, ExprModifierColor) << " " << label;
-  }
-
-  // Print a single flag if it is set.
-  void printFlag(bool isSet, StringRef label) {
-    if (isSet)
-      printFlag(label);
-  }
-
-  void printCommon(const char *name, StringRef label, TerminalColor Color) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, LabelColor) << label;
-    if (!label.empty()) {  // not null/empty
-      OS << "=";
-    }
-
-    PrintWithColorRAII(OS, Color) << name;
-  }
-
-  raw_ostream &printCommon(Expr *E, const char *C, StringRef Label) {
-    PrintOptions PO;
-    PO.PrintTypesForDebugging = true;
-
-    printCommon(C, Label, ExprColor);
-
-    if (E->isImplicit())
-      PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
-    PrintWithColorRAII(OS, TypeColor) << " type='";
-    PrintWithColorRAII(OS, TypeColor) << getTypeOfExpr(E).getString(PO) << '\'';
-
-    // If we have a source range and an ASTContext, print the source range.
+  LLVM_NODISCARD ASTNodeDumper
+  printCommon(Expr *E, const char *C, StringRef Label) {
     if (!Ctx)
       if (auto Ty = getTypeOfExpr(E))
         Ctx = &Ty->getASTContext();
 
-    if (Ctx) {
-      auto L = E->getLoc();
-      if (L.isValid()) {
-        PrintWithColorRAII(OS, LocationColor) << " location=";
-        L.print(PrintWithColorRAII(OS, LocationColor).getOS(), Ctx->SourceMgr);
-      }
+    ASTNodeDumper dump(this, C, Label, ExprColor);
 
-      auto R = E->getSourceRange();
-      if (R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                Ctx->SourceMgr, /*PrintText=*/false);
-      }
-    }
+    dump.printFlag(E->isImplicit(), "implicit", ExprModifierColor);
 
-    printFlag(E->TrailingSemiLoc.isValid(), "trailing_semi");
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    dump.colored(TypeColor)
+        << " type='" << getTypeOfExpr(E).getString(PO) << '\'';
 
-    return OS;
+    dump.printNodeLocation(E->getLoc());
+    dump.printNodeRange(E->getSourceRange());
+    dump.printFlag(E->TrailingSemiLoc.isValid(), "trailing_semi",
+                   ExprModifierColor);
+
+    return dump;
   }
 
-  void printCommonPost() {
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void printSemanticExpr(Expr * semanticExpr) {
+  void printSemanticExpr(ASTNodeDumper &dump, Expr *semanticExpr) {
     if (semanticExpr == nullptr) {
       return;
     }
     
-    OS << '\n';
-    printRec(semanticExpr, "semantic_expr");
+    dump << '\n';
+    dump.printRec(semanticExpr, "semantic_expr");
   }
 
   void visitErrorExpr(ErrorExpr *E, StringRef Label) {
-    printCommon(E, "error_expr", Label);
-    printCommonPost();
+    (void)printCommon(E, "error_expr", Label);
   }
 
   void visitCodeCompletionExpr(CodeCompletionExpr *E, StringRef Label) {
-    printCommon(E, "code_completion_expr", Label);
+    auto dump = printCommon(E, "code_completion_expr", Label);
     if (E->getBase()) {
-      OS << '\n';
-      printRec(E->getBase());
+      dump << '\n';
+      dump.printRec(E->getBase());
     }
-    printCommonPost();
   }
 
   void visitNilLiteralExpr(NilLiteralExpr *E, StringRef Label) {
-    printCommon(E, "nil_literal_expr", Label);
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    printCommonPost();
+    auto dump = printCommon(E, "nil_literal_expr", Label);
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
   }
 
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E, StringRef Label) {
-    printCommon(E, "integer_literal_expr", Label);
-    if (E->isNegative())
-      PrintWithColorRAII(OS, LiteralValueColor) << " negative";
-    PrintWithColorRAII(OS, LiteralValueColor) << " value=";
+    auto dump = printCommon(E, "integer_literal_expr", Label);
+
+    dump.printFlag(E->isNegative(), "negative", LiteralValueColor);
+
     Type T = getTypeOfExpr(E);
     if (T.isNull() || !T->is<BuiltinIntegerType>())
-      PrintWithColorRAII(OS, LiteralValueColor) << E->getDigitsText();
+      dump.print(E->getDigitsText(), "value", LiteralValueColor);
     else
-      PrintWithColorRAII(OS, LiteralValueColor) << E->getValue();
-    PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
-    E->getBuiltinInitializer().dump(
-        PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    printCommonPost();
+      dump.print(E->getValue(), "value", LiteralValueColor);
+
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
+                      LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
   }
+
   void visitFloatLiteralExpr(FloatLiteralExpr *E, StringRef Label) {
-    printCommon(E, "float_literal_expr", Label);
-    if (E->isNegative())
-      PrintWithColorRAII(OS, LiteralValueColor) << " negative";
-    PrintWithColorRAII(OS, LiteralValueColor)
-      << " value=" << E->getDigitsText();
-    PrintWithColorRAII(OS, LiteralValueColor) << " builtin_initializer=";
-    E->getBuiltinInitializer().dump(
-        PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    if (!E->getBuiltinType().isNull()) {
-      PrintWithColorRAII(OS, TypeColor) << " builtin_type='";
-      E->getBuiltinType().print(PrintWithColorRAII(OS, TypeColor).getOS());
-      PrintWithColorRAII(OS, TypeColor) << "'";
-    }
-    printCommonPost();
+    auto dump = printCommon(E, "float_literal_expr", Label);
+
+    dump.printFlag(E->isNegative(), "negative", LiteralValueColor);
+    dump.print(E->getDigitsText(), "value", LiteralValueColor);
+
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
+                      LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+
+    if (!E->getBuiltinType().isNull())
+      dump.print(E->getBuiltinType(), "builtin_type", TypeColor);
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E, StringRef Label) {
-    printCommon(E, "boolean_literal_expr", Label);
-    PrintWithColorRAII(OS, LiteralValueColor)
-      << " value=" << (E->getValue() ? "true" : "false")
-      << " builtin_initializer=";
-    E->getBuiltinInitializer().dump(
-      PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    printCommonPost();
+    auto dump = printCommon(E, "boolean_literal_expr", Label);
+
+    dump.print(E->getValue() ? "true" : "false", "value", LiteralValueColor);
+
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
+                      LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
   }
 
   void visitStringLiteralExpr(StringLiteralExpr *E, StringRef Label) {
-    printCommon(E, "string_literal_expr", Label);
-    PrintWithColorRAII(OS, LiteralValueColor) << " encoding="
-      << getStringLiteralExprEncodingString(E->getEncoding())
-      << " value=" << QuotedString(E->getValue())
-      << " builtin_initializer=";
-    E->getBuiltinInitializer().dump(
-      PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    printCommonPost();
+    auto dump = printCommon(E, "string_literal_expr", Label);
+
+    dump.print(getStringLiteralExprEncodingString(E->getEncoding()), "encoding",
+               LiteralValueColor);
+    dump.print(QuotedString(E->getValue()), "value", LiteralValueColor);
+
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
+                      LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
   }
+
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E, StringRef Label) {
-    printCommon(E, "interpolated_string_literal_expr", Label);
+    auto dump = printCommon(E, "interpolated_string_literal_expr", Label);
     
-    // Print the trailing quote location
-    if (Ctx) {
-      auto TQL = E->getTrailingQuoteLoc();
-      if (TQL.isValid()) {
-        PrintWithColorRAII(OS, LocationColor) << " trailing_quote_loc=";
-        TQL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
-                  Ctx->SourceMgr);
-      }
-    }
-    PrintWithColorRAII(OS, LiteralValueColor)
-      << " literal_capacity="
-      << E->getLiteralCapacity() << " interpolation_count="
-      << E->getInterpolationCount();
-    PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
-    E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    OS << "\n";
-    printRec(E->getAppendingExpr());
-    printCommonPost();
+    dump.print(E->getTrailingQuoteLoc(), "trailing_quote_loc", LocationColor);
+
+    dump.print(E->getLiteralCapacity(), "literal_capacity", LiteralValueColor);
+    dump.print(E->getInterpolationCount(), "interpolation_count",
+               LiteralValueColor);
+
+    dump.printDeclRef(E->getBuilderInit(), "builder_init", LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "result_init", LiteralValueColor);
+
+    dump << "\n";
+    dump.printRec(E->getAppendingExpr());
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, StringRef Label) {
-    printCommon(E, "magic_identifier_literal_expr", Label);
-    OS << " kind=" << MagicIdentifierLiteralExpr::getKindString(E->getKind());
+    auto dump = printCommon(E, "magic_identifier_literal_expr", Label);
 
-    if (E->isString()) {
-      OS << " encoding="
-         << getStringLiteralExprEncodingString(E->getStringEncoding());
-    }
-    OS << " builtin_initializer=";
-    E->getBuiltinInitializer().dump(OS);
-    OS << " initializer=";
-    E->getInitializer().dump(OS);
-    printCommonPost();
+    dump.print(MagicIdentifierLiteralExpr::getKindString(E->getKind()), "kind");
+
+    if (E->isString())
+      dump.print(getStringLiteralExprEncodingString(E->getStringEncoding()),
+                 "encoding", LiteralValueColor);
+
+    dump.printDeclRef(E->getBuiltinInitializer(), "builtin_initializer",
+                      LiteralValueColor);
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E, StringRef Label) {
-    printCommon(E, "object_literal", Label);
-    OS << " kind='" << E->getLiteralKindPlainName() << "'";
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
-    printArgumentLabels(E->getArgumentLabels());
-    OS << "\n";
-    printRec(E->getArg());
-    printCommonPost();
+    auto dump = printCommon(E, "object_literal", Label);
+
+    dump.print(QuotedString(E->getLiteralKindPlainName()), "kind");
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+    printArgumentLabels(dump, E->getArgumentLabels());
+
+    dump << "\n";
+    dump.printRec(E->getArg());
   }
 
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E, StringRef Label) {
-    printCommon(E, "discard_assignment_expr", Label);
-    printCommonPost();
+    (void)printCommon(E, "discard_assignment_expr", Label);
   }
 
   void visitDeclRefExpr(DeclRefExpr *E, StringRef Label) {
-    printCommon(E, "declref_expr", Label);
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getDeclRef());
+    auto dump = printCommon(E, "declref_expr", Label);
+
+    dump.printDeclRef(E->getDeclRef(), "decl", DeclColor);
+
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getAccessSemanticsString(E->getAccessSemantics());
-    PrintWithColorRAII(OS, ExprModifierColor)
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
-    printCommonPost();
+      dump.print(getAccessSemanticsString(E->getAccessSemantics()), "",
+                 AccessLevelColor);
+
+    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
+               ExprModifierColor);
   }
+
   void visitSuperRefExpr(SuperRefExpr *E, StringRef Label) {
-    printCommon(E, "super_ref_expr", Label);
-    printCommonPost();
+    (void)printCommon(E, "super_ref_expr", Label);
   }
 
   void visitTypeExpr(TypeExpr *E, StringRef Label) {
-    printCommon(E, "type_expr", Label);
-    PrintWithColorRAII(OS, TypeReprColor) << " typerepr='";
-    if (E->getTypeRepr())
-      E->getTypeRepr()->print(PrintWithColorRAII(OS, TypeReprColor).getOS());
-    else
-      PrintWithColorRAII(OS, TypeReprColor) << "<<NULL>>";
-    PrintWithColorRAII(OS, TypeReprColor) << "'";
-    printCommonPost();
+    auto dump = printCommon(E, "type_expr", Label);
+
+    dump.printTypeRepr(E->getTypeRepr(), "typerepr");
   }
 
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E, StringRef Label) {
-    printCommon(E, "other_constructor_ref_expr", Label);
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getDeclRef());
-    printCommonPost();
+    auto dump = printCommon(E, "other_constructor_ref_expr", Label);
+    dump.printDeclRef(E->getDeclRef(), "decl");
   }
+
   void visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *E, StringRef Label) {
-    printCommon(E, "overloaded_decl_ref_expr", Label);
-    PrintWithColorRAII(OS, IdentifierColor) << " name="
-      << E->getDecls()[0]->getBaseName();
-    PrintWithColorRAII(OS, ExprModifierColor)
-      << " number_of_decls=" << E->getDecls().size()
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind())
-      << " decls=[\n";
-    interleave(E->getDecls(),
-               [&](ValueDecl *D) {
-                 OS.indent(Indent + 2);
-                 D->dumpRef(PrintWithColorRAII(OS, DeclModifierColor).getOS());
-               },
-               [&] { PrintWithColorRAII(OS, DeclModifierColor) << ",\n"; });
-    PrintWithColorRAII(OS, ExprModifierColor) << "]";
-    printCommonPost();
-  }
-  void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E, StringRef Label) {
-    printCommon(E, "unresolved_decl_ref_expr", Label);
-    PrintWithColorRAII(OS, IdentifierColor) << " name=" << E->getName();
-    PrintWithColorRAII(OS, ExprModifierColor)
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
-    printCommonPost();
-  }
-  void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E, StringRef Label) {
-    printCommon(E, "unresolved_specialize_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    for (TypeLoc T : E->getUnresolvedParams()) {
-      OS << '\n';
-      printRec(T.getTypeRepr());
+    auto dump = printCommon(E, "overloaded_decl_ref_expr", Label);
+
+    dump.printNodeName(E->getDecls()[0]->getBaseName());
+    dump.print(E->getDecls().size(), "number_of_decls", ExprModifierColor);
+    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
+               ExprModifierColor);
+
+    for (auto D : E->getDecls()) {
+      dump << "\n";
+      auto childDump = dump.child("candidate", "", DeclModifierColor);
+      childDump.printDeclRef(D, "decl");
     }
-    printCommonPost();
+  }
+
+  void visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E, StringRef Label) {
+    auto dump = printCommon(E, "unresolved_decl_ref_expr", Label);
+
+    dump.printNodeName(E->getName());
+    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
+               ExprModifierColor);
+  }
+
+  void visitUnresolvedSpecializeExpr(UnresolvedSpecializeExpr *E, StringRef Label) {
+    auto dump = printCommon(E, "unresolved_specialize_expr", Label);
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
+
+    for (TypeLoc T : E->getUnresolvedParams()) {
+      dump << '\n';
+      dump.printRec(T.getTypeRepr());
+    }
   }
 
   void visitMemberRefExpr(MemberRefExpr *E, StringRef Label) {
-    printCommon(E, "member_ref_expr", Label);
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getMember());
-    if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getAccessSemanticsString(E->getAccessSemantics());
-    printFlag(E->isSuper(), "super");
+    auto dump = printCommon(E, "member_ref_expr", Label);
 
-    OS << '\n';
-    printRec(E->getBase());
-    printCommonPost();
+    dump.printDeclRef(E->getMember(), "decl");
+
+    if (E->getAccessSemantics() != AccessSemantics::Ordinary)
+      dump.print(getAccessSemanticsString(E->getAccessSemantics()), "",
+                 AccessLevelColor);
+
+    dump.printFlag(E->isSuper(), "super");
+
+    dump << '\n';
+    dump.printRec(E->getBase());
   }
+
   void visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, StringRef Label) {
-    printCommon(E, "dynamic_member_ref_expr", Label);
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    E->getMember().dump(OS);
-    OS << '\n';
-    printRec(E->getBase());
-    printCommonPost();
+    auto dump = printCommon(E, "dynamic_member_ref_expr", Label);
+
+    dump.printDeclRef(E->getMember(), "decl");
+
+    dump << '\n';
+    dump.printRec(E->getBase());
   }
+
   void visitUnresolvedMemberExpr(UnresolvedMemberExpr *E, StringRef Label) {
-    printCommon(E, "unresolved_member_expr", Label);
-    OS << " name='" << E->getName() << "'";
-    PrintWithColorRAII(OS, ExprModifierColor)
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
-    printCommonPost();
+    auto dump = printCommon(E, "unresolved_member_expr", Label);
+
+    dump.printNodeName(E->getName());
+    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
+               ExprModifierColor);
   }
+
   void visitDotSelfExpr(DotSelfExpr *E, StringRef Label) {
-    printCommon(E, "dot_self_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "dot_self_expr", Label);
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
   void visitParenExpr(ParenExpr *E, StringRef Label) {
-    printCommon(E, "paren_expr", Label);
-    if (E->hasTrailingClosure())
-      OS << " trailing-closure";
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "paren_expr", Label);
+
+    dump.printFlag(E->hasTrailingClosure(), "trailing-closure");
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitAwaitExpr(AwaitExpr *E, StringRef Label) {
-    printCommon(E, "await_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "await_expr", Label);
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitUnresolvedMemberChainResultExpr(UnresolvedMemberChainResultExpr *E,
                                             StringRef Label){
-    printCommon(E, "unresolved_member_chain_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "unresolved_member_chain_expr", Label);
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitTupleExpr(TupleExpr *E, StringRef Label) {
-    printCommon(E, "tuple_expr", Label);
-    if (E->hasTrailingClosure())
-      OS << " trailing-closure";
+    auto dump = printCommon(E, "tuple_expr", Label);
+
+    dump.printFlag(E->hasTrailingClosure(), "trailing-closure");
 
     if (E->hasElementNames()) {
-      PrintWithColorRAII(OS, IdentifierColor) << " names=";
-
+      dump.printLabel("names", IdentifierColor);
       interleave(E->getElementNames(),
                  [&](Identifier name) {
-                   PrintWithColorRAII(OS, IdentifierColor)
-                     << (name.empty()?"''":name.str());
+                   dump.colored(IdentifierColor) << QuotedString(name.str());
                  },
-                 [&] { PrintWithColorRAII(OS, IdentifierColor) << ","; });
+                 [&] { dump.colored(IdentifierColor) << ","; });
     }
 
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-      OS << '\n';
+      dump << '\n';
       if (E->getElement(i))
-        printRec(E->getElement(i));
+        dump.printRec(E->getElement(i));
       else
-        OS.indent(Indent+2) << "<<tuple element default value>>";
+        (void)dump.child("<<default value>>", "", ExprColor);
     }
-    printCommonPost();
   }
+
   void visitArrayExpr(ArrayExpr *E, StringRef Label) {
-    printCommon(E, "array_expr", Label);
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    auto dump = printCommon(E, "array_expr", Label);
+
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+
     for (auto elt : E->getElements()) {
-      OS << '\n';
-      printRec(elt);
+      dump << '\n';
+      dump.printRec(elt);
     }
-    printCommonPost();
   }
+
   void visitDictionaryExpr(DictionaryExpr *E, StringRef Label) {
-    printCommon(E, "dictionary_expr", Label);
-    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
-    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    auto dump = printCommon(E, "dictionary_expr", Label);
+
+    dump.printDeclRef(E->getInitializer(), "initializer", LiteralValueColor);
+
     for (auto elt : E->getElements()) {
-      OS << '\n';
-      printRec(elt);
+      dump << '\n';
+      dump.printRec(elt);
     }
-    printCommonPost();
   }
+
   void visitSubscriptExpr(SubscriptExpr *E, StringRef Label) {
-    printCommon(E, "subscript_expr", Label);
+    auto dump = printCommon(E, "subscript_expr", Label);
+
     if (E->getAccessSemantics() != AccessSemantics::Ordinary)
-      PrintWithColorRAII(OS, AccessLevelColor)
-        << " " << getAccessSemanticsString(E->getAccessSemantics());
-    printFlag(E->isSuper(), "super");
-    if (E->hasDecl()) {
-      PrintWithColorRAII(OS, DeclColor) << " decl=";
-      printDeclRef(E->getDecl());
-    }
-    printArgumentLabels(E->getArgumentLabels());
-    OS << '\n';
-    printRec(E->getBase());
-    OS << '\n';
-    printRec(E->getIndex());
-    printCommonPost();
+      dump.print(getAccessSemanticsString(E->getAccessSemantics()), "",
+                 AccessLevelColor);
+    dump.printFlag(E->isSuper(), "super");
+    if (E->hasDecl())
+      dump.printDeclRef(E->getDecl(), "decl");
+    printArgumentLabels(dump, E->getArgumentLabels());
+
+    dump << '\n';
+    dump.printRec(E->getBase(), "base");
+
+    dump << '\n';
+    dump.printRec(E->getIndex(), "index");
   }
+
   void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, StringRef Label) {
-    printCommon(E, "keypath_application_expr", Label);
-    OS << '\n';
-    printRec(E->getBase());
-    OS << '\n';
-    printRec(E->getKeyPath());
-    printCommonPost();
+    auto dump = printCommon(E, "keypath_application_expr", Label);
+
+    dump << '\n';
+    dump.printRec(E->getBase(), "base");
+
+    dump << '\n';
+    dump.printRec(E->getKeyPath(), "key_path");
   }
+
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E, StringRef Label) {
-    printCommon(E, "dynamic_subscript_expr", Label);
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getMember());
-    printArgumentLabels(E->getArgumentLabels());
-    OS << '\n';
-    printRec(E->getBase());
-    OS << '\n';
-    printRec(E->getIndex());
-    printCommonPost();
+    auto dump = printCommon(E, "dynamic_subscript_expr", Label);
+
+    dump.printDeclRef(E->getMember(), "decl");
+    printArgumentLabels(dump, E->getArgumentLabels());
+
+    dump << '\n';
+    dump.printRec(E->getBase(), "base");
+
+    dump << '\n';
+    dump.printRec(E->getIndex(), "index");
   }
+
   void visitUnresolvedDotExpr(UnresolvedDotExpr *E, StringRef Label) {
-    printCommon(E, "unresolved_dot_expr", Label);
-    OS << " field '" << E->getName() << "'";
-    PrintWithColorRAII(OS, ExprModifierColor)
-      << " function_ref=" << getFunctionRefKindStr(E->getFunctionRefKind());
+    auto dump = printCommon(E, "unresolved_dot_expr", Label);
+
+    dump.printNodeName(E->getName());
+    dump.print(getFunctionRefKindStr(E->getFunctionRefKind()), "function_ref",
+               ExprModifierColor);
+
     if (E->getBase()) {
-      OS << '\n';
-      printRec(E->getBase());
+      dump << '\n';
+      dump.printRec(E->getBase(), "base");
     }
-    printCommonPost();
   }
+
   void visitTupleElementExpr(TupleElementExpr *E, StringRef Label) {
-    printCommon(E, "tuple_element_expr", Label);
-    OS << " field #" << E->getFieldNumber() << '\n';
-    printRec(E->getBase());
-    printCommonPost();
+    auto dump = printCommon(E, "tuple_element_expr", Label);
+
+    dump.print(E->getFieldNumber(), "index", IdentifierColor);
+
+    dump << '\n';
+    dump.printRec(E->getBase(), "base");
   }
+
   void visitDestructureTupleExpr(DestructureTupleExpr *E, StringRef Label) {
-    printCommon(E, "destructure_tuple_expr", Label);
-    OS << "\n";
-    printRec(E->getDestructuredElements(), "destructured");
-    OS << "\n";
-    printRec(E->getSubExpr());
-    OS << "\n";
-    printRec(E->getResultExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "destructure_tuple_expr", Label);
+
+    dump.printRec(E->getDestructuredElements(), "destructured");
+
+    dump << "\n";
+    dump.printRec(E->getSubExpr());
+
+    dump << "\n";
+    dump.printRec(E->getResultExpr());
   }
+
   void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E, StringRef Label) {
-    printCommon(E, "unresolvedtype_conversion_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "unresolvedtype_conversion_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitFunctionConversionExpr(FunctionConversionExpr *E, StringRef Label) {
-    printCommon(E, "function_conversion_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "function_conversion_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitCovariantFunctionConversionExpr(CovariantFunctionConversionExpr *E,
                                             StringRef Label) {
-    printCommon(E, "covariant_function_conversion_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "covariant_function_conversion_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *E,
                                           StringRef Label) {
-    printCommon(E, "covariant_return_conversion_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "covariant_return_conversion_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitImplicitlyUnwrappedFunctionConversionExpr(
       ImplicitlyUnwrappedFunctionConversionExpr *E, StringRef Label) {
-    printCommon(E, "implicitly_unwrapped_function_conversion_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "implicitly_unwrapped_function_conversion_expr",
+                            Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E, StringRef Label) {
-    printCommon(E, "underlying_to_opaque_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "underlying_to_opaque_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitErasureExpr(ErasureExpr *E, StringRef Label) {
-    printCommon(E, "erasure_expr", Label);
-    OS << '\n';
-    for (auto conf : E->getConformances()) {
-      printRec(conf);
-      OS << '\n';
-    }
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "erasure_expr", Label);
+
+    dump.printRec(E->getConformances(), "conformances");
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitAnyHashableErasureExpr(AnyHashableErasureExpr *E, StringRef Label) {
-    printCommon(E, "any_hashable_erasure_expr", Label);
-    OS << '\n';
-    printRec(E->getConformance());
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "any_hashable_erasure_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getConformance());
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *E,
                                           StringRef Label) {
-    printCommon(E, "conditional_bridge_from_objc_expr", Label);
-    OS << " conversion=";
-    printDeclRef(E->getConversion());
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "conditional_bridge_from_objc_expr", Label);
+
+    dump.printDeclRef(E->getConversion(), "conversion");
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitBridgeFromObjCExpr(BridgeFromObjCExpr *E, StringRef Label) {
-    printCommon(E, "bridge_from_objc_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "bridge_from_objc_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitBridgeToObjCExpr(BridgeToObjCExpr *E, StringRef Label) {
-    printCommon(E, "bridge_to_objc_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "bridge_to_objc_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitLoadExpr(LoadExpr *E, StringRef Label) {
-    printCommon(E, "load_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "load_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitMetatypeConversionExpr(MetatypeConversionExpr *E, StringRef Label) {
-    printCommon(E, "metatype_conversion_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "metatype_conversion_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
                                            StringRef Label) {
-    printCommon(E, "collection_upcast_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
+    auto dump = printCommon(E, "collection_upcast_expr", Label);
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
+
     if (auto keyConversion = E->getKeyConversion()) {
-      OS << '\n';
-      printRec(keyConversion.Conversion, "key_conversion");
+      dump << '\n';
+      dump.printRec(keyConversion.Conversion, "key_conversion");
     }
+
     if (auto valueConversion = E->getValueConversion()) {
-      OS << '\n';
-      printRec(valueConversion.Conversion, "value_conversion");
+      dump << '\n';
+      dump.printRec(valueConversion.Conversion, "value_conversion");
     }
-    printCommonPost();
   }
+
   void visitDerivedToBaseExpr(DerivedToBaseExpr *E, StringRef Label) {
-    printCommon(E, "derived_to_base_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "derived_to_base_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, StringRef Label) {
-    printCommon(E, "archetype_to_super_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "archetype_to_super_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, StringRef Label) {
-    printCommon(E, "inject_into_optional", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "inject_into_optional", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E,
                                       StringRef Label) {
-    printCommon(E, "class_metatype_to_object", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "class_metatype_to_object", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *E,
                                             StringRef Label) {
-    printCommon(E, "existential_metatype_to_object", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "existential_metatype_to_object", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E,
                                          StringRef Label) {
-    printCommon(E, "protocol_metatype_to_object", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "protocol_metatype_to_object", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitInOutToPointerExpr(InOutToPointerExpr *E, StringRef Label) {
-    printCommon(E, "inout_to_pointer", Label);
-    OS << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "inout_to_pointer", Label);
+    dump.printFlag(E->isNonAccessing(), "nonaccessing");
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitArrayToPointerExpr(ArrayToPointerExpr *E, StringRef Label) {
-    printCommon(E, "array_to_pointer", Label);
-    OS << (E->isNonAccessing() ? " nonaccessing" : "") << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "array_to_pointer", Label);
+    dump.printFlag(E->isNonAccessing(), "nonaccessing");
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitStringToPointerExpr(StringToPointerExpr *E, StringRef Label) {
-    printCommon(E, "string_to_pointer", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "string_to_pointer", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitPointerToPointerExpr(PointerToPointerExpr *E, StringRef Label) {
-    printCommon(E, "pointer_to_pointer", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "pointer_to_pointer", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E, StringRef Label) {
-    printCommon(E, "foreign_object_conversion", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "foreign_object_conversion", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E, StringRef Label) {
-    printCommon(E, "unevaluated_instance", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "unevaluated_instance", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E, StringRef Label) {
-    printCommon(E, "differentiable_function", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "differentiable_function", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitLinearFunctionExpr(LinearFunctionExpr *E, StringRef Label) {
-    printCommon(E, "linear_function", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "linear_function", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitDifferentiableFunctionExtractOriginalExpr(
       DifferentiableFunctionExtractOriginalExpr *E, StringRef Label) {
-    printCommon(E, "differentiable_function_extract_original", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "differentiable_function_extract_original", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitLinearFunctionExtractOriginalExpr(
       LinearFunctionExtractOriginalExpr *E, StringRef Label) {
-    printCommon(E, "linear_function_extract_original", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "linear_function_extract_original", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitLinearToDifferentiableFunctionExpr(
       LinearToDifferentiableFunctionExpr *E, StringRef Label) {
-    printCommon(E, "linear_to_differentiable_function", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "linear_to_differentiable_function", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitInOutExpr(InOutExpr *E, StringRef Label) {
-    printCommon(E, "inout_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "inout_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitVarargExpansionExpr(VarargExpansionExpr *E, StringRef Label) {
-    printCommon(E, "vararg_expansion_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "vararg_expansion_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitForceTryExpr(ForceTryExpr *E, StringRef Label) {
-    printCommon(E, "force_try_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "force_try_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitOptionalTryExpr(OptionalTryExpr *E, StringRef Label) {
-    printCommon(E, "optional_try_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "optional_try_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitTryExpr(TryExpr *E, StringRef Label) {
-    printCommon(E, "try_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "try_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitSequenceExpr(SequenceExpr *E, StringRef Label) {
-    printCommon(E, "sequence_expr", Label);
+    auto dump = printCommon(E, "sequence_expr", Label);
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
-      OS << '\n';
-      printRec(E->getElement(i));
+      dump << '\n';
+      dump.printRec(E->getElement(i));
     }
-    printCommonPost();
   }
 
   void visitCaptureListExpr(CaptureListExpr *E, StringRef Label) {
-    printCommon(E, "capture_list", Label);
-    for (auto capture : E->getCaptureList()) {
-      OS << '\n';
-      Indent += 2;
-      printRec(capture.PBD);
-      Indent -= 2;
+    auto dump = printCommon(E, "capture_list", Label);
+    {
+      auto childDump = dump.child("captures", "", CapturesColor);
+      for (auto capture : E->getCaptureList()) {
+        childDump << '\n';
+        childDump.printRec(capture.PBD);
+      }
     }
-    printRec(E->getClosureBody());
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getClosureBody(), "body");
   }
 
-  llvm::raw_ostream &printClosure(AbstractClosureExpr *E, char const *name, StringRef Label) {
-    printCommon(E, name, Label);
-    PrintWithColorRAII(OS, DiscriminatorColor)
-      << " discriminator=" << E->getDiscriminator();
+  LLVM_NODISCARD ASTNodeDumper
+  printClosure(AbstractClosureExpr *E, char const *name, StringRef Label) {
+    auto dump = printCommon(E, name, Label);
+
+    dump.print(E->getDiscriminator(), "discriminator", DiscriminatorColor);
 
     switch (auto isolation = E->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
       break;
 
     case ClosureActorIsolation::ActorInstance:
-      PrintWithColorRAII(OS, CapturesColor) << " actor-isolated="
-        << isolation.getActorInstance()->printRef();
+      dump.printDeclRef(isolation.getActorInstance(), "actor_isolated",
+                        CapturesColor);
       break;
 
     case ClosureActorIsolation::GlobalActor:
-      PrintWithColorRAII(OS, CapturesColor) << " global-actor-isolated="
-        << isolation.getGlobalActor().getString();
+      dump.print(isolation.getGlobalActor(), "global_actor_isolated",
+                 CapturesColor);
       break;
     }
 
     if (!E->getCaptureInfo().isTrivial()) {
-      OS << " ";
-      E->getCaptureInfo().print(PrintWithColorRAII(OS, CapturesColor).getOS());
+      dump << " ";
+      E->getCaptureInfo().print(dump.colored(CapturesColor).getOS());
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
     if (auto Ty = getTypeOfExpr(E)) {
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
-        if (!fType->getExtInfo().isNoEscape())
-          PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
-        if (fType->getExtInfo().isSendable())
-          PrintWithColorRAII(OS, ClosureModifierColor) << " concurrent";
+        dump.printFlag(!fType->getExtInfo().isNoEscape(), "escaping",
+                       ClosureModifierColor);
+        dump.printFlag(fType->getExtInfo().isSendable(), "concurrent",
+                       ClosureModifierColor);
       }
     }
 
-    return OS;
+    return dump;
   }
 
   void visitClosureExpr(ClosureExpr *E, StringRef Label) {
-    printClosure(E, "closure_expr", Label);
-    if (E->hasSingleExpressionBody())
-      PrintWithColorRAII(OS, ClosureModifierColor) << " single-expression";
-    if (E->allowsImplicitSelfCapture())
-      PrintWithColorRAII(OS, ClosureModifierColor) << " implicit-self";
-    if (E->inheritsActorContext())
-      PrintWithColorRAII(OS, ClosureModifierColor) << " inherits-actor-context";
+    auto dump = printClosure(E, "closure_expr", Label);
+
+    dump.printFlag(E->hasSingleExpressionBody(), "single_expr",
+                   ClosureModifierColor);
+    dump.printFlag(E->allowsImplicitSelfCapture(), "implicit_self",
+                   ClosureModifierColor);
+    dump.printFlag(E->inheritsActorContext(), "inherits_actor_context",
+                   ClosureModifierColor);
 
     if (E->getParameters()) {
-      OS << '\n';
-      PrintDecl(Ctx, OS, Delegate, Indent+2)
-          .printParameterList(E->getParameters());
+      dump << '\n';
+      dump.printRec(E->getParameters());
     }
 
-    OS << '\n';
-    printRec(E->getBody());
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getBody(), "body");
   }
+
   void visitAutoClosureExpr(AutoClosureExpr *E, StringRef Label) {
-    printClosure(E, "autoclosure_expr", Label);
+    auto dump = printClosure(E, "autoclosure_expr", Label);
 
     if (E->getParameters()) {
-      OS << '\n';
-      PrintDecl(Ctx, OS, Delegate, Indent+2)
-          .printParameterList(E->getParameters());
+      dump << '\n';
+      dump.printRec(E->getParameters());
     }
 
-    OS << '\n';
-    printRec(E->getSingleExpressionBody());
-
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getSingleExpressionBody(), "single_expr_body");
   }
 
   void visitDynamicTypeExpr(DynamicTypeExpr *E, StringRef Label) {
-    printCommon(E, "metatype_expr", Label);
-    OS << '\n';
-    printRec(E->getBase());
-    printCommonPost();
+    auto dump = printCommon(E, "metatype_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getBase(), "base");
   }
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E, StringRef Label) {
-    printCommon(E, "opaque_value_expr", Label);
-    OS << " @ " << (void*)E;
-    printCommonPost();
+    auto dump = printCommon(E, "opaque_value_expr", Label);
+    dump.print((void*)E);
   }
 
   void visitPropertyWrapperValuePlaceholderExpr(
       PropertyWrapperValuePlaceholderExpr *E, StringRef Label) {
-    printCommon(E, "property_wrapper_value_placeholder_expr", Label);
-    OS << '\n';
-    printRec(E->getOpaqueValuePlaceholder());
+    auto dump = printCommon(E, "property_wrapper_value_placeholder_expr",
+                            Label);
+
+    dump << '\n';
+    dump.printRec(E->getOpaqueValuePlaceholder(), "opaque_value_placeholder");
+
     if (auto *value = E->getOriginalWrappedValue()) {
-      OS << '\n';
-      printRec(value);
+      dump << '\n';
+      dump.printRec(value, "original_wrapped_value");
     }
-    printCommonPost();
   }
 
   void visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E,
                                        StringRef Label) {
-    printCommon(E, "applied_property_wrapper_expr", Label);
-    printRec(E->getValue());
-    printCommonPost();
+    auto dump = printCommon(E, "applied_property_wrapper_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getValue());
   }
 
   void visitDefaultArgumentExpr(DefaultArgumentExpr *E, StringRef Label) {
-    printCommon(E, "default_argument_expr", Label);
-    OS << " default_args_owner=";
-    E->getDefaultArgsOwner().dump(OS);
-    OS << " param=" << E->getParamIndex();
-    printCommonPost();
+    auto dump = printCommon(E, "default_argument_expr", Label);
+
+    dump.printLabel("default_args_owner");
+    E->getDefaultArgsOwner().dump(dump.getOS());
+
+    dump.print(E->getParamIndex(), "param_index");
   }
 
-  void printArgumentLabels(ArrayRef<Identifier> argLabels) {
-    PrintWithColorRAII(OS, ArgumentsColor) << " arg_labels=";
+  void printArgumentLabels(ASTNodeDumper & dump,
+                           ArrayRef<Identifier> argLabels) {
+    dump.printLabel("arg_labels", ArgumentsColor);
     for (auto label : argLabels) {
-      PrintWithColorRAII(OS, ArgumentsColor)
+      dump.colored(ArgumentsColor)
         << (label.empty() ? "_" : label.str()) << ":";
     }
   }
 
   void printApplyExpr(ApplyExpr *E, const char *NodeName, StringRef Label) {
-    printCommon(E, NodeName, Label);
-    if (E->isThrowsSet()) {
-      PrintWithColorRAII(OS, ExprModifierColor)
-        << (E->throws() ? " throws" : " nothrow");
-    }
-    if (auto call = dyn_cast<CallExpr>(E))
-      printArgumentLabels(call->getArgumentLabels());
+    auto dump = printCommon(E, NodeName, Label);
 
-    OS << '\n';
-    printRec(E->getFn());
-    OS << '\n';
-    printRec(E->getArg());
-    printCommonPost();
+    if (E->isThrowsSet())
+      dump.printFlag(E->throws() ? " throws" : " nothrow");
+
+    if (auto call = dyn_cast<CallExpr>(E))
+      printArgumentLabels(dump, call->getArgumentLabels());
+
+    dump << '\n';
+    dump.printRec(E->getFn(), "fn");
+
+    dump << '\n';
+    dump.printRec(E->getArg(), "arg");
   }
 
   void visitCallExpr(CallExpr *E, StringRef Label) {
@@ -2709,313 +2605,302 @@ public:
     printApplyExpr(E, "constructor_ref_call_expr", Label);
   }
   void visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, StringRef Label) {
-    printCommon(E, "dot_syntax_base_ignored", Label);
-    OS << '\n';
-    printRec(E->getLHS());
-    OS << '\n';
-    printRec(E->getRHS());
-    printCommonPost();
+    auto dump = printCommon(E, "dot_syntax_base_ignored", Label);
+    dump << '\n';
+    dump.printRec(E->getLHS());
+    dump << '\n';
+    dump.printRec(E->getRHS());
   }
 
   void printExplicitCastExpr(ExplicitCastExpr *E, const char *name, StringRef Label) {
-    printCommon(E, name, Label);
+    auto dump = printCommon(E, name, Label);
 
     if (auto checkedCast = dyn_cast<CheckedCastExpr>(E))
-      OS << ' ' << getCheckedCastKindName(checkedCast->getCastKind());
+      dump.printFlag(getCheckedCastKindName(checkedCast->getCastKind()));
 
-    OS << " writtenType='";
+    dump.printLabel("writtenType");
+    dump << "'";
     if (canGetTypeOfTypeRepr())
-      getTypeOfTypeRepr(E->getCastTypeRepr()).print(OS);
+      getTypeOfTypeRepr(E->getCastTypeRepr()).print(dump.getOS());
     else
-      E->getCastType().print(OS);
-    OS << "'";
+      E->getCastType().print(dump.getOS());
+    dump << "'";
 
-    OS << '\n';
-    printRec(E->getSubExpr());
-
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E, StringRef Label) {
     printExplicitCastExpr(E, "forced_checked_cast_expr", Label);
   }
+
   void visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                        StringRef Label) {
     printExplicitCastExpr(E, "conditional_checked_cast_expr", Label);
   }
+
   void visitIsExpr(IsExpr *E, StringRef Label) {
     printExplicitCastExpr(E, "is_subtype_expr", Label);
   }
+
   void visitCoerceExpr(CoerceExpr *E, StringRef Label) {
     printExplicitCastExpr(E, "coerce_expr", Label);
   }
+
   void visitArrowExpr(ArrowExpr *E, StringRef Label) {
-    printCommon(E, "arrow_expr", Label);
-    printFlag(E->getAsyncLoc().isValid(), "async");
-    printFlag(E->getThrowsLoc().isValid(), "throws");
-    OS << '\n';
-    printRec(E->getArgsExpr());
-    OS << '\n';
-    printRec(E->getResultExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "arrow_expr", Label);
+    dump.printFlag(E->getAsyncLoc().isValid(), "async");
+    dump.printFlag(E->getThrowsLoc().isValid(), "throws");
+
+    dump << '\n';
+    dump.printRec(E->getArgsExpr(), "args");
+
+    dump << '\n';
+    dump.printRec(E->getResultExpr(), "result");
   }
+
   void visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E, StringRef Label) {
-    printCommon(E, "rebind_self_in_constructor_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "rebind_self_in_constructor_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitIfExpr(IfExpr *E, StringRef Label) {
-    printCommon(E, "if_expr", Label);
-    OS << '\n';
-    printRec(E->getCondExpr());
-    OS << '\n';
-    printRec(E->getThenExpr());
-    OS << '\n';
-    printRec(E->getElseExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "if_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getCondExpr(), "condition");
+    dump << '\n';
+    dump.printRec(E->getThenExpr(), "then_expr");
+    dump << '\n';
+    dump.printRec(E->getElseExpr(), "else_expr");
   }
+
   void visitAssignExpr(AssignExpr *E, StringRef Label) {
-    printCommon(E, "assign_expr", Label);
-    OS << '\n';
-    printRec(E->getDest());
-    OS << '\n';
-    printRec(E->getSrc());
-    printCommonPost();
+    auto dump = printCommon(E, "assign_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getDest(), "dest");
+    dump << '\n';
+    dump.printRec(E->getSrc(), "src");
   }
+
   void visitEnumIsCaseExpr(EnumIsCaseExpr *E, StringRef Label) {
-    printCommon(E, "enum_is_case_expr", Label);
-    OS << ' ' << E->getEnumElement()->getBaseIdentifier();
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "enum_is_case_expr", Label);
+    dump.printNodeName(E->getEnumElement());
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitUnresolvedPatternExpr(UnresolvedPatternExpr *E, StringRef Label) {
-    printCommon(E, "unresolved_pattern_expr", Label);
-    OS << '\n';
-    printRec(E->getSubPattern());
-    printCommonPost();
+    auto dump = printCommon(E, "unresolved_pattern_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubPattern());
   }
+
   void visitBindOptionalExpr(BindOptionalExpr *E, StringRef Label) {
-    printCommon(E, "bind_optional_expr", Label);
-    OS << " depth=" << E->getDepth() << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "bind_optional_expr", Label);
+    dump.print(E->getDepth(), "depth");
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitOptionalEvaluationExpr(OptionalEvaluationExpr *E, StringRef Label) {
-    printCommon(E, "optional_evaluation_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "optional_evaluation_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitForceValueExpr(ForceValueExpr *E, StringRef Label) {
-    printCommon(E, "force_value_expr", Label);
-    if (E->isForceOfImplicitlyUnwrappedOptional())
-      PrintWithColorRAII(OS, ExprModifierColor) << " implicit_iuo_unwrap";
+    auto dump = printCommon(E, "force_value_expr", Label);
+    dump.printFlag(E->isForceOfImplicitlyUnwrappedOptional(),
+                   "implicit_iuo_unwrap", ExprModifierColor);
 
-    OS << '\n';
-    printRec(E->getSubExpr());
-
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitOpenExistentialExpr(OpenExistentialExpr *E, StringRef Label) {
-    printCommon(E, "open_existential_expr", Label);
+    auto dump = printCommon(E, "open_existential_expr", Label);
 
-    OS << '\n';
-    printRec(E->getOpaqueValue());
+    dump << '\n';
+    dump.printRec(E->getOpaqueValue(), "opaque_value");
 
-    OS << '\n';
-    printRec(E->getExistentialValue());
+    dump << '\n';
+    dump.printRec(E->getExistentialValue(), "existential_value");
 
-    OS << '\n';
-    printRec(E->getSubExpr());
-
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *E,
                                          StringRef Label) {
-    printCommon(E, "make_temporarily_escapable_expr", Label);
+    auto dump = printCommon(E, "make_temporarily_escapable_expr", Label);
 
-    OS << '\n';
-    printRec(E->getOpaqueValue());
+    dump << '\n';
+    dump.printRec(E->getOpaqueValue(), "opaque_value");
 
-    OS << '\n';
-    printRec(E->getNonescapingClosureValue());
+    dump << '\n';
+    dump.printRec(E->getNonescapingClosureValue(), "nonescaping_closure_value");
 
-    OS << '\n';
-    printRec(E->getSubExpr());
-
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
-  void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, StringRef Label) {
-    printCommon(E, "editor_placeholder_expr", Label);
 
-    // Print the trailing angle bracket location
-    if (Ctx) {
-      auto TABL = E->getTrailingAngleBracketLoc();
-      if (TABL.isValid()) {
-        PrintWithColorRAII(OS, LocationColor) << " trailing_angle_bracket_loc=";
-        TABL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
-                   Ctx->SourceMgr);
-      }
-    }
+  void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, StringRef Label) {
+    auto dump = printCommon(E, "editor_placeholder_expr", Label);
+
+    dump.print(E->getTrailingAngleBracketLoc(), "trailing_angle_bracket_loc",
+               LocationColor);
 
     auto *TyR = E->getPlaceholderTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR) {
-      OS << '\n';
-      printRec(TyR, "placeholder_type_repr");
+      dump << '\n';
+      dump.printRec(TyR, "placeholder_type_repr");
     }
     if (ExpTyR && ExpTyR != TyR) {
-      OS << '\n';
-      printRec(ExpTyR, "type_for_expansion");
+      dump << '\n';
+      dump.printRec(ExpTyR, "type_for_expansion");
     }
 
-    printSemanticExpr(E->getSemanticExpr());
+    printSemanticExpr(dump, E->getSemanticExpr());
+  }
 
-    printCommonPost();
-  }
   void visitLazyInitializerExpr(LazyInitializerExpr *E, StringRef Label) {
-    printCommon(E, "lazy_initializer_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "lazy_initializer_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
+
   void visitObjCSelectorExpr(ObjCSelectorExpr *E, StringRef Label) {
-    printCommon(E, "objc_selector_expr", Label);
-    OS << " kind=" << getObjCSelectorExprKindString(E->getSelectorKind());
-    PrintWithColorRAII(OS, DeclColor) << " decl=";
-    printDeclRef(E->getMethod());
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "objc_selector_expr", Label);
+    dump.print(getObjCSelectorExprKindString(E->getSelectorKind()), "kind");
+    dump.printDeclRef(E->getMethod(), "decl");
+
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitKeyPathExpr(KeyPathExpr *E, StringRef Label) {
-    printCommon(E, "keypath_expr", Label);
-    printFlag(E->isObjC(), "objc");
+    auto dump = printCommon(E, "keypath_expr", Label);
+    dump.printFlag(E->isObjC(), "objc");
 
-    OS << '\n';
-    Indent += 2;
-    printCommon("", "components", ExprColor);
-    OS << "\n";
-    Indent += 2;
-    for (unsigned i : indices(E->getComponents())) {
-      auto &component = E->getComponents()[i];
-      OS << '\n';
-      switch (component.getKind()) {
-      case KeyPathExpr::Component::Kind::Invalid:
-        printCommon("", "invalid", ASTNodeColor);
-        break;
+    {
+      dump << '\n';
+      auto childDump = dump.child("", "components", ExprColor);
+      for (unsigned i : indices(E->getComponents())) {
+        Optional<ASTNodeDumper> grandchildDump;
+        auto &component = E->getComponents()[i];
+        childDump << '\n';
+        switch (component.getKind()) {
+        case KeyPathExpr::Component::Kind::Invalid:
+          grandchildDump = childDump.child("", "invalid", ASTNodeColor);
+          break;
 
-      case KeyPathExpr::Component::Kind::OptionalChain:
-        printCommon("", "optional_chain", ASTNodeColor);
-        break;
-        
-      case KeyPathExpr::Component::Kind::OptionalForce:
-        printCommon("", "optional_force", ASTNodeColor);
-        break;
-        
-      case KeyPathExpr::Component::Kind::OptionalWrap:
-        printCommon("", "optional_wrap", ASTNodeColor);
-        break;
-        
-      case KeyPathExpr::Component::Kind::Property:
-        printCommon("", "property", ASTNodeColor);
-        PrintWithColorRAII(OS, DeclColor) << " decl=";
-        printDeclRef(component.getDeclRef());
-        break;
-      
-      case KeyPathExpr::Component::Kind::Subscript:
-        printCommon("", "subscript", ASTNodeColor);
-        PrintWithColorRAII(OS, DeclColor) << " decl='";
-        printDeclRef(component.getDeclRef());
-        PrintWithColorRAII(OS, DeclColor) << "'";
-        break;
-      
-      case KeyPathExpr::Component::Kind::UnresolvedProperty:
-        printCommon("", "unresolved_property", ASTNodeColor);
-        PrintWithColorRAII(OS, IdentifierColor)
-          << " decl_name='" << component.getUnresolvedDeclName() << "'";
-        break;
-        
-      case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-        printCommon("", "unresolved_subscript", ASTNodeColor);
-        printArgumentLabels(component.getSubscriptLabels());
-        break;
-      case KeyPathExpr::Component::Kind::Identity:
-        printCommon("", "identity", ASTNodeColor);
-        break;
+        case KeyPathExpr::Component::Kind::OptionalChain:
+          grandchildDump = childDump.child("", "optional_chain", ASTNodeColor);
+          break;
 
-      case KeyPathExpr::Component::Kind::TupleElement:
-        printCommon("", "tuple_element", ASTNodeColor);
-        PrintWithColorRAII(OS, DiscriminatorColor)
-          << " #" << component.getTupleIndex();
-        break;
-      case KeyPathExpr::Component::Kind::DictionaryKey:
-        printCommon("", "dict_key", ASTNodeColor);
-        PrintWithColorRAII(OS, IdentifierColor)
-          << " key='" << component.getUnresolvedDeclName() << "'";
-        break;
-      case KeyPathExpr::Component::Kind::CodeCompletion:
-        PrintWithColorRAII(OS, ASTNodeColor) << "completion";
-        break;
+        case KeyPathExpr::Component::Kind::OptionalForce:
+          grandchildDump = childDump.child("", "optional_force", ASTNodeColor);
+          break;
+
+        case KeyPathExpr::Component::Kind::OptionalWrap:
+          grandchildDump = childDump.child("", "optional_wrap", ASTNodeColor);
+          break;
+
+        case KeyPathExpr::Component::Kind::Property:
+          grandchildDump = childDump.child("", "property", ASTNodeColor);
+          grandchildDump->printDeclRef(component.getDeclRef(), "decl");
+          break;
+
+        case KeyPathExpr::Component::Kind::Subscript:
+          grandchildDump = childDump.child("", "subscript", ASTNodeColor);
+          grandchildDump->printDeclRef(component.getDeclRef(), "decl");
+          break;
+
+        case KeyPathExpr::Component::Kind::UnresolvedProperty:
+          grandchildDump = childDump.child("", "unresolved_property",
+                                           ASTNodeColor);
+          grandchildDump->printNodeName(component.getUnresolvedDeclName());
+          break;
+
+        case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+          grandchildDump = childDump.child("", "unresolved_subscript",
+                                           ASTNodeColor);
+          printArgumentLabels(*grandchildDump, component.getSubscriptLabels());
+          break;
+
+        case KeyPathExpr::Component::Kind::Identity:
+          grandchildDump = childDump.child("", "identity", ASTNodeColor);
+          break;
+
+        case KeyPathExpr::Component::Kind::TupleElement:
+          grandchildDump = childDump.child("", "tuple_element", ASTNodeColor);
+          grandchildDump->print(component.getTupleIndex(), "index",
+                                DiscriminatorColor);
+          break;
+
+        case KeyPathExpr::Component::Kind::DictionaryKey:
+          grandchildDump = childDump.child("", "dict_key", ASTNodeColor);
+          grandchildDump->print(component.getUnresolvedDeclName(), "key",
+                                IdentifierColor);
+          break;
+
+        case KeyPathExpr::Component::Kind::CodeCompletion:
+          grandchildDump = childDump.child("completion", "", ASTNodeColor);
+          break;
+        }
+
+        grandchildDump->print(getTypeOfKeyPathComponent(E, i), "type",
+                              TypeColor);
+        if (auto indexExpr = component.getIndexExpr()) {
+          *grandchildDump << '\n';
+          grandchildDump->printRec(indexExpr);
+        }
       }
-      PrintWithColorRAII(OS, TypeColor)
-        << " type='" << getTypeOfKeyPathComponent(E, i) << "'";
-      if (auto indexExpr = component.getIndexExpr()) {
-        OS << '\n';
-        printRec(indexExpr);
-      }
-      printCommonPost();
     }
-    Indent -= 2;
-
-    printCommonPost();
-    Indent -= 2;
 
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {
-      OS << '\n';
-      printRec(stringLiteral, "objc_string_literal");
+      dump << '\n';
+      dump.printRec(stringLiteral, "objc_string_literal");
     }
+
     if (!E->isObjC()) {
       if (auto root = E->getParsedRoot()) {
-        OS << "\n";
-        printRec(root, "parsed_root");
+        dump << "\n";
+        dump.printRec(root, "parsed_root");
       }
       if (auto path = E->getParsedPath()) {
-        OS << "\n";
-        printRec(path, "parsed_path");
+        dump << "\n";
+        dump.printRec(path, "parsed_path");
       }
     }
-    printCommonPost();
   }
 
   void visitKeyPathDotExpr(KeyPathDotExpr *E, StringRef Label) {
-    printCommon(E, "key_path_dot_expr", Label);
-    printCommonPost();
+    (void)printCommon(E, "key_path_dot_expr", Label);
   }
 
   void visitOneWayExpr(OneWayExpr *E, StringRef Label) {
-    printCommon(E, "one_way_expr", Label);
-    OS << '\n';
-    printRec(E->getSubExpr());
-    printCommonPost();
+    auto dump = printCommon(E, "one_way_expr", Label);
+    dump << '\n';
+    dump.printRec(E->getSubExpr());
   }
 
   void visitTapExpr(TapExpr *E, StringRef Label) {
     if (!Ctx)
       Ctx = &E->getVar()->getDeclContext()->getASTContext();
 
-    printCommon(E, "tap_expr", Label);
-    PrintWithColorRAII(OS, DeclColor) << " var=";
-    printDeclRef(E->getVar());
-    OS << '\n';
+    auto dump = printCommon(E, "tap_expr", Label);
+    dump.printDeclRef(E->getVar(), "var");
 
-    printRec(E->getSubExpr());
-    OS << '\n';
+    dump << '\n';
+    dump.printRec(E->getSubExpr(), "initializer");
 
-    printRec(E->getBody());
-    printCommonPost();
+    dump << '\n';
+    dump.printRec(E->getBody(), "body");
   }
 };
 
@@ -3068,185 +2953,146 @@ public:
                          ExprTypeDelegate &delegate, unsigned indent)
     : Ctx(ctx), OS(os), Delegate(delegate), Indent(indent) { }
 
-  void printRec(Decl *D, StringRef Label = "");
-  void printRec(Expr *E, StringRef Label = "");
-  void printRec(TypeRepr *T, StringRef Label = "");
-
-  // Print a single flag.
-  void printFlag(StringRef label) {
-    PrintWithColorRAII(OS, TypeFieldColor) << " " << label;
-  }
-
-  // Print a single flag if it is set.
-  void printFlag(bool isSet, StringRef label) {
-    if (isSet)
-      printFlag(label);
-  }
-
-  void printCommon(const char *name, StringRef label, TerminalColor Color) {
-    OS.indent(Indent);
-    PrintWithColorRAII(OS, ParenthesisColor) << '(';
-    PrintWithColorRAII(OS, LabelColor) << label;
-    if (!label.empty()) {  // not null/empty
-      OS << "=";
-    }
-
-    PrintWithColorRAII(OS, Color) << name;
-  }
-
-  raw_ostream &printCommon(const char *Name, StringRef Label) {
-    printCommon(Name, Label, TypeReprColor);
-    return OS;
-  }
-
-  void printCommonPost() {
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  LLVM_NODISCARD ASTNodeDumper
+  printCommon(const char *Name, StringRef Label) {
+    return ASTNodeDumper(this, Name, Label, TypeReprColor);
   }
 
   void visitErrorTypeRepr(ErrorTypeRepr *T, StringRef Label) {
-    printCommon("type_error", Label);
+    (void)printCommon("type_error", Label);
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, StringRef Label) {
-    printCommon("type_attributed", Label) << " attrs=";
-    T->printAttrs(OS);
-    OS << '\n';
-    printRec(T->getTypeRepr());
+    auto dump = printCommon("type_attributed", Label);
+
+    dump.printLabel("attrs");
+    T->printAttrs(dump.getOS());
+
+    dump << '\n';
+    dump.printRec(T->getTypeRepr());
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T, StringRef Label) {
-    printCommon("type_ident", Label);
-    Indent += 2;
+    auto dump = printCommon("type_ident", Label);
     for (auto comp : T->getComponentRange()) {
-      OS << '\n';
-      printCommon("component", "");
-      PrintWithColorRAII(OS, IdentifierColor)
-        << " id='" << comp->getNameRef() << '\'';
-      OS << " bind=";
+      dump << '\n';
+      auto childDump = dump.child("component", "", TypeReprColor);
+
+      childDump.printNodeName(comp->getNameRef());
+
       if (comp->isBound())
-        comp->getBoundDecl()->dumpRef(OS);
-      else OS << "none";
-      printCommonPost();
+        childDump.printDeclRef(comp->getBoundDecl(), "bind", DeclColor);
+      else
+        childDump.print("none", "bind", DeclColor);
+
       if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp)) {
         for (auto genArg : GenIdT->getGenericArgs()) {
-          OS << '\n';
-          printRec(genArg);
+          childDump << '\n';
+          childDump.printRec(genArg);
         }
       }
     }
-    printCommonPost();
-    Indent -= 2;
   }
 
   void visitFunctionTypeRepr(FunctionTypeRepr *T, StringRef Label) {
-    printCommon("type_function", Label);
-    OS << '\n'; printRec(T->getArgsTypeRepr());
-    if (T->isAsync())
-      OS << " async ";
-    if (T->isThrowing())
-      OS << " throws ";
-    OS << '\n'; printRec(T->getResultTypeRepr());
-    printCommonPost();
+    auto dump = printCommon("type_function", Label);
+    dump.printFlag(T->isAsync(), "async");
+    dump.printFlag(T->isThrowing(), "throws");
+
+    dump << '\n';
+    dump.printRec(T->getArgsTypeRepr(), "arg_type");
+
+    dump << '\n';
+    dump.printRec(T->getResultTypeRepr(), "result_type");
   }
 
   void visitArrayTypeRepr(ArrayTypeRepr *T, StringRef Label) {
-    printCommon("type_array", Label) << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_array", Label);
+    dump << '\n';
+    dump.printRec(T->getBase(), "element");
   }
 
   void visitDictionaryTypeRepr(DictionaryTypeRepr *T, StringRef Label) {
-    printCommon("type_dictionary", Label) << '\n';
-    printRec(T->getKey());
-    OS << '\n';
-    printRec(T->getValue());
-    printCommonPost();
+    auto dump = printCommon("type_dictionary", Label);
+    dump << '\n';
+    dump.printRec(T->getKey(), "key_type");
+    dump << '\n';
+    dump.printRec(T->getValue(), "value_type");
   }
 
   void visitTupleTypeRepr(TupleTypeRepr *T, StringRef Label) {
-    printCommon("type_tuple", Label);
+    auto dump = printCommon("type_tuple", Label);
 
     for (auto elem : T->getElements()) {
-      OS << '\n';
+      dump << '\n';
       if (elem.Name.empty())
-        printRec(elem.Type);
+        dump.printRec(elem.Type);
       else
-        printRec(elem.Type, elem.Name.str());
+        dump.printRec(elem.Type, elem.Name.str());
     }
-    printCommonPost();
   }
 
   void visitCompositionTypeRepr(CompositionTypeRepr *T, StringRef Label) {
-    printCommon("type_composite", Label);
+    auto dump = printCommon("type_composite", Label);
     for (auto elem : T->getTypes()) {
-      OS << '\n';
-      printRec(elem);
+      dump << '\n';
+      dump.printRec(elem);
     }
-    printCommonPost();
   }
 
   void visitMetatypeTypeRepr(MetatypeTypeRepr *T, StringRef Label) {
-    printCommon("type_metatype", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_metatype", Label);
+    dump << '\n';
+    dump.printRec(T->getBase(), "instance_type");
   }
 
   void visitProtocolTypeRepr(ProtocolTypeRepr *T, StringRef Label) {
-    printCommon("type_protocol", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_protocol", Label);
+    dump << '\n';
+    dump.printRec(T->getBase());
   }
 
   void visitInOutTypeRepr(InOutTypeRepr *T, StringRef Label) {
-    printCommon("type_inout", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_inout", Label);
+    dump << '\n';
+    dump.printRec(T->getBase());
   }
   
   void visitSharedTypeRepr(SharedTypeRepr *T, StringRef Label) {
-    printCommon("type_shared", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_shared", Label);
+    dump << '\n';
+    dump.printRec(T->getBase());
   }
 
   void visitOwnedTypeRepr(OwnedTypeRepr *T, StringRef Label) {
-    printCommon("type_owned", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_owned", Label);
+    dump << '\n';
+    dump.printRec(T->getBase());
   }
 
   void visitIsolatedTypeRepr(IsolatedTypeRepr *T, StringRef Label) {
-    printCommon("isolated", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("isolated", Label);
+    dump << '\n';
+    dump.printRec(T->getBase());
   }
 
   void visitOptionalTypeRepr(OptionalTypeRepr *T, StringRef Label) {
-    printCommon("type_optional", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_optional", Label);
+    dump << '\n';
+    dump.printRec(T->getBase());
   }
 
   void visitImplicitlyUnwrappedOptionalTypeRepr(
       ImplicitlyUnwrappedOptionalTypeRepr *T, StringRef Label) {
-    printCommon("type_implicitly_unwrapped_optional", Label);
-    OS << '\n';
-    printRec(T->getBase());
-    printCommonPost();
+    auto dump = printCommon("type_implicitly_unwrapped_optional", Label);
+    dump << '\n';
+    dump.printRec(T->getBase());
   }
 
   void visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T, StringRef Label) {
-    printCommon("type_opaque_return", Label);
-    OS << '\n';
-    printRec(T->getConstraint());
-    printCommonPost();
+    auto dump = printCommon("type_opaque_return", Label);
+    dump << '\n';
+    dump.printRec(T->getConstraint());
   }
 
   void visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T, StringRef Label) {
@@ -3257,49 +3103,38 @@ public:
   }
 
   void visitPlaceholderTypeRepr(PlaceholderTypeRepr *T, StringRef Label) {
-    printCommon("type_placeholder", Label);
-    printCommonPost();
+    (void)printCommon("type_placeholder", Label);
   }
 
   void visitFixedTypeRepr(FixedTypeRepr *T, StringRef Label) {
-    printCommon("type_fixed", Label);
     auto Ty = T->getType();
     if (!Ctx && Ty)
       Ctx = &Ty->getASTContext();
 
-    if (Ctx) {
-      if (T->getLoc().isValid()) {
-        OS << " location=@";
-        T->getLoc().print(OS, Ctx->SourceMgr);
-      } else {
-        OS << " location=<<invalid>>";
-      }
-    }
-    OS << " type="; Ty.dump(OS);
-    printCommonPost();
+    auto dump = printCommon("type_fixed", Label);
+    dump.printNodeLocation(T->getLoc());
+    dump << '\n';
+    dump.printRec(Ty, "fixed_type");
   }
 
   void visitSILBoxTypeRepr(SILBoxTypeRepr *T, StringRef Label) {
-    printCommon("sil_box", Label);
-    Indent += 2;
+    auto dump = printCommon("sil_box", Label);
 
     ArrayRef<SILBoxTypeReprField> Fields = T->getFields();
     for (unsigned i = 0, end = Fields.size(); i != end; ++i) {
-      OS << '\n';
-      printCommon("sil_box_field", "");
-      printFlag(Fields[i].isMutable(), "mutable");
-      OS << '\n';
-      printRec(Fields[i].getFieldType());
-      printCommonPost();
+      dump << '\n';
+      auto childDump = dump.child("sil_box_field", "", TypeReprColor);
+
+      childDump.printFlag(Fields[i].isMutable(), "mutable");
+
+      childDump << '\n';
+      childDump.printRec(Fields[i].getFieldType());
     }
 
     for (auto genArg : T->getGenericArguments()) {
-      OS << '\n';
-      printRec(genArg);
+      dump << '\n';
+      dump.printRec(genArg);
     }
-
-    printCommonPost();
-    Indent -= 2;
   }
 };
 
@@ -3316,27 +3151,34 @@ void TypeRepr::dump() const {
 // conformances.
 static void dumpProtocolConformanceRec(
     const ProtocolConformance *conformance, llvm::raw_ostream &out,
-    unsigned indent,
+    unsigned indent, StringRef Label,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
 static void dumpProtocolConformanceRefRec(
     const ProtocolConformanceRef conformance, llvm::raw_ostream &out,
-    unsigned indent,
+    unsigned indent, StringRef label,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
   if (conformance.isInvalid()) {
-    out.indent(indent) << "(invalid_conformance)";
+    out.indent(indent) << "(";
+    if (!label.empty())
+      out << label << "=";
+    out << "invalid_conformance)";
   } else if (conformance.isConcrete()) {
-    dumpProtocolConformanceRec(conformance.getConcrete(), out, indent, visited);
+    dumpProtocolConformanceRec(conformance.getConcrete(), out, indent, label,
+                               visited);
   } else {
-    out.indent(indent) << "(abstract_conformance protocol="
-                       << conformance.getAbstract()->getName();
+    out.indent(indent) << "(";
+    if (!label.empty())
+      out << label << "=";
+    out <<"abstract_conformance protocol="
+        << conformance.getAbstract()->getName();
     PrintWithColorRAII(out, ParenthesisColor) << ')';
   }
 }
 
 static void dumpProtocolConformanceRec(
     const ProtocolConformance *conformance, llvm::raw_ostream &out,
-    unsigned indent,
+    unsigned indent, StringRef label,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
   // A recursive conformance shouldn't have its contents printed, or there's
   // infinite recursion. (This also avoids printing things that occur multiple
@@ -3346,6 +3188,8 @@ static void dumpProtocolConformanceRec(
   auto printCommon = [&](StringRef kind) {
     out.indent(indent);
     PrintWithColorRAII(out, ParenthesisColor) << '(';
+    if (!label.empty())
+      out << label << "=";
     out << kind << "_conformance type=" << conformance->getType()
         << " protocol=" << conformance->getProtocol()->getName();
 
@@ -3394,7 +3238,7 @@ static void dumpProtocolConformanceRec(
 
       for (auto sigConf : normal->getSignatureConformances()) {
         out << '\n';
-        dumpProtocolConformanceRefRec(sigConf, out, indent + 2, visited);
+        dumpProtocolConformanceRefRec(sigConf, out, indent + 2, "", visited);
       }
     }
 
@@ -3425,7 +3269,7 @@ static void dumpProtocolConformanceRec(
 
     out << '\n';
     dumpProtocolConformanceRec(conf->getInheritedConformance(), out, indent + 2,
-                               visited);
+                               "", visited);
     break;
   }
 
@@ -3452,7 +3296,7 @@ static void dumpProtocolConformanceRec(
       out << "(conditional requirements unable to be computed)\n";
     }
     dumpProtocolConformanceRec(conf->getGenericConformance(), out, indent + 2,
-                               visited);
+                               "", visited);
     break;
   }
   }
@@ -3518,7 +3362,7 @@ static void dumpSubstitutionMapRec(
     out << "conformance type=";
     req.getFirstType()->print(out);
     out << "\n";
-    dumpProtocolConformanceRefRec(conformances.front(), out, indent + 4,
+    dumpProtocolConformanceRefRec(conformances.front(), out, indent + 4, "",
                                   visited);
 
     printParen(')');
@@ -3537,12 +3381,12 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out, unsigned indent,
   if (!details && isConcrete())
     visited.insert(getConcrete());
 
-  dumpProtocolConformanceRefRec(*this, out, indent, visited);
+  dumpProtocolConformanceRefRec(*this, out, indent, "", visited);
 }
 
 void ProtocolConformanceRef::print(llvm::raw_ostream &out) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  dumpProtocolConformanceRefRec(*this, out, 0, visited);
+  dumpProtocolConformanceRefRec(*this, out, 0, "", visited);
 
 }
 
@@ -3554,7 +3398,7 @@ void ProtocolConformance::dump() const {
 
 void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
-  dumpProtocolConformanceRec(this, out, indent, visited);
+  dumpProtocolConformanceRec(this, out, indent, "", visited);
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,
@@ -4218,75 +4062,32 @@ void StableSerializationPath::dump(llvm::raw_ostream &os) const {
   }
 }
 
-void PrintPattern::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
+void ASTNodeDumper::printRec(Decl *D, StringRef Label) {
+  PrintDecl(Ctx, *OS, *Delegate, IndentChildren).visit(D, Label);
 }
-void PrintPattern::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
+void ASTNodeDumper::printRec(Expr *E, StringRef Label) {
+  PrintExpr(Ctx, *OS, *Delegate, IndentChildren).visit(E, Label);
 }
-void PrintPattern::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
+void ASTNodeDumper::printRec(Stmt *S, StringRef Label) {
+  PrintStmt(Ctx, *OS, *Delegate, IndentChildren).visit(S, Label);
 }
-void PrintPattern::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
+void ASTNodeDumper::printRec(TypeRepr *T, StringRef Label) {
+  PrintTypeRepr(Ctx, *OS, *Delegate, IndentChildren).visit(T, Label);
 }
-void PrintPattern::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(const_cast<Pattern *>(P), Label);
+void ASTNodeDumper::printRec(const Pattern *P, StringRef Label) {
+  PrintPattern(Ctx, *OS, *Delegate, IndentChildren)
+      .visit(const_cast<Pattern *>(P), Label);
 }
-
-void PrintDecl::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
+void ASTNodeDumper::printRec(Type Ty, StringRef Label) {
+  PrintType(Ctx, *OS, *Delegate, IndentChildren)
+      .visit(Ty, Label);
 }
-void PrintDecl::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
+void ASTNodeDumper::printRec(ParameterList *PL, StringRef Label) {
+  PrintDecl(Ctx, *OS, *Delegate, IndentChildren).printParameterList(PL, Label);
 }
-void PrintDecl::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
-}
-void PrintDecl::printRec(Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(P, Label);
-}
-void PrintDecl::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
-}
-
-void PrintStmt::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
-}
-void PrintStmt::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
-}
-void PrintStmt::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
-}
-void PrintStmt::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(const_cast<Pattern *>(P), Label);
-}
-
-void PrintExpr::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
-}
-void PrintExpr::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
-}
-void PrintExpr::printRec(Stmt *S, StringRef Label) {
-  PrintStmt(Ctx, OS, Delegate, Indent + 2).visit(S, Label);
-}
-void PrintExpr::printRec(const Pattern *P, StringRef Label) {
-  PrintPattern(Ctx, OS, Delegate, Indent+2).visit(const_cast<Pattern *>(P), Label);
-}
-void PrintExpr::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
-}
-
-void PrintTypeRepr::printRec(Decl *D, StringRef Label) {
-  PrintDecl(Ctx, OS, Delegate, Indent + 2).visit(D, Label);
-}
-void PrintTypeRepr::printRec(Expr *E, StringRef Label) {
-  PrintExpr(Ctx, OS, Delegate, Indent + 2).visit(E, Label);
-}
-void PrintTypeRepr::printRec(TypeRepr *T, StringRef Label) {
-  PrintTypeRepr(Ctx, OS, Delegate, Indent+2).visit(T, Label);
+void ASTNodeDumper::printRec(ProtocolConformanceRef conf, StringRef Label) {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpProtocolConformanceRefRec(conf, *OS, IndentChildren, Label, visited);
 }
 
 void PrintType::printRec(Type type, StringRef label) {

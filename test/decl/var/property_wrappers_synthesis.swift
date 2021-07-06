@@ -26,8 +26,9 @@ struct UseWrapper<T: DefaultInit> {
   var wrapped = T()
 
   // CHECK: pattern_binding_decl implicit
-  // CHECK-NEXT: pattern_typed implicit type='Wrapper<T>'
-  // CHECK-NEXT: pattern_named implicit type='Wrapper<T>' '_wrapped'
+  // CHECK-NEXT: (pattern_entry
+  // CHECK-NEXT: (pattern=pattern_typed implicit type='Wrapper<T>'
+  // CHECK-NEXT: (pattern_named implicit type='Wrapper<T>' "_wrapped"
   // CHECK: constructor_ref_call_expr
   // CHECK-NEXT: declref_expr{{.*}}Wrapper.init(wrappedValue:)
   init() { }
