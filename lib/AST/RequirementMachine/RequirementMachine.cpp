@@ -280,16 +280,11 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 /// Attempt to obtain a confluent rewrite system using the completion
 /// procedure.
 void RequirementMachine::computeCompletion(CanGenericSignature sig) {
-  unsigned remainingSteps = Context.LangOpts.RequirementMachineStepLimit;
-  bool keepGoing = true;
-
-  while (keepGoing) {
+  while (true) {
     // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
     auto result = Impl->System.computeConfluentCompletion(
-        remainingSteps, Context.LangOpts.RequirementMachineDepthLimit);
-
-    assert(remainingSteps >= result.second);
-    remainingSteps -= result.second;
+        Context.LangOpts.RequirementMachineStepLimit,
+        Context.LangOpts.RequirementMachineDepthLimit);
 
     if (Context.Stats) {
       Context.Stats->getFrontendCounters()
@@ -297,22 +292,26 @@ void RequirementMachine::computeCompletion(CanGenericSignature sig) {
     }
 
     // Check for failure.
-    switch (result.first) {
-    case RewriteSystem::CompletionResult::Success:
-      break;
+    auto checkCompletionResult = [&]() {
+      switch (result.first) {
+      case RewriteSystem::CompletionResult::Success:
+        break;
 
-    case RewriteSystem::CompletionResult::MaxIterations:
-      llvm::errs() << "Generic signature " << sig
-                   << " exceeds maximum completion step count\n";
-      Impl->System.dump(llvm::errs());
-      abort();
+      case RewriteSystem::CompletionResult::MaxIterations:
+        llvm::errs() << "Generic signature " << sig
+                     << " exceeds maximum completion step count\n";
+        Impl->System.dump(llvm::errs());
+        abort();
 
-    case RewriteSystem::CompletionResult::MaxDepth:
-      llvm::errs() << "Generic signature " << sig
-                   << " exceeds maximum completion depth\n";
-      Impl->System.dump(llvm::errs());
-      abort();
-    }
+      case RewriteSystem::CompletionResult::MaxDepth:
+        llvm::errs() << "Generic signature " << sig
+                     << " exceeds maximum completion depth\n";
+        Impl->System.dump(llvm::errs());
+        abort();
+      }
+    };
+
+    checkCompletionResult();
 
     // Simplify right hand sides in preparation for building the
     // equivalence class map.
@@ -321,7 +320,22 @@ void RequirementMachine::computeCompletion(CanGenericSignature sig) {
     // Build the equivalence class map, which performs concrete term
     // unification; if this added any new rules, run the completion
     // procedure again.
-    keepGoing = Impl->System.buildEquivalenceClassMap(Impl->Map);
+    result = Impl->System.buildEquivalenceClassMap(
+        Impl->Map,
+        Context.LangOpts.RequirementMachineStepLimit,
+        Context.LangOpts.RequirementMachineDepthLimit);
+
+    if (Context.Stats) {
+      Context.Stats->getFrontendCounters()
+        .NumRequirementMachineUnifiedConcreteTerms += result.second;
+    }
+
+    checkCompletionResult();
+
+    // If buildEquivalenceClassMap() added new rules, we run another
+    // round of Knuth-Bendix, and build the equivalence class map again.
+    if (result.second == 0)
+      break;
   }
 
   if (Context.LangOpts.DebugRequirementMachine) {
