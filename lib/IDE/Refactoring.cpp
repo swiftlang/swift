@@ -4258,10 +4258,12 @@ struct AsyncHandlerDesc {
     if (!isValid())
       return nullptr;
 
-    if (Node.isExpr(swift::ExprKind::Call)) {
-      CallExpr *CE = cast<CallExpr>(Node.dyn_cast<Expr *>());
-      if (CE->getFn()->getReferencedDecl().getDecl() == getHandler())
-        return CE;
+    if (auto E = Node.dyn_cast<Expr *>()) {
+      if (auto *CE = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr())) {
+        if (CE->getFn()->getReferencedDecl().getDecl() == getHandler()) {
+          return CE;
+        }
+      }
     }
     return nullptr;
   }
@@ -5924,17 +5926,18 @@ public:
 
     OS << "await ";
 
-    // withChecked[Throwing]Continuation { cont in
+    // withChecked[Throwing]Continuation { continuation in
     if (TopHandler.HasError) {
       OS << "withCheckedThrowingContinuation";
     } else {
       OS << "withCheckedContinuation";
     }
-    OS << " " << tok::l_brace << " cont " << tok::kw_in << "\n";
+    OS << " " << tok::l_brace << " continuation " << tok::kw_in << "\n";
 
     // fnWithHandler(args...) { ... }
-    auto ClosureStr = getAsyncWrapperCompletionClosure("cont", TopHandler);
-    addForwardingCallTo(FD, TopHandler, /*HandlerReplacement*/ ClosureStr);
+    auto ClosureStr =
+        getAsyncWrapperCompletionClosure("continuation", TopHandler);
+    addForwardingCallTo(FD, TopHandler, /*HandlerReplacement=*/ClosureStr);
 
     OS << tok::r_brace << "\n"; // end continuation closure
     OS << tok::r_brace << "\n"; // end function body
@@ -5998,13 +6001,13 @@ private:
     std::string OutputStr;
     llvm::raw_string_ostream OS(OutputStr);
 
-    OS << " " << tok::l_brace; // start closure
+    OS << tok::l_brace; // start closure
 
     // Prepare parameter names for the closure.
     auto SuccessParams = HandlerDesc.getSuccessParams();
     SmallVector<SmallString<4>, 2> SuccessParamNames;
     for (auto idx : indices(SuccessParams)) {
-      SuccessParamNames.emplace_back("res");
+      SuccessParamNames.emplace_back("result");
 
       // If we have multiple success params, number them e.g res1, res2...
       if (SuccessParams.size() > 1)
@@ -6012,7 +6015,7 @@ private:
     }
     Optional<SmallString<4>> ErrName;
     if (HandlerDesc.getErrorParam())
-      ErrName.emplace("err");
+      ErrName.emplace("error");
 
     auto HasAnyParams = !SuccessParamNames.empty() || ErrName;
     if (HasAnyParams)
@@ -6044,8 +6047,21 @@ private:
         OS << tok::kw_if << " " << tok::kw_let << " ";
         OS << *ErrName << " " << tok::equal << " " << *ErrName << " ";
         OS << tok::l_brace << "\n";
+        for (auto Idx : indices(SuccessParamNames)) {
+          auto &Name = SuccessParamNames[Idx];
+          auto ParamTy = SuccessParams[Idx].getParameterType();
+          if (!HandlerDesc.shouldUnwrap(ParamTy))
+            continue;
 
-        // cont.resume(throwing: err)
+          // assert(res == nil, "Expected nil-success param 'res' for non-nil
+          //                     error")
+          OS << "assert" << tok::l_paren << Name << " == " << tok::kw_nil;
+          OS << tok::comma << " \"Expected nil success param '" << Name;
+          OS << "' for non-nil error\"";
+          OS << tok::r_paren << "\n";
+        }
+
+        // continuation.resume(throwing: err)
         OS << ContName << tok::period << "resume" << tok::l_paren;
         OS << "throwing" << tok::colon << " " << *ErrName;
         OS << tok::r_paren << "\n";
@@ -6077,7 +6093,7 @@ private:
         OS << tok::r_brace << "\n";
       }
 
-      // cont.resume(returning: (res1, res2, ...))
+      // continuation.resume(returning: (res1, res2, ...))
       OS << ContName << tok::period << "resume" << tok::l_paren;
       OS << "returning" << tok::colon << " ";
       addTupleOf(SuccessParamNames, OS, [&](auto Ref) { OS << Ref; });
@@ -6085,7 +6101,7 @@ private:
       break;
     }
     case HandlerType::RESULT: {
-      // cont.resume(with: res)
+      // continuation.resume(with: res)
       assert(SuccessParamNames.size() == 1);
       OS << ContName << tok::period << "resume" << tok::l_paren;
       OS << "with" << tok::colon << " " << SuccessParamNames[0];
@@ -6343,10 +6359,10 @@ private:
       }
     } else if (CallExpr *CE = TopHandler.getAsHandlerCall(E)) {
       if (Scopes.back().isWrappedInContination()) {
-        return addCustom(CE->getSourceRange(),
+        return addCustom(E->getSourceRange(),
                          [&]() { addHandlerCallToContinuation(CE); });
       } else if (NestedExprCount == 0) {
-        return addCustom(CE->getSourceRange(), [&]() { addHandlerCall(CE); });
+        return addCustom(E->getSourceRange(), [&]() { addHandlerCall(CE); });
       }
     } else if (auto *CE = dyn_cast<CallExpr>(E)) {
       // Try and hoist a call's completion handler. Don't do so if
