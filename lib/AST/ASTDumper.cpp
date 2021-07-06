@@ -583,7 +583,7 @@ public:
 
 
 
-static StringRef
+StringRef swift::
 getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
   switch (value) {
   case SILFunctionType::Representation::Thick: return "thick";
@@ -655,8 +655,8 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
   llvm_unreachable("bad kind");
 }
 
-static StringRef getImportKindString(ImportKind value) {
-  switch (value) {
+StringRef swift::getImportKindString(ImportKind importKind) {
+  switch (importKind) {
   case ImportKind::Module: return "module";
   case ImportKind::Type: return "type";
   case ImportKind::Struct: return "struct";
@@ -666,8 +666,16 @@ static StringRef getImportKindString(ImportKind value) {
   case ImportKind::Var: return "var";
   case ImportKind::Func: return "func";
   }
-  
+
   llvm_unreachable("Unhandled ImportKind in switch.");
+}
+
+Optional<StringRef> swift::getImportKindKeyword(ImportKind importKind) {
+  switch (importKind) {
+  case ImportKind::Module: return None;
+  case ImportKind::Type: return StringRef("typealias");
+  default: return getImportKindString(importKind);
+  }
 }
 
 static StringRef
@@ -717,11 +725,11 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
 
   llvm_unreachable("Unhandled AccessSemantics in switch.");
 }
-static StringRef getMetatypeRepresentationString(MetatypeRepresentation value) {
+StringRef swift::getMetatypeRepresentationString(MetatypeRepresentation value) {
   switch (value) {
     case MetatypeRepresentation::Thin: return "thin";
     case MetatypeRepresentation::Thick: return "thick";
-    case MetatypeRepresentation::ObjC: return "@objc";
+    case MetatypeRepresentation::ObjC: return "objc_metatype";
   }
 
   llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
@@ -735,7 +743,7 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
 
   llvm_unreachable("Unhandled StringLiteral in switch.");
 }
-static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
+StringRef swift::getCtorInitializerKindString(CtorInitializerKind value) {
   switch (value) {
     case CtorInitializerKind::Designated: return "designated";
     case CtorInitializerKind::Convenience: return "convenience";
@@ -744,15 +752,6 @@ static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
   }
 
   llvm_unreachable("Unhandled CtorInitializerKind in switch.");
-}
-static StringRef getAssociativityString(Associativity value) {
-  switch (value) {
-    case Associativity::None: return "none";
-    case Associativity::Left: return "left";
-    case Associativity::Right: return "right";
-  }
-
-  llvm_unreachable("Unhandled Associativity in switch.");
 }
 
 void ASTNodeDumper::printNodeAccessSemantics(AccessSemantics semantics) {
@@ -1360,7 +1359,7 @@ namespace {
       auto dump = printCommon(PGD, "precedence_group_decl", Label);
 
       dump.printNodeName(PGD->getName());
-      dump.printFlag(getAssociativityString(PGD->getAssociativity()),
+      dump.printFlag(getAssociativitySpelling(PGD->getAssociativity()),
                      "associativity");
       dump.printFlag(PGD->isAssignment(), "assignment");
 

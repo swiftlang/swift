@@ -6776,6 +6776,8 @@ enum class CtorInitializerKind {
   Factory
 };
 
+StringRef getCtorInitializerKindString(CtorInitializerKind value);
+
 /// Specifies the kind of initialization call performed within the body
 /// of the constructor, e.g., self.init or super.init.
 enum class BodyInitKind {
