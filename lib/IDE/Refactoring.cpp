@@ -6902,7 +6902,11 @@ private:
         }
         OS << ' ' << tok::kw_else << ' ' << tok::l_brace << '\n';
         OS << "fatalError" << tok::l_paren;
-        OS << "\"Expected non-nil result '" << ArgName << "' for nil error\"";
+        OS << "\"Expected non-nil result ";
+        if (ArgName.str() != "result") {
+          OS << "'" << ArgName << "' ";
+        }
+        OS << "in the non-error case\"";
         OS << tok::r_paren << '\n';
         OS << tok::r_brace << '\n';
       }
