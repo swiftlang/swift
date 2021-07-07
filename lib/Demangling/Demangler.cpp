@@ -3410,6 +3410,9 @@ NodePointer Demangler::demangleSubscript() {
   NodePointer LabelList = popFunctionParamLabels(Type);
   NodePointer Context = popContext();
 
+  if (!Type)
+    return nullptr;
+
   NodePointer Subscript = createNode(Node::Kind::Subscript);
   Subscript = addChild(Subscript, Context);
   addChild(Subscript, LabelList);
