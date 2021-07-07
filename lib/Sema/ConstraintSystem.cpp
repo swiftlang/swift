@@ -2958,6 +2958,10 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
       // Simplify the base.
       Type newBase = simplifyTypeImpl(depMemTy->getBase(), getFixedTypeFn);
 
+      if (newBase->isPlaceholder()) {
+        return PlaceholderType::get(getASTContext(), depMemTy);
+      }
+
       // If nothing changed, we're done.
       if (newBase.getPointer() == depMemTy->getBase().getPointer())
         return type;
@@ -5098,6 +5102,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
 Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
                                              FunctionType *closureType,
+                                             DeclContext *ClosureContext,
                                              bool isDefaultWrappedValue,
                                              bool isAsyncLetWrapper) {
   auto &Context = DC->getASTContext();
@@ -5116,8 +5121,9 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
     newClosureType = closureType->withExtInfo(info.withNoEscape(false))
                          ->castTo<FunctionType>();
 
-  auto *closure = new (Context) AutoClosureExpr(
-      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
+  auto *closure = new (Context)
+      AutoClosureExpr(expr, newClosureType,
+                      AutoClosureExpr::InvalidDiscriminator, ClosureContext);
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 

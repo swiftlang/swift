@@ -81,3 +81,12 @@ func rdar_59703585() {
   cb = swiftCallback
   // expected-error@-1 {{cannot assign value of type '(UnsafePointer<Int8>, UnsafeMutableRawPointer?) -> ()' to type 'Fn?' (aka 'Optional<@convention(c) (Optional<UnsafePointer<Int8>>, Optional<UnsafeMutableRawPointer>) -> ()>')}}
 }
+
+// SR-14869
+var v1: (inout Float) -> ()
+v1 = { (_: inout Int) in } 
+// expected-error@-1{{cannot assign value of type '(inout Int) -> ()' to type '(inout Float) -> ()'}}
+
+var v2: (Int , inout Float) -> ()
+v2 = { (_: Int, _: inout Int) in } 
+// expected-error@-1{{cannot assign value of type '(Int, inout Int) -> ()' to type '(Int, inout Float) -> ()'}}

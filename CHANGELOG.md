@@ -6,6 +6,42 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.5
 ---------
 
+* [SE-0311][]:
+
+  Task local values can be defined using the new `@TaskLocal` property wrapper.
+  Such values are carried implicitly by the task in which the binding was made,
+  as well as any child-tasks, and unstructured task created from the tasks context.
+  
+  ```swift
+  struct TraceID { 
+    @TaskLocal
+    static var current: TraceID? 
+  }
+  
+  func printTraceID() {
+    if let traceID = TraceID.current {
+      print("\(traceID)")
+    } else {
+      print("nil")
+    }
+  }
+  
+  func run() async { 
+    printTraceID()    // prints: nil
+    TraceID.$current.withValue("1234-5678") { 
+      printTraceID()  // prints: 1234-5678
+      inner()         // prints: 1234-5678
+    }
+    printTraceID()    // prints: nil
+  }
+  
+  func inner() {
+    // if called from a context in which the task-local value
+    // was bound, it will print it (or 'nil' otherwise)
+    printTraceID()
+  }
+  ```
+
 * [SE-0316][]:
 
 	A type can be defined as a global actor. Global actors extend the notion
@@ -8562,6 +8598,7 @@ Swift 1.0
 [SE-0300]: <https://github.com/apple/swift-evolution/blob/main/proposals/0300-continuation.md>
 [SE-0306]: <https://github.com/apple/swift-evolution/blob/main/proposals/0306-actors.md>
 [SE-0310]: <https://github.com/apple/swift-evolution/blob/main/proposals/0310-effectful-readonly-properties.md>
+[SE-0311]: <https://github.com/apple/swift-evolution/blob/main/proposals/0311-task-locals.md>
 [SE-0313]: <https://github.com/apple/swift-evolution/blob/main/proposals/0313-actor-isolation-control.md>
 [SE-0316]: <https://github.com/apple/swift-evolution/blob/main/proposals/0316-global-actors.md>
 
