@@ -589,14 +589,19 @@ ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,
       "too many substitutions", ())
-ERROR(sil_dbg_unknown_key,none,
-      "unknown key '%0' in debug variable declaration", (StringRef))
 ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
 ERROR(sil_expected_access_kind,none,
       "%0 instruction must have explicit access kind", (StringRef))
 ERROR(sil_expected_access_enforcement,none,
       "%0 instruction must have explicit access enforcement", (StringRef))
+
+ERROR(sil_dbg_unknown_key,none,
+      "unknown key '%0' in debug variable declaration", (StringRef))
+ERROR(sil_dbg_unknown_expr_part,none,
+      "unrecognized debug info expression %0", (StringRef))
+ERROR(sil_dbg_expr_expect_operand_kind,none,
+      "operator %0 expects a %1 kind operand here", (StringRef, StringRef))
 
 ERROR(sil_keypath_expected_component_kind,none,
       "expected keypath component kind", ())
