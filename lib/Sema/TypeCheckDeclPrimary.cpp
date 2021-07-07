@@ -2003,6 +2003,14 @@ public:
       }
     }
 
+    // Reject "class" methods on actors.
+    if (SD->getStaticSpelling() == StaticSpellingKind::KeywordClass &&
+        SD->getDeclContext()->getSelfClassDecl() &&
+        SD->getDeclContext()->getSelfClassDecl()->isActor()) {
+      SD->diagnose(diag::class_subscript_not_in_class, false)
+          .fixItReplace(SD->getStaticLoc(), "static");
+    }
+
     // Now check all the accessors.
     SD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
