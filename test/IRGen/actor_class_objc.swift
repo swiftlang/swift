@@ -9,8 +9,6 @@ import Foundation
 
 // CHECK-LABEL: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass" = global
 //   Metaclass is an instance of the root class.
-// CHECK-SAME: %objc_class* {{.*}}@"OBJC_METACLASS_$_NSObject{{(.ptrauth)?}}"
-//   Metaclass superclass is the metaclass of the superclass.
 // CHECK-SAME: %objc_class* {{.*}}@"OBJC_METACLASS_$_SwiftNativeNSObject{{(.ptrauth)?}}"
 
 // CHECK: @"$s16actor_class_objc7MyClassCMf" = internal global
@@ -29,9 +27,9 @@ import Foundation
 // CHECK-64-SAME: i64 112,
 // CHECK-32-SAME: i32 56,
 
-public actor MyClass: NSObject {
+@objc public actor MyClass {
   public var x: Int
-  public override init() { self.x = 0 }
+  public init() { self.x = 0 }
 }
 
 // CHECK-LABEL: define {{.*}} @"$s16actor_class_objc7MyClassC1xSivg"

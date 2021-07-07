@@ -9,6 +9,7 @@
 add_libswift_module(Optimizer
     DEPENDS SIL)
 
+add_subdirectory(Analysis)
 add_subdirectory(InstructionPasses)
 add_subdirectory(PassManager)
 add_subdirectory(FunctionPasses)

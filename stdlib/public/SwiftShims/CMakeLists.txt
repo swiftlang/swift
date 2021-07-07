@@ -24,16 +24,9 @@ set(sources
   _SwiftConcurrency.h
   _SwiftDistributed.h
 
-  CoreMediaOverlayShims.h
   DispatchOverlayShims.h
-  NetworkOverlayShims.h
-  OSOverlayShims.h
   ObjectiveCOverlayShims.h
-  SafariServicesOverlayShims.h
-  AppKitOverlayShims.h
-  UIKitOverlayShims.h
   XCTestOverlayShims.h
-  XPCOverlayShims.h
 
   CoreFoundationOverlayShims.h
   CFCharacterSetShims.h
@@ -54,8 +47,6 @@ set(sources
   NSLocaleShims.h
   NSTimeZoneShims.h
   NSUndoManagerShims.h
-
-  ClockKitOverlayShims.h
 
   module.modulemap
   )

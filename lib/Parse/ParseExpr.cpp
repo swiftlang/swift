@@ -659,21 +659,26 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   if (rootResult.isNull() && pathResult.isNull())
     return nullptr;
 
-  auto keypath =
-      new (Context) KeyPathExpr(backslashLoc, rootResult.getPtrOrNull(),
-                                pathResult.getPtrOrNull(), hasLeadingDot);
-
   // Handle code completion.
   if ((Tok.is(tok::code_complete) && !Tok.isAtStartOfLine()) ||
       (Tok.is(tok::period) && peekToken().isAny(tok::code_complete))) {
     SourceLoc DotLoc;
     consumeIf(tok::period, DotLoc);
+
+    // Add the code completion expression to the path result.
+    CodeCompletionExpr *CC = new (Context)
+        CodeCompletionExpr(pathResult.getPtrOrNull(), Tok.getLoc());
+    auto keypath = new (Context)
+        KeyPathExpr(backslashLoc, rootResult.getPtrOrNull(), CC, hasLeadingDot);
     if (CodeCompletion)
       CodeCompletion->completeExprKeyPath(keypath, DotLoc);
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult(keypath);
   }
 
+  auto keypath =
+      new (Context) KeyPathExpr(backslashLoc, rootResult.getPtrOrNull(),
+                                pathResult.getPtrOrNull(), hasLeadingDot);
   return makeParserResult(parseStatus, keypath);
 }
 
@@ -1170,6 +1175,19 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           CodeCompletion->completeDotExpr(CCExpr, /*DotLoc=*/TokLoc);
         }
         consumeToken(tok::code_complete);
+
+        // Parse and discard remaining suffixes.
+        // e.g.
+        //   closureReceiver {
+        //     baseExpr.<complete> { $0 }
+        //   }
+        // In this case, we want to consume the trailing closure because
+        // otherwise it will get parsed as a get-set clause on a variable
+        // declared by `baseExpr.<complete>` which is complete garbage.
+        bool hasBindOptional = false;
+        parseExprPostfixSuffix(makeParserResult(CCExpr), isExprBasic,
+                               periodHasKeyPathBehavior, hasBindOptional);
+
         return makeParserCodeCompletionResult(CCExpr);
       }
 

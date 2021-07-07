@@ -27,6 +27,7 @@
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/WithColor.h"
 
 using namespace swift;
 using namespace llvm::opt;
@@ -1360,6 +1361,16 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_save_optimization_record_path))
     Opts.OptRecordFile = A->getValue();
 
+  // If any of the '-g<kind>', except '-gnone', is given,
+  // tell the SILPrinter to print debug info as well
+  if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
+    if (!A->getOption().matches(options::OPT_gnone))
+      Opts.PrintDebugInfo = true;
+  }
+
+  if (Args.hasArg(OPT_legacy_gsil))
+    llvm::WithColor::warning() << "'-gsil' is deprecated, "
+                               << "use '-sil-based-debuginfo' instead\n";
   if (Args.hasArg(OPT_debug_on_sil)) {
     // Derive the name of the SIL file for debugging from
     // the regular outputfile.

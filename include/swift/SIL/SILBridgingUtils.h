@@ -70,6 +70,10 @@ inline SILValue castToSILValue(BridgedValue value) {
   return static_cast<ValueBase *>(value.obj);
 }
 
+inline SILType castToSILType(BridgedType type) {
+  return SILType::getFromOpaqueValue(type.typePtr);
+}
+
 template <class I = SILInstruction> I *castToInst(BridgedInstruction inst) {
   return cast<I>(static_cast<SILNode *>(inst.obj)->castToInstruction());
 }

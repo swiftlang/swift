@@ -793,6 +793,15 @@ namespace RuntimeConstants {
     }
     return RuntimeAvailability::AlwaysAvailable;
   }
+
+  RuntimeAvailability
+  MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
+    auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -1679,7 +1688,7 @@ bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
 bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
-      (Triple.isOSDarwin() || Triple.isTvOS() ||
+      (Triple.isOSDarwin() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
   if (canPrespecializeTarget && isStandardLibrary()) {
     return true;

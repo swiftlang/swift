@@ -1311,6 +1311,16 @@ unsigned swift::getFieldIndex(NominalTypeDecl *decl, VarDecl *field) {
                    "property of the operand type");
 }
 
+unsigned swift::getCaseIndex(EnumElementDecl *enumElement) {
+  unsigned idx = 0;
+  for (EnumElementDecl *e : enumElement->getParentEnum()->getAllElements()) {
+    if (e == enumElement)
+      return idx;
+    ++idx;
+  }
+  llvm_unreachable("enum element not found in enum decl");
+}
+
 /// Get the property for a struct or class by its unique index.
 VarDecl *swift::getIndexedField(NominalTypeDecl *decl, unsigned index) {
   if (auto *structDecl = dyn_cast<StructDecl>(decl)) {

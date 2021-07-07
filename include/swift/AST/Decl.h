@@ -228,6 +228,9 @@ struct OverloadSignature {
   /// Whether this is a function.
   unsigned IsFunction : 1;
 
+  /// Whether this is an async function.
+  unsigned IsAsyncFunction : 1;
+
   /// Whether this is a enum element.
   unsigned IsEnumElement : 1;
 
@@ -249,8 +252,9 @@ struct OverloadSignature {
 
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
-        IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
+        IsVariable(false), IsFunction(false), IsAsyncFunction(false),
+        InProtocolExtension(false), InExtensionOfGenericType(false),
+        HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -2369,6 +2373,10 @@ public:
 
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
+
+  /// Is this declaration semantically 'final', meaning that the type checker
+  /// should treat it as final even if the ABI does not?
+  bool isSemanticallyFinal() const;
 
   /// Is this declaration 'final'?
   bool isFinal() const;
@@ -7552,7 +7560,8 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl();
+    auto classDecl = getDeclContext()->getSelfClassDecl();
+    return classDecl && !classDecl->isActor();
   } else {
     return false;
   }

@@ -78,7 +78,8 @@ public:
 
   /// Constructor based on SILOptions.
   ///
-  /// DebugInfo will be set according to the -sil-print-debuginfo option.
+  /// DebugInfo will be set according to SILOptions::PrintDebugInfo or
+  /// the -sil-print-debuginfo option.
   SILPrintContext(llvm::raw_ostream &OS, const SILOptions &Opts);
 
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose, bool SortedSIL,

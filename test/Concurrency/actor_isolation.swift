@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift
+// RUN: %target-typecheck-verify-swift -I %t -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
+
+import OtherActors
 
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
@@ -783,12 +787,12 @@ class SomeClassWithInits {
   func hasDetached() {
     Task.detached {
       // okay
-      await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
-      self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      await self.isolated()
+      self.isolated()
       // expected-error@-1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
       // expected-note@-2{{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
 
-      print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      print(await self.mutableState)
     }
   }
 }
@@ -799,6 +803,21 @@ func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make
   _ = SomeClassWithInits.shared // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
   SomeClassWithInits.staticIsolated() // expected-error{{call to main actor-isolated static method 'staticIsolated()' in a synchronous nonisolated context}}
 }
+
+// ----------------------------------------------------------------------
+// nonisolated let and cross-module let
+// ----------------------------------------------------------------------
+func testCrossModuleLets(actor: OtherModuleActor) async {
+  _ = actor.a         // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{property access is 'async'}}
+  _ = await actor.a   // okay
+  _ = actor.b         // okay
+  _ = actor.c // expected-error{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-1{{property access is 'async'}}
+  // expected-warning@-2{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
+  _ = await actor.c // expected-warning{{cannot use property 'c' with a non-sendable type 'SomeClass' across actors}}
+}
+
 
 // ----------------------------------------------------------------------
 // Actor protocols.
@@ -921,3 +940,18 @@ actor Counter {
     return counter
   }
 }
+
+/// Superclass checks for global actor-qualified class types.
+class C2 { }
+
+@SomeGlobalActor
+class C3: C2 { } // expected-error{{global actor 'SomeGlobalActor'-isolated class 'C3' has different actor isolation from nonisolated superclass 'C2'}}
+
+@GenericGlobalActor<U>
+class GenericSuper<U> { }
+
+@GenericGlobalActor<[T]>
+class GenericSub1<T>: GenericSuper<[T]> { }
+
+@GenericGlobalActor<T>
+class GenericSub2<T>: GenericSuper<[T]> { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated class 'GenericSub2' has different actor isolation from global actor 'GenericGlobalActor<U>'-isolated superclass 'GenericSuper'}}

@@ -244,7 +244,7 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     // regular users so we can ensure that the borrow scope operand's scope is
     // completely within the owned value's scope. If we do not have a borrow
     // scope operand, just continue, we are done.
-    auto initialScopedOperand = BorrowingOperand::get(op);
+    auto initialScopedOperand = BorrowingOperand(op);
     if (!initialScopedOperand) {
       continue;
     }
@@ -348,7 +348,7 @@ bool SILValueOwnershipChecker::gatherUsers(
       // Ok, our operand does not consume guaranteed values. Check if it is a
       // BorrowScopeOperand and if so, add its end scope instructions as
       // implicit regular users of our value.
-      if (auto scopedOperand = BorrowingOperand::get(op)) {
+      if (auto scopedOperand = BorrowingOperand(op)) {
         assert(!scopedOperand.isReborrow());
 
         std::function<void(Operand *)> onError = [&](Operand *op) {

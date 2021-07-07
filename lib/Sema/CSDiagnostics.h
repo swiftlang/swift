@@ -235,7 +235,7 @@ protected:
   using PathEltKind = ConstraintLocator::PathElementKind;
   using DiagOnDecl = Diag<DescriptiveDeclKind, DeclName, Type, Type>;
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
-  using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
+  using DiagAsNote = Diag<Type, Type, Type, Type>;
 
   /// If this failure associated with one of the conditional requirements,
   /// this field would represent conformance where requirement comes from.
@@ -740,6 +740,11 @@ private:
   /// argument, or trying to assign it to a variable which expects @escaping
   /// or @Sendable function.
   bool diagnoseParameterUse() const;
+
+  /// Emit a tailored diagnostic for a no-escape/espace mismatch for function
+  /// arguments where the mismatch has to take into account that a
+  /// function type subtype relation in the parameter position is contravariant.
+  bool diagnoseFunctionParameterEscapenessMismatch(AssignExpr *) const;
 };
 
 /// Diagnose failure where a global actor attribute is dropped when

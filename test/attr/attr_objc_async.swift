@@ -51,7 +51,10 @@ actor class MyActor2 { }
 // expected-error@-1 {{keyword 'class' cannot be used as an identifier here}}
 
 // CHECK: @objc actor MyObjCActor
-@objc actor MyObjCActor: NSObject { }
+@objc actor MyObjCActor { }
 
-@objc actor class MyObjCActor2: NSObject {}
+@objc actor class MyObjCActor2 {}
 // expected-error@-1 {{keyword 'class' cannot be used as an identifier here}}
+
+actor MyObjCActor3: NSObject { } // expected-error{{actor types do not support inheritance}}
+// expected-note@-1{{use '@objc' to expose actor 'MyObjCActor3' to Objective-C}}

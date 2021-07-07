@@ -947,7 +947,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   ClassDecl *covariantSelf = nullptr;
   if (witness->getDeclContext()->getExtendedProtocolDecl()) {
     if (auto *classDecl = dc->getSelfClassDecl()) {
-      if (!classDecl->isFinal()) {
+      if (!classDecl->isSemanticallyFinal()) {
         // If the requirement's type does not involve any associated types,
         // we use a class-constrained generic parameter as the 'Self' type
         // in the witness thunk.
@@ -2788,7 +2788,8 @@ bool ConformanceChecker::checkActorIsolation(
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(
-                  witness, /*fromExpression=*/false)) {
+                  witness, witness->getDeclContext(),
+                  /*fromExpression=*/false)) {
   case ActorIsolationRestriction::DistributedActorSelf: {
     if (witness->isSynthesized()) {
       // Some of our synthesized properties get special treatment,
@@ -3237,7 +3238,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
   if (isa<ConstructorDecl>(Requirement)) {
     if (auto CD = Adopter->getSelfClassDecl()) {
-      if (!CD->isFinal() && isa<ExtensionDecl>(Adopter)) {
+      if (!CD->isSemanticallyFinal() && isa<ExtensionDecl>(Adopter)) {
         // In this case, user should mark class as 'final' or define
         // 'required' initializer directly in the class definition.
         return false;
@@ -4179,7 +4180,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
 
     if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {
-      if (!classDecl->isFinal()) {
+      if (!classDecl->isSemanticallyFinal()) {
         checkNonFinalClassWitness(requirement, witness);
       }
     }
@@ -5200,7 +5201,7 @@ TypeChecker::couldDynamicallyConformToProtocol(Type type, ProtocolDecl *Proto,
   
   // A non-final class might have a subclass that conforms to the protocol.
   if (auto *classDecl = type->getClassOrBoundGenericClass()) {
-    if (!classDecl->isFinal())
+    if (!classDecl->isSemanticallyFinal())
       return true;
   }
 

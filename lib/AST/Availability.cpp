@@ -334,6 +334,10 @@ AvailabilityContext ASTContext::getDifferentiationAvailability() {
   return getSwiftFutureAvailability();
 }
 
+AvailabilityContext ASTContext::getMultiPayloadEnumTagSinglePayload() {
+  return getSwift56Availability();
+}
+
 AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
@@ -429,6 +433,9 @@ AvailabilityContext ASTContext::getSwift55Availability() {
   }
 }
 
+AvailabilityContext ASTContext::getSwift56Availability() {
+  return getSwiftFutureAvailability();
+}
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;

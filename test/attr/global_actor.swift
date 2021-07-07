@@ -20,7 +20,7 @@ struct GenericGlobalActor<T> {
 
 // Ill-formed global actors.
 @globalActor
-open class GA2 { // expected-error{{type 'GA2' does not conform to protocol 'GlobalActor'}}
+final class GA2 { // expected-error{{type 'GA2' does not conform to protocol 'GlobalActor'}}
 }
 
 @globalActor
@@ -35,7 +35,7 @@ struct GA4 {
 }
 
 @globalActor
-open class GA5 {
+open class GA5 { // expected-error{{non-final class 'GA5' cannot be a global actor}}
   static let shared = SomeActor() // expected-error{{property 'shared' must be declared public because it matches a requirement in public protocol 'GlobalActor'}}
   // expected-note@-1{{mark the static property as 'public' to satisfy the requirement}}
 }
@@ -49,7 +49,7 @@ extension GA6 where T: Equatable {
 }
 
 @globalActor
-class GA7 { // expected-error{{type 'GA7' does not conform to protocol 'GlobalActor'}}
+final class GA7 { // expected-error{{type 'GA7' does not conform to protocol 'GlobalActor'}}
   static let shared = 5 // expected-note{{candidate would match and infer 'ActorType' = 'Int' if 'Int' conformed to 'Actor'}}
 }
 

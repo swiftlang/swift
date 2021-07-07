@@ -20,6 +20,11 @@ func runSILPrinter(function: Function, context: FunctionPassContext) {
   for (bbIdx, block) in function.blocks.enumerated() {
     print("bb\(bbIdx):")
 
+    print("  predecessors: " +
+          block.predecessors.map { $0.label }.joined(separator: ", "))
+    print("  successors:   " +
+          block.successors.map { $0.label }.joined(separator: ", "))
+
     print("  arguments:")
     for arg in block.arguments {
       print("    arg: \(arg)")

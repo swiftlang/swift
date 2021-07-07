@@ -956,7 +956,7 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
 
   // Make sure TSan knows that the resume call happens-before the task
   // restarting.
-  _swift_tsan_release(task);
+  _swift_tsan_release(static_cast<Job *>(task));
 
   // The status should be either Pending or Awaited.  If it's Awaited,
   // which is probably the most likely option, then we should immediately

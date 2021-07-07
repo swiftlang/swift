@@ -508,7 +508,7 @@ static void eliminateReborrowsOfRecursiveBorrows(
       // Otherwise, we have a reborrow. For now our reborrows must be
       // phis. Add our owned value as a new argument of that phi along our
       // edge and undef along all other edges.
-      auto borrowingOp = BorrowingOperand::get(use);
+      auto borrowingOp = BorrowingOperand(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(*borrowingOp);
       auto *newBasePhi =
@@ -572,7 +572,7 @@ rewriteReborrows(SILValue newBorrowedValue,
       // Otherwise, we have a reborrow. For now our reborrows must be
       // phis. Add our owned value as a new argument of that phi along our
       // edge and undef along all other edges.
-      auto borrowingOp = BorrowingOperand::get(use);
+      auto borrowingOp = BorrowingOperand(use);
       auto *brInst = cast<BranchInst>(borrowingOp.op->getUser());
       auto *newBorrowedPhi = brInst->getArgForOperand(*borrowingOp);
       auto *newBasePhi =

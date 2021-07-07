@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-library-evolution
+// REQUIRES: concurrency
 
 class C1 { }
 final class C2: Sendable { }
@@ -85,14 +86,27 @@ struct HasFunctions {
   var cfp: @convention(c) () -> Void
 }
 
+@globalActor
+actor MyGlobalActor {
+  static let shared = MyGlobalActor()
+}
+
+@MyGlobalActor
+class C3 { }
+
+class C4: C3 { }
+
 func testCV(
-  c1: C1, c2: C2, s1: S1, e1: E1, e2: E2, gs1: GS1<Int>, gs2: GS2<Int>,
+  c1: C1, c2: C2, c3: C3, c4: C4, s1: S1, e1: E1, e2: E2,
+  gs1: GS1<Int>, gs2: GS2<Int>,
   bc: Bitcode, ps: PublicStruct, pe: PublicEnum,
   fps: FrozenPublicStruct, fpe: FrozenPublicEnum,
   hf: HasFunctions
 ) {
   acceptCV(c1) // expected-error{{'C1' conform to 'Sendable'}}
   acceptCV(c2)
+  acceptCV(c3)
+  acceptCV(c4)
   acceptCV(s1)
   acceptCV(e1) // expected-error{{'E1' conform to 'Sendable'}}
   acceptCV(e2)

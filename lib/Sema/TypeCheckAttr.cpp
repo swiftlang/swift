@@ -799,7 +799,9 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
   }
 
   if (attr->getAccess() == AccessLevel::Open) {
-    if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
+    auto classDecl = dyn_cast<ClassDecl>(D);
+    if (!(classDecl && !classDecl->isActor()) &&
+        !D->isPotentiallyOverridable() &&
         !attr->isInvalid()) {
       diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
         .fixItReplace(attr->getRange(), "public");
@@ -2085,7 +2087,8 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
     return;
   }
   // Only classes can have required constructors.
-  if (parentTy->getClassOrBoundGenericClass()) {
+  if (parentTy->getClassOrBoundGenericClass() &&
+      !parentTy->getClassOrBoundGenericClass()->isActor()) {
     // The constructor must be declared within the class itself.
     // FIXME: Allow an SDK overlay to add a required initializer to a class
     // defined in Objective-C
@@ -4489,7 +4492,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     if (diagnoseDynamicSelfResult) {
       // Diagnose class initializers in non-final classes.
       if (isa<ConstructorDecl>(original)) {
-        if (!classDecl->isFinal()) {
+        if (!classDecl->isSemanticallyFinal()) {
           diags.diagnose(
               attr->getLocation(),
               diag::differentiable_attr_nonfinal_class_init_unsupported,
@@ -4790,7 +4793,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     if (diagnoseDynamicSelfResult) {
       // Diagnose class initializers in non-final classes.
       if (isa<ConstructorDecl>(originalAFD)) {
-        if (!classDecl->isFinal()) {
+        if (!classDecl->isSemanticallyFinal()) {
           diags.diagnose(attr->getLocation(),
                          diag::derivative_attr_nonfinal_class_init_unsupported,
                          classDecl->getDeclaredInterfaceType());

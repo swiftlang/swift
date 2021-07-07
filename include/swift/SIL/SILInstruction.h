@@ -6267,6 +6267,8 @@ public:
 ///                object, including properties declared in a superclass.
 unsigned getFieldIndex(NominalTypeDecl *decl, VarDecl *property);
 
+unsigned getCaseIndex(EnumElementDecl *enumElement);
+
 /// Get the property for a struct or class by its unique index, or nullptr if
 /// the index does not match a property declared in this struct or class or
 /// one its superclasses.

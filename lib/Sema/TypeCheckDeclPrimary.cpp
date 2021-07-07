@@ -1681,6 +1681,9 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
+      // Check for actor isolation.
+      (void)getActorIsolation(VD);
+
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
@@ -2395,12 +2398,18 @@ public:
 
     if (auto superclass = CD->getSuperclassDecl()) {
       // Actors cannot have superclasses, nor can they be superclasses.
-      if (CD->isActor() && !superclass->isNSObject())
+      if (CD->isActor()) {
         CD->diagnose(diag::actor_inheritance,
                      /*distributed=*/CD->isDistributedActor());
-      else if (superclass->isActor())
+        if (superclass->isNSObject() && !CD->isDistributedActor()) {
+          CD->diagnose(diag::actor_inheritance_nsobject, CD->getName())
+            .fixItInsert(CD->getAttributeInsertionLoc(/*forModifier=*/false),
+                         "@objc ");
+        }
+      } else if (superclass->isActor()) {
         CD->diagnose(diag::actor_inheritance,
                      /*distributed=*/CD->isDistributedActor());
+      }
     }
 
     // Force lowering of stored properties.

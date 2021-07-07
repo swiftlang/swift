@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ProtocolGraph.h"
+#include "ProtocolGraph.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Requirement.h"
@@ -132,7 +132,7 @@ void ProtocolGraph::computeInheritedAssociatedTypes() {
 void ProtocolGraph::computeInheritedProtocols() {
   // Visit protocols in reverse order, so that if P inherits from Q and
   // Q inherits from R, we first visit R, then Q, then P, ensuring that
-  // R's associated types are added to P's list, etc.
+  // R's inherited protocols are added to P's list, etc.
   for (const auto *proto : llvm::reverse(Protocols)) {
     auto &info = Info[proto];
 

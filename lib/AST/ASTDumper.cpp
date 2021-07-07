@@ -2775,6 +2775,9 @@ public:
         PrintWithColorRAII(OS, IdentifierColor)
           << "  key='" << component.getUnresolvedDeclName() << "'";
         break;
+      case KeyPathExpr::Component::Kind::CodeCompletion:
+        PrintWithColorRAII(OS, ASTNodeColor) << "completion";
+        break;
       }
       PrintWithColorRAII(OS, TypeColor)
         << " type='" << GetTypeOfKeyPathComponent(E, i) << "'";

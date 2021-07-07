@@ -12,8 +12,14 @@ RUN: swift-demangle -remangle-objc-rt '$ss8Mystruct33_7B40D7ED6632C2BEA2CA3BFFD5
 // CHECK-OLD: r in _.?(Swift.UnsafeRawPointer) -> Swift.UnsafeRawPointer
 RUN: swift-demangle -remangle-objc-rt '$s1_1?1PSVSVF1rP' | %FileCheck -check-prefix CHECK-OLD %s
 
+// CHECK-OLD2: Swift.Int.related decl 'B' for protocol self-conformance descriptor for Swift.IteratorProtocol
+RUN: swift-demangle -remangle-objc-rt '$sSiStMSLB_p' | %FileCheck -check-prefix CHECK-OLD2 %s
+
 // CHECK-OLD3: Swift.related decl 'H' for partial apply forwarder
 RUN: swift-demangle -remangle-objc-rt '$ssTALHP' | %FileCheck -check-prefix CHECK-OLD3 %s
+
+// CHECK-OLD4: foobar in Swift.DefaultIndices.subscript : A
+RUN: swift-demangle -remangle-objc-rt '$sSIxip6foobarP' | %FileCheck -check-prefix CHECK-OLD4 %s
 
 // CHECK-GENERICEXT: Swift._ContiguousArrayStorage<(extension in Swift):Swift.FlattenSequence<StdlibCollectionUnittest.MinimalBidirectionalCollection<StdlibCollectionUnittest.MinimalBidirectionalCollection<Swift.Int>>>.Index>
 RUN: swift-demangle -remangle-objc-rt '$ss23_ContiguousArrayStorageCys15FlattenSequenceVsE5IndexVy24StdlibCollectionUnittest020MinimalBidirectionalH0VyAIySiGG_GGD' | %FileCheck -check-prefix CHECK-GENERICEXT %s

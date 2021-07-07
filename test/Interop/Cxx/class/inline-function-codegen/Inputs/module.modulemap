@@ -1,31 +1,39 @@
 module ConstructorCallsFunction {
   header "constructor-calls-function.h"
+  requires cplusplus
 }
 
 module ConstructorCallsFunctionFromNestedStruct {
   header "constructor-calls-function-from-nested-struct.h"
+  requires cplusplus
 }
 
 module ConstructorCallsMethod {
   header "constructor-calls-method.h"
+  requires cplusplus
 }
 
 module FieldInitCallsFunction {
   header "field-init-calls-function.h"
+  requires cplusplus
 }
 
 module MethodCallsFunction {
   header "method-calls-function.h"
+  requires cplusplus
 }
 
 module MethodCallsMethod {
   header "method-calls-method.h"
+  requires cplusplus
 }
 
 module MethodCallsMethodFromNestedStruct {
   header "method-calls-method-from-nested-struct.h"
+  requires cplusplus
 }
 
 module StaticVarInitCallsFunction {
   header "static-var-init-calls-function.h"
+  requires cplusplus
 }

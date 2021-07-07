@@ -128,7 +128,7 @@ foo(b:
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | let x = { () -> Result in
 // CHECK:             |          +++++++++++++++++
-// CHECK:             |         ^ error: unable to infer complex closure return type; add explicit type to disambiguate
+// CHECK:             |         ^ error: cannot infer return type for closure with multiple statements; add explicit type to disambiguate
 // CHECK: [[#LINE+1]] |   let y = 1
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:8
@@ -152,7 +152,7 @@ foo(b:
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:20
 // CHECK: [[#LINE-1]] |
 // CHECK: [[#LINE]]   | let 👍👍👍 = {
-// CHECK:    | --> error: unable to infer complex closure return type; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
+// CHECK:    | --> error: cannot infer return type for closure with multiple statements; add explicit type to disambiguate [insert ' () -> <#Result#> in ']
 // CHECK: [[#LINE+1]] |   let y = 1
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:5

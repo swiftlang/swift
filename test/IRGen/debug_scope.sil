@@ -1,0 +1,27 @@
+// RUN: %target-swiftc_driver -g -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// SR-14856: IRGen couldn't handle `SILLocation` with `FilenameAndLocationKind`
+// storage kind.
+
+sil_scope 2 { loc "the_file.swift":2:6 parent @foo : $@convention(thin) () -> () }
+sil_scope 3 { loc "the_file.swift":3:5 parent 2 }
+
+// It shouldn't crash
+// CHECK: @foo
+// CHECK-SAME: !dbg ![[FUNC_DI:[0-9]+]]
+sil hidden @foo : $@convention(thin) () -> () {
+bb0:
+  %2 = integer_literal $Builtin.Int64, 17, loc "the_file.swift":3:12, scope 3
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Debug info should be correctly generated
+// CHECK:     distinct !DILexicalBlock(scope: ![[FUNC_DI]]
+// CHECK-SAME:                         file:  ![[FILE_DI:[0-9]+]]
+// CHECK-SAME:                         line: 3, column: 5
+// CHECK:     ![[FILE_DI]] = !DIFile(filename: "the_file.swift"

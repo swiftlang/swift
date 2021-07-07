@@ -264,6 +264,7 @@ class TestBenchmarkDriverInitialization(unittest.TestCase):
         self.assertEqual(driver.tests, ["Benchmark3"])
         self.assertEqual(driver.all_tests, ["Benchmark1", "Benchmark2", "Benchmark3"])
 
+    @unittest.skip("comparing against localtime() is flaky. rdar://79701124")
     def test_log_file(self):
         """When swift-repo is set, log is tied to Git branch and revision."""
         self.assertIsNone(

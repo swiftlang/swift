@@ -13,15 +13,21 @@
 #ifndef SWIFT_REQUIREMENTMACHINE_H
 #define SWIFT_REQUIREMENTMACHINE_H
 
+#include "swift/AST/GenericSignature.h"
+
+namespace llvm {
+class raw_ostream;
+}
+
 namespace swift {
 
 class ASTContext;
 class AssociatedTypeDecl;
-class CanGenericSignature;
 class CanType;
-class GenericSignature;
+class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
+class Type;
 
 /// Wraps a rewrite system with higher-level operations in terms of
 /// generic signatures and interface types.
@@ -43,10 +49,20 @@ class RequirementMachine final {
   void addGenericSignature(CanGenericSignature sig);
 
   bool isComplete() const;
-  void markComplete();
+  void computeCompletion(CanGenericSignature sig);
 
 public:
   ~RequirementMachine();
+
+  // Generic signature queries
+  bool requiresClass(Type depType) const;
+  LayoutConstraint getLayoutConstraint(Type depType) const;
+  bool requiresProtocol(Type depType, const ProtocolDecl *proto) const;
+  GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
+  bool isConcreteType(Type depType) const;
+  bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
+
+  void dump(llvm::raw_ostream &out) const;
 };
 
 } // end namespace swift
