@@ -615,6 +615,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!AlreadyDiagnosedMetatypes.insert(E).second)
         return;
 
+      // In Swift < 6 warn about plain type name passed as an
+      // argument to a subscript, dynamic subscript, or ObjC
+      // literal since it used to be accepted.
+      DiagnosticBehavior behavior = DiagnosticBehavior::Error;
+
       // Allow references to types as a part of:
       // - member references T.foo, T.Type, T.self, etc.
       // - constructor calls T()
@@ -634,11 +639,22 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             isa<SubscriptExpr>(ParentExpr)) {
           return;
         }
+
+        if (!Ctx.LangOpts.isSwiftVersionAtLeast(6)) {
+          auto argument = CallArgs.find(ParentExpr);
+          if (argument != CallArgs.end()) {
+            auto *callExpr = argument->second;
+            if (isa<SubscriptExpr>(callExpr) ||
+                isa<DynamicSubscriptExpr>(callExpr) ||
+                isa<ObjectLiteralExpr>(callExpr))
+              behavior = DiagnosticBehavior::Warning;
+          }
+        }
       }
 
       // Is this a protocol metatype?
-
-      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
+      Ctx.Diags.diagnose(E->getStartLoc(), diag::value_of_metatype_type)
+          .limitBehavior(behavior);
 
       // Add fix-it to insert '()', only if this is a metatype of
       // non-existential type and has any initializers.
