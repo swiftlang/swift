@@ -735,3 +735,14 @@ func rdar55369704() {
     _ = x - Int(s.value) // expected-error {{value of type 'S' has no member 'value'}}
   }
 }
+
+// SR-14533
+struct SR14533 {
+  var xs: [Int] 
+}
+
+func fSR14533(_ s: SR14533) {
+  for (x1, x2) in zip(s.xs, s.ys) {
+    // expected-error@-1{{value of type 'SR14533' has no member 'ys'}}
+  }
+}

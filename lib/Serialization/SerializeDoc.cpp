@@ -341,8 +341,8 @@ static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
       return false;
   }
 
-  // Skip SPI decls.
-  if (D->isSPI())
+  // Skip SPI decls, unless we're generating a symbol graph with SPI information.
+  if (D->isSPI() && !D->getASTContext().SymbolGraphOpts.IncludeSPISymbols)
     return false;
 
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
