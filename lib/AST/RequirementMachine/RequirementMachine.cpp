@@ -236,8 +236,74 @@ struct RequirementMachine::Implementation {
       : Context(ctx),
         System(Context),
         Map(Context, System.getProtocols()) {}
+  void verify(const MutableTerm &term);
   void dump(llvm::raw_ostream &out);
 };
+
+void RequirementMachine::Implementation::verify(const MutableTerm &term) {
+#ifndef NDEBUG
+  MutableTerm erased;
+
+  // First, "erase" resolved associated types from the term, and try
+  // to simplify it again.
+  for (auto atom : term) {
+    if (erased.empty()) {
+      switch (atom.getKind()) {
+      case Atom::Kind::Protocol:
+      case Atom::Kind::GenericParam:
+        erased.add(atom);
+        continue;
+
+      case Atom::Kind::AssociatedType:
+        erased.add(Atom::forProtocol(atom.getProtocols()[0], Context));
+        break;
+
+      case Atom::Kind::Name:
+      case Atom::Kind::Layout:
+      case Atom::Kind::Superclass:
+      case Atom::Kind::ConcreteType:
+        llvm::errs() << "Bad initial atom in " << term << "\n";
+        abort();
+        break;
+      }
+    }
+
+    switch (atom.getKind()) {
+    case Atom::Kind::Name:
+      assert(!erased.empty());
+      erased.add(atom);
+      break;
+
+    case Atom::Kind::AssociatedType:
+      erased.add(Atom::forName(atom.getName(), Context));
+      break;
+
+    case Atom::Kind::Protocol:
+    case Atom::Kind::GenericParam:
+    case Atom::Kind::Layout:
+    case Atom::Kind::Superclass:
+    case Atom::Kind::ConcreteType:
+      llvm::errs() << "Bad interior atom " << atom << " in " << term << "\n";
+      abort();
+      break;
+    }
+  }
+
+  MutableTerm simplified = erased;
+  System.simplify(simplified);
+
+  // We should end up with the same term.
+  if (simplified != term) {
+    llvm::errs() << "Term verification failed\n";
+    llvm::errs() << "Initial term:    " << term << "\n";
+    llvm::errs() << "Erased term:     " << erased << "\n";
+    llvm::errs() << "Simplified term: " << simplified << "\n";
+    llvm::errs() << "\n";
+    dump(llvm::errs());
+    abort();
+  }
+#endif
+}
 
 void RequirementMachine::Implementation::dump(llvm::raw_ostream &out) {
   out << "Requirement machine for " << Sig << "\n";
@@ -368,6 +434,7 @@ bool RequirementMachine::requiresClass(Type depType) const {
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
                                                   /*proto=*/nullptr);
   Impl->System.simplify(term);
+  Impl->verify(term);
 
   auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
   if (!equivClass)
@@ -384,6 +451,7 @@ LayoutConstraint RequirementMachine::getLayoutConstraint(Type depType) const {
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
                                                   /*proto=*/nullptr);
   Impl->System.simplify(term);
+  Impl->verify(term);
 
   auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
   if (!equivClass)
@@ -397,6 +465,7 @@ bool RequirementMachine::requiresProtocol(Type depType,
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
                                                   /*proto=*/nullptr);
   Impl->System.simplify(term);
+  Impl->verify(term);
 
   auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
   if (!equivClass)
@@ -418,6 +487,7 @@ RequirementMachine::getRequiredProtocols(Type depType) const {
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
                                                   /*proto=*/nullptr);
   Impl->System.simplify(term);
+  Impl->verify(term);
 
   auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
   if (!equivClass)
@@ -440,6 +510,7 @@ bool RequirementMachine::isConcreteType(Type depType) const {
   auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
                                                   /*proto=*/nullptr);
   Impl->System.simplify(term);
+  Impl->verify(term);
 
   auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
   if (!equivClass)
@@ -453,10 +524,12 @@ bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
   auto term1 = Impl->Context.getMutableTermForType(depType1->getCanonicalType(),
                                                    /*proto=*/nullptr);
   Impl->System.simplify(term1);
+  Impl->verify(term1);
 
   auto term2 = Impl->Context.getMutableTermForType(depType2->getCanonicalType(),
                                                    /*proto=*/nullptr);
   Impl->System.simplify(term2);
+  Impl->verify(term2);
 
   return (term1 == term2);
 }
