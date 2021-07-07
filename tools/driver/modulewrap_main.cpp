@@ -26,6 +26,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Option/ArgList.h"
@@ -177,9 +178,10 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   TypeCheckerOptions TypeCheckOpts;
   LangOptions LangOpts;
   ClangImporterOptions ClangImporterOpts;
+  symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
   LangOpts.Target = Invocation.getTargetTriple();
   ASTContext &ASTCtx = *ASTContext::get(LangOpts, TypeCheckOpts, SearchPathOpts,
-                                        ClangImporterOpts, SrcMgr,
+                                        ClangImporterOpts, SymbolGraphOpts, SrcMgr,
                                         Instance.getDiags());
   registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
