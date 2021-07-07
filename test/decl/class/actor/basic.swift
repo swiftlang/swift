@@ -44,4 +44,7 @@ actor A2 {
 extension A2 {
   class func h2() { } // expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}
   static func i2() { } // okay
+
+  class subscript(i: Int) -> Int { i } // expected-error{{class subscripts are only allowed within classes; use 'static' to declare a static subscript}}
+  static subscript(s: String) -> String { s }
 }
