@@ -32,5 +32,25 @@ public func testStringConstantForCFunction() {
   puts("Hello " + "world!")
 }
 
+// CHECK-LABEL: sil [noinline] @$s4test0A17TypeInterpolationyyF
+// CHECK-NOT: apply
+// CHECK:    [[L:%[0-9]+]] = string_literal utf8 "String"
+// CHECK-NOT: apply
+// CHECK:    [[P:%[0-9]+]] = struct $UnsafePointer<Int8> ([[L]] : $Builtin.RawPointer)
+// CHECK-NOT: apply
+// CHECK:    [[O:%[0-9]+]] = enum $Optional<UnsafePointer<Int8>>, #Optional.some!enumelt, [[P]]
+// CHECK-NOT: apply
+// CHECK:    [[F:%[0-9]+]] = function_ref @puts
+// CHECK:    apply [[F]]([[O]])
+// CHECK: } // end sil function '$s4test0A17TypeInterpolationyyF'
+@inline(never)
+public func testTypeInterpolation() {
+  puts("\(String.self)")
+}
+
 // CHECK-OUTPUT: Hello world!
 testStringConstantForCFunction()
+
+// CHECK-OUTPUT: String
+testTypeInterpolation()
+

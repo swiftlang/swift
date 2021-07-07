@@ -347,6 +347,12 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     P.addCOWArrayOpts();
     P.addDCE();
     P.addSwiftArrayPropertyOpt();
+    
+    // This string optimization can catch additional opportunities, which are
+    // exposed once optimized String interpolations (from the high-level string
+    // optimization) are cleaned up. But before the mid-level inliner inlines
+    // semantic calls.
+    P.addStringOptimization();
   }
 
   // Run the devirtualizer, specializer, and inliner. If any of these
