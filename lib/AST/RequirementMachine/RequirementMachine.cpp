@@ -238,6 +238,8 @@ struct RequirementMachine::Implementation {
         Map(Context, System.getProtocols()) {}
   void verify(const MutableTerm &term);
   void dump(llvm::raw_ostream &out);
+
+  MutableTerm getLongestValidPrefix(const MutableTerm &term);
 };
 
 void RequirementMachine::Implementation::verify(const MutableTerm &term) {
@@ -532,4 +534,181 @@ bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
   Impl->verify(term2);
 
   return (term1 == term2);
+}
+
+MutableTerm
+RequirementMachine::Implementation::getLongestValidPrefix(const MutableTerm &term) {
+  MutableTerm prefix;
+
+  for (auto atom : term) {
+    switch (atom.getKind()) {
+    case Atom::Kind::Name:
+      return prefix;
+
+    case Atom::Kind::Protocol:
+      assert(prefix.empty() &&
+             "Protocol atom can only appear at the start of a type term");
+      if (!System.getProtocols().isKnownProtocol(atom.getProtocol()))
+        return prefix;
+
+      break;
+
+    case Atom::Kind::GenericParam:
+      assert(prefix.empty() &&
+             "Generic parameter atom can only appear at the start of a type term");
+      break;
+
+    case Atom::Kind::AssociatedType: {
+      const auto *equivClass = Map.lookUpEquivalenceClass(prefix);
+      if (!equivClass)
+        return prefix;
+
+      auto conformsTo = equivClass->getConformsTo();
+
+      for (const auto *proto : atom.getProtocols()) {
+        if (!System.getProtocols().isKnownProtocol(proto))
+          return prefix;
+
+        // T.[P:A] is valid iff T conforms to P.
+        if (std::find(conformsTo.begin(), conformsTo.end(), proto)
+              == conformsTo.end())
+          return prefix;
+      }
+
+      break;
+    }
+
+    case Atom::Kind::Layout:
+    case Atom::Kind::Superclass:
+    case Atom::Kind::ConcreteType:
+      llvm_unreachable("Property atom cannot appear in a type term");
+    }
+
+    // This atom is valid, add it to the longest prefix.
+    prefix.add(atom);
+  }
+
+  return prefix;
+}
+
+/// Unlike the other queries, the input type can be any type, not just a
+/// type parameter.
+///
+/// Replaces all structural components that are type parameters with their
+/// most canonical form, which is either a (possibly different)
+/// type parameter, or a concrete type, in which case we recursively
+/// simplify any type parameters appearing in structural positions of
+/// that concrete type as well, and so on.
+Type RequirementMachine::getCanonicalTypeInContext(
+    Type type,
+    TypeArrayView<GenericTypeParamType> genericParams) const {
+  const auto &protos = Impl->System.getProtocols();
+
+  return type.transformRec([&](Type t) -> Optional<Type> {
+    if (!t->isTypeParameter())
+      return None;
+
+    // Get a simplified term T.
+    auto term = Impl->Context.getMutableTermForType(t->getCanonicalType(),
+                                                    /*proto=*/nullptr);
+    Impl->System.simplify(term);
+
+    // We need to handle "purely concrete" member types, eg if I have a
+    // signature <T where T == Foo>, and we're asked to canonicalize the
+    // type T.[P:A] where Foo : A.
+    //
+    // This comes up because we can derive the signature <T where T == Foo>
+    // from a generic signature like <T where T : P>; adding the
+    // concrete requirement 'T == Foo' renders 'T : P' redundant. We then
+    // want to take interface types written against the original signature
+    // and canonicalize them with respect to the derived signature.
+    //
+    // The problem is that T.[P:A] is not a valid term in the rewrite system
+    // for <T where T == Foo>, since we do not have the requirement T : P.
+    //
+    // A more principled solution would build a substitution map when
+    // building a derived generic signature that adds new requirements;
+    // interface types would first be substituted before being canonicalized
+    // in the new signature.
+    //
+    // For now, we handle this with a two-step process; we split a term up
+    // into a longest valid prefix, which must resolve to a concrete type,
+    // and the remaining suffix, which we use to perform a concrete
+    // substitution using subst().
+
+    // In the below, let T be a type term, with T == UV, where U is the
+    // longest valid prefix.
+    //
+    // Note that V can be empty if T is fully valid; we expect this to be
+    // true most of the time.
+    auto prefix = Impl->getLongestValidPrefix(term);
+
+    // Get a type (concrete or dependent) for U.
+    auto prefixType = [&]() -> Type {
+      Impl->verify(prefix);
+
+      auto *equivClass = Impl->Map.lookUpEquivalenceClass(prefix);
+      if (equivClass && equivClass->isConcreteType()) {
+        auto concreteType = equivClass->getConcreteType(genericParams,
+                                                        protos, Impl->Context);
+        if (!concreteType->hasTypeParameter())
+          return concreteType;
+
+        // FIXME: Recursion guard is needed here
+        return getCanonicalTypeInContext(concreteType, genericParams);
+      }
+
+      return Impl->Context.getTypeForTerm(prefix, genericParams, protos);
+    }();
+
+    // If T is already valid, the longest valid prefix U of T is T itself, and
+    // V is empty. Just return the type we computed above.
+    //
+    // This is the only case where U is allowed to be dependent.
+    if (prefix.size() == term.size())
+      return prefixType;
+
+    // If U is not concrete, we have an invalid member type of a dependent
+    // type, which is not valid in this generic signature. Give up.
+    if (prefixType->isTypeParameter()) {
+      llvm::errs() << "Invalid type parameter in getCanonicalTypeInContext()\n";
+      llvm::errs() << "Original type: " << type << "\n";
+      llvm::errs() << "Simplified term: " << term << "\n";
+      llvm::errs() << "Longest valid prefix: " << prefix << "\n";
+      llvm::errs() << "Prefix type: " << prefixType << "\n";
+      llvm::errs() << "\n";
+      dump(llvm::errs());
+      abort();
+    }
+
+    // Compute the type of the unresolved suffix term V, rooted in the
+    // generic parameter τ_0_0.
+    auto origType = Impl->Context.getRelativeTypeForTerm(
+        term, prefix, Impl->System.getProtocols());
+
+    // Substitute τ_0_0 in the above relative type with the concrete type
+    // for U.
+    //
+    // Example: if T == A.B.C and the longest valid prefix is A.B which
+    // maps to a concrete type Foo<Int>, then we have:
+    //
+    // U == A.B
+    // V == C
+    //
+    // prefixType == Foo<Int>
+    // origType   == τ_0_0.C
+    // substType  == Foo<Int>.C
+    //
+    auto substType = origType.subst(
+      [&](SubstitutableType *type) -> Type {
+        assert(cast<GenericTypeParamType>(type)->getDepth() == 0);
+        assert(cast<GenericTypeParamType>(type)->getIndex() == 0);
+
+        return prefixType;
+      },
+      LookUpConformanceInSignature(Impl->Sig.getPointer()));
+
+    // FIXME: Recursion guard is needed here
+    return getCanonicalTypeInContext(substType, genericParams);
+  });
 }

@@ -743,8 +743,41 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
   if (!type->hasTypeParameter())
     return CanType(type);
 
-  auto &builder = *getGenericSignatureBuilder();
-  return builder.getCanonicalTypeInContext(type, { })->getCanonicalType();
+  auto computeViaGSB = [&]() {
+    auto &builder = *getGenericSignatureBuilder();
+    return builder.getCanonicalTypeInContext(type, { })->getCanonicalType();
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->getCanonicalTypeInContext(type, { })->getCanonicalType();
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    if (gsbResult != rqmResult) {
+      llvm::errs() << "RequirementMachine::getCanonicalTypeInContext() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
+      gsbResult.dump(llvm::errs());
+      llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      rqmResult.dump(llvm::errs());
+      llvm::errs() << "\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
