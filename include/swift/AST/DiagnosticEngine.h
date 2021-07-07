@@ -22,6 +22,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/Version.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -528,6 +529,12 @@ namespace swift {
     /// emitted as a warning, but a note will still be emitted as a note.
     InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
 
+    /// Limit the diagnostic behavior to warning until the specified version.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
+
     /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
     /// emitted in place of the diagnostic that otherwise would have been
     /// emitted.
@@ -803,6 +810,10 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// The Swift language version. This is used to limit diagnostic behavior
+    /// until a specific language version, e.g. Swift 6.
+    version::Version languageVersion;
+
     /// Whether we are actively pretty-printing a declaration as part of
     /// diagnostics.
     bool IsPrettyPrintingDecl = false;
@@ -864,6 +875,8 @@ namespace swift {
     }
 
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
+
+    void setLanguageVersion(version::Version v) { languageVersion = v; }
 
     void setLocalization(StringRef locale, StringRef path) {
       assert(!locale.empty());

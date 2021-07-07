@@ -320,6 +320,14 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
+InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
+  if (!Engine->languageVersion.isVersionAtLeast(majorVersion))
+    this->limitBehavior(DiagnosticBehavior::Warning);
+
+  return *this;
+}
+
+InFlightDiagnostic &
 InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   // Save current active diagnostic into WrappedDiagnostics, ignoring state
   // so we don't get a None return or influence future diagnostics.
