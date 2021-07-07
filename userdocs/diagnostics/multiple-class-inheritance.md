@@ -1,6 +1,6 @@
-
 # Multiple Inheritance of Classes
-In some programming languages, object can inherit features and characteristics from multiple parent or base classes. This feature is called multiple inheritence and is unsupported in swift. However, Swift provide language features that can acheive results similar to multiple inheritence through the use of protocols.
+
+In some programming languages, a class can have multiple superclasses. This feature is called multiple inheritance and is unsupported in Swift. However, using protocols, one can achieve a similar effect as multiple inheritance.
 
 For example, the protocol `Animal` and `Flyable` defines blueprints of methods like `move()`. The class `Bird` now provide concrete implementation to its conforming protocols.
 
