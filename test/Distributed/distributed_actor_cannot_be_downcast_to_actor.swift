@@ -11,7 +11,7 @@ extension Actor {
 
 @available(SwiftStdlib 5.5, *)
 func g<A: Actor>(a: A) async { // expected-note{{where 'A' = 'MA'}}
-    print(await a.f())
+    print(await a.f()) // expected-warning{{no 'async' operations occur within 'await' expression}}
 }
 
 @available(SwiftStdlib 5.5, *)

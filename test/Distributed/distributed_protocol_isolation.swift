@@ -9,8 +9,12 @@ import _Distributed
 
 @available(SwiftStdlib 5.5, *)
 protocol DistProtocol: DistributedActor {
+  // FIXME(distributed): avoid issuing these warnings, these originate from the call on the DistProtocol where we marked this func as dist isolated,
   func local() -> String
-  func localAsync() async -> String
+  // (the note appears a few times, because we misuse the call many times)
+  // expected-note@-2{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}} // FIXME: don't emit this note
+  // expected-note@-3{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}} // FIXME: don't emit this note
+  // expected-note@-4{{calls to instance method 'local()' from outside of its actor context are implicitly asynchronous}} // FIXME: don't emit this note
 
   distributed func dist() -> String
   distributed func dist(string: String) -> String
@@ -23,8 +27,7 @@ protocol DistProtocol: DistributedActor {
 @available(SwiftStdlib 5.5, *)
 distributed actor SpecificDist: DistProtocol {
 
-  nonisolated func local() -> String { "hi" }
-  nonisolated func localAsync() async -> String { "hi" }
+  nonisolated func local() -> String { "hi" } // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
 
   distributed func dist() -> String { "dist!" }
   distributed func dist(string: String) -> String { string }
@@ -35,7 +38,6 @@ distributed actor SpecificDist: DistProtocol {
 
   func inside() async throws {
     _ = self.local() // ok
-    _ = await self.localAsync() // ok
 
     _ = self.dist() // ok
     _ = self.dist(string: "") // ok
@@ -47,7 +49,7 @@ distributed actor SpecificDist: DistProtocol {
 
 @available(SwiftStdlib 5.5, *)
 func outside_good(dp: SpecificDist) async throws {
-  _ = dp.local() // ok
+  _ = dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
 
   _ = try await dp.dist() // implicit async throws
   _ = try await dp.dist(string: "") // implicit async throws
@@ -56,23 +58,32 @@ func outside_good(dp: SpecificDist) async throws {
   _ = try await dp.distAsyncThrows() // ok
 }
 
-//@available(SwiftStdlib 5.5, *)
-//func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
-//  _ = try await dp.dist() // implicit async throws
-////  _ = try await dp.dist(string: "") // implicit async throws
-////  _ = try await dp.distAsync() // implicit throws
-////  _ = try await dp.distThrows() // implicit async
-////  _ = try await dp.distAsyncThrows() // ok
-//}
+@available(SwiftStdlib 5.5, *)
+func outside_good_generic<DP: DistProtocol>(dp: DP) async throws {
+  _ = dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = await dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  // the below warning is expected because we don't apply the "implicitly async" to the not-callable func
+  // expected-warning@-2{{no 'async' operations occur within 'await' expression}}
 
-//@available(SwiftStdlib 5.5, *)
-//func outside_good_ext(dp: DistProtocol) async throws {
-//  _ = try await dp.dist() // implicit async throws
-////  _ = try await dp.dist(string: "") // implicit async throws
-////  _ = try await dp.distAsync() // implicit throws
-////  _ = try await dp.distThrows() // implicit async
-////  _ = try await dp.distAsyncThrows() // ok
-//}
+  _ = try dp.local() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  // the below warning is expected because we don't apply the "implicitly throwing" to the not-callable func
+  // expected-warning@-2{{no calls to throwing functions occur within 'try' expression}}
+
+  _ = try await dp.dist() // implicit async throws
+  _ = try await dp.dist(string: "") // implicit async throws
+  _ = try await dp.distAsync() // implicit throws
+  _ = try await dp.distThrows() // implicit async
+  _ = try await dp.distAsyncThrows() // ok
+}
+
+@available(SwiftStdlib 5.5, *)
+func outside_good_ext(dp: DistProtocol) async throws {
+  _ = try await dp.dist() // implicit async throws
+  _ = try await dp.dist(string: "") // implicit async throws
+  _ = try await dp.distAsync() // implicit throws
+  _ = try await dp.distThrows() // implicit async
+  _ = try await dp.distAsyncThrows() // ok
+}
 
 // ==== -----------------------------------------------------------------------
 // MARK: Error cases

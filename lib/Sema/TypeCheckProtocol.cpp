@@ -2792,56 +2792,19 @@ bool ConformanceChecker::checkActorIsolation(
                   /*fromExpression=*/false)) {
   case ActorIsolationRestriction::DistributedActorSelf: {
     if (witness->isSynthesized()) {
-      // Some of our synthesized properties get special treatment,
-      // they are always available, regardless if the actor is remote even.
-      auto &C = requirement->getASTContext();
-
-      // actorAddress is special, it is *always* available.
-      // even if the actor is 'remote' it is always available and immutable.
-      if (witness->getName() == C.Id_actorAddress &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorAddressDecl()->getDeclaredInterfaceType()))
-        return false;
-
-      // TODO: we don't *really* need to expose the transport like that... reconsider?
-      if (witness->getName() == C.Id_actorTransport &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorTransportDecl()->getDeclaredInterfaceType()))
+      // we only have two 'distributed-actor-nonisolated' properties,
+      // the address and transport; if we see any such marked property,
+      // we're free to automatically assume those are fine and accessible always.
+      if (witness->isDistributedActorIndependent())
         return false;
     }
 
     if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(witness)) {
       // A 'distributed func' may witness a distributed isolated function requirement.
-      if (funcDecl->isDistributed()) {
+      if (funcDecl->isDistributed())
         return false;
-      }
     }
 
-    auto requirementIsolation = getActorIsolation(requirement);
-    // A distributed function may be witnessed by a distributed function.
-    if (requirementIsolation == ActorIsolation::DistributedActorInstance) {
-      fprintf(stderr, "[%s:%d] (%s) OKEY!\n", __FILE__, __LINE__, __FUNCTION__);
-      return false;
-    }
-
-    fprintf(stderr, "[%s:%d] (%s) REQUIREMENT\n", __FILE__, __LINE__, __FUNCTION__);
-    requirement->dump();
-    fprintf(stderr, "[%s:%d] (%s) WITNESS\n", __FILE__, __LINE__, __FUNCTION__);
-    witness->dump();
-
-    fprintf(stderr, "[%s:%d] (%s) OH NO, was:%d, inst:%d, dist:%d\n", __FILE__, __LINE__, __FUNCTION__,
-            requirementIsolation,
-            ActorIsolation::ActorInstance,
-            ActorIsolation::DistributedActorInstance);
-
-    // A distributed function may be witnessed by a distributed function.
-    if (requirementIsolation == ActorIsolation::DistributedActorInstance) {
-      requirement->dump();
-      fprintf(stderr, "[%s:%d] (%s) OKEY!\n", __FILE__, __LINE__, __FUNCTION__);
-      return false;
-    }
-
-    fprintf(stderr, "[%s:%d] (%s) LLVM_FALLTHROUGH!\n", __FILE__, __LINE__, __FUNCTION__);
     // continue checking ActorSelf rules
     LLVM_FALLTHROUGH;
   }
@@ -2853,21 +2816,6 @@ bool ConformanceChecker::checkActorIsolation(
     if (requirementIsolation == ActorIsolation::ActorInstance)
       return false;
 
-//    // A distributed function may be witnessed by a distributed function.
-//    if (requirementIsolation == ActorIsolation::DistributedActorInstance) {
-//      fprintf(stderr, "[%s:%d] (%s) OKEY!\n", __FILE__, __LINE__, __FUNCTION__);
-//      return false;
-//    }
-//
-//    fprintf(stderr, "[%s:%d] (%s) REQUIREMENT\n", __FILE__, __LINE__, __FUNCTION__);
-//    requirement->dump();
-//    fprintf(stderr, "[%s:%d] (%s) WITNESS\n", __FILE__, __LINE__, __FUNCTION__);
-//    witness->dump();
-//
-//    fprintf(stderr, "[%s:%d] (%s) OH NO, was:%d, inst:%d, dist:%d\n", __FILE__, __LINE__, __FUNCTION__,
-//            requirementIsolation,
-//            ActorIsolation::ActorInstance,
-//            ActorIsolation::DistributedActorInstance);
     witness->diagnose(diag::actor_isolated_witness,
                       witness->getDescriptiveKind(),
                       witness->getName());
@@ -2917,8 +2865,12 @@ bool ConformanceChecker::checkActorIsolation(
   bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
     llvm_unreachable("There are not actor protocols");
+  case ActorIsolation::DistributedActorInstance:
+    // A requirement inside a distributed actor, where it has a protocol that was
+    // bound requiring a `DistributedActor` conformance (`protocol D: DistributedActor`),
+    // results in the requirement being isolated to given distributed actor.
+    break;
 
   case ActorIsolation::GlobalActorUnsafe:
     requirementIsUnsafe = true;

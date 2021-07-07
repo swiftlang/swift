@@ -3269,6 +3269,9 @@ public:
   /// it is either a distributed actor.
   bool isDistributedActor() const;
 
+  /// Whether this nominal type qualifies as any actor (plain or distributed).
+  bool isAnyActor() const;
+
   /// Return the range of semantics attributes attached to this NominalTypeDecl.
   auto getSemanticsAttrs() const
       -> decltype(getAttrs().getSemanticsAttrs()) {
