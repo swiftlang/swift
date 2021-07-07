@@ -15,6 +15,9 @@ RUN: swift-demangle -remangle-objc-rt '$sSiStMSLB_p' | %FileCheck -check-prefix 
 // CHECK-OLD3: Swift.related decl 'H' for partial apply forwarder
 RUN: swift-demangle -remangle-objc-rt '$ssTALHP' | %FileCheck -check-prefix CHECK-OLD3 %s
 
+// CHECK-OLD4: foobar in Swift.DefaultIndices.subscript : A
+RUN: swift-demangle -remangle-objc-rt '$sSIxip6foobarP' | %FileCheck -check-prefix CHECK-OLD4 %s
+
 // CHECK-GENERICEXT: Swift._ContiguousArrayStorage<(extension in Swift):Swift.FlattenSequence<StdlibCollectionUnittest.MinimalBidirectionalCollection<StdlibCollectionUnittest.MinimalBidirectionalCollection<Swift.Int>>>.Index>
 RUN: swift-demangle -remangle-objc-rt '$ss23_ContiguousArrayStorageCys15FlattenSequenceVsE5IndexVy24StdlibCollectionUnittest020MinimalBidirectionalH0VyAIySiGG_GGD' | %FileCheck -check-prefix CHECK-GENERICEXT %s
 
