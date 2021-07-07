@@ -8,7 +8,7 @@ Swift 5.5
 
 * [SE-0311][]:
 
-  Task local values offer a  can be defined using the new `@TaskLocal` property wrapper.
+  Task local values can be defined using the new `@TaskLocal` property wrapper.
   Such values are carried implicitly by the task in which the binding was made,
   as well as any child-tasks, and unstructured task created from the tasks context.
   
