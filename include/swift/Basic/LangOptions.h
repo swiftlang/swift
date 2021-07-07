@@ -662,6 +662,10 @@ namespace swift {
     /// parameters of closures.
     bool EnableOneWayClosureParameters = false;
 
+    /// Enable experimental support for type inference through multi-statement
+    /// closures.
+    bool EnableMultiStatementClosureInference = false;
+
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
   };
