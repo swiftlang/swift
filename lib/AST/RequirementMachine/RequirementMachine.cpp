@@ -229,13 +229,21 @@ struct RequirementMachine::Implementation {
   RewriteContext Context;
   RewriteSystem System;
   EquivalenceClassMap Map;
+  CanGenericSignature Sig;
   bool Complete = false;
 
   explicit Implementation(ASTContext &ctx)
       : Context(ctx),
         System(Context),
         Map(Context, System.getProtocols()) {}
+  void dump(llvm::raw_ostream &out);
 };
+
+void RequirementMachine::Implementation::dump(llvm::raw_ostream &out) {
+  out << "Requirement machine for " << Sig << "\n";
+  System.dump(out);
+  Map.dump(out);
+}
 
 RequirementMachine::RequirementMachine(ASTContext &ctx) : Context(ctx) {
   Impl = new Implementation(ctx);
@@ -246,6 +254,8 @@ RequirementMachine::~RequirementMachine() {
 }
 
 void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
+  Impl->Sig = sig;
+
   PrettyStackTraceGenericSignature debugStack("building rewrite system for", sig);
 
   auto *Stats = Context.Stats;
@@ -270,7 +280,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
   Impl->System.initialize(std::move(builder.Rules),
                           std::move(builder.Protocols));
 
-  computeCompletion(sig);
+  computeCompletion();
 
   if (Context.LangOpts.DebugRequirementMachine) {
     llvm::dbgs() << "}\n";
@@ -279,7 +289,7 @@ void RequirementMachine::addGenericSignature(CanGenericSignature sig) {
 
 /// Attempt to obtain a confluent rewrite system using the completion
 /// procedure.
-void RequirementMachine::computeCompletion(CanGenericSignature sig) {
+void RequirementMachine::computeCompletion() {
   while (true) {
     // First, run the Knuth-Bendix algorithm to resolve overlapping rules.
     auto result = Impl->System.computeConfluentCompletion(
@@ -298,13 +308,13 @@ void RequirementMachine::computeCompletion(CanGenericSignature sig) {
         break;
 
       case RewriteSystem::CompletionResult::MaxIterations:
-        llvm::errs() << "Generic signature " << sig
+        llvm::errs() << "Generic signature " << Impl->Sig
                      << " exceeds maximum completion step count\n";
         Impl->System.dump(llvm::errs());
         abort();
 
       case RewriteSystem::CompletionResult::MaxDepth:
-        llvm::errs() << "Generic signature " << sig
+        llvm::errs() << "Generic signature " << Impl->Sig
                      << " exceeds maximum completion depth\n";
         Impl->System.dump(llvm::errs());
         abort();
@@ -351,8 +361,7 @@ bool RequirementMachine::isComplete() const {
 }
 
 void RequirementMachine::dump(llvm::raw_ostream &out) const {
-  Impl->System.dump(out);
-  Impl->Map.dump(out);
+  Impl->dump(out);
 }
 
 bool RequirementMachine::requiresClass(Type depType) const {
