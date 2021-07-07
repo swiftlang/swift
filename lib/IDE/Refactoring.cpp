@@ -4268,17 +4268,51 @@ struct AsyncHandlerDesc {
     return nullptr;
   }
 
+  /// Returns \c true if the call to the completion handler contains possibly
+  /// non-nil values for both the success and error parameters, e.g.
+  /// \code
+  ///   completion(result, error)
+  /// \endcode
+  /// This can only happen if the completion handler is a params handler.
+  bool isAmbiguousCallToParamHandler(const CallExpr *CE) const {
+    if (!HasError || Type != HandlerType::PARAMS) {
+      // Only param handlers with an error can pass both an error AND a result.
+      return false;
+    }
+    auto Args = callArgs(CE).ref();
+    if (!isa<NilLiteralExpr>(Args.back())) {
+      // We've got an error parameter. If any of the success params is not nil,
+      // the call is ambiguous.
+      for (auto &Arg : Args.drop_back()) {
+        if (!isa<NilLiteralExpr>(Arg)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Given a call to the `Handler`, extract the expressions to be returned or
   /// thrown, taking care to remove the `.success`/`.failure` if it's a
   /// `RESULT` handler type.
-  HandlerResult extractResultArgs(const CallExpr *CE) const {
+  /// If the call is ambiguous (contains potentially non-nil arguments to both
+  /// the result and the error parameters), the \p ReturnErrorArgsIfAmbiguous
+  /// determines whether the success or error parameters are passed.
+  HandlerResult extractResultArgs(const CallExpr *CE,
+                                  bool ReturnErrorArgsIfAmbiguous) const {
     auto ArgList = callArgs(CE);
     auto Args = ArgList.ref();
 
     if (Type == HandlerType::PARAMS) {
-      // If there's an error parameter and the user isn't passing nil to it,
-      // assume this is the error path.
-      if (HasError && !isa<NilLiteralExpr>(Args.back()))
+      bool IsErrorResult;
+      if (isAmbiguousCallToParamHandler(CE)) {
+        IsErrorResult = ReturnErrorArgsIfAmbiguous;
+      } else {
+        // If there's an error parameter and the user isn't passing nil to it,
+        // assume this is the error path.
+        IsErrorResult = (HasError && !isa<NilLiteralExpr>(Args.back()));
+      }
+      if (IsErrorResult)
         return HandlerResult(Args.back(), true);
 
       // We can drop the args altogether if they're just Void.
@@ -6048,17 +6082,9 @@ private:
         OS << *ErrName << " " << tok::equal << " " << *ErrName << " ";
         OS << tok::l_brace << "\n";
         for (auto Idx : indices(SuccessParamNames)) {
-          auto &Name = SuccessParamNames[Idx];
           auto ParamTy = SuccessParams[Idx].getParameterType();
           if (!HandlerDesc.shouldUnwrap(ParamTy))
             continue;
-
-          // assert(res == nil, "Expected nil-success param 'res' for non-nil
-          //                     error")
-          OS << "assert" << tok::l_paren << Name << " == " << tok::kw_nil;
-          OS << tok::comma << " \"Expected nil success param '" << Name;
-          OS << "' for non-nil error\"";
-          OS << tok::r_paren << "\n";
         }
 
         // continuation.resume(throwing: err)
@@ -6085,8 +6111,7 @@ private:
 
         // fatalError(...)
         OS << "fatalError" << tok::l_paren;
-        OS << "\"Expected non-nil success param '" << Name;
-        OS << "' for nil error\"";
+        OS << "\"Expected non-nil result '" << Name << "' for nil error\"";
         OS << tok::r_paren << "\n";
 
         // End guard.
@@ -6360,9 +6385,10 @@ private:
     } else if (CallExpr *CE = TopHandler.getAsHandlerCall(E)) {
       if (Scopes.back().isWrappedInContination()) {
         return addCustom(E->getSourceRange(),
-                         [&]() { addHandlerCallToContinuation(CE); });
+                         [&]() { convertHandlerToContinuationResume(CE); });
       } else if (NestedExprCount == 0) {
-        return addCustom(E->getSourceRange(), [&]() { addHandlerCall(CE); });
+        return addCustom(E->getSourceRange(),
+                         [&]() { convertHandlerToReturnOrThrows(CE); });
       }
     } else if (auto *CE = dyn_cast<CallExpr>(E)) {
       // Try and hoist a call's completion handler. Don't do so if
@@ -6588,14 +6614,137 @@ private:
 
   void addDo() { OS << tok::kw_do << " " << tok::l_brace << "\n"; }
 
-  void addHandlerCall(const CallExpr *CE) {
-    assert(TopHandler.getAsHandlerCall(const_cast<CallExpr *>(CE)) == CE &&
-           "addHandlerCall must be used with a call to the TopHandler's "
-           "completion handler");
-    auto Exprs = TopHandler.extractResultArgs(CE);
+  /// Assuming that \p Result represents an error result to completion handler,
+  /// returns \c true if the error has already been handled through a
+  /// 'try await'.
+  bool isErrorAlreadyHandled(HandlerResult Result) {
+    assert(Result.isError());
+    assert(Result.args().size() == 1 &&
+           "There should only be one error parameter");
+    // We assume that the error has already been handled if its variable
+    // declaration doesn't exist anymore, which is the case if it's in
+    // Placeholders but not in Unwraps (if it's in Placeholders and Unwraps
+    // an optional Error has simply been promoted to a non-optional Error).
+    if (auto DRE = dyn_cast<DeclRefExpr>(Result.args().back())) {
+      if (Placeholders.count(DRE->getDecl()) &&
+          !Unwraps.count(DRE->getDecl())) {
+        return true;
+      }
+    }
+    return false;
+  }
 
+  /// Returns \c true if the source representation of \p E can be interpreted
+  /// as an expression returning an Optional value.
+  bool isExpressionOptional(Expr *E) {
+    if (isa<InjectIntoOptionalExpr>(E)) {
+      // E is downgrading a non-Optional result to an Optional. Its source
+      // representation isn't Optional.
+      return false;
+    }
+    if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
+      if (Unwraps.count(DRE->getDecl())) {
+        // E has been promoted to a non-Optional value. It can't be used as an
+        // Optional anymore.
+        return false;
+      }
+    }
+    if (!E->getType().isNull() && E->getType()->isOptional()) {
+      return true;
+    }
+    // We couldn't determine the type. Assume non-Optional.
+    return false;
+  }
+
+  /// Converts a call \p CE to a completion handler. Depending on the call it
+  /// will be interpreted as a call that's returning a success result, an error
+  /// or, if the call is completely ambiguous, adds an if-let that checks if the
+  /// error is \c nil at runtime and dispatches to the success or error case
+  /// depending on it.
+  /// \p AddConvertedHandlerCall needs to add the converted version of the
+  /// completion handler. Depending on the given \c HandlerResult, it must be
+  /// intepreted as a success or error call.
+  /// \p AddConvertedErrorCall must add the converted equivalent of returning an
+  /// error. The passed \c StringRef contains the name of a variable that is of
+  /// type 'Error'.
+  void convertHandlerCall(
+      const CallExpr *CE,
+      llvm::function_ref<void(HandlerResult)> AddConvertedHandlerCall,
+      llvm::function_ref<void(StringRef)> AddConvertedErrorCall) {
+    auto Result =
+        TopHandler.extractResultArgs(CE, /*ReturnErrorArgsIfAmbiguous=*/true);
+    if (!TopHandler.isAmbiguousCallToParamHandler(CE)) {
+      if (Result.isError()) {
+        if (!isErrorAlreadyHandled(Result)) {
+          // If the error has already been handled, we don't need to add another
+          // throwing call.
+          AddConvertedHandlerCall(Result);
+        }
+      } else {
+        AddConvertedHandlerCall(Result);
+      }
+    } else {
+      assert(Result.isError() && "If the call was ambiguous, we should have "
+                                 "retrieved its error representation");
+      assert(Result.args().size() == 1 &&
+             "There should only be one error parameter");
+      Expr *ErrorExpr = Result.args().back();
+      if (isErrorAlreadyHandled(Result)) {
+        // The error has already been handled, interpret the call as a success
+        // call.
+        auto SuccessExprs = TopHandler.extractResultArgs(
+            CE, /*ReturnErrorArgsIfAmbiguous=*/false);
+        AddConvertedHandlerCall(SuccessExprs);
+      } else if (!isExpressionOptional(ErrorExpr)) {
+        // The error is never nil. No matter what the success param is, we
+        // interpret it as an error call.
+        AddConvertedHandlerCall(Result);
+      } else {
+        // The call was truly ambiguous. Add an
+        // if let error = <convert error arg> {
+        //   throw error // or equivalent
+        // } else {
+        //   <interpret call as success call>
+        // }
+        auto SuccessExprs = TopHandler.extractResultArgs(
+            CE, /*ReturnErrorArgsIfAmbiguous=*/false);
+
+        // The variable 'error' is only available in the 'if let' scope, so we
+        // don't need to create a new unique one.
+        StringRef ErrorName = "error";
+        OS << tok::kw_if << ' ' << tok::kw_let << ' ' << ErrorName << ' '
+           << tok::equal << ' ';
+        convertNode(ErrorExpr, /*StartOverride=*/{}, /*ConvertCalls=*/false);
+        OS << ' ' << tok::l_brace << '\n';
+        AddConvertedErrorCall(ErrorName);
+        OS << tok::r_brace << ' ' << tok::kw_else << ' ' << tok::l_brace
+           << '\n';
+        AddConvertedHandlerCall(SuccessExprs);
+        OS << '\n' << tok::r_brace;
+      }
+    }
+  }
+
+  /// Convert a call \p CE to a completion handler to its 'return' or 'throws'
+  /// equivalent.
+  void convertHandlerToReturnOrThrows(const CallExpr *CE) {
+    return convertHandlerCall(
+        CE,
+        [&](HandlerResult Exprs) {
+          convertHandlerToReturnOrThrowsImpl(CE, Exprs);
+        },
+        [&](StringRef ErrorName) {
+          OS << tok::kw_throw << ' ' << ErrorName << '\n';
+        });
+  }
+
+  /// Convert the call \p CE to a completion handler to its 'return' or 'throws'
+  /// equivalent, where \p Result determines whether the call should be
+  /// interpreted as an error or success call.
+  void convertHandlerToReturnOrThrowsImpl(const CallExpr *CE,
+                                          HandlerResult Result) {
     bool AddedReturnOrThrow = true;
-    if (!Exprs.isError()) {
+    if (!Result.isError()) {
       // It's possible the user has already written an explicit return statement
       // for the completion handler call, e.g 'return completion(args...)'. In
       // that case, be sure not to add another return.
@@ -6611,12 +6760,40 @@ private:
       OS << tok::kw_throw;
     }
 
-    ArrayRef<Expr *> Args = Exprs.args();
+    ArrayRef<Expr *> Args = Result.args();
     if (!Args.empty()) {
       if (AddedReturnOrThrow)
-        OS << " ";
+        OS << ' ';
       unsigned I = 0;
       addTupleOf(Args, OS, [&](Expr *Elt) {
+        // Special case: If the completion handler is a params handler that
+        // takes an error, we could pass arguments to it without unwrapping
+        // them. E.g.
+        //   simpleWithError { (res: String?, error: Error?) in
+        //     completion(res, nil)
+        //   }
+        // But after refactoring `simpleWithError` to an async function we have
+        //   let res: String = await simple()
+        // and `res` is no longer an `Optional`. Thus it's in `Placeholders` and
+        // `Unwraps` and any reference to it will be replaced by a placeholder
+        // unless it is wrapped in an unwrapping expression. This would cause us
+        // to create `return <#res# >`.
+        // Under our assumption that either the error or the result parameter
+        // are non-nil, the above call to the completion handler is equivalent
+        // to
+        //   completion(res!, nil)
+        // which correctly yields
+        //   return res
+        // Synthesize the force unwrap so that we get the expected results.
+        if (TopHandler.getHandlerType() == HandlerType::PARAMS &&
+            TopHandler.HasError) {
+          if (auto DRE = dyn_cast<DeclRefExpr>(Elt)) {
+            auto D = DRE->getDecl();
+            if (Unwraps.count(D)) {
+              Elt = new (getASTContext()) ForceValueExpr(Elt, SourceLoc());
+            }
+          }
+        }
         // Can't just add the range as we need to perform replacements
         convertNode(Elt, /*StartOverride=*/CE->getArgumentLabelLoc(I),
                     /*ConvertCalls=*/false);
@@ -6625,22 +6802,36 @@ private:
     }
   }
 
-  /// Assuming that \p CE is a call to \c TopHandler's completion handler and
-  /// that the current scope is wrapped in a continuation, replace it with a
-  /// call to the continuation.
-  void addHandlerCallToContinuation(const CallExpr *CE) {
-    assert(TopHandler.getAsHandlerCall(const_cast<CallExpr *>(CE)) == CE &&
-           "addHandlerCallToContinuation must be used with a call to the "
-           "TopHandler's completion handler");
+  /// Convert a call \p CE to a completion handler to resumes of the
+  /// continuation that's currently on top of the stack.
+  void convertHandlerToContinuationResume(const CallExpr *CE) {
+    return convertHandlerCall(
+        CE,
+        [&](HandlerResult Exprs) {
+          convertHandlerToContinuationResumeImpl(CE, Exprs);
+        },
+        [&](StringRef ErrorName) {
+          Identifier ContinuationName = Scopes.back().ContinuationName;
+          OS << ContinuationName << tok::period << "resume" << tok::l_paren
+             << "throwing" << tok::colon << ' ' << ErrorName;
+          OS << tok::r_paren << '\n';
+        });
+  }
+
+  /// Convert a call \p CE to a completion handler to resumes of the
+  /// continuation that's currently on top of the stack.
+  /// \p Result determines whether the call should be interpreted as a success
+  /// or error call.
+  void convertHandlerToContinuationResumeImpl(const CallExpr *CE,
+                                              HandlerResult Result) {
     assert(Scopes.back().isWrappedInContination());
 
-    ArrayRef<Expr *> Args;
+    std::vector<Expr *> Args;
     StringRef ResumeArgumentLabel;
     switch (TopHandler.getHandlerType()) {
     case HandlerType::PARAMS: {
-      auto Exprs = TopHandler.extractResultArgs(CE);
-      Args = Exprs.args();
-      if (!Exprs.isError()) {
+      Args = Result.args();
+      if (!Result.isError()) {
         ResumeArgumentLabel = "returning";
       } else {
         ResumeArgumentLabel = "throwing";
@@ -6656,16 +6847,88 @@ private:
       llvm_unreachable("Invalid top handler");
     }
 
+    // A vector in which each argument of Result has an entry. If the entry is
+    // not empty then that argument has been unwrapped using 'guard let' into
+    // a variable with that name.
+    SmallVector<Identifier, 4> ArgNames;
+    ArgNames.reserve(Args.size());
+
+    /// When unwrapping a result argument \p Arg into a variable using
+    /// 'guard let' return a suitable name for the unwrapped variable.
+    /// \p ArgIndex is the index of \p Arg in the results passed to the
+    /// completion handler.
+    auto GetSuitableNameForGuardUnwrap = [&](Expr *Arg,
+                                             unsigned ArgIndex) -> Identifier {
+      // If Arg is a DeclRef, use its name for the guard unwrap.
+      // guard let myVar1 = myVar.
+      if (auto DRE = dyn_cast<DeclRefExpr>(Arg)) {
+        return createUniqueName(DRE->getDecl()->getBaseIdentifier().str());
+      } else if (auto IIOE = dyn_cast<InjectIntoOptionalExpr>(Arg)) {
+        if (auto DRE = dyn_cast<DeclRefExpr>(IIOE->getSubExpr())) {
+          return createUniqueName(DRE->getDecl()->getBaseIdentifier().str());
+        }
+      }
+      if (Args.size() == 1) {
+        // We only have a single result. 'result' seems a resonable name.
+        return createUniqueName("result");
+      } else {
+        // We are returning a tuple. Name the result elements 'result' +
+        // index in tuple.
+        return createUniqueName("result" + std::to_string(ArgIndex));
+      }
+    };
+
+    unsigned ArgIndex = 0;
+    for (auto Arg : Args) {
+      Identifier ArgName;
+      if (isExpressionOptional(Arg) && TopHandler.HasError) {
+        ArgName = GetSuitableNameForGuardUnwrap(Arg, ArgIndex);
+        Scopes.back().Names.insert(ArgName);
+        OS << tok::kw_guard << ' ' << tok::kw_let << ' ' << ArgName << ' '
+           << tok::equal << ' ';
+        convertNode(Arg, /*StartOverride=*/CE->getArgumentLabelLoc(ArgIndex),
+                    /*ConvertCalls=*/false);
+        if (auto CE = dyn_cast<CallExpr>(Arg)) {
+          if (CE->hasTrailingClosure()) {
+            // If the argument is a call with trailing closure, the generated
+            // guard statement does not compile.
+            // e.g. 'guard let result1 = value.map { $0 + 1 } else { ... }'
+            // doesn't compile.
+            // Adding a '.self' at the end makes the code compile (although it
+            // will still issue a warning about a trailing closure use inside a
+            // guard condition).
+            OS << tok::period << tok::kw_self;
+          }
+        }
+        OS << ' ' << tok::kw_else << ' ' << tok::l_brace << '\n';
+        OS << "fatalError" << tok::l_paren;
+        OS << "\"Expected non-nil result ";
+        if (ArgName.str() != "result") {
+          OS << "'" << ArgName << "' ";
+        }
+        OS << "in the non-error case\"";
+        OS << tok::r_paren << '\n';
+        OS << tok::r_brace << '\n';
+      }
+      ArgNames.push_back(ArgName);
+      ArgIndex++;
+    }
+
     Identifier ContName = Scopes.back().ContinuationName;
     OS << ContName << tok::period << "resume" << tok::l_paren
        << ResumeArgumentLabel << tok::colon << ' ';
 
-    unsigned I = 0;
+    ArgIndex = 0;
     addTupleOf(Args, OS, [&](Expr *Elt) {
-      // Can't just add the range as we need to perform replacements
-      convertNode(Elt, /*StartOverride=*/CE->getArgumentLabelLoc(I),
-                  /*ConvertCalls=*/false);
-      I++;
+      Identifier ArgName = ArgNames[ArgIndex];
+      if (!ArgName.empty()) {
+        OS << ArgName;
+      } else {
+        // Can't just add the range as we need to perform replacements
+        convertNode(Elt, /*StartOverride=*/CE->getArgumentLabelLoc(ArgIndex),
+                    /*ConvertCalls=*/false);
+      }
+      ArgIndex++;
     });
     OS << tok::r_paren;
   }
@@ -6834,7 +7097,8 @@ private:
     if (ErrorNodes.size() == 1) {
       auto Node = ErrorNodes[0];
       if (auto *HandlerCall = TopHandler.getAsHandlerCall(Node)) {
-        auto Res = TopHandler.extractResultArgs(HandlerCall);
+        auto Res = TopHandler.extractResultArgs(
+            HandlerCall, /*ReturnErrorArgsIfAmbiguous=*/true);
         if (Res.args().size() == 1) {
           // Skip if we have the param itself or the name it's bound to
           auto *SingleDecl = Res.args()[0]->getReferencedDecl().getDecl();
