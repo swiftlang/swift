@@ -28,6 +28,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -231,6 +232,7 @@ class ASTContext final {
   ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
              SearchPathOptions &SearchPathOpts,
              ClangImporterOptions &ClangImporterOpts,
+             symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
              SourceManager &SourceMgr,
              DiagnosticEngine &Diags);
 
@@ -246,6 +248,7 @@ public:
   static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
                          ClangImporterOptions &ClangImporterOpts,
+                         symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts,
                          SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
@@ -266,6 +269,9 @@ public:
 
   /// The clang importer options used by this AST context.
   ClangImporterOptions &ClangImporterOpts;
+
+  /// The symbol graph generation options used by this AST context.
+  symbolgraphgen::SymbolGraphOptions &SymbolGraphOpts;
 
   /// The source manager object.
   SourceManager &SourceMgr;
