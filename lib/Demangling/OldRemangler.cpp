@@ -874,7 +874,20 @@ void Remangler::mangleVariable(Node *node, EntityContext &ctx, unsigned depth) {
 
 void Remangler::mangleSubscript(Node *node, EntityContext &ctx,
                                 unsigned depth) {
-  mangleNamedAndTypedEntity(node, 'i', "", ctx, depth + 1);
+  assert(node->getNumChildren() >= 2);
+  Buffer << 'i';
+  mangleEntityContext(node->begin()[0], ctx, depth + 1);
+  if (node->getLastChild()->getKind() == Node::Kind::PrivateDeclName)
+    mangle(node->getLastChild(), depth + 1);
+
+  if (node->getNumChildren() >= 3
+      && node->begin()[1]->getKind() == Node::Kind::LabelList) {
+    auto LabelList = node->begin()[1];
+    auto Type = node->begin()[2];
+    mangleEntityType(applyParamLabels(LabelList, Type, Factory), ctx, depth + 1);
+  } else {
+    mangleEntityType(node->begin()[1], ctx, depth + 1);
+  }
 }
 
 void Remangler::mangleAccessor(Node *storageNode, StringRef accessorCode,
