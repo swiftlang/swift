@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -321,8 +322,10 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 
 InFlightDiagnostic &
 InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
-  if (!Engine->languageVersion.isVersionAtLeast(majorVersion))
-    this->limitBehavior(DiagnosticBehavior::Warning);
+  if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
+    limitBehavior(DiagnosticBehavior::Warning)
+      .wrapIn(diag::error_in_future_swift_version, majorVersion);
+  }
 
   return *this;
 }
