@@ -5,6 +5,10 @@ In some programming languages, a class can have multiple superclasses. This feat
 For example, the protocol `Animal` and `Flyable` defines blueprints of methods like `move()`. The class `Bird` now provide concrete implementation to its conforming protocols.
 
 ```swift
+protocol Flyable {
+    func fly()
+}
+
 protocol Animal {
     func move()
 }
@@ -12,6 +16,10 @@ protocol Animal {
 class Bird: Animal, Flyable {
     func move() {
         print("Moving...")
+    }
+    
+    func fly() {
+        print("Flying...")
     }
 }
 
