@@ -10,6 +10,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 import ObjectiveC
+import Foundation
 import _Concurrency
 import StdlibUnittest
 
@@ -70,26 +71,12 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 }
 
 @available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
-actor ActorNSObjectSubKlass : NSObject {}
+@objc actor ActorNSObjectSubKlass {}
 
 if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   Tests.test("no crash when inherit from nsobject")
   .code {
     let x = ActorNSObjectSubKlass()
-    objc_setAssociatedObject(x, "myKey", "myValue", .OBJC_ASSOCIATION_RETAIN)
-  }
-}
-
-@available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
-actor ActorNSObjectSubKlassGeneric<T> : NSObject {
-  var state: T
-  init(state: T) { self.state = state }
-}
-
-if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
-  Tests.test("no crash when generic inherit from nsobject")
-  .code {
-    let x = ActorNSObjectSubKlassGeneric(state: 5)
     objc_setAssociatedObject(x, "myKey", "myValue", .OBJC_ASSOCIATION_RETAIN)
   }
 }
