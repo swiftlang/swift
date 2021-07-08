@@ -208,7 +208,7 @@ public struct TaskGroup<ChildTaskResult> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func async(
+  public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -242,7 +242,7 @@ public struct TaskGroup<ChildTaskResult> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func asyncUnlessCancelled(
+  public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
@@ -440,7 +440,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func async(
+  public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
@@ -474,7 +474,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func asyncUnlessCancelled(
+  public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
