@@ -202,11 +202,20 @@ public struct TaskPriority: RawRepresentable, Sendable {
   }
 
   public static let high: TaskPriority = .init(rawValue: 0x19)
-  public static let userInitiated: TaskPriority = high
-  public static let `default`: TaskPriority = .init(rawValue: 0x15)
+
+  @_alwaysEmitIntoClient
+  public static var medium: TaskPriority {
+    .init(rawValue: 0x15)
+  }
+
   public static let low: TaskPriority = .init(rawValue: 0x11)
+
+  public static let userInitiated: TaskPriority = high
   public static let utility: TaskPriority = low
   public static let background: TaskPriority = .init(rawValue: 0x09)
+
+  @available(*, deprecated, renamed: "medium")
+  public static let `default`: TaskPriority = .init(rawValue: 0x15)
 }
 
 @available(SwiftStdlib 5.5, *)
