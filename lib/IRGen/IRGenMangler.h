@@ -426,6 +426,11 @@ public:
                                       const ProtocolDecl *Proto) {
     beginMangling();
     appendProtocolConformance(Conformance);
+
+    // appendProtocolConformance() sets CurGenericSignature; clear it out
+    // before calling appendAssociatedTypePath().
+    CurGenericSignature = nullptr;
+
     bool isFirstAssociatedTypeIdentifier = true;
     appendAssociatedTypePath(AssociatedType, isFirstAssociatedTypeIdentifier);
     appendAnyGenericType(Proto);
@@ -444,6 +449,10 @@ public:
   }
 
   void appendAssociatedTypePath(CanType associatedType, bool &isFirst) {
+    // In the mangling format, the "short associated type" optimization is
+    // not performed when mangling an associated type path.
+    assert(!CurGenericSignature && "Caller needs to explicitly clear the signature");
+
     if (auto memberType = dyn_cast<DependentMemberType>(associatedType)) {
       appendAssociatedTypePath(memberType.getBase(), isFirst);
       appendAssociatedTypeName(memberType);
