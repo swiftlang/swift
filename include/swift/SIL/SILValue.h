@@ -1050,6 +1050,11 @@ public:
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump() const LLVM_ATTRIBUTE_USED,
+      "Dump the operand's state. Only for use in the debugger!");
+  void print(llvm::raw_ostream &os) const;
+
 private:
   void removeFromCurrent() {
     if (!Back)

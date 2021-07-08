@@ -233,6 +233,14 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     }
   }
 
+  // Reject "class" methods on actors.
+  if (StaticSpelling == StaticSpellingKind::KeywordClass &&
+      binding->getDeclContext()->getSelfClassDecl() &&
+      binding->getDeclContext()->getSelfClassDecl()->isActor()) {
+    binding->diagnose(diag::class_var_not_in_class, false)
+        .fixItReplace(binding->getStaticLoc(), "static");
+  }
+
   // Check the pattern.
   auto contextualPattern =
       ContextualPattern::forPatternBindingDecl(binding, entryNumber);

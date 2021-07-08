@@ -349,7 +349,8 @@ the following changes are permitted:
 
 - Reordering any existing members, including stored properties (unless the
   struct is marked ``@frozen``; see below).
-- Adding any new members, including stored properties.
+- Adding any new members, including stored properties (see below for an
+  exception).
 - Changing existing properties from stored to computed or vice versa (unless the
   struct is marked ``@frozen``; see below).
 - As a special case of the above, adding or removing ``lazy`` from a stored
@@ -369,6 +370,9 @@ layout. Note that adding a stored property to a struct is *not* a breaking
 change even with Swift's synthesis of memberwise and no-argument initializers;
 these initializers are always ``internal`` and thus not exposed to clients
 outside the module.
+
+Adding a new stored property with availability newer than the deployment
+target for the library is an error.
 
 It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
 or accessor within a struct.
@@ -507,9 +511,10 @@ without breaking binary compatibility. As with structs, this results in a fair
 amount of indirection when dealing with enum values, in order to potentially
 accommodate new values. More specifically, the following changes are permitted:
 
-- Adding a new case (unless the enum is marked ``@frozen``; see below).
+- Adding a new case (see below for exceptions around ``@frozen`` and
+  availability).
 - Reordering existing cases is a `binary-compatible source-breaking change`
-  (unless the struct is marked ``@frozen``; see below). In particular, both
+  (unless the enum is marked ``@frozen``; see below). In particular, both
   CaseIterable and RawRepresentable default implementations may affect client
   behavior.
 - Adding a raw type to an enum that does not have one.
@@ -525,6 +530,10 @@ accommodate new values. More specifically, the following changes are permitted:
     known cases, the compiler is of course free to use a more efficient
     representation for the value, just as it may discard fields of structs that
     are provably never accessed.
+
+Adding a new case with one or more associated values and with availability
+newer than the deployment target for the library is an error.
+This limitation is similar to the limitation for stored properties on structs.
 
 Adding or removing the ``@objc`` attribute from an enum is not permitted; this
 affects the enum's memory representation and is not backwards-compatible.
