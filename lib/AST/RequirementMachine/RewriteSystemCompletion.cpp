@@ -202,9 +202,9 @@ Atom RewriteSystem::mergeAssociatedTypes(Atom lhs, Atom rhs) const {
   }
 
   // The two input sets are minimal already, so the merged set
-  // should have at least as many elements as each input set.
-  assert(minimalProtos.size() >= protos.size());
-  assert(minimalProtos.size() >= otherProtos.size());
+  // should have at least as many elements as the smallest
+  // input set.
+  assert(minimalProtos.size() >= std::min(protos.size(), otherProtos.size()));
 
   // The merged set cannot contain more elements than the union
   // of the two sets.
