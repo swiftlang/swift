@@ -26,6 +26,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <stdint.h>
 #include <assert.h>
+#include <climits>
 
 namespace swift {
 
