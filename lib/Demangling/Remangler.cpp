@@ -2899,6 +2899,13 @@ Demangle::mangleNode(NodePointer node, SymbolicResolver resolver,
 }
 
 bool Demangle::isSpecialized(Node *node) {
+  // We shouldn't get here with node being NULL; if we do, assert in debug,
+  // or return false at runtime (which should at least help diagnose things
+  // further if it happens).
+  assert(node);
+  if (!node)
+    return false;
+
   switch (node->getKind()) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
@@ -2935,10 +2942,12 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ModifyAccessor:
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
-      return isSpecialized(node->getChild(0));
+      assert(node->getNumChildren() > 0);
+      return node->getNumChildren() > 0 && isSpecialized(node->getChild(0));
 
     case Node::Kind::Extension:
-      return isSpecialized(node->getChild(1));
+      assert(node->getNumChildren() > 1);
+      return node->getNumChildren() > 1 && isSpecialized(node->getChild(1));
 
     default:
       return false;
