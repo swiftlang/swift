@@ -5,13 +5,14 @@
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: OS=windows-msvc
 
 // for sleep
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)
     import Glibc
+#elseif os(Windows)
+    import WinSDK
 #endif
 
 class Canary {
@@ -30,7 +31,11 @@ if #available(SwiftStdlib 5.5, *) {
     }
   }
   task.cancel()
+#if os(Windows)
+  Sleep(1 * 1000)
+#else
   sleep(1)
+#endif
   detach {
     await Task.withCancellationHandler {
         print("Task was cancelled!")
@@ -39,7 +44,11 @@ if #available(SwiftStdlib 5.5, *) {
         print("Running the operation...")
     }
   }
+#if os(Windows)
+  Sleep(10 * 1000)
+#else
   sleep(10)
+#endif
 } else {
   // Fake prints to satisfy FileCheck.
   print("Canary")
