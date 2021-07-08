@@ -2461,7 +2461,10 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
     inputType = interfaceType->getCanonicalType();
   }
 
-  auto sig = DC->getGenericSignatureOfContext();
+  GenericSignature sig;
+  auto *closure = dyn_cast<AbstractClosureExpr>(DC);
+  if (!closure || closure->getCaptureInfo().hasGenericParamCaptures())
+    sig = DC->getGenericSignatureOfContext();
 
   AnyFunctionType::Param param(
       inputType, Identifier(),
