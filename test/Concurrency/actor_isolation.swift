@@ -71,7 +71,7 @@ actor MyActor: MySuperActor { // expected-error{{actor types do not support inhe
     return self.name // expected-error{{property 'name' isolated to global actor 'MainActor' can not be referenced from actor 'MyActor' in a synchronous context}}
   }
 
-  class func synchronousClass() { }
+  static func synchronousClass() { }
   static func synchronousStatic() { }
 
   func synchronous() -> String { text.first ?? "nothing" } // expected-note 9{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
