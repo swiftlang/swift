@@ -21,9 +21,6 @@ import Swift
 @frozen
 public struct UnownedJob {
   private var context: Builtin.Job
-
-  /// Starts running the task.
-  public func run() { }
 }
 
 /// A mechanism to interface
