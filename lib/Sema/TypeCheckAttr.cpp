@@ -5427,7 +5427,8 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     }
   } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
-    diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+    diagnoseAndRemoveAttr(
+        attr, diag::distributed_actor_func_not_in_distributed_actor);
     return;
   }
 
@@ -5438,19 +5439,30 @@ void AttributeChecker::visitDistributedActorAttr(DistributedActorAttr *attr) {
       return;
     }
 
+    // distributed func cannot be simultaneously nonisolated
+    if (auto nonisolated = funcDecl->getAttrs().getAttribute<NonisolatedAttr>()) {
+      diagnoseAndRemoveAttr(
+          nonisolated, diag::distributed_actor_func_nonisolated,
+          funcDecl->getName());
+      return;
+    }
+
     // distributed func must be declared inside an distributed actor
     if (dc->getSelfClassDecl() &&
         !dc->getSelfClassDecl()->isDistributedActor()) {
-      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
     } else if (auto protoDecl = dc->getSelfProtocolDecl()){
       if (!protoDecl->inheritsFromDistributedActor()) {
         // TODO: could suggest adding `: DistributedActor` to the protocol as well
-        diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+        diagnoseAndRemoveAttr(
+            attr, diag::distributed_actor_func_not_in_distributed_actor);
         return;
       }
     } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
-      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
+      diagnoseAndRemoveAttr(
+          attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
     }
   }

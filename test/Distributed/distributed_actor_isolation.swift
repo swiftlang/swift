@@ -88,6 +88,16 @@ distributed actor DistributedActor_1 {
     fatalError()
   }
 
+  nonisolated distributed func nonisolatedDistributed() async {
+    // expected-error@-1{{function 'nonisolatedDistributed()' cannot be both 'nonisolated' and 'distributed'}}{{3-15=}}
+    fatalError()
+  }
+
+  distributed nonisolated func distributedNonisolated() async {
+    // expected-error@-1{{function 'distributedNonisolated()' cannot be both 'nonisolated' and 'distributed'}}{{15-27=}}
+    fatalError()
+  }
+
   func test_inside() async throws {
     _ = self.name
     _ = self.computedMutable
