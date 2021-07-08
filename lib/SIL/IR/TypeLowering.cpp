@@ -2447,37 +2447,20 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
 /// (property-type) -> backing-type.
 static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
                                                      TypeConverter &TC,
-                                                     VarDecl *VD) {
+                                                     VarDecl *VD,
+                                                     bool fromWrappedValue) {
   CanType resultType =
       VD->getPropertyWrapperBackingPropertyType()->getCanonicalType();
 
   auto *DC = VD->getInnermostDeclContext();
-  CanType inputType =
-    VD->getPropertyWrapperInitValueInterfaceType()->getCanonicalType();
+  CanType inputType;
+  if (fromWrappedValue) {
+    inputType = VD->getPropertyWrapperInitValueInterfaceType()->getCanonicalType();
+  } else {
+    Type interfaceType = VD->getPropertyWrapperProjectionVar()->getInterfaceType();
+    inputType = interfaceType->getCanonicalType();
+  }
 
-  auto sig = DC->getGenericSignatureOfContext();
-
-  AnyFunctionType::Param param(
-      inputType, Identifier(),
-      ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
-  // FIXME: Verify ExtInfo state is correct, not working by accident.
-  CanAnyFunctionType::ExtInfo info;
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
-                                 resultType, info);
-}
-
-static CanAnyFunctionType getPropertyWrapperInitFromProjectedValueInterfaceType(TypeConverter &TC,
-                                                                                VarDecl *VD) {
-  CanType resultType =
-      VD->getPropertyWrapperBackingPropertyType()->getCanonicalType();
-
-  Type interfaceType = VD->getPropertyWrapperProjectionVar()->getInterfaceType();
-  if (interfaceType->hasArchetype())
-    interfaceType = interfaceType->mapTypeOutOfContext();
-
-  CanType inputType = interfaceType->getCanonicalType();
-
-  auto *DC = VD->getInnermostDeclContext();
   auto sig = DC->getGenericSignatureOfContext();
 
   AnyFunctionType::Param param(
@@ -2682,11 +2665,9 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(cast<VarDecl>(vd));
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
-    return getPropertyWrapperBackingInitializerInterfaceType(*this,
-                                                             cast<VarDecl>(vd));
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
-    return getPropertyWrapperInitFromProjectedValueInterfaceType(*this,
-                                                                 cast<VarDecl>(vd));
+    return getPropertyWrapperBackingInitializerInterfaceType(
+        *this, cast<VarDecl>(vd), c.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer);
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, false);
