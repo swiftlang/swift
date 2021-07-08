@@ -618,10 +618,10 @@ class CompletionContextFinder : public ASTWalker {
   /// If we are completing inside an expression, the \c CodeCompletionExpr that
   /// represents the code completion token.
 
-  /// The AST node that represents the code completion token, either as an
-  /// expression or a KeyPath component.
-  llvm::PointerUnion<CodeCompletionExpr *, const KeyPathExpr::Component *>
-      CompletionNode;
+  /// The AST node that represents the code completion token, either as a
+  /// \c CodeCompletionExpr or a \c KeyPathExpr which contains a code completion
+  /// component.
+  llvm::PointerUnion<CodeCompletionExpr *, const KeyPathExpr *> CompletionNode;
 
   Expr *InitialExpr = nullptr;
   DeclContext *InitialDC;
@@ -675,10 +675,13 @@ public:
       for (auto &component : KeyPath->getComponents()) {
         if (component.getKind() ==
             KeyPathExpr::Component::Kind::CodeCompletion) {
-          CompletionNode = &component;
+          CompletionNode = KeyPath;
           return std::make_pair(false, nullptr);
         }
       }
+      // Code completion in key paths is modelled by a code completion component
+      // Don't walk the key path's parsed expressions.
+      return std::make_pair(false, E);
     }
 
     return std::make_pair(true, E);
@@ -713,12 +716,33 @@ public:
   }
 
   bool hasCompletionKeyPathComponent() const {
-    return CompletionNode.dyn_cast<const KeyPathExpr::Component *>() != nullptr;
+    return CompletionNode.dyn_cast<const KeyPathExpr *>() != nullptr;
   }
 
-  const KeyPathExpr::Component *getCompletionKeyPathComponent() const {
+  /// If we are completing in a key path, returns the \c KeyPath that contains
+  /// the code completion component.
+  const KeyPathExpr *getKeyPathContainingCompletionComponent() const {
     assert(hasCompletionKeyPathComponent());
-    return CompletionNode.get<const KeyPathExpr::Component *>();
+    return CompletionNode.get<const KeyPathExpr *>();
+  }
+
+  /// If we are completing in a key path, returns the index at which the key
+  /// path has the code completion component.
+  size_t getKeyPathCompletionComponentIndex() const {
+    assert(hasCompletionKeyPathComponent());
+    size_t ComponentIndex = 0;
+    auto Components =
+        getKeyPathContainingCompletionComponent()->getComponents();
+    for (auto &Component : Components) {
+      if (Component.getKind() == KeyPathExpr::Component::Kind::CodeCompletion) {
+        break;
+      } else {
+        ComponentIndex++;
+      }
+    }
+    assert(ComponentIndex < Components.size() &&
+           "No completion component in the key path?");
+    return ComponentIndex;
   }
 
   struct Fallback {
@@ -949,20 +973,27 @@ bool TypeChecker::typeCheckForCodeCompletion(
     if (contextAnalyzer.locatedInMultiStmtClosure()) {
       auto &solution = solutions.front();
 
-      if (solution.hasType(contextAnalyzer.getCompletionExpr())) {
-        llvm::for_each(solutions, callback);
-        return CompletionResult::Ok;
+      bool HasTypeForCompletionNode = false;
+      if (completionExpr) {
+        HasTypeForCompletionNode = solution.hasType(completionExpr);
+      } else {
+        assert(contextAnalyzer.hasCompletionKeyPathComponent());
+        HasTypeForCompletionNode = solution.hasType(
+            contextAnalyzer.getKeyPathContainingCompletionComponent(),
+            contextAnalyzer.getKeyPathCompletionComponentIndex());
       }
 
-      // At this point we know the code completion expression wasn't checked
-      // with the closure's surrounding context, so can defer to regular type-
-      // checking for the current call to typeCheckExpression. If that succeeds
-      // we will get a second call to typeCheckExpression for the body of the
-      // closure later and can gather completions then. If it doesn't we rely
-      // on the fallback typechecking in the subclasses of
-      // TypeCheckCompletionCallback that considers in isolation a
-      // sub-expression of the closure that contains the completion location.
-      return CompletionResult::NotApplicable;
+      if (!HasTypeForCompletionNode) {
+        // At this point we know the code completion node wasn't checked with
+        // the closure's surrounding context, so can defer to regular
+        // type-checking for the current call to typeCheckExpression. If that
+        // succeeds we will get a second call to typeCheckExpression for the
+        // body of the closure later and can gather completions then. If it
+        // doesn't we rely on the fallback typechecking in the subclasses of
+        // TypeCheckCompletionCallback that considers in isolation a
+        // sub-expression of the closure that contains the completion location.
+        return CompletionResult::NotApplicable;
+      }
     }
 
     llvm::for_each(solutions, callback);
