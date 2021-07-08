@@ -333,7 +333,14 @@ public struct TaskGroup<ChildTaskResult> {
   internal mutating func awaitAllRemainingTasks() async {
     while let _ = await next() {}
   }
-  
+
+  /// Wait for all remaining tasks in the task group to complete before
+  /// returning.
+  @_alwaysEmitIntoClient
+  public mutating func waitForAll() async {
+    await awaitAllRemainingTasks()
+  }
+
   /// Query whether the group has any remaining tasks.
   ///
   /// Task groups are always empty upon entry to the `withTaskGroup` body, and
@@ -422,6 +429,17 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
         }
       } catch {}
     }
+  }
+
+  public mutating func _waitForAll() async throws {
+    while let _ = try await next() { }
+  }
+
+  /// Wait for all remaining tasks in the task group to complete before
+  /// returning.
+  @_alwaysEmitIntoClient
+  public mutating func waitForAll() async throws {
+    while let _ = try await next() { }
   }
 
   /// Spawn, unconditionally, a child task in the group.
