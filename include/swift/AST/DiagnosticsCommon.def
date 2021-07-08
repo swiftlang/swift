@@ -44,6 +44,10 @@ NOTE(previous_decldef,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
+WARNING(error_in_future_swift_version,none,
+        "%0; this is an error in Swift %1",
+        (DiagnosticInfo *, unsigned))
+
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())

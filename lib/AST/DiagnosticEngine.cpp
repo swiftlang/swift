@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -316,6 +317,16 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
 InFlightDiagnostic &
 InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
   Engine->getActiveDiagnostic().setBehaviorLimit(limit);
+  return *this;
+}
+
+InFlightDiagnostic &
+InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
+  if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
+    limitBehavior(DiagnosticBehavior::Warning)
+      .wrapIn(diag::error_in_future_swift_version, majorVersion);
+  }
+
   return *this;
 }
 

@@ -4733,10 +4733,6 @@ ERROR(invalid_ownership_is_let,none,
 ERROR(ownership_invalid_in_protocols,none,
       "%0 cannot be applied to a property declaration in a protocol",
       (ReferenceOwnership))
-WARNING(ownership_invalid_in_protocols_compat_warning,none,
-      "%0 should not be applied to a property declaration "
-      "in a protocol and will be disallowed in future versions",
-      (ReferenceOwnership))
 
 // required
 ERROR(required_initializer_nonclass,none,
