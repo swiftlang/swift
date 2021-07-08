@@ -3,7 +3,6 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
-// UNSUPPORTED: OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
