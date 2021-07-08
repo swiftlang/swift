@@ -759,6 +759,11 @@ public struct UnsafeCurrentTask {
   public var priority: TaskPriority {
     getJobFlags(_task).priority ?? .unspecified
   }
+
+  /// Cancel the current task.
+  public func cancel() {
+    _taskCancel(_task)
+  }
 }
 
 @available(SwiftStdlib 5.5, *)
