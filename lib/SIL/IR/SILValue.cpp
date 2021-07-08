@@ -347,6 +347,16 @@ bool Operand::isConsuming() const {
   return get().getOwnershipKind() != OwnershipKind::None;
 }
 
+void Operand::dump() const { print(llvm::dbgs()); }
+
+void Operand::print(llvm::raw_ostream &os) const {
+  os << "Operand.\n"
+        "Owner: "
+     << *Owner << "Value: " << get() << "Operand Number: " << getOperandNumber()
+     << '\n'
+     << "Is Type Dependent: " << (isTypeDependent() ? "yes" : "no") << '\n';
+}
+
 //===----------------------------------------------------------------------===//
 //                             OperandConstraint
 //===----------------------------------------------------------------------===//
