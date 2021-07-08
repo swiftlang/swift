@@ -76,7 +76,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// Suspends the current task for _at least_ the given duration
   /// in nanoseconds, unless the task is cancelled. If the task is cancelled,
-  /// throws \c CancellationError.
+  /// throws \c CancellationError without waiting for the duration.
   ///
   /// This function does _not_ block the underlying thread.
   public static func sleep(nanoseconds duration: UInt64) async throws {
