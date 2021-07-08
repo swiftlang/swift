@@ -4455,6 +4455,9 @@ ERROR(distributed_actor_func_result_not_codable,none,
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "Distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
+ERROR(nonisolated_distributed_actor_storage,none,
+      "'nonisolated' can not be applied to distributed actor stored properties",
+      ())
 ERROR(distributed_actor_func_nonisolated, none,
       "function %0 cannot be both 'nonisolated' and 'distributed'",
       (DeclName))
@@ -4599,7 +4602,7 @@ ERROR(distributed_actor_independent_property_must_be_let,none,
       "_distributedActorIndependent can be applied to properties, however they must be 'let'",
       ())
 NOTE(distributed_actor_isolated_property,none,
-      "distributed actor state is only available within the actor instance",
+      "distributed actor state is only available within the actor instance", // TODO: reword in terms of isolation
       ())
 
 ERROR(concurrency_lib_missing,none,
