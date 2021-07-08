@@ -19,6 +19,7 @@ import Dispatch
     // CHECK: Starting!
     print("Starting!")
     await testSleepFinished()
+    await testSleepMomentary()
     await testSleepCancelledBeforeStarted()
     await testSleepCancelled()
   }
@@ -35,6 +36,17 @@ import Dispatch
 
     // assert that at least the specified time passed since calling `sleep`
     assert(stop >= (start + .nanoseconds(pause)))
+
+    // CHECK-NEXT: Wakey wakey!
+    print("Wakey wakey!")
+  }
+
+  static func testSleepMomentary() async {
+    // CHECK-NEXT: Testing sleep that completes instantly
+    print("Testing sleep that completes instantly")
+
+    // try! will fail if the task got cancelled (which shouldn't happen).
+    try! await Task.sleep(nanoseconds: 0)
 
     // CHECK-NEXT: Wakey wakey!
     print("Wakey wakey!")
