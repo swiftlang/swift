@@ -452,6 +452,8 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   Diagnostics.setDiagnosticDocumentationPath(
       Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
+  Diagnostics.setLanguageVersion(
+      Invocation.getLangOptions().EffectiveLanguageVersion);
   if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
     Diagnostics.setLocalization(
         Invocation.getDiagnosticOptions().LocalizationCode,

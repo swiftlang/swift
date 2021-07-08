@@ -3354,10 +3354,9 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on
     // properties of Objective-C protocols.
-    auto D = var->getASTContext().isSwiftVersionAtLeast(5)
-                 ? diag::ownership_invalid_in_protocols
-                 : diag::ownership_invalid_in_protocols_compat_warning;
+    auto D = diag::ownership_invalid_in_protocols;
     Diags.diagnose(attr->getLocation(), D, ownershipKind)
+        .warnUntilSwiftVersion(5)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
   }

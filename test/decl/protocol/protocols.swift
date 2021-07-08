@@ -467,7 +467,7 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
-    // expected-warning@+1 {{'weak' should not be applied to a property declaration in a protocol and will be disallowed in future versions}}
+    // expected-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in Swift 5}}
     weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 
