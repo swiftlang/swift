@@ -418,6 +418,9 @@ protected:
   /// Returns true if \a F has an @_effects attribute which could be handled.
   bool setDefinedEffects(SILFunction *F);
 
+  /// Set the parameter effects of a function by looking at their conventions
+  bool setParamEffects(SILFunction *F);
+
   /// Set the side-effects of a semantic call.
   /// Return true if \p ASC could be handled.
   bool setSemanticEffects(ArraySemanticsCall ASC);

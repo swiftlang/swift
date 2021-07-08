@@ -341,6 +341,21 @@ FunctionSideEffectFlags *FunctionSideEffects::getEffectsOn(SILValue Addr) {
   return &GlobalEffects;
 }
 
+bool FunctionSideEffects::setParamEffects(SILFunction *F) {
+  for (auto i :
+       range(F->getLoweredFunctionType()->getNumIndirectFormalResults())) {
+    ParamEffects[i].Writes = true;
+  }
+  for (auto &paramAndIdx :
+       enumerate(F->getLoweredFunctionType()->getParameters())) {
+    auto &param = paramAndIdx.value();
+    if (param.isIndirectMutating() || param.isConsumed()) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Return true if the given function has defined effects that were successfully
 // recorded in this FunctionSideEffects object.
 bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
@@ -348,25 +363,23 @@ bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
     Traps = true;
     return true;
   }
+
   switch (F->getEffectsKind()) {
-    case EffectsKind::ReleaseNone:
-      GlobalEffects.Reads = true;
-      GlobalEffects.Writes = true;
-      GlobalEffects.Releases = false;
-      return true;
-    case EffectsKind::ReadNone:
-      return true;
-    case EffectsKind::ReadOnly:
-      // @_effects(readonly) is worthless if we have owned parameters, because
-      // the release inside the callee may call a deinit, which itself can do
-      // anything.
-      if (!F->hasOwnedParameters()) {
-        GlobalEffects.Reads = true;
-        return true;
-      }
-      break;
-    default:
-      break;
+  case EffectsKind::ReleaseNone: {
+    GlobalEffects.Reads = true;
+    GlobalEffects.Writes = true;
+    GlobalEffects.Releases = false;
+    return setParamEffects(F);
+  }
+  case EffectsKind::ReadNone: {
+    return setParamEffects(F);
+  }
+  case EffectsKind::ReadOnly: {
+    GlobalEffects.Reads = true;
+    return setParamEffects(F);
+  }
+  default:
+    break;
   }
 
   return false;
@@ -523,6 +536,7 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
+  case SILInstructionKind::CopyValueInst:
     getEffectsOn(I->getOperand(0))->Retains = true;
     return;
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
@@ -532,6 +546,8 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::ReleaseValueInst:
+  case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::DestroyAddrInst:
     getEffectsOn(I->getOperand(0))->Releases = true;
     return;
   case SILInstructionKind::UnconditionalCheckedCastInst:

@@ -32,12 +32,12 @@ class X {
 
   init()
 }
-
 sil [_semantics "programtermination_point"] @exitfunc : $@convention(thin) () -> Never
 sil [readnone] @pure_func : $@convention(thin) () -> ()
 sil [releasenone] @releasenone_func : $@convention(thin) () -> ()
 sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
 sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
+sil [readnone] [ossa] @get_object : $@convention(thin) () -> (@owned X)
 
 sil @unknown_func : $@convention(thin) () -> ()
 
@@ -551,3 +551,47 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @readonly_and_store
+// CHECK: <func=r,param0=w>
+sil [readonly] [ossa] @readonly_and_store : $@convention(thin) () -> @out X {
+bb0(%0 : $*X):
+  %f = function_ref @get_object : $@convention(thin) () -> (@owned X)
+  %a = apply %f() : $@convention(thin) () -> (@owned X)
+  store %a to [init] %0  : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [readonly] [ossa] @readonly_ownedparam : $@convention(thin) (@owned X) -> () {
+bb0(%0 : @owned $X):
+  destroy_value %0 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [readonly] [ossa] @readonly_inoutparam : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %f = function_ref @get_object : $@convention(thin) () -> (@owned X)
+  %a = apply %f() : $@convention(thin) () -> (@owned X)
+  destroy_addr %0 : $*X
+  store %a to [init] %0  : $*X
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [readnone] [ossa] @readnone_ownedparam : $@convention(thin) (@owned X) -> () {
+bb0(%0 : @owned $X):
+  destroy_value %0 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [readnone] [ossa] @readnone_inoutparam : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %f = function_ref @get_object : $@convention(thin) () -> (@owned X)
+  %a = apply %f() : $@convention(thin) () -> (@owned X)
+  destroy_addr %0 : $*X
+  store %a to [init] %0  : $*X
+  %r = tuple ()
+  return %r : $()
+}
