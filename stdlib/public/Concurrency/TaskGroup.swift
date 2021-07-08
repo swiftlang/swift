@@ -431,7 +431,8 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     }
   }
 
-  public mutating func _waitForAll() async throws {
+  @usableFromInline
+  internal mutating func _waitForAll() async throws {
     while let _ = try await next() { }
   }
 
