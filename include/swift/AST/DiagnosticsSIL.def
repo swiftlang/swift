@@ -169,11 +169,11 @@ ERROR(self_closure_use_uninit,none,
       "'self' captured by a closure before all members were initialized", ())
 
 /// false == sync; true == global-actor isolated
-ERROR(self_use_actor_init,none,
+WARNING(self_use_actor_init,none,
       "this use of actor 'self' %select{can only|cannot}0 appear in "
       "%select{an async|a global-actor isolated}0 initializer",
       (bool))
-ERROR(self_disallowed_actor_init,none,
+WARNING(self_disallowed_actor_init,none,
       "actor 'self' %select{can only|cannot}0 %1 from "
       "%select{an async|a global-actor isolated}0 initializer",
       (bool, StringRef))
