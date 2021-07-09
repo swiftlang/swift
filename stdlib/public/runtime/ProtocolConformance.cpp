@@ -175,6 +175,11 @@ static MetadataResponse getSuperclassForMaybeIncompleteMetadata(
     // always fully set up, so we can just skip it and fetch the Subclass field.
     if (classMetadata->isTypeMetadata() && classMetadata->isArtificialSubclass())
       return {classMetadata->Superclass, MetadataState::Complete};
+
+    // Pure ObjC classes are already set up, and the code below will not be
+    // happy with them.
+    if (!classMetadata->isTypeMetadata())
+      return {classMetadata->Superclass, MetadataState::Complete};
 #endif
 
   MetadataState metadataState;
