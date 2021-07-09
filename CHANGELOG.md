@@ -6,6 +6,43 @@ _**Note:** This is in reverse chronological order, so newer entries are added to
 Swift 5.5
 ---------
 
+* [SR-14731][]:
+
+  The compiler now correctly rejects the application of generic arguments to the
+  special `Self` type:
+
+  ```swift
+  struct Box<T> {
+    // previously interpreted as a return type of Box<T>, ignoring the <Int> part;
+    // now we diagnose an error with a fix-it suggesting replacing `Self` with `Box`
+    static func makeBox() -> Self<Int> {...}
+  }```
+
+* [SR-14878][]:
+
+  The compiler now correctly rejects `@available` annotations on enum cases with
+  associated values with an OS version newer than the current deployment target:
+
+  ```swift
+  @available(macOS 12, *)
+  public struct Crayon {}
+
+  public enum Pen {
+    case pencil
+
+    @available(macOS 12, *)
+    case crayon(Crayon)
+  }
+  ```
+
+  While this worked with some examples, there is no way for the Swift runtime to
+  perform the requisite dynamic layout needed to support this in general, which
+  could cause crashes at runtime.
+
+  Note that conditional availability on stored properties in structs and classes
+  is not supported for similar reasons; it was already correctly detected and
+  diagnosed.
+
 * [SE-0311][]:
 
   Task local values can be defined using the new `@TaskLocal` property wrapper.
@@ -8639,3 +8676,5 @@ Swift 1.0
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
 [SR-11700]: <https://bugs.swift.org/browse/SR-11700>
 [SR-11841]: <https://bugs.swift.org/browse/SR-11841>
+[SR-14731]: <https://bugs.swift.org/browse/SR-14731>
+[SR-14878]: <https://bugs.swift.org/browse/SR-14878>
