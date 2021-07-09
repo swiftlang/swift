@@ -83,6 +83,8 @@ struct ProtocolGraph {
 
   void visitRequirements(ArrayRef<Requirement> reqs);
 
+  bool isKnownProtocol(const ProtocolDecl *proto) const;
+
   const ProtocolInfo &getProtocolInfo(
       const ProtocolDecl *proto) const;
 

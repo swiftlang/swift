@@ -502,6 +502,19 @@ static bool isInterestingTypealias(Type type) {
   return true;
 }
 
+/// Walks the type recursivelly desugaring  types to display, but skipping
+/// `GenericTypeParamType` because we would lose association with its original
+/// declaration and end up presenting the parameter in τ_0_0 format on
+/// diagnostic.
+static Type getAkaTypeForDisplay(Type type) {
+  return type.transform([](Type visitTy) -> Type {
+    if (isa<SugarType>(visitTy.getPointer()) &&
+        !isa<GenericTypeParamType>(visitTy.getPointer()))
+      return getAkaTypeForDisplay(visitTy->getDesugaredType());
+    return visitTy;
+  });
+}
+
 /// Decide whether to show the desugared type or not.  We filter out some
 /// cases to avoid too much noise.
 static bool shouldShowAKA(Type type, StringRef typeName) {
@@ -517,7 +530,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
   // If they are textually the same, don't show them.  This can happen when
   // they are actually different types, because they exist in different scopes
   // (e.g. everyone names their type parameters 'T').
-  if (typeName == type->getCanonicalType()->getString())
+  if (typeName == getAkaTypeForDisplay(type).getString())
     return false;
 
   return true;
@@ -532,26 +545,13 @@ static bool typeSpellingIsAmbiguous(Type type,
   for (auto arg : Args) {
     if (arg.getKind() == DiagnosticArgumentKind::Type) {
       auto argType = arg.getAsType();
-      if (argType && !argType->isEqual(type) &&
+      if (argType && argType->getWithoutParens().getPointer() != type.getPointer() &&
           argType->getWithoutParens().getString(PO) == type.getString(PO)) {
         return true;
       }
     }
   }
   return false;
-}
-
-/// Walks the type recursivelly desugaring  types to display, but skipping
-/// `GenericTypeParamType` because we would lose association with its original
-/// declaration and end up presenting the parameter in τ_0_0 format on
-/// diagnostic.
-static Type getAkaTypeForDisplay(Type type) {
-  return type.transform([](Type visitTy) -> Type {
-    if (isa<SugarType>(visitTy.getPointer()) &&
-        !isa<GenericTypeParamType>(visitTy.getPointer()))
-      return getAkaTypeForDisplay(visitTy->getDesugaredType());
-    return visitTy;
-  });
 }
 
 /// Determine whether this is the main actor type.

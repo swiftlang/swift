@@ -434,6 +434,18 @@ public:
                                     const ProtocolDecl *proto);
 
   ASTContext &getASTContext() { return Context; }
+
+  Type getTypeForTerm(Term term,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const ProtocolGraph &protos) const;
+
+  Type getTypeForTerm(const MutableTerm &term,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      const ProtocolGraph &protos) const;
+
+  Type getRelativeTypeForTerm(
+                      const MutableTerm &term, const MutableTerm &prefix,
+                      const ProtocolGraph &protos) const;
 };
 
 /// A rewrite rule that replaces occurrences of LHS with RHS.
@@ -580,11 +592,15 @@ public:
   };
 
   std::pair<CompletionResult, unsigned>
-  computeConfluentCompletion(unsigned maxIterations, unsigned maxDepth);
+  computeConfluentCompletion(unsigned maxIterations,
+                             unsigned maxDepth);
 
   void simplifyRightHandSides();
 
-  bool buildEquivalenceClassMap(EquivalenceClassMap &map);
+  std::pair<CompletionResult, unsigned>
+  buildEquivalenceClassMap(EquivalenceClassMap &map,
+                           unsigned maxIterations,
+                           unsigned maxDepth);
 
   void dump(llvm::raw_ostream &out) const;
 
