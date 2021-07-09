@@ -18,8 +18,6 @@ import Swift
 @frozen
 public struct UnownedJob {
   private var context: Builtin.Job
-
-  public func run() { }
 }
 
 @available(SwiftStdlib 5.5, *)

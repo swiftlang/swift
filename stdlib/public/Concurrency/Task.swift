@@ -202,11 +202,20 @@ public struct TaskPriority: RawRepresentable, Sendable {
   }
 
   public static let high: TaskPriority = .init(rawValue: 0x19)
-  public static let userInitiated: TaskPriority = high
-  public static let `default`: TaskPriority = .init(rawValue: 0x15)
+
+  @_alwaysEmitIntoClient
+  public static var medium: TaskPriority {
+    .init(rawValue: 0x15)
+  }
+
   public static let low: TaskPriority = .init(rawValue: 0x11)
+
+  public static let userInitiated: TaskPriority = high
   public static let utility: TaskPriority = low
   public static let background: TaskPriority = .init(rawValue: 0x09)
+
+  @available(*, deprecated, renamed: "medium")
+  public static let `default`: TaskPriority = .init(rawValue: 0x15)
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -606,25 +615,6 @@ extension Task where Failure == Error {
   }
 }
 
-// ==== Async Sleep ------------------------------------------------------------
-
-@available(SwiftStdlib 5.5, *)
-extension Task where Success == Never, Failure == Never {
-  /// Suspends the current task for _at least_ the given duration
-  /// in nanoseconds.
-  ///
-  /// This function does _not_ block the underlying thread.
-  public static func sleep(_ duration: UInt64) async {
-    let currentTask = Builtin.getCurrentAsyncTask()
-    let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
-
-    return await Builtin.withUnsafeContinuation { (continuation: Builtin.RawUnsafeContinuation) -> Void in
-      let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
-      _enqueueJobGlobalWithDelay(duration, job)
-    }
-  }
-}
-
 // ==== Voluntary Suspension -----------------------------------------------------
 
 @available(SwiftStdlib 5.5, *)
@@ -636,6 +626,8 @@ extension Task where Success == Never, Failure == Never {
   /// This is not a perfect cure for starvation;
   /// if the task is the highest-priority task in the system, it might go
   /// immediately back to executing.
+  ///
+  @available(*, deprecated, renamed: "suspend()")
   public static func yield() async {
     let currentTask = Builtin.getCurrentAsyncTask()
     let priority = getJobFlags(currentTask).priority ?? Task.currentPriority._downgradeUserInteractive
@@ -644,6 +636,11 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(priority: Int(priority.rawValue), continuation: continuation)
       _enqueueJobGlobal(job)
     }
+  }
+
+  @_alwaysEmitIntoClient
+  public static func suspend() async {
+    await yield()
   }
 }
 
@@ -714,6 +711,11 @@ public struct UnsafeCurrentTask {
   /// - SeeAlso: `Task.currentPriority`
   public var priority: TaskPriority {
     getJobFlags(_task).priority ?? .unspecified
+  }
+
+  /// Cancel the current task.
+  public func cancel() {
+    _taskCancel(_task)
   }
 }
 
