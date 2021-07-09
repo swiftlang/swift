@@ -4852,6 +4852,15 @@ private:
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
 
+  /// Simplify a closure body element constraint by generating required
+  /// constraints to represent the given element in constraint system
+  /// and associate expected element type to expression type via equality.
+  SolutionKind simplifyClosureBodyElementConstraint(
+                 TypeVariableType *elementTy,
+                 ASTNode element,
+                 TypeMatchOptions flags,
+                 ConstraintLocatorBuilder locator);
+
 public: // FIXME: Public for use by static functions.
   /// Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,

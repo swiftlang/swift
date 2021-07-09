@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_H
 #define SWIFT_SEMA_CONSTRAINT_H
 
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
@@ -192,6 +193,10 @@ enum class ConstraintKind : char {
   /// inferred from a conversion, so the check is more relax comparing to
   /// `ConformsTo`.
   TransitivelyConformsTo,
+  /// Represents an AST node contained in a body of a closure. It has only
+  /// one type - type variable representing type of a node, other side is
+  /// the AST node to infer the type for.
+  ClosureBodyElement,
 };
 
 /// Classification of the different kinds of constraints.
@@ -208,7 +213,10 @@ enum class ConstraintClassification : char {
   TypeProperty,
 
   /// A disjunction constraint.
-  Disjunction
+  Disjunction,
+
+  /// An element of a closure body.
+  ClosureElement,
 };
 
 /// Specifies a restriction on the kind of conversion that should be
@@ -399,6 +407,13 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// The DC in which the use appears.
       DeclContext *UseDC;
     } Overload;
+
+    struct {
+      /// The type of the node.
+      TypeVariableType *ElementTy;
+      /// The node itself.
+      ASTNode Element;
+    } ClosureElement;
   };
 
   /// The locator that describes where in the expression this
@@ -447,6 +462,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a relational constraint with a fix.
   Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
+  /// Construct a closure body element constraint.
+  Constraint(TypeVariableType *elementTy, ASTNode node,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -523,6 +543,11 @@ public:
       ConstraintSystem &cs, Type argumentFnType, Type calleeType,
       Optional<TrailingClosureMatching> trailingClosureMatching,
       ConstraintLocator *locator);
+
+  static Constraint *createClosureBodyElement(ConstraintSystem &cs,
+                                              TypeVariableType *elementTy,
+                                              ASTNode node,
+                                              ConstraintLocator *locator);
 
   /// Determine the kind of constraint.
   ConstraintKind getKind() const { return Kind; }
@@ -629,6 +654,9 @@ public:
 
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
+
+    case ConstraintKind::ClosureBodyElement:
+      return ConstraintClassification::ClosureElement;
     }
 
     llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -648,6 +676,9 @@ public:
     case ConstraintKind::ValueWitness:
       return Member.First;
 
+    case ConstraintKind::ClosureBodyElement:
+      return Type(ClosureElement.ElementTy);
+
     default:
       return Types.First;
     }
@@ -658,6 +689,7 @@ public:
     switch (getKind()) {
     case ConstraintKind::Disjunction:
     case ConstraintKind::BindOverload:
+    case ConstraintKind::ClosureBodyElement:
       llvm_unreachable("constraint has no second type");
 
     case ConstraintKind::ValueMember:
@@ -759,6 +791,16 @@ public:
            Kind == ConstraintKind::UnresolvedValueMember ||
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
+  }
+
+  TypeVariableType *getElementType() const {
+    assert(Kind == ConstraintKind::ClosureBodyElement);
+    return ClosureElement.ElementTy;
+  }
+
+  ASTNode getClosureElement() const {
+    assert(Kind == ConstraintKind::ClosureBodyElement);
+    return ClosureElement.Element;
   }
 
   /// For an applicable function constraint, retrieve the trailing closure

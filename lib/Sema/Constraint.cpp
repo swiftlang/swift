@@ -99,6 +99,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
     llvm_unreachable("Key path constraint takes three types");
+
+  case ConstraintKind::ClosureBodyElement:
+    llvm_unreachable("Closure body element constraint should use create()");
   }
 
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -146,6 +149,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
+  case ConstraintKind::ClosureBodyElement:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -239,6 +243,17 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
+Constraint::Constraint(TypeVariableType *elementTy, ASTNode node,
+                       ConstraintLocator *locator,
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+  : Kind(ConstraintKind::ClosureBodyElement), TheFix(nullptr), HasRestriction(false),
+    IsActive(false), IsDisabled(false), IsDisabledForPerformance(false),
+    RememberChoice(false), IsFavored(false),
+    NumTypeVariables(typeVars.size()), ClosureElement{elementTy, node},
+    Locator(locator) {
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
           Kind == ConstraintKind::LiteralConformsTo ||
@@ -308,6 +323,10 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::KeyPathApplication:
     return create(cs, getKind(), getFirstType(), getSecondType(), getThirdType(),
                   getLocator());
+
+  case ConstraintKind::ClosureBodyElement:
+    return createClosureBodyElement(cs, getElementType(), getClosureElement(),
+                                    getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -461,6 +480,14 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Defaultable:
     Out << " can default to ";
     break;
+
+  case ConstraintKind::ClosureBodyElement: {
+    Out << " closure body element ";
+    getClosureElement().dump(Out);
+    skipSecond = true;
+    break;
+  }
+
   case ConstraintKind::Disjunction:
     llvm_unreachable("disjunction handled above");
   }
@@ -626,6 +653,10 @@ gatherReferencedTypeVars(Constraint *constraint,
       baseType->getTypeVariables(typeVars);
     }
 
+    break;
+
+  case ConstraintKind::ClosureBodyElement:
+    constraint->getFirstType()->getTypeVariables(typeVars);
     break;
   }
 }
@@ -927,6 +958,18 @@ Constraint *Constraint::createApplicableFunction(
   }
 
   return constraint;
+}
+
+Constraint *Constraint::createClosureBodyElement(ConstraintSystem &cs,
+                                                 TypeVariableType *elementTy,
+                                                 ASTNode node,
+                                                 ConstraintLocator *locator) {
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  typeVars.insert(elementTy);
+
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(elementTy, node, locator, typeVars);
 }
 
 Optional<TrailingClosureMatching>

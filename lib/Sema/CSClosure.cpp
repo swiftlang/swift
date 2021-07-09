@@ -130,6 +130,13 @@ bool ConstraintSystem::generateConstraints(ClosureExpr *closure) {
   return generator.hadError;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyClosureBodyElementConstraint(
+    TypeVariableType *elementTy, ASTNode element, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  return SolutionKind::Error;
+}
+
 // MARK: Solution application
 
 namespace {
