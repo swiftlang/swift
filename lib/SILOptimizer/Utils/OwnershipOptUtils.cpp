@@ -78,7 +78,8 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
   // argument.
   auto *phiArg =
       destBB->createPhiArgument(innerCopy->getType(), OwnershipKind::Owned);
-  addNewEdgeValueToBranch(bi, destBB, innerCopy, callbacks);
+  InstructionDeleter deleter(callbacks);
+  addNewEdgeValueToBranch(bi, destBB, innerCopy, deleter);
 
   // Grab our predecessor blocks, ignoring us, add to the branch edge an
   // undef corresponding to our value.
@@ -93,7 +94,7 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
       continue;
     addNewEdgeValueToBranch(
         predBlock->getTerminator(), destBB,
-        SILUndef::get(innerCopy->getType(), *destBB->getParent()), callbacks);
+        SILUndef::get(innerCopy->getType(), *destBB->getParent()), deleter);
   }
 
   return phiArg;

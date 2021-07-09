@@ -230,9 +230,10 @@ SILValue SILSSAUpdater::getValueInMiddleOfBlock(SILBasicBlock *block) {
 
   // Create a new phi node.
   SILPhiArgument *phiArg = block->createPhiArgument(type, OwnershipKind::Owned);
-  for (auto &pair : predVals)
-    addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second);
-
+  for (auto &pair : predVals) {
+    addNewEdgeValueToBranch(pair.first->getTerminator(), block, pair.second,
+                            deleter);
+  }
   if (insertedPhis)
     insertedPhis->push_back(phiArg);
 
@@ -326,7 +327,8 @@ public:
 
     for (auto *predBlock : predBlockList) {
       TermInst *ti = predBlock->getTerminator();
-      addNewEdgeValueToBranch(ti, block, ssaUpdater->phiSentinel.get());
+      addNewEdgeValueToBranch(ti, block, ssaUpdater->phiSentinel.get(),
+                              ssaUpdater->deleter);
     }
 
     return phi;
