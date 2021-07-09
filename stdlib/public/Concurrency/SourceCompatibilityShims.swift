@@ -190,65 +190,101 @@ extension Task where Failure == Never {
 
 @available(SwiftStdlib 5.5, *)
 extension TaskGroup {
-  @available(*, deprecated, renamed: "async(priority:operation:)")
+  @available(*, deprecated, renamed: "addTask(priority:operation:)")
   @_alwaysEmitIntoClient
   public mutating func add(
       priority: TaskPriority? = nil,
       operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) async -> Bool {
-    return self.asyncUnlessCancelled(priority: priority) {
+    return self.addTaskUnlessCancelled(priority: priority) {
       await operation()
     }
   }
 
-  @available(*, deprecated, renamed: "async(priority:operation:)")
+  @available(*, deprecated, renamed: "addTask(priority:operation:)")
   @_alwaysEmitIntoClient
   public mutating func spawn(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
-    async(priority: priority, operation: operation)
+    addTask(priority: priority, operation: operation)
   }
 
-  @available(*, deprecated, renamed: "asyncUnlessCancelled(priority:operation:)")
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
   @_alwaysEmitIntoClient
   public mutating func spawnUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
-    asyncUnlessCancelled(priority: priority, operation: operation)
+    addTaskUnlessCancelled(priority: priority, operation: operation)
+  }
+
+  @available(*, deprecated, renamed: "addTask(priority:operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) {
+    addTask(priority: priority, operation: operation)
+  }
+
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    addTaskUnlessCancelled(priority: priority, operation: operation)
   }
 }
 
 @available(SwiftStdlib 5.5, *)
 extension ThrowingTaskGroup {
-  @available(*, deprecated, renamed: "async(priority:operation:)")
+  @available(*, deprecated, renamed: "addTask(priority:operation:)")
   @_alwaysEmitIntoClient
   public mutating func add(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) async -> Bool {
-    return self.asyncUnlessCancelled(priority: priority) {
+    return self.addTaskUnlessCancelled(priority: priority) {
       try await operation()
     }
   }
 
-  @available(*, deprecated, renamed: "async(priority:operation:)")
+  @available(*, deprecated, renamed: "addTask(priority:operation:)")
   @_alwaysEmitIntoClient
   public mutating func spawn(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
-    async(priority: priority, operation: operation)
+    addTask(priority: priority, operation: operation)
   }
 
-  @available(*, deprecated, renamed: "asyncUnlessCancelled(priority:operation:)")
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
   @_alwaysEmitIntoClient
   public mutating func spawnUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
-    asyncUnlessCancelled(priority: priority, operation: operation)
+    addTaskUnlessCancelled(priority: priority, operation: operation)
+  }
+
+  @available(*, deprecated, renamed: "addTask(priority:operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func async(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    addTask(priority: priority, operation: operation)
+  }
+
+  @available(*, deprecated, renamed: "addTaskUnlessCancelled(priority:operation:)")
+  @_alwaysEmitIntoClient
+  public mutating func asyncUnlessCancelled(
+    priority: TaskPriority? = nil,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) -> Bool {
+    addTaskUnlessCancelled(priority: priority, operation: operation)
   }
 }
 

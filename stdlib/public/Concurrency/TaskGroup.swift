@@ -236,7 +236,7 @@ public struct TaskGroup<ChildTaskResult> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func async(
+  public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) {
@@ -270,7 +270,7 @@ public struct TaskGroup<ChildTaskResult> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func asyncUnlessCancelled(
+  public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
   ) -> Bool {
@@ -354,7 +354,14 @@ public struct TaskGroup<ChildTaskResult> {
   internal mutating func awaitAllRemainingTasks() async {
     while let _ = await next() {}
   }
-  
+
+  /// Wait for all remaining tasks in the task group to complete before
+  /// returning.
+  @_alwaysEmitIntoClient
+  public mutating func waitForAll() async {
+    await awaitAllRemainingTasks()
+  }
+
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
   /// At the start of the body of a `withTaskGroup(of:returning:body:)` call,
@@ -444,6 +451,18 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     }
   }
 
+  @usableFromInline
+  internal mutating func _waitForAll() async throws {
+    while let _ = try await next() { }
+  }
+
+  /// Wait for all remaining tasks in the task group to complete before
+  /// returning.
+  @_alwaysEmitIntoClient
+  public mutating func waitForAll() async throws {
+    while let _ = try await next() { }
+  }
+
   /// Unconditionally create a child task in the group.
   ///
   /// ### Error handling
@@ -460,7 +479,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func async(
+  public mutating func addTask(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) {
@@ -494,7 +513,7 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
   @_alwaysEmitIntoClient
-  public mutating func asyncUnlessCancelled(
+  public mutating func addTaskUnlessCancelled(
     priority: TaskPriority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
   ) -> Bool {
