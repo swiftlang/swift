@@ -24,6 +24,7 @@ namespace swift {
 class ASTContext;
 class AssociatedTypeDecl;
 class CanType;
+class GenericTypeParamType;
 class LayoutConstraint;
 class ProtocolDecl;
 class Requirement;
@@ -49,7 +50,7 @@ class RequirementMachine final {
   void addGenericSignature(CanGenericSignature sig);
 
   bool isComplete() const;
-  void computeCompletion(CanGenericSignature sig);
+  void computeCompletion();
 
 public:
   ~RequirementMachine();
@@ -61,6 +62,8 @@ public:
   GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
   bool isConcreteType(Type depType) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
+  Type getCanonicalTypeInContext(Type type,
+                      TypeArrayView<GenericTypeParamType> genericParams) const;
 
   void dump(llvm::raw_ostream &out) const;
 };

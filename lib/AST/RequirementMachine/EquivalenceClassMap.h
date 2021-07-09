@@ -86,6 +86,11 @@ public:
     return ConcreteType.hasValue();
   }
 
+  Type getConcreteType(
+      TypeArrayView<GenericTypeParamType> genericParams,
+      const ProtocolGraph &protos,
+      RewriteContext &ctx) const;
+
   LayoutConstraint getLayoutConstraint() const {
     return Layout;
   }
@@ -103,7 +108,8 @@ class EquivalenceClassMap {
   RewriteContext &Context;
   std::vector<std::unique_ptr<EquivalenceClass>> Map;
   const ProtocolGraph &Protos;
-  bool DebugConcreteUnification = false;
+  unsigned DebugConcreteUnification : 1;
+  unsigned DebugConcretizeNestedTypes : 1;
 
   EquivalenceClass *getEquivalenceClassIfPresent(const MutableTerm &key) const;
   EquivalenceClass *getOrCreateEquivalenceClass(const MutableTerm &key);
@@ -116,14 +122,28 @@ class EquivalenceClassMap {
 public:
   explicit EquivalenceClassMap(RewriteContext &ctx,
                                const ProtocolGraph &protos)
-      : Context(ctx), Protos(protos) {}
+      : Context(ctx), Protos(protos) {
+    DebugConcreteUnification = false;
+    DebugConcretizeNestedTypes = false;
+  }
 
   EquivalenceClass *lookUpEquivalenceClass(const MutableTerm &key) const;
+
+  void dump(llvm::raw_ostream &out) const;
 
   void clear();
   void addProperty(const MutableTerm &key, Atom property,
                    SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules);
-  void dump(llvm::raw_ostream &out) const;
+  void concretizeNestedTypesFromConcreteParents(
+                   SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
+
+private:
+  void concretizeNestedTypesFromConcreteParent(
+                   const MutableTerm &key,
+                   CanType concreteType,
+                   ArrayRef<Term> substitutions,
+                   ArrayRef<const ProtocolDecl *> conformsTo,
+                   SmallVectorImpl<std::pair<MutableTerm, MutableTerm>> &inducedRules) const;
 };
 
 } // end namespace rewriting
