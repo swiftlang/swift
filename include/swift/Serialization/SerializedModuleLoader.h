@@ -458,6 +458,10 @@ public:
   }
 };
 
+/// Extract compiler arguments from an interface file buffer.
+bool extractCompilerFlagsFromInterface(StringRef interfacePath,
+                                       StringRef buffer, llvm::StringSaver &ArgSaver,
+                                       SmallVectorImpl<const char *> &SubArgs);
 
 } // end namespace swift
 
