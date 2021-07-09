@@ -4657,10 +4657,7 @@ void ConformanceChecker::resolveValueWitnesses() {
           Adoptee->getClassOrBoundGenericClass() &&
           Adoptee->getClassOrBoundGenericClass()->isActor()) {
         witness->diagnose(diag::unowned_executor_outside_actor);
-        // FIXME: This diagnostic was temporarily downgraded from an error to a
-        // warning because it spuriously triggers when building the Foundation
-        // module from its textual swiftinterface. (rdar://78932296)
-        //return;
+        return;
       }
 
       // Objective-C checking for @objc requirements.
