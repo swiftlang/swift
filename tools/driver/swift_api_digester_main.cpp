@@ -2655,7 +2655,7 @@ public:
   void printHelp() {
     std::string ExecutableName =
         llvm::sys::path::stem(MainExecutablePath).str();
-    Table->PrintHelp(llvm::outs(), ExecutableName.c_str(), "Swift API Digester",
+    Table->printHelp(llvm::outs(), ExecutableName.c_str(), "Swift API Digester",
                      /*IncludedFlagsBitmask*/ SwiftAPIDigesterOption,
                      /*ExcludedFlagsBitmask*/ 0,
                      /*ShowAllAliases*/ false);

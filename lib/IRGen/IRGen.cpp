@@ -824,7 +824,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
 
   // Save llvm.compiler.used and remove it.
   SmallVector<llvm::Constant*, 2> UsedArray;
-  SmallSet<llvm::GlobalValue*, 4> UsedGlobals;
+  SmallVector<llvm::GlobalValue*, 4> UsedGlobals;
   auto *UsedElementType =
     llvm::Type::getInt8Ty(M->getContext())->getPointerTo(0);
   llvm::GlobalVariable *Used =
@@ -1533,7 +1533,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, ASTContext &Ctx,
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   // Use clang's datalayout.
-  Module->setDataLayout(Clang->getTargetInfo().getDataLayout());
+  Module->setDataLayout(Clang->getTargetInfo().getDataLayoutString());
 
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, Ctx.Diags, nullptr, nullptr, Module,
