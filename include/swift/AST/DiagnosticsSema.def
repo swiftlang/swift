@@ -4367,10 +4367,7 @@ ERROR(distributed_actor_protocol_illegal_inheritance,none,
       "non-distributed actor type %0 cannot conform to the 'DistributedActor' protocol",
       (DeclName))
 
-// FIXME: This diagnostic was temporarily downgraded from an error because
-// it spuriously triggers when building the Foundation module from its textual
-// swiftinterface. (rdar://78932296)
-WARNING(unowned_executor_outside_actor,none,
+ERROR(unowned_executor_outside_actor,none,
       "'unownedExecutor' can only be implemented within the main "
       "definition of an actor", ())
 ERROR(override_implicit_unowned_executor,none,
