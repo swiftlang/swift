@@ -22,11 +22,11 @@ func asyncThrowsOnCancel() async throws -> Int {
 @available(SwiftStdlib 5.5, *)
 func test_taskGroup_add() async throws -> Int {
   try await withThrowingTaskGroup(of: Int.self) { group in
-    group.async {
+    group.addTask {
       await asyncFunc()
     }
 
-    group.async {
+    group.addTask {
       await asyncFunc()
     }
 
@@ -51,9 +51,9 @@ func boom() async throws -> Int { throw Boom() }
 func first_allMustSucceed() async throws {
 
   let first: Int = try await withThrowingTaskGroup(of: Int.self) { group in
-    group.async { await work() }
-    group.async { await work() }
-    group.async { try await boom() }
+    group.addTask { await work() }
+    group.addTask { await work() }
+    group.addTask { try await boom() }
 
     if let first = try await group.next() {
       return first
@@ -72,9 +72,9 @@ func first_ignoreFailures() async throws {
   @Sendable func boom() async throws -> Int { throw Boom() }
 
   let first: Int = try await withThrowingTaskGroup(of: Int.self) { group in
-    group.async { await work() }
-    group.async { await work() }
-    group.async {
+    group.addTask { await work() }
+    group.addTask { await work() }
+    group.addTask {
       do {
         return try await boom()
       } catch {
@@ -121,7 +121,7 @@ func test_taskGroup_quorum_thenCancel() async {
   func gatherQuorum(followers: [Follower]) async -> Bool {
     try! await withThrowingTaskGroup(of: Vote.self) { group in
       for follower in followers {
-        group.async { try await follower.vote() }
+        group.addTask { try await follower.vote() }
       }
 
       defer {
@@ -192,7 +192,7 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
       var submitted = 0
 
       func submitNext() async throws {
-        group.async { [submitted,i] in
+        group.addTask { [submitted,i] in
           let value = try await transform(self[i])
           return SendableTuple2(submitted, value)
         }
