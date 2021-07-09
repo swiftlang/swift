@@ -135,15 +135,28 @@ static bool hasForceEmitSemanticAttr(SILFunction &fn, StringRef passName) {
   });
 }
 
+static bool isMethodWithForceEmitSemanticAttrNominalType(SILFunction &fn) {
+  if (!fn.hasSelfParam())
+    return false;
+
+  auto selfType = fn.getSelfArgument()->getType();
+  auto *nomType = selfType.getNominalOrBoundGenericNominal();
+  if (!nomType)
+    return false;
+  return nomType->shouldEmitAssemblyVisionRemarksOnMethods();
+}
+
 Emitter::Emitter(StringRef passName, SILFunction &fn)
     : fn(fn), passName(passName),
       passedEnabled(
           hasForceEmitSemanticAttr(fn, passName) ||
+          isMethodWithForceEmitSemanticAttrNominalType(fn) ||
           (fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern &&
            fn.getASTContext().LangOpts.OptimizationRemarkPassedPattern->match(
                passName))),
       missedEnabled(
           hasForceEmitSemanticAttr(fn, passName) ||
+          isMethodWithForceEmitSemanticAttrNominalType(fn) ||
           (fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern &&
            fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
                passName))) {}
