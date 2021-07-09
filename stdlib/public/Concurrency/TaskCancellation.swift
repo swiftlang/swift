@@ -112,7 +112,7 @@ public struct CancellationError: Error {
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_addCancellationHandler")
-func _taskAddCancellationHandler(handler: @Sendable () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 
 @available(SwiftStdlib 5.5, *)
 @_silgen_name("swift_task_removeCancellationHandler")
