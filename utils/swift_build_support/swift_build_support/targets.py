@@ -68,6 +68,18 @@ class Platform(object):
                 return True
         return False
 
+    def swift_flags(self, args):
+        """
+        Swift compiler flags for a platform, useful for cross-compiling
+        """
+        return ''
+
+    def cmake_options(self, args):
+        """
+        CMake flags to build for a platform, useful for cross-compiling
+        """
+        return ''
+
 
 class DarwinPlatform(Platform):
     def __init__(self, name, archs, sdk_name=None, is_simulator=False):
@@ -135,6 +147,29 @@ class AndroidPlatform(Platform):
         for tests.
         """
         return True
+
+    def swift_flags(self, args):
+        flags = '-target %s-unknown-linux-android%s ' % (args.android_arch,
+                                                         args.android_api_level)
+
+        flags += '-resource-dir %s/swift-%s-%s/lib/swift ' % (
+                 args.build_root, self.name, args.android_arch)
+
+        android_toolchain_path = '%s/toolchains/llvm/prebuilt/%s' % (
+            args.android_ndk, StdlibDeploymentTarget.host_target().name)
+
+        flags += '-sdk %s/sysroot ' % (android_toolchain_path)
+        flags += '-tools-directory %s/bin' % (android_toolchain_path)
+        return flags
+
+    def cmake_options(self, args):
+        options = '-DCMAKE_SYSTEM_NAME=Android '
+        options += '-DCMAKE_SYSTEM_VERSION=%s ' % (args.android_api_level)
+        options += '-DCMAKE_SYSTEM_PROCESSOR=%s ' % (args.android_arch if not
+                                                     args.android_arch == 'armv7'
+                                                     else 'armv7-a')
+        options += '-DCMAKE_ANDROID_NDK:PATH=%s' % (args.android_ndk)
+        return options
 
 
 class Target(object):
