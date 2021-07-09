@@ -3279,6 +3279,12 @@ public:
     return getAttrs().hasSemanticsAttr(attrValue);
   }
 
+  /// Returns true if we should emit assembly vision remarks on all methods of
+  /// this nominal type.
+  bool shouldEmitAssemblyVisionRemarksOnMethods() const {
+    return getAttrs().hasAttribute<EmitAssemblyVisionRemarksAttr>();
+  }
+
   /// Whether this declaration has a synthesized memberwise initializer.
   bool hasMemberwiseInitializer() const;
 
