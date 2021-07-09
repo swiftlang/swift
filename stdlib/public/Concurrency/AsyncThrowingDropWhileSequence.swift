@@ -66,6 +66,7 @@ extension AsyncSequence {
 /// given error-throwing closure returns false, after which it passes through
 /// all remaining elements.
 @available(SwiftStdlib 5.5, *)
+@frozen
 public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -73,7 +74,7 @@ public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let predicate: (Base.Element) async throws -> Bool
 
-  @usableFromInline
+  @inlinable
   init(
     _ base: Base, 
     predicate: @escaping (Base.Element) async throws -> Bool
@@ -94,6 +95,7 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the drop-while sequence.
+  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -107,7 +109,7 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
     @usableFromInline
     var doneDropping = false
 
-    @usableFromInline
+    @inlinable
     init(
       _ baseIterator: Base.AsyncIterator, 
       predicate: @escaping (Base.Element) async throws -> Bool

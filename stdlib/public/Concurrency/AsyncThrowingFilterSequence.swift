@@ -56,6 +56,7 @@ extension AsyncSequence {
 /// An asynchronous sequence that contains, in order, the elements of
 /// the base sequence that satisfy the given error-throwing predicate.
 @available(SwiftStdlib 5.5, *)
+@frozen
 public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -63,7 +64,7 @@ public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let isIncluded: (Element) async throws -> Bool
 
-  @usableFromInline
+  @inlinable
   init(
     _ base: Base, 
     isIncluded: @escaping (Base.Element) async throws -> Bool
@@ -84,6 +85,7 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
   public typealias AsyncIterator = Iterator
 
   /// The iterator that produces elements of the filter sequence.
+  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
@@ -94,7 +96,7 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     @usableFromInline
     var finished = false
 
-    @usableFromInline
+    @inlinable
     init(
       _ baseIterator: Base.AsyncIterator,
       isIncluded: @escaping (Base.Element) async throws -> Bool
