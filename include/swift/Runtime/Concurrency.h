@@ -673,6 +673,18 @@ void swift_task_reportUnexpectedExecutor(
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
 
+#ifdef __APPLE__
+/// A magic symbol whose address is the mask to apply to a frame pointer to
+/// signal that it is an async frame. Do not try to read the actual value of
+/// this global, it will crash.
+///
+/// On ARM64_32, the address is only 32 bits, and therefore this value covers
+/// the top 32 bits of the in-memory frame pointer. On other 32-bit platforms,
+/// the bit is not used and the address is always 0.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+struct { char c; } swift_async_extendedFramePointerFlags;
+#endif
+
 }
 
 #pragma clang diagnostic pop

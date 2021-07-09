@@ -178,3 +178,33 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
   %42 = tuple ()
   return %42 : $()
 }
+
+sil @simpleClosure : $@convention(thin) () -> ()
+
+// Don't crash.
+// CHECK-LABEL: sil [ossa] @testIteratorInvalidation
+// CHECK:    [[C:%.*]] = thin_to_thick_function
+// CHECK:    [[CC:%.*]] = copy_value [[C]]
+// CHECK:    [[NE:%.*]] = convert_escape_to_noescape [[CC]]
+// CHECK:    br bb3([[NE:%.*]]
+// CHECK:  } // end sil function 'testIteratorInvalidation'
+sil [ossa] @testIteratorInvalidation : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@noescape @callee_guaranteed () -> ()):
+  %2 = function_ref @simpleClosure : $@convention(thin) () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) () -> () to $@callee_guaranteed () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $@noescape @callee_guaranteed () -> ())
+
+bb2:
+  %11 = convert_escape_to_noescape [not_guaranteed] %3 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  br bb3(%11 : $@noescape @callee_guaranteed () -> ())
+
+
+bb3(%13 : $@noescape @callee_guaranteed () -> ()):
+  %15 = apply %13() : $@noescape @callee_guaranteed () -> ()
+  %16 = tuple ()
+  return %16 : $()
+}
+
