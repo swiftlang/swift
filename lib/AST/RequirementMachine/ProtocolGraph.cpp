@@ -28,6 +28,11 @@ void ProtocolGraph::visitRequirements(ArrayRef<Requirement> reqs) {
   }
 }
 
+/// Return true if we know about this protocol.
+bool ProtocolGraph::isKnownProtocol(const ProtocolDecl *proto) const {
+  return Info.count(proto) > 0;
+}
+
 /// Look up information about a known protocol.
 const ProtocolInfo &ProtocolGraph::getProtocolInfo(
     const ProtocolDecl *proto) const {
