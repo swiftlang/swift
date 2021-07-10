@@ -1499,6 +1499,7 @@ void Serializer::writeASTBlockEntity(
                                               numTypeWitnesses,
                                               numValueWitnesses,
                                               numSignatureConformances,
+                                              conformance->isUnchecked(),
                                               data);
 
   // Write requirement signature conformances.

@@ -10043,7 +10043,8 @@ void ClangImporter::Implementation::loadAllConformances(
     auto conformance = SwiftContext.getConformance(
         dc->getDeclaredInterfaceType(),
         protocol, SourceLoc(), dc,
-        ProtocolConformanceState::Incomplete);
+        ProtocolConformanceState::Incomplete,
+        protocol->isSpecificProtocol(KnownProtocolKind::Sendable));
     conformance->setLazyLoader(this, /*context*/0);
     conformance->setState(ProtocolConformanceState::Complete);
     Conformances.push_back(conformance);

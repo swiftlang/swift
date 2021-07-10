@@ -2662,7 +2662,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    unsigned i, llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
+    unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
     bool &anyObject) {
   auto typeDecl = decl.dyn_cast<const TypeDecl *>();
   auto extDecl = decl.dyn_cast<const ExtensionDecl *>();
@@ -2684,18 +2684,28 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: This is a hack. We need cooperation from
   // InheritedDeclsReferencedRequest to make this work.
   SourceLoc loc;
+  SourceLoc uncheckedLoc;
   if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
                                     : extDecl->getInherited()[i].getTypeRepr()){
     loc = typeRepr->getLoc();
+
+    // Dig out the @unchecked attribute, if it's present.
+    while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+      if (attrTypeRepr->getAttrs().has(TAK_unchecked)) {
+        uncheckedLoc = attrTypeRepr->getAttrs().getLoc(TAK_unchecked);
+      }
+
+      typeRepr = attrTypeRepr->getTypeRepr();
+    }
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc});
+    result.push_back({nominal, loc, uncheckedLoc});
   }
 }
 
-SmallVector<Located<NominalTypeDecl *>, 4>
+SmallVector<InheritedNominalEntry, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     bool &anyObject) {
@@ -2705,7 +2715,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // Gather results from all of the inherited types.
   unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
                                    : extDecl->getInherited().size();
-  SmallVector<Located<NominalTypeDecl *>, 4> result;
+  SmallVector<InheritedNominalEntry, 4> result;
   for (unsigned i : range(numInherited)) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
@@ -2731,7 +2741,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(req.getProtocolDecl(), loc);
+      result.emplace_back(req.getProtocolDecl(), loc, SourceLoc());
     }
     return result;
   }
@@ -2741,7 +2751,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   anyObject |= selfBounds.anyObject;
 
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, loc);
+    result.emplace_back(inheritedNominal, loc, SourceLoc());
 
   return result;
 }
