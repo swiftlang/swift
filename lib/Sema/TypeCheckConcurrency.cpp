@@ -3571,19 +3571,6 @@ bool swift::checkSendableConformance(
       return true;
   }
 
-  // Global-actor-isolated types can be Sendable. We do not check the
-  // instance properties.
-  switch (getActorIsolation(nominal)) {
-  case ActorIsolation::Unspecified:
-  case ActorIsolation::ActorInstance:
-  case ActorIsolation::Independent:
-    break;
-
-  case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
-    return false;
-  }
-
   if (classDecl) {
     // An non-final class cannot conform to `Sendable`.
     if (!classDecl->isSemanticallyFinal()) {
@@ -3662,7 +3649,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
   }
 
   // Local function to form the implicit conformance.
-  auto formConformance = [&]() -> NormalProtocolConformance * {
+  auto formConformance = [&](bool isUnchecked) -> NormalProtocolConformance * {
     ASTContext &ctx = nominal->getASTContext();
     auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
     if (!proto)
@@ -3670,7 +3657,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
     auto conformance = ctx.getConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        nominal, ProtocolConformanceState::Complete);
+        nominal, ProtocolConformanceState::Complete, isUnchecked);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
@@ -3695,7 +3682,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     }
 
     // Form the implicit conformance to Sendable.
-    return formConformance();
+    return formConformance(/*isUnchecked=*/true);
   }
 
   // Only structs and enums can get implicit Sendable conformances by
@@ -3720,7 +3707,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
           nominal, nominal, SendableCheck::Implicit))
     return nullptr;
 
-  return formConformance();
+  return formConformance(/*isUnchecked=*/false);
 }
 
 AnyFunctionType *swift::applyGlobalActorType(

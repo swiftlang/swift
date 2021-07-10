@@ -611,7 +611,7 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount;
+  unsigned valueCount, typeCount, conformanceCount, isUnchecked;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -623,7 +623,7 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
-                                              rawIDs);
+                                              isUnchecked, rawIDs);
 
   ASTContext &ctx = getContext();
   auto doOrError = getDeclContextChecked(contextID);
@@ -645,7 +645,8 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
   ++NumNormalProtocolConformancesLoaded;
 
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
-                                        ProtocolConformanceState::Incomplete);
+                                        ProtocolConformanceState::Incomplete,
+                                        isUnchecked);
 
   // Record this conformance.
   if (conformanceEntry.isComplete())
@@ -6300,7 +6301,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount;
+  unsigned valueCount, typeCount, conformanceCount, isUnchecked;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -6312,7 +6313,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
-                                              rawIDs);
+                                              isUnchecked, rawIDs);
 
   // Read requirement signature conformances.
   const ProtocolDecl *proto = conformance->getProtocol();
