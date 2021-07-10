@@ -1,0 +1,13 @@
+## libLTO.dylib
+## private patch:  fix lto_library path to the one relative to swift executable
+## Assume libLTO.dylib is under xxx/lib/libLTO.dylib while swift binary is under xxx/bin/swift
+
+## Set up TOOLCHAIN_PATH LIBRARY_PATH and MACOSX_SDK
+
+## We build and run the test case under 3 cases:
+## no -emit-dead-strippable-symbols
+## --> runs fine
+## -Xfrontend -emit-dead-strippable-symbols -Xfrontend -disable-concrete-type-metadata-mangled-name-accessors
+## --> runs fine
+## -Xfrontend -emit-dead-strippable-symbols
+## --> crashes
