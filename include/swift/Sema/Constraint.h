@@ -130,6 +130,9 @@ enum class ConstraintKind : char {
   /// A disjunction constraint that specifies that one or more of the
   /// stored constraints must hold.
   Disjunction,
+  /// A conjunction constraint that specifies that all of the stored
+  /// constraints must hold.
+  Conjunction,
   /// The first type is an optional type whose object type is the second
   /// type, preserving lvalue-ness.
   OptionalObject,
@@ -214,6 +217,9 @@ enum class ConstraintClassification : char {
 
   /// A disjunction constraint.
   Disjunction,
+
+  /// A conjunction constraint.
+  Conjunction,
 
   /// An element of a closure body.
   ClosureElement,
@@ -538,6 +544,11 @@ public:
                                        RememberChoice_t shouldRememberChoice
                                          = ForgetChoice);
 
+  /// Create a new conjunction constraint.
+  static Constraint *createConjunction(ConstraintSystem &cs,
+                                       ArrayRef<Constraint *> constraints,
+                                       ConstraintLocator *locator);
+
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
       ConstraintSystem &cs, Type argumentFnType, Type calleeType,
@@ -655,6 +666,9 @@ public:
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
 
+    case ConstraintKind::Conjunction:
+      return ConstraintClassification::Conjunction;
+
     case ConstraintKind::ClosureBodyElement:
       return ConstraintClassification::ClosureElement;
     }
@@ -667,6 +681,9 @@ public:
     switch (getKind()) {
     case ConstraintKind::Disjunction:
       llvm_unreachable("disjunction constraints have no type operands");
+
+    case ConstraintKind::Conjunction:
+      llvm_unreachable("conjunction constraints have no type operands");
 
     case ConstraintKind::BindOverload:
       return Overload.First;
@@ -688,6 +705,7 @@ public:
   Type getSecondType() const {
     switch (getKind()) {
     case ConstraintKind::Disjunction:
+    case ConstraintKind::Conjunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::ClosureBodyElement:
       llvm_unreachable("constraint has no second type");
@@ -742,7 +760,8 @@ public:
 
   /// Retrieve the set of constraints in a disjunction.
   ArrayRef<Constraint *> getNestedConstraints() const {
-    assert(Kind == ConstraintKind::Disjunction);
+    assert(Kind == ConstraintKind::Disjunction ||
+           Kind == ConstraintKind::Conjunction);
     return Nested;
   }
 

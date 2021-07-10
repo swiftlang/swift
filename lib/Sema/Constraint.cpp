@@ -32,7 +32,8 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Nested(constraints), Locator(locator) {
-  assert(kind == ConstraintKind::Disjunction);
+  assert(kind == ConstraintKind::Disjunction ||
+         kind == ConstraintKind::Conjunction);
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
                           getTypeVariablesBuffer().begin());
 }
@@ -96,6 +97,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Disjunction:
     llvm_unreachable("Disjunction constraints should use create()");
 
+  case ConstraintKind::Conjunction:
+    llvm_unreachable("Conjunction constraints should use create()");
+
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
     llvm_unreachable("Key path constraint takes three types");
@@ -142,6 +146,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Defaultable:
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
+  case ConstraintKind::Conjunction:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
@@ -319,6 +324,9 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
         cs, getNestedConstraints(), getLocator(),
         static_cast<RememberChoice_t>(shouldRememberChoice()));
 
+  case ConstraintKind::Conjunction:
+    return createConjunction(cs, getNestedConstraints(), getLocator());
+
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
     return create(cs, getKind(), getFirstType(), getSecondType(), getThirdType(),
@@ -336,9 +344,11 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   // Print all type variables as $T0 instead of _ here.
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
-  
-  if (Kind == ConstraintKind::Disjunction) {
-    Out << "disjunction";
+
+  if (Kind == ConstraintKind::Disjunction ||
+      Kind == ConstraintKind::Conjunction) {
+    Out << (Kind == ConstraintKind::Disjunction ? "disjunction"
+                                                : "conjunction");
     if (shouldRememberChoice())
       Out << " (remembered)";
     if (Locator) {
@@ -490,6 +500,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
   case ConstraintKind::Disjunction:
     llvm_unreachable("disjunction handled above");
+  case ConstraintKind::Conjunction:
+    llvm_unreachable("conjunction handled above");
   }
 
   if (!skipSecond)
@@ -601,6 +613,7 @@ gatherReferencedTypeVars(Constraint *constraint,
                          SmallPtrSetImpl<TypeVariableType *> &typeVars) {
   switch (constraint->getKind()) {
   case ConstraintKind::Disjunction:
+  case ConstraintKind::Conjunction:
     for (auto nested : constraint->getNestedConstraints())
       gatherReferencedTypeVars(nested, typeVars);
     return;
@@ -922,6 +935,23 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
                               cs.allocateCopy(constraints), locator, typeVars);
   disjunction->RememberChoice = (bool) rememberChoice;
   return disjunction;
+}
+
+Constraint *Constraint::createConjunction(ConstraintSystem &cs,
+                                          ArrayRef<Constraint *> constraints,
+                                          ConstraintLocator *locator) {
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
+
+  for (auto *constraint : constraints)
+    gatherReferencedTypeVars(constraint, typeVars);
+
+  assert(!constraints.empty() && "Empty conjunction constraint");
+  unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  auto conjunction =
+      new (mem) Constraint(ConstraintKind::Conjunction,
+                           cs.allocateCopy(constraints), locator, typeVars);
+  return conjunction;
 }
 
 Constraint *Constraint::createApplicableFunction(
