@@ -235,6 +235,27 @@ func genericContext<T>(_: T) where T: P {
 
   // property wrapper init from projected value of $value #1 in closure #2 in implicit closure #2 in genericContext<A>(_:)
   // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14genericContextyyxAA1PRzlFxAA17ProjectionWrapperVySiGcfu0_xAFcfU0_6$valueL_AFvpfW : $@convention(thin) <T where T : P> (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
+
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14genericContextyyxAA1PRzlF5innerL_1ayAA7WrapperVySiG_tAaCRzlF : $@convention(thin) (Wrapper<Int>) -> ()
+  func inner(@Wrapper a: Int) {}
+
+  // property wrapper backing initializer of a #1 in inner #1 <A>(a:) in genericContext<A>(_:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14genericContextyyxAA1PRzlF5innerL_1ayAA7WrapperVySiG_tAaCRzlFAEL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+
+  inner(a: 1)
+
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14genericContextyyxAA1PRzlF5innerL0_yyAaCRzlF : $@convention(thin) <T where T : P> () -> ()
+  func inner() { _ = T.self }
+
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14genericContextyyxAA1PRzlF5innerL1_1byAA7WrapperVySiG_tAaCRzlF : $@convention(thin) <T where T : P> (Wrapper<Int>) -> ()
+  func inner(@Wrapper b: Int) {
+    inner()
+  }
+
+  // property wrapper backing initializer of b #1 in inner #3 <A>(b:) in genericContext<A>(_:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter14genericContextyyxAA1PRzlF5innerL1_1byAA7WrapperVySiG_tAaCRzlFAEL_SivpfP : $@convention(thin) <T where T : P> (Int) -> Wrapper<Int>
+
+  inner(b: 1)
 }
 
 @propertyWrapper
