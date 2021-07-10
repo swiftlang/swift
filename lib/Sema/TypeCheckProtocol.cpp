@@ -1356,6 +1356,27 @@ bool WitnessChecker::findBestWitness(
     }
   }
 
+  // If there are multiple viable matches, drop any that are less available than the
+  // requirement.
+  if (numViable > 1) {
+    SmallVector<RequirementMatch, 2> checkedMatches;
+    bool foundCheckedMatch = false;
+
+    for (auto match : matches) {
+      if (!match.isViable()) {
+        checkedMatches.push_back(match);
+      } else if (checkWitness(requirement, match).Kind != CheckKind::Availability) {
+        foundCheckedMatch = true;
+        checkedMatches.push_back(match);
+      }
+    }
+
+    // If none of the matches were at least as available as the requirement, don't
+    // drop any of them; this will produce better diagnostics.
+    if (foundCheckedMatch)
+      std::swap(checkedMatches, matches);
+  }
+
   if (numViable == 0) {
     // Assume any missing value witnesses for a conformance in a module
     // interface can be treated as opaque.

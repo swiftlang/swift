@@ -2246,7 +2246,7 @@ namespace {
         Type subPatternType = getTypeForPattern(
             subPattern,
             locator.withPathElement(LocatorPathElt::PatternMatch(subPattern)),
-            openedType, bindPatternVarsOneWay);
+            openedType, /*bindPatternVarsOneWay*/false);
 
         if (!subPatternType)
           return Type();
