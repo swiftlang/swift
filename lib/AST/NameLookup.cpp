@@ -2486,7 +2486,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     // is implemented.
     if (auto *proto = ext->getExtendedProtocolDecl()) {
       auto protoType = proto->getDeclaredInterfaceType();
-      TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+      InheritedEntry selfInherited[1] = {
+        InheritedEntry(TypeLoc::withoutLoc(protoType)) };
       genericParams->getParams().front()->setInherited(
         ctx.AllocateCopy(selfInherited));
     }
@@ -2506,7 +2507,8 @@ GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) c
     auto selfDecl = new (ctx) GenericTypeParamDecl(
         proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
     auto protoType = proto->getDeclaredInterfaceType();
-    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+    InheritedEntry selfInherited[1] = {
+      InheritedEntry(TypeLoc::withoutLoc(protoType)) };
     selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
     selfDecl->setImplicit();
 
@@ -2662,15 +2664,7 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   if (TypeRepr *typeRepr = typeDecl ? typeDecl->getInherited()[i].getTypeRepr()
                                     : extDecl->getInherited()[i].getTypeRepr()){
     loc = typeRepr->getLoc();
-
-    // Dig out the @unchecked attribute, if it's present.
-    while (auto attrTypeRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-      if (attrTypeRepr->getAttrs().has(TAK_unchecked)) {
-        uncheckedLoc = attrTypeRepr->getAttrs().getLoc(TAK_unchecked);
-      }
-
-      typeRepr = attrTypeRepr->getTypeRepr();
-    }
+    uncheckedLoc = typeRepr->findUncheckedAttrLoc();
   }
 
   // Form the result.

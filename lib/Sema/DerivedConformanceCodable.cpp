@@ -125,8 +125,9 @@ static EnumDecl *addImplicitCodingKeys_enum(EnumDecl *target) {
   // enum cases based on those case names.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
-  TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
+  InheritedEntry protoTypeLoc[1] = {
+    InheritedEntry(TypeLoc::withoutLoc(codingKeyType))};
+  ArrayRef<InheritedEntry> inherited = C.AllocateCopy(protoTypeLoc);
 
   llvm::SmallVector<EnumDecl *, 4> codingKeys;
 

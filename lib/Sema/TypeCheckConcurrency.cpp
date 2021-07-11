@@ -3556,6 +3556,20 @@ bool swift::checkSendableConformance(
       return false;
   }
 
+  // Global-actor-isolated types can be Sendable. We do not check the
+  // instance data because it's all isolated to the global actor.
+  switch (getActorIsolation(nominal)) {
+  case ActorIsolation::Unspecified:
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::DistributedActorInstance:
+  case ActorIsolation::Independent:
+    break;
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+    return false;
+  }
+
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
   auto behavior = toDiagnosticBehavior(
@@ -3649,7 +3663,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
   }
 
   // Local function to form the implicit conformance.
-  auto formConformance = [&](bool isUnchecked) -> NormalProtocolConformance * {
+  auto formConformance = [&]() -> NormalProtocolConformance * {
     ASTContext &ctx = nominal->getASTContext();
     auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
     if (!proto)
@@ -3657,7 +3671,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
     auto conformance = ctx.getConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        nominal, ProtocolConformanceState::Complete, isUnchecked);
+        nominal, ProtocolConformanceState::Complete, false);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
@@ -3682,7 +3696,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     }
 
     // Form the implicit conformance to Sendable.
-    return formConformance(/*isUnchecked=*/true);
+    return formConformance();
   }
 
   // Only structs and enums can get implicit Sendable conformances by
@@ -3707,7 +3721,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
           nominal, nominal, SendableCheck::Implicit))
     return nullptr;
 
-  return formConformance(/*isUnchecked=*/false);
+  return formConformance();
 }
 
 AnyFunctionType *swift::applyGlobalActorType(
