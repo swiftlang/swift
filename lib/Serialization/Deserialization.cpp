@@ -623,7 +623,8 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
-                                              isUnchecked, rawIDs);
+                                              isUnchecked,
+                                              rawIDs);
 
   ASTContext &ctx = getContext();
   auto doOrError = getDeclContextChecked(contextID);
@@ -647,7 +648,6 @@ Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
                                         ProtocolConformanceState::Incomplete,
                                         isUnchecked);
-
   // Record this conformance.
   if (conformanceEntry.isComplete())
     return conformance;
@@ -2453,14 +2453,19 @@ class DeclDeserializer {
 
   void handleInherited(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                        ArrayRef<uint64_t> rawInheritedIDs) {
-    SmallVector<TypeLoc, 2> inheritedTypes;
+    SmallVector<InheritedEntry, 2> inheritedTypes;
     for (auto rawID : rawInheritedIDs) {
-      auto maybeType = MF.getTypeChecked(rawID);
+      // The low bit indicates "@unchecked".
+      bool isUnchecked = rawID & 0x01;
+      TypeID typeID = rawID >> 1;
+
+      auto maybeType = MF.getTypeChecked(typeID);
       if (!maybeType) {
         llvm::consumeError(maybeType.takeError());
         continue;
       }
-      inheritedTypes.push_back(TypeLoc::withoutLoc(MF.getType(rawID)));
+      inheritedTypes.push_back(
+          InheritedEntry(TypeLoc::withoutLoc(maybeType.get()), isUnchecked));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);
