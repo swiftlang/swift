@@ -17,12 +17,13 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/SILValue.h"
+#include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -458,7 +459,7 @@ namespace {
     void injectActorHops();
 
     /// Given an initializing block and the live-in availability of TheMemory,
-    /// this function injects a `hop_to_executor` instruction after the
+    /// this function injects a `hop_to_executor` instruction soon after the
     /// first non-load use of TheMemory that fully-initializes it.
     /// An "initializing block" is one that definitely contains a such a
     /// non-load use, e.g., because its live-in set is *not* all-Yes, but its
@@ -801,7 +802,8 @@ static void injectHopToExecutorAfter(SILLocation loc,
                                      SILBasicBlock::iterator insertPt,
                                      SILValue actor, bool needsBorrow = true) {
 
-  LLVM_DEBUG(llvm::dbgs() << "hop-injector: inserting hop after " << *insertPt);
+  LLVM_DEBUG(llvm::dbgs() << "hop-injector: requested insertion after "
+                          << *insertPt);
 
   // While insertAfter can handle terminators, it cannot handle ones that lead
   // to a block with multiple predecessors. I don't expect that a terminator
@@ -810,15 +812,55 @@ static void injectHopToExecutorAfter(SILLocation loc,
   // initialized.
   assert(!isa<TermInst>(*insertPt) && "unexpected hop-inject after terminator");
 
-  SILBuilderWithScope::insertAfter(&*insertPt, [&](SILBuilder &b) {
-    if (needsBorrow)
-      actor = b.createBeginBorrow(loc, actor);
+  auto injectAfter = [&](SILInstruction *insertPt) -> void {
+    LLVM_DEBUG(llvm::dbgs() << "hop-injector: injecting after " << *insertPt);
+    SILBuilderWithScope::insertAfter(insertPt, [&](SILBuilder &b) {
+      if (needsBorrow)
+        actor = b.createBeginBorrow(loc, actor);
 
-    b.createHopToExecutor(loc, actor, /*mandatory=*/false);
+      b.createHopToExecutor(loc, actor, /*mandatory=*/false);
 
-    if (needsBorrow)
-      b.createEndBorrow(loc, actor);
-  });
+      if (needsBorrow)
+        b.createEndBorrow(loc, actor);
+    });
+  };
+
+  //////
+  // NOTE: We prefer to inject a hop outside of any access regions, so that
+  // the dynamic access-set is empty. This is a best-effort to avoid injecting
+  // it inside of a region, but does not account for overlapping accesses, etc.
+  // But, I cannot think of a way to create an overlapping access with a stored
+  // property when it is first initialized, because it's not valid to pass those
+  // inout or capture them in a closure. - kavon
+
+  SILInstruction *cur = &*insertPt;
+  BeginAccessInst *access = nullptr;
+
+  // Finds begin_access instructions that need hops placed after its end_access.
+  auto getBeginAccess = [](SILValue v) -> BeginAccessInst * {
+    return dyn_cast<BeginAccessInst>(getAccessScope(v));
+  };
+
+  // If this insertion-point is after a store-like instruction, look for a
+  // begin_access corresponding to the destination.
+  if (auto *store = dyn_cast<StoreInst>(cur)) {
+    access = getBeginAccess(store->getDest());
+  } else if (auto *assign = dyn_cast<AssignInst>(cur)) {
+    access = getBeginAccess(assign->getDest());
+  }
+
+  // If we found a begin_access, then we need to inject the hop after
+  // all of the corresponding end_accesses.
+  if (access) {
+    for (auto *endAccess : access->getEndAccesses())
+      injectAfter(endAccess);
+
+    return;
+  }
+
+  //////
+  // Otherwise, we just put the hop after the original insertion point.
+  return injectAfter(cur);
 }
 
 void LifetimeChecker::injectActorHopForBlock(
