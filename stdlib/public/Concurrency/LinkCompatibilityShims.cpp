@@ -48,3 +48,4 @@ OLD_SYMBOL($ss31withCheckedThrowingContinuation8function_xSS_ys0bD0Vyxs5Error_pG
 OLD_SYMBOL($ss4TaskV17checkCancellationyyKFZ)
 OLD_SYMBOL($ss5ActorMp)
 OLD_SYMBOL($ss4TaskV8PriorityOMn)
+OLD_SYMBOL($ss12TaskPriorityVMn)
