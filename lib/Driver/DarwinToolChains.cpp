@@ -330,6 +330,7 @@ void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
     // Xcode toolchain.
     StringRef P = llvm::sys::path::parent_path(getDriver().getSwiftProgramPath());
     llvm::SmallString<128> LibLTOPath(P);
+    llvm::sys::path::remove_filename(LibLTOPath); // Remove '/bin'
     llvm::sys::path::append(LibLTOPath, "lib");
     llvm::sys::path::append(LibLTOPath, "libLTO.dylib");
     if (llvm::sys::fs::exists(LibLTOPath)) {
