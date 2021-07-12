@@ -97,6 +97,7 @@ extension DistributedActor {
         fatalError("\(#function) is not implemented yet for distributed actors'")
     }
 
+    // FIXME: distributed(nonisolated)
     nonisolated public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(self.actorAddress)

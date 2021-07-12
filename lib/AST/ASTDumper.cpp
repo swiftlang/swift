@@ -855,6 +855,10 @@ namespace {
         D->getCaptureInfo().print(OS);
       }
 
+      if (D->isDistributed()) {
+        OS << " distributed";
+      }
+
       if (auto fac = D->getForeignAsyncConvention()) {
         OS << " foreign_async=";
         if (auto type = fac->completionHandlerType())

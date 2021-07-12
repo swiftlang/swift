@@ -17,13 +17,6 @@ actor LocalActor_1 {
 struct NotCodableValue { }
 
 @available(SwiftStdlib 5.5, *)
-distributed struct StructNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
-@available(SwiftStdlib 5.5, *)
-distributed class ClassNope {} // expected-error{{'distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
-@available(SwiftStdlib 5.5, *)
-distributed enum EnumNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
-
-@available(SwiftStdlib 5.5, *)
 distributed actor DistributedActor_1 {
 
   let name: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}

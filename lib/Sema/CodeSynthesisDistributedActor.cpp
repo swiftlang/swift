@@ -527,7 +527,6 @@ static void addImplicitResignAddress(ClassDecl *decl) {
   BraceStmt *newBody = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
                                          /*implicit=*/true);
 
-  newBody->dump();
   deinitDecl->setBody(newBody, AbstractFunctionDecl::BodyKind::TypeChecked); // FIXME: no idea if Parsed is right, we are NOT type checked I guess?
 }
 
