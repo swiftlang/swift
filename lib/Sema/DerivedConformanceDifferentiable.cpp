@@ -341,7 +341,7 @@ static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
 ///
 /// Precondition: `decl` is a nominal type decl or an extension decl.
 void getInheritedProtocols(Decl *decl, SmallPtrSetImpl<ProtocolDecl *> &protos) {
-  ArrayRef<TypeLoc> inheritedTypeLocs;
+  ArrayRef<InheritedEntry> inheritedTypeLocs;
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     inheritedTypeLocs = nominalDecl->getInherited();
   else if (auto *extDecl = dyn_cast<ExtensionDecl>(decl))

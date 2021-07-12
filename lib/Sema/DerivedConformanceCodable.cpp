@@ -160,8 +160,8 @@ static EnumDecl *addImplicitCaseCodingKeys(EnumDecl *target,
 
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
-  TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
+  InheritedEntry protoTypeLoc[1] = {InheritedEntry(TypeLoc::withoutLoc(codingKeyType))};
+  ArrayRef<InheritedEntry> inherited = C.AllocateCopy(protoTypeLoc);
 
   // Only derive if this case exist in the CodingKeys enum
   auto *codingKeyCase =
@@ -222,8 +222,8 @@ static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
   // enum cases based on those var names.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
-  TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
+  InheritedEntry protoTypeLoc[1] = {InheritedEntry(TypeLoc::withoutLoc(codingKeyType))};
+  ArrayRef<InheritedEntry> inherited = C.AllocateCopy(protoTypeLoc);
 
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
                                     inherited, nullptr, target);
