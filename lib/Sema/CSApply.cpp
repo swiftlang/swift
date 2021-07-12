@@ -8920,11 +8920,6 @@ bool Solution::hasType(ASTNode node) const {
   return cs.hasType(node);
 }
 
-bool Solution::hasType(const KeyPathExpr *KP, unsigned ComponentIndex) const {
-  auto &cs = getConstraintSystem();
-  return cs.hasType(KP, ComponentIndex);
-}
-
 Type Solution::getType(ASTNode node) const {
   auto result = nodeTypes.find(node);
   if (result != nodeTypes.end())
