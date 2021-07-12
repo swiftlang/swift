@@ -35,7 +35,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_KEY_PATH_BASE | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_KEY_PATH_RESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_AFTER_SELF | %FileCheck %s -check-prefix=OBJ-NODOT
 class Person {
     var name: String
     var friends: [Person] = []
@@ -191,8 +190,4 @@ func genericKeyPathBase<Root>(to keyPath: ReferenceWritableKeyPath<Root, Person>
 func genericKeyPathResult<KeyPathResult>(id: KeyPath<Person, KeyPathResult>) {
   genericKeyPathResult(\.#^GENERIC_KEY_PATH_RESULT^#)
   // Same as TYPE_DOT.
-}
-
-func completeAfterSelf(people: [Person]) {
-  people.map(\.self#^COMPLETE_AFTER_SELF^#)
 }

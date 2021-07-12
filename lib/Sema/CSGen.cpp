@@ -3232,7 +3232,7 @@ namespace {
           break;
         }
         case KeyPathExpr::Component::Kind::Identity:
-          break;
+          continue;
         case KeyPathExpr::Component::Kind::DictionaryKey:
           llvm_unreachable("DictionaryKey only valid in #keyPath");
           break;
