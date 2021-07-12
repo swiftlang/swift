@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,52 +10,60 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// Canonicalize the copies and destroys of a single owned or guaranteed OSSA
-/// value.
+/// Canonicalize the copies and destroys of a single owned OSSA value.
 ///
 /// This top-level API rewrites the extended OSSA lifetime of a SILValue:
 ///
-///     void canonicalizeValueLifetime(SILValue def, CanonicalOSSALifetime &)
+///     void canonicalizeValueLifetime(SILValue def, CanonicalizeOSSALifetime &)
 ///
-/// The extended lifetime transitively includes the uses of `def` itself along
-/// with the uses of any copies of `def`. Canonicalization provably minimizes
-/// the OSSA lifetime and its copies by rewriting all copies and destroys. Only
-/// consusming uses that are not on the liveness boundary require a copy.
+/// The "extended lifetime" of the references defined by 'def' transitively
+/// includes the uses of 'def' itself along with the uses of any copies of
+/// 'def'. Canonicalization provably minimizes the OSSA lifetime and its copies
+/// by rewriting all copies and destroys. Only consusming uses that are not on
+/// the liveness boundary require a copy.
 ///
-/// Example #1: Handle consuming and nonconsuming uses.
+/// Example #1: The last consuming use ends the reference lifetime.
 ///
 ///     bb0(%arg : @owned $T, %addr : @trivial $*T):
 ///       %copy = copy_value %arg : $T
-///       debug_value %copy : $T
 ///       store %copy to [init] %addr : $*T
-///       debug_value %arg : $T
 ///       debug_value_addr %addr : $*T
 ///       destroy_value %arg : $T
 ///
 /// Will be transformed to:
 ///
 ///     bb0(%arg : @owned $T, %addr : @trivial $*T):
-///       // The original copy is deleted.
-///       debug_value %arg : $T
-///       // A new copy_value is inserted before the consuming store.
-///       %copy = copy_value %arg : $T
 ///       store %copy to [init] %addr : $*T
-///       // The non-consuming use now uses the original value.
-///       debug_value %arg : $T
-///       // A new destroy is inserted after the last use.
+///       debug_value_addr %addr : $*T
+///
+/// Example #2: Destroys are hoisted to the last use. Copies are inserted only
+/// at consumes within the lifetime (to directly satisfy ownership conventions):
+///
+///     bb0(%arg : @owned $T, %addr : @trivial $*T):
+///       %copy1 = copy_value %arg : $T
+///       store %arg to [init] %addr : $*T
+///       %_ = apply %_(%copy1) : $@convention(thin) (@guaranteed T) -> ()
+///       debug_value_addr %addr : $*T
+///       destroy_value %copy1 : $T
+///
+/// Will be transformed to:
+///
+///     bb0(%arg : @owned $T, %addr : @trivial $*T):
+///       %copy1 = copy_value %arg : $T
+///       store %copy1 to [init] %addr : $*T
+///       %_ = apply %_(%arg) : $@convention(thin) (@guaranteed T) -> ()
 ///       destroy_value %arg : $T
 ///       debug_value_addr %addr : $*T
-///       // The original destroy is deleted.
 ///
-/// Example #2: Handle control flow.
+/// Example #3: Handle control flow.
 ///
 ///     bb0(%arg : @owned $T):
 ///       cond_br %_, bb1, bb2
 ///     bb1:
 ///       br bb3
 ///     bb2:
-///       debug_value %arg : $T
 ///       %copy = copy_value %arg : $T
+///       %_ = apply %_(%copy) : $@convention(thin) (@guaranteed T) -> ()
 ///       destroy_value %copy : $T
 ///       br bb3
 ///     bb3:
@@ -69,30 +77,26 @@
 ///       destroy_value %arg : $T
 ///       br bb3
 ///     bb2:
-///       // The original copy is deleted.
-///       debug_value %arg : $T
+///       %_ = apply %_(%arg) : $@convention(thin) (@guaranteed T) -> ()
 ///       destroy_value %arg : $T
 ///       br bb3
 ///     bb2:
 ///       // The original destroy is deleted.
 ///
-/// FIXME: Canonicalization currently bails out if any uses of the def has
-/// OperandOwnership::PointerEscape. Once project_box is protected by a borrow
-/// scope and mark_dependence is associated with an end_dependence,
-/// canonicalization will work everywhere as intended. The intention is to keep
-/// the canonicalization algorithm as simple and robust, leaving the remaining
-/// performance opportunities contingent on fixing the SIL representation.
+/// Pass Requirements:
 ///
-/// FIXME: Canonicalization currently fails to eliminate copies downstream of a
-/// ForwardingBorrow. Aggregates should be fixed to be Reborrow instead of
-/// ForwardingBorrow, then computeCanonicalLiveness() can be fixed to extend
-/// liveness through ForwardingBorrows.
+///   This utility invalidates instructions but both uses and preserves
+///   NonLocalAccessBlockAnalysis.
+///
+///   The use-def walks in this utility, e.g. getCanonicalCopiedDef, assume no
+///   cycles in the data flow graph without a phi.
 ///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
+#include "swift/Basic/DAGNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -104,23 +108,11 @@
 
 namespace swift {
 
-/// Convert this struct_extract into a copy+destructure. Return the destructured
-/// result or invalid SILValue. The caller must delete the extract and its
-/// now-dead copy use.
-///
-/// If a copied-def is a struct-extract, attempt a destructure conversion
-///   %extract = struct_extract %... : $TypeWithSingleOwnershipValue
-///   %copy = copy_value %extract : $OwnershipValue
-/// To:
-///   %copy = copy_value %extract : $TypeWithSingleOwnershipValue
-///   (%extracted,...) = destructure %copy : $TypeWithSingleOwnershipValue
-///
-/// \p instModCallbacks If non-null, this routine uses
-/// InstModCallbacks::{setUseValue,RAUW}() internally to modify code. Otherwise,
-/// just performs standard operations.
-SILValue
-convertExtractToDestructure(StructExtractInst *extract,
-                            InstModCallbacks *instModCallbacks = nullptr);
+extern llvm::Statistic NumCopiesEliminated;
+extern llvm::Statistic NumCopiesGenerated;
+
+/// Insert a copy on this operand. Trace and update stats.
+void copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks);
 
 /// Information about consumes on the extended-lifetime boundary. Consuming uses
 /// within the lifetime are not included--they will consume a copy after
@@ -137,12 +129,6 @@ class CanonicalOSSAConsumeInfo {
   /// Record any debug_value instructions found after a final consume.
   SmallVector<DebugValueInst *, 8> debugAfterConsume;
 
-  /// For borrowed defs, track per-block copies of the borrowed value that only
-  /// have uses outside the borrow scope and will not be removed by
-  /// canonicalization. These copies are effectively distinct OSSA lifetimes
-  /// that should be canonicalized separately.
-  llvm::SmallDenseMap<SILBasicBlock *, CopyValueInst *, 4> persistentCopies;
-
   /// The set of non-destroy consumes that need to be poisoned. This is
   /// determined in two steps. First findOrInsertDestroyInBlock() checks if the
   /// lifetime shrank within the block. Second rewriteCopies() checks if the
@@ -151,13 +137,15 @@ class CanonicalOSSAConsumeInfo {
   SmallPtrSetVector<SILInstruction *, 4> needsPoisonConsumes;
 
 public:
-  bool hasUnclaimedConsumes() const { return !finalBlockConsumes.empty(); }
-
   void clear() {
     finalBlockConsumes.clear();
     debugAfterConsume.clear();
-    persistentCopies.clear();
     needsPoisonConsumes.clear();
+  }
+
+  bool empty() {
+    return finalBlockConsumes.empty() && debugAfterConsume.empty()
+           && needsPoisonConsumes.empty();
   }
 
   void recordNeedsPoison(SILInstruction *consume) {
@@ -172,7 +160,7 @@ public:
     return needsPoisonConsumes.getArrayRef();
   }
 
-  bool hasFinalConsumes() const { return !finalBlockConsumes.empty(); }
+  bool hasUnclaimedConsumes() const { return !finalBlockConsumes.empty(); }
 
   void recordFinalConsume(SILInstruction *inst) {
     assert(!finalBlockConsumes.count(inst->getParent()));
@@ -207,80 +195,51 @@ public:
     return debugAfterConsume;
   }
 
-  bool hasPersistentCopies() const { return !persistentCopies.empty(); }
-
-  bool isPersistentCopy(CopyValueInst *copy) const {
-    auto iter = persistentCopies.find(copy->getParent());
-    if (iter == persistentCopies.end()) {
-      return false;
-    }
-    return iter->second == copy;
-  }
-
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
-};
-
-// Worklist of pointer-like things that have an invalid default value. Avoid
-// revisiting nodes--suitable for DAGs, but pops finished nodes without
-// preserving them in the vector.
-//
-// The primary API has two methods: intialize() and pop(). Others are provided
-// for flexibility.
-//
-// TODO: make this a better utility.
-template <typename T, unsigned SmallSize> struct PtrWorklist {
-  SmallPtrSet<T, SmallSize> ptrVisited;
-  SmallVector<T, SmallSize> ptrVector;
-
-  PtrWorklist() = default;
-
-  PtrWorklist(const PtrWorklist &) = delete;
-
-  void initialize(T t) {
-    clear();
-    insert(t);
-  }
-
-  template <typename R> void initializeRange(R &&range) {
-    clear();
-    ptrVisited.insert(range.begin(), range.end());
-    ptrVector.append(range.begin(), range.end());
-  }
-
-  T pop() { return empty() ? T() : ptrVector.pop_back_val(); }
-
-  bool empty() const { return ptrVector.empty(); }
-
-  unsigned size() const { return ptrVector.size(); }
-
-  void clear() {
-    ptrVector.clear();
-    ptrVisited.clear();
-  }
-
-  void insert(T t) {
-    if (ptrVisited.insert(t).second)
-      ptrVector.push_back(t);
-  }
 };
 
 /// Canonicalize OSSA lifetimes.
 ///
 /// Allows the allocation of analysis state to be reused across calls to
 /// canonicalizeValueLifetime().
+///
+/// TODO: Move all the private per-definition members into an implementation
+/// class in the .cpp file.
 class CanonicalizeOSSALifetime {
 public:
-  /// Find the original definition of a potentially copied value.
-  static SILValue getCanonicalCopiedDef(SILValue v);
+  /// Find the original definition of a potentially copied value. \p copiedValue
+  /// must be an owned value. It is usually a copy but may also be a destroy.
+  ///
+  /// This single helper specifies the root of an owned extended lifetime. Owned
+  /// extended lifetimes may not overlap. This ensures that canonicalization can
+  /// run as a utility without invalidating instruction worklists in the client,
+  /// as long as the client works on each canonical def independently.
+  ///
+  /// If the source of a copy is guaranteed, then the copy itself is the root of
+  /// an owned extended lifetime. Note that it will also be part of a borrowed
+  /// extended lifetime, which will be canonicalized separately by
+  /// CanonicalizeBorrowScope.
+  ///
+  /// This use-def walk must be consistent with the def-use walks performed
+  /// within the canonicalizeValueLifetime() and canonicalizeBorrowScopes()
+  /// implementations.
+  static SILValue getCanonicalCopiedDef(SILValue v) {
+    while (auto *copy = dyn_cast<CopyValueInst>(v)) {
+      auto def = copy->getOperand();
+      if (def.getOwnershipKind() != OwnershipKind::Owned) {
+        // This guaranteed value cannot be handled, treat the copy as an owned
+        // live range def instead.
+        return copy;
+      }
+      v = def;
+    }
+    return v;
+  }
 
 private:
   /// If true, then debug_value instructions outside of non-debug
   /// liveness may be pruned during canonicalization.
   bool pruneDebugMode;
-
-  /// If true, borrows scopes will be canonicalized allowing copies of
-  /// guaranteed values to be eliminated.
-  bool canonicalizeBorrowMode;
 
   /// If true, then new destroy_value instructions will be poison.
   bool poisonRefsMode;
@@ -290,16 +249,12 @@ private:
   // extendLivenessThroughOverlappingAccess is invoked.
   NonLocalAccessBlocks *accessBlocks = nullptr;
 
-  DominanceAnalysis *dominanceAnalysis;
+  DominanceInfo *domTree;
+
+  InstructionDeleter &deleter;
 
   /// Current copied def for which this state describes the liveness.
   SILValue currentDef;
-
-  /// If an outer copy is created for uses outside the borrow scope
-  CopyValueInst *outerCopy = nullptr;
-
-  /// Cumulatively, have any instructions been modified by canonicalization?
-  bool changed = false;
 
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed. For guaranteed values it remains empty. A backward walk from
@@ -315,11 +270,11 @@ private:
   /// outisde the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
-  /// Reuse a general visited set for def-use traversal.
-  PtrWorklist<SILValue, 8> defUseWorklist;
+  /// Visited set for general def-use traversal that prevents revisiting values.
+  DAGNodeWorklist<SILValue, 8> defUseWorklist;
 
-  /// Reuse a general worklist for CFG traversal.
-  PtrWorklist<SILBasicBlock *, 8> blockWorklist;
+  /// Visited set general CFG traversal that prevents revisiting blocks.
+  DAGNodeWorklist<SILBasicBlock *, 8> blockWorklist;
 
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
@@ -336,25 +291,17 @@ private:
   /// may be in PrunedLiveness::LiveWithin).
   SmallSetVector<SILBasicBlock *, 8> remnantLiveOutBlocks;
 
-  /// Information about consuming instructions discovered in this caonical OSSA
+  /// Information about consuming instructions discovered in this canonical OSSA
   /// lifetime.
   CanonicalOSSAConsumeInfo consumes;
 
-  /// The callbacks to use when deleting/rauwing instructions.
-  InstModCallbacks instModCallbacks;
-
 public:
-  CanonicalizeOSSALifetime(
-      bool pruneDebugMode, bool canonicalizeBorrowMode, bool poisonRefsMode,
-      NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-      DominanceAnalysis *dominanceAnalysis,
-      InstModCallbacks instModCallbacks = InstModCallbacks())
-      : pruneDebugMode(pruneDebugMode),
-        canonicalizeBorrowMode(canonicalizeBorrowMode),
-        poisonRefsMode(poisonRefsMode),
-        accessBlockAnalysis(accessBlockAnalysis),
-        dominanceAnalysis(dominanceAnalysis),
-        instModCallbacks(instModCallbacks) {}
+  CanonicalizeOSSALifetime(bool pruneDebugMode, bool poisonRefsMode,
+                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                           DominanceInfo *domTree, InstructionDeleter &deleter)
+      : pruneDebugMode(pruneDebugMode), poisonRefsMode(poisonRefsMode),
+        accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
+        deleter(deleter) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 
@@ -366,7 +313,6 @@ public:
     consumes.clear();
 
     currentDef = def;
-    outerCopy = nullptr;
     liveness.initializeDefBlock(def->getParentBlock());
   }
 
@@ -377,30 +323,21 @@ public:
     remnantLiveOutBlocks.clear();
   }
 
-  bool hasChanged() const { return changed; }
-
-  void setChanged() { changed = true; }
-
-  SILValue createdOuterCopy() const { return outerCopy; }
-
   /// Top-Level API: rewrites copies and destroys within \p def's extended
   /// lifetime. \p lifetime caches transient analysis state across multiple
   /// calls.
   ///
-  /// Return false if the OSSA structure cannot be recognized (with a proper
-  /// OSSA representation this will always return true).
+  /// Return true if any change was made to \p def's extended lifetime. \p def
+  /// itself will not be deleted and no instructions outside of \p def's
+  /// extended lifetime will be affected (only copies and destroys are
+  /// rewritten).
   ///
-  /// Upon returning, isChanged() indicates, cumulatively, whether any SIL
-  /// changes were made.
-  ///
-  /// Upon returning, createdOuterCopy() indicates whether a new copy was
-  /// created for uses outside the borrow scope. To canonicalize the new outer
-  /// lifetime, call this API again on the value defined by the new copy.
+  /// This only deletes instructions within \p def's extended lifetime. Use
+  /// InstructionDeleter::cleanUpDeadInstructions() to recursively delete dead
+  /// operands.
   bool canonicalizeValueLifetime(SILValue def);
 
-  /// Return the inst mod callbacks struct used by this CanonicalizeOSSALifetime
-  /// to pass to other APIs that need to compose with CanonicalizeOSSALifetime.
-  InstModCallbacks getInstModCallbacks() const { return instModCallbacks; }
+  InstModCallbacks &getCallbacks() { return deleter.getCallbacks(); }
 
 protected:
   void recordDebugValue(DebugValueInst *dvi) {
@@ -410,20 +347,6 @@ protected:
   void recordConsumingUse(Operand *use) {
     consumingBlocks.insert(use->getUser()->getParent());
   }
-
-  bool computeBorrowLiveness();
-
-  bool consolidateBorrowScope();
-
-  bool findBorrowScopeUses(llvm::SmallPtrSetImpl<SILInstruction *> &useInsts);
-
-  void filterOuterBorrowUseInsts(
-      llvm::SmallPtrSetImpl<SILInstruction *> &outerUseInsts);
-
-  void rewriteOuterBorrowUsesAndFindConsumes(
-      SILValue incomingValue,
-      llvm::SmallPtrSetImpl<SILInstruction *> &outerUseInsts);
-
   bool computeCanonicalLiveness();
 
   bool endsAccessOverlappingPrunedBoundary(SILInstruction *inst);
@@ -441,29 +364,6 @@ protected:
 
   void injectPoison();
 };
-
-/// Canonicalize the passed in set of defs, eliminating in one batch any that
-/// are not needed given the canonical lifetime of the various underlying owned
-/// value introducers.
-///
-/// On success, returns the invalidation kind that the caller must use to
-/// invalidate analyses. Currently it will only ever return
-/// SILAnalysis::InvalidationKind::Instructions or None.
-///
-/// NOTE: This routine is guaranteed to not invalidate
-/// NonLocalAccessBlockAnalysis, so callers should lock it before invalidating
-/// instructions. E.x.:
-///
-///    accessBlockAnalysis->lockInvalidation();
-///    pass->invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-///    accessBlockAnalysis->unlockInvalidation();
-///
-/// NOTE: We assume that all \p inputDefs is a set (that is it has no duplicate
-/// elements) and that all values have been generated by running a copy through
-/// CanonicalizeOSSALifetime::getCanonicalCopiedDef(copy)).
-SILAnalysis::InvalidationKind
-canonicalizeOSSALifetimes(CanonicalizeOSSALifetime &canonicalizeLifetime,
-                          ArrayRef<SILValue> inputDefs);
 
 } // end namespace swift
 
