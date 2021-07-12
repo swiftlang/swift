@@ -366,9 +366,10 @@ class InheritedProtocolCollector {
         if (canPrintNormally)
           IncludedProtocols.push_back(protoTy->getDecl());
         else
-          ExtraProtocols.push_back({protoTy->getDecl(),
+          ExtraProtocols.push_back(
+            ProtocolAndAvailability(protoTy->getDecl(),
                                     getAvailabilityAttrs(D, availableAttrs),
-                                    inherited.isUnchecked});
+                                    inherited.isUnchecked));
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
@@ -385,9 +386,10 @@ class InheritedProtocolCollector {
       for (auto *conf : localConformances) {
         if (conf->getSourceKind() != ConformanceEntryKind::Synthesized)
           continue;
-        ExtraProtocols.push_back({conf->getProtocol(),
+        ExtraProtocols.push_back(
+          ProtocolAndAvailability(conf->getProtocol(),
                                   getAvailabilityAttrs(D, availableAttrs),
-                                  isUncheckedConformance(conf)});
+                                  isUncheckedConformance(conf)));
       }
     }
   }
@@ -568,7 +570,8 @@ public:
         if (isPublicOrUsableFromInline(inherited) &&
             conformanceDeclaredInModule(M, nominal, inherited) &&
             !M->isImportedImplementationOnly(inherited->getParentModule())) {
-          protocolsToPrint.push_back({inherited, availability, isUnchecked});
+          protocolsToPrint.push_back(
+            ProtocolAndAvailability(inherited, availability, isUnchecked));
           return TypeWalker::Action::SkipChildren;
         }
 
