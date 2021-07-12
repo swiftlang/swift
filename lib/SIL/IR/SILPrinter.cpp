@@ -981,9 +981,8 @@ public:
 
     // Print results.
     auto results = I->getResults();
-    if (results.size() == 1 &&
-        I->isStaticInitializerInst() &&
-        I == &I->getParent()->back()) {
+    if (results.size() == 1 && !I->isDeleted() && I->isStaticInitializerInst()
+        && I == &I->getParent()->back()) {
       *this << "%initval = ";
     } else if (results.size() == 1) {
       ID Name = Ctx.getID(results[0]);
@@ -1011,7 +1010,8 @@ public:
 
     // Maybe print debugging information.
     bool printedSlashes = false;
-    if (Ctx.printDebugInfo() && !I->isStaticInitializerInst()) {
+    if (Ctx.printDebugInfo() && !I->isDeleted()
+        && !I->isStaticInitializerInst()) {
       auto &SM = I->getModule().getASTContext().SourceMgr;
       printDebugLocRef(I->getLoc(), SM);
       printDebugScopeRef(I->getDebugScope(), SM);
@@ -1439,6 +1439,9 @@ public:
 
   void printForwardingOwnershipKind(OwnershipForwardingMixin *inst,
                                     SILValue op) {
+    if (!op)
+      return;
+
     if (inst->getForwardingOwnershipKind() != op.getOwnershipKind()) {
       *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
     }

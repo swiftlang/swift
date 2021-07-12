@@ -86,6 +86,9 @@ class SILCombiner :
   /// If set to true then the optimizer is free to erase cond_fail instructions.
   bool RemoveCondFails;
 
+  /// If set to true then copies are canonicalized in OSSA mode.
+  bool enableCopyPropagation;
+
   /// Set to true if some alloc/dealloc_stack instruction are inserted and at
   /// the end of the run stack nesting needs to be corrected.
   bool invalidatedStackNesting = false;
@@ -114,43 +117,45 @@ public:
               SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
               AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
-              NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails)
+              NonLocalAccessBlockAnalysis *NLABA, bool removeCondFails,
+              bool enableCopyPropagation)
       : parentTransform(parentTransform), AA(AA), DA(DA), PCA(PCA), CHA(CHA),
         NLABA(NLABA), Worklist("SC"),
         deleter(InstModCallbacks()
-                .onDelete([&](SILInstruction *instToDelete) {
-                  // We allow for users in SILCombine to perform 2 stage
-                  // deletion, so we need to split the erasing of instructions
-                  // from adding operands to the worklist.
-                  eraseInstFromFunction(*instToDelete,
-                                        false /* don't add operands */);
-                })
-                .onNotifyWillBeDeleted(
-                  [&](SILInstruction *instThatWillBeDeleted) {
+                    .onDelete([&](SILInstruction *instToDelete) {
+                      // We allow for users in SILCombine to perform 2 stage
+                      // deletion, so we need to split the erasing of
+                      // instructions from adding operands to the worklist.
+                      eraseInstFromFunction(*instToDelete,
+                                            false /* don't add operands */);
+                    })
+                    .onNotifyWillBeDeleted(
+                        [&](SILInstruction *instThatWillBeDeleted) {
                           Worklist.addOperandsToWorklist(
                             *instThatWillBeDeleted);
-                  })
-                .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
-                  Worklist.add(newlyCreatedInst);
-                })
-                .onSetUseValue([&](Operand *use, SILValue newValue) {
-                  use->set(newValue);
-                  Worklist.add(use->getUser());
-                })),
-        deadEndBlocks(&B.getFunction()),
-        MadeChange(false), RemoveCondFails(removeCondFails), Iteration(0),
-        Builder(B), CastOpt(
-                        FuncBuilder, nullptr /*SILBuilderContext*/,
-                        /* ReplaceValueUsesAction */
-                        [&](SILValue Original, SILValue Replacement) {
-                          replaceValueUsesWith(Original, Replacement);
-                        },
-                        /* ReplaceInstUsesAction */
-                        [&](SingleValueInstruction *I, ValueBase *V) {
-                          replaceInstUsesWith(*I, V);
-                        },
-                        /* EraseAction */
-                        [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
+                        })
+                    .onCreateNewInst([&](SILInstruction *newlyCreatedInst) {
+                      Worklist.add(newlyCreatedInst);
+                    })
+                    .onSetUseValue([&](Operand *use, SILValue newValue) {
+                      use->set(newValue);
+                      Worklist.add(use->getUser());
+                    })),
+        deadEndBlocks(&B.getFunction()), MadeChange(false),
+        RemoveCondFails(removeCondFails),
+        enableCopyPropagation(enableCopyPropagation), Iteration(0), Builder(B),
+        CastOpt(
+            FuncBuilder, nullptr /*SILBuilderContext*/,
+            /* ReplaceValueUsesAction */
+            [&](SILValue Original, SILValue Replacement) {
+              replaceValueUsesWith(Original, Replacement);
+            },
+            /* ReplaceInstUsesAction */
+            [&](SingleValueInstruction *I, ValueBase *V) {
+              replaceInstUsesWith(*I, V);
+            },
+            /* EraseAction */
+            [&](SILInstruction *I) { eraseInstFromFunction(*I); }),
         deBlocks(&B.getFunction()),
         ownershipFixupContext(getInstModCallbacks(), deBlocks),
         libswiftPassInvocation(parentTransform->getPassManager(), this) {}
@@ -375,6 +380,10 @@ public:
   /// when this is done. Returns true if we deleted svi and thus we should not
   /// try to visit it.
   bool trySinkOwnedForwardingInst(SingleValueInstruction *svi);
+
+  /// Apply CanonicalizeOSSALifetime to the extended lifetime of any copy
+  /// introduced during SILCombine for an owned value.
+  void canonicalizeOSSALifetimes();
 
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.

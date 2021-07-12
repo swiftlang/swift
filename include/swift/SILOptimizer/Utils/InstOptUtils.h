@@ -68,6 +68,10 @@ NullablePtr<SILInstruction> createDecrementBefore(SILValue ptr,
 /// Get the insertion point after \p val.
 Optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
 
+/// True if this instruction's only uses are debug_value (in -O mode),
+/// destroy_value, or end-of-scope instruction such as end_borrow.
+bool hasOnlyEndOfScopeOrDestroyUses(SILInstruction *inst);
+
 /// Return the number of @inout arguments passed to the given apply site.
 unsigned getNumInOutArguments(FullApplySite applySite);
 
@@ -244,11 +248,11 @@ public:
   InstructionDeleter(InstModCallbacks chainedCallbacks = InstModCallbacks())
       : deadInstructions(), iteratorRegistry(chainedCallbacks) {}
 
-  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
-
   UpdatingInstructionIteratorRegistry &getIteratorRegistry() {
     return iteratorRegistry;
   }
+
+  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
 
   llvm::iterator_range<UpdatingInstructionIterator>
   updatingRange(SILBasicBlock *bb) {
@@ -258,6 +262,12 @@ public:
   llvm::iterator_range<UpdatingReverseInstructionIterator>
   updatingReverseRange(SILBasicBlock *bb) {
     return iteratorRegistry.makeReverseIteratorRange(bb);
+  }
+
+  bool hadCallbackInvocation() const {
+    return const_cast<InstructionDeleter *>(this)
+        ->getCallbacks()
+        .hadCallbackInvocation();
   }
 
   /// If the instruction \p inst is dead, record it so that it can be cleaned
