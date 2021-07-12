@@ -2188,7 +2188,8 @@ ASTContext::getConformance(Type conformingType,
                            ProtocolDecl *protocol,
                            SourceLoc loc,
                            DeclContext *dc,
-                           ProtocolConformanceState state) {
+                           ProtocolConformanceState state,
+                           bool isUnchecked) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2204,7 +2205,8 @@ ASTContext::getConformance(Type conformingType,
   // Build a new normal protocol conformance.
   auto result
     = new (*this, AllocationArena::Permanent)
-      NormalProtocolConformance(conformingType, protocol, loc, dc, state);
+        NormalProtocolConformance(
+          conformingType, protocol, loc, dc, state,isUnchecked);
   normalConformances.InsertNode(result, insertPos);
 
   return result;

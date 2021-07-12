@@ -1019,7 +1019,8 @@ public:
                  ProtocolDecl *protocol,
                  SourceLoc loc,
                  DeclContext *dc,
-                 ProtocolConformanceState state);
+                 ProtocolConformanceState state,
+                 bool isUnchecked);
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *

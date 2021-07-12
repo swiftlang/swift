@@ -3607,6 +3607,20 @@ bool swift::checkSendableConformance(
       return false;
   }
 
+  // Global-actor-isolated types can be Sendable. We do not check the
+  // instance data because it's all isolated to the global actor.
+  switch (getActorIsolation(nominal)) {
+  case ActorIsolation::Unspecified:
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::DistributedActorInstance:
+  case ActorIsolation::Independent:
+    break;
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+    return false;
+  }
+
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
   auto behavior = toDiagnosticBehavior(
@@ -3620,20 +3634,6 @@ bool swift::checkSendableConformance(
 
     if (behavior != DiagnosticBehavior::Warning)
       return true;
-  }
-
-  // Global-actor-isolated types can be Sendable. We do not check the
-  // instance properties.
-  switch (getActorIsolation(nominal)) {
-  case ActorIsolation::Unspecified:
-  case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
-  case ActorIsolation::Independent:
-    break;
-
-  case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
-    return false;
   }
 
   if (classDecl) {
@@ -3722,7 +3722,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
     auto conformance = ctx.getConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        nominal, ProtocolConformanceState::Complete);
+        nominal, ProtocolConformanceState::Complete, false);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 
