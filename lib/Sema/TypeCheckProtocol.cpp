@@ -2827,21 +2827,16 @@ bool ConformanceChecker::checkActorIsolation(
                   /*fromExpression=*/false)) {
   case ActorIsolationRestriction::DistributedActorSelf: {
     if (witness->isSynthesized()) {
-      // Some of our synthesized properties get special treatment,
-      // they are always available, regardless if the actor is remote even.
-      auto &C = requirement->getASTContext();
-
-      // actorAddress is special, it is *always* available.
-      // even if the actor is 'remote' it is always available and immutable.
-      if (witness->getName() == C.Id_actorAddress &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorAddressDecl()->getDeclaredInterfaceType()))
+      // we only have two 'distributed-actor-nonisolated' properties,
+      // the address and transport; if we see any such marked property,
+      // we're free to automatically assume those are fine and accessible always.
+      if (witness->isDistributedActorIndependent())
         return false;
+    }
 
-      // TODO: we don't *really* need to expose the transport like that... reconsider?
-      if (witness->getName() == C.Id_actorTransport &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorTransportDecl()->getDeclaredInterfaceType()))
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(witness)) {
+      // A 'distributed func' may witness a distributed isolated function requirement.
+      if (funcDecl->isDistributed())
         return false;
     }
 
@@ -2849,9 +2844,11 @@ bool ConformanceChecker::checkActorIsolation(
     LLVM_FALLTHROUGH;
   }
   case ActorIsolationRestriction::ActorSelf: {
+    auto requirementIsolation = getActorIsolation(requirement);
+
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
-    if (getActorIsolation(requirement) == ActorIsolation::ActorInstance)
+    if (requirementIsolation == ActorIsolation::ActorInstance)
       return false;
 
     witness->diagnose(diag::actor_isolated_witness,
@@ -2903,8 +2900,12 @@ bool ConformanceChecker::checkActorIsolation(
   bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
     llvm_unreachable("There are not actor protocols");
+  case ActorIsolation::DistributedActorInstance:
+    // A requirement inside a distributed actor, where it has a protocol that was
+    // bound requiring a `DistributedActor` conformance (`protocol D: DistributedActor`),
+    // results in the requirement being isolated to given distributed actor.
+    break;
 
   case ActorIsolation::GlobalActorUnsafe:
     requirementIsUnsafe = true;

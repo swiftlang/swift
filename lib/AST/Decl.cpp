@@ -3895,6 +3895,10 @@ bool NominalTypeDecl::isDistributedActor() const {
                            false);
 }
 
+bool NominalTypeDecl::isAnyActor() const {
+  return isActor() || isDistributedActor();
+}
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<InheritedEntry> inherited,
