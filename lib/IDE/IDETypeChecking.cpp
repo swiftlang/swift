@@ -255,7 +255,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
-    SmallVector<TypeLoc, 4> Results;
+    SmallVector<InheritedEntry, 4> Results;
     getInheritedForPrinting(ED, Options, Results);
     return Results.size();
   }
