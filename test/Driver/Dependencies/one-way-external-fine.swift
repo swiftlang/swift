@@ -1,3 +1,4 @@
+// REQUIRES: rdar80485272
 /// other ==> main
 /// "./main1-external" ==> main
 /// "./main2-external" ==> main

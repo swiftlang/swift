@@ -1,3 +1,4 @@
+// REQUIRES: rdar80485272
 // main | other
 
 // RUN: %empty-directory(%t)

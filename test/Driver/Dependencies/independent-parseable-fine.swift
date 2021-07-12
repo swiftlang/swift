@@ -1,3 +1,4 @@
+// REQUIRES: rdar80485272
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/independent-fine/* %t
 // RUN: touch -t 201401240005 %t/*
