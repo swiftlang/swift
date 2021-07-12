@@ -1858,6 +1858,13 @@ static void diagnoseConformanceImpliedByConditionalConformance(
       .fixItInsert(loc, differentFixit);
 }
 
+/// Determine whether there are additional semantic checks for conformance
+/// to the given protocol. This should return true when @unchecked can be
+/// used to disable those semantic checks.
+static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
+  return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
+}
+
 /// Determine whether the type \c T conforms to the protocol \c Proto,
 /// recording the complete witness table if it does.
 ProtocolConformance *MultiConformanceChecker::
@@ -2058,6 +2065,13 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     }
     conformance->setInvalid();
     return conformance;
+  }
+
+  // Complain about the use of @unchecked for protocols that don't have
+  // additional semantic checks.
+  if (conformance->isUnchecked() && !hasAdditionalSemanticChecks(Proto)) {
+    C.Diags.diagnose(
+      ComplainLoc, diag::unchecked_conformance_not_special, ProtoType);
   }
 
   bool impliedDisablesMissingWitnessFixits = false;
@@ -2813,21 +2827,16 @@ bool ConformanceChecker::checkActorIsolation(
                   /*fromExpression=*/false)) {
   case ActorIsolationRestriction::DistributedActorSelf: {
     if (witness->isSynthesized()) {
-      // Some of our synthesized properties get special treatment,
-      // they are always available, regardless if the actor is remote even.
-      auto &C = requirement->getASTContext();
-
-      // actorAddress is special, it is *always* available.
-      // even if the actor is 'remote' it is always available and immutable.
-      if (witness->getName() == C.Id_actorAddress &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorAddressDecl()->getDeclaredInterfaceType()))
+      // we only have two 'distributed-actor-nonisolated' properties,
+      // the address and transport; if we see any such marked property,
+      // we're free to automatically assume those are fine and accessible always.
+      if (witness->isDistributedActorIndependent())
         return false;
+    }
 
-      // TODO: we don't *really* need to expose the transport like that... reconsider?
-      if (witness->getName() == C.Id_actorTransport &&
-          witness->getInterfaceType()->isEqual(
-              C.getActorTransportDecl()->getDeclaredInterfaceType()))
+    if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(witness)) {
+      // A 'distributed func' may witness a distributed isolated function requirement.
+      if (funcDecl->isDistributed())
         return false;
     }
 
@@ -2835,9 +2844,11 @@ bool ConformanceChecker::checkActorIsolation(
     LLVM_FALLTHROUGH;
   }
   case ActorIsolationRestriction::ActorSelf: {
+    auto requirementIsolation = getActorIsolation(requirement);
+
     // An actor-isolated witness can only conform to an actor-isolated
     // requirement.
-    if (getActorIsolation(requirement) == ActorIsolation::ActorInstance)
+    if (requirementIsolation == ActorIsolation::ActorInstance)
       return false;
 
     witness->diagnose(diag::actor_isolated_witness,
@@ -2889,8 +2900,12 @@ bool ConformanceChecker::checkActorIsolation(
   bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
     llvm_unreachable("There are not actor protocols");
+  case ActorIsolation::DistributedActorInstance:
+    // A requirement inside a distributed actor, where it has a protocol that was
+    // bound requiring a `DistributedActor` conformance (`protocol D: DistributedActor`),
+    // results in the requirement being isolated to given distributed actor.
+    break;
 
   case ActorIsolation::GlobalActorUnsafe:
     requirementIsUnsafe = true;
@@ -5839,7 +5854,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   MultiConformanceChecker groupChecker(Context);
 
   ProtocolConformance *SendableConformance = nullptr;
-  ProtocolConformance *unsafeSendableConformance = nullptr;
+  bool sendableConformanceIsUnchecked = false;
   ProtocolConformance *errorConformance = nullptr;
   ProtocolConformance *codingKeyConformance = nullptr;
   bool anyInvalid = false;
@@ -5870,6 +5885,11 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
       SendableConformance = conformance;
+
+      if (auto normal = conformance->getRootNormalConformance()) {
+        if (normal->isUnchecked())
+          sendableConformanceIsUnchecked = true;
+      }
     } else if (proto->isSpecificProtocol(KnownProtocolKind::DistributedActor)) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
         if (!classDecl->isDistributedActor()) {
@@ -5897,7 +5917,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeSendable)) {
-      unsafeSendableConformance = conformance;
+      sendableConformanceIsUnchecked = true;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
       errorConformance = conformance;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
@@ -5906,7 +5926,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   }
 
   // Check constraints of Sendable.
-  if (SendableConformance && !unsafeSendableConformance) {
+  if (SendableConformance && !sendableConformanceIsUnchecked) {
     SendableCheck check = SendableCheck::Explicit;
     if (errorConformance || codingKeyConformance)
       check = SendableCheck::ImpliedByStandardProtocol;

@@ -393,10 +393,10 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
                 diag::distributed_actor_func_defined_outside_of_distributed_actor,
                 func->getName());
           }
-        }
+        } // TODO: need to handle protocol case here too?
 
-          return forDistributedActorSelf(isolation.getActor(),
-                                         /*isCrossActor*/ isAccessibleAcrossActors); // TODO: not sure?
+        return forDistributedActorSelf(isolation.getActor(),
+                                       /*isCrossActor*/ isAccessibleAcrossActors);
       }
     }
 
@@ -438,7 +438,6 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     }
 
     case ActorIsolation::Independent:
-      // Actor-independent have no restrictions on their access.
       return forUnrestricted();
 
     case ActorIsolation::Unspecified:
@@ -2264,8 +2263,27 @@ namespace {
       switch (auto isolation =
                   ActorIsolationRestriction::forDeclaration(
                     memberRef, getDeclContext())) {
-      case ActorIsolationRestriction::Unrestricted:
+      case ActorIsolationRestriction::Unrestricted: {
+        // If a cross-actor reference is to an isolated actor, it's not
+        // crossing actors.
+        if (getIsolatedActor(base))
+          return false;
+
+        // Always fine to invoke constructors from outside of actors.
+        if (dyn_cast<ConstructorDecl>(member))
+          return false;
+
+        // While the member may be unrestricted, perhaps
+        if (auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext())) {
+          if (classDecl->isDistributedActor()) {
+            ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
+            noteIsolatedActorMember(member, context);
+            return true;
+          }
+        }
+
         return false;
+      }
 
       case ActorIsolationRestriction::CrossActorSelf: {
         // If a cross-actor reference is to an isolated actor, it's not
@@ -2295,7 +2313,6 @@ namespace {
               member->isInstanceMember() &&
               isActorInitOrDeInitContext(getDeclContext()))) {
           // invocation on not-'self', is only okey if this is a distributed func
-
           if (auto func = dyn_cast<FuncDecl>(member)) {
             if (!func->isDistributed()) {
               ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
@@ -2411,6 +2428,14 @@ namespace {
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
         // cases. The error is emitted by diagnoseInOutArg.
+
+        if (auto classDecl = dyn_cast<ClassDecl>(member->getDeclContext())) {
+          if (classDecl->isDistributedActor()) {
+            member->diagnose(diag::distributed_actor_isolated_method);
+            return true;
+          }
+        }
+
         return false;
       }
       llvm_unreachable("unhandled actor isolation kind!");
@@ -3132,10 +3157,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // overridden by other inference rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
 
-  // A @Sendable function is assumed to be actor-independent.
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    // A @Sendable function is assumed to be actor-independent.
     if (func->isSendable()) {
       defaultIsolation = ActorIsolation::forIndependent();
+    }
+
+    if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
+      if (nominal->isDistributedActor()) {
+        defaultIsolation = ActorIsolation::forDistributedActorInstance(nominal);
+      }
     }
   }
 
@@ -3172,10 +3203,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
 
     case ActorIsolation::DistributedActorInstance: {
-      /// 'distributed actor independent' implies 'actor independent'
-      if (value->isDistributedActorIndependent())
+      /// 'distributed actor independent' implies 'nonisolated'
+      if (value->isDistributedActorIndependent()) {
+        // TODO: rename 'distributed actor independent' to 'distributed(nonisolated)'
         value->getAttrs().add(
             new (ctx) DistributedActorIndependentAttr(/*IsImplicit=*/true));
+        value->getAttrs().add(
+            new (ctx) NonisolatedAttr(/*IsImplicit=*/true));
+      }
       break;
     }
     case ActorIsolation::ActorInstance:
@@ -3186,6 +3221,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       // Nothing to do.
       break;
     }
+
     return inferred;
   };
 
@@ -3291,7 +3327,7 @@ bool HasIsolatedSelfRequest::evaluate(
   // Only ever applies to members of actors.
   auto dc = value->getDeclContext();
   auto selfTypeDecl = dc->getSelfNominalTypeDecl();
-  if (!selfTypeDecl || !selfTypeDecl->isActor())
+  if (!selfTypeDecl || !selfTypeDecl->isAnyActor())
     return false;
 
   // For accessors, consider the storage declaration.
@@ -3607,6 +3643,20 @@ bool swift::checkSendableConformance(
       return false;
   }
 
+  // Global-actor-isolated types can be Sendable. We do not check the
+  // instance data because it's all isolated to the global actor.
+  switch (getActorIsolation(nominal)) {
+  case ActorIsolation::Unspecified:
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::DistributedActorInstance:
+  case ActorIsolation::Independent:
+    break;
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+    return false;
+  }
+
   // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
   auto behavior = toDiagnosticBehavior(
@@ -3620,20 +3670,6 @@ bool swift::checkSendableConformance(
 
     if (behavior != DiagnosticBehavior::Warning)
       return true;
-  }
-
-  // Global-actor-isolated types can be Sendable. We do not check the
-  // instance properties.
-  switch (getActorIsolation(nominal)) {
-  case ActorIsolation::Unspecified:
-  case ActorIsolation::ActorInstance:
-  case ActorIsolation::DistributedActorInstance:
-  case ActorIsolation::Independent:
-    break;
-
-  case ActorIsolation::GlobalActor:
-  case ActorIsolation::GlobalActorUnsafe:
-    return false;
   }
 
   if (classDecl) {
@@ -3722,7 +3758,7 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
     auto conformance = ctx.getConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        nominal, ProtocolConformanceState::Complete);
+        nominal, ProtocolConformanceState::Complete, false);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 

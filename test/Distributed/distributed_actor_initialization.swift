@@ -156,5 +156,3 @@ distributed actor BadRedeclare22 { //expected-error {{type 'BadRedeclare22' does
   // expected-error@-3 {{invalid redeclaration of synthesized 'init(resolve:using:)'}}
   // expected-error@-4 {{invalid redeclaration of synthesized initializer 'init(resolve:using:)'}}
 }
-
-// TODO: handle subclassing as well

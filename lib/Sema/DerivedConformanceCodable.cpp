@@ -137,8 +137,9 @@ addImplicitCodingKeys(NominalTypeDecl *target,
   // enum cases based on those var names.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
-  TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
+  InheritedEntry protoTypeLoc[1] = {
+    InheritedEntry(TypeLoc::withoutLoc(codingKeyType))};
+  ArrayRef<InheritedEntry> inherited = C.AllocateCopy(protoTypeLoc);
 
   auto *enumDecl = new (C) EnumDecl(SourceLoc(), codingKeysEnumIdentifier,
                                     SourceLoc(), inherited, nullptr, target);

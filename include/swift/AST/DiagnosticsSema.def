@@ -4441,7 +4441,7 @@ NOTE(distributed_actor_isolated_method_note,none,
       "only 'distributed' functions can be called from outside the distributed actor",
       ())
 ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' functions can be called from outside the distributed actor", // TODO: more like 'non-distributed' ... defined here
+      "only 'distributed' functions can be called from outside the distributed actor", // TODO: improve error message to be more like 'non-distributed' ... defined here
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
@@ -4452,6 +4452,12 @@ ERROR(distributed_actor_func_result_not_codable,none,
 ERROR(distributed_actor_remote_func_implemented_manually,none,
       "Distributed function's %0 remote counterpart %1 cannot not be implemented manually.",
       (Identifier, Identifier))
+ERROR(nonisolated_distributed_actor_storage,none,
+      "'nonisolated' can not be applied to distributed actor stored properties",
+      ())
+ERROR(distributed_actor_func_nonisolated, none,
+      "function %0 cannot be both 'nonisolated' and 'distributed'",
+      (DeclName))
 ERROR(distributed_actor_remote_func_is_not_static,none,
       "remote function %0 must be static.",
       (DeclName))
@@ -4516,15 +4522,22 @@ ERROR(concurrent_value_class_mutable_property,none,
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_outside_source_file,none,
       "conformance to 'Sendable' must occur in the same source file as "
-      "%0 %1; use 'UnsafeSendable' for retroactive conformance",
+      "%0 %1; use '@unchecked Sendable' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_nonfinal_class,none,
       "non-final class %0 cannot conform to `Sendable`; "
-      "use `UnsafeSendable`", (DeclName))
+      "use `@unchecked Sendable`", (DeclName))
 ERROR(concurrent_value_inherit,none,
       "`Sendable` class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
+
+WARNING(unchecked_conformance_not_special,none,
+      "@unchecked conformance to %0 has no meaning", (Type))
+ERROR(unchecked_not_inheritance_clause,none,
+      "'unchecked' attribute only applies in inheritance clauses", ())
+ERROR(unchecked_not_existential,none,
+      "'unchecked' attribute cannot apply to non-protocol type %0", (Type))
 
 ERROR(nonisolated_let,none,
       "'nonisolated' is meaningless on 'let' declarations because "
@@ -4593,7 +4606,7 @@ ERROR(distributed_actor_independent_property_must_be_let,none,
       "_distributedActorIndependent can be applied to properties, however they must be 'let'",
       ())
 NOTE(distributed_actor_isolated_property,none,
-      "distributed actor state is only available within the actor instance",
+      "distributed actor state is only available within the actor instance", // TODO: reword in terms of isolation
       ())
 
 ERROR(concurrency_lib_missing,none,

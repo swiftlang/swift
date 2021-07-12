@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,22 +29,39 @@
 ///
 /// See CanonicalOSSALifetime.h for examples.
 ///
-/// TODO: Enable canonical-ossa-rewrite-borrows to rewrite single-block borrows.
-/// Add support for multi-block borrows, load_borrow, and phi by using
-/// persistentCopies.
+/// TODO: Canonicalization currently bails out if any uses of the def has
+/// OperandOwnership::PointerEscape. Once project_box is protected by a borrow
+/// scope and mark_dependence is associated with an end_dependence, those will
+/// no longer be represented as PointerEscapes, and canonicalization will
+/// naturally work everywhere as intended. The intention is to keep the
+/// canonicalization algorithm as simple and robust, leaving the remaining
+/// performance opportunities contingent on fixing the SIL representation.
 ///
-/// TODO: If all client passes can maintain block numbers, then the
-/// SmallDenseMaps/SetVectors can be replaced with bitsets/sparsesets.
+/// TODO: Replace BasicBlock SmallDenseMaps/SetVectors with inlined bits;
+/// see BasicBlockDataStructures.h.
+///
+/// TODO: This algorithm would be extraordinarily simple and cheap except for
+/// the following issues:
+///
+/// 1. Liveness is extended by any overlapping begin/end_access scopes. This
+/// avoids calling a destructor within an exclusive access. A simpler
+/// alternative would be to model all end_access instructions as deinit
+/// barriers, but that may significantly limit optimization.
+///
+/// 2. A poison mode supports debugging by setting the poisonRefs flag on any
+/// destroys that have been hoisted. This forces the shadow variables to be
+/// overwritten with a sentinel, preventing the debugger from seeing
+/// deinitialized objects.
 ///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "copy-propagation"
 
 #include "swift/SILOptimizer/Utils/CanonicalOSSALifetime.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/Statistic.h"
@@ -52,469 +69,37 @@
 using namespace swift;
 using llvm::SmallSetVector;
 
-STATISTIC(NumCopiesEliminated, "number of copy_value instructions removed");
+llvm::Statistic swift::NumCopiesEliminated = {
+    DEBUG_TYPE, "NumCopiesEliminated",
+    "number of copy_value instructions removed"};
+
+llvm::Statistic swift::NumCopiesGenerated = {
+    DEBUG_TYPE, "NumCopiesGenerated",
+    "number of copy_value instructions created"};
+
 STATISTIC(NumDestroysEliminated,
           "number of destroy_value instructions removed");
-STATISTIC(NumCopiesGenerated, "number of copy_value instructions created");
 STATISTIC(NumDestroysGenerated, "number of destroy_value instructions created");
 STATISTIC(NumUnknownUsers, "number of functions with unknown users");
 
-/// This use-def walk must be consistent with the def-use walks performed
-/// within the canonicalizeValueLifetime() implementation.
-SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
-  while (auto *copy = dyn_cast<CopyValueInst>(v)) {
-    auto def = copy->getOperand();
-    if (def.getOwnershipKind() == OwnershipKind::Owned) {
-      v = def;
-      continue;
-    }
-    if (auto borrowedVal = BorrowedValue(def)) {
-      // Any def's that aren't filtered out here must be handled by
-      // computeBorrowLiveness.
-      switch (borrowedVal.kind) {
-      case BorrowedValueKind::Invalid:
-        llvm_unreachable("Using invalid case?!");
-      case BorrowedValueKind::SILFunctionArgument:
-        return def;
-      case BorrowedValueKind::BeginBorrow: {
-        return def;
-      }
-      case BorrowedValueKind::LoadBorrow:
-      case BorrowedValueKind::Phi:
-        break;
-      }
-    }
-    // This guaranteed value cannot be handled, treat the copy as an owned
-    // live range def instead.
-    return copy;
-  }
-  return v;
-}
+//===----------------------------------------------------------------------===//
+//                           MARK: General utilities
+//===----------------------------------------------------------------------===//
 
 /// The lifetime extends beyond given consuming use. Copy the value.
 ///
 /// This can set the operand value, but cannot invalidate the use iterator.
-static void copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks) {
+void swift::copyLiveUse(Operand *use, InstModCallbacks &instModCallbacks) {
   SILInstruction *user = use->getUser();
   SILBuilderWithScope builder(user->getIterator());
 
   auto loc = RegularLocation::getAutoGeneratedLocation(user->getLoc());
   auto *copy = builder.createCopyValue(loc, use->get());
   instModCallbacks.createdNewInst(copy);
-  instModCallbacks.setUseValue(use, copy);
+  use->set(copy);
 
   ++NumCopiesGenerated;
   LLVM_DEBUG(llvm::dbgs() << "  Copying at last use " << *copy);
-}
-
-// TODO: generalize this to handle multiple nondebug uses of the struct_extract.
-SILValue swift::convertExtractToDestructure(StructExtractInst *extract,
-                                            InstModCallbacks *callbacks) {
-  if (!hasOneNonDebugUse(extract))
-    return nullptr;
-
-  if (!extract->isFieldOnlyNonTrivialField())
-    return nullptr;
-
-  auto *extractCopy =
-      dyn_cast<CopyValueInst>(getNonDebugUses(extract).begin()->getUser());
-  if (!extractCopy)
-    return nullptr;
-
-  SILBuilderWithScope builder(extract);
-  auto loc = extract->getLoc();
-  auto *copy = builder.createCopyValue(loc, extract->getOperand());
-  auto *destructure = builder.createDestructureStruct(loc, copy);
-  if (callbacks) {
-    callbacks->createdNewInst(copy);
-    callbacks->createdNewInst(destructure);
-  }
-
-  SILValue nonTrivialResult = destructure->getResult(extract->getFieldIndex());
-  assert(!nonTrivialResult->getType().isTrivial(*destructure->getFunction())
-         && "field idx mismatch");
-
-  if (callbacks) {
-    callbacks->replaceValueUsesWith(extractCopy, nonTrivialResult);
-  } else {
-    extractCopy->replaceAllUsesWith(nonTrivialResult);
-  }
-  return nonTrivialResult;
-}
-
-//===----------------------------------------------------------------------===//
-//                        MARK: Rewrite borrow scopes
-//===----------------------------------------------------------------------===//
-
-bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
-  auto borrowedVal = BorrowedValue(currentDef);
-  if (!borrowedVal) {
-    return false;
-  }
-  switch (borrowedVal.kind) {
-  case BorrowedValueKind::Invalid:
-    llvm_unreachable("Used invalid");
-  case BorrowedValueKind::SILFunctionArgument:
-    // For efficiency, function arguments skip liveness.
-    return true;
-  case BorrowedValueKind::LoadBorrow:
-  case BorrowedValueKind::Phi:
-    // TODO: Canonicalize load_borrow scope and phi once consolidateBorrowScope
-    // can handle persistentCopies.
-    return false;
-  case BorrowedValueKind::BeginBorrow:
-    break;
-  }
-  if (!canonicalizeBorrowMode)
-    return false;
-
-  // Note that there is no need to look through any reborrows. The reborrowed
-  // value is considered a separate lifetime for canonicalization. Any copies of
-  // the reborrowed value will not be rewritten when canonicalizing the current
-  // borrow scope because they are "hidden" behind the reborrow.
-  borrowedVal.visitLocalScopeEndingUses([this](Operand *use) {
-    liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ true);
-    return true;
-  });
-  return true;
-}
-
-// Create a copy for outer uses of the borrow scope introduced by
-// currentDef. This copy should only be used by outer uses in the same block
-// as the borrow scope.
-//
-// To use an existing outer copy, we could find its earliest consume. But the
-// new copy will immediately canonicalized and a canonical begin_borrow scope
-// have no outer uses of its first block.
-static CopyValueInst *createOuterCopy(BeginBorrowInst *beginBorrow,
-                                      InstModCallbacks &instModCallbacks) {
-  SILBuilderWithScope builder(beginBorrow);
-
-  auto loc = RegularLocation::getAutoGeneratedLocation(beginBorrow->getLoc());
-  auto *copy = builder.createCopyValue(loc, beginBorrow->getOperand());
-  instModCallbacks.createdNewInst(copy);
-
-  ++NumCopiesGenerated;
-  LLVM_DEBUG(llvm::dbgs() << "  Outer copy " << *copy);
-
-  return copy;
-}
-
-// This def-use traversal is similar to findExtendedTransitiveGuaranteedUses(),
-// however, to cover the canonical lifetime, it looks through copies. It also
-// considers uses within the introduced borrow scope itself (instead of simply
-// visiting the scope-ending uses). It does not, however, look into nested
-// borrow scopes uses, since nested scopes are canonicalized independently.
-//
-// \p useInsts are the potentially outer use instructions. This set will
-// be pared down to only the outer uses in the next step.
-bool CanonicalizeOSSALifetime::findBorrowScopeUses(
-    llvm::SmallPtrSetImpl<SILInstruction *> &useInsts) {
-  auto isUserInLiveOutBlock = [&](SILInstruction *user) {
-    return (liveness.getBlockLiveness(user->getParent())
-            == PrunedLiveBlocks::LiveOut);
-    return false;
-  };
-  auto recordOuterUse = [&](Operand *use) {
-    // If the user's block is LiveOut, then it is definitely within the borrow
-    // scope, so there's no need to record it.
-    if (isUserInLiveOutBlock(use->getUser())) {
-      return;
-    }
-    useInsts.insert(use->getUser());
-  };
-  defUseWorklist.initialize(currentDef);
-  // Avoid revisiting uses because we recurse through
-  // struct/destructure. Otherwise the order does not matter.
-  while (SILValue value = defUseWorklist.pop()) {
-    for (Operand *use : value->getUses()) {
-      auto *user = use->getUser();
-      // Recurse through copies.
-      if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-        defUseWorklist.insert(copy);
-        continue;
-      }
-      // Note: debug_value uses are handled like normal uses here. They should
-      // be stripped later if required when handling outerCopy or
-      // persistentCopies.
-
-      switch (use->getOperandOwnership()) {
-      case OperandOwnership::NonUse:
-        break;
-      case OperandOwnership::TrivialUse:
-        llvm_unreachable("this operand cannot handle ownership");
-
-      case OperandOwnership::InteriorPointer:
-      case OperandOwnership::ForwardingBorrow:
-      case OperandOwnership::EndBorrow:
-      case OperandOwnership::Reborrow:
-        // Ignore uses that must be within the borrow scope.
-        // Rewriting does not look through reborrowed values--it considers them
-        // part of a separate lifetime.
-        break;
-
-      case OperandOwnership::ForwardingUnowned:
-      case OperandOwnership::PointerEscape:
-        // Pointer escapes are only allowed if they use the guaranteed value,
-        // which means that the escaped value must be confied to the current
-        // borrow scope.
-        if (use->get().getOwnershipKind() != OwnershipKind::Guaranteed)
-          return false;
-        break;
-
-      case OperandOwnership::ForwardingConsume:
-        // Recurse through destructure, but also record them as an outer
-        // use. Note that they will consider to be outer uses even if they are
-        // within this scope as long as any of their transitively uses our
-        // outside the scope.
-        //
-        // FIXME: handle all ForwardingOperands.
-        recordOuterUse(use);
-        for (auto result : user->getResults()) {
-          if (result.getOwnershipKind() == OwnershipKind::Owned) {
-            defUseWorklist.insert(result);
-          }
-        }
-        break;
-
-      case OperandOwnership::InstantaneousUse:
-      case OperandOwnership::UnownedInstantaneousUse:
-      case OperandOwnership::BitwiseEscape:
-      case OperandOwnership::DestroyingConsume:
-        recordOuterUse(use);
-        break;
-      case OperandOwnership::Borrow:
-        BorrowingOperand borrowOper(use);
-        assert(borrowOper && "BorrowingOperand must handle OperandOwnership");
-        recordOuterUse(use);
-        // For borrows, record the scope-ending instructions in addition to the
-        // borrow instruction outer use points. The logic below to check whether
-        // a borrow scope is an outer use must visit the same set of uses.
-        borrowOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
-          if (!isUserInLiveOutBlock(endBorrow->getUser())) {
-            useInsts.insert(endBorrow->getUser());
-          }
-          return true;
-        });
-        break;
-      }
-    } // end switch OperandOwnership
-  }   // end def-use traversal
-
-  return true;
-}
-
-void CanonicalizeOSSALifetime::filterOuterBorrowUseInsts(
-    llvm::SmallPtrSetImpl<SILInstruction *> &outerUseInsts) {
-  auto *beginBorrow = cast<BeginBorrowInst>(currentDef);
-  SmallVector<SILInstruction *, 4> scopeEndingInsts;
-  BorrowedValue(beginBorrow).getLocalScopeEndingInstructions(scopeEndingInsts);
-  blockWorklist.clear();
-  // Remove outer uses that occur before the end of the borrow scope by
-  // reverse iterating from the end_borrow.
-  auto scanBlock = [&](SILBasicBlock *bb, SILBasicBlock::iterator endIter) {
-    auto beginIter = bb->begin();
-    if (bb == beginBorrow->getParent()) {
-      beginIter = std::next(beginBorrow->getIterator());
-    } else {
-      blockWorklist.insert(bb);
-    }
-    for (auto instIter = endIter; instIter != beginIter;) {
-      --instIter;
-      outerUseInsts.erase(&*instIter);
-    }
-  };
-  for (auto *scopeEnd : scopeEndingInsts) {
-    scanBlock(scopeEnd->getParent(), std::next(scopeEnd->getIterator()));
-  }
-  // This worklist is also a visited set, so we never pop the entries.
-  while (auto *bb = blockWorklist.pop()) {
-    for (auto *predBB : bb->getPredecessorBlocks()) {
-      scanBlock(predBB, predBB->end());
-    }
-  }
-}
-
-// Repeat the same def-use traversal as findBorrowScopeUses(). This time,
-// instead of recording all the uses, rewrite the operands of outer uses,
-// record consumingUses, and add forwarding operations to the outerUseInsts if
-// they have transitive outer uses.
-//
-// Recurse through forwarded consumes, but don't revisit uses. Once an outer
-// use it visited, it marks its incoming operand as an outer use.
-//
-// Return true if any outer uses were found and rewritten.
-void CanonicalizeOSSALifetime::rewriteOuterBorrowUsesAndFindConsumes(
-    SILValue incomingValue,
-    llvm::SmallPtrSetImpl<SILInstruction *> &outerUseInsts) {
-
-  SILValue newIncomingValue =
-      (incomingValue == currentDef) ? outerCopy : incomingValue;
-
-  // Outer uses specific to the current incomingValue
-  SmallVector<SILInstruction *, 4> currentOuterUseInsts;
-  SmallVector<Operand *, 4> consumingUses;
-  SmallPtrSet<SILInstruction *, 4> unclaimedConsumingUsers;
-
-  auto rewriteOuterUse = [&](Operand *use) {
-    LLVM_DEBUG(llvm::dbgs() << "  Use of outer copy " << *use->getUser());
-    instModCallbacks.setUseValue(use, newIncomingValue);
-    currentOuterUseInsts.push_back(use->getUser());
-    outerUseInsts.insert(incomingValue->getDefiningInstruction());
-    if (use->isLifetimeEnding()) {
-      consumingUses.push_back(use);
-      unclaimedConsumingUsers.insert(use->getUser());
-    }
-  };
-  // defUseWorklist is used recursively here
-  unsigned defUseStart = defUseWorklist.size();
-  defUseWorklist.insert(incomingValue);
-  while (defUseStart < defUseWorklist.size()) {
-    SILValue value = defUseWorklist.pop();
-    // Gather the uses before updating any of them.
-    SmallVector<Operand *, 4> uses(value->getUses());
-    for (Operand *use : uses) {
-      auto *user = use->getUser();
-      // Transitively poke through copies.
-      if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-        defUseWorklist.insert(copy);
-        continue;
-      }
-      // Note: debug_value uses are handled like normal uses here. They should
-      // be stripped later if required when handling outerCopy or
-      // persistentCopies.
-
-      switch (use->getOperandOwnership()) {
-      case OperandOwnership::NonUse:
-      case OperandOwnership::TrivialUse:
-      case OperandOwnership::InteriorPointer:
-      case OperandOwnership::ForwardingBorrow:
-      case OperandOwnership::EndBorrow:
-      case OperandOwnership::Reborrow:
-      case OperandOwnership::ForwardingUnowned:
-      case OperandOwnership::PointerEscape:
-        break;
-
-      case OperandOwnership::ForwardingConsume:
-        // FIXME: Need unit tests for various forwarding operations.
-        //
-        // Handles:
-        //   Enum, SelectValue, InitExistential, MarkDependence
-        //   Struct, Tuple
-        //   DestructureStruct, DestructureTuple
-        //   Various reference casts,
-        //   SelectEnum, SwitchEnum, CheckCastBranch
-        if (OwnershipForwardingMixin::isa(user->getKind())) {
-          for (auto result : user->getResults()) {
-            if (result.getOwnershipKind() != OwnershipKind::Owned)
-              continue;
-
-            // Process transitive users and add this destructure to
-            // outerUseInsts if any outer uses were found.
-            rewriteOuterBorrowUsesAndFindConsumes(result, outerUseInsts);
-            if (outerUseInsts.count(user)) {
-              rewriteOuterUse(use);
-            }
-          }
-          continue;
-        }
-        // Calls and unrecognized forwarding consumes are end points.
-        LLVM_FALLTHROUGH;
-
-      case OperandOwnership::InstantaneousUse:
-      case OperandOwnership::UnownedInstantaneousUse:
-      case OperandOwnership::BitwiseEscape:
-      case OperandOwnership::DestroyingConsume:
-        if (outerUseInsts.count(use->getUser())) {
-          rewriteOuterUse(use);
-        }
-        break;
-      case OperandOwnership::Borrow:
-        BorrowingOperand borrowOper(use);
-        assert(borrowOper && "BorrowingOperand must handle OperandOwnership");
-
-        // For borrows, record the scope-ending instructions in addition to the
-        // borrow instruction outer use points.
-        if (outerUseInsts.count(use->getUser())
-            || !borrowOper.visitExtendedScopeEndingUses([&](Operand *endScope) {
-                 return !outerUseInsts.count(endScope->getUser());
-               })) {
-          rewriteOuterUse(use);
-        }
-        break;
-      }
-    }  // end switch OperandOwnership
-  }    // end def-use traversal
-
-  // Insert a destroy on the outer copy's or forwarding consume's lifetime
-  // frontier, or claim an existing consume.
-  ValueLifetimeAnalysis lifetimeAnalysis(
-      newIncomingValue.getDefiningInstruction(), currentOuterUseInsts);
-  ValueLifetimeBoundary boundary;
-  lifetimeAnalysis.computeLifetimeBoundary(boundary);
-
-  for (auto *boundaryEdge : boundary.boundaryEdges) {
-    if (DeadEndBlocks::triviallyEndsInUnreachable(boundaryEdge))
-      continue;
-    auto insertPt = boundaryEdge->begin();
-    auto *dvi = SILBuilderWithScope(insertPt).createDestroyValue(
-        insertPt->getLoc(), newIncomingValue);
-    instModCallbacks.createdNewInst(dvi);
-  }
-
-  for (SILInstruction *lastUser : boundary.lastUsers) {
-    if (unclaimedConsumingUsers.erase(lastUser))
-        continue;
-
-    SILBuilderWithScope::insertAfter(lastUser, [&](SILBuilder &b) {
-      auto *dvi = b.createDestroyValue(lastUser->getLoc(), newIncomingValue);
-      instModCallbacks.createdNewInst(dvi);
-    });
-  }
-  // Add copies for consuming users of newIncomingValue.
-  for (auto *use : consumingUses) {
-    // If the user is still in the unclaimedConsumingUsers set, then it does not
-    // end the outer copy's lifetime and therefore requires a copy. Only one
-    // operand can be claimed as ending the lifetime, so return its user to the
-    // unclaimedConsumingUsers set after skipping the first copy.
-    auto iterAndInserted = unclaimedConsumingUsers.insert(use->getUser());
-    if (!iterAndInserted.second) {
-      copyLiveUse(use, instModCallbacks);
-    }
-  }
-}
-
-// If this succeeds, then all uses of the borrowed value outside the borrow
-// scope will be rewritten to use an outer copy, and all remaining uses of the
-// borrowed value will be confined to the borrow scope.
-//
-// TODO: Canonicalize multi-block borrow scopes, load_borrow scope, and phi
-// borrow scopes by adding one copy per block to persistentCopies for
-// each block that dominates an outer use.
-bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
-  if (isa<SILFunctionArgument>(currentDef)) {
-    return true;
-  }
-  // getCanonicalCopiedDef ensures that if currentDef is a guaranteed value,
-  // then it is a borrow scope introducer.
-  assert(BorrowedValue(currentDef).isLocalScope());
-
-  // Gather all potential outer uses before rewriting any to avoid scanning any
-  // basic block more than once.
-  llvm::SmallPtrSet<SILInstruction *, 8> outerUseInsts;
-  if (!findBorrowScopeUses(outerUseInsts))
-    return false;
-
-  filterOuterBorrowUseInsts(outerUseInsts);
-  if (outerUseInsts.empty()) {
-    return true;
-  }
-  this->outerCopy =
-      createOuterCopy(cast<BeginBorrowInst>(currentDef), instModCallbacks);
-
-  defUseWorklist.clear();
-  rewriteOuterBorrowUsesAndFindConsumes(currentDef, outerUseInsts);
-  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -662,8 +247,7 @@ endsAccessOverlappingPrunedBoundary(SILInstruction *inst) {
     // that does not pass through endAccess. endAccess is dominated by
     // both currentDef and begin_access. Therefore, such a path only exists if
     // beginAccess dominates currentDef.
-    DominanceInfo *domInfo = dominanceAnalysis->get(inst->getFunction());
-    return domInfo->properlyDominates(beginAccess->getParent(),
+    return domTree->properlyDominates(beginAccess->getParent(),
                                       getCurrentDef()->getParentBlock());
   }
   llvm_unreachable("covered switch");
@@ -776,7 +360,7 @@ void CanonicalizeOSSALifetime::insertDestroyOnCFGEdge(
   SILBuilderWithScope builder(pos);
   auto loc = RegularLocation::getAutoGeneratedLocation(pos->getLoc());
   auto *di = builder.createDestroyValue(loc, currentDef, needsPoison);
-  instModCallbacks.createdNewInst(di);
+  getCallbacks().createdNewInst(di);
 
   consumes.recordFinalConsume(di);
 
@@ -848,15 +432,13 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
       if (isa<TermInst>(inst)) {
         for (auto &succ : bb->getSuccessors()) {
           insertDestroyOnCFGEdge(bb, succ, poisonRefsMode);
-          setChanged();
         }
       } else {
         if (existingDestroy) {
           needsPoison = existingDestroyNeedsPoison;
         }
         insertDestroyAtInst(std::next(instIter), existingDestroy, currentDef,
-                            needsPoison, consumes, instModCallbacks);
-        setChanged();
+                            needsPoison, consumes, getCallbacks());
       }
       return;
     case PrunedLiveness::LifetimeEndingUse:
@@ -907,8 +489,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
         needsPoison = existingDestroyNeedsPoison;
       }
       insertDestroyAtInst(instIter, existingDestroy, currentDef, needsPoison,
-                          consumes, instModCallbacks);
-      setChanged();
+                          consumes, getCallbacks());
       return;
     }
     --instIter;
@@ -919,8 +500,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
         needsPoison = existingDestroyNeedsPoison;
       }
       insertDestroyAtInst(std::next(instIter), existingDestroy, currentDef,
-                          needsPoison, consumes, instModCallbacks);
-      setChanged();
+                          needsPoison, consumes, getCallbacks());
       return;
     }
   }
@@ -958,7 +538,6 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
       for (auto *predBB : bb->getPredecessorBlocks()) {
         if (liveness.getBlockLiveness(predBB) == PrunedLiveBlocks::LiveOut) {
           insertDestroyOnCFGEdge(predBB, bb, poisonRefsMode);
-          setChanged();
         } else {
           if (poisonRefsMode) {
             remnantLiveOutBlocks.insert(predBB);
@@ -979,9 +558,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroys() {
 /// copies and destroys for deletion. Insert new copies for interior uses that
 /// require ownership of the used operand.
 void CanonicalizeOSSALifetime::rewriteCopies() {
-  bool isOwned = currentDef.getOwnershipKind() == OwnershipKind::Owned;
-  assert((!isOwned || !consumes.hasPersistentCopies())
-         && "persistent copies use borrowed values");
+  assert(currentDef.getOwnershipKind() == OwnershipKind::Owned);
 
   SmallSetVector<SILInstruction *, 8> instsToDelete;
   defUseWorklist.clear();
@@ -994,10 +571,8 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
     auto *user = use->getUser();
     // Recurse through copies.
     if (auto *copy = dyn_cast<CopyValueInst>(user)) {
-      if (!consumes.isPersistentCopy(copy)) {
-        defUseWorklist.insert(copy);
-        return true;
-      }
+      defUseWorklist.insert(copy);
+      return true;
     }
     if (auto *destroy = dyn_cast<DestroyValueInst>(user)) {
       // If this destroy was marked as a final destroy, ignore it; otherwise,
@@ -1045,14 +620,8 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   for (auto useIter = currentDef->use_begin(), endIter = currentDef->use_end();
        useIter != endIter;) {
     Operand *use = *useIter++;
-    // A direct lifetime-ending use of a guaranteed value (EndBorrow or
-    // Reborrow), never needs a copy.
-    if (!isOwned && use->isLifetimeEnding()) {
-      continue;
-    }
     if (!visitUse(use)) {
-      copyLiveUse(use, instModCallbacks);
-      setChanged();
+      copyLiveUse(use, getCallbacks());
     }
   }
   while (SILValue value = defUseWorklist.pop()) {
@@ -1065,16 +634,14 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
         if (!reusedCopyOp && srcCopy->getParent() == use->getParentBlock()) {
           reusedCopyOp = use;
         } else {
-          copyLiveUse(use, instModCallbacks);
-          setChanged();
+          copyLiveUse(use, getCallbacks());
         }
       }
     }
     if (!(reusedCopyOp && srcCopy->hasOneUse())) {
-      setChanged();
-      instModCallbacks.replaceValueUsesWith(srcCopy, srcCopy->getOperand());
+      getCallbacks().replaceValueUsesWith(srcCopy, srcCopy->getOperand());
       if (reusedCopyOp) {
-        instModCallbacks.setUseValue(reusedCopyOp, srcCopy);
+        reusedCopyOp->set(srcCopy);
       } else {
         if (instsToDelete.insert(srcCopy)) {
           LLVM_DEBUG(llvm::dbgs() << "  Removing " << *srcCopy);
@@ -1099,15 +666,12 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
   // Remove any dead, non-recovered debug_values.
   for (auto *dvi : consumes.getDebugInstsAfterConsume()) {
     LLVM_DEBUG(llvm::dbgs() << "  Removing debug_value: " << *dvi);
-    instModCallbacks.deleteInst(dvi);
+    deleter.forceDelete(dvi);
   }
 
   // Remove the leftover copy_value and destroy_value instructions.
-  if (!instsToDelete.empty()) {
-    recursivelyDeleteTriviallyDeadInstructions(instsToDelete.takeVector(),
-                                               /*force=*/true,
-                                               instModCallbacks);
-    setChanged();
+  for (unsigned idx = 0, eidx = instsToDelete.size(); idx != eidx; ++idx) {
+    deleter.forceDelete(instsToDelete[idx]);
   }
 }
 
@@ -1119,7 +683,7 @@ void CanonicalizeOSSALifetime::injectPoison() {
         builder.getInsertionPoint()->getLoc());
       auto *di = builder.createDestroyValue(loc, currentDef,
                                             /*needsPoison*/ true);
-      instModCallbacks.createdNewInst(di);
+      getCallbacks().createdNewInst(di);
       ++NumDestroysGenerated;
       LLVM_DEBUG(llvm::dbgs() << "  Destroy at last use " << *di);
     };
@@ -1148,7 +712,7 @@ void CanonicalizeOSSALifetime::injectPoison() {
 /// shorten lifetimes to mimic -O behavior, not to remove copies.
 ///
 /// IRGen must also have support for injecting poison into values of this type.
-bool shouldCanonicalizeWithPoison(SILValue def) {
+static bool shouldCanonicalizeWithPoison(SILValue def) {
   assert(def->getType().isObject() && "only SIL values are canonicalized");
   auto objectTy = def->getType().unwrapOptionalType();
 
@@ -1159,57 +723,45 @@ bool shouldCanonicalizeWithPoison(SILValue def) {
   return objectTy.isAnyClassReferenceType();
 }
 
+/// Canonicalize a single extended owned lifetime.
 bool CanonicalizeOSSALifetime::canonicalizeValueLifetime(SILValue def) {
+  if (def.getOwnershipKind() != OwnershipKind::Owned)
+    return false;
+
+  if (poisonRefsMode && !shouldCanonicalizeWithPoison(def))
+    return false;
+
   LLVM_DEBUG(llvm::dbgs() << "  Canonicalizing: " << def);
 
-  switch (def.getOwnershipKind()) {
-  case OwnershipKind::None:
-  case OwnershipKind::Unowned:
-  case OwnershipKind::Any:
+  // Note: There is no need to register callbacks with this utility. 'onDelete'
+  // is the only one in use to handle dangling pointers, which could be done
+  // instead be registering a temporary handler with the pass. Canonicalization
+  // is only allowed to create and delete instructions that are associated with
+  // this canonical def (copies and destroys). Each canonical def has a disjoint
+  // extended lifetime. Any pass calling this utility should work at the level
+  // canonical defs, not individual instructions.
+  //
+  // NotifyWillBeDeleted will not work because copy rewriting removes operands
+  // before deleting instructions. Also prohibit setUse callbacks just because
+  // that would simply be insane.
+  assert(!getCallbacks().notifyWillBeDeletedFunc
+         && !getCallbacks().setUseValueFunc && "unsupported");
+
+  initDef(def);
+  // Step 1: compute liveness
+  if (!computeCanonicalLiveness()) {
+    clearLiveness();
     return false;
-  case OwnershipKind::Guaranteed:
-    // The goal of poisonRefsMode is only to hoist destroys, not remove copies.
-    if (poisonRefsMode)
-      return false;
-
-    initDef(def);
-    if (!computeBorrowLiveness()) {
-      clearLiveness();
-      return false;
-    }
-    // Set outerCopy and persistentCopies and rewrite uses
-    // outside the scope.
-    if (!consolidateBorrowScope()) {
-      clearLiveness();
-      return false;
-    }
-    // Invalidate book-keeping before deleting instructions.
-    clearLiveness();
-    // Rewrite copies and delete extra destroys within the scope.
-    assert(!consumes.hasFinalConsumes());
-    rewriteCopies();
-    return true;
-  case OwnershipKind::Owned:
-    if (poisonRefsMode && !shouldCanonicalizeWithPoison(def))
-      return false;
-
-    initDef(def);
-    // Step 1: compute liveness
-    if (!computeCanonicalLiveness()) {
-      clearLiveness();
-      return false;
-    }
-    extendLivenessThroughOverlappingAccess();
-    // Step 2: record final destroys
-    findOrInsertDestroys();
-    // Step 3: rewrite copies and delete extra destroys
-    rewriteCopies();
-
-    clearLiveness();
-    consumes.clear();
-    return true;
   }
-  llvm_unreachable("covered switch");
+  extendLivenessThroughOverlappingAccess();
+  // Step 2: record final destroys
+  findOrInsertDestroys();
+  // Step 3: rewrite copies and delete extra destroys
+  rewriteCopies();
+
+  clearLiveness();
+  consumes.clear();
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1223,63 +775,3 @@ SWIFT_ASSERT_ONLY_DECL(
       llvm::dbgs() << "  " << *blockAndInst.getSecond();
     }
   })
-
-//===----------------------------------------------------------------------===//
-//                    MARK: Canonicalize Lifetimes Utility
-//===----------------------------------------------------------------------===//
-
-SILAnalysis::InvalidationKind
-swift::canonicalizeOSSALifetimes(CanonicalizeOSSALifetime &canonicalizer,
-                                 ArrayRef<SILValue> copiedDefs) {
-  auto isCopyDead = [](CopyValueInst *copy, bool pruneDebug) -> bool {
-    for (Operand *use : copy->getUses()) {
-      auto *user = use->getUser();
-      if (isa<DestroyValueInst>(user)) {
-        continue;
-      }
-      if (pruneDebug && isa<DebugValueInst>(user)) {
-        continue;
-      }
-      return false;
-    }
-    return true;
-  };
-
-  // Cleanup dead copies. If getCanonicalCopiedDef returns a copy (because the
-  // copy's source operand is unrecgonized), then the copy is itself treated
-  // like a def and may be dead after canonicalization.
-  SmallVector<SILInstruction *, 4> deadCopies;
-  for (auto def : copiedDefs) {
-    // Canonicalized this def. If we did not perform any canonicalization, just
-    // continue.
-    if (!canonicalizer.canonicalizeValueLifetime(def))
-      continue;
-
-    // Otherwise, see if we have a dead copy.
-    if (auto *copy = dyn_cast<CopyValueInst>(def)) {
-      if (isCopyDead(copy, false /*prune debug*/)) {
-        deadCopies.push_back(copy);
-      }
-    }
-
-    // Canonicalize any new outer copy.
-    if (SILValue outerCopy = canonicalizer.createdOuterCopy()) {
-      SILValue outerDef = canonicalizer.getCanonicalCopiedDef(outerCopy);
-      canonicalizer.canonicalizeValueLifetime(outerDef);
-    }
-
-    // TODO: also canonicalize any lifetime.persistentCopies like separate owned
-    // live ranges.
-  }
-
-  if (!canonicalizer.hasChanged() && deadCopies.empty()) {
-    return SILAnalysis::InvalidationKind::Nothing;
-  }
-
-  // We use our canonicalizers inst mod callbacks.
-  InstructionDeleter deleter(canonicalizer.getInstModCallbacks());
-  for (auto *copy : deadCopies) {
-    deleter.deleteIfDead(copy);
-  }
-  return SILAnalysis::InvalidationKind::Instructions;
-}

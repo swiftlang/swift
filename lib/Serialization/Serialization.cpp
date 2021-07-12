@@ -1499,6 +1499,7 @@ void Serializer::writeASTBlockEntity(
                                               numTypeWitnesses,
                                               numValueWitnesses,
                                               numSignatureConformances,
+                                              conformance->isUnchecked(),
                                               data);
 
   // Write requirement signature conformances.
@@ -3060,6 +3061,24 @@ public:
   /// If this gets referenced, we forgot to handle a decl.
   void visitDecl(const Decl *) = delete;
 
+  /// Add all of the inherited entries to the result vector.
+  ///
+  /// \returns the number of entries added.
+  unsigned addInherited(ArrayRef<InheritedEntry> inheritedEntries,
+                        SmallVectorImpl<TypeID> &result) {
+    for (const auto &inherited : inheritedEntries) {
+      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
+      TypeID typeRef = S.addTypeRef(inherited.getType());
+
+      // Encode "unchecked" in the low bit.
+      typeRef = (typeRef << 1) | (inherited.isUnchecked ? 0x01 : 0x00);
+
+      result.push_back(typeRef);
+    }
+
+    return inheritedEntries.size();
+  }
+
   void visitExtensionDecl(const ExtensionDecl *extension) {
     using namespace decls_block;
 
@@ -3083,11 +3102,8 @@ public:
                           ConformanceLookupKind::All);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
-    for (auto inherited : extension->getInherited()) {
-      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
-    size_t numInherited = inheritedAndDependencyTypes.size();
+    size_t numInherited = addInherited(
+        extension->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(
@@ -3321,10 +3337,8 @@ public:
                           ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theStruct->getInherited()) {
-      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
+    unsigned numInherited = addInherited(
+        theStruct->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (Requirement req : theStruct->getGenericRequirements()) {
@@ -3347,7 +3361,7 @@ public:
                                             theStruct->getGenericSignature()),
                              rawAccessLevel,
                              conformances.size(),
-                             theStruct->getInherited().size(),
+                             numInherited,
                              inheritedAndDependencyTypes);
 
 
@@ -3366,10 +3380,8 @@ public:
                           ConformanceLookupKind::All);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theEnum->getInherited()) {
-      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
+    unsigned numInherited = addInherited(
+        theEnum->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
@@ -3405,7 +3417,7 @@ public:
                             S.addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
                             conformances.size(),
-                            theEnum->getInherited().size(),
+                            numInherited,
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theEnum->getGenericParams());
@@ -3424,10 +3436,8 @@ public:
                           ConformanceLookupKind::NonInherited);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theClass->getInherited()) {
-      assert(!inherited.getType() || !inherited.getType()->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(inherited.getType()));
-    }
+    unsigned numInherited = addInherited(
+        theClass->getInherited(), inheritedAndDependencyTypes);
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     if (theClass->hasSuperclass()) {
@@ -3465,7 +3475,7 @@ public:
                             S.addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),
-                            theClass->getInherited().size(),
+                            numInherited,
                             inheritedAndDependencyTypes);
 
     writeGenericParams(theClass->getGenericParams());
@@ -3482,10 +3492,13 @@ public:
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     llvm::SmallSetVector<Type, 4> dependencyTypes;
 
+    unsigned numInherited = addInherited(
+        proto->getInherited(), inheritedAndDependencyTypes);
+
+    // Separately collect inherited protocol types as dependencies.
     for (auto element : proto->getInherited()) {
       auto elementType = element.getType();
       assert(!elementType || !elementType->hasArchetype());
-      inheritedAndDependencyTypes.push_back(S.addTypeRef(elementType));
       if (elementType && elementType->is<ProtocolType>())
         dependencyTypes.insert(elementType);
     }
@@ -3513,7 +3526,7 @@ public:
                                  ->requiresClass(),
                                proto->isObjC(),
                                proto->existentialTypeSupported(),
-                               rawAccessLevel, proto->getInherited().size(),
+                               rawAccessLevel, numInherited,
                                inheritedAndDependencyTypes);
 
     writeGenericParams(proto->getGenericParams());
