@@ -1,31 +1,12 @@
-
-set(driver_sources_and_options
-                driver.cpp
-                autolink_extract_main.cpp
-                modulewrap_main.cpp
-                swift_api_digester_main.cpp
-                swift_indent_main.cpp
-                swift_symbolgraph_extract_main.cpp
-                swift_api_extract_main.cpp
-                )
-
-set(driver_common_libs
-                swiftAPIDigester
-                swiftDriver
-                swiftFrontendTool
-                swiftSymbolGraphGen
-                LLVMBitstreamReader)
-
 # The swift-frontend tool
-
 add_swift_host_tool(swift-frontend
-  ${driver_sources_and_options}
+  driver.cpp
   SWIFT_COMPONENT compiler
   HAS_LIBSWIFT
 )
 target_link_libraries(swift-frontend
-                      PRIVATE
-                        ${driver_common_libs}
+                      PUBLIC
+                        swiftDriverTool
                         libswift)
 
 # Create a `swift-driver` symlinks adjacent to the `swift-frontend` executable
@@ -74,11 +55,6 @@ add_swift_tool_symlink(swift-api-extract swift-frontend compiler)
 add_swift_tool_symlink(swift-autolink-extract swift-frontend autolink-driver)
 add_swift_tool_symlink(swift-indent swift-frontend editor-integration)
 add_swift_tool_symlink(swift-api-digester swift-frontend compiler)
-
-# If building as part of clang, make sure the headers are installed.
-if(NOT SWIFT_BUILT_STANDALONE)
-  add_dependencies(swift-frontend clang-resource-headers)
-endif()
 
 add_dependencies(compiler swift-frontend)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift${CMAKE_EXECUTABLE_SUFFIX}"
