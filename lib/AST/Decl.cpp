@@ -7120,7 +7120,7 @@ static bool isPotentialCompletionHandler(const ParamDecl *param) {
 }
 
 Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
-    AbstractFunctionDecl *asyncAlternative) const {
+    const AbstractFunctionDecl *asyncAlternative) const {
   const ParameterList *params = getParameters();
   if (params->size() == 0)
     return None;
@@ -7203,7 +7203,7 @@ Optional<unsigned> AbstractFunctionDecl::findPotentialCompletionHandlerParam(
 
     // The next original param should match the current async, so don't
     // increment the async index
-    potentialParam = asyncParamIndex;
+    potentialParam = paramIndex;
     paramIndex++;
   }
   return potentialParam;

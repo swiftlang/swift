@@ -6220,7 +6220,7 @@ public:
   /// handler if \p asyncAlternative is not set (with the same conditions on
   /// its type as above).
   Optional<unsigned> findPotentialCompletionHandlerParam(
-      AbstractFunctionDecl *asyncAlternative = nullptr) const;
+      const AbstractFunctionDecl *asyncAlternative = nullptr) const;
 
   /// Determine whether this function is implicitly known to have its
   /// parameters of function type be @_unsafeSendable.
