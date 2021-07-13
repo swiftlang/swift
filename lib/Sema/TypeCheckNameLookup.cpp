@@ -595,7 +595,7 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
                                         NameLookupOptions lookupOptions,
                                         TypoCorrectionResults &corrections,
-                                        GenericSignatureBuilder *gsb,
+                                        GenericSignature genericSig,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
@@ -636,7 +636,8 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC,
                              /*includeInstanceMembers*/true,
                              /*includeDerivedRequirements*/false,
-                             /*includeProtocolExtensionMembers*/true, gsb);
+                             /*includeProtocolExtensionMembers*/true,
+                             genericSig);
   } else {
     lookupVisibleDecls(consumer, DC, /*top level*/ true,
                        corrections.Loc.getBaseNameLoc());

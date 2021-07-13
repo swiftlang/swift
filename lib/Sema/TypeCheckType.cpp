@@ -193,7 +193,8 @@ Type TypeResolution::resolveDependentMemberType(
   }
 
   assert(stage == TypeResolutionStage::Interface);
-  if (!getGenericSignature())
+  auto genericSig = getGenericSignature();
+  if (!genericSig)
     return ErrorType::get(baseTy);
 
   auto builder = getGenericSignatureBuilder();
@@ -218,7 +219,7 @@ Type TypeResolution::resolveDependentMemberType(
     TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
                                        MetatypeType::get(baseTy),
                                        defaultMemberLookupOptions,
-                                       corrections, builder);
+                                       corrections, genericSig);
 
     // Check whether we have a single type result.
     auto singleType = cast_or_null<TypeDecl>(
