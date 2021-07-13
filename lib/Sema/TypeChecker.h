@@ -23,6 +23,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
@@ -42,7 +43,6 @@ class Decl;
 class DeclAttribute;
 class DiagnosticEngine;
 class ExportContext;
-class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
 class RootProtocolConformance;
@@ -1109,7 +1109,7 @@ void performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                            Type baseTypeOrNull,
                            NameLookupOptions lookupOptions,
                            TypoCorrectionResults &corrections,
-                           GenericSignatureBuilder *gsb = nullptr,
+                           GenericSignature genericSig = GenericSignature(),
                            unsigned maxResults = 4);
 
 /// Check if the given decl has a @_semantics attribute that gives it
