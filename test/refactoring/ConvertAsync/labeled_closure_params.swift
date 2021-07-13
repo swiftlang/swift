@@ -1,7 +1,9 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-LABELED-RESULTS %s
-func mutlipleLabeledResults(completion: (_ first: String, _ second: String) -> Void) { }
+func mutlipleLabeledResults(completion: @escaping (_ first: String, _ second: String) -> Void) { }
 // MULTIPLE-LABELED-RESULTS: {
 // MULTIPLE-LABELED-RESULTS-NEXT: Task {
 // MULTIPLE-LABELED-RESULTS-NEXT: let result = await mutlipleLabeledResults()
@@ -11,7 +13,7 @@ func mutlipleLabeledResults(completion: (_ first: String, _ second: String) -> V
 // MULTIPLE-LABELED-RESULTS: func mutlipleLabeledResults() async -> (first: String, second: String) { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MIXED-LABELED-RESULTS %s
-func mixedLabeledResult(completion: (_ first: String, String) -> Void) { }
+func mixedLabeledResult(completion: @escaping (_ first: String, String) -> Void) { }
 // MIXED-LABELED-RESULTS: {
 // MIXED-LABELED-RESULTS-NEXT: Task {
 // MIXED-LABELED-RESULTS-NEXT: let result = await mixedLabeledResult()
@@ -21,7 +23,7 @@ func mixedLabeledResult(completion: (_ first: String, String) -> Void) { }
 // MIXED-LABELED-RESULTS: func mixedLabeledResult() async -> (first: String, String) { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=SINGLE-LABELED-RESULT %s
-func singleLabeledResult(completion: (_ first: String) -> Void) { }
+func singleLabeledResult(completion: @escaping (_ first: String) -> Void) { }
 // SINGLE-LABELED-RESULT: {
 // SINGLE-LABELED-RESULT-NEXT: Task {
 // SINGLE-LABELED-RESULT-NEXT: let result = await singleLabeledResult()
@@ -31,7 +33,7 @@ func singleLabeledResult(completion: (_ first: String) -> Void) { }
 // SINGLE-LABELED-RESULT: func singleLabeledResult() async -> String { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=SINGLE-LABELED-RESULT-WITH-ERROR %s
-func singleLabeledResultWithError(completion: (_ first: String?, _ error: Error?) -> Void) { }
+func singleLabeledResultWithError(completion: @escaping (_ first: String?, _ error: Error?) -> Void) { }
 // SINGLE-LABELED-RESULT-WITH-ERROR: {
 // SINGLE-LABELED-RESULT-WITH-ERROR-NEXT: Task {
 // SINGLE-LABELED-RESULT-WITH-ERROR-NEXT: do {
@@ -45,7 +47,7 @@ func singleLabeledResultWithError(completion: (_ first: String?, _ error: Error?
 // SINGLE-LABELED-RESULT-WITH-ERROR: func singleLabeledResultWithError() async throws -> String { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MULTIPLE-LABELED-RESULT-WITH-ERROR %s
-func multipleLabeledResultWithError(completion: (_ first: String?, _ second: String?, _ error: Error?) -> Void) { }
+func multipleLabeledResultWithError(completion: @escaping (_ first: String?, _ second: String?, _ error: Error?) -> Void) { }
 // MULTIPLE-LABELED-RESULT-WITH-ERROR: {
 // MULTIPLE-LABELED-RESULT-WITH-ERROR-NEXT: Task {
 // MULTIPLE-LABELED-RESULT-WITH-ERROR-NEXT: do {

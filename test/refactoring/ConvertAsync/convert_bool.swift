@@ -13,9 +13,9 @@
 import Foundation
 import ConvertBoolObjC
 
-func boolWithErr(completion: (Bool, Error?) -> Void) {}
-func multipleBoolWithErr(completion: (String?, Bool, Bool, Error?) -> Void) {}
-func optionalBoolWithErr(completion: (String?, Bool?, Bool, Error?) -> Void) {}
+func boolWithErr(completion: @escaping (Bool, Error?) -> Void) {}
+func multipleBoolWithErr(completion: @escaping (String?, Bool, Bool, Error?) -> Void) {}
+func optionalBoolWithErr(completion: @escaping (String?, Bool?, Bool, Error?) -> Void) {}
 
 // All 7 of the below should generate the same refactoring.
 
@@ -191,7 +191,7 @@ boolWithErr { success, err in
     }
   }
   if !success {
-    for x: Int in [] {
+    for _: Int in [] {
       fatalError("oh no \(err!)")
     }
   }
@@ -218,7 +218,7 @@ boolWithErr { success, err in
 // BOOL-DONT-HANDLE2-NEXT:   }
 // BOOL-DONT-HANDLE2-NEXT: }
 // BOOL-DONT-HANDLE2-NEXT: if !success {
-// BOOL-DONT-HANDLE2-NEXT:   for x: Int in [] {
+// BOOL-DONT-HANDLE2-NEXT:   for _: Int in [] {
 // BOOL-DONT-HANDLE2-NEXT:     fatalError("oh no \(<#err#>!)")
 // BOOL-DONT-HANDLE2-NEXT:   }
 // BOOL-DONT-HANDLE2-NEXT: }
@@ -227,7 +227,7 @@ boolWithErr { success, err in
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -I %S/Inputs -sdk %clang-importer-sdk-path | %FileCheck -check-prefix=BOOL-DONT-HANDLE3 %s
 boolWithErr { success, err in
   if !success {
-    fatalError("oh no maybe \(err)")
+    fatalError("oh no maybe \(String(describing: err))")
   }
   print("not err")
 }
@@ -236,7 +236,7 @@ boolWithErr { success, err in
 
 // BOOL-DONT-HANDLE3:      let success = try await boolWithErr()
 // BOOL-DONT-HANDLE3-NEXT: if !success {
-// BOOL-DONT-HANDLE3-NEXT:   fatalError("oh no maybe \(<#err#>)")
+// BOOL-DONT-HANDLE3-NEXT:   fatalError("oh no maybe \(String(describing: <#err#>))")
 // BOOL-DONT-HANDLE3-NEXT: }
 // BOOL-DONT-HANDLE3-NEXT: print("not err")
 
@@ -348,7 +348,7 @@ optionalBoolWithErr { str, optBool, b, err in
     print("d \(err!)")
   }
   if optBool == false {
-    print("e \(err)")
+    print("e \(String(describing: err))")
   }
   if optBool != true {
     print("f \(err!)")
@@ -366,7 +366,7 @@ optionalBoolWithErr { str, optBool, b, err in
 // OPT-BOOL-WITH-ERR-NEXT:   let (str, optBool, b) = try await optionalBoolWithErr()
 // OPT-BOOL-WITH-ERR-NEXT:   print("a \(<#err#>!)")
 // OPT-BOOL-WITH-ERR-NEXT:   if <#optBool#> == false {
-// OPT-BOOL-WITH-ERR-NEXT:     print("e \(<#err#>)")
+// OPT-BOOL-WITH-ERR-NEXT:     print("e \(String(describing: <#err#>))")
 // OPT-BOOL-WITH-ERR-NEXT:   }
 // OPT-BOOL-WITH-ERR-NEXT:   if <#optBool#> != true {
 // OPT-BOOL-WITH-ERR-NEXT:     print("f \(<#err#>!)")
@@ -432,7 +432,7 @@ ClassWithHandlerMethods.secondBoolFlagFailure("") { str, unrelated, failure, err
   if failure && err != nil {
     print("neat")
   }
-  if failure, let err = err {
+  if failure, let _ = err {
     print("neato")
   }
 }

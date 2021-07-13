@@ -1,3 +1,5 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 -enable-experimental-concurrency | %FileCheck -check-prefix=SIMPLE %s
