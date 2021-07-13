@@ -1,4 +1,4 @@
-//===--- driver.cpp - Swift Compiler Driver -------------------------------===//
+//===--- DriverTool.h - Driver control ----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This is the entry point to the swift compiler driver.
+// This file provides a high-level API for interacting with the basic
+// driver operation.
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/DriverTool/DriverTool.h"
+#ifndef SWIFT_DRIVERTOOL_H
+#define SWIFT_DRIVERTOOL_H
 
-int main(int argc_, const char **argv_) {
-  return swift::mainEntry(argc_, argv_);
-}
+#include "swift/Basic/LLVM.h"
+
+namespace swift {
+  int mainEntry(int argc_, const char **argv_);
+} // namespace swift
+
+#endif
