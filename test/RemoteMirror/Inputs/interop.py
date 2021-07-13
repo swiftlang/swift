@@ -45,12 +45,12 @@ subprocess.check_call(['clang',
                        '-I', '../../../include/',
                        '-o', '/tmp/test',
                        '-Wall', '-Wextra',
-                       '-g', 'test.m'])
+                       '-g', 'interop.m'])
 
 # Build a test library with each Swift compiler passed in.
 for i, (swiftc, swiftlib) in enumerate(zip(swiftcs, swiftlibs)):
     subprocess.check_call(
-        ['xcrun', swiftc, '-emit-library', 'test.swift',
+        ['xcrun', swiftc, '-emit-library', 'interop.swift',
          '-o', os.path.join('/tmp', 'libtest' + str(i) + '.dylib'),
          '-Xlinker', '-rpath', '-Xlinker', swiftlib])
 
