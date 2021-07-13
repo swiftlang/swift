@@ -538,6 +538,23 @@ bool RequirementMachine::isConcreteType(Type depType) const {
   return equivClass->isConcreteType();
 }
 
+Type RequirementMachine::getConcreteType(Type depType) const {
+  auto term = Impl->Context.getMutableTermForType(depType->getCanonicalType(),
+                                                  /*proto=*/nullptr);
+  Impl->System.simplify(term);
+  Impl->verify(term);
+
+  auto *equivClass = Impl->Map.lookUpEquivalenceClass(term);
+  if (!equivClass)
+    return Type();
+
+  if (!equivClass->isConcreteType())
+    return Type();
+
+  auto &protos = Impl->System.getProtocols();
+  return equivClass->getConcreteType({ }, protos, Impl->Context);
+}
+
 bool RequirementMachine::areSameTypeParameterInContext(Type depType1,
                                                        Type depType2) const {
   auto term1 = Impl->Context.getMutableTermForType(depType1->getCanonicalType(),

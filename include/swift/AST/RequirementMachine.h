@@ -62,6 +62,7 @@ public:
   GenericSignature::RequiredProtocols getRequiredProtocols(Type depType) const;
   Type getSuperclassBound(Type depType) const;
   bool isConcreteType(Type depType) const;
+  Type getConcreteType(Type depType) const;
   bool areSameTypeParameterInContext(Type depType1, Type depType2) const;
   Type getCanonicalTypeInContext(Type type,
                       TypeArrayView<GenericTypeParamType> genericParams) const;

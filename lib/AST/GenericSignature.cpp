@@ -558,14 +558,56 @@ bool GenericSignatureImpl::isConcreteType(Type type) const {
 Type GenericSignatureImpl::getConcreteType(Type type) const {
   assert(type->isTypeParameter() && "Expected a type parameter");
 
-  auto &builder = *getGenericSignatureBuilder();
-  auto equivClass =
+  auto computeViaGSB = [&]() -> Type {
+    auto &builder = *getGenericSignatureBuilder();
+    auto equivClass =
     builder.resolveEquivalenceClass(
                                   type,
                                   ArchetypeResolutionKind::CompleteWellFormed);
-  if (!equivClass) return Type();
+    if (!equivClass) return nullptr;
 
-  return equivClass->concreteType;
+    return equivClass->concreteType;
+  };
+
+  auto computeViaRQM = [&]() {
+    auto *machine = getRequirementMachine();
+    return machine->getConcreteType(type);
+  };
+
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.EnableRequirementMachine) {
+    auto rqmResult = computeViaRQM();
+
+#ifndef NDEBUG
+    auto gsbResult = computeViaGSB();
+
+    auto check = [&]() {
+      if (!gsbResult || !rqmResult)
+        return !gsbResult == !rqmResult;
+      return gsbResult->isEqual(rqmResult);
+    };
+
+    if (!check()) {
+      llvm::errs() << "RequirementMachine::getConcreteType() is broken\n";
+      llvm::errs() << "Generic signature: " << GenericSignature(this) << "\n";
+      llvm::errs() << "Dependent type: "; type.dump(llvm::errs());
+      llvm::errs() << "GenericSignatureBuilder says: " << gsbResult << "\n";
+      if (gsbResult)
+        gsbResult.dump(llvm::errs());
+      llvm::errs() << "\n";
+      llvm::errs() << "RequirementMachine says: " << rqmResult << "\n";
+      if (rqmResult)
+        rqmResult.dump(llvm::errs());
+      llvm::errs() << "\n";
+      getRequirementMachine()->dump(llvm::errs());
+      abort();
+    }
+#endif
+
+    return rqmResult;
+  } else {
+    return computeViaGSB();
+  }
 }
 
 LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) const {
