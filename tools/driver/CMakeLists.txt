@@ -6,7 +6,8 @@ add_swift_host_tool(swift-frontend
 )
 target_link_libraries(swift-frontend
                       PUBLIC
-                        swiftDriverTool)
+                        swiftDriverTool
+                        libswift)
 
 # Create a `swift-driver` symlinks adjacent to the `swift-frontend` executable
 # to ensure that `swiftc` forwards to the standalone driver when invoked.

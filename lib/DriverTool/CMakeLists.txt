@@ -12,8 +12,7 @@ set(driver_common_libs
                 swiftDriver
                 swiftFrontendTool
                 swiftSymbolGraphGen
-                LLVMBitstreamReader
-                libswift)
+                LLVMBitstreamReader)
 
 add_swift_host_library(swiftDriverTool STATIC
   ${driver_sources_and_options}
