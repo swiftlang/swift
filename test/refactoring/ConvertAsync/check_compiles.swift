@@ -1,6 +1,8 @@
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 
-func simple(completion: () -> Void) { }
+func simple(completion: @escaping () -> Void) { }
 func anything() -> Bool { return true }
 
 // RUN: %swift-frontend -typecheck %s
