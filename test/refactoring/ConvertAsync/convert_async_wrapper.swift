@@ -9,7 +9,7 @@ enum CustomError : Error {
 // RUN: %refactor-check-compiles -add-async-wrapper -dump-text -source-filename %s -pos=%(line+1):1 -enable-experimental-concurrency | %FileCheck -check-prefix=FOO1 %s
 func foo1(_ completion: @escaping () -> Void) {}
 // FOO1:      convert_async_wrapper.swift [[# @LINE-1]]:1 -> [[# @LINE-1]]:1
-// FOO1-NEXT: @completionHandlerAsync("foo1()", completionHandlerIndex: 0)
+// FOO1-NEXT: @available(*, renamed: "foo1()")
 // FOO1-EMPTY:
 // FOO1-NEXT: convert_async_wrapper.swift [[# @LINE-4]]:49 -> [[# @LINE-4]]:49
 // FOO1-EMPTY:
@@ -27,7 +27,7 @@ func foo1(_ completion: @escaping () -> Void) {}
 // RUN: %refactor-check-compiles -add-async-wrapper -dump-text -source-filename %s -pos=%(line+1):1 -enable-experimental-concurrency | %FileCheck -check-prefix=FOO2 %s
 func foo2(arg: String, _ completion: @escaping (String) -> Void) {}
 // FOO2:      convert_async_wrapper.swift [[# @LINE-1]]:1 -> [[# @LINE-1]]:1
-// FOO2-NEXT: @completionHandlerAsync("foo2(arg:)", completionHandlerIndex: 1)
+// FOO2-NEXT: @available(*, renamed: "foo2(arg:)")
 // FOO2-EMPTY:
 // FOO2-NEXT: convert_async_wrapper.swift [[# @LINE-4]]:68 -> [[# @LINE-4]]:68
 // FOO2-EMPTY:
